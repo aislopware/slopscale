@@ -8,6 +8,8 @@
 //
 //	go run ./cmd/gen-openapi                       # write the v1 3.1 spec to its default path
 //	go run ./cmd/gen-openapi -api v2               # write the v2 3.1 spec to its default path
+//	go run ./cmd/gen-openapi -out <path>           # write the v1 3.1 spec to <path>
+//	go run ./cmd/gen-openapi -api v2 -out <path>   # write the v2 3.1 spec to <path>
 //	go run ./cmd/gen-openapi -downgrade <path>     # write the v1 3.0.3 downgrade (for client gen)
 //	go run ./cmd/gen-openapi -api v2 -downgrade <path>  # the v2 3.0.3 downgrade
 package main
@@ -39,6 +41,7 @@ var specs = map[string]spec{
 func main() {
 	api := flag.String("api", "v1", "which API spec to emit: v1 or v2")
 	downgrade := flag.String("downgrade", "", "write the OpenAPI 3.0.3 downgrade to this path instead of the committed 3.1 spec")
+	out := flag.String("out", "", "write the OpenAPI 3.1 spec to this path instead of the default")
 	flag.Parse()
 
 	s, ok := specs[*api]
@@ -52,7 +55,12 @@ func main() {
 		return
 	}
 
-	writeSpec(s.outPath, s.full)
+	target := s.outPath
+	if *out != "" {
+		target = *out
+	}
+
+	writeSpec(target, s.full)
 }
 
 func writeSpec(path string, gen func() ([]byte, error)) {
