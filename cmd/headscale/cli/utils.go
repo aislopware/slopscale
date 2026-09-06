@@ -23,7 +23,7 @@ import (
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 const (
@@ -160,11 +160,11 @@ func newHeadscaleCLIWithConfig() (context.Context, *clientv1.ClientWithResponses
 			Str("socket", cfg.UnixSocket).
 			Msgf("HEADSCALE_CLI_ADDRESS environment is not set, connecting to unix socket.")
 
-		client, err := newSocketClient(cfg.UnixSocket)
-		if err != nil {
+		client, clientErr := newSocketClient(cfg.UnixSocket)
+		if clientErr != nil {
 			cancel()
 
-			return nil, nil, nil, err
+			return nil, nil, nil, clientErr
 		}
 
 		log.Trace().Caller().Str(zf.Address, cfg.UnixSocket).Msg("connecting via unix socket")
@@ -199,7 +199,7 @@ func newSocketClient(socketPath string) (*clientv1.ClientWithResponses, error) {
 	// Probe for a clearer permission error up front. [os.OpenFile] on a unix
 	// socket returns ENXIO on Linux (expected); only permission errors are
 	// actionable. The real connection goes through [net.Dial].
-	socket, err := os.OpenFile(socketPath, os.O_WRONLY, SocketWritePermissions) //nolint
+	socket, err := os.OpenFile(socketPath, os.O_WRONLY, SocketWritePermissions)
 	if err != nil {
 		if os.IsPermission(err) {
 			return nil, fmt.Errorf(
@@ -226,6 +226,12 @@ func newSocketClient(socketPath string) (*clientv1.ClientWithResponses, error) {
 	)
 }
 
+// Socket dial retry backoff bounds; see dialHeadscaleSocket.
+const (
+	socketDialInitialInterval = 50 * time.Millisecond
+	socketDialMaxInterval     = 1 * time.Second
+)
+
 // dialHeadscaleSocket connects to the unix socket, retrying until it appears or
 // ctx (the CLI timeout) expires. The socket is created late in startup (after
 // noise key, database, migrations), so a command run right after the server
@@ -233,12 +239,17 @@ func newSocketClient(socketPath string) (*clientv1.ClientWithResponses, error) {
 // blocking-dial tolerance rather than failing on a not-yet-present socket.
 func dialHeadscaleSocket(ctx context.Context, socketPath string) (net.Conn, error) {
 	b := backoff.NewExponentialBackOff()
-	b.InitialInterval = 50 * time.Millisecond
-	b.MaxInterval = 1 * time.Second
+	b.InitialInterval = socketDialInitialInterval
+	b.MaxInterval = socketDialMaxInterval
 
-	return backoff.Retry(ctx, func() (net.Conn, error) {
+	conn, err := backoff.Retry(ctx, func() (net.Conn, error) {
 		return util.SocketDialer(ctx, socketPath)
 	}, backoff.WithBackOff(b))
+	if err != nil {
+		return nil, fmt.Errorf("dialing headscale socket %s: %w", socketPath, err)
+	}
+
+	return conn, nil
 }
 
 // clientBaseURL turns a configured CLI address into a client base URL. A bare
@@ -260,8 +271,7 @@ func newRemoteClient(address, apiKey string, insecure bool) (*clientv1.ClientWit
 	transport := &http.Transport{}
 	if insecure {
 		transport.TLSClientConfig = &tls.Config{
-			// turn off gosec as we are intentionally setting insecure.
-			//nolint:gosec
+			//nolint:gosec // G402: intentionally honouring the insecure flag
 			InsecureSkipVerify: true,
 		}
 	}
@@ -281,7 +291,7 @@ func newRemoteClient(address, apiKey string, insecure bool) (*clientv1.ClientWit
 
 // formatOutput serialises result into the requested format. For the
 // default (empty) format the human-readable override string is returned.
-func formatOutput(result any, override string, outputFormat string) (string, error) {
+func formatOutput(result any, override, outputFormat string) (string, error) {
 	switch outputFormat {
 	case outputFormatJSON:
 		b, err := json.MarshalIndent(result, "", "\t")
@@ -355,7 +365,12 @@ func renderTable(header []string, rows [][]string) error {
 	tableData = append(tableData, header)
 	tableData = append(tableData, rows...)
 
-	return pterm.DefaultTable.WithHasHeader().WithData(tableData).Render()
+	err := pterm.DefaultTable.WithHasHeader().WithData(tableData).Render()
+	if err != nil {
+		return fmt.Errorf("rendering table: %w", err)
+	}
+
+	return nil
 }
 
 // printListOutput checks the --output flag: when a machine-readable format is

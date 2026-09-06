@@ -4,9 +4,10 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"fmt"
 	"hash/crc64"
 	"io"
-	"math/rand"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,30 +18,33 @@ import (
 
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 	"tailscale.com/tailcfg"
 )
 
 func loadDERPMapFromPath(path string) (*tailcfg.DERPMap, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading DERP map file %q: %w", path, err)
 	}
 
 	var derpMap tailcfg.DERPMap
 
 	err = yaml.Unmarshal(b, &derpMap)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshaling DERP map YAML: %w", err)
+	}
 
-	return &derpMap, err
+	return &derpMap, nil
 }
 
 func loadDERPMapFromURL(addr url.URL) (*tailcfg.DERPMap, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), types.HTTPTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, addr.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, addr.String(), http.NoBody)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating request for DERP map: %w", err)
 	}
 
 	client := http.Client{
@@ -49,21 +53,24 @@ func loadDERPMapFromURL(addr url.URL) (*tailcfg.DERPMap, error) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching DERP map from %s: %w", addr.String(), err)
 	}
 
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading DERP map response body: %w", err)
 	}
 
 	var derpMap tailcfg.DERPMap
 
 	err = json.Unmarshal(body, &derpMap)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshaling DERP map JSON: %w", err)
+	}
 
-	return &derpMap, err
+	return &derpMap, nil
 }
 
 // mergeDERPMaps naively merges a list of [tailcfg.DERPMap] values into a single
@@ -159,7 +166,9 @@ func derpRandom() *rand.Rand {
 
 	if derpRandomInst == nil {
 		seed := cmp.Or(viper.GetString("dns.base_domain"), time.Now().String())
-		derpRandomInst = rand.New(rand.NewSource(int64(crc64.Checksum([]byte(seed), crc64Table)))) //nolint:gosec // weak random is fine for DERP scrambling
+		derpRandomInst = rand.New( //nolint:gosec // weak random is fine for DERP scrambling
+			rand.NewPCG(crc64.Checksum([]byte(seed), crc64Table), 0),
+		)
 	}
 
 	return derpRandomInst
