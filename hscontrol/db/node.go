@@ -102,6 +102,51 @@ func queryNode(q Querier, stmt jet.SelectStatement) (*types.Node, error) {
 	return record.node()
 }
 
+// Node statements on the map request and registration paths, rendered once;
+// see [fixedSQL].
+var (
+	nodeByID = newFixedSQL(func() statement {
+		return selectNodes().WHERE(table.Nodes.ID.EQ(jet.Uint64(0))).LIMIT(1)
+	})
+	nodeByNodeKey = newFixedSQL(func() statement {
+		return selectNodes().WHERE(table.Nodes.NodeKey.EQ(jet.String(""))).LIMIT(1)
+	})
+	allNodes    = newFixedSQL(func() statement { return selectNodes() })
+	peersOfNode = newFixedSQL(func() statement {
+		return selectNodes().WHERE(table.Nodes.ID.NOT_EQ(jet.Uint64(0)))
+	})
+	nodeLastSeen = newFixedSQL(func() statement {
+		return table.Nodes.UPDATE(table.Nodes.LastSeen, table.Nodes.UpdatedAt).
+			SET(jet.String(""), jet.String("")).
+			WHERE(table.Nodes.ID.EQ(jet.Uint64(0)))
+	})
+)
+
+// limitOne is the argument jet binds for LIMIT(1).
+const limitOne = int64(1)
+
+func fixedNodes(q Querier, stmt *fixedSQL, args ...any) (types.Nodes, error) {
+	var records []nodeRecord
+
+	err := q.executor().queryFixed(stmt, &records, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodeRecordsToNodes(records)
+}
+
+func fixedNode(q Querier, stmt *fixedSQL, args ...any) (*types.Node, error) {
+	var record nodeRecord
+
+	err := q.executor().queryFixed(stmt, &record, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return record.node()
+}
+
 func nodeIDList(ids []types.NodeID) []jet.Expression {
 	exprs := make([]jet.Expression, len(ids))
 	for i, id := range ids {
@@ -122,12 +167,18 @@ func (hsdb *HSDatabase) ListPeers(nodeID types.NodeID, peerIDs ...types.NodeID) 
 // If no peer IDs are given, all peers are returned.
 // If at least one peer ID is given, only these peer nodes will be returned.
 func ListPeers(q Querier, nodeID types.NodeID, peerIDs ...types.NodeID) (types.Nodes, error) {
-	where := table.Nodes.ID.NOT_EQ(jet.Uint64(nodeID.Uint64()))
+	var (
+		nodes types.Nodes
+		err   error
+	)
+
 	if len(peerIDs) > 0 {
-		where = where.AND(table.Nodes.ID.IN(nodeIDList(peerIDs)...))
+		where := table.Nodes.ID.NOT_EQ(jet.Uint64(nodeID.Uint64())).AND(table.Nodes.ID.IN(nodeIDList(peerIDs)...))
+		nodes, err = queryNodes(q, selectNodes().WHERE(where))
+	} else {
+		nodes, err = fixedNodes(q, peersOfNode, nodeID.Uint64())
 	}
 
-	nodes, err := queryNodes(q, selectNodes().WHERE(where))
 	if err != nil {
 		return types.Nodes{}, err
 	}
@@ -144,12 +195,11 @@ func (hsdb *HSDatabase) ListNodes(nodeIDs ...types.NodeID) (types.Nodes, error) 
 // ListNodes queries the database for either all nodes if no parameters are given
 // or for the given nodes if at least one node ID is given as parameter.
 func ListNodes(q Querier, nodeIDs ...types.NodeID) (types.Nodes, error) {
-	stmt := selectNodes()
 	if len(nodeIDs) > 0 {
-		stmt = stmt.WHERE(table.Nodes.ID.IN(nodeIDList(nodeIDs)...))
+		return queryNodes(q, selectNodes().WHERE(table.Nodes.ID.IN(nodeIDList(nodeIDs)...)))
 	}
 
-	return queryNodes(q, stmt)
+	return fixedNodes(q, allNodes)
 }
 
 // ListEphemeralNodes returns the nodes registered with an ephemeral pre-auth key.
@@ -173,7 +223,7 @@ func (hsdb *HSDatabase) GetNodeByID(id types.NodeID) (*types.Node, error) {
 
 // GetNodeByID finds a [types.Node] by ID and returns the [types.Node] struct.
 func GetNodeByID(q Querier, id types.NodeID) (*types.Node, error) {
-	return queryNode(q, selectNodes().WHERE(table.Nodes.ID.EQ(jet.Uint64(id.Uint64()))))
+	return fixedNode(q, nodeByID, id.Uint64(), limitOne)
 }
 
 func (hsdb *HSDatabase) GetNodeByNodeKey(nodeKey key.NodePublic) (*types.Node, error) {
@@ -185,7 +235,7 @@ func GetNodeByNodeKey(
 	q Querier,
 	nodeKey key.NodePublic,
 ) (*types.Node, error) {
-	return queryNode(q, selectNodes().WHERE(table.Nodes.NodeKey.EQ(jet.String(nodeKey.String()))))
+	return fixedNode(q, nodeByNodeKey, nodeKey.String(), limitOne)
 }
 
 // CreateNode inserts node and sets its ID. CreatedAt and UpdatedAt are
@@ -251,6 +301,35 @@ func UpdateNode(q Querier, node *types.Node, update NodeUpdate) error {
 		return err
 	}
 
+	stmt := nodeUpdates[boolIndex(update.Expiry)][boolIndex(update.AuthKey)]
+
+	return q.executor().execFixed(stmt, row.updateArgs(update)...)
+}
+
+// nodeUpdates holds the four shapes of [UpdateNode], indexed by whether
+// the expiry and then the auth key are written.
+var nodeUpdates = [2][2]*fixedSQL{
+	{
+		newFixedSQL(nodeUpdateStatement(NodeUpdate{})),
+		newFixedSQL(nodeUpdateStatement(NodeUpdate{AuthKey: true})),
+	},
+	{
+		newFixedSQL(nodeUpdateStatement(NodeUpdate{Expiry: true})),
+		newFixedSQL(nodeUpdateStatement(NodeUpdate{Expiry: true, AuthKey: true})),
+	},
+}
+
+func boolIndex(b bool) int {
+	if b {
+		return 1
+	}
+
+	return 0
+}
+
+// nodeUpdateColumns lists the columns [UpdateNode] writes, in the order
+// [nodeRow.updateArgs] supplies their values.
+func nodeUpdateColumns(update NodeUpdate) jet.ColumnList {
 	columns := jet.ColumnList{
 		table.Nodes.MachineKey,
 		table.Nodes.NodeKey,
@@ -277,11 +356,54 @@ func UpdateNode(q Querier, node *types.Node, update NodeUpdate) error {
 		columns = append(columns, table.Nodes.AuthKeyID)
 	}
 
-	_, err = q.executor().exec(
-		table.Nodes.UPDATE(columns).MODEL(row).WHERE(table.Nodes.ID.EQ(jet.Uint64(node.ID.Uint64()))),
-	)
+	return columns
+}
 
-	return err
+func nodeUpdateStatement(update NodeUpdate) func() statement {
+	return func() statement {
+		columns := nodeUpdateColumns(update)
+
+		values := make([]any, len(columns))
+		for i := range values {
+			values[i] = jet.String("")
+		}
+
+		return table.Nodes.UPDATE(columns).
+			SET(values[0], values[1:]...).
+			WHERE(table.Nodes.ID.EQ(jet.Uint64(0)))
+	}
+}
+
+// updateArgs returns the row's values for [nodeUpdateColumns], followed by
+// the ID the WHERE clause binds.
+func (r *nodeRow) updateArgs(update NodeUpdate) []any {
+	args := []any{
+		r.MachineKey,
+		r.NodeKey,
+		r.DiscoKey,
+		r.Endpoints,
+		r.HostInfo,
+		optional(r.Ipv4),
+		optional(r.Ipv6),
+		r.Hostname,
+		r.GivenName,
+		optional(r.UserID),
+		r.RegisterMethod,
+		r.Tags,
+		optional(r.LastSeen),
+		r.ApprovedRoutes,
+		r.UpdatedAt,
+	}
+
+	if update.Expiry {
+		args = append(args, optional(r.Expiry))
+	}
+
+	if update.AuthKey {
+		args = append(args, optional(r.AuthKeyID))
+	}
+
+	return append(args, r.ID)
 }
 
 // SaveNode overwrites every column of node's row when a row with its ID
@@ -331,7 +453,7 @@ func (hsdb *HSDatabase) SetLastSeen(nodeID types.NodeID, lastSeen time.Time) err
 // SetLastSeen sets a node's last seen field indicating that we
 // have recently communicating with this node.
 func SetLastSeen(q Querier, nodeID types.NodeID, lastSeen time.Time) error {
-	return updateNodeColumn(q, nodeID, table.Nodes.LastSeen, lastSeen)
+	return q.executor().execFixed(nodeLastSeen, lastSeen, time.Now(), nodeID.Uint64())
 }
 
 // RenameNode takes a [types.Node] struct and a new [types.Node.GivenName] for the nodes

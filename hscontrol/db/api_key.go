@@ -92,14 +92,15 @@ func (hsdb *HSDatabase) ListAPIKeys() ([]types.APIKey, error) {
 }
 
 // queryAPIKey returns the API key matched by where, or [ErrNotFound].
+func selectAPIKey(where jet.BoolExpression) jet.SelectStatement {
+	return jet.SELECT(table.APIKeys.AllColumns).FROM(table.APIKeys).WHERE(where).
+		ORDER_BY(table.APIKeys.ID.ASC()).LIMIT(1)
+}
+
 func queryAPIKey(q Querier, where jet.BoolExpression) (*types.APIKey, error) {
 	var record apiKeyRecord
 
-	err := q.executor().query(
-		jet.SELECT(table.APIKeys.AllColumns).FROM(table.APIKeys).WHERE(where).
-			ORDER_BY(table.APIKeys.ID.ASC()).LIMIT(1),
-		&record,
-	)
+	err := q.executor().query(selectAPIKey(where), &record)
 	if err != nil {
 		return nil, err
 	}
@@ -107,9 +108,22 @@ func queryAPIKey(q Querier, where jet.BoolExpression) (*types.APIKey, error) {
 	return &record.Key, nil
 }
 
+// apiKeyByPrefix is the lookup every authenticated API request makes,
+// rendered once; see [fixedSQL].
+var apiKeyByPrefix = newFixedSQL(func() statement {
+	return selectAPIKey(table.APIKeys.Prefix.EQ(jet.String("")))
+})
+
 // GetAPIKey returns a [types.APIKey] for a given key.
 func (hsdb *HSDatabase) GetAPIKey(prefix string) (*types.APIKey, error) {
-	return queryAPIKey(hsdb, table.APIKeys.Prefix.EQ(jet.String(prefix)))
+	var record apiKeyRecord
+
+	err := hsdb.ex.queryFixed(apiKeyByPrefix, &record, prefix, limitOne)
+	if err != nil {
+		return nil, err
+	}
+
+	return &record.Key, nil
 }
 
 // GetAPIKeyByID returns a [types.APIKey] for a given id.

@@ -41,15 +41,32 @@ func queryUsers(q Querier, stmt jet.SelectStatement) ([]types.User, error) {
 }
 
 // queryUser returns the first user matched by where, or [ErrUserNotFound].
-func queryUser(q Querier, where jet.BoolExpression) (*types.User, error) {
+func selectUser(where jet.BoolExpression) jet.SelectStatement {
+	return jet.SELECT(table.Users.AllColumns).FROM(table.Users).
+		WHERE(where.AND(table.Users.DeletedAt.IS_NULL())).
+		ORDER_BY(table.Users.ID.ASC()).LIMIT(1)
+}
+
+// User lookups on the registration and API paths, rendered once; see
+// [fixedSQL].
+var (
+	userByID = newFixedSQL(func() statement {
+		return selectUser(table.Users.ID.EQ(jet.Uint64(0)))
+	})
+	userByProviderIdentifier = newFixedSQL(func() statement {
+		return selectUser(table.Users.ProviderIdentifier.EQ(jet.String("")))
+	})
+)
+
+func fixedUser(q Querier, stmt *fixedSQL, args ...any) (*types.User, error) {
 	var record userRecord
 
-	err := q.executor().query(
-		jet.SELECT(table.Users.AllColumns).FROM(table.Users).
-			WHERE(where.AND(table.Users.DeletedAt.IS_NULL())).
-			ORDER_BY(table.Users.ID.ASC()).LIMIT(1),
-		&record,
-	)
+	err := q.executor().queryFixed(stmt, &record, args...)
+
+	return userResult(&record, err)
+}
+
+func userResult(record *userRecord, err error) (*types.User, error) {
 	if errors.Is(err, ErrNotFound) {
 		return nil, ErrUserNotFound
 	}
@@ -215,7 +232,7 @@ func (hsdb *HSDatabase) GetUserByID(uid types.UserID) (*types.User, error) {
 }
 
 func GetUserByID(q Querier, uid types.UserID) (*types.User, error) {
-	return queryUser(q, table.Users.ID.EQ(jet.Uint64(uint64(uid))))
+	return fixedUser(q, userByID, uint64(uid), limitOne)
 }
 
 func (hsdb *HSDatabase) GetUserByOIDCIdentifier(id string) (*types.User, error) {
@@ -225,7 +242,7 @@ func (hsdb *HSDatabase) GetUserByOIDCIdentifier(id string) (*types.User, error) 
 }
 
 func GetUserByOIDCIdentifier(q Querier, id string) (*types.User, error) {
-	return queryUser(q, table.Users.ProviderIdentifier.EQ(jet.String(id)))
+	return fixedUser(q, userByProviderIdentifier, id, limitOne)
 }
 
 func (hsdb *HSDatabase) ListUsers(filter *types.User) ([]types.User, error) {

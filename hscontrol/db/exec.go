@@ -274,6 +274,10 @@ func (e *executor) query(stmt statement, dest any) error {
 		return err
 	}
 
+	return e.runQuery(runner, query, args, dest)
+}
+
+func (e *executor) runQuery(runner qrm.DB, query string, args []any, dest any) error {
 	start := time.Now()
 
 	rows, err := qrm.Query(e.ctx, runner, query, args, dest)
@@ -291,6 +295,10 @@ func (e *executor) exec(stmt statement) (int64, error) {
 		return 0, err
 	}
 
+	return e.runExec(runner, query, args)
+}
+
+func (e *executor) runExec(runner qrm.DB, query string, args []any) (int64, error) {
 	start := time.Now()
 
 	var affected int64

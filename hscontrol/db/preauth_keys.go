@@ -91,6 +91,28 @@ func queryPreAuthKey(q Querier, where jet.BoolExpression) (*types.PreAuthKey, er
 	return record.preAuthKey()
 }
 
+// Pre-auth key lookups on the registration path, rendered once; see
+// [fixedSQL].
+var (
+	preAuthKeyByKey = newFixedSQL(func() statement {
+		return selectPreAuthKeys().WHERE(table.PreAuthKeys.Key.EQ(jet.String(""))).LIMIT(1)
+	})
+	preAuthKeyByPrefix = newFixedSQL(func() statement {
+		return selectPreAuthKeys().WHERE(table.PreAuthKeys.Prefix.EQ(jet.String(""))).LIMIT(1)
+	})
+)
+
+func fixedPreAuthKey(q Querier, stmt *fixedSQL, args ...any) (*types.PreAuthKey, error) {
+	var record preAuthKeyRecord
+
+	err := q.executor().queryFixed(stmt, &record, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return record.preAuthKey()
+}
+
 // insertPreAuthKey inserts key and sets its ID.
 func insertPreAuthKey(q Querier, key *types.PreAuthKey) error {
 	row, err := preAuthKeyRowFrom(key)
@@ -252,7 +274,7 @@ func findAuthKey(q Querier, keyStr string) (*types.PreAuthKey, error) {
 
 	if !found {
 		// Legacy format (plaintext) - backwards compatibility
-		pak, err := queryPreAuthKey(q, table.PreAuthKeys.Key.EQ(jet.String(keyStr)))
+		pak, err := fixedPreAuthKey(q, preAuthKeyByKey, keyStr, limitOne)
 		if err != nil {
 			return nil, ErrPreAuthKeyNotFound
 		}
@@ -272,7 +294,7 @@ func findAuthKey(q Querier, keyStr string) (*types.PreAuthKey, error) {
 	}
 
 	// Look up key by prefix
-	pak, err := queryPreAuthKey(q, table.PreAuthKeys.Prefix.EQ(jet.String(prefix)))
+	pak, err := fixedPreAuthKey(q, preAuthKeyByPrefix, prefix, limitOne)
 	if err != nil {
 		return nil, ErrPreAuthKeyNotFound
 	}
