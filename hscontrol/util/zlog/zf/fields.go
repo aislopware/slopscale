@@ -32,7 +32,7 @@ const (
 	NewGivenName       = "new_given_name"
 	NewName            = "new_name"
 	GeneratedHostname  = "generated.hostname"
-	RegistrationKey    = "registration_key" //nolint:gosec // G101: not a credential
+	RegistrationKey    = "registration_key"
 	RegistrationMethod = "registrationMethod"
 	ExpiresAt          = "expiresAt"
 )
@@ -203,7 +203,6 @@ const (
 
 // Debug environment variable fields.
 const (
-	DebugDeadlock              = "HEADSCALE_DEBUG_DEADLOCK"
 	DebugDERPUseIP             = "HEADSCALE_DEBUG_DERP_USE_IP"
 	DebugDumpConfig            = "HEADSCALE_DEBUG_DUMP_CONFIG"
 	DebugHighCardinalityMetric = "HEADSCALE_DEBUG_HIGH_CARDINALITY_METRICS"
