@@ -1,7 +1,12 @@
 package cli
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -303,6 +308,85 @@ func TestIsPreReleaseVersion(t *testing.T) {
 					tt.version,
 				)
 			}
+		})
+	}
+}
+
+func TestLatestRelease(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`[
+			{"tag_name": "v0.25.0-rc.1", "draft": false},
+			{"tag_name": "v0.26.0", "draft": true},
+			{"tag_name": "v0.24.3", "draft": false},
+			{"tag_name": "not-a-version", "draft": false},
+			{"tag_name": "v0.25.0", "draft": false}
+		]`))
+	}))
+	t.Cleanup(srv.Close)
+
+	stable := filterPreReleasesIfStable(func() string { return v231 })
+
+	got, err := latestRelease(t.Context(), srv.URL, stable)
+	require.NoError(t, err)
+	assert.Equal(t, "v0.25.0", got, "drafts, pre-releases and malformed tags are skipped")
+
+	preRelease := filterPreReleasesIfStable(func() string { return v23Alpha1 })
+
+	got, err = latestRelease(t.Context(), srv.URL, preRelease)
+	require.NoError(t, err)
+	assert.Equal(t, "v0.25.0", got, "the stable release is newer than the release candidate")
+}
+
+func TestLatestReleaseErrors(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/empty":
+			_, _ = w.Write([]byte(`[]`))
+		case "/garbage":
+			_, _ = w.Write([]byte(`{`))
+		default:
+			w.WriteHeader(http.StatusForbidden)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	skipNone := func(string) bool { return false }
+
+	_, err := latestRelease(t.Context(), srv.URL+"/empty", skipNone)
+	require.ErrorIs(t, err, errNoRelease)
+
+	_, err = latestRelease(t.Context(), srv.URL+"/garbage", skipNone)
+	require.Error(t, err)
+
+	_, err = latestRelease(t.Context(), srv.URL+"/rate-limited", skipNone)
+	require.ErrorIs(t, err, errNoRelease)
+}
+
+func TestIsOutdated(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		current string
+		newest  string
+		want    bool
+	}{
+		{current: v231, newest: v24Tag, want: true},
+		{current: "v0.24.0", newest: v24Tag, want: false},
+		{current: "v0.25.0", newest: v24Tag, want: false},
+		{current: v23RC1, newest: "v0.23.0", want: true},
+		{current: "dev", newest: v24Tag, want: false},
+		{current: "", newest: v24Tag, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.current+"_vs_"+tt.newest, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, isOutdated(tt.current, tt.newest))
 		})
 	}
 }

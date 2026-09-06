@@ -1,20 +1,26 @@
 package cli
 
 import (
+	"context"
+	"encoding/json/v2"
+	"errors"
+	"fmt"
+	"net/http"
 	"os"
 	"runtime"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"github.com/tcnksm/go-latest"
+	"golang.org/x/mod/semver"
 )
 
-var cfgFile string = ""
+var cfgFile string
 
 func init() {
 	if len(os.Args) > 1 &&
@@ -74,23 +80,102 @@ func initConfig() {
 		versionInfo := types.GetVersionInfo()
 		if (runtime.GOOS == "linux" || runtime.GOOS == "darwin") &&
 			!versionInfo.Dirty {
-			githubTag := &latest.GithubTag{
-				Owner:         "juanfont",
-				Repository:    "headscale",
-				TagFilterFunc: filterPreReleasesIfStable(func() string { return versionInfo.Version }),
-			}
-
-			res, err := latest.Check(githubTag, versionInfo.Version)
-			if err == nil && res.Outdated {
-				//nolint
+			newest, err := latestRelease(
+				context.Background(),
+				releasesURL,
+				filterPreReleasesIfStable(func() string { return versionInfo.Version }),
+			)
+			if err == nil && isOutdated(versionInfo.Version, newest) {
 				log.Warn().Msgf(
-					"An updated version of Headscale has been found (%s vs. your current %s). Check it out https://github.com/juanfont/headscale/releases\n",
-					res.Current,
+					"An updated version of Headscale has been found (%s vs. your current %s). "+
+						"Check it out https://github.com/juanfont/headscale/releases\n",
+					newest,
 					versionInfo.Version,
 				)
 			}
 		}
 	}
+}
+
+const (
+	releasesURL          = "https://api.github.com/repos/juanfont/headscale/releases?per_page=30"
+	releaseCheckTimeout  = 5 * time.Second
+	releaseCheckMaxBytes = 1 << 20
+)
+
+var errNoRelease = errors.New("no release found")
+
+// latestRelease returns the newest release tag listed at url that skip does
+// not reject, comparing tags as semantic versions.
+func latestRelease(ctx context.Context, url string, skip func(tag string) bool) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, releaseCheckTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+	if err != nil {
+		return "", fmt.Errorf("building release request: %w", err)
+	}
+
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("fetching releases: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("fetching releases: %w: %s", errNoRelease, resp.Status)
+	}
+
+	var releases []struct {
+		TagName string `json:"tag_name"`
+		Draft   bool   `json:"draft"`
+	}
+
+	err = json.UnmarshalRead(http.MaxBytesReader(nil, resp.Body, releaseCheckMaxBytes), &releases)
+	if err != nil {
+		return "", fmt.Errorf("decoding releases: %w", err)
+	}
+
+	newest := ""
+
+	for _, release := range releases {
+		tag := canonicalVersion(release.TagName)
+		if release.Draft || !semver.IsValid(tag) || skip(release.TagName) {
+			continue
+		}
+
+		if newest == "" || semver.Compare(tag, newest) > 0 {
+			newest = tag
+		}
+	}
+
+	if newest == "" {
+		return "", errNoRelease
+	}
+
+	return newest, nil
+}
+
+// isOutdated reports whether newest is a higher semantic version than current.
+func isOutdated(current, newest string) bool {
+	current = canonicalVersion(current)
+	if !semver.IsValid(current) {
+		return false
+	}
+
+	return semver.Compare(canonicalVersion(newest), current) > 0
+}
+
+// canonicalVersion gives a tag the leading "v" that semver expects.
+func canonicalVersion(tag string) string {
+	if strings.HasPrefix(tag, "v") {
+		return tag
+	}
+
+	return "v" + tag
 }
 
 var prereleases = []string{"alpha", "beta", "rc", "dev"}
