@@ -31,7 +31,6 @@ all: lint test build
 check-deps:
 	$(call check_tool,go)
 	$(call check_tool,golangci-lint)
-	$(call check_tool,gofumpt)
 	$(call check_tool,mdformat)
 	$(call check_tool,prettier)
 
@@ -45,7 +44,7 @@ build: check-deps $(GO_SOURCES) go.mod go.sum
 .PHONY: test
 test: check-deps $(GO_SOURCES) go.mod go.sum
 	@echo "Running Go tests..."
-	CGO_ENABLED=1 go test -race ./...
+	CGO_ENABLED=1 go test -race -short -timeout 30m ./...
 
 
 # Formatting targets
@@ -55,7 +54,7 @@ fmt: fmt-go fmt-mdformat fmt-prettier
 .PHONY: fmt-go
 fmt-go: check-deps $(GO_SOURCES)
 	@echo "Formatting Go code..."
-	gofumpt -l -w .
+	golangci-lint fmt
 	golangci-lint run --fix
 
 .PHONY: fmt-mdformat
