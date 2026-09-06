@@ -55,12 +55,32 @@ repos:
         types_or: [markdown]
         files: ^docs/
 
-      # golangci-lint for Go code quality
+      # go fix applies the Go release modernizers (any, min/max, range-int,
+      # slices/maps, strings.SplitSeq, wg.Go, ...) so new code never lands
+      # in an old idiom.
+      - id: go-fix
+        name: go fix
+        entry: go fix ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      # golangci-lint for Go code quality; --fix also runs the formatters
+      # (gci, gofumpt, goimports, golines).
       - id: golangci-lint
         name: golangci-lint
         entry: golangci-lint run --new-from-rev=HEAD~1 --timeout=5m --fix
         language: system
         types: [go]
+        pass_filenames: false
+
+      # go.mod/go.sum must be tidy; a stale graph hides unused or missing
+      # requirements from govulncheck and the Nix vendor hash.
+      - id: go-mod-tidy
+        name: go mod tidy -diff
+        entry: go mod tidy -diff
+        language: system
+        files: ^(go\.mod|go\.sum)$
         pass_filenames: false
 
       # vendor-hash keeps flakehashes.json in sync with go.mod/go.sum.

@@ -1,41 +1,110 @@
 ---
 version: "2"
+
+# Every linter is on unless listed under disable. All code is machine-written,
+# so the gate is deliberately strict: a linter is only disabled when it fights
+# an external contract or a deliberate project convention, and the reason is
+# recorded next to it. Complexity limits apply to production code only; test
+# and integration code is excluded by rule below.
 linters:
   default: all
   disable:
-    # canonicalheader v1.1.2 panics (nil deref) on a generic method in a
-    # package that also calls http.Header.Set. Re-enable once golangci-lint
-    # ships a version that parses Go 1.27 generic methods.
-    - canonicalheader
-    - cyclop
-    - depguard
-    - dupl
+    # Struct literals deliberately omit zero-valued fields throughout; the
+    # rule would touch every tailcfg/types literal in the tree.
     - exhaustruct
     - exhaustruct_v5
-    - funcorder
-    - funlen
-    - gochecknoglobals
-    - gochecknoinits
-    - gocognit
-    - godox
-    - gomodguard
-    - interfacebloat
-    - ireturn
-    - lll
-    - maintidx
-    - makezero
-    - mnd
-    - musttag
-    - nestif
-    - nolintlint
+    # Tests share process-wide state (viper, zerolog, DERP shuffle seed);
+    # blanket t.Parallel() is a race source, not a quality gate. tparallel
+    # still enforces consistency where parallelism is used.
     - paralleltest
-    - revive
-    - tagliatelle
+    # Internal (_test in the same package) tests are a deliberate choice so
+    # unexported invariants can be asserted directly.
     - testpackage
+    # JSON tag casing is dictated by the Tailscale API (snake_case), the
+    # Docker API (PascalCase) and the v1 API (camelCase); one convention
+    # cannot fit all three.
+    - tagliatelle
+    # Short names (c, tt, wg, ip, id) are the Go convention this tree follows;
+    # varnamelen's whitelist would mirror the whole vocabulary.
     - varnamelen
-    - wrapcheck
+    # Deprecated: superseded by wsl_v5, which is enabled.
     - wsl
+    # Package-level state (metrics, sentinel errors, cobra commands) is the
+    # idiom for this codebase; init() is limited by path rule below.
+    - gochecknoglobals
+    # Replaced by the depguard denylist below.
+    - gomodguard
   settings:
+    cyclop:
+      max-complexity: 30
+    depguard:
+      rules:
+        main:
+          list-mode: lax
+          deny:
+            - pkg: io/ioutil
+              desc: deprecated; use io and os
+            - pkg: github.com/pkg/errors
+              desc: use errors and fmt.Errorf with %w
+            - pkg: golang.org/x/exp/maps
+              desc: use maps from the standard library
+            - pkg: golang.org/x/exp/slices
+              desc: use slices from the standard library
+            - pkg: golang.org/x/exp/constraints
+              desc: use cmp.Ordered
+            - pkg: github.com/glebarez/sqlite
+              desc: SQLite is modernc.org/sqlite through database/sql; a second driver registering "sqlite" panics at init
+            - pkg: github.com/glebarez/go-sqlite
+              desc: SQLite is modernc.org/sqlite through database/sql; a second driver registering "sqlite" panics at init
+            - pkg: gorm.io/driver/sqlite
+              desc: needs cgo via mattn/go-sqlite3; SQLite is modernc.org/sqlite through database/sql
+            - pkg: github.com/mattn/go-sqlite3
+              desc: needs cgo; SQLite is modernc.org/sqlite through database/sql
+            - pkg: gorm.io/gorm
+              desc: queries are built with go-jet/jet in hscontrol/db; GORM was removed
+            - pkg: github.com/go-gormigrate/gormigrate/v2
+              desc: migrations run through hscontrol/db/migrate.go
+            - pkg: gopkg.in/yaml.v3
+              desc: archived upstream; use go.yaml.in/yaml/v3
+            - pkg: github.com/tcnksm/go-latest
+              desc: unmaintained since 2017; the release check is a plain GitHub API call in cmd/headscale/cli/root.go
+            - pkg: github.com/sasha-s/go-deadlock
+              desc: was configured but never used by any mutex; use sync
+            - pkg: math/rand$
+              desc: use math/rand/v2
+            - pkg: sort$
+              desc: use slices.Sort, slices.SortFunc and slices.BinarySearch
+            - pkg: github.com/golang/protobuf
+              desc: use google.golang.org/protobuf
+            - pkg: gopkg.in/yaml.v2
+              desc: use gopkg.in/yaml.v3
+            - pkg: github.com/mitchellh/mapstructure
+              desc: use github.com/go-viper/mapstructure/v2
+            - pkg: github.com/sirupsen/logrus
+              desc: use zerolog
+        server:
+          list-mode: lax
+          files:
+            - "**/hscontrol/**"
+            - "**/cmd/headscale/**"
+          deny:
+            - pkg: log$
+              desc: use zerolog (github.com/rs/zerolog/log)
+    dupl:
+      threshold: 150
+    errcheck:
+      check-type-assertions: false # forcetypeassert covers this
+      check-blank: false
+    exhaustive:
+      check:
+        - switch
+      default-signifies-exhaustive: false
+    funlen:
+      lines: 150
+      statements: 80
+      ignore-comments: true
+    gocognit:
+      min-complexity: 30
     goconst:
       # Test fixtures repeat strings (IPs, tags, hostnames) by their
       # nature; extracting them obscures the test rather than helping.
@@ -47,6 +116,128 @@ linters:
       # Default is 3. Short literals ("set", "get", "new") read better
       # at call sites than behind a named constant.
       min-len: 6
+    gocritic:
+      enable-all: true
+      disabled-checks:
+        # nolintlint (require-explanation) already demands a reason on every
+        # directive; enabling this too would report each one twice.
+        - whyNoLint
+        # Passing large structs by value is often deliberate (immutability
+        # on the map-response path); pointer conversion is a design change.
+        - hugeParam
+        - rangeValCopy
+        # Named results are used only where they aid the reader.
+        - unnamedResult
+    godox:
+      # TODO(name) comments are allowed and tracked in review; the rest
+      # mark code that must not be merged.
+      keywords:
+        - FIXME
+        - HACK
+        - XXX
+    govet:
+      enable-all: true
+      disable:
+        # Struct layout is chosen for readability; padding is not a concern
+        # at this scale.
+        - fieldalignment
+    unqueryvet:
+      # jet's AllColumns is deliberate whole-row mapping into the row types in
+      # hscontrol/db/model.go; SELECT * in raw SQL is still reported.
+      check-sql-builders: false
+    ireturn:
+      # Constructors may return these framework and sum-type interfaces.
+      # Anything else must return a concrete type.
+      allow:
+        - anon
+        - error
+        - empty
+        - generic
+        - stdlib
+        - github\.com/danielgtaylor/huma/v2\.API
+        - github\.com/danielgtaylor/huma/v2/humatest\.TestAPI
+        - github\.com/go-chi/chi/v5/middleware\.LogEntry
+        - github\.com/chasefleming/elem-go\.Node
+        - github\.com/google/go-cmp/cmp\.Option
+        # jet's builder returns its statement interfaces; qrm.DB is what
+        # jet executes on (a pool, a transaction or a prepared statement).
+        - github\.com/go-jet/jet/v2/sqlite\.(SelectStatement|BoolExpression|Expression)
+        - github\.com/go-jet/jet/v2/qrm\.DB
+        - hscontrol/policy\.PolicyManager
+        - hscontrol\.AuthProvider
+        - hscontrol/policy/v2\.(Alias|Owner|AutoApprover|ResolvedAddresses)
+        - headscale/integration\.(TailscaleClient|ControlServer)
+    lll:
+      line-length: 120
+      tab-width: 4
+    maintidx:
+      under: 20
+    mnd:
+      ignored-functions:
+        - '^time\.'
+        - '^strconv\.'
+        - "^make$"
+        - '^os\.(Mkdir|MkdirAll|OpenFile|WriteFile|Chmod|Exit)$'
+        - '^math\.'
+        - '^rand\.'
+        - '^bytes\.'
+        - '^netip\.'
+        - '^context\.WithTimeout$'
+        - '\.SetDefault$'
+        - 'Flags\(\)\.'
+      ignored-numbers:
+        - "0"
+        - "1"
+        - "2"
+        - "0o600"
+        - "0o644"
+        - "0o700"
+        - "0o755"
+    nestif:
+      min-complexity: 8
+    nlreturn:
+      block-size: 4
+    nolintlint:
+      allow-unused: false
+      require-specific: true
+      require-explanation: true
+    staticcheck:
+      checks:
+        - all
+    wrapcheck:
+      # Errors from third-party packages must carry context before they
+      # cross a function boundary; errors from this module already do.
+      ignore-package-globs:
+        - github.com/juanfont/headscale/*
+      ignore-sigs:
+        - .Errorf(
+        - errors.New(
+        - errors.Join(
+        - errors.Unwrap(
+        - .Wrap(
+        - .Wrapf(
+        - (context.Context).Err()
+    thelper:
+      # Table-driven cases are closures that take *testing.T; they are not
+      # helpers and must not call t.Helper() (it would hide the failing
+      # assertion line). Parameter position and name are still enforced.
+      test:
+        first: true
+        name: true
+        begin: false
+      benchmark:
+        first: true
+        name: true
+        begin: false
+      tb:
+        first: true
+        name: true
+        begin: false
+    usetesting:
+      context-background: true
+      context-todo: true
+      os-setenv: true
+      os-temp-dir: true
     forbidigo:
       forbid:
         # Forbid time.Sleep everywhere with context-appropriate alternatives
@@ -73,30 +264,6 @@ linters:
             tsaddr.SortPrefixes is forbidden. Use Go 1.26's netip.Prefix.Compare instead.
             Example: slices.SortFunc(prefixes, netip.Prefix.Compare)
       analyze-types: true
-    gocritic:
-      disabled-checks:
-        - appendAssign
-        - ifElseChain
-    nlreturn:
-      block-size: 4
-    varnamelen:
-      ignore-names:
-        - err
-        - db
-        - id
-        - ip
-        - ok
-        - c
-        - tt
-        - tx
-        - rx
-        - sb
-        - wg
-        - pr
-        - p
-        - p2
-      ignore-type-assert-ok: true
-      ignore-map-index-ok: true
   exclusions:
     generated: lax
     presets:
@@ -109,6 +276,33 @@ linters:
       - builtin$
       - examples$
       - gen
+    rules:
+      # Size, duplication and magic-number limits are for production code.
+      # Table tests and integration scenarios are long, repetitive and
+      # literal-heavy by nature.
+      - path: '(.+)_test\.go$|^integration/|^hscontrol/servertest/'
+        linters:
+          - cyclop
+          # Scenario tests repeat the same connect/assert shape on purpose.
+          - dupl
+          - funlen
+          - gocognit
+          - gocyclo
+          - maintidx
+          - mnd
+          - nestif
+          # Test code returns ad-hoc errors, ignores marshal errors of
+          # fixtures, uses weak randomness and fake credentials, and
+          # converts small literal integers; none of it ships.
+          - err113
+          - errchkjson
+          - gosec
+          - wrapcheck
+      # cobra subcommands and huma operations register themselves from
+      # init(); that is the framework convention.
+      - path: "^cmd/headscale/cli/|^hscontrol/api/"
+        linters:
+          - gochecknoinits
 
 formatters:
   enable:
@@ -116,6 +310,14 @@ formatters:
     - gofmt
     - gofumpt
     - goimports
+    - golines
+  settings:
+    golines:
+      max-len: 120
+      tab-len: 4
+      shorten-comments: false
+      # tagalign owns struct-tag layout.
+      reformat-tags: false
   exclusions:
     generated: lax
     paths:

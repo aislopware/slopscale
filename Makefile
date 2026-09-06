@@ -54,6 +54,7 @@ fmt: fmt-go fmt-mdformat fmt-prettier
 .PHONY: fmt-go
 fmt-go: check-deps $(GO_SOURCES)
 	@echo "Formatting Go code..."
+	go fix ./...
 	golangci-lint fmt
 	golangci-lint run --fix
 
@@ -67,14 +68,28 @@ fmt-prettier: check-deps $(PRETTIER_SOURCES)
 	@echo "Formatting markup and config files..."
 	prettier --write '**/*.{ts,js,md,yaml,yml,sass,css,scss,html}'
 
-# Linting targets
+# Linting targets. `lint` is the full gate: every golangci-lint linter and
+# formatter (see .golangci.yaml), go vet, a tidy/verified module graph, and a
+# vulnerability scan of the dependency tree.
 .PHONY: lint
-lint: lint-go
+lint: lint-go lint-mod lint-vuln
 
 .PHONY: lint-go
 lint-go: check-deps $(GO_SOURCES) go.mod go.sum
 	@echo "Linting Go code..."
 	golangci-lint run --timeout 10m
+	go vet -tags integration ./...
+
+.PHONY: lint-mod
+lint-mod: go.mod go.sum
+	@echo "Checking module graph..."
+	go mod tidy -diff
+	go mod verify
+
+.PHONY: lint-vuln
+lint-vuln: go.mod go.sum
+	@echo "Scanning dependencies for known vulnerabilities..."
+	go tool govulncheck ./...
 
 # Code generation
 .PHONY: generate
@@ -90,19 +105,18 @@ openapi:
 	@echo "Emitting OpenAPI spec from code..."
 	go run ./cmd/gen-openapi
 
-# Generate the strongly-typed Go HTTP clients (v1 and v2). The served specs are
-# OpenAPI 3.1, but oapi-codegen v2 does not yet read 3.1, so each client is
-# generated from a transient 3.0.3 downgrade of its document. Pinned so the
-# committed clients are reproducible.
+# Generate the strongly-typed Go HTTP clients (v1 and v2) from the served
+# OpenAPI 3.1 documents using oapi-codegen. Pinned so the committed clients
+# are reproducible.
 .PHONY: client
 client:
 	@echo "Generating API clients..."
-	@tmp=$$(mktemp -t headscale-openapi-3.0.XXXXXX.yaml); \
-	go run ./cmd/gen-openapi -downgrade "$$tmp" && \
-	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.1 \
+	@tmp=$$(mktemp -t headscale-openapi-3.1.XXXXXX.yaml); \
+	go run ./cmd/gen-openapi -out "$$tmp" && \
+	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 \
 		-generate types,client -package clientv1 -o gen/client/v1/client.gen.go "$$tmp" && \
-	go run ./cmd/gen-openapi -api v2 -downgrade "$$tmp" && \
-	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.1 \
+	go run ./cmd/gen-openapi -api v2 -out "$$tmp" && \
+	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 \
 		-generate types,client -package clientv2 -o gen/client/v2/client.gen.go "$$tmp"; \
 	status=$$?; rm -f "$$tmp"; exit $$status
 
@@ -130,7 +144,7 @@ help:
 	@echo "  build        - Build headscale binary"
 	@echo "  test         - Run Go tests"
 	@echo "  fmt          - Format all code (Go, docs, markup)"
-	@echo "  lint         - Lint all code (Go)"
+	@echo "  lint         - Lint all code (golangci-lint, vet, mod tidy, govulncheck)"
 	@echo "  generate     - Generate code (go generate + client)"
 	@echo "  dev          - Full development workflow (fmt + lint + test + build)"
 	@echo "  clean        - Clean build artifacts"
