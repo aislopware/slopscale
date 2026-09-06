@@ -2,7 +2,16 @@ package servertest
 
 import (
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 )
+
+// convergeTimeout bounds how long the mesh assertions wait for every
+// client's netmap to settle. Peer lists arrive over several map responses,
+// so a snapshot taken right after a change would report a state that is
+// still in flight.
+const convergeTimeout = 10 * time.Second
 
 // AssertMeshComplete verifies that every client in the slice sees
 // exactly (len(clients) - 1) peers, i.e. a fully connected mesh.
@@ -10,19 +19,22 @@ func AssertMeshComplete(tb testing.TB, clients []*TestClient) {
 	tb.Helper()
 
 	expected := len(clients) - 1
-	for _, c := range clients {
-		nm := c.Netmap()
-		if nm == nil {
-			tb.Errorf("AssertMeshComplete: %s has no netmap", c.Name)
 
-			continue
-		}
+	assert.EventuallyWithT(tb, func(collect *assert.CollectT) {
+		for _, c := range clients {
+			nm := c.Netmap()
+			if nm == nil {
+				collect.Errorf("AssertMeshComplete: %s has no netmap", c.Name)
 
-		if got := len(nm.Peers); got != expected {
-			tb.Errorf("AssertMeshComplete: %s has %d peers, want %d (peers: %v)",
-				c.Name, got, expected, c.PeerNames())
+				continue
+			}
+
+			if got := len(nm.Peers); got != expected {
+				collect.Errorf("AssertMeshComplete: %s has %d peers, want %d (peers: %v)",
+					c.Name, got, expected, c.PeerNames())
+			}
 		}
-	}
+	}, convergeTimeout, 25*time.Millisecond)
 }
 
 // AssertSymmetricVisibility checks that peer visibility is symmetric:
@@ -30,39 +42,43 @@ func AssertMeshComplete(tb testing.TB, clients []*TestClient) {
 func AssertSymmetricVisibility(tb testing.TB, clients []*TestClient) {
 	tb.Helper()
 
-	for _, a := range clients {
-		for _, b := range clients {
-			if a == b {
-				continue
-			}
+	assert.EventuallyWithT(tb, func(collect *assert.CollectT) {
+		for _, a := range clients {
+			for _, b := range clients {
+				if a == b {
+					continue
+				}
 
-			_, aSeesB := a.PeerByName(b.Name)
+				_, aSeesB := a.PeerByName(b.Name)
 
-			_, bSeesA := b.PeerByName(a.Name)
-			if aSeesB != bSeesA {
-				tb.Errorf("AssertSymmetricVisibility: %s sees %s = %v, but %s sees %s = %v",
-					a.Name, b.Name, aSeesB, b.Name, a.Name, bSeesA)
+				_, bSeesA := b.PeerByName(a.Name)
+				if aSeesB != bSeesA {
+					collect.Errorf("AssertSymmetricVisibility: %s sees %s = %v, but %s sees %s = %v",
+						a.Name, b.Name, aSeesB, b.Name, a.Name, bSeesA)
+				}
 			}
 		}
-	}
+	}, convergeTimeout, 25*time.Millisecond)
 }
 
 // AssertPeerOnline checks that the observer sees peerName as online.
 func AssertPeerOnline(tb testing.TB, observer *TestClient, peerName string) {
 	tb.Helper()
 
-	peer, ok := observer.PeerByName(peerName)
-	if !ok {
-		tb.Errorf("AssertPeerOnline: %s does not see peer %s", observer.Name, peerName)
+	assert.EventuallyWithT(tb, func(collect *assert.CollectT) {
+		peer, ok := observer.PeerByName(peerName)
+		if !ok {
+			collect.Errorf("AssertPeerOnline: %s does not see peer %s", observer.Name, peerName)
 
-		return
-	}
+			return
+		}
 
-	isOnline, known := peer.Online().GetOk()
-	if !known || !isOnline {
-		tb.Errorf("AssertPeerOnline: %s sees peer %s but Online=%v (known=%v), want true",
-			observer.Name, peerName, isOnline, known)
-	}
+		isOnline, known := peer.Online().GetOk()
+		if !known || !isOnline {
+			collect.Errorf("AssertPeerOnline: %s sees peer %s but Online=%v (known=%v), want true",
+				observer.Name, peerName, isOnline, known)
+		}
+	}, convergeTimeout, 25*time.Millisecond)
 }
 
 // AssertConsistentState checks that all clients agree on peer
@@ -71,32 +87,34 @@ func AssertPeerOnline(tb testing.TB, observer *TestClient, peerName string) {
 func AssertConsistentState(tb testing.TB, clients []*TestClient) {
 	tb.Helper()
 
-	for _, c := range clients {
-		nm := c.Netmap()
-		if nm == nil {
-			continue
-		}
-
-		peerNames := make(map[string]bool, len(nm.Peers))
-		for _, p := range nm.Peers {
-			hi := p.Hostinfo()
-			if hi.Valid() {
-				peerNames[hi.Hostname()] = true
-			}
-		}
-
-		// Check that c sees all other connected clients.
-		for _, other := range clients {
-			if other == c || other.Netmap() == nil {
+	assert.EventuallyWithT(tb, func(collect *assert.CollectT) {
+		for _, c := range clients {
+			nm := c.Netmap()
+			if nm == nil {
 				continue
 			}
 
-			if !peerNames[other.Name] {
-				tb.Errorf("AssertConsistentState: %s does not see %s (peers: %v)",
-					c.Name, other.Name, c.PeerNames())
+			peerNames := make(map[string]bool, len(nm.Peers))
+			for _, p := range nm.Peers {
+				hi := p.Hostinfo()
+				if hi.Valid() {
+					peerNames[hi.Hostname()] = true
+				}
+			}
+
+			// Check that c sees all other connected clients.
+			for _, other := range clients {
+				if other == c || other.Netmap() == nil {
+					continue
+				}
+
+				if !peerNames[other.Name] {
+					collect.Errorf("AssertConsistentState: %s does not see %s (peers: %v)",
+						c.Name, other.Name, c.PeerNames())
+				}
 			}
 		}
-	}
+	}, convergeTimeout, 25*time.Millisecond)
 }
 
 // AssertDERPMapPresent checks that the netmap contains a DERP map.

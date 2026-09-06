@@ -45,6 +45,7 @@ type serverConfig struct {
 	batcherWorkers   int
 	taildropEnabled  bool
 	realListener     bool
+	nodeStoreBatch   time.Duration
 }
 
 func defaultServerConfig() *serverConfig {
@@ -54,6 +55,10 @@ func defaultServerConfig() *serverConfig {
 		batcherWorkers:   1,
 		ephemeralTimeout: 30 * time.Second,
 		taildropEnabled:  true,
+		// Production coalesces NodeStore writes for up to 500ms. Every
+		// Connect, endpoint update, or route approval in a test would pay
+		// that wait, so use the same short window the state tests use.
+		nodeStoreBatch: state.TestBatchTimeout,
 	}
 }
 
@@ -144,6 +149,7 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 			BatchChangeDelay:               sc.batchDelay,
 			BatcherWorkers:                 sc.batcherWorkers,
 			NodeMapSessionBufferedChanSize: sc.bufferedChanSize,
+			NodeStoreBatchTimeout:          sc.nodeStoreBatch,
 		},
 	}
 

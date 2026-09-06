@@ -191,7 +191,12 @@ func runViaHACompat(t *testing.T, c *testcapture.Capture) {
 		}
 
 		t.Run(viewerName, func(t *testing.T) {
-			compareCaptureNetmap(t, cl, capture, clients)
+			// Peer and route updates arrive as separate map responses, so
+			// compare against the netmap once it has converged rather than
+			// the first one that shows the right peer count.
+			assert.EventuallyWithT(t, func(c *assert.CollectT) {
+				compareCaptureNetmap(c, cl, capture, clients)
+			}, 15*time.Second, 25*time.Millisecond)
 		})
 	}
 }
@@ -200,13 +205,11 @@ func runViaHACompat(t *testing.T, c *testcapture.Capture) {
 // [testcapture.Node]'s [netmap.NetworkMap] data. Same logic as [compareNetmap] but
 // reads from typed [testcapture] fields instead of goldenFile strings.
 func compareCaptureNetmap(
-	t *testing.T,
+	t require.TestingT,
 	viewer *servertest.TestClient,
 	want testcapture.Node,
 	clients map[string]*servertest.TestClient,
 ) {
-	t.Helper()
-
 	nm := viewer.Netmap()
 	require.NotNil(t, nm, "viewer has no netmap")
 

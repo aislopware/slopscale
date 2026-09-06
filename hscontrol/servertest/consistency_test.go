@@ -6,6 +6,7 @@ import (
 
 	"github.com/juanfont/headscale/hscontrol/servertest"
 	"github.com/stretchr/testify/assert"
+	"tailscale.com/types/netmap"
 )
 
 // TestConsistency verifies that all nodes converge to the same
@@ -96,16 +97,22 @@ func TestConsistency(t *testing.T) {
 			c.WaitForPeers(t, minPeers, 30*time.Second)
 		}
 
-		// Verify the new nodes can see each other.
+		// Verify the new nodes can see each other. The peer count above
+		// can be satisfied by nodes still in their disconnect grace
+		// period, so wait for each specific peer to show up.
 		for _, a := range []*servertest.TestClient{c5, c6, c7} {
 			for _, b := range []*servertest.TestClient{c5, c6, c7} {
 				if a == b {
 					continue
 				}
 
-				_, found := a.PeerByName(b.Name)
-				assert.True(t, found,
-					"new client %s should see %s", a.Name, b.Name)
+				a.WaitForCondition(t, "new client "+a.Name+" sees "+b.Name,
+					15*time.Second,
+					func(nm *netmap.NetworkMap) bool {
+						_, found := a.PeerByName(b.Name)
+
+						return found
+					})
 			}
 		}
 

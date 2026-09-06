@@ -219,10 +219,14 @@ func runViaMapCompat(t *testing.T, c *testcapture.Capture) {
 		}
 
 		t.Run(viewerName, func(t *testing.T) {
-			nm := cl.Netmap()
-			require.NotNil(t, nm, "netmap is nil")
+			// Routes and primary routes arrive in map responses after the
+			// peer itself, so compare against a settled netmap.
+			assert.EventuallyWithT(t, func(c *assert.CollectT) {
+				nm := cl.Netmap()
+				require.NotNil(c, nm, "netmap is nil")
 
-			compareNetmap(t, nm, capture, clients)
+				compareNetmap(c, nm, capture, clients)
+			}, 15*time.Second, 25*time.Millisecond)
 		})
 	}
 }
@@ -235,12 +239,11 @@ func runViaMapCompat(t *testing.T, c *testcapture.Capture) {
 //   - PrimaryRoutes per peer
 //   - PacketFilter rule count and non-Tailscale dst prefixes
 func compareNetmap(
-	t *testing.T,
+	t require.TestingT,
 	got *netmap.NetworkMap,
 	want testcapture.Node,
 	clients map[string]*servertest.TestClient,
 ) {
-	t.Helper()
 
 	require.NotNil(t, want.Netmap, "golden Netmap is nil")
 
@@ -506,13 +509,11 @@ func hsAddrsByPeer(clients map[string]*servertest.TestClient) map[netip.Addr]str
 // or /128 (IPv6) expands to the union of its contained peers.
 // Unresolvable Tailscale-range sources fail the test.
 func canonicaliseSrcStrings(
-	t *testing.T,
+	t require.TestingT,
 	srcs []string,
 	addrToPeer map[netip.Addr]string,
 	ruleIndex int,
 ) []string {
-	t.Helper()
-
 	seen := map[string]struct{}{}
 
 	for _, src := range srcs {
@@ -536,13 +537,11 @@ func canonicaliseSrcStrings(
 // [canonicaliseSrcStrings], reading already-parsed [netip.Prefix] values
 // from [tailcfg.Match.Srcs].
 func canonicaliseSrcPrefixes(
-	t *testing.T,
+	t require.TestingT,
 	srcs []netip.Prefix,
 	addrToPeer map[netip.Addr]string,
 	ruleIndex int,
 ) []string {
-	t.Helper()
-
 	seen := map[string]struct{}{}
 
 	for _, pfx := range srcs {
@@ -563,14 +562,12 @@ func canonicaliseSrcPrefixes(
 // through literally; a Tailscale-range prefix expands to the union
 // of peer names whose addresses fall within it.
 func addIdentsForSrc(
-	t *testing.T,
+	t require.TestingT,
 	pfx netip.Prefix,
 	addrToPeer map[netip.Addr]string,
 	ruleIndex int,
 	seen map[string]struct{},
 ) {
-	t.Helper()
-
 	if !prefixInTailscaleRange(pfx) {
 		seen[pfx.String()] = struct{}{}
 
