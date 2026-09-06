@@ -867,11 +867,13 @@ func (a *AuthProviderOIDC) handleRegistration(
 	// runs: it always produces a non-empty change, so the change cannot
 	// tell the two apart afterwards.
 	newNode := true
+
 	if entry, ok := a.h.state.GetAuthCacheEntry(registrationID); ok {
 		all := a.h.state.GetNodesByMachineKeyAllUsers(entry.RegistrationData().MachineKey)
 		_, sameUser := all[types.UserID(user.ID)]
 		tagged, hasTagged := all[0]
-		newNode = !sameUser && !(hasTagged && tagged.IsTagged())
+		convertingTagged := hasTagged && tagged.IsTagged()
+		newNode = !sameUser && !convertingTagged
 	}
 
 	node, nodeChange, err := a.h.state.HandleNodeFromAuthPath(

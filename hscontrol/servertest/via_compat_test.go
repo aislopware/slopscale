@@ -244,7 +244,6 @@ func compareNetmap(
 	want testcapture.Node,
 	clients map[string]*servertest.TestClient,
 ) {
-
 	require.NotNil(t, want.Netmap, "golden Netmap is nil")
 
 	// Build golden peer map (only peers in our client set).
