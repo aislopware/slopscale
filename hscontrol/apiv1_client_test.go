@@ -1,7 +1,6 @@
 package hscontrol
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -24,7 +23,7 @@ func TestAPIV1GeneratedClient(t *testing.T) {
 	client, err := clientv1.NewClientWithResponses(srv.URL)
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	health, err := client.HealthWithResponse(ctx)
 	require.NoError(t, err)

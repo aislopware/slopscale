@@ -35,7 +35,7 @@ func TestApiKeyCommand(t *testing.T) {
 	keys := make([]string, count)
 
 	for idx := range count {
-		apiResult, err := headscale.Execute(
+		apiResult, executeErr := headscale.Execute(
 			[]string{
 				"headscale",
 				"apikeys",
@@ -46,7 +46,7 @@ func TestApiKeyCommand(t *testing.T) {
 				"json",
 			},
 		)
-		require.NoError(t, err)
+		require.NoError(t, executeErr)
 		assert.NotEmpty(t, apiResult)
 
 		keys[idx] = apiResult
@@ -115,7 +115,7 @@ func TestApiKeyCommand(t *testing.T) {
 
 	// Expire three keys
 	for idx := range 3 {
-		_, err := headscale.Execute(
+		_, executeErr := headscale.Execute(
 			[]string{
 				"headscale",
 				"apikeys",
@@ -124,7 +124,7 @@ func TestApiKeyCommand(t *testing.T) {
 				listedAPIKeys[idx].Prefix,
 			},
 		)
-		require.NoError(t, err)
+		require.NoError(t, executeErr)
 
 		expiredPrefixes[listedAPIKeys[idx].Prefix] = true
 	}
@@ -143,7 +143,11 @@ func TestApiKeyCommand(t *testing.T) {
 			&listedAfterExpireAPIKeys,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for API keys list after expire")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for API keys list after expire",
+	)
 
 	for index := range listedAfterExpireAPIKeys {
 		if _, ok := expiredPrefixes[listedAfterExpireAPIKeys[index].Prefix]; ok {
@@ -185,7 +189,11 @@ func TestApiKeyCommand(t *testing.T) {
 			&listedAPIKeysAfterDelete,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for API keys list after delete")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for API keys list after delete",
+	)
 
 	assert.Len(t, listedAPIKeysAfterDelete, 4)
 
@@ -214,7 +222,11 @@ func TestApiKeyCommand(t *testing.T) {
 			&listedAPIKeysAfterExpireByID,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for API keys list after expire by ID")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for API keys list after expire by ID",
+	)
 
 	// Verify the key was expired
 	for idx := range listedAPIKeysAfterExpireByID {
@@ -250,7 +262,11 @@ func TestApiKeyCommand(t *testing.T) {
 			&listedAPIKeysAfterDeleteByID,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for API keys list after delete by ID")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for API keys list after delete by ID",
+	)
 
 	assert.Len(t, listedAPIKeysAfterDeleteByID, 3)
 
@@ -296,11 +312,27 @@ func TestApiKeyCommandValidation(t *testing.T) {
 		wantErr string
 	}{
 		{name: "create invalid expiration", args: []string{"apikeys", "create", "--expiration", "not-a-duration"}},
-		{name: "expire neither selector", args: []string{"apikeys", "expire"}, wantErr: "either --id or --prefix must be provided"},
-		{name: "expire both selectors", args: []string{"apikeys", "expire", "--id", id, "--prefix", prefix}, wantErr: "only one of --id or --prefix can be provided"},
+		{
+			name:    "expire neither selector",
+			args:    []string{"apikeys", "expire"},
+			wantErr: "either --id or --prefix must be provided",
+		},
+		{
+			name:    "expire both selectors",
+			args:    []string{"apikeys", "expire", "--id", id, "--prefix", prefix},
+			wantErr: "only one of --id or --prefix can be provided",
+		},
 		{name: "expire nonexistent prefix", args: []string{"apikeys", "expire", "--prefix", "nonexistent"}},
-		{name: "delete neither selector", args: []string{"apikeys", "delete"}, wantErr: "either --id or --prefix must be provided"},
-		{name: "delete both selectors", args: []string{"apikeys", "delete", "--id", id, "--prefix", prefix}, wantErr: "only one of --id or --prefix can be provided"},
+		{
+			name:    "delete neither selector",
+			args:    []string{"apikeys", "delete"},
+			wantErr: "either --id or --prefix must be provided",
+		},
+		{
+			name:    "delete both selectors",
+			args:    []string{"apikeys", "delete", "--id", id, "--prefix", prefix},
+			wantErr: "only one of --id or --prefix can be provided",
+		},
 		{name: "delete nonexistent id", args: []string{"apikeys", "delete", "--id", "99999"}},
 	}
 

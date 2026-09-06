@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -36,7 +37,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	xmaps "golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
 	"tailscale.com/envknob"
 	"tailscale.com/util/mak"
@@ -54,6 +54,7 @@ var (
 	errNoHeadscaleAvailable = errors.New("no headscale available")
 	errNoUserAvailable      = errors.New("no user available")
 	errNoClientFound        = errors.New("client not found")
+	errUserMultipleNetworks = errors.New("users can only have nodes placed in one network")
 
 	// AllVersions represents a list of Tailscale versions the suite
 	// uses to test compatibility with the [ControlServer].
@@ -64,7 +65,9 @@ var (
 	//
 	// The rest of the version represents Tailscale versions that can be
 	// found in Tailscale's apt repository.
-	AllVersions = append([]string{"head", "unstable"}, capver.TailscaleLatestMajorMinor(capver.SupportedMajorMinorVersions, true)...)
+	AllVersions = append(
+		[]string{"head", "unstable"},
+		capver.TailscaleLatestMajorMinor(capver.SupportedMajorMinorVersions, true)...)
 
 	// MustTestVersions is the minimum set of versions we should test.
 	// At the moment, this is arbitrarily chosen as:
@@ -173,10 +176,6 @@ type ScenarioSpec struct {
 	MaxWait time.Duration
 }
 
-func (s *Scenario) prefixedNetworkName(name string) string {
-	return s.testHashPrefix + "-" + name
-}
-
 // NewScenario creates a test [Scenario] which can be used to bootstraps a [ControlServer] with
 // a set of [User]s and [TailscaleClient]s.
 func NewScenario(spec ScenarioSpec) (*Scenario, error) {
@@ -197,9 +196,9 @@ func NewScenario(spec ScenarioSpec) (*Scenario, error) {
 	}
 
 	if api := version.Get("ApiVersion"); api != "" {
-		client, err := docker.NewVersionedClientFromEnv(api)
-		if err != nil {
-			return nil, fmt.Errorf("pinning docker client to API version %s: %w", api, err)
+		client, clientErr := docker.NewVersionedClientFromEnv(api)
+		if clientErr != nil {
+			return nil, fmt.Errorf("pinning docker client to API version %s: %w", api, clientErr)
 		}
 
 		pool.Client = client
@@ -235,34 +234,44 @@ func NewScenario(spec ScenarioSpec) (*Scenario, error) {
 		for name, netSpec := range s.spec.Networks {
 			networkName := testHashPrefix + "-" + name
 
-			network, err := s.AddNetworkWithSubnet(networkName, netSpec.Subnet)
-			if err != nil {
-				return nil, err
+			network, netErr := s.AddNetworkWithSubnet(networkName, netSpec.Subnet)
+			if netErr != nil {
+				return nil, netErr
 			}
 
 			for _, user := range netSpec.Users {
 				if n2, ok := userToNetwork[user]; ok {
-					return nil, fmt.Errorf("users can only have nodes placed in one network: %s into %s but already in %s", user, network.Network.Name, n2.Network.Name) //nolint:err113
+					return nil, fmt.Errorf(
+						"%w: %s into %s but already in %s",
+						errUserMultipleNetworks,
+						user,
+						network.Network.Name,
+						n2.Network.Name,
+					)
 				}
 
 				mak.Set(&userToNetwork, user, network)
 			}
 		}
 	} else {
-		_, err := s.AddNetwork(s.testDefaultNetwork)
-		if err != nil {
-			return nil, err
+		_, netErr := s.AddNetwork(s.testDefaultNetwork)
+		if netErr != nil {
+			return nil, netErr
 		}
 	}
 
 	for network, extras := range spec.ExtraService {
 		for _, extra := range extras {
-			svc, err := extra(s, network)
-			if err != nil {
-				return nil, err
+			svc, extraErr := extra(s, network)
+			if extraErr != nil {
+				return nil, extraErr
 			}
 
-			mak.Set(&s.extraServices, s.prefixedNetworkName(network), append(s.extraServices[s.prefixedNetworkName(network)], svc))
+			mak.Set(
+				&s.extraServices,
+				s.prefixedNetworkName(network),
+				append(s.extraServices[s.prefixedNetworkName(network)], svc),
+			)
 		}
 	}
 
@@ -317,29 +326,29 @@ func (s *Scenario) Networks() []*dockertest.Network {
 		panic("Scenario.Networks called with empty network list")
 	}
 
-	return xmaps.Values(s.networks)
+	return slices.Collect(maps.Values(s.networks))
 }
 
 func (s *Scenario) Network(name string) (*dockertest.Network, error) {
-	net, ok := s.networks[s.prefixedNetworkName(name)]
+	dnetwork, ok := s.networks[s.prefixedNetworkName(name)]
 	if !ok {
-		return nil, fmt.Errorf("no network named: %s", name) //nolint:err113
+		return nil, fmt.Errorf("no network named: %s", name)
 	}
 
-	return net, nil
+	return dnetwork, nil
 }
 
 func (s *Scenario) SubnetOfNetwork(name string) (*netip.Prefix, error) {
-	net, ok := s.networks[s.prefixedNetworkName(name)]
+	dnetwork, ok := s.networks[s.prefixedNetworkName(name)]
 	if !ok {
-		return nil, fmt.Errorf("no network named: %s", name) //nolint:err113
+		return nil, fmt.Errorf("no network named: %s", name)
 	}
 
-	if len(net.Network.IPAM.Config) == 0 {
-		return nil, fmt.Errorf("no IPAM config found in network: %s", name) //nolint:err113
+	if len(dnetwork.Network.IPAM.Config) == 0 {
+		return nil, fmt.Errorf("no IPAM config found in network: %s", name)
 	}
 
-	pref, err := netip.ParsePrefix(net.Network.IPAM.Config[0].Subnet)
+	pref, err := netip.ParsePrefix(dnetwork.Network.IPAM.Config[0].Subnet)
 	if err != nil {
 		return nil, err
 	}
@@ -350,7 +359,7 @@ func (s *Scenario) SubnetOfNetwork(name string) (*netip.Prefix, error) {
 func (s *Scenario) Services(name string) ([]*dockertest.Resource, error) {
 	res, ok := s.extraServices[s.prefixedNetworkName(name)]
 	if !ok {
-		return nil, fmt.Errorf("no network named: %s", name) //nolint:err113
+		return nil, fmt.Errorf("no network named: %s", name)
 	}
 
 	return res, nil
@@ -521,16 +530,17 @@ func (s *Scenario) CreatePreAuthKey(
 	reusable bool,
 	ephemeral bool,
 ) (*clientv1.PreAuthKey, error) {
-	if headscale, err := s.Headscale(); err == nil { //nolint:noinlineerr
-		key, err := headscale.CreateAuthKey(user, reusable, ephemeral)
-		if err != nil {
-			return nil, fmt.Errorf("creating user: %w", err)
-		}
-
-		return key, nil
+	headscale, err := s.Headscale()
+	if err != nil {
+		return nil, fmt.Errorf("creating user: %w", errNoHeadscaleAvailable)
 	}
 
-	return nil, fmt.Errorf("creating user: %w", errNoHeadscaleAvailable)
+	key, err := headscale.CreateAuthKey(user, reusable, ephemeral)
+	if err != nil {
+		return nil, fmt.Errorf("creating user: %w", err)
+	}
+
+	return key, nil
 }
 
 // CreatePreAuthKeyWithOptions creates a "pre authorised key" with the specified options
@@ -573,22 +583,23 @@ func (s *Scenario) CreatePreAuthKeyWithTags(
 // CreateUser creates a [User] to be created in the
 // Headscale instance on behalf of the [Scenario].
 func (s *Scenario) CreateUser(user string) (*clientv1.User, error) {
-	if headscale, err := s.Headscale(); err == nil { //nolint:noinlineerr
-		u, err := headscale.CreateUser(user)
-		if err != nil {
-			return nil, fmt.Errorf("creating user: %w", err)
-		}
-
-		s.mu.Lock()
-		s.users[user] = &User{
-			Clients: make(map[string]TailscaleClient),
-		}
-		s.mu.Unlock()
-
-		return u, nil
+	headscale, err := s.Headscale()
+	if err != nil {
+		return nil, fmt.Errorf("creating user: %w", errNoHeadscaleAvailable)
 	}
 
-	return nil, fmt.Errorf("creating user: %w", errNoHeadscaleAvailable)
+	u, err := headscale.CreateUser(user)
+	if err != nil {
+		return nil, fmt.Errorf("creating user: %w", err)
+	}
+
+	s.mu.Lock()
+	s.users[user] = &User{
+		Clients: make(map[string]TailscaleClient),
+	}
+	s.mu.Unlock()
+
+	return u, nil
 }
 
 /// Client related stuff
@@ -789,7 +800,11 @@ func (s *Scenario) CountTailscale() int {
 func (s *Scenario) WaitForTailscaleSync() error {
 	tsCount := s.CountTailscale()
 
-	err := s.WaitForTailscaleSyncWithPeerCount(tsCount-1, integrationutil.PeerSyncTimeout(), integrationutil.PeerSyncRetryInterval())
+	err := s.WaitForTailscaleSyncWithPeerCount(
+		tsCount-1,
+		integrationutil.PeerSyncTimeout(),
+		integrationutil.PeerSyncRetryInterval(),
+	)
 	if err != nil {
 		for _, user := range s.users {
 			for _, client := range user.Clients {
@@ -850,35 +865,6 @@ func (s *Scenario) WaitForTailscaleSyncWithPeerCount(peerCount int, timeout, ret
 	return s.waitPeers(func(*User) int { return peerCount }, timeout, retryInterval)
 }
 
-// waitPeers blocks until every [TailscaleClient] reports the expected peer
-// count returned by perUser for its owning user, fanning out per user.
-func (s *Scenario) waitPeers(perUser func(*User) int, timeout, retryInterval time.Duration) error {
-	var allErrors []error
-
-	for _, user := range s.users {
-		expectedCount := perUser(user)
-
-		for _, client := range user.Clients {
-			c := client
-
-			user.syncWaitGroup.Go(func() error {
-				return c.WaitForPeers(expectedCount, timeout, retryInterval)
-			})
-		}
-
-		err := user.syncWaitGroup.Wait()
-		if err != nil {
-			allErrors = append(allErrors, err)
-		}
-	}
-
-	if len(allErrors) > 0 {
-		return multierr.New(allErrors...)
-	}
-
-	return nil
-}
-
 func (s *Scenario) CreateHeadscaleEnvWithLoginURL(
 	tsOpts []tsic.Option,
 	opts ...hsic.Option,
@@ -891,98 +877,6 @@ func (s *Scenario) CreateHeadscaleEnv(
 	opts ...hsic.Option,
 ) error {
 	return s.createHeadscaleEnv(false, tsOpts, opts...)
-}
-
-// CreateHeadscaleEnv starts the headscale environment and the clients
-// according to the [ScenarioSpec] passed to the [Scenario].
-func (s *Scenario) createHeadscaleEnv(
-	withURL bool,
-	tsOpts []tsic.Option,
-	opts ...hsic.Option,
-) error {
-	return s.createHeadscaleEnvWithTags(withURL, tsOpts, nil, "", opts...)
-}
-
-// createHeadscaleEnvWithTags starts the headscale environment and the clients
-// according to the [ScenarioSpec] passed to the [Scenario]. If preAuthKeyTags is
-// non-empty and withURL is false, the tags will be applied to the PreAuthKey
-// (tags-as-identity model).
-//
-// For webauth (withURL=true), if webauthTagUser is non-empty and preAuthKeyTags
-// is non-empty, only nodes belonging to that user will request tags via
-// --advertise-tags. This is necessary because tagOwners ACL controls which
-// users can request specific tags.
-func (s *Scenario) createHeadscaleEnvWithTags(
-	withURL bool,
-	tsOpts []tsic.Option,
-	preAuthKeyTags []string,
-	webauthTagUser string,
-	opts ...hsic.Option,
-) error {
-	headscale, err := s.Headscale(opts...)
-	if err != nil {
-		return err
-	}
-
-	for _, user := range s.spec.Users {
-		var u *clientv1.User
-
-		if s.spec.OIDCSkipUserCreation {
-			// Only register locally — OIDC login will create the headscale user.
-			s.mu.Lock()
-			s.users[user] = &User{Clients: make(map[string]TailscaleClient)}
-			s.mu.Unlock()
-		} else {
-			u, err = s.CreateUser(user)
-			if err != nil {
-				return err
-			}
-		}
-
-		var userOpts []tsic.Option
-		if s.userToNetwork != nil {
-			userOpts = append(tsOpts, tsic.WithNetwork(s.userToNetwork[user]))
-		} else {
-			userOpts = append(tsOpts, tsic.WithNetwork(s.networks[s.testDefaultNetwork]))
-		}
-
-		// For webauth with tags, only apply tags to the specified webauthTagUser
-		// (other users may not be authorized via tagOwners)
-		if withURL && webauthTagUser != "" && len(preAuthKeyTags) > 0 && user == webauthTagUser {
-			userOpts = append(userOpts, tsic.WithTags(preAuthKeyTags))
-		}
-
-		err = s.CreateTailscaleNodesInUser(user, "all", s.spec.NodesPerUser, userOpts...)
-		if err != nil {
-			return err
-		}
-
-		if withURL {
-			err = s.RunTailscaleUpWithURL(user, headscale.GetEndpoint())
-			if err != nil {
-				return err
-			}
-		} else {
-			// Use tagged PreAuthKey if tags are provided (tags-as-identity model)
-			var key *clientv1.PreAuthKey
-			if len(preAuthKeyTags) > 0 {
-				key, err = s.CreatePreAuthKeyWithTags(mustParseID(u.Id), true, false, preAuthKeyTags)
-			} else {
-				key, err = s.CreatePreAuthKey(mustParseID(u.Id), true, false)
-			}
-
-			if err != nil {
-				return err
-			}
-
-			err = s.RunTailscaleUp(user, headscale.GetEndpoint(), key.Key)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
 }
 
 func (s *Scenario) RunTailscaleUpWithURL(userStr, loginServer string) error {
@@ -1157,25 +1051,25 @@ func doLoginURLWithClient(hostname string, loginURL *url.URL, hc *http.Client, f
 	error,
 ) {
 	if hc == nil {
-		return "", nil, fmt.Errorf("%s http client is nil", hostname) //nolint:err113
+		return "", nil, fmt.Errorf("%s http client is nil", hostname)
 	}
 
 	if loginURL == nil {
-		return "", nil, fmt.Errorf("%s login url is nil", hostname) //nolint:err113
+		return "", nil, fmt.Errorf("%s login url is nil", hostname)
 	}
 
 	log.Printf("%s logging in with url: %s", hostname, loginURL.String())
 
 	ctx := context.Background()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, loginURL.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, loginURL.String(), http.NoBody)
 	if err != nil {
 		return "", nil, fmt.Errorf("%s creating http request: %w", hostname, err)
 	}
 
 	originalRedirect := hc.CheckRedirect
 	if !followRedirects {
-		hc.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		hc.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		}
 	}
@@ -1208,13 +1102,13 @@ func doLoginURLWithClient(hostname string, loginURL *url.URL, hc *http.Client, f
 	if followRedirects && resp.StatusCode != http.StatusOK {
 		log.Printf("body: %s", body)
 
-		return body, redirectURL, fmt.Errorf("%s unexpected status code %d", hostname, resp.StatusCode) //nolint:err113
+		return body, redirectURL, fmt.Errorf("%s unexpected status code %d", hostname, resp.StatusCode)
 	}
 
 	if resp.StatusCode >= http.StatusBadRequest {
 		log.Printf("body: %s", body)
 
-		return body, redirectURL, fmt.Errorf("%s unexpected status code %d", hostname, resp.StatusCode) //nolint:err113
+		return body, redirectURL, fmt.Errorf("%s unexpected status code %d", hostname, resp.StatusCode)
 	}
 
 	if hc.Jar != nil {
@@ -1253,14 +1147,14 @@ func submitConfirmForm(
 	// Extract form action URL.
 	actionIdx := strings.Index(htmlBody, `action="`)
 	if actionIdx == -1 {
-		return "", nil, fmt.Errorf("%s confirm form: no action attribute", hostname) //nolint:err113
+		return "", nil, fmt.Errorf("%s confirm form: no action attribute", hostname)
 	}
 
 	actionStart := actionIdx + len(`action="`)
 
 	actionEnd := strings.Index(htmlBody[actionStart:], `"`)
 	if actionEnd == -1 {
-		return "", nil, fmt.Errorf("%s confirm form: unterminated action attribute", hostname) //nolint:err113
+		return "", nil, fmt.Errorf("%s confirm form: unterminated action attribute", hostname)
 	}
 
 	formAction := htmlBody[actionStart : actionStart+actionEnd]
@@ -1269,24 +1163,24 @@ func submitConfirmForm(
 	// attributes in name-type-value order so we grab the whole tag.
 	before, _, ok := strings.Cut(htmlBody, `name="headscale_register_confirm"`)
 	if !ok {
-		return "", nil, fmt.Errorf("%s confirm form: no CSRF input", hostname) //nolint:err113
+		return "", nil, fmt.Errorf("%s confirm form: no CSRF input", hostname)
 	}
 
 	tagStart := strings.LastIndex(before, "<input")
 	if tagStart == -1 {
-		return "", nil, fmt.Errorf("%s confirm form: no input tag for CSRF", hostname) //nolint:err113
+		return "", nil, fmt.Errorf("%s confirm form: no input tag for CSRF", hostname)
 	}
 
 	tagEnd := strings.Index(htmlBody[tagStart:], ">")
 	if tagEnd == -1 {
-		return "", nil, fmt.Errorf("%s confirm form: unterminated input tag", hostname) //nolint:err113
+		return "", nil, fmt.Errorf("%s confirm form: unterminated input tag", hostname)
 	}
 
 	inputTag := htmlBody[tagStart : tagStart+tagEnd+1]
 
 	valIdx := strings.Index(inputTag, `value="`)
 	if valIdx == -1 {
-		return "", nil, fmt.Errorf("%s confirm form: no value in CSRF input", hostname) //nolint:err113
+		return "", nil, fmt.Errorf("%s confirm form: no value in CSRF input", hostname)
 	}
 
 	valStart := valIdx + len(`value="`)
@@ -1309,7 +1203,12 @@ func submitConfirmForm(
 
 	ctx := context.Background()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, confirmURL.String(), strings.NewReader(formData.Encode()))
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		confirmURL.String(),
+		strings.NewReader(formData.Encode()),
+	)
 	if err != nil {
 		return "", nil, fmt.Errorf("%s creating confirm request: %w", hostname, err)
 	}
@@ -1328,7 +1227,7 @@ func submitConfirmForm(
 	}
 
 	if confirmResp.StatusCode != http.StatusOK {
-		return string(confirmBytes), nil, fmt.Errorf( //nolint:err113
+		return string(confirmBytes), nil, fmt.Errorf(
 			"%s confirm returned status %d: %s",
 			hostname, confirmResp.StatusCode, string(confirmBytes),
 		)
@@ -1339,53 +1238,20 @@ func submitConfirmForm(
 
 var errParseAuthPage = errors.New("parsing auth page")
 
-func (s *Scenario) runHeadscaleRegister(userStr string, body string) error {
-	// see api.go HTML template
-	codeSep := strings.Split(body, "</code>")
-	if len(codeSep) != 2 {
-		return errParseAuthPage
-	}
-
-	keySep := strings.Split(codeSep[0], "--auth-id ")
-	if len(keySep) != 2 {
-		return errParseAuthPage
-	}
-
-	key := keySep[1]
-	key = strings.SplitN(key, " ", 2)[0]
-	log.Printf("registering node %s", key)
-
-	if headscale, err := s.Headscale(); err == nil { //nolint:noinlineerr
-		_, err = headscale.Execute(
-			[]string{"headscale", "auth", "register", "--user", userStr, "--auth-id", key},
-		)
-		if err != nil {
-			log.Printf("registering node: %s", err)
-
-			return err
-		}
-
-		return nil
-	}
-
-	return fmt.Errorf("finding headscale: %w", errNoHeadscaleAvailable)
-}
-
 type LoggingRoundTripper struct {
 	Hostname string
 }
 
 func (t LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	noTls := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // nolint
+	noTLS := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 
-	resp, err := noTls.RoundTrip(req)
+	resp, err := noTLS.RoundTrip(req)
 	if err != nil {
 		return nil, err
 	}
 
-	//nolint:gosec // G706: integration-only log of trusted scenario state
 	log.Printf(`
 ---
 %s - method: %s | url: %s
@@ -1420,7 +1286,7 @@ func (s *Scenario) GetIPs(user string) ([]netip.Addr, error) {
 // GetClients returns all [TailscaleClient]s associated with a [User] in a [Scenario].
 func (s *Scenario) GetClients(user string) ([]TailscaleClient, error) {
 	if ns, ok := s.users[user]; ok {
-		return xmaps.Values(ns.Clients), nil
+		return slices.Collect(maps.Values(ns.Clients)), nil
 	}
 
 	return nil, fmt.Errorf("getting clients: %w", errNoUserAvailable)
@@ -1546,6 +1412,164 @@ func (s *Scenario) CreateDERPServer(version string, opts ...dsic.Option) (*dsic.
 	return derp, nil
 }
 
+func (s *Scenario) prefixedNetworkName(name string) string {
+	return s.testHashPrefix + "-" + name
+}
+
+// waitPeers blocks until every [TailscaleClient] reports the expected peer
+// count returned by perUser for its owning user, fanning out per user.
+func (s *Scenario) waitPeers(perUser func(*User) int, timeout, retryInterval time.Duration) error {
+	var allErrors []error
+
+	for _, user := range s.users {
+		expectedCount := perUser(user)
+
+		for _, client := range user.Clients {
+			c := client
+
+			user.syncWaitGroup.Go(func() error {
+				return c.WaitForPeers(expectedCount, timeout, retryInterval)
+			})
+		}
+
+		err := user.syncWaitGroup.Wait()
+		if err != nil {
+			allErrors = append(allErrors, err)
+		}
+	}
+
+	if len(allErrors) > 0 {
+		return multierr.New(allErrors...)
+	}
+
+	return nil
+}
+
+// CreateHeadscaleEnv starts the headscale environment and the clients
+// according to the [ScenarioSpec] passed to the [Scenario].
+func (s *Scenario) createHeadscaleEnv(
+	withURL bool,
+	tsOpts []tsic.Option,
+	opts ...hsic.Option,
+) error {
+	return s.createHeadscaleEnvWithTags(withURL, tsOpts, nil, "", opts...)
+}
+
+// createHeadscaleEnvWithTags starts the headscale environment and the clients
+// according to the [ScenarioSpec] passed to the [Scenario]. If preAuthKeyTags is
+// non-empty and withURL is false, the tags will be applied to the PreAuthKey
+// (tags-as-identity model).
+//
+// For webauth (withURL=true), if webauthTagUser is non-empty and preAuthKeyTags
+// is non-empty, only nodes belonging to that user will request tags via
+// --advertise-tags. This is necessary because tagOwners ACL controls which
+// users can request specific tags.
+func (s *Scenario) createHeadscaleEnvWithTags(
+	withURL bool,
+	tsOpts []tsic.Option,
+	preAuthKeyTags []string,
+	webauthTagUser string,
+	opts ...hsic.Option,
+) error {
+	headscale, err := s.Headscale(opts...)
+	if err != nil {
+		return err
+	}
+
+	for _, user := range s.spec.Users {
+		var u *clientv1.User
+
+		if s.spec.OIDCSkipUserCreation {
+			// Only register locally — OIDC login will create the headscale user.
+			s.mu.Lock()
+			s.users[user] = &User{Clients: make(map[string]TailscaleClient)}
+			s.mu.Unlock()
+		} else {
+			u, err = s.CreateUser(user)
+			if err != nil {
+				return err
+			}
+		}
+
+		userOpts := slices.Clone(tsOpts)
+		if s.userToNetwork != nil {
+			userOpts = append(userOpts, tsic.WithNetwork(s.userToNetwork[user]))
+		} else {
+			userOpts = append(userOpts, tsic.WithNetwork(s.networks[s.testDefaultNetwork]))
+		}
+
+		// For webauth with tags, only apply tags to the specified webauthTagUser
+		// (other users may not be authorized via tagOwners)
+		if withURL && webauthTagUser != "" && len(preAuthKeyTags) > 0 && user == webauthTagUser {
+			userOpts = append(userOpts, tsic.WithTags(preAuthKeyTags))
+		}
+
+		err = s.CreateTailscaleNodesInUser(user, "all", s.spec.NodesPerUser, userOpts...)
+		if err != nil {
+			return err
+		}
+
+		if withURL {
+			err = s.RunTailscaleUpWithURL(user, headscale.GetEndpoint())
+			if err != nil {
+				return err
+			}
+		} else {
+			// Use tagged PreAuthKey if tags are provided (tags-as-identity model)
+			var key *clientv1.PreAuthKey
+			if len(preAuthKeyTags) > 0 {
+				key, err = s.CreatePreAuthKeyWithTags(mustParseID(u.Id), true, false, preAuthKeyTags)
+			} else {
+				key, err = s.CreatePreAuthKey(mustParseID(u.Id), true, false)
+			}
+
+			if err != nil {
+				return err
+			}
+
+			err = s.RunTailscaleUp(user, headscale.GetEndpoint(), key.Key)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (s *Scenario) runHeadscaleRegister(userStr, body string) error {
+	// see api.go HTML template
+	codeSep := strings.Split(body, "</code>")
+	if len(codeSep) != 2 {
+		return errParseAuthPage
+	}
+
+	keySep := strings.Split(codeSep[0], "--auth-id ")
+	if len(keySep) != 2 {
+		return errParseAuthPage
+	}
+
+	key := keySep[1]
+	key = strings.SplitN(key, " ", 2)[0]
+	log.Printf("registering node %s", key)
+
+	headscale, err := s.Headscale()
+	if err != nil {
+		return fmt.Errorf("finding headscale: %w", errNoHeadscaleAvailable)
+	}
+
+	_, err = headscale.Execute(
+		[]string{"headscale", "auth", "register", "--user", userStr, "--auth-id", key},
+	)
+	if err != nil {
+		log.Printf("registering node: %s", err)
+
+		return err
+	}
+
+	return nil
+}
+
 type scenarioOIDC struct {
 	r   *dockertest.Resource
 	cfg *types.OIDCConfig
@@ -1633,15 +1657,16 @@ func (s *Scenario) runMockOIDC(accessTTL time.Duration, users []mockoidc.MockUse
 	// Add integration test labels if running under hi tool
 	dockertestutil.DockerAddIntegrationLabels(mockOidcOptions, "oidc")
 
-	if pmockoidc, err := s.pool.BuildAndRunWithBuildOptions( //nolint:noinlineerr
+	pmockoidc, err := s.pool.BuildAndRunWithBuildOptions(
 		headscaleBuildOptions,
 		mockOidcOptions,
 		dockertestutil.DockerRestartPolicy,
-	); err == nil {
-		s.mockOIDC.r = pmockoidc
-	} else {
+	)
+	if err != nil {
 		return err
 	}
+
+	s.mockOIDC.r = pmockoidc
 
 	// headscale needs to set up the provider with a specific
 	// IP addr to ensure we get the correct config from the well-known
@@ -1653,17 +1678,17 @@ func (s *Scenario) runMockOIDC(accessTTL time.Duration, users []mockoidc.MockUse
 
 	hostEndpoint := net.JoinHostPort(ipAddr, strconv.Itoa(port))
 
-	if err := s.pool.Retry(func() error { //nolint:noinlineerr
+	err = s.pool.Retry(func() error {
 		oidcConfigURL := fmt.Sprintf("http://%s/oidc/.well-known/openid-configuration", hostEndpoint)
 		httpClient := &http.Client{}
 		ctx := context.Background()
-		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, oidcConfigURL, nil)
+		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, oidcConfigURL, http.NoBody)
 
-		resp, err := httpClient.Do(req)
-		if err != nil {
-			log.Printf("headscale mock OIDC tests is not ready: %s\n", err)
+		resp, httpErr := httpClient.Do(req)
+		if httpErr != nil {
+			log.Printf("headscale mock OIDC tests is not ready: %s\n", httpErr)
 
-			return err
+			return httpErr
 		}
 		defer resp.Body.Close()
 
@@ -1672,7 +1697,8 @@ func (s *Scenario) runMockOIDC(accessTTL time.Duration, users []mockoidc.MockUse
 		}
 
 		return nil
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
 
@@ -1694,27 +1720,18 @@ func (s *Scenario) runMockOIDC(accessTTL time.Duration, users []mockoidc.MockUse
 type extraServiceFunc func(*Scenario, string) (*dockertest.Resource, error)
 
 func Webservice(s *Scenario, networkName string) (*dockertest.Resource, error) {
-	// port, err := dockertestutil.RandomFreeHostPort()
-	// if err != nil {
-	// 	log.Fatalf("finding open port: %s", err)
-	// }
-	// portNotation := fmt.Sprintf("%d/tcp", port)
 	hash := rands.HexString(hsicOIDCMockHashLength)
 
 	hostname := "hs-webservice-" + hash
 
 	network, ok := s.networks[s.prefixedNetworkName(networkName)]
 	if !ok {
-		return nil, fmt.Errorf("network does not exist: %s", networkName) //nolint:err113
+		return nil, fmt.Errorf("network does not exist: %s", networkName)
 	}
 
 	webOpts := &dockertest.RunOptions{
-		Name: hostname,
-		Cmd:  []string{"/bin/sh", "-c", "cd / ; python3 -m http.server --bind :: 80"},
-		// ExposedPorts: []string{portNotation},
-		// PortBindings: map[docker.Port][]docker.PortBinding{
-		// 	docker.Port(portNotation): {{HostPort: strconv.Itoa(port)}},
-		// },
+		Name:     hostname,
+		Cmd:      []string{"/bin/sh", "-c", "cd / ; python3 -m http.server --bind :: 80"},
 		Networks: []*dockertest.Network{network},
 		Env:      []string{},
 	}
@@ -1735,36 +1752,6 @@ func Webservice(s *Scenario, networkName string) (*dockertest.Resource, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// headscale needs to set up the provider with a specific
-	// IP addr to ensure we get the correct config from the well-known
-	// endpoint.
-	// ipAddr := web.GetIPInNetwork(network)
-
-	// log.Println("Waiting for headscale mock oidc to be ready for tests")
-	// hostEndpoint := net.JoinHostPort(ipAddr, strconv.Itoa(port))
-
-	// if err := s.pool.Retry(func() error {
-	// 	oidcConfigURL := fmt.Sprintf("http://%s/etc/hostname", hostEndpoint)
-	// 	httpClient := &http.Client{}
-	// 	ctx := context.Background()
-	// 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, oidcConfigURL, nil)
-	// 	resp, err := httpClient.Do(req)
-	// 	if err != nil {
-	// 		log.Printf("headscale mock OIDC tests is not ready: %s\n", err)
-
-	// 		return err
-	// 	}
-	// 	defer resp.Body.Close()
-
-	// 	if resp.StatusCode != http.StatusOK {
-	// 		return errStatusCodeNotOK
-	// 	}
-
-	// 	return nil
-	// }); err != nil {
-	// 	return err
-	// }
 
 	return web, nil
 }

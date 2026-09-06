@@ -55,9 +55,13 @@ func TestOAuthClientCommands(t *testing.T) {
 
 	cases := []commandCase{
 		{
-			name:  "create sends scopes, tags, and description and shows the secret once",
-			src:   createOAuthClientCmd,
-			flags: map[string]string{"scope": "devices:core", "tag": "tag:k8s-operator", "description": "kubernetes operator"},
+			name: "create sends scopes, tags, and description and shows the secret once",
+			src:  createOAuthClientCmd,
+			flags: map[string]string{
+				"scope":       "devices:core",
+				"tag":         "tag:k8s-operator",
+				"description": "kubernetes operator",
+			},
 			routes: map[string]apiHandler{
 				"POST /api/v2/tailnet/{tailnet}/keys": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 					t.Helper()
@@ -164,7 +168,9 @@ func TestOAuthClientCommands(t *testing.T) {
 			src:   deleteOAuthClientCmd,
 			flags: map[string]string{"id": "nope"},
 			routes: map[string]apiHandler{
-				"DELETE /api/v2/tailnet/{tailnet}/keys/{id}": func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+				"DELETE /api/v2/tailnet/{tailnet}/keys/{id}": func(
+					t *testing.T, w http.ResponseWriter, _ *http.Request,
+				) {
 					t.Helper()
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusNotFound)
@@ -235,9 +241,24 @@ func TestV2Error(t *testing.T) {
 	}{
 		{name: "200 is not an error", status: http.StatusOK, body: `{"message":"ignored"}`},
 		{name: "204 is not an error", status: http.StatusNoContent},
-		{name: "message field is surfaced", status: http.StatusForbidden, body: `{"message":"scope denied"}`, want: "api error (403): scope denied"},
-		{name: "empty message falls back to the body", status: http.StatusForbidden, body: `{"message":""}`, want: `api error (403): {"message":""}`},
-		{name: "non-json body is trimmed", status: http.StatusBadGateway, body: "  bad gateway\n", want: "api error (502): bad gateway"},
+		{
+			name:   "message field is surfaced",
+			status: http.StatusForbidden,
+			body:   `{"message":"scope denied"}`,
+			want:   "api error (403): scope denied",
+		},
+		{
+			name:   "empty message falls back to the body",
+			status: http.StatusForbidden,
+			body:   `{"message":""}`,
+			want:   `api error (403): {"message":""}`,
+		},
+		{
+			name:   "non-json body is trimmed",
+			status: http.StatusBadGateway,
+			body:   "  bad gateway\n",
+			want:   "api error (502): bad gateway",
+		},
 	}
 
 	for _, tt := range tests {

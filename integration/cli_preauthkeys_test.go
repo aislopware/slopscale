@@ -41,7 +41,7 @@ func TestPreAuthKeyCommand(t *testing.T) {
 		var preAuthKey clientv1.PreAuthKey
 
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
-			err := executeAndUnmarshal(
+			executeAndUnmarshalErr := executeAndUnmarshal(
 				headscale,
 				[]string{
 					"headscale",
@@ -59,7 +59,7 @@ func TestPreAuthKeyCommand(t *testing.T) {
 				},
 				&preAuthKey,
 			)
-			assert.NoError(c, err)
+			assert.NoError(c, executeAndUnmarshalErr)
 		}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for preauth key creation")
 
 		keys[index] = &preAuthKey
@@ -158,7 +158,11 @@ func TestPreAuthKeyCommand(t *testing.T) {
 			&listedPreAuthKeysAfterExpire,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for preauth keys list after expire")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for preauth keys list after expire",
+	)
 
 	assert.True(t, listedPreAuthKeysAfterExpire[1].Expiration.Before(time.Now()))
 	assert.True(t, listedPreAuthKeysAfterExpire[2].Expiration.After(time.Now()))
@@ -202,7 +206,11 @@ func TestPreAuthKeyCommandWithoutExpiry(t *testing.T) {
 			&preAuthKey,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for preauth key creation without expiry")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for preauth key creation without expiry",
+	)
 
 	var listedPreAuthKeys []clientv1.PreAuthKey
 
@@ -268,7 +276,11 @@ func TestPreAuthKeyCommandReusableEphemeral(t *testing.T) {
 			&preAuthReusableKey,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for reusable preauth key creation")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for reusable preauth key creation",
+	)
 
 	var preAuthEphemeralKey clientv1.PreAuthKey
 
@@ -288,7 +300,11 @@ func TestPreAuthKeyCommandReusableEphemeral(t *testing.T) {
 			&preAuthEphemeralKey,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for ephemeral preauth key creation")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for ephemeral preauth key creation",
+	)
 
 	assert.True(t, preAuthEphemeralKey.Ephemeral)
 	assert.False(t, preAuthEphemeralKey.Reusable)
@@ -308,7 +324,11 @@ func TestPreAuthKeyCommandReusableEphemeral(t *testing.T) {
 			&listedPreAuthKeys,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for preauth keys list after reusable/ephemeral creation")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for preauth keys list after reusable/ephemeral creation",
+	)
 
 	// There is one key created by [Scenario.CreateHeadscaleEnv]
 	assert.Len(t, listedPreAuthKeys, 3)
@@ -358,7 +378,11 @@ func TestPreAuthKeyDeleteCommand(t *testing.T) {
 		for i := range listed {
 			assert.NotEqual(c, created.Id, listed[i].Id, "deleted key should not be listed")
 		}
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for preauth key list after delete")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for preauth key list after delete",
+	)
 }
 
 // TestPreAuthKeyCommandValidation covers the validation permutations of the
@@ -375,8 +399,14 @@ func TestPreAuthKeyCommandValidation(t *testing.T) {
 		args    []string
 		wantErr string
 	}{
-		{name: "create malformed tag", args: []string{"preauthkeys", "--user", "1", "create", "--tags", "notatag", "--output", "json"}},
-		{name: "create nonexistent user", args: []string{"preauthkeys", "--user", "99999", "create", "--output", "json"}},
+		{
+			name: "create malformed tag",
+			args: []string{"preauthkeys", "--user", "1", "create", "--tags", "notatag", "--output", "json"},
+		},
+		{
+			name: "create nonexistent user",
+			args: []string{"preauthkeys", "--user", "99999", "create", "--output", "json"},
+		},
 		{name: "expire missing id", args: []string{"preauthkeys", "expire"}, wantErr: "missing --id parameter"},
 		{name: "delete missing id", args: []string{"preauthkeys", "delete"}, wantErr: "missing --id parameter"},
 	}

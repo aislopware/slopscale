@@ -16,7 +16,13 @@ import (
 )
 
 const (
-	bypassFlag = "bypass-server-and-access-database-directly" //nolint:gosec // not a credential
+	bypassFlag = "bypass-server-and-access-database-directly"
+
+	bypassFlagHelp = "Uses the headscale config to directly access the database, " +
+		"bypassing the API and does not require the server to be running"
+	bypassFlagHelpCheck = "Open the database directly (no running server required) to resolve user " +
+		"references and to evaluate the policy's tests and sshTests blocks. " +
+		"Required when those checks are needed."
 )
 
 var errAborted = errors.New("command aborted by user")
@@ -40,7 +46,10 @@ func bypassDatabase() (*db.HSDatabase, error) {
 // openBypassDB confirms the destructive bypass action and opens the database
 // directly. The caller is responsible for closing the returned handle.
 func openBypassDB(cmd *cobra.Command) (*db.HSDatabase, error) {
-	if !confirmAction(cmd, "DO NOT run this command if an instance of headscale is running, are you sure headscale is not running?") {
+	if !confirmAction(
+		cmd,
+		"DO NOT run this command if an instance of headscale is running, are you sure headscale is not running?",
+	) {
 		return nil, errAborted
 	}
 
@@ -50,16 +59,19 @@ func openBypassDB(cmd *cobra.Command) (*db.HSDatabase, error) {
 func init() {
 	rootCmd.AddCommand(policyCmd)
 
-	getPolicy.Flags().BoolP(bypassFlag, "", false, "Uses the headscale config to directly access the database, bypassing the API and does not require the server to be running")
+	getPolicy.Flags().
+		BoolP(bypassFlag, "", false, bypassFlagHelp)
 	policyCmd.AddCommand(getPolicy)
 
 	setPolicy.Flags().StringP("file", "f", "", "Path to a policy file in HuJSON format")
-	setPolicy.Flags().BoolP(bypassFlag, "", false, "Uses the headscale config to directly access the database, bypassing the API and does not require the server to be running")
+	setPolicy.Flags().
+		BoolP(bypassFlag, "", false, bypassFlagHelp)
 	mustMarkRequired(setPolicy, "file")
 	policyCmd.AddCommand(setPolicy)
 
 	checkPolicy.Flags().StringP("file", "f", "", "Path to a policy file in HuJSON format")
-	checkPolicy.Flags().BoolP(bypassFlag, "", false, "Open the database directly (no running server required) to resolve user references and to evaluate the policy's tests and sshTests blocks. Required when those checks are needed.")
+	checkPolicy.Flags().
+		BoolP(bypassFlag, "", false, bypassFlagHelpCheck)
 	mustMarkRequired(checkPolicy, "file")
 	policyCmd.AddCommand(checkPolicy)
 }
@@ -73,7 +85,7 @@ var getPolicy = &cobra.Command{
 	Use:     "get",
 	Short:   "Print the current ACL Policy",
 	Aliases: []string{cmdShow, "view", "fetch"},
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		var policyData string
 
 		if bypass, _ := cmd.Flags().GetBool(bypassFlag); bypass {
@@ -124,7 +136,7 @@ var setPolicy = &cobra.Command{
 	Updates the existing ACL Policy with the provided policy. The policy must be a valid HuJSON object.
 	This command only works when the acl.policy_mode is set to "db", and the policy will be stored in the database.`,
 	Aliases: []string{"put", "update"},
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		policyPath, _ := cmd.Flags().GetString("file")
 
 		policyBytes, err := os.ReadFile(policyPath)
@@ -189,7 +201,7 @@ var checkPolicy = &cobra.Command{
 	running any "tests" or "sshTests" block. By default the command calls a
 	running headscale over its API; pass --` + bypassFlag + ` to
 	open the database directly when headscale is not running.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		policyPath, _ := cmd.Flags().GetString("file")
 
 		policyBytes, err := os.ReadFile(policyPath)
@@ -198,34 +210,34 @@ var checkPolicy = &cobra.Command{
 		}
 
 		if bypass, _ := cmd.Flags().GetBool(bypassFlag); bypass {
-			d, err := openBypassDB(cmd)
-			if err != nil {
-				return err
+			d, dbErr := openBypassDB(cmd)
+			if dbErr != nil {
+				return dbErr
 			}
 			defer d.Close()
 
-			users, err := d.ListUsers(nil)
-			if err != nil {
-				return fmt.Errorf("loading users: %w", err)
+			users, dbErr := d.ListUsers(nil)
+			if dbErr != nil {
+				return fmt.Errorf("loading users: %w", dbErr)
 			}
 
-			nodes, err := d.ListNodes()
-			if err != nil {
-				return fmt.Errorf("loading nodes: %w", err)
+			nodes, dbErr := d.ListNodes()
+			if dbErr != nil {
+				return fmt.Errorf("loading nodes: %w", dbErr)
 			}
 
 			// [policy.NewPolicyManager] validates structure and user references
 			// but intentionally skips test evaluation (boot path).
 			// [policy.PolicyManager.SetPolicy] is the user-write boundary and is what runs the
 			// tests and sshTests blocks.
-			pm, err := policy.NewPolicyManager(policyBytes, users, nodes.ViewSlice())
-			if err != nil {
-				return fmt.Errorf("parsing policy file: %w", err)
+			pm, dbErr := policy.NewPolicyManager(policyBytes, users, nodes.ViewSlice())
+			if dbErr != nil {
+				return fmt.Errorf("parsing policy file: %w", dbErr)
 			}
 
-			_, err = pm.SetPolicy(policyBytes)
-			if err != nil {
-				return err
+			_, dbErr = pm.SetPolicy(policyBytes)
+			if dbErr != nil {
+				return dbErr
 			}
 
 			fmt.Println("Policy is valid")
@@ -236,11 +248,11 @@ var checkPolicy = &cobra.Command{
 		policyStr := string(policyBytes)
 
 		err = withClient(func(ctx context.Context, client *clientv1.ClientWithResponses) error {
-			resp, err := client.CheckPolicyWithResponse(ctx, clientv1.CheckPolicyJSONRequestBody{
+			resp, reqErr := client.CheckPolicyWithResponse(ctx, clientv1.CheckPolicyJSONRequestBody{
 				Policy: &policyStr,
 			})
-			if err != nil {
-				return err
+			if reqErr != nil {
+				return reqErr
 			}
 
 			if resp.StatusCode() != http.StatusOK {

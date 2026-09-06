@@ -35,7 +35,7 @@ func TestAPIKeyCommands(t *testing.T) {
 	listAll := func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 		t.Helper()
 		assertBearer(t, r)
-		writeJSON(t, w, clientv1.ListApiKeysOutputBody{ApiKeys: keys})
+		writeJSON(t, w, clientv1.ListAPIKeysOutputBody{ApiKeys: keys})
 	}
 
 	deleteByPrefix := func(prefix string) apiHandler {
@@ -88,7 +88,7 @@ func TestAPIKeyCommands(t *testing.T) {
 						assert.WithinDuration(t, time.Now().Add(90*24*time.Hour), *body.Expiration, time.Minute)
 					}
 
-					writeJSON(t, w, clientv1.CreateApiKeyOutputBody{ApiKey: "abcd1234.supersecret"})
+					writeJSON(t, w, clientv1.CreateAPIKeyOutputBody{ApiKey: "abcd1234.supersecret"})
 				},
 			},
 			want: "abcd1234.supersecret\n",
@@ -109,7 +109,7 @@ func TestAPIKeyCommands(t *testing.T) {
 						assert.WithinDuration(t, time.Now().Add(time.Hour), *body.Expiration, time.Minute)
 					}
 
-					writeJSON(t, w, clientv1.CreateApiKeyOutputBody{ApiKey: "abcd1234.supersecret"})
+					writeJSON(t, w, clientv1.CreateAPIKeyOutputBody{ApiKey: "abcd1234.supersecret"})
 				},
 			},
 			want: "\"abcd1234.supersecret\"\n",

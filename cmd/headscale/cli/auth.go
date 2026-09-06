@@ -34,66 +34,72 @@ var authCmd = &cobra.Command{
 var authRegisterCmd = &cobra.Command{
 	Use:   "register",
 	Short: "Register a node to your network",
-	RunE: clientRunE(func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, args []string) error {
-		user, _ := cmd.Flags().GetString("user")
-		authID, _ := cmd.Flags().GetString("auth-id")
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			user, _ := cmd.Flags().GetString("user")
+			authID, _ := cmd.Flags().GetString("auth-id")
 
-		resp, err := client.AuthRegisterWithResponse(ctx, clientv1.AuthRegisterJSONRequestBody{
-			AuthId: &authID,
-			User:   &user,
-		})
-		if err != nil {
-			return fmt.Errorf("registering node: %w", err)
-		}
+			resp, err := client.AuthRegisterWithResponse(ctx, clientv1.AuthRegisterJSONRequestBody{
+				AuthId: &authID,
+				User:   &user,
+			})
+			if err != nil {
+				return fmt.Errorf("registering node: %w", err)
+			}
 
-		if resp.StatusCode() != http.StatusOK {
-			return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
-		}
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
 
-		node := resp.JSON200.Node
+			node := resp.JSON200.Node
 
-		return printOutput(
-			cmd,
-			node,
-			fmt.Sprintf("Node %s registered", node.GivenName),
-		)
-	}),
+			return printOutput(
+				cmd,
+				node,
+				fmt.Sprintf("Node %s registered", node.GivenName),
+			)
+		},
+	),
 }
 
 var authApproveCmd = &cobra.Command{
 	Use:   "approve",
 	Short: "Approve a pending authentication request",
-	RunE: clientRunE(func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, args []string) error {
-		authID, _ := cmd.Flags().GetString("auth-id")
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			authID, _ := cmd.Flags().GetString("auth-id")
 
-		resp, err := client.AuthApproveWithResponse(ctx, clientv1.AuthApproveJSONRequestBody{AuthId: &authID})
-		if err != nil {
-			return fmt.Errorf("approving auth request: %w", err)
-		}
+			resp, err := client.AuthApproveWithResponse(ctx, clientv1.AuthApproveJSONRequestBody{AuthId: &authID})
+			if err != nil {
+				return fmt.Errorf("approving auth request: %w", err)
+			}
 
-		if resp.StatusCode() != http.StatusOK {
-			return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
-		}
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
 
-		return printOutput(cmd, resp.JSON200, "Auth request approved")
-	}),
+			return printOutput(cmd, resp.JSON200, "Auth request approved")
+		},
+	),
 }
 
 var authRejectCmd = &cobra.Command{
 	Use:   "reject",
 	Short: "Reject a pending authentication request",
-	RunE: clientRunE(func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, args []string) error {
-		authID, _ := cmd.Flags().GetString("auth-id")
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			authID, _ := cmd.Flags().GetString("auth-id")
 
-		resp, err := client.AuthRejectWithResponse(ctx, clientv1.AuthRejectJSONRequestBody{AuthId: &authID})
-		if err != nil {
-			return fmt.Errorf("rejecting auth request: %w", err)
-		}
+			resp, err := client.AuthRejectWithResponse(ctx, clientv1.AuthRejectJSONRequestBody{AuthId: &authID})
+			if err != nil {
+				return fmt.Errorf("rejecting auth request: %w", err)
+			}
 
-		if resp.StatusCode() != http.StatusOK {
-			return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
-		}
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
 
-		return printOutput(cmd, resp.JSON200, "Auth request rejected")
-	}),
+			return printOutput(cmd, resp.JSON200, "Auth request rejected")
+		},
+	),
 }

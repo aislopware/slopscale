@@ -13,6 +13,7 @@ import (
 	"tailscale.com/tailcfg"
 )
 
+//nolint:interfacebloat // mirrors the full headscale control-plane surface exercised by integration tests
 type ControlServer interface {
 	Shutdown() (string, string, error)
 	SaveLog(path string) (string, string, error)

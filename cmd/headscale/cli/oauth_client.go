@@ -23,9 +23,12 @@ func init() {
 	oauthClientsCmd.AddCommand(listOAuthClientsCmd)
 
 	createOAuthClientCmd.Flags().
-		StringArrayP("scope", "s", nil, "Scope the client's tokens are granted (repeatable): auth_keys, oauth_keys, devices:core, devices:routes, policy_file, feature_settings (each with a :read variant), or all/all:read")
+		StringArrayP("scope", "s", nil,
+			"Scope the client's tokens are granted (repeatable): auth_keys, oauth_keys, devices:core, "+
+				"devices:routes, policy_file, feature_settings (each with a :read variant), or all/all:read")
 	createOAuthClientCmd.Flags().
-		StringArrayP("tag", "t", nil, "Tag the client's tokens may assign to devices (repeatable), e.g. tag:k8s-operator")
+		StringArrayP("tag", "t", nil,
+			"Tag the client's tokens may assign to devices (repeatable), e.g. tag:k8s-operator")
 	createOAuthClientCmd.Flags().StringP("description", "d", "", "Human-readable description")
 	oauthClientsCmd.AddCommand(createOAuthClientCmd)
 
@@ -191,11 +194,11 @@ func newV2Client() (context.Context, *clientv2.ClientWithResponses, context.Canc
 			},
 		}}
 
-		client, err := clientv2.NewClientWithResponses("http://local", clientv2.WithHTTPClient(httpClient))
-		if err != nil {
+		client, clientErr := clientv2.NewClientWithResponses("http://local", clientv2.WithHTTPClient(httpClient))
+		if clientErr != nil {
 			cancel()
 
-			return nil, nil, nil, err
+			return nil, nil, nil, clientErr
 		}
 
 		return ctx, client, cancel, nil

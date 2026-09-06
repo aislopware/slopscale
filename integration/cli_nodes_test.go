@@ -47,7 +47,7 @@ func TestNodeCommand(t *testing.T) {
 	require.NoError(t, err)
 
 	for index, regID := range regIDs {
-		_, err := headscale.Execute(
+		_, executeErr := headscale.Execute(
 			[]string{
 				"headscale",
 				"debug",
@@ -62,12 +62,12 @@ func TestNodeCommand(t *testing.T) {
 				"json",
 			},
 		)
-		require.NoError(t, err)
+		require.NoError(t, executeErr)
 
 		var node clientv1.Node
 
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
-			err = executeAndUnmarshal(
+			executeErr = executeAndUnmarshal(
 				headscale,
 				[]string{
 					"headscale",
@@ -82,7 +82,7 @@ func TestNodeCommand(t *testing.T) {
 				},
 				&node,
 			)
-			assert.NoError(c, err)
+			assert.NoError(c, executeErr)
 		}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for node registration")
 
 		nodes[index] = &node
@@ -96,7 +96,7 @@ func TestNodeCommand(t *testing.T) {
 	var listAll []clientv1.Node
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		err := executeAndUnmarshal(
+		executeAndUnmarshalErr := executeAndUnmarshal(
 			headscale,
 			[]string{
 				"headscale",
@@ -107,7 +107,7 @@ func TestNodeCommand(t *testing.T) {
 			},
 			&listAll,
 		)
-		assert.NoError(ct, err)
+		assert.NoError(ct, executeAndUnmarshalErr)
 		assert.Len(ct, listAll, len(regIDs), "Should list all nodes after CLI operations")
 	}, integrationutil.ScaledTimeout(20*time.Second), 1*time.Second)
 
@@ -132,7 +132,7 @@ func TestNodeCommand(t *testing.T) {
 	require.NoError(t, err)
 
 	for index, regID := range otherUserRegIDs {
-		_, err := headscale.Execute(
+		_, executeErr := headscale.Execute(
 			[]string{
 				"headscale",
 				"debug",
@@ -147,12 +147,12 @@ func TestNodeCommand(t *testing.T) {
 				"json",
 			},
 		)
-		require.NoError(t, err)
+		require.NoError(t, executeErr)
 
 		var node clientv1.Node
 
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
-			err = executeAndUnmarshal(
+			executeErr = executeAndUnmarshal(
 				headscale,
 				[]string{
 					"headscale",
@@ -167,14 +167,23 @@ func TestNodeCommand(t *testing.T) {
 				},
 				&node,
 			)
-			assert.NoError(c, err)
-		}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for other-user node registration")
+			assert.NoError(c, executeErr)
+		},
+			integrationutil.ScaledTimeout(10*time.Second),
+			integrationutil.FastPoll,
+			"Waiting for other-user node registration",
+		)
 
 		otherUserMachines[index] = &node
 	}
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		assert.Len(ct, otherUserMachines, len(otherUserRegIDs), "Should have correct number of otherUser machines after CLI operations")
+		assert.Len(
+			ct,
+			otherUserMachines,
+			len(otherUserRegIDs),
+			"Should have correct number of otherUser machines after CLI operations",
+		)
 	}, integrationutil.ScaledTimeout(15*time.Second), 1*time.Second)
 
 	// Test list all nodes after added otherUser
@@ -193,7 +202,11 @@ func TestNodeCommand(t *testing.T) {
 			&listAllWithotherUser,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for nodes list after adding other-user nodes")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for nodes list after adding other-user nodes",
+	)
 
 	// All nodes, nodes + otherUser
 	assert.Len(t, listAllWithotherUser, 7)
@@ -222,7 +235,11 @@ func TestNodeCommand(t *testing.T) {
 			&listOnlyotherUserMachineUser,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for nodes list filtered by other-user")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for nodes list filtered by other-user",
+	)
 
 	assert.Len(t, listOnlyotherUserMachineUser, 2)
 
@@ -306,7 +323,7 @@ func TestNodeExpireCommand(t *testing.T) {
 	nodes := make([]*clientv1.Node, len(regIDs))
 
 	for index, regID := range regIDs {
-		_, err := headscale.Execute(
+		_, executeErr := headscale.Execute(
 			[]string{
 				"headscale",
 				"debug",
@@ -321,12 +338,12 @@ func TestNodeExpireCommand(t *testing.T) {
 				"json",
 			},
 		)
-		require.NoError(t, err)
+		require.NoError(t, executeErr)
 
 		var node clientv1.Node
 
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
-			err = executeAndUnmarshal(
+			executeErr = executeAndUnmarshal(
 				headscale,
 				[]string{
 					"headscale",
@@ -341,8 +358,12 @@ func TestNodeExpireCommand(t *testing.T) {
 				},
 				&node,
 			)
-			assert.NoError(c, err)
-		}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for node-expire-user node registration")
+			assert.NoError(c, executeErr)
+		},
+			integrationutil.ScaledTimeout(10*time.Second),
+			integrationutil.FastPoll,
+			"Waiting for node-expire-user node registration",
+		)
 
 		nodes[index] = &node
 	}
@@ -376,7 +397,7 @@ func TestNodeExpireCommand(t *testing.T) {
 	}
 
 	for idx := range 3 {
-		_, err := headscale.Execute(
+		_, executeErr := headscale.Execute(
 			[]string{
 				"headscale",
 				"nodes",
@@ -385,7 +406,7 @@ func TestNodeExpireCommand(t *testing.T) {
 				listAll[idx].Id,
 			},
 		)
-		require.NoError(t, err)
+		require.NoError(t, executeErr)
 	}
 
 	var listAllAfterExpiry []clientv1.Node
@@ -447,7 +468,7 @@ func TestNodeRenameCommand(t *testing.T) {
 	require.NoError(t, err)
 
 	for index, regID := range regIDs {
-		_, err := headscale.Execute(
+		_, executeErr := headscale.Execute(
 			[]string{
 				"headscale",
 				"debug",
@@ -462,12 +483,12 @@ func TestNodeRenameCommand(t *testing.T) {
 				"json",
 			},
 		)
-		require.NoError(t, err)
+		require.NoError(t, executeErr)
 
 		var node clientv1.Node
 
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
-			err = executeAndUnmarshal(
+			executeErr = executeAndUnmarshal(
 				headscale,
 				[]string{
 					"headscale",
@@ -482,8 +503,12 @@ func TestNodeRenameCommand(t *testing.T) {
 				},
 				&node,
 			)
-			assert.NoError(c, err)
-		}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for node-rename-command node registration")
+			assert.NoError(c, executeErr)
+		},
+			integrationutil.ScaledTimeout(10*time.Second),
+			integrationutil.FastPoll,
+			"Waiting for node-rename-command node registration",
+		)
 
 		nodes[index] = &node
 	}
@@ -516,7 +541,7 @@ func TestNodeRenameCommand(t *testing.T) {
 	assert.Contains(t, listAll[4].GivenName, "node-5")
 
 	for idx := range 3 {
-		res, err := headscale.Execute(
+		res, executeErr := headscale.Execute(
 			[]string{
 				"headscale",
 				"nodes",
@@ -526,7 +551,7 @@ func TestNodeRenameCommand(t *testing.T) {
 				fmt.Sprintf("newnode-%d", idx+1),
 			},
 		)
-		require.NoError(t, err)
+		require.NoError(t, executeErr)
 
 		assert.Contains(t, res, "Node renamed")
 	}
@@ -584,7 +609,11 @@ func TestNodeRenameCommand(t *testing.T) {
 			&listAllAfterRenameAttempt,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for nodes list after failed rename attempt")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for nodes list after failed rename attempt",
+	)
 
 	assert.Len(t, listAllAfterRenameAttempt, 5)
 
@@ -598,9 +627,7 @@ func TestNodeRenameCommand(t *testing.T) {
 func TestPreAuthKeyCorrectUserLoggedInCommand(t *testing.T) {
 	IntegrationSkip(t)
 
-	//nolint:goconst // test data, not worth extracting
 	user1 := "user1"
-	//nolint:goconst // test data, not worth extracting
 	user2 := "user2"
 
 	spec := ScenarioSpec{
@@ -647,15 +674,19 @@ func TestPreAuthKeyCorrectUserLoggedInCommand(t *testing.T) {
 			&user2Key,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for user2 preauth key creation")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for user2 preauth key creation",
+	)
 
 	var listNodes []*clientv1.Node
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		var err error
+		var listNodesErr error
 
-		listNodes, err = headscale.ListNodes()
-		assert.NoError(ct, err)
+		listNodes, listNodesErr = headscale.ListNodes()
+		assert.NoError(ct, listNodesErr)
 		assert.Len(ct, listNodes, 1, "Should have exactly 1 node for user1")
 		assert.Equal(ct, user1, listNodes[0].User.Name, "Node should belong to user1")
 	}, integrationutil.ScaledTimeout(15*time.Second), 1*time.Second)
@@ -675,8 +706,8 @@ func TestPreAuthKeyCorrectUserLoggedInCommand(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		status, err := client.Status()
-		assert.NoError(ct, err)
+		status, statusErr := client.Status()
+		assert.NoError(ct, statusErr)
 		assert.NotContains(ct, []string{"Starting", "Running"}, status.BackendState,
 			"Expected node to be logged out, backend state: %s", status.BackendState)
 	}, integrationutil.StatusReadyTimeout, 2*time.Second)
@@ -687,10 +718,21 @@ func TestPreAuthKeyCorrectUserLoggedInCommand(t *testing.T) {
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		status, err := client.Status()
 		assert.NoError(ct, err)
-		assert.Equal(ct, "Running", status.BackendState, "Expected node to be logged in, backend state: %s", status.BackendState)
+		assert.Equal(
+			ct,
+			"Running",
+			status.BackendState,
+			"Expected node to be logged in, backend state: %s",
+			status.BackendState,
+		)
 		// With tags-as-identity model, tagged nodes show as [types.TaggedDevices] user (2147455555)
 		// The PreAuthKey was created with tags, so the node is tagged
-		assert.Equal(ct, "userid:2147455555", status.Self.UserID.String(), "Expected node to be logged in as tagged-devices user")
+		assert.Equal(
+			ct,
+			"userid:2147455555",
+			status.Self.UserID.String(),
+			"Expected node to be logged in as tagged-devices user",
+		)
 	}, integrationutil.StatusReadyTimeout, 2*time.Second)
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
@@ -756,7 +798,11 @@ func TestTaggedNodesCLIOutput(t *testing.T) {
 			&user2Key,
 		)
 		assert.NoError(c, err)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for user2 tagged preauth key creation")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for user2 tagged preauth key creation",
+	)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -773,8 +819,8 @@ func TestTaggedNodesCLIOutput(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		status, err := client.Status()
-		assert.NoError(ct, err)
+		status, statusErr := client.Status()
+		assert.NoError(ct, statusErr)
 		assert.NotContains(ct, []string{"Starting", "Running"}, status.BackendState,
 			"Expected node to be logged out, backend state: %s", status.BackendState)
 	}, integrationutil.StatusReadyTimeout, 2*time.Second)
@@ -786,9 +832,20 @@ func TestTaggedNodesCLIOutput(t *testing.T) {
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		status, err := client.Status()
 		assert.NoError(ct, err)
-		assert.Equal(ct, "Running", status.BackendState, "Expected node to be logged in, backend state: %s", status.BackendState)
+		assert.Equal(
+			ct,
+			"Running",
+			status.BackendState,
+			"Expected node to be logged in, backend state: %s",
+			status.BackendState,
+		)
 		// With tags-as-identity model, tagged nodes show as [types.TaggedDevices] user (2147455555)
-		assert.Equal(ct, "userid:2147455555", status.Self.UserID.String(), "Expected node to be logged in as tagged-devices user")
+		assert.Equal(
+			ct,
+			"userid:2147455555",
+			status.Self.UserID.String(),
+			"Expected node to be logged in as tagged-devices user",
+		)
 	}, integrationutil.StatusReadyTimeout, 2*time.Second)
 
 	// Wait for the second node to appear
@@ -816,7 +873,12 @@ func TestTaggedNodesCLIOutput(t *testing.T) {
 		assert.Contains(ct, stdout, "tagged-devices", "Tailscale status should show 'tagged-devices' for tagged nodes")
 
 		// The output should NOT show the raw numeric userid to the user
-		assert.NotContains(ct, stdout, "userid:2147455555", "Tailscale status should not show numeric userid for tagged nodes")
+		assert.NotContains(
+			ct,
+			stdout,
+			"userid:2147455555",
+			"Tailscale status should not show numeric userid for tagged nodes",
+		)
 	}, integrationutil.ScaledTimeout(20*time.Second), 1*time.Second)
 }
 
@@ -843,7 +905,7 @@ func TestNodeExpireFlagsCommand(t *testing.T) {
 	var node clientv1.Node
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		err := executeAndUnmarshal(headscale,
+		executeAndUnmarshalErr := executeAndUnmarshal(headscale,
 			[]string{
 				"headscale", "auth", "register",
 				"--user", "expire-flags-user",
@@ -852,7 +914,7 @@ func TestNodeExpireFlagsCommand(t *testing.T) {
 			},
 			&node,
 		)
-		assert.NoError(c, err)
+		assert.NoError(c, executeAndUnmarshalErr)
 	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for node registration")
 
 	nodeID := node.Id
@@ -864,11 +926,11 @@ func TestNodeExpireFlagsCommand(t *testing.T) {
 	listNodeByID := func(ct *assert.CollectT) *clientv1.Node {
 		var nodes []clientv1.Node
 
-		err := executeAndUnmarshal(headscale,
+		executeAndUnmarshalErr := executeAndUnmarshal(headscale,
 			[]string{"headscale", "nodes", "list", "--output", "json"},
 			&nodes,
 		)
-		require.NoError(ct, err)
+		require.NoError(ct, executeAndUnmarshalErr)
 
 		for i := range nodes {
 			if nodes[i].Id == node.Id {
@@ -971,17 +1033,37 @@ func TestNodeCommandValidation(t *testing.T) {
 		{"rename too long", []string{"nodes", "rename", "--identifier", id, strings.Repeat("t", 64)}, "too long"},
 		{"expire missing identifier", []string{"nodes", "expire"}, "identifier"},
 		{"expire nonexistent", []string{"nodes", "expire", "--identifier", "99999"}, ""},
-		{"expire invalid time", []string{"nodes", "expire", "--identifier", id, "--expiry", "not-a-time"}, "parsing expiry"},
+		{
+			"expire invalid time",
+			[]string{"nodes", "expire", "--identifier", id, "--expiry", "not-a-time"},
+			"parsing expiry",
+		},
 		{"tag missing identifier", []string{"nodes", "tag", "--tags", "tag:x"}, "identifier"},
 		{"tag empty", []string{"nodes", "tag", "--identifier", id}, "cannot remove all tags"},
 		{"tag invalid format", []string{"nodes", "tag", "--identifier", id, "--tags", "notatag"}, "tag must start"},
-		{"tag unpermitted", []string{"nodes", "tag", "--identifier", id, "--tags", "tag:undefined"}, "invalid or not permitted"},
+		{
+			"tag unpermitted",
+			[]string{"nodes", "tag", "--identifier", id, "--tags", "tag:undefined"},
+			"invalid or not permitted",
+		},
 		{"approve missing identifier", []string{"nodes", "approve-routes", "--routes", "10.0.0.0/24"}, "identifier"},
-		{"approve nonexistent", []string{"nodes", "approve-routes", "--identifier", "99999", "--routes", "10.0.0.0/24"}, ""},
-		{"approve invalid cidr", []string{"nodes", "approve-routes", "--identifier", id, "--routes", "notacidr"}, "parsing route"},
+		{
+			"approve nonexistent",
+			[]string{"nodes", "approve-routes", "--identifier", "99999", "--routes", "10.0.0.0/24"},
+			"",
+		},
+		{
+			"approve invalid cidr",
+			[]string{"nodes", "approve-routes", "--identifier", id, "--routes", "notacidr"},
+			"parsing route",
+		},
 		// The deprecated `nodes register` alias drives its own RegisterNode path;
 		// cover its error cases (the happy path is covered via `auth register`).
-		{"register nonexistent user", []string{"nodes", "register", "--user", "ghost", "--key", types.MustAuthID().String()}, ""},
+		{
+			"register nonexistent user",
+			[]string{"nodes", "register", "--user", "ghost", "--key", types.MustAuthID().String()},
+			"",
+		},
 		{"register invalid key", []string{"nodes", "register", "--user", "user1", "--key", "badkey"}, ""},
 	}
 
@@ -1050,8 +1132,8 @@ func TestNodeTagCommand(t *testing.T) {
 	var nodeID string
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		nodes, err := headscale.ListNodes()
-		assert.NoError(ct, err)
+		nodes, listNodesErr := headscale.ListNodes()
+		assert.NoError(ct, listNodesErr)
 		assert.Len(ct, nodes, 1)
 
 		if len(nodes) == 1 {
@@ -1075,8 +1157,8 @@ func TestNodeTagCommand(t *testing.T) {
 
 	// The node is now a tagged node, presented as the tagged-devices user.
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		nodes, err := headscale.ListNodes()
-		assert.NoError(ct, err)
+		nodes, listNodesErr := headscale.ListNodes()
+		assert.NoError(ct, listNodesErr)
 		assert.Len(ct, nodes, 1)
 
 		if len(nodes) == 1 {

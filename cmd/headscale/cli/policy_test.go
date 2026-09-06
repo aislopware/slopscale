@@ -245,7 +245,8 @@ func TestPolicyBypassCommands(t *testing.T) {
 		require.NoError(t, err)
 		// Byte-exact on purpose: JSONEq would hide whitespace the bypass
 		// path rewrites before storing.
-		assert.Equal(t, strictPolicy+"\n", out) //nolint:testifylint
+		//nolint:testifylint // byte-exact on purpose: JSONEq would hide whitespace rewrites
+		assert.Equal(t, strictPolicy+"\n", out)
 	})
 
 	t.Run("check accepts a valid policy", func(t *testing.T) {

@@ -364,10 +364,6 @@ func TestPingAllByHostname(t *testing.T) {
 	assertPingAll(t, allClients, allHostnames)
 }
 
-// If subtests are parallel, then they will start before setup is run.
-// This might mean we approach setup slightly wrong, but for now, ignore
-// the linter
-// nolint:tparallel
 // TestTaildrop tests the Taildrop file sharing functionality across multiple scenarios:
 // 1. Same-user transfers: Nodes owned by the same user can send files to each other
 // 2. Cross-user transfers: Nodes owned by different users cannot send files to each other
@@ -1450,7 +1446,7 @@ func TestPingAllByIPManyUpDown(t *testing.T) {
 		t.Logf("Starting DownUpPing run %d at %s", run+1, time.Now().Format(TimestampFormat))
 
 		// Create fresh errgroup with timeout for each run
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 		wg, _ := errgroup.WithContext(ctx)
 
 		for _, client := range allClients {

@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -82,7 +81,7 @@ func TestResolveSingleUser(t *testing.T) {
 		users      []clientv1.User
 		identifier string
 		flagName   string
-		wantId     string
+		wantID     string
 		wantErr    bool
 	}{
 		{
@@ -91,13 +90,13 @@ func TestResolveSingleUser(t *testing.T) {
 			name:     "resolves by name to the matched user's identifier",
 			users:    []clientv1.User{lukas, hannes},
 			flagName: "hannes@rueger.events",
-			wantId:   "9",
+			wantID:   "9",
 		},
 		{
 			name:       "resolves by identifier",
 			users:      []clientv1.User{hannes},
 			identifier: "9",
-			wantId:     "9",
+			wantID:     "9",
 		},
 		{
 			name:     "no match is an error",
@@ -126,7 +125,7 @@ func TestResolveSingleUser(t *testing.T) {
 
 			cmd := commandWithUserFlags(t, tt.identifier, tt.flagName)
 
-			id, user, err := resolveSingleUser(context.Background(), client, cmd)
+			id, user, err := resolveSingleUser(t.Context(), client, cmd)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("resolveSingleUser() error = nil, want error")
@@ -139,12 +138,12 @@ func TestResolveSingleUser(t *testing.T) {
 				t.Fatalf("resolveSingleUser() error = %v", err)
 			}
 
-			if id != tt.wantId {
-				t.Errorf("resolveSingleUser() id = %q, want %q", id, tt.wantId)
+			if id != tt.wantID {
+				t.Errorf("resolveSingleUser() id = %q, want %q", id, tt.wantID)
 			}
 
-			if user.Id != tt.wantId {
-				t.Errorf("resolveSingleUser() user.Id = %q, want %q", user.Id, tt.wantId)
+			if user.Id != tt.wantID {
+				t.Errorf("resolveSingleUser() user.Id = %q, want %q", user.Id, tt.wantID)
 			}
 		})
 	}
@@ -211,10 +210,14 @@ func TestUserCommands(t *testing.T) {
 
 	cases := []commandCase{
 		{
-			name:  "create sends the optional fields",
-			src:   createUserCmd,
-			args:  []string{"alice"},
-			flags: map[string]string{"display-name": "Alice", "email": "alice@example.com", "picture-url": "https://example.com/a.png"},
+			name: "create sends the optional fields",
+			src:  createUserCmd,
+			args: []string{"alice"},
+			flags: map[string]string{
+				"display-name": "Alice",
+				"email":        "alice@example.com",
+				"picture-url":  "https://example.com/a.png",
+			},
 			routes: map[string]apiHandler{
 				"POST /api/v1/user": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 					t.Helper()

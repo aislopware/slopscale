@@ -22,10 +22,10 @@ func TestAPIV1SocketClient(t *testing.T) {
 
 	socketPath := filepath.Join(t.TempDir(), "headscale.sock")
 
-	lis, err := new(net.ListenConfig).Listen(context.Background(), "unix", socketPath)
+	lis, err := new(net.ListenConfig).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)
 
-	srv := &http.Server{Handler: newHumaTestHandler(app)} //nolint:gosec
+	srv := &http.Server{Handler: newHumaTestHandler(app)}
 	go func() { _ = srv.Serve(lis) }()
 
 	t.Cleanup(func() { _ = srv.Close() })
@@ -46,7 +46,7 @@ func TestAPIV1SocketClient(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	health, err := client.HealthWithResponse(ctx)
 	require.NoError(t, err)

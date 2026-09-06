@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -72,14 +71,14 @@ func TestAPIAuthenticationBypass(t *testing.T) {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
 
 	t.Run("HTTP_NoAuthHeader", func(t *testing.T) {
 		// Test 1: Request without any Authorization header
 		// Expected: Should return 401 with ONLY "Unauthorized" text, no user data
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, apiURL, nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, apiURL, http.NoBody)
 		require.NoError(t, err)
 
 		resp, err := client.Do(req)
@@ -131,7 +130,7 @@ func TestAPIAuthenticationBypass(t *testing.T) {
 	t.Run("HTTP_InvalidAuthHeader", func(t *testing.T) {
 		// Test 2: Request with invalid Authorization header (missing "Bearer " prefix)
 		// Expected: Should return 401 with ONLY "Unauthorized" text, no user data
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, apiURL, nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, apiURL, http.NoBody)
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "InvalidToken")
 
@@ -165,7 +164,7 @@ func TestAPIAuthenticationBypass(t *testing.T) {
 		// Test 3: Request with Bearer prefix but invalid token
 		// Expected: Should return 401 with ONLY "Unauthorized" text, no user data
 		// Note: Both malformed and properly formatted invalid tokens should return 401
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, apiURL, nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, apiURL, http.NoBody)
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer invalid-token-12345")
 
@@ -198,7 +197,7 @@ func TestAPIAuthenticationBypass(t *testing.T) {
 	t.Run("HTTP_ValidAPIKey", func(t *testing.T) {
 		// Test 4: Request with valid API key
 		// Expected: Should return 200 with user data (this is the authorized case)
-		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, apiURL, nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, apiURL, http.NoBody)
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer "+validAPIKey)
 
@@ -464,8 +463,12 @@ func TestRemoteCLIAuthenticationBypass(t *testing.T) {
 		// the CLI should fail immediately
 		_, err := headscale.Execute(
 			[]string{
-				"sh", "-c",
-				fmt.Sprintf("HEADSCALE_CLI_ADDRESS=%s HEADSCALE_CLI_INSECURE=true headscale users list --output json 2>&1", remoteAddr),
+				"sh",
+				"-c",
+				fmt.Sprintf(
+					"HEADSCALE_CLI_ADDRESS=%s HEADSCALE_CLI_INSECURE=true headscale users list --output json 2>&1",
+					remoteAddr,
+				),
 			},
 		)
 
@@ -478,8 +481,13 @@ func TestRemoteCLIAuthenticationBypass(t *testing.T) {
 		// Test 2: Try to use CLI with invalid API key (should fail with auth error)
 		output, err := headscale.Execute(
 			[]string{
-				"sh", "-c",
-				fmt.Sprintf("HEADSCALE_CLI_ADDRESS=%s HEADSCALE_CLI_API_KEY=invalid-key-12345 HEADSCALE_CLI_INSECURE=true headscale users list --output json 2>&1", remoteAddr),
+				"sh",
+				"-c",
+				fmt.Sprintf(
+					"HEADSCALE_CLI_ADDRESS=%s HEADSCALE_CLI_API_KEY=invalid-key-12345 "+
+						"HEADSCALE_CLI_INSECURE=true headscale users list --output json 2>&1",
+					remoteAddr,
+				),
 			},
 		)
 
@@ -508,8 +516,14 @@ func TestRemoteCLIAuthenticationBypass(t *testing.T) {
 		// Test 3: Use CLI with valid API key (should succeed)
 		output, err := headscale.Execute(
 			[]string{
-				"sh", "-c",
-				fmt.Sprintf("HEADSCALE_CLI_ADDRESS=%s HEADSCALE_CLI_API_KEY=%s HEADSCALE_CLI_INSECURE=true headscale users list --output json", remoteAddr, validAPIKey),
+				"sh",
+				"-c",
+				fmt.Sprintf(
+					"HEADSCALE_CLI_ADDRESS=%s HEADSCALE_CLI_API_KEY=%s "+
+						"HEADSCALE_CLI_INSECURE=true headscale users list --output json",
+					remoteAddr,
+					validAPIKey,
+				),
 			},
 		)
 

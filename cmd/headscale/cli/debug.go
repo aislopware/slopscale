@@ -33,32 +33,34 @@ var debugCmd = &cobra.Command{
 var createNodeCmd = &cobra.Command{
 	Use:   "create-node",
 	Short: "Create a node that can be registered with `auth register <>` command",
-	RunE: clientRunE(func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, args []string) error {
-		user, _ := cmd.Flags().GetString("user")
-		name, _ := cmd.Flags().GetString("name")
-		registrationID, _ := cmd.Flags().GetString("key")
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			user, _ := cmd.Flags().GetString("user")
+			name, _ := cmd.Flags().GetString("name")
+			registrationID, _ := cmd.Flags().GetString("key")
 
-		_, err := types.AuthIDFromString(registrationID)
-		if err != nil {
-			return fmt.Errorf("parsing machine key: %w", err)
-		}
+			_, err := types.AuthIDFromString(registrationID)
+			if err != nil {
+				return fmt.Errorf("parsing machine key: %w", err)
+			}
 
-		routes, _ := cmd.Flags().GetStringSlice("route")
+			routes, _ := cmd.Flags().GetStringSlice("route")
 
-		resp, err := client.DebugCreateNodeWithResponse(ctx, clientv1.DebugCreateNodeJSONRequestBody{
-			Key:    &registrationID,
-			Name:   &name,
-			User:   &user,
-			Routes: &routes,
-		})
-		if err != nil {
-			return fmt.Errorf("creating node: %w", err)
-		}
+			resp, err := client.DebugCreateNodeWithResponse(ctx, clientv1.DebugCreateNodeJSONRequestBody{
+				Key:    &registrationID,
+				Name:   &name,
+				User:   &user,
+				Routes: &routes,
+			})
+			if err != nil {
+				return fmt.Errorf("creating node: %w", err)
+			}
 
-		if resp.StatusCode() != http.StatusOK {
-			return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
-		}
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
 
-		return printOutput(cmd, resp.JSON200.Node, "Node created")
-	}),
+			return printOutput(cmd, resp.JSON200.Node, "Node created")
+		},
+	),
 }

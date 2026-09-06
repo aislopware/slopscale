@@ -456,7 +456,11 @@ func TestNodeCommands(t *testing.T) {
 				"POST /api/v1/node/backfillips": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 					t.Helper()
 					assert.Equal(t, "true", r.URL.Query().Get("confirmed"))
-					writeJSON(t, w, clientv1.BackfillNodeIPsOutputBody{Changes: []string{"node 7: added fd7a:115c:a1e0::7"}})
+					writeJSON(
+						t,
+						w,
+						clientv1.BackfillNodeIPsOutputBody{Changes: []string{"node 7: added fd7a:115c:a1e0::7"}},
+					)
 				},
 			},
 			want: "Node IPs backfilled successfully\n",
@@ -468,10 +472,17 @@ func TestNodeCommands(t *testing.T) {
 			routes: map[string]apiHandler{
 				"POST /api/v1/node/backfillips": func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
 					t.Helper()
-					writeJSON(t, w, clientv1.BackfillNodeIPsOutputBody{Changes: []string{"node 7: added fd7a:115c:a1e0::7"}})
+					writeJSON(
+						t,
+						w,
+						clientv1.BackfillNodeIPsOutputBody{Changes: []string{"node 7: added fd7a:115c:a1e0::7"}},
+					)
 				},
 			},
-			want: indentJSON(t, clientv1.BackfillNodeIPsOutputBody{Changes: []string{"node 7: added fd7a:115c:a1e0::7"}}),
+			want: indentJSON(
+				t,
+				clientv1.BackfillNodeIPsOutputBody{Changes: []string{"node 7: added fd7a:115c:a1e0::7"}},
+			),
 		},
 		{
 			name:   "backfillips declined at the prompt does nothing",

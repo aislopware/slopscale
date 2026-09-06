@@ -40,7 +40,7 @@ func TestUserCommand(t *testing.T) {
 	)
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		err := executeAndUnmarshal(headscale,
+		executeAndUnmarshalErr := executeAndUnmarshal(headscale,
 			[]string{
 				"headscale",
 				"users",
@@ -50,7 +50,7 @@ func TestUserCommand(t *testing.T) {
 			},
 			&listUsers,
 		)
-		assert.NoError(ct, err)
+		assert.NoError(ct, executeAndUnmarshalErr)
 
 		slices.SortFunc(listUsers, sortWithID)
 		result = []string{listUsers[0].Name, listUsers[1].Name}
@@ -78,7 +78,7 @@ func TestUserCommand(t *testing.T) {
 	var listAfterRenameUsers []*clientv1.User
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		err := executeAndUnmarshal(headscale,
+		executeAndUnmarshalErr := executeAndUnmarshal(headscale,
 			[]string{
 				"headscale",
 				"users",
@@ -88,7 +88,7 @@ func TestUserCommand(t *testing.T) {
 			},
 			&listAfterRenameUsers,
 		)
-		assert.NoError(ct, err)
+		assert.NoError(ct, executeAndUnmarshalErr)
 
 		slices.SortFunc(listAfterRenameUsers, sortWithID)
 		result = []string{listAfterRenameUsers[0].Name, listAfterRenameUsers[1].Name}
@@ -128,7 +128,12 @@ func TestUserCommand(t *testing.T) {
 		},
 	}
 
-	if diff := tcmp.Diff(want, listByUsername, cmpopts.IgnoreUnexported(clientv1.User{}), cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt")); diff != "" {
+	if diff := tcmp.Diff(
+		want,
+		listByUsername,
+		cmpopts.IgnoreUnexported(clientv1.User{}),
+		cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+	); diff != "" {
 		t.Errorf("unexpected users (-want +got):\n%s", diff)
 	}
 
@@ -159,7 +164,12 @@ func TestUserCommand(t *testing.T) {
 		},
 	}
 
-	if diff := tcmp.Diff(want, listByID, cmpopts.IgnoreUnexported(clientv1.User{}), cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt")); diff != "" {
+	if diff := tcmp.Diff(
+		want,
+		listByID,
+		cmpopts.IgnoreUnexported(clientv1.User{}),
+		cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+	); diff != "" {
 		t.Errorf("unexpected users (-want +got):\n%s", diff)
 	}
 
@@ -179,7 +189,7 @@ func TestUserCommand(t *testing.T) {
 	var listAfterIDDelete []*clientv1.User
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		err := executeAndUnmarshal(headscale,
+		executeAndUnmarshalErr := executeAndUnmarshal(headscale,
 			[]string{
 				"headscale",
 				"users",
@@ -189,7 +199,7 @@ func TestUserCommand(t *testing.T) {
 			},
 			&listAfterIDDelete,
 		)
-		assert.NoError(ct, err)
+		assert.NoError(ct, executeAndUnmarshalErr)
 
 		slices.SortFunc(listAfterIDDelete, sortWithID)
 
@@ -201,7 +211,12 @@ func TestUserCommand(t *testing.T) {
 			},
 		}
 
-		if diff := tcmp.Diff(want, listAfterIDDelete, cmpopts.IgnoreUnexported(clientv1.User{}), cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt")); diff != "" {
+		if diff := tcmp.Diff(
+			want,
+			listAfterIDDelete,
+			cmpopts.IgnoreUnexported(clientv1.User{}),
+			cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+		); diff != "" {
 			assert.Fail(ct, "unexpected users", "diff (-want +got):\n%s", diff)
 		}
 	}, integrationutil.ScaledTimeout(20*time.Second), 1*time.Second)
@@ -233,7 +248,11 @@ func TestUserCommand(t *testing.T) {
 		)
 		assert.NoError(c, err)
 		assert.Empty(c, listAfterNameDelete)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for user list after name delete")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"Waiting for user list after name delete",
+	)
 }
 
 // TestUserCreateCommand exercises `headscale users create` with all of its
@@ -310,10 +329,22 @@ func TestUserCommandValidation(t *testing.T) {
 		{name: "create missing name", args: []string{"users", "create"}, wantErr: "missing parameters"},
 		{name: "create duplicate", args: []string{"users", "create", "user1"}},
 		{name: "rename missing new-name", args: []string{"users", "rename", "--identifier", "1"}, wantErr: "new-name"},
-		{name: "rename missing selector", args: []string{"users", "rename", "--new-name", "x"}, wantErr: "--name or --identifier"},
-		{name: "destroy missing selector", args: []string{"users", "destroy", "--force"}, wantErr: "--name or --identifier"},
+		{
+			name:    "rename missing selector",
+			args:    []string{"users", "rename", "--new-name", "x"},
+			wantErr: "--name or --identifier",
+		},
+		{
+			name:    "destroy missing selector",
+			args:    []string{"users", "destroy", "--force"},
+			wantErr: "--name or --identifier",
+		},
 		{name: "destroy nonexistent", args: []string{"users", "destroy", "--force", "--identifier", "99999"}},
-		{name: "list nonexistent name is empty", args: []string{"users", "list", "--name", "ghost", "--output", "json"}, wantEmptyList: true},
+		{
+			name:          "list nonexistent name is empty",
+			args:          []string{"users", "list", "--name", "ghost", "--output", "json"},
+			wantEmptyList: true,
+		},
 	}
 
 	for _, tt := range tests {
