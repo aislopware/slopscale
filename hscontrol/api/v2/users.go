@@ -16,13 +16,14 @@ func init() {
 	registrations = append(registrations, registerUsers)
 }
 
-// Headscale models neither user type nor status and has a single tailnet,
-// so these fields are fixed strings: every account is an active member. The
-// role is the user's real admin role.
+// Headscale models no user type and has a single tailnet, so those fields
+// are fixed strings: every account is a member of tailnet 1. The role is
+// the user's real admin role and the status reflects users approval.
 const (
-	userTypeMember   = "member"
-	userStatusActive = "active"
-	singleTailnetID  = "1"
+	userTypeMember          = "member"
+	userStatusActive        = "active"
+	userStatusNeedsApproval = "needs-approval"
+	singleTailnetID         = "1"
 
 	// tagTailscaleCompat marks operations ported from the Tailscale API.
 	tagTailscaleCompat = "Tailscale compat"
@@ -120,6 +121,50 @@ func registerUsers(api huma.API, b Backend) {
 
 		return out, nil
 	})
+
+	registerUserApproval(api, b, usersTags)
+}
+
+// registerUserApproval registers the Tailscale approve/suspend/restore
+// user actions. Suspend and restore map onto withdrawing and re-granting
+// approval: a suspended user cannot register nodes and their nodes lose
+// their peers until restored.
+func registerUserApproval(api huma.API, b Backend, usersTags []string) {
+	actions := []struct {
+		id, path, summary string
+		approved          bool
+	}{
+		{"approveUser", "approve", "Approve a user", true},
+		{"suspendUser", "suspend", "Suspend a user", false},
+		{"restoreUser", "restore", "Restore a user", true},
+	}
+
+	for _, action := range actions {
+		huma.Register(api, principal.RequireScope(huma.Operation{
+			OperationID:   action.id,
+			Method:        http.MethodPost,
+			Path:          "/api/v2/users/{id}/" + action.path,
+			Summary:       action.summary,
+			Tags:          usersTags,
+			Security:      security,
+			DefaultStatus: http.StatusOK,
+			Errors:        []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
+		}, scope.Users), func(_ context.Context, in *userByIDInput) (*emptyOutput, error) {
+			view, err := lookupUser(b, in.UserID)
+			if err != nil {
+				return nil, err
+			}
+
+			_, userChange, err := b.State.SetUserApproval(types.UserID(view.ID()), action.approved)
+			if err != nil {
+				return nil, mapError(action.summary, err)
+			}
+
+			b.Change(userChange)
+
+			return &emptyOutput{}, nil
+		})
+	}
 }
 
 // lookupUser resolves a user id to its UserView, mapping a malformed or unknown
@@ -159,6 +204,10 @@ func userFromView(b Backend, view types.UserView) User {
 		Type:          userTypeMember,
 		Role:          view.Role().String(),
 		Status:        userStatusActive,
+	}
+
+	if !view.ApprovedAt().Valid() {
+		u.Status = userStatusNeedsApproval
 	}
 
 	nodes := b.State.ListNodesByUser(types.UserID(view.ID()))

@@ -3,6 +3,8 @@
   "body": {
     "users": [
       {
+        "approved": true,
+        "approvedAt": "\u003ctimestamp\u003e",
         "createdAt": "\u003ctimestamp\u003e",
         "displayName": "",
         "email": "",

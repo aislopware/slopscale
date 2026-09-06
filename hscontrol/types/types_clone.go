@@ -25,6 +25,9 @@ func (src *User) Clone() *User {
 	if dst.DeletedAt != nil {
 		dst.DeletedAt = new(*src.DeletedAt)
 	}
+	if dst.ApprovedAt != nil {
+		dst.ApprovedAt = new(*src.ApprovedAt)
+	}
 	return dst
 }
 
@@ -41,6 +44,7 @@ var _UserCloneNeedsRegeneration = User(struct {
 	Provider           string
 	ProfilePicURL      string
 	Role               Role
+	ApprovedAt         *time.Time
 }{})
 
 // Clone makes a deep copy of Node.
@@ -75,6 +79,9 @@ func (src *Node) Clone() *Node {
 		dst.LastSeen = new(*src.LastSeen)
 	}
 	dst.ApprovedRoutes = append(src.ApprovedRoutes[:0:0], src.ApprovedRoutes...)
+	if dst.ApprovedAt != nil {
+		dst.ApprovedAt = new(*src.ApprovedAt)
+	}
 	if dst.DeletedAt != nil {
 		dst.DeletedAt = new(*src.DeletedAt)
 	}
@@ -105,6 +112,7 @@ var _NodeCloneNeedsRegeneration = Node(struct {
 	Expiry         *time.Time
 	LastSeen       *time.Time
 	ApprovedRoutes Prefixes
+	ApprovedAt     *time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	DeletedAt      *time.Time
@@ -142,18 +150,19 @@ func (src *PreAuthKey) Clone() *PreAuthKey {
 
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _PreAuthKeyCloneNeedsRegeneration = PreAuthKey(struct {
-	ID          uint64
-	Key         string
-	Prefix      string
-	Hash        []byte
-	UserID      *uint
-	User        *User
-	Description string
-	Reusable    bool
-	Ephemeral   bool
-	Used        bool
-	Tags        []string
-	CreatedAt   *time.Time
-	Expiration  *time.Time
-	Revoked     *time.Time
+	ID            uint64
+	Key           string
+	Prefix        string
+	Hash          []byte
+	UserID        *uint
+	User          *User
+	Description   string
+	Preauthorized bool
+	Reusable      bool
+	Ephemeral     bool
+	Used          bool
+	Tags          []string
+	CreatedAt     *time.Time
+	Expiration    *time.Time
+	Revoked       *time.Time
 }{})

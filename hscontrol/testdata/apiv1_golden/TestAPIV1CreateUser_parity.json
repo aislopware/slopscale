@@ -2,6 +2,8 @@
   "status": 200,
   "body": {
     "user": {
+      "approved": true,
+      "approvedAt": "\u003ctimestamp\u003e",
       "createdAt": "\u003ctimestamp\u003e",
       "displayName": "Test",
       "email": "t@example.com",

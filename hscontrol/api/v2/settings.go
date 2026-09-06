@@ -2,7 +2,6 @@ package apiv2
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -49,10 +48,33 @@ type (
 	}
 	patchSettingsInput struct {
 		Tailnet string `path:"tailnet"`
-		// Accepted and ignored; updating settings is not supported.
-		Body json.RawMessage
+		Body    UpdateTailnetSettings
 	}
 )
+
+// UpdateTailnetSettings carries the settings a PATCH may change; absent
+// fields keep their value. Switching an approval off approves everything
+// that was waiting. The other Tailscale settings are file-based here and
+// are rejected.
+type UpdateTailnetSettings struct {
+	DevicesApprovalOn *bool `json:"devicesApprovalOn,omitempty"`
+	UsersApprovalOn   *bool `json:"usersApprovalOn,omitempty"`
+}
+
+func tailnetSettings(b Backend) TailnetSettings {
+	cfg := b.Cfg
+	current := b.State.Settings()
+
+	return TailnetSettings{
+		// File-mode policy is genuinely externally managed (read-only via API).
+		ACLsExternallyManagedOn:                cfg.Policy.Mode == types.PolicyModeFile,
+		DevicesApprovalOn:                      current.DevicesApprovalOn,
+		DevicesKeyDurationDays:                 int(cfg.Node.Expiry / (hoursPerDay * time.Hour)),
+		HTTPSEnabled:                           cfg.TLS.CertPath != "" || cfg.TLS.LetsEncrypt.Hostname != "",
+		UsersApprovalOn:                        current.UsersApprovalOn,
+		UsersRoleAllowedToJoinExternalTailnets: "none",
+	}
+}
 
 func registerSettings(api huma.API, b Backend) {
 	settingsTags := []string{"TailnetSettings", "Tailscale compat"}
@@ -71,15 +93,7 @@ func registerSettings(api huma.API, b Backend) {
 			return nil, err
 		}
 
-		cfg := b.Cfg
-
-		return &settingsOutput{Body: TailnetSettings{
-			// File-mode policy is genuinely externally managed (read-only via API).
-			ACLsExternallyManagedOn:                cfg.Policy.Mode == types.PolicyModeFile,
-			DevicesKeyDurationDays:                 int(cfg.Node.Expiry / (hoursPerDay * time.Hour)),
-			HTTPSEnabled:                           cfg.TLS.CertPath != "" || cfg.TLS.LetsEncrypt.Hostname != "",
-			UsersRoleAllowedToJoinExternalTailnets: "none",
-		}}, nil
+		return &settingsOutput{Body: tailnetSettings(b)}, nil
 	})
 
 	huma.Register(api, principal.RequireScope(huma.Operation{
@@ -87,24 +101,38 @@ func registerSettings(api huma.API, b Backend) {
 		Method:      http.MethodPatch,
 		Path:        "/api/v2/tailnet/{tailnet}/settings",
 		Summary:     "Update tailnet settings",
-		Tags:        settingsTags,
-		Security:    security,
-		// The body is accepted but ignored; skip validation.
-		SkipValidateBody: true,
-		Errors: []int{
-			http.StatusUnauthorized,
-			http.StatusForbidden,
-			http.StatusNotFound,
-			http.StatusNotImplemented,
-		},
+		Description: "Changes devicesApprovalOn and usersApprovalOn; the other settings are " +
+			"file-based in Headscale and cannot be changed here.",
+		Tags:     settingsTags,
+		Security: security,
+		Errors:   []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.FeatureSettings), func(_ context.Context, in *patchSettingsInput) (*settingsOutput, error) {
 		err := requireDefaultTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
 		}
 
-		return nil, huma.Error501NotImplemented(
-			"updating tailnet settings is not supported by Headscale",
-		)
+		updates := []struct {
+			key   types.SettingKey
+			value *bool
+		}{
+			{types.SettingDevicesApprovalOn, in.Body.DevicesApprovalOn},
+			{types.SettingUsersApprovalOn, in.Body.UsersApprovalOn},
+		}
+
+		for _, u := range updates {
+			if u.value == nil {
+				continue
+			}
+
+			c, err := b.State.SetSetting(u.key, *u.value)
+			if err != nil {
+				return nil, mapError("updating tailnet settings", err)
+			}
+
+			b.Change(c)
+		}
+
+		return &settingsOutput{Body: tailnetSettings(b)}, nil
 	})
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/juanfont/headscale/hscontrol/db"
+	hsstate "github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/templates"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
@@ -506,6 +507,16 @@ func (a *AuthProviderOIDC) RegisterConfirmHandler(
 			return
 		}
 
+		if errors.Is(err, hsstate.ErrUserNotApproved) {
+			httpUserError(writer, NewHTTPError(
+				http.StatusForbidden,
+				"your account is waiting for an administrator's approval; try again once it has been approved",
+				err,
+			))
+
+			return
+		}
+
 		httpUserError(writer, err)
 
 		return
@@ -712,7 +723,7 @@ func (a *AuthProviderOIDC) createOrUpdateUserFromClaim(
 	user.FromClaim(claims, a.cfg.EmailVerifiedRequired)
 
 	if newUser {
-		user, c, err = a.h.state.CreateUser(*user)
+		user, c, err = a.h.state.CreateUserFromLogin(*user)
 		if err != nil {
 			return nil, change.Change{}, fmt.Errorf("creating user: %w", err)
 		}

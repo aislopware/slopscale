@@ -118,6 +118,14 @@ func CreateUser(q Querier, user types.User) (*types.User, error) {
 		return nil, err
 	}
 
+	// A user created here, rather than by a login, is approved by the
+	// administrator creating it. Login-created users go through
+	// state.CreateUserFromLogin, which decides from the users approval
+	// switch and saves directly.
+	if user.ApprovedAt == nil {
+		user.ApprovedAt = new(time.Now().UTC())
+	}
+
 	err = SaveUser(q, &user)
 	if err != nil {
 		return nil, fmt.Errorf("creating user: %w", err)
@@ -271,6 +279,53 @@ func RenameUser(q Querier, uid types.UserID, newName string) error {
 
 func (hsdb *HSDatabase) GetUserByID(uid types.UserID) (*types.User, error) {
 	return GetUserByID(hsdb, uid)
+}
+
+// UserSetApproval records when a user was admitted to the tailnet; nil
+// withdraws the approval.
+func UserSetApproval(q Querier, uid types.UserID, approvedAt *time.Time) error {
+	affected, err := q.executor().exec(
+		table.Users.UPDATE(table.Users.ApprovedAt).SET(approvedAt).
+			WHERE(table.Users.ID.EQ(jet.Uint64(uint64(uid))).AND(table.Users.DeletedAt.IS_NULL())),
+	)
+	if err != nil {
+		return fmt.Errorf("setting user %d approval: %w", uid, err)
+	}
+
+	if affected == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}
+
+// ApproveAllUsers admits every user still waiting for approval, as when
+// users approval is switched off. It returns the affected user ids.
+func ApproveAllUsers(q Querier, approvedAt time.Time) ([]types.UserID, error) {
+	pending := table.Users.ApprovedAt.IS_NULL().AND(table.Users.DeletedAt.IS_NULL())
+
+	var rows []idRow
+
+	err := q.executor().query(jet.SELECT(table.Users.ID.AS("id_row.id")).FROM(table.Users).WHERE(pending), &rows)
+	if err != nil {
+		return nil, fmt.Errorf("listing unapproved users: %w", err)
+	}
+
+	if len(rows) == 0 {
+		return nil, nil
+	}
+
+	_, err = q.executor().exec(table.Users.UPDATE(table.Users.ApprovedAt).SET(approvedAt).WHERE(pending))
+	if err != nil {
+		return nil, fmt.Errorf("approving users: %w", err)
+	}
+
+	ids := make([]types.UserID, len(rows))
+	for i, r := range rows {
+		ids[i] = types.UserID(r.ID)
+	}
+
+	return ids, nil
 }
 
 func GetUserByID(q Querier, uid types.UserID) (*types.User, error) {

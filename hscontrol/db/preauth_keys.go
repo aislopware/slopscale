@@ -46,6 +46,14 @@ func validateACLTags(tags []string) ([]string, error) {
 	return tags, nil
 }
 
+// CreatePreAuthKeyFromSpec creates a pre-auth key from spec; see
+// [CreatePreAuthKeyFromSpec].
+func (hsdb *HSDatabase) CreatePreAuthKeyFromSpec(spec types.PreAuthKeySpec) (*types.PreAuthKeyNew, error) {
+	return Write(hsdb, func(tx *Tx) (*types.PreAuthKeyNew, error) {
+		return CreatePreAuthKeyFromSpec(tx, spec)
+	})
+}
+
 func (hsdb *HSDatabase) CreatePreAuthKey(
 	uid *types.UserID,
 	reusable bool,
@@ -164,8 +172,23 @@ func CreatePreAuthKey(
 	expiration *time.Time,
 	aclTags []string,
 ) (*types.PreAuthKeyNew, error) {
+	return CreatePreAuthKeyFromSpec(q, types.PreAuthKeySpec{
+		UserID:        uid,
+		Reusable:      reusable,
+		Ephemeral:     ephemeral,
+		Preauthorized: true,
+		Expiration:    expiration,
+		Tags:          aclTags,
+	})
+}
+
+// CreatePreAuthKeyFromSpec creates a pre-auth key from spec. The key must be
+// tagged or user-owned.
+func CreatePreAuthKeyFromSpec(q Querier, spec types.PreAuthKeySpec) (*types.PreAuthKeyNew, error) {
+	uid, reusable, ephemeral, expiration := spec.UserID, spec.Reusable, spec.Ephemeral, spec.Expiration
+
 	// Validate: must be tagged OR user-owned, not neither
-	if uid == nil && len(aclTags) == 0 {
+	if uid == nil && len(spec.Tags) == 0 {
 		return nil, ErrPreAuthKeyNotTaggedOrOwned
 	}
 
@@ -185,7 +208,7 @@ func CreatePreAuthKey(
 		userID = &user.ID
 	}
 
-	aclTags, err := validateACLTags(aclTags)
+	aclTags, err := validateACLTags(spec.Tags)
 	if err != nil {
 		return nil, err
 	}
@@ -204,15 +227,16 @@ func CreatePreAuthKey(
 	}
 
 	key := types.PreAuthKey{
-		UserID:     userID, // nil for system-created keys, or "created by" for tagged keys
-		User:       user,   // nil for system-created keys
-		Reusable:   reusable,
-		Ephemeral:  ephemeral,
-		CreatedAt:  &now,
-		Expiration: expiration,
-		Tags:       aclTags, // empty for user-owned keys
-		Prefix:     prefix,  // Store prefix
-		Hash:       hash,    // Store hash
+		UserID:        userID, // nil for system-created keys, or "created by" for tagged keys
+		User:          user,   // nil for system-created keys
+		Reusable:      reusable,
+		Ephemeral:     ephemeral,
+		Preauthorized: spec.Preauthorized,
+		CreatedAt:     &now,
+		Expiration:    expiration,
+		Tags:          aclTags, // empty for user-owned keys
+		Prefix:        prefix,  // Store prefix
+		Hash:          hash,    // Store hash
 	}
 
 	err = insertPreAuthKey(q, &key)
@@ -221,14 +245,15 @@ func CreatePreAuthKey(
 	}
 
 	return &types.PreAuthKeyNew{
-		ID:         key.ID,
-		Key:        keyStr,
-		Reusable:   key.Reusable,
-		Ephemeral:  key.Ephemeral,
-		Tags:       key.Tags,
-		Expiration: key.Expiration,
-		CreatedAt:  key.CreatedAt,
-		User:       key.User,
+		ID:            key.ID,
+		Key:           keyStr,
+		Reusable:      key.Reusable,
+		Ephemeral:     key.Ephemeral,
+		Preauthorized: key.Preauthorized,
+		Tags:          key.Tags,
+		Expiration:    key.Expiration,
+		CreatedAt:     key.CreatedAt,
+		User:          key.User,
 	}, nil
 }
 

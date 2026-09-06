@@ -328,10 +328,18 @@ func TestAPIv2Device_SetAuthorized(t *testing.T) {
 		e.api.Post("/api/v2/device/"+e.deviceID+"/authorized", map[string]any{"authorized": true}).Code)
 	assert.True(t, getDevice(t, e.api, e.deviceID).Authorized)
 
-	// De-authorize is rejected; the node stays present and authorized.
-	bad := e.api.Post("/api/v2/device/"+e.deviceID+"/authorized", map[string]any{"authorized": false})
-	assert.Equal(t, http.StatusBadRequest, bad.Code)
-	assert.Contains(t, bad.Body.String(), `"message"`)
+	// De-authorizing withdraws the approval: the node stays present but
+	// waits for an administrator again.
+	require.Equal(t, http.StatusOK,
+		e.api.Post("/api/v2/device/"+e.deviceID+"/authorized", map[string]any{"authorized": false}).Code)
+	assert.False(t, getDevice(t, e.api, e.deviceID).Authorized)
+
+	node, ok := e.app.state.GetNodeByID(e.nodeID)
+	require.True(t, ok)
+	assert.False(t, node.IsApproved())
+
+	require.Equal(t, http.StatusOK,
+		e.api.Post("/api/v2/device/"+e.deviceID+"/authorized", map[string]any{"authorized": true}).Code)
 	assert.True(t, getDevice(t, e.api, e.deviceID).Authorized)
 }
 

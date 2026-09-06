@@ -30,6 +30,8 @@ type PreAuthKey struct {
 	Expiration time.Time `json:"expiration"`
 	CreatedAt  time.Time `json:"createdAt"`
 	ACLTags    []string  `json:"aclTags"    nullable:"false"`
+
+	Preauthorized bool `doc:"Nodes registered with the key skip device approval." json:"preauthorized"`
 }
 
 // CreatePreAuthKeyRequestBody is the v1.CreatePreAuthKeyRequest body. Every
@@ -40,6 +42,8 @@ type CreatePreAuthKeyRequestBody struct {
 	Ephemeral  bool       `json:"ephemeral,omitempty"`
 	Expiration *time.Time `json:"expiration,omitempty"`
 	ACLTags    []string   `json:"aclTags,omitempty"`
+
+	Preauthorized *bool `doc:"Defaults to true." json:"preauthorized,omitempty"`
 }
 
 // ExpirePreAuthKeyRequestBody is the v1.ExpirePreAuthKeyRequest body.
@@ -120,13 +124,14 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 			userID = u.TypedID()
 		}
 
-		preAuthKey, err := b.State.CreatePreAuthKey(
-			userID,
-			in.Body.Reusable,
-			in.Body.Ephemeral,
-			&expiration,
-			in.Body.ACLTags,
-		)
+		preAuthKey, err := b.State.CreatePreAuthKeyFromSpec(types.PreAuthKeySpec{
+			UserID:        userID,
+			Reusable:      in.Body.Reusable,
+			Ephemeral:     in.Body.Ephemeral,
+			Preauthorized: in.Body.Preauthorized == nil || *in.Body.Preauthorized,
+			Expiration:    &expiration,
+			Tags:          in.Body.ACLTags,
+		})
 		if err != nil {
 			// A key that is neither tagged nor user-owned is invalid input (400).
 			return nil, mapError("creating pre-auth key", err)
@@ -221,6 +226,8 @@ func preAuthKeyNewToResponse(key *types.PreAuthKeyNew) PreAuthKey {
 		Reusable:  key.Reusable,
 		Ephemeral: key.Ephemeral,
 		ACLTags:   nonNilTags(key.Tags),
+
+		Preauthorized: key.Preauthorized,
 	}
 
 	if key.User != nil {
@@ -249,6 +256,8 @@ func preAuthKeyToResponse(key *types.PreAuthKey) PreAuthKey {
 		Ephemeral: key.Ephemeral,
 		Used:      key.Used,
 		ACLTags:   nonNilTags(key.Tags),
+
+		Preauthorized: key.Preauthorized,
 	}
 
 	if key.User != nil {

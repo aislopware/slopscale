@@ -1,0 +1,245 @@
+package state
+
+import (
+	"errors"
+	"fmt"
+	"time"
+
+	hsdb "github.com/juanfont/headscale/hscontrol/db"
+	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/juanfont/headscale/hscontrol/types/change"
+)
+
+var (
+	// ErrUserNotApproved is returned when a user who is still waiting for
+	// an administrator's approval tries to register a node.
+	ErrUserNotApproved = errors.New("user is waiting for approval")
+	// ErrUnknownSetting is returned for a setting key the server does not know.
+	ErrUnknownSetting = hsdb.ErrUnknownSetting
+)
+
+// Settings returns the tailnet-wide switches as last loaded or written.
+// A nil State, as API tests without state build, has every switch off.
+func (s *State) Settings() types.Settings {
+	if s == nil {
+		return types.Settings{}
+	}
+
+	if p := s.settings.Load(); p != nil {
+		return *p
+	}
+
+	return types.Settings{}
+}
+
+// SetSetting writes one tailnet-wide switch. Switching an approval off
+// admits everything that was waiting, so nothing stays stuck behind a
+// requirement that no longer exists; the returned change carries that
+// fan-out.
+func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error) {
+	settings := s.Settings()
+
+	switch key {
+	case types.SettingDevicesApprovalOn:
+		settings.DevicesApprovalOn = on
+	case types.SettingUsersApprovalOn:
+		settings.UsersApprovalOn = on
+	default:
+		return change.Change{}, fmt.Errorf("%w: %q", ErrUnknownSetting, key)
+	}
+
+	err := s.db.SaveSetting(key, on)
+	if err != nil {
+		return change.Change{}, err
+	}
+
+	s.settings.Store(&settings)
+
+	if on {
+		return change.Change{}, nil
+	}
+
+	switch key {
+	case types.SettingDevicesApprovalOn:
+		return s.approvePendingNodes()
+	case types.SettingUsersApprovalOn:
+		return s.approvePendingUsers()
+	default:
+		return change.Change{}, nil
+	}
+}
+
+// approvePendingNodes admits every node waiting for device approval.
+func (s *State) approvePendingNodes() (change.Change, error) {
+	now := time.Now().UTC()
+
+	ids, err := hsdb.Write(s.db, func(tx *hsdb.Tx) ([]types.NodeID, error) {
+		return hsdb.ApproveAllNodes(tx, now)
+	})
+	if err != nil {
+		return change.Change{}, err
+	}
+
+	if len(ids) == 0 {
+		return change.Change{}, nil
+	}
+
+	for _, id := range ids {
+		s.nodeStore.UpdateNode(id, func(node *types.Node) {
+			node.ApprovedAt = &now
+		})
+	}
+
+	return s.policyChangeAfterApproval()
+}
+
+// approvePendingUsers admits every user waiting for users approval.
+func (s *State) approvePendingUsers() (change.Change, error) {
+	now := time.Now().UTC()
+
+	ids, err := hsdb.Write(s.db, func(tx *hsdb.Tx) ([]types.UserID, error) {
+		return hsdb.ApproveAllUsers(tx, now)
+	})
+	if err != nil {
+		return change.Change{}, err
+	}
+
+	if len(ids) == 0 {
+		return change.Change{}, nil
+	}
+
+	return s.updatePolicyManagerUsers()
+}
+
+// SetNodeApproval admits a node to the tailnet or withdraws it again. An
+// unapproved node stays registered and keeps its address but gets no
+// peers and no peer sees it; the change tells every node, and the node
+// itself, so the client leaves (or enters) its "needs machine auth" state.
+func (s *State) SetNodeApproval(nodeID types.NodeID, approved bool) (types.NodeView, change.Change, error) {
+	var approvedAt *time.Time
+	if approved {
+		approvedAt = new(time.Now().UTC())
+	}
+
+	n, ok := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
+		node.ApprovedAt = approvedAt
+	})
+	if !ok {
+		return types.NodeView{}, change.Change{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, nodeID)
+	}
+
+	// persistNodeToDB leaves approved_at alone, as it does expiry.
+	err := s.db.NodeSetApproval(nodeID, approvedAt)
+	if err != nil {
+		return types.NodeView{}, change.Change{}, fmt.Errorf("setting node approval in database: %w", err)
+	}
+
+	c, err := s.policyChangeAfterApproval()
+	if err != nil {
+		return n, change.Change{}, err
+	}
+
+	return n, c, nil
+}
+
+// policyChangeAfterApproval refreshes the policy manager's node list and
+// returns the tailnet-wide recompute that approval changes need: every
+// node's peer list may have gained or lost the node, and every node gets
+// its own self node so the clients of the nodes admitted or withdrawn see
+// MachineAuthorized flip. Self is included for all rather than through
+// [change.Change.OriginNode] because one change carries a single origin
+// while an approval switch can admit many nodes at once.
+func (s *State) policyChangeAfterApproval() (change.Change, error) {
+	_, err := s.updatePolicyManagerNodes()
+	if err != nil {
+		return change.Change{}, fmt.Errorf("updating policy manager after approval change: %w", err)
+	}
+
+	c := change.PolicyChange()
+	c.Reason = "node approval"
+	c.IncludeSelf = true
+
+	return c, nil
+}
+
+// SetUserApproval admits a user to the tailnet or withdraws them again.
+// Withdrawing also withdraws every node the user owns; admitting approves
+// those nodes when device approval is off, otherwise they wait their turn.
+func (s *State) SetUserApproval(userID types.UserID, approved bool) (*types.User, change.Change, error) {
+	var approvedAt *time.Time
+	if approved {
+		approvedAt = new(time.Now().UTC())
+	}
+
+	err := s.db.Write(func(tx *hsdb.Tx) error {
+		return hsdb.UserSetApproval(tx, userID, approvedAt)
+	})
+	if err != nil {
+		return nil, change.Change{}, err
+	}
+
+	user, err := s.db.GetUserByID(userID)
+	if err != nil {
+		return nil, change.Change{}, fmt.Errorf("reloading user after approval change: %w", err)
+	}
+
+	c, err := s.updatePolicyManagerUsers()
+	if err != nil {
+		return user, change.Change{}, err
+	}
+
+	if approved && s.Settings().DevicesApprovalOn {
+		return user, c, nil
+	}
+
+	for _, node := range s.ListNodesByUser(userID).All() {
+		if node.IsApproved() == approved {
+			continue
+		}
+
+		_, nodeChange, err := s.SetNodeApproval(node.ID(), approved)
+		if err != nil {
+			return user, change.Change{}, err
+		}
+
+		c = c.Merge(nodeChange)
+	}
+
+	return user, c, nil
+}
+
+// approvedAtRegistration decides whether a node registered right now is
+// admitted immediately: yes unless device approval is on and the node did
+// not present a preauthorized key.
+func (s *State) approvedAtRegistration(pak *types.PreAuthKey) *time.Time {
+	if s.Settings().DevicesApprovalOn && (pak == nil || !pak.Preauthorized) {
+		return nil
+	}
+
+	return new(time.Now().UTC())
+}
+
+// requireApprovedUser refuses registration for a user still waiting for
+// approval. Tagged nodes carry no owner and are never refused here.
+func requireApprovedUser(user *types.User) error {
+	if user != nil && (user.ApprovedAt == nil || user.ApprovedAt.IsZero()) {
+		return fmt.Errorf("%w: %s", ErrUserNotApproved, user.Username())
+	}
+
+	return nil
+}
+
+// approvedPeerCandidates drops nodes that are waiting for approval before
+// the policy builds the peer map, so an unapproved node has no peers and
+// appears in nobody's.
+func approvedPeerCandidates(nodes []types.NodeView) []types.NodeView {
+	approved := nodes[:0:0]
+
+	for _, n := range nodes {
+		if n.IsApproved() {
+			approved = append(approved, n)
+		}
+	}
+
+	return approved
+}

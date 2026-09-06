@@ -133,22 +133,32 @@ func TestAPIv2SettingsConstantOffFields(t *testing.T) {
 }
 
 // TestAPIv2SettingsPatchUnsupported confirms writes are rejected and inert.
-func TestAPIv2SettingsPatchUnsupported(t *testing.T) {
+func TestAPIv2SettingsPatch(t *testing.T) {
 	t.Parallel()
 
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
-	patch := api.Patch("/api/v2/tailnet/-/settings", map[string]any{"devicesApprovalOn": true})
-	assert.Equal(t, http.StatusNotImplemented, patch.Code)
-	assert.Contains(t, patch.Body.String(), `"message"`)
+	require.False(t, getSettings(t, api).DevicesApprovalOn)
+	require.False(t, getSettings(t, api).UsersApprovalOn)
 
-	// The rejected PATCH did not mutate anything.
-	assert.False(t, getSettings(t, api).DevicesApprovalOn)
+	patch := api.Patch("/api/v2/tailnet/-/settings", map[string]any{"devicesApprovalOn": true})
+	require.Equalf(t, http.StatusOK, patch.Code, "body: %s", patch.Body)
+
+	got := getSettings(t, api)
+	assert.True(t, got.DevicesApprovalOn)
+	assert.False(t, got.UsersApprovalOn, "absent fields keep their value")
+
+	patch = api.Patch("/api/v2/tailnet/-/settings", map[string]any{"usersApprovalOn": true, "devicesApprovalOn": false})
+	require.Equalf(t, http.StatusOK, patch.Code, "body: %s", patch.Body)
+
+	got = getSettings(t, api)
+	assert.False(t, got.DevicesApprovalOn)
+	assert.True(t, got.UsersApprovalOn)
 }
 
-// TestAPIv2SettingsNonDefaultTailnet404 — the tailnet check runs before the
-// 501, so a bad tailnet is 404 on both verbs.
+// TestAPIv2SettingsNonDefaultTailnet404 — the tailnet check runs first, so a
+// bad tailnet is 404 on both verbs.
 func TestAPIv2SettingsNonDefaultTailnet404(t *testing.T) {
 	t.Parallel()
 

@@ -13,6 +13,10 @@ CREATE TABLE users(
   provider text,
   profile_pic_url text,
   role text,
+  -- approved_at is NULL while a user created by OIDC login waits for an
+  -- administrator (users approval); administrator-created users are
+  -- approved on creation.
+  approved_at datetime,
 
   created_at datetime,
   updated_at datetime,
@@ -50,6 +54,9 @@ CREATE TABLE pre_auth_keys(
   ephemeral numeric DEFAULT false,
   used numeric DEFAULT false,
   tags text,
+  -- preauthorized keys register nodes as approved even while device
+  -- approval is on.
+  preauthorized numeric DEFAULT true,
   expiration datetime,
   revoked datetime,
 
@@ -122,6 +129,9 @@ CREATE TABLE nodes(
   last_seen datetime,
   expiry datetime,
   approved_routes text,
+  -- approved_at is NULL while a node registered with device approval on
+  -- waits for an administrator; it gets no peers and no peer sees it.
+  approved_at datetime,
 
   created_at datetime,
   updated_at datetime,
@@ -144,5 +154,13 @@ CREATE INDEX idx_policies_deleted_at ON policies(deleted_at);
 CREATE TABLE database_versions(
   id integer PRIMARY KEY,
   version text NOT NULL,
+  updated_at datetime
+);
+
+-- settings holds tailnet-wide switches keyed by name; see
+-- hscontrol/types/settings.go for the keys and their defaults.
+CREATE TABLE settings(
+  key text PRIMARY KEY,
+  value text,
   updated_at datetime
 );

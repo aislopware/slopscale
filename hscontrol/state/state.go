@@ -116,6 +116,8 @@ type State struct {
 	ipAlloc *hsdb.IPAllocator
 	// derpMap contains the current DERP relay configuration
 	derpMap atomic.Pointer[tailcfg.DERPMap]
+	// settings holds the tailnet-wide switches; see [State.Settings].
+	settings atomic.Pointer[types.Settings]
 	// polMan handles policy evaluation and management
 	polMan policy.PolicyManager
 
@@ -226,7 +228,7 @@ func NewState(cfg *types.Config) (*State, error) {
 	nodeStore := NewNodeStore(
 		nodes,
 		func(nodes []types.NodeView) map[types.NodeID][]types.NodeView {
-			return polMan.BuildPeerMap(views.SliceOf(nodes))
+			return polMan.BuildPeerMap(views.SliceOf(approvedPeerCandidates(nodes)))
 		},
 		batchSize,
 		batchTimeout,
@@ -246,6 +248,13 @@ func NewState(cfg *types.Config) (*State, error) {
 		sshCheckAuth:  make(map[sshCheckPair]time.Time),
 		registerLocks: xsync.NewMap[key.MachinePublic, *sync.Mutex](),
 	}
+
+	settings, err := db.LoadSettings()
+	if err != nil {
+		return nil, err
+	}
+
+	s.settings.Store(&settings)
 
 	// Surface nodes whose stored data would break map generation (e.g. an
 	// invalid given name from a legacy row) so an operator can fix them. This
@@ -343,39 +352,23 @@ func (s *State) ReloadPolicy() ([]change.Change, error) {
 // CreateUser creates a new user and updates the policy manager.
 // Returns the created user, change set, and any error.
 func (s *State) CreateUser(user types.User) (*types.User, change.Change, error) {
-	// Role assignment and the insert share a transaction so two first users
-	// created at once cannot both become owner.
-	err := s.db.Write(func(tx *hsdb.Tx) error {
-		err := assignInitialRole(tx, &user)
-		if err != nil {
-			return err
-		}
-
-		return hsdb.SaveUser(tx, &user)
-	})
-	if err != nil {
-		return nil, change.Change{}, fmt.Errorf("creating user: %w", err)
+	// An administrator created this user, which is its approval.
+	if user.ApprovedAt == nil {
+		user.ApprovedAt = new(time.Now().UTC())
 	}
 
-	// Check if policy manager needs updating
-	c, err := s.updatePolicyManagerUsers()
-	if err != nil {
-		// Log the error but don't fail the user creation
-		return &user, change.Change{}, fmt.Errorf("updating policy manager after user creation: %w", err)
+	return s.createUser(user)
+}
+
+// CreateUserFromLogin creates the user behind a first OIDC login. With
+// users approval on, the user waits for an administrator before any node
+// of theirs can register; see [State.SetUserApproval].
+func (s *State) CreateUserFromLogin(user types.User) (*types.User, change.Change, error) {
+	if !s.Settings().UsersApprovalOn {
+		user.ApprovedAt = new(time.Now().UTC())
 	}
 
-	// Even if the policy manager doesn't detect a filter change, SSH policies
-	// might now be resolvable when they weren't before. If there are existing
-	// nodes, we should send a policy change to ensure they get updated SSH policies.
-	// TODO(kradalby): detect this, or rebuild all SSH policies so we can determine
-	// this upstream.
-	if c.IsEmpty() {
-		c = change.PolicyChange()
-	}
-
-	log.Info().Str(zf.UserName, user.Name).Msg("user created")
-
-	return &user, c, nil
+	return s.createUser(user)
 }
 
 // UpdateUser modifies an existing user using the provided update function within a transaction.
@@ -754,7 +747,13 @@ func (s *State) ListPeers(nodeID types.NodeID, peerIDs ...types.NodeID) views.Sl
 	// where the caller already knows which peer IDs are involved.
 	// Peer visibility filtering happens in the mapper against the live
 	// policy (buildTailPeers and the shared visiblePeerIDs filter), because
-	// the snapshot peer map is not rebuilt on policy changes.
+	// the snapshot peer map is not rebuilt on policy changes. Approval is
+	// applied here as the snapshot peer map applies it: a node waiting for
+	// approval has no peers and is nobody's peer.
+	if requester, ok := s.nodeStore.GetNode(nodeID); !ok || !requester.IsApproved() {
+		return views.SliceOf([]types.NodeView{})
+	}
+
 	allNodes := s.nodeStore.ListNodes()
 
 	nodeIDSet := make(map[types.NodeID]struct{}, len(peerIDs))
@@ -765,7 +764,7 @@ func (s *State) ListPeers(nodeID types.NodeID, peerIDs ...types.NodeID) views.Sl
 	var filteredNodes []types.NodeView
 
 	for _, node := range allNodes.All() {
-		if _, exists := nodeIDSet[node.ID()]; exists {
+		if _, exists := nodeIDSet[node.ID()]; exists && node.IsApproved() {
 			filteredNodes = append(filteredNodes, node)
 		}
 	}
@@ -1026,6 +1025,10 @@ func (s *State) ExpireExpiredNodes(lastCheck time.Time) (time.Time, []change.Cha
 
 // SSHPolicy returns the SSH access policy for a node.
 func (s *State) SSHPolicy(node types.NodeView) (*tailcfg.SSHPolicy, error) {
+	if !node.IsApproved() {
+		return nil, nil //nolint:nilnil // a node waiting for approval has no SSH policy
+	}
+
 	return s.polMan.SSHPolicy(s.cfg.ServerURL, node)
 }
 
@@ -1044,6 +1047,10 @@ func (s *State) Filter() ([]tailcfg.FilterRule, []matcher.Match) {
 
 // FilterForNode returns filter rules for a specific node, handling autogroup:self per-node.
 func (s *State) FilterForNode(node types.NodeView) ([]tailcfg.FilterRule, error) {
+	if !node.IsApproved() {
+		return nil, nil
+	}
+
 	return s.polMan.FilterForNode(node)
 }
 
@@ -1361,6 +1368,12 @@ func (s *State) CreatePreAuthKey(
 	aclTags []string,
 ) (*types.PreAuthKeyNew, error) {
 	return s.db.CreatePreAuthKey(userID, reusable, ephemeral, expiration, aclTags)
+}
+
+// CreatePreAuthKeyFromSpec creates a pre-auth key from spec; see
+// [types.PreAuthKeySpec].
+func (s *State) CreatePreAuthKeyFromSpec(spec types.PreAuthKeySpec) (*types.PreAuthKeyNew, error) {
+	return s.db.CreatePreAuthKeyFromSpec(spec)
 }
 
 // Test helpers for the state layer
@@ -1691,6 +1704,11 @@ func (s *State) HandleNodeFromAuthPath(
 		return types.NodeView{}, change.Change{}, fmt.Errorf("finding user: %w", err)
 	}
 
+	err = requireApprovedUser(user)
+	if err != nil {
+		return types.NodeView{}, change.Change{}, err
+	}
+
 	regData := regEntry.RegistrationData()
 
 	// Hostname was already validated/normalised at producer time. Build
@@ -1803,6 +1821,15 @@ func (s *State) HandleNodeFromPreAuthKey(
 	pak, err := s.GetPreAuthKey(regReq.Auth.AuthKey)
 	if err != nil {
 		return types.NodeView{}, change.Change{}, err
+	}
+
+	// A tagged key's user only records who created it; the node it
+	// registers is owned by its tags.
+	if len(pak.Tags) == 0 {
+		err = requireApprovedUser(pak.User)
+		if err != nil {
+			return types.NodeView{}, change.Change{}, err
+		}
 	}
 
 	// Helper to get username for logging (handles nil User for tags-only keys)
@@ -3308,6 +3335,7 @@ func (s *State) createAndSaveNewNode(params newNodeParams) (types.NodeView, erro
 		IsOnline:       new(false), // Explicitly offline until [State.Connect] is called
 		RegisterMethod: params.RegisterMethod,
 		Expiry:         params.Expiry,
+		ApprovedAt:     s.approvedAtRegistration(params.PreAuthKey),
 	}
 
 	assignNodeOwnership(&nodeToRegister, params)
@@ -3508,4 +3536,42 @@ func peerChangePersistWorthy(peerChange tailcfg.PeerChange) bool {
 		peerChange.Endpoints != nil ||
 		peerChange.DERPRegion != 0 ||
 		peerChange.KeyExpiry != nil
+}
+
+// createUser inserts user with its initial role; see [State.CreateUser]
+// and [State.CreateUserFromLogin] for who is approved when.
+func (s *State) createUser(user types.User) (*types.User, change.Change, error) {
+	// Role assignment and the insert share a transaction so two first users
+	// created at once cannot both become owner.
+	err := s.db.Write(func(tx *hsdb.Tx) error {
+		err := assignInitialRole(tx, &user)
+		if err != nil {
+			return err
+		}
+
+		return hsdb.SaveUser(tx, &user)
+	})
+	if err != nil {
+		return nil, change.Change{}, fmt.Errorf("creating user: %w", err)
+	}
+
+	// Check if policy manager needs updating
+	c, err := s.updatePolicyManagerUsers()
+	if err != nil {
+		// Log the error but don't fail the user creation
+		return &user, change.Change{}, fmt.Errorf("updating policy manager after user creation: %w", err)
+	}
+
+	// Even if the policy manager doesn't detect a filter change, SSH policies
+	// might now be resolvable when they weren't before. If there are existing
+	// nodes, we should send a policy change to ensure they get updated SSH policies.
+	// TODO(kradalby): detect this, or rebuild all SSH policies so we can determine
+	// this upstream.
+	if c.IsEmpty() {
+		c = change.PolicyChange()
+	}
+
+	log.Info().Str(zf.UserName, user.Name).Msg("user created")
+
+	return &user, c, nil
 }

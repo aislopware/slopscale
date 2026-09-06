@@ -28,6 +28,9 @@ var (
 	typeBlob      = columnType{sqlite: "blob", postgres: "bytea"}
 	typeInteger   = columnType{sqlite: "integer", postgres: "bigint"}
 	typeTimestamp = columnType{sqlite: "datetime", postgres: "timestamptz"}
+	// typeBoolTrue is a boolean that defaults to true, for flags that
+	// existing rows must keep behaving as if they had set.
+	typeBoolTrue = columnType{sqlite: "numeric DEFAULT true", postgres: "boolean DEFAULT true"}
 )
 
 func (t columnType) forDialect(d dialect) string {

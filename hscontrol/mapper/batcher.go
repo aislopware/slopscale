@@ -100,8 +100,12 @@ func generateMapResponse(nc nodeConnection, mapper *mapper, r change.Change) (*t
 
 		removedPeers := nc.computePeerDiff(currentPeerIDs)
 		// Include self node when this is a self-update (e.g., node's own tags changed)
-		// so the node sees its updated self info along with new packet filters.
-		mapResp, err = mapper.policyChangeResponse(nodeID, version, removedPeers, currentPeers, isSelfUpdate)
+		// so the node sees its updated self info along with new packet filters, or
+		// when the change asks for it on every node (approval flips
+		// MachineAuthorized on the self node of everyone it admits).
+		mapResp, err = mapper.policyChangeResponse(
+			nodeID, version, removedPeers, currentPeers, isSelfUpdate || r.IncludeSelf,
+		)
 	case isSelfUpdate:
 		// Non-policy self-update: just send the self node info
 		mapResp, err = mapper.selfMapResponse(nodeID, version)

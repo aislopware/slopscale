@@ -102,6 +102,12 @@ type User struct {
 	// Role is the user's administrative role; see [Role]. Rows from before
 	// roles existed hold "member".
 	Role Role
+
+	// ApprovedAt is when the user was admitted to the tailnet. Nil while
+	// a user created by OIDC login waits for an administrator (users
+	// approval); such a user cannot register nodes. Users created by an
+	// administrator are approved on creation.
+	ApprovedAt *time.Time
 }
 
 func (u *User) StringID() string {

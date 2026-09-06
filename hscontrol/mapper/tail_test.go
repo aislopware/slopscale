@@ -50,6 +50,7 @@ func TestTailNode(t *testing.T) {
 	created := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
 	lastSeen := time.Date(2009, time.November, 10, 23, 9, 0, 0, time.UTC)
 	expire := time.Date(2500, time.November, 11, 23, 0, 0, 0, time.UTC)
+	approved := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 	tests := []struct {
 		name       string
@@ -62,8 +63,9 @@ func TestTailNode(t *testing.T) {
 		{
 			name: "empty-node",
 			node: &types.Node{
-				GivenName: "empty",
-				Hostinfo:  &tailcfg.Hostinfo{},
+				GivenName:  "empty",
+				Hostinfo:   &tailcfg.Hostinfo{},
+				ApprovedAt: &approved,
 			},
 			dnsConfig:  &tailcfg.DNSConfig{},
 			baseDomain: "",
@@ -85,7 +87,8 @@ func TestTailNode(t *testing.T) {
 		{
 			name: "minimal-node",
 			node: &types.Node{
-				ID: 0,
+				ID:         0,
+				ApprovedAt: &approved,
 				MachineKey: mustMK(
 					"mkey:f08305b4ee4250b95a70f3b7504d048d75d899993c624a26d422c67af0422507",
 				),
@@ -177,8 +180,9 @@ func TestTailNode(t *testing.T) {
 		{
 			name: "check-dot-suffix-on-node-name",
 			node: &types.Node{
-				GivenName: "minimal",
-				Hostinfo:  &tailcfg.Hostinfo{},
+				GivenName:  "minimal",
+				Hostinfo:   &tailcfg.Hostinfo{},
+				ApprovedAt: &approved,
 			},
 			dnsConfig:  &tailcfg.DNSConfig{},
 			baseDomain: "example.com",

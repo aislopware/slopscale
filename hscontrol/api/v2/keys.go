@@ -389,13 +389,14 @@ func createAuthKey(ctx context.Context, b Backend, body CreateKeyRequest) (*keyO
 
 	expiration := time.Now().Add(expiryDuration(body.ExpirySeconds))
 
-	pak, err := b.State.CreatePreAuthKey(
-		userID,
-		create.Reusable,
-		create.Ephemeral,
-		&expiration,
-		create.Tags,
-	)
+	pak, err := b.State.CreatePreAuthKeyFromSpec(types.PreAuthKeySpec{
+		UserID:        userID,
+		Reusable:      create.Reusable,
+		Ephemeral:     create.Ephemeral,
+		Preauthorized: create.Preauthorized,
+		Expiration:    &expiration,
+		Tags:          create.Tags,
+	})
 	if err != nil {
 		return nil, mapError("creating auth key", err)
 	}
@@ -494,9 +495,7 @@ func findKeyByID(b Backend, rawID string) (*types.PreAuthKey, error) {
 }
 
 // keyFromNew builds the create response from the freshly created key. The
-// plaintext secret is returned only here. preauthorized is reported true to
-// match keyFromStored: Headscale always authorizes pre-auth-key nodes, so the
-// create and read paths must agree or the Terraform provider sees a diff.
+// plaintext secret is returned only here.
 func keyFromNew(pak *types.PreAuthKeyNew, req CreateKeyRequest) Key {
 	var create KeyDeviceCreateCapabilities
 	if req.Capabilities != nil {
@@ -512,7 +511,7 @@ func keyFromNew(pak *types.PreAuthKeyNew, req CreateKeyRequest) Key {
 		Capabilities: capabilities(
 			create.Reusable,
 			create.Ephemeral,
-			true,
+			pak.Preauthorized,
 			pak.Tags,
 		),
 		Tags: pak.Tags,
@@ -532,9 +531,7 @@ func keyFromNew(pak *types.PreAuthKeyNew, req CreateKeyRequest) Key {
 }
 
 // keyFromStored builds the get/list response from a stored key. The secret is
-// never returned here. preauthorized is reported true: Headscale has no separate
-// device-approval step, so every pre-auth key authorizes its nodes. Reporting it
-// stably keeps the Terraform provider from seeing a forced-replacement diff.
+// never returned here.
 func keyFromStored(pak *types.PreAuthKey) Key {
 	key := Key{
 		ID:           pak.StringID(),
@@ -542,7 +539,7 @@ func keyFromStored(pak *types.PreAuthKey) Key {
 		Description:  pak.Description,
 		Created:      timeOrZero(pak.CreatedAt),
 		Invalid:      pak.Validate() != nil,
-		Capabilities: capabilities(pak.Reusable, pak.Ephemeral, true, pak.Tags),
+		Capabilities: capabilities(pak.Reusable, pak.Ephemeral, pak.Preauthorized, pak.Tags),
 		Tags:         pak.Tags,
 	}
 

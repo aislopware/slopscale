@@ -387,6 +387,19 @@ func (s *TestServer) CreateEphemeralPreAuthKey(tb testing.TB, userID types.UserI
 	return s.createPreAuthKey(tb, userID, false, true, nil)
 }
 
+// CreatePreAuthKeyFromSpec creates a pre-auth key with every property
+// chosen by the caller and returns its plaintext.
+func (s *TestServer) CreatePreAuthKeyFromSpec(tb testing.TB, spec types.PreAuthKeySpec) string {
+	tb.Helper()
+
+	pak, err := s.st.CreatePreAuthKeyFromSpec(spec)
+	if err != nil {
+		tb.Fatalf("servertest: CreatePreAuthKeyFromSpec: %v", err)
+	}
+
+	return pak.Key
+}
+
 func (s *TestServer) createPreAuthKey(
 	tb testing.TB,
 	userID types.UserID,

@@ -35,6 +35,11 @@ type PreAuthKey struct {
 	// the v1 API or CLI.
 	Description string
 
+	// Preauthorized keys register nodes as approved even while device
+	// approval is on. Keys created before the switch existed are
+	// preauthorized.
+	Preauthorized bool
+
 	Reusable  bool
 	Ephemeral bool
 	Used      bool
@@ -53,16 +58,29 @@ type PreAuthKey struct {
 	Revoked *time.Time
 }
 
+// PreAuthKeySpec describes a pre-auth key to create. A key is tagged
+// (Tags set) or user-owned (UserID set); a tagged key may still carry the
+// creating user's id.
+type PreAuthKeySpec struct {
+	UserID        *UserID
+	Reusable      bool
+	Ephemeral     bool
+	Preauthorized bool
+	Expiration    *time.Time
+	Tags          []string
+}
+
 // PreAuthKeyNew is returned once when the key is created.
 type PreAuthKeyNew struct {
-	ID         uint64
-	Key        string
-	Reusable   bool
-	Ephemeral  bool
-	Tags       []string
-	Expiration *time.Time
-	CreatedAt  *time.Time
-	User       *User // Can be nil for system-created tagged keys
+	ID            uint64
+	Key           string
+	Reusable      bool
+	Ephemeral     bool
+	Preauthorized bool
+	Tags          []string
+	Expiration    *time.Time
+	CreatedAt     *time.Time
+	User          *User // Can be nil for system-created tagged keys
 }
 
 // StringID returns the key's id as a decimal string, the form the HTTP APIs

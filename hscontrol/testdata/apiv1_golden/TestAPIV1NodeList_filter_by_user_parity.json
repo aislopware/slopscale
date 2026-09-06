@@ -3,6 +3,8 @@
   "body": {
     "nodes": [
       {
+        "approved": true,
+        "approvedAt": "\u003ctimestamp\u003e",
         "approvedRoutes": [],
         "availableRoutes": [],
         "createdAt": "\u003ctimestamp\u003e",
@@ -23,9 +25,12 @@
           "expiration": null,
           "id": "1",
           "key": "\u003csecret\u003e",
+          "preauthorized": true,
           "reusable": false,
           "used": true,
           "user": {
+            "approved": true,
+            "approvedAt": "\u003ctimestamp\u003e",
             "createdAt": "\u003ctimestamp\u003e",
             "displayName": "",
             "email": "",
@@ -41,6 +46,8 @@
         "subnetRoutes": [],
         "tags": [],
         "user": {
+          "approved": true,
+          "approvedAt": "\u003ctimestamp\u003e",
           "createdAt": "\u003ctimestamp\u003e",
           "displayName": "",
           "email": "",

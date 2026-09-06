@@ -41,6 +41,7 @@ type nodeRow struct {
 	LastSeen       *time.Time
 	Expiry         *time.Time
 	ApprovedRoutes string
+	ApprovedAt     *time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	DeletedAt      *time.Time
@@ -101,6 +102,7 @@ func (r *nodeRow) node() (*types.Node, error) {
 		AuthKeyID:      r.AuthKeyID,
 		Expiry:         r.Expiry,
 		LastSeen:       r.LastSeen,
+		ApprovedAt:     r.ApprovedAt,
 		CreatedAt:      r.CreatedAt,
 		UpdatedAt:      r.UpdatedAt,
 		DeletedAt:      r.DeletedAt,
@@ -174,6 +176,7 @@ func nodeRowFrom(node *types.Node) (nodeRow, error) {
 		AuthKeyID:      node.AuthKeyID,
 		LastSeen:       node.LastSeen,
 		Expiry:         node.Expiry,
+		ApprovedAt:     node.ApprovedAt,
 		CreatedAt:      node.CreatedAt,
 		UpdatedAt:      node.UpdatedAt,
 		DeletedAt:      node.DeletedAt,
@@ -206,19 +209,20 @@ func nodeRowFrom(node *types.Node) (nodeRow, error) {
 
 // preAuthKeyRow is a row of the pre_auth_keys table.
 type preAuthKeyRow struct {
-	ID          uint64 `sql:"primary_key"`
-	Key         string
-	Prefix      string
-	Hash        []byte
-	UserID      *uint
-	Description string
-	Reusable    bool
-	Ephemeral   bool
-	Used        bool
-	Tags        string
-	Expiration  *time.Time
-	Revoked     *time.Time
-	CreatedAt   *time.Time
+	ID            uint64 `sql:"primary_key"`
+	Key           string
+	Prefix        string
+	Hash          []byte
+	UserID        *uint
+	Description   string
+	Reusable      bool
+	Ephemeral     bool
+	Used          bool
+	Tags          string
+	Preauthorized bool
+	Expiration    *time.Time
+	Revoked       *time.Time
+	CreatedAt     *time.Time
 }
 
 // preAuthKeyRecord is the destination of pre-auth key queries: the key with
@@ -256,18 +260,19 @@ func preAuthKeyRecordsToKeys(records []preAuthKeyRecord) ([]types.PreAuthKey, er
 
 func (r *preAuthKeyRow) preAuthKey() (*types.PreAuthKey, error) {
 	key := &types.PreAuthKey{
-		ID:          r.ID,
-		Key:         r.Key,
-		Prefix:      r.Prefix,
-		Hash:        r.Hash,
-		UserID:      r.UserID,
-		Description: r.Description,
-		Reusable:    r.Reusable,
-		Ephemeral:   r.Ephemeral,
-		Used:        r.Used,
-		Expiration:  r.Expiration,
-		Revoked:     r.Revoked,
-		CreatedAt:   r.CreatedAt,
+		ID:            r.ID,
+		Key:           r.Key,
+		Prefix:        r.Prefix,
+		Hash:          r.Hash,
+		UserID:        r.UserID,
+		Description:   r.Description,
+		Reusable:      r.Reusable,
+		Ephemeral:     r.Ephemeral,
+		Used:          r.Used,
+		Preauthorized: r.Preauthorized,
+		Expiration:    r.Expiration,
+		Revoked:       r.Revoked,
+		CreatedAt:     r.CreatedAt,
 	}
 
 	err := unmarshalJSONColumn(r.Tags, &key.Tags)
@@ -285,19 +290,20 @@ func preAuthKeyRowFrom(key *types.PreAuthKey) (preAuthKeyRow, error) {
 	}
 
 	return preAuthKeyRow{
-		ID:          key.ID,
-		Key:         key.Key,
-		Prefix:      key.Prefix,
-		Hash:        key.Hash,
-		UserID:      key.UserID,
-		Description: key.Description,
-		Reusable:    key.Reusable,
-		Ephemeral:   key.Ephemeral,
-		Used:        key.Used,
-		Tags:        tags,
-		Expiration:  key.Expiration,
-		Revoked:     key.Revoked,
-		CreatedAt:   key.CreatedAt,
+		ID:            key.ID,
+		Key:           key.Key,
+		Prefix:        key.Prefix,
+		Hash:          key.Hash,
+		UserID:        key.UserID,
+		Description:   key.Description,
+		Reusable:      key.Reusable,
+		Ephemeral:     key.Ephemeral,
+		Used:          key.Used,
+		Tags:          tags,
+		Preauthorized: key.Preauthorized,
+		Expiration:    key.Expiration,
+		Revoked:       key.Revoked,
+		CreatedAt:     key.CreatedAt,
 	}, nil
 }
 

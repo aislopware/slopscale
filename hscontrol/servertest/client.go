@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -67,6 +68,14 @@ type clientConfig struct {
 	hostname  string
 	tags      []string
 	user      *types.User
+	authKey   string
+}
+
+// WithAuthKey registers with the given pre-auth key instead of one the
+// server mints for the client, for keys with non-default properties such
+// as preauthorized=false.
+func WithAuthKey(authKey string) ClientOption {
+	return func(cc *clientConfig) { cc.authKey = authKey }
 }
 
 // WithEphemeral makes the client register as an ephemeral node.
@@ -115,6 +124,8 @@ func NewClient(tb testing.TB, server *TestServer, name string, opts ...ClientOpt
 	var authKey string
 
 	switch {
+	case cc.authKey != "":
+		authKey = cc.authKey
 	case cc.ephemeral:
 		authKey = server.CreateEphemeralPreAuthKey(tb, uid)
 	case len(cc.tags) > 0:
@@ -438,6 +449,17 @@ func (c *TestClient) WaitForUpdate(tb testing.TB, timeout time.Duration) *netmap
 
 		return nil
 	}
+}
+
+// NodeIDString returns the client's node id as the HTTP APIs render it,
+// read from the self node of the current netmap.
+func (c *TestClient) NodeIDString() string {
+	nm := c.Netmap()
+	if nm == nil || !nm.SelfNode.Valid() {
+		return ""
+	}
+
+	return strconv.FormatInt(int64(nm.SelfNode.ID()), 10)
 }
 
 // Peers returns the current peer list, or nil.

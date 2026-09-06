@@ -2,6 +2,8 @@
   "status": 200,
   "body": {
     "node": {
+      "approved": true,
+      "approvedAt": "\u003ctimestamp\u003e",
       "approvedRoutes": [],
       "availableRoutes": [],
       "createdAt": "\u003ctimestamp\u003e",
@@ -20,6 +22,8 @@
       "subnetRoutes": [],
       "tags": [],
       "user": {
+        "approved": true,
+        "approvedAt": "\u003ctimestamp\u003e",
         "createdAt": "\u003ctimestamp\u003e",
         "displayName": "",
         "email": "",

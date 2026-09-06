@@ -168,6 +168,12 @@ type Node struct {
 	// See [Node.Hostinfo]
 	ApprovedRoutes Prefixes
 
+	// ApprovedAt is when an administrator (or the registration itself,
+	// when device approval is off or the pre-auth key is preauthorized)
+	// admitted the node to the tailnet. Nil while the node waits for
+	// approval: it then gets no peers and no peer sees it.
+	ApprovedAt *time.Time
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time
@@ -227,6 +233,12 @@ func (node *Node) IsExpired() bool {
 	}
 
 	return time.Since(*node.Expiry) > 0
+}
+
+// IsApproved reports whether the node has been admitted to the tailnet.
+// See [Node.ApprovedAt].
+func (node *Node) IsApproved() bool {
+	return node.ApprovedAt != nil && !node.ApprovedAt.IsZero()
 }
 
 // IsEphemeral returns if the node is registered as an Ephemeral node.
@@ -923,6 +935,15 @@ func (nv NodeView) IsExpired() bool {
 	return nv.ж.IsExpired()
 }
 
+// IsApproved reports whether the node has been admitted to the tailnet.
+func (nv NodeView) IsApproved() bool {
+	if !nv.Valid() {
+		return false
+	}
+
+	return nv.ж.IsApproved()
+}
+
 // IsEphemeral returns if the node is registered as an Ephemeral node.
 // https://tailscale.com/docs/features/ephemeral-nodes
 func (nv NodeView) IsEphemeral() bool {
@@ -1257,7 +1278,7 @@ func (nv NodeView) tailNode(
 
 		Tags: nv.Tags().AsSlice(),
 
-		MachineAuthorized: !nv.IsExpired(),
+		MachineAuthorized: nv.IsApproved() && !nv.IsExpired(),
 		Expired:           nv.IsExpired(),
 	}
 

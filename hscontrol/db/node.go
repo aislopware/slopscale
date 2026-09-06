@@ -66,8 +66,33 @@ func selectNodes() jet.SelectStatement {
 // listNodesWithoutAuthKeys loads nodes with their users only, with the
 // user columns of before 202609062100-user-role. Migrations that predate
 // columns of the pre_auth_keys or users tables use it.
+// nodeColumnsBeforeApproval is the nodes table as it was before
+// 202609070900-approval.
+var nodeColumnsBeforeApproval = jet.ColumnList{
+	table.Nodes.ID,
+	table.Nodes.MachineKey,
+	table.Nodes.NodeKey,
+	table.Nodes.DiscoKey,
+	table.Nodes.Endpoints,
+	table.Nodes.HostInfo,
+	table.Nodes.Ipv4,
+	table.Nodes.Ipv6,
+	table.Nodes.Hostname,
+	table.Nodes.GivenName,
+	table.Nodes.UserID,
+	table.Nodes.RegisterMethod,
+	table.Nodes.Tags,
+	table.Nodes.AuthKeyID,
+	table.Nodes.LastSeen,
+	table.Nodes.Expiry,
+	table.Nodes.ApprovedRoutes,
+	table.Nodes.CreatedAt,
+	table.Nodes.UpdatedAt,
+	table.Nodes.DeletedAt,
+}
+
 func listNodesWithoutAuthKeys(q Querier) (types.Nodes, error) {
-	stmt := jet.SELECT(table.Nodes.AllColumns, userColumnsBeforeRoles).
+	stmt := jet.SELECT(nodeColumnsBeforeApproval, userColumnsBeforeRoles).
 		FROM(table.Nodes.LEFT_JOIN(table.Users, table.Nodes.UserID.EQ(table.Users.ID))).
 		ORDER_BY(table.Nodes.ID.ASC())
 
@@ -504,6 +529,50 @@ func NodeSetExpiry(q Querier, nodeID types.NodeID, expiry *time.Time) error {
 	return updateNodeColumn(q, nodeID, table.Nodes.Expiry, expiry)
 }
 
+func (hsdb *HSDatabase) NodeSetApproval(nodeID types.NodeID, approvedAt *time.Time) error {
+	return hsdb.Write(func(tx *Tx) error {
+		return NodeSetApproval(tx, nodeID, approvedAt)
+	})
+}
+
+// NodeSetApproval records when a node was admitted to the tailnet; nil
+// withdraws the approval so the node waits for an administrator again.
+func NodeSetApproval(q Querier, nodeID types.NodeID, approvedAt *time.Time) error {
+	return updateNodeColumn(q, nodeID, table.Nodes.ApprovedAt, approvedAt)
+}
+
+// ApproveAllNodes admits every node still waiting for approval, as when
+// device approval is switched off. It returns the affected node ids.
+func ApproveAllNodes(q Querier, approvedAt time.Time) ([]types.NodeID, error) {
+	var rows []idRow
+
+	err := q.executor().query(
+		jet.SELECT(table.Nodes.ID.AS("id_row.id")).FROM(table.Nodes).WHERE(table.Nodes.ApprovedAt.IS_NULL()),
+		&rows,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listing unapproved nodes: %w", err)
+	}
+
+	if len(rows) == 0 {
+		return nil, nil
+	}
+
+	_, err = q.executor().exec(
+		table.Nodes.UPDATE(table.Nodes.ApprovedAt).SET(approvedAt).WHERE(table.Nodes.ApprovedAt.IS_NULL()),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("approving nodes: %w", err)
+	}
+
+	ids := make([]types.NodeID, len(rows))
+	for i, r := range rows {
+		ids[i] = types.NodeID(r.ID)
+	}
+
+	return ids, nil
+}
+
 func (hsdb *HSDatabase) DeleteNode(node *types.Node) error {
 	return hsdb.Write(func(tx *Tx) error {
 		return DeleteNode(tx, node)
@@ -865,6 +934,7 @@ func (hsdb *HSDatabase) CreateNodeForTest(user *types.User, hostname ...string) 
 		UserID:         &user.ID,
 		RegisterMethod: util.RegisterMethodAuthKey,
 		AuthKeyID:      &pakID,
+		ApprovedAt:     new(time.Now().UTC()),
 	}
 
 	err = CreateNode(hsdb, node)

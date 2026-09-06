@@ -283,16 +283,21 @@ func handleDeleteDevice(b Backend, in *deviceByIDInput) (*emptyOutput, error) {
 // authorized=false is rejected so callers are not misled into thinking the
 // device is fenced off.
 func handleAuthorizeDevice(b Backend, in *setAuthorizedInput) (*emptyOutput, error) {
-	_, err := lookupNode(b, in.DeviceID)
+	node, err := lookupNode(b, in.DeviceID)
 	if err != nil {
 		return nil, err
 	}
 
-	if !in.Body.Authorized {
-		return nil, huma.Error400BadRequest(
-			"Headscale does not support de-authorizing a device; delete or expire it instead",
-		)
+	if node.IsApproved() == in.Body.Authorized {
+		return &emptyOutput{}, nil
 	}
+
+	_, nodeChange, err := b.State.SetNodeApproval(node.ID(), in.Body.Authorized)
+	if err != nil {
+		return nil, mapError("authorizing device", err)
+	}
+
+	b.Change(nodeChange)
 
 	return &emptyOutput{}, nil
 }
@@ -454,7 +459,7 @@ func deviceFromView(view types.NodeView, allFields bool) Device {
 		Name:              view.GivenName(),
 		ID:                id,
 		NodeID:            id,
-		Authorized:        true, // Headscale has no post-registration de-auth state.
+		Authorized:        view.IsApproved(),
 		User:              deviceUser(view),
 		Tags:              emptyIfNil(view.Tags().AsSlice()),
 		KeyExpiryDisabled: !view.Expiry().Valid(),

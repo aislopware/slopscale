@@ -28,6 +28,9 @@ type User struct {
 	Provider      string    `json:"provider"`
 	ProfilePicURL string    `json:"profilePicUrl"`
 	Role          string    `doc:"owner, admin, network-admin, it-admin, auditor or member" json:"role"`
+
+	Approved   bool       `doc:"false while the user waits for an administrator." json:"approved"`
+	ApprovedAt *time.Time `json:"approvedAt"                                      nullable:"true"`
 }
 
 // userFromView converts a domain user into the v1 response shape, reading
@@ -40,7 +43,7 @@ func userFromView(u types.UserView) User {
 		name = u.Username()
 	}
 
-	return User{
+	out := User{
 		ID:            formatID(u.ID()),
 		Name:          name,
 		CreatedAt:     u.CreatedAt(),
@@ -50,5 +53,13 @@ func userFromView(u types.UserView) User {
 		Provider:      u.Provider(),
 		ProfilePicURL: u.ProfilePicURL(),
 		Role:          u.Role().String(),
+		Approved:      u.ApprovedAt().Valid(),
 	}
+
+	if u.ApprovedAt().Valid() {
+		at := u.ApprovedAt().Get()
+		out.ApprovedAt = &at
+	}
+
+	return out
 }

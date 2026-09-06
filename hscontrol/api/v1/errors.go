@@ -37,7 +37,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, db.ErrCannotChangeOIDCUser),
 		errors.Is(err, db.ErrPreAuthKeyNotTaggedOrOwned),
 		errors.Is(err, db.ErrSingleUseAuthKeyHasBeenUsed),
-		errors.Is(err, types.ErrInvalidRole):
+		errors.Is(err, types.ErrInvalidRole),
+		errors.Is(err, state.ErrUnknownSetting):
 		return huma.Error400BadRequest(msg, err)
 
 	case errors.Is(err, state.ErrNodeKeyInUse),
@@ -49,6 +50,7 @@ func mapError(msg string, err error) error {
 		errors.Is(err, state.ErrRoleChangeForbidden),
 		errors.Is(err, state.ErrOnlyOwnerTransfers),
 		errors.Is(err, state.ErrOwnerRoleImmutable),
+		errors.Is(err, state.ErrUserNotApproved),
 		errors.Is(err, db.ErrCannotDeleteOwner):
 		return huma.Error403Forbidden(msg, err)
 

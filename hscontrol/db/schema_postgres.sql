@@ -16,7 +16,8 @@ CREATE TABLE users(
   provider_identifier text,
   provider text,
   profile_pic_url text,
-  role text
+  role text,
+  approved_at timestamptz
 );
 CREATE INDEX idx_users_deleted_at ON users(deleted_at);
 CREATE UNIQUE INDEX idx_provider_identifier ON users(provider_identifier) WHERE provider_identifier IS NOT NULL;
@@ -37,6 +38,7 @@ CREATE TABLE pre_auth_keys(
   created_at timestamptz,
   expiration timestamptz,
   revoked timestamptz,
+  preauthorized boolean DEFAULT true,
   CONSTRAINT fk_pre_auth_keys_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON pre_auth_keys(prefix) WHERE prefix IS NOT NULL AND prefix != '';
@@ -98,6 +100,7 @@ CREATE TABLE nodes(
   created_at timestamptz,
   updated_at timestamptz,
   deleted_at timestamptz,
+  approved_at timestamptz,
   CONSTRAINT fk_nodes_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_nodes_auth_key FOREIGN KEY(auth_key_id) REFERENCES pre_auth_keys(id)
 );
@@ -114,5 +117,10 @@ CREATE INDEX idx_policies_deleted_at ON policies(deleted_at);
 CREATE TABLE database_versions(
   id bigserial PRIMARY KEY,
   version text NOT NULL,
+  updated_at timestamptz
+);
+CREATE TABLE settings(
+  key text PRIMARY KEY,
+  value text,
   updated_at timestamptz
 );

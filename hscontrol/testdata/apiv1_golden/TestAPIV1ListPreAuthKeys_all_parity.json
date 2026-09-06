@@ -9,9 +9,12 @@
         "expiration": "\u003ctimestamp\u003e",
         "id": "1",
         "key": "\u003csecret\u003e",
+        "preauthorized": true,
         "reusable": true,
         "used": false,
         "user": {
+          "approved": true,
+          "approvedAt": "\u003ctimestamp\u003e",
           "createdAt": "\u003ctimestamp\u003e",
           "displayName": "",
           "email": "",
@@ -32,6 +35,7 @@
         "expiration": "\u003ctimestamp\u003e",
         "id": "2",
         "key": "\u003csecret\u003e",
+        "preauthorized": true,
         "reusable": false,
         "used": false,
         "user": null

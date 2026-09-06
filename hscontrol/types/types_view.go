@@ -127,6 +127,14 @@ func (v UserView) ProfilePicURL() string { return v.ж.ProfilePicURL }
 // roles existed hold "member".
 func (v UserView) Role() Role { return v.ж.Role }
 
+// ApprovedAt is when the user was admitted to the tailnet. Nil while
+// a user created by OIDC login waits for an administrator (users
+// approval); such a user cannot register nodes. Users created by an
+// administrator are approved on creation.
+func (v UserView) ApprovedAt() views.ValuePointer[time.Time] {
+	return views.ValuePointerOf(v.ж.ApprovedAt)
+}
+
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _UserViewNeedsRegeneration = User(struct {
 	ID                 uint
@@ -140,6 +148,7 @@ var _UserViewNeedsRegeneration = User(struct {
 	Provider           string
 	ProfilePicURL      string
 	Role               Role
+	ApprovedAt         *time.Time
 }{})
 
 // View returns a read-only view of Node.
@@ -266,6 +275,15 @@ func (v NodeView) LastSeen() views.ValuePointer[time.Time] {
 func (v NodeView) ApprovedRoutes() views.Slice[netip.Prefix] {
 	return views.SliceOf(v.ж.ApprovedRoutes)
 }
+
+// ApprovedAt is when an administrator (or the registration itself,
+// when device approval is off or the pre-auth key is preauthorized)
+// admitted the node to the tailnet. Nil while the node waits for
+// approval: it then gets no peers and no peer sees it.
+func (v NodeView) ApprovedAt() views.ValuePointer[time.Time] {
+	return views.ValuePointerOf(v.ж.ApprovedAt)
+}
+
 func (v NodeView) CreatedAt() time.Time { return v.ж.CreatedAt }
 func (v NodeView) UpdatedAt() time.Time { return v.ж.UpdatedAt }
 func (v NodeView) DeletedAt() views.ValuePointer[time.Time] {
@@ -317,6 +335,7 @@ var _NodeViewNeedsRegeneration = Node(struct {
 	Expiry         *time.Time
 	LastSeen       *time.Time
 	ApprovedRoutes Prefixes
+	ApprovedAt     *time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	DeletedAt      *time.Time
@@ -414,6 +433,11 @@ func (v PreAuthKeyView) User() UserView { return v.ж.User.View() }
 // Free-text description, set via the v2 API. Empty for keys created through
 // the v1 API or CLI.
 func (v PreAuthKeyView) Description() string { return v.ж.Description }
+
+// Preauthorized keys register nodes as approved even while device
+// approval is on. Keys created before the switch existed are
+// preauthorized.
+func (v PreAuthKeyView) Preauthorized() bool { return v.ж.Preauthorized }
 func (v PreAuthKeyView) Reusable() bool      { return v.ж.Reusable }
 func (v PreAuthKeyView) Ephemeral() bool     { return v.ж.Ephemeral }
 func (v PreAuthKeyView) Used() bool          { return v.ж.Used }
@@ -439,18 +463,19 @@ func (v PreAuthKeyView) Revoked() views.ValuePointer[time.Time] {
 
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _PreAuthKeyViewNeedsRegeneration = PreAuthKey(struct {
-	ID          uint64
-	Key         string
-	Prefix      string
-	Hash        []byte
-	UserID      *uint
-	User        *User
-	Description string
-	Reusable    bool
-	Ephemeral   bool
-	Used        bool
-	Tags        []string
-	CreatedAt   *time.Time
-	Expiration  *time.Time
-	Revoked     *time.Time
+	ID            uint64
+	Key           string
+	Prefix        string
+	Hash          []byte
+	UserID        *uint
+	User          *User
+	Description   string
+	Preauthorized bool
+	Reusable      bool
+	Ephemeral     bool
+	Used          bool
+	Tags          []string
+	CreatedAt     *time.Time
+	Expiration    *time.Time
+	Revoked       *time.Time
 }{})

@@ -37,17 +37,19 @@ var registerMethodToV1Enum = map[string]string{
 // fields: scalars and slices always (no omitempty), nested messages and optional
 // timestamps as JSON null when unset.
 type Node struct {
-	ID          string          `format:"uint64"    json:"id"`
+	ID          string          `format:"uint64"                                        json:"id"`
 	MachineKey  string          `json:"machineKey"`
 	NodeKey     string          `json:"nodeKey"`
 	DiscoKey    string          `json:"discoKey"`
-	IPAddresses []string        `json:"ipAddresses" nullable:"false"`
+	IPAddresses []string        `json:"ipAddresses"                                     nullable:"false"`
 	Name        string          `json:"name"`
 	User        *User           `json:"user"`
-	LastSeen    *time.Time      `json:"lastSeen"    nullable:"true"`
-	Expiry      *time.Time      `json:"expiry"      nullable:"true"`
+	LastSeen    *time.Time      `json:"lastSeen"                                        nullable:"true"`
+	Expiry      *time.Time      `json:"expiry"                                          nullable:"true"`
 	PreAuthKey  *NodePreAuthKey `json:"preAuthKey"`
 	CreatedAt   time.Time       `json:"createdAt"`
+	Approved    bool            `doc:"false while the node waits for an administrator." json:"approved"`
+	ApprovedAt  *time.Time      `json:"approvedAt"                                      nullable:"true"`
 
 	//nolint:lll // struct tag enum list cannot be wrapped
 	RegisterMethod string `enum:"REGISTER_METHOD_UNSPECIFIED,REGISTER_METHOD_AUTH_KEY,REGISTER_METHOD_CLI,REGISTER_METHOD_OIDC" json:"registerMethod"`
@@ -72,6 +74,8 @@ type NodePreAuthKey struct {
 	Expiration *time.Time `json:"expiration" nullable:"true"`
 	CreatedAt  *time.Time `json:"createdAt"  nullable:"true"`
 	ACLTags    []string   `json:"aclTags"    nullable:"false"`
+
+	Preauthorized bool `json:"preauthorized"`
 }
 
 // SetTagsRequestBody mirrors v1.SetTagsRequest.
@@ -623,6 +627,12 @@ func nodeFromView(view types.NodeView) Node {
 		AvailableRoutes: nonNilStrings(util.PrefixesToString(view.AnnouncedRoutes())),
 		SubnetRoutes:    []string{},
 		Tags:            nonNilStrings(view.Tags().AsSlice()),
+		Approved:        view.IsApproved(),
+	}
+
+	if view.ApprovedAt().Valid() {
+		at := view.ApprovedAt().Get()
+		n.ApprovedAt = &at
 	}
 
 	if view.User().Valid() {
@@ -657,6 +667,8 @@ func nodePreAuthKeyFromView(authKey types.PreAuthKeyView) *NodePreAuthKey {
 		Ephemeral: authKey.Ephemeral(),
 		Used:      authKey.Used(),
 		ACLTags:   nonNilStrings(authKey.Tags().AsSlice()),
+
+		Preauthorized: authKey.Preauthorized(),
 	}
 
 	if authKey.User().Valid() {

@@ -319,10 +319,9 @@ func nodeToRegisterResponse(node types.NodeView) *tailcfg.RegisterResponse {
 	resp := &tailcfg.RegisterResponse{
 		NodeKeyExpired: node.IsExpired(),
 
-		// Headscale does not implement the concept of machine authorization
-		// so we always return true here.
-		// Revisit this if #2176 gets implemented.
-		MachineAuthorized: true,
+		// The client learns its approval from the self node in the netmap;
+		// this mirrors it for the registration reply.
+		MachineAuthorized: node.IsApproved(),
 	}
 
 	// For tagged nodes, use the [types.TaggedDevices] special user
@@ -496,7 +495,7 @@ func (h *Headscale) handleRegisterWithAuthKey(
 	h.Change(changed, routesChange)
 
 	resp := &tailcfg.RegisterResponse{
-		MachineAuthorized: true,
+		MachineAuthorized: node.IsApproved(),
 		NodeKeyExpired:    node.IsExpired(),
 		User:              node.Owner().TailscaleUser(),
 		Login:             node.Owner().TailscaleLogin(),

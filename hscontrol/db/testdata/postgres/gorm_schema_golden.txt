@@ -29,6 +29,7 @@ COL nodes.approved_routes text null=YES
 COL nodes.created_at timestamp with time zone null=YES
 COL nodes.updated_at timestamp with time zone null=YES
 COL nodes.deleted_at timestamp with time zone null=YES
+COL nodes.approved_at timestamp with time zone null=YES
 COL oauth_access_tokens.id bigint null=NO default=nextval('oauth_access_tokens_id_seq'::regclass)
 COL oauth_access_tokens.prefix text null=YES
 COL oauth_access_tokens.hash bytea null=YES
@@ -64,6 +65,10 @@ COL pre_auth_keys.tags text null=YES
 COL pre_auth_keys.created_at timestamp with time zone null=YES
 COL pre_auth_keys.expiration timestamp with time zone null=YES
 COL pre_auth_keys.revoked timestamp with time zone null=YES
+COL pre_auth_keys.preauthorized boolean null=YES default=true
+COL settings.key text null=NO
+COL settings.value text null=YES
+COL settings.updated_at timestamp with time zone null=YES
 COL users.id bigint null=NO default=nextval('users_id_seq'::regclass)
 COL users.created_at timestamp with time zone null=YES
 COL users.updated_at timestamp with time zone null=YES
@@ -75,6 +80,7 @@ COL users.provider_identifier text null=YES
 COL users.provider text null=YES
 COL users.profile_pic_url text null=YES
 COL users.role text null=YES
+COL users.approved_at timestamp with time zone null=YES
 IDX CREATE INDEX idx_policies_deleted_at ON public.policies USING btree (deleted_at)
 IDX CREATE INDEX idx_users_deleted_at ON public.users USING btree (deleted_at)
 IDX CREATE UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)
@@ -92,6 +98,7 @@ IDX CREATE UNIQUE INDEX oauth_access_tokens_pkey ON public.oauth_access_tokens U
 IDX CREATE UNIQUE INDEX oauth_clients_pkey ON public.oauth_clients USING btree (id)
 IDX CREATE UNIQUE INDEX policies_pkey ON public.policies USING btree (id)
 IDX CREATE UNIQUE INDEX pre_auth_keys_pkey ON public.pre_auth_keys USING btree (id)
+IDX CREATE UNIQUE INDEX settings_pkey ON public.settings USING btree (key)
 IDX CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)
 CON api_keys api_keys_id_not_null NOT NULL id
 CON api_keys api_keys_pkey PRIMARY KEY (id)
@@ -113,5 +120,7 @@ CON policies policies_pkey PRIMARY KEY (id)
 CON pre_auth_keys fk_pre_auth_keys_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 CON pre_auth_keys pre_auth_keys_id_not_null NOT NULL id
 CON pre_auth_keys pre_auth_keys_pkey PRIMARY KEY (id)
+CON settings settings_key_not_null NOT NULL key
+CON settings settings_pkey PRIMARY KEY (key)
 CON users users_id_not_null NOT NULL id
 CON users users_pkey PRIMARY KEY (id)

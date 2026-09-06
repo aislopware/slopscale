@@ -437,7 +437,70 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 				return nil
 			},
 		},
+		{
+			// Device and user approval: nodes and users gain approved_at,
+			// pre-auth keys gain preauthorized, and the settings table
+			// holds the two approval switches. Everything that exists
+			// when the migration runs was admitted under the old rules,
+			// so it is backfilled as approved and every existing key as
+			// preauthorized; the switches default to off.
+			id:  "202609070900-approval",
+			run: migrateApproval,
+		},
 	}
+}
+
+// migrateApproval (202609070900) adds the approval columns and the
+// settings table.
+func migrateApproval(tx *Tx) error {
+	columns := []struct {
+		table, column string
+		typ           columnType
+		backfill      string
+	}{
+		{"nodes", "approved_at", typeTimestamp, `UPDATE nodes SET approved_at = created_at WHERE approved_at IS NULL`},
+		{"users", "approved_at", typeTimestamp, `UPDATE users SET approved_at = created_at WHERE approved_at IS NULL`},
+		{
+			"pre_auth_keys", "preauthorized", typeBoolTrue,
+			`UPDATE pre_auth_keys SET preauthorized = true WHERE preauthorized IS NULL`,
+		},
+	}
+
+	for _, c := range columns {
+		err := tx.ex.addColumnIfMissing(c.table, c.column, c.typ)
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.ex.execRaw(c.backfill)
+		if err != nil {
+			return fmt.Errorf("backfilling %s.%s: %w", c.table, c.column, err)
+		}
+	}
+
+	hasSettings, err := tx.ex.hasTable("settings")
+	if err != nil {
+		return err
+	}
+
+	if hasSettings {
+		return nil
+	}
+
+	ddl := `CREATE TABLE settings(
+  key text PRIMARY KEY,
+  value text,
+  updated_at datetime
+)`
+	if tx.ex.dialect == dialectPostgres {
+		ddl = `CREATE TABLE settings(
+  key text PRIMARY KEY,
+  value text,
+  updated_at timestamptz
+)`
+	}
+
+	return tx.ex.execAll("creating settings table", []string{ddl})
 }
 
 // migrateRoutesToApprovedRoutes (202502131714) denormalises the enabled
