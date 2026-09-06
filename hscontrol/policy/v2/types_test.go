@@ -3,6 +3,7 @@ package v2
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
 	"net/netip"
 	"slices"
 	"strings"
@@ -16,7 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go4.org/netipx"
-	xmaps "golang.org/x/exp/maps"
 	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 )
@@ -505,7 +505,9 @@ func TestUnmarshalPolicy(t *testing.T) {
 	],
 }
 `,
-			wantErr: `invalid autogroup: got "autogroup:invalid", must be one of [autogroup:internet autogroup:member autogroup:nonroot autogroup:tagged autogroup:self autogroup:danger-all]`,
+			wantErr: `invalid autogroup: got "autogroup:invalid", must be one of ` +
+				`[autogroup:internet autogroup:member autogroup:nonroot ` +
+				`autogroup:tagged autogroup:self autogroup:danger-all]`,
 		},
 		{
 			name: "undefined-hostname-errors-2490",
@@ -1155,6 +1157,7 @@ func TestUnmarshalPolicy(t *testing.T) {
 		},
 		// headscale-admin uses # in some field names to add metadata, so we will ignore
 		// those to ensure it doesnt break.
+		//nolint:lll // URL
 		// https://github.com/GoodiesHQ/headscale-admin/blob/214a44a9c15c92d2b42383f131b51df10c84017c/src/lib/common/acl.svelte.ts#L38
 		{
 			name: "hash-fields-are-allowed-but-ignored",
@@ -2787,7 +2790,7 @@ func TestResolvePolicy(t *testing.T) {
 			t.Parallel()
 
 			ips, err := tt.toResolve.Resolve(tt.pol,
-				xmaps.Values(users),
+				slices.Collect(maps.Values(users)),
 				tt.nodes.ViewSlice())
 			if tt.wantErr == "" {
 				if err != nil {
@@ -6171,7 +6174,7 @@ func TestUnmarshalPolicySSHTests(t *testing.T) {
 				got := pol.SSHTests[0]
 				require.Equal(t, []SSHUser{"root"}, got.Accept)
 				require.Equal(t, []SSHUser{"nobody"}, got.Deny)
-				require.Equal(t, []SSHUser{"alice"}, got.Check) //nolint:goconst
+				require.Equal(t, []SSHUser{"alice"}, got.Check)
 			},
 		},
 		{
@@ -6394,7 +6397,11 @@ func TestValidateCapabilityName(t *testing.T) {
 		{name: "custom domain allowed", cap: "example.com/cap/foo", wantErr: nil},
 		{name: "allowlisted tailscale cap", cap: "tailscale.com/cap/drive", wantErr: nil},
 		{name: "setec secrets cap allowed", cap: "tailscale.com/cap/secrets", wantErr: nil},
-		{name: "non-allowlisted tailscale cap rejected", cap: "tailscale.com/cap/nope", wantErr: ErrCapNameTailscaleDomain},
+		{
+			name:    "non-allowlisted tailscale cap rejected",
+			cap:     "tailscale.com/cap/nope",
+			wantErr: ErrCapNameTailscaleDomain,
+		},
 		{name: "url scheme rejected", cap: "https://tailscale.com/cap/drive", wantErr: ErrCapNameInvalidForm},
 	}
 	for _, tt := range tests {

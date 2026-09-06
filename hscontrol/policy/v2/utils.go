@@ -24,7 +24,8 @@ var (
 	ErrBracketsNotIPv6        = errors.New("square brackets are only valid around IPv6 addresses")
 )
 
-// splitDestinationAndPort takes an input string and returns the destination and port as a tuple, or an error if the input is invalid.
+// splitDestinationAndPort takes an input string and returns the destination and
+// port as a tuple, or an error if the input is invalid.
 // It supports two bracketed IPv6 forms:
 //   - "[addr]:port" (RFC 3986, e.g. "[::1]:80")
 //   - "[addr]/prefix:port" (e.g. "[fd7a::1]/128:80,443")
@@ -50,7 +51,7 @@ func splitDestinationAndPort(input string) (string, string, error) {
 		}
 
 		rest := input[closeBracket+1:]
-		if len(rest) == 0 || (rest[0] != ':' && rest[0] != '/') {
+		if rest == "" || (rest[0] != ':' && rest[0] != '/') {
 			return "", "", fmt.Errorf("%w: %q", ErrBracketsNotIPv6, input)
 		}
 

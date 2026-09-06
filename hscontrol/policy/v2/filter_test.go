@@ -153,21 +153,33 @@ func TestParsing(t *testing.T) {
 }`,
 			want: []tailcfg.FilterRule{
 				{
-					SrcIPs: []string{"100.64.0.0-100.115.91.255", "100.115.94.0-100.127.255.255", "fd7a:115c:a1e0::/48"},
+					SrcIPs: []string{
+						"100.64.0.0-100.115.91.255",
+						"100.115.94.0-100.127.255.255",
+						"fd7a:115c:a1e0::/48",
+					},
 					DstPorts: []tailcfg.NetPortRange{
 						{IP: "100.100.100.100", Ports: tailcfg.PortRangeAny},
 					},
 					IPProto: []int{ProtocolTCP},
 				},
 				{
-					SrcIPs: []string{"100.64.0.0-100.115.91.255", "100.115.94.0-100.127.255.255", "fd7a:115c:a1e0::/48"},
+					SrcIPs: []string{
+						"100.64.0.0-100.115.91.255",
+						"100.115.94.0-100.127.255.255",
+						"fd7a:115c:a1e0::/48",
+					},
 					DstPorts: []tailcfg.NetPortRange{
 						{IP: "100.100.100.100", Ports: tailcfg.PortRange{First: 53, Last: 53}},
 					},
 					IPProto: []int{ProtocolUDP},
 				},
 				{
-					SrcIPs: []string{"100.64.0.0-100.115.91.255", "100.115.94.0-100.127.255.255", "fd7a:115c:a1e0::/48"},
+					SrcIPs: []string{
+						"100.64.0.0-100.115.91.255",
+						"100.115.94.0-100.127.255.255",
+						"fd7a:115c:a1e0::/48",
+					},
 					DstPorts: []tailcfg.NetPortRange{
 						{IP: "100.100.100.100", Ports: tailcfg.PortRangeAny},
 					},
@@ -202,7 +214,11 @@ func TestParsing(t *testing.T) {
 `,
 			want: []tailcfg.FilterRule{
 				{
-					SrcIPs: []string{"100.64.0.0-100.115.91.255", "100.115.94.0-100.127.255.255", "fd7a:115c:a1e0::/48"},
+					SrcIPs: []string{
+						"100.64.0.0-100.115.91.255",
+						"100.115.94.0-100.127.255.255",
+						"fd7a:115c:a1e0::/48",
+					},
 					DstPorts: []tailcfg.NetPortRange{
 						{IP: "100.100.100.100", Ports: tailcfg.PortRangeAny},
 					},
@@ -343,7 +359,11 @@ func TestParsing(t *testing.T) {
 `,
 			want: []tailcfg.FilterRule{
 				{
-					SrcIPs: []string{"100.64.0.0-100.115.91.255", "100.115.94.0-100.127.255.255", "fd7a:115c:a1e0::/48"},
+					SrcIPs: []string{
+						"100.64.0.0-100.115.91.255",
+						"100.115.94.0-100.127.255.255",
+						"fd7a:115c:a1e0::/48",
+					},
 					DstPorts: []tailcfg.NetPortRange{
 						{IP: "100.100.100.100", Ports: tailcfg.PortRangeAny},
 					},
@@ -1270,7 +1290,12 @@ func TestSSHJSONSerialization(t *testing.T) {
 	want := &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
 		{
 			Principals: []*tailcfg.SSHPrincipal{{NodeIP: "100.64.0.1"}},
-			SSHUsers:   map[string]string{"root": "", "ssh-it-user": "ssh-it-user", "ubuntu": "ubuntu", "admin": "admin"},
+			SSHUsers: map[string]string{
+				"root":        "",
+				"ssh-it-user": "ssh-it-user",
+				"ubuntu":      "ubuntu",
+				"admin":       "admin",
+			},
 			Action: &tailcfg.SSHAction{
 				Accept:                    true,
 				AllowAgentForwarding:      true,
@@ -1404,7 +1429,11 @@ func TestCompileFilterRulesForNodeWithAutogroupSelf(t *testing.T) {
 			}
 
 			if ipSet.Contains(addr) {
-				t.Errorf("SECURITY VIOLATION: source IP %s should not be included but found in SrcIP %s", excludedIP, srcEntry)
+				t.Errorf(
+					"SECURITY VIOLATION: source IP %s should not be included but found in SrcIP %s",
+					excludedIP,
+					srcEntry,
+				)
 			}
 		}
 	}
@@ -2276,9 +2305,24 @@ func TestSSHWithAutogroupSelfAndMixedDestinations(t *testing.T) {
 		routerPrincipals[i] = p.NodeIP
 	}
 
-	require.Contains(t, routerPrincipals, "100.64.0.1", "router rule should include user1's device (unfiltered sources)")
-	require.Contains(t, routerPrincipals, "100.64.0.2", "router rule should include user1's other device (unfiltered sources)")
-	require.Contains(t, routerPrincipals, "100.64.0.3", "router rule should include user2's device (unfiltered sources)")
+	require.Contains(
+		t,
+		routerPrincipals,
+		"100.64.0.1",
+		"router rule should include user1's device (unfiltered sources)",
+	)
+	require.Contains(
+		t,
+		routerPrincipals,
+		"100.64.0.2",
+		"router rule should include user1's other device (unfiltered sources)",
+	)
+	require.Contains(
+		t,
+		routerPrincipals,
+		"100.64.0.3",
+		"router rule should include user2's device (unfiltered sources)",
+	)
 }
 
 // TestAutogroupSelfWithNonExistentUserInGroup verifies that when a group
@@ -3533,12 +3577,13 @@ func TestSrcIPsWithRoutes(t *testing.T) {
 
 			got := srcIPsWithRoutes(tt.resolved, tt.hasWildcard, tt.hasDangerAll, nodes)
 
-			if tt.hasDangerAll {
+			switch {
+			case tt.hasDangerAll:
 				assert.Equal(t, []string{"*"}, got)
-			} else if tt.hasWildcard {
+			case tt.hasWildcard:
 				assert.Contains(t, got, "100.64.0.1", "should contain the resolved IP")
 				assert.Contains(t, got, "10.0.0.0/24", "should contain approved subnet route")
-			} else {
+			default:
 				assert.Equal(t, tt.want, got)
 			}
 		})

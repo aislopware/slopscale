@@ -279,7 +279,6 @@ func evaluateAssertion(
 	kind sshAssertion,
 	res *SSHPolicyTestResult,
 ) {
-dstLoop:
 	for _, dst := range dstNodes {
 		dstPol, err := compiledSSHPolicy(pol, users, nodes, cache, dst)
 		if err != nil {
@@ -291,66 +290,75 @@ dstLoop:
 			continue
 		}
 
-		dstLabel := dst.Hostname()
+		evaluateAssertionForDest(dstPol, srcAddrs, user, dst.Hostname(), kind, res)
+	}
+}
 
-		acceptHit := false
-		checkHit := false
+// evaluateAssertionForDest evaluates the assertion for every srcAddr
+// against a single destination's compiled SSH policy. All src IPs must
+// agree; one counter-example fails the whole (user, dst) pair.
+func evaluateAssertionForDest(
+	dstPol *tailcfg.SSHPolicy,
+	srcAddrs []netip.Addr,
+	user, dstLabel string,
+	kind sshAssertion,
+	res *SSHPolicyTestResult,
+) {
+	acceptHit := false
+	checkHit := false
 
-		for _, srcAddr := range srcAddrs {
-			a, c := reachability(dstPol, srcAddr, user)
-			if a {
-				acceptHit = true
-			}
+	for _, srcAddr := range srcAddrs {
+		a, c := reachability(dstPol, srcAddr, user)
+		if a {
+			acceptHit = true
+		}
 
-			if c {
-				checkHit = true
-			}
-
-			// All src IPs must agree; one counter-example fails
-			// the whole (user, dst) pair.
-			switch kind {
-			case assertAccept:
-				if !a {
-					res.Passed = false
-					res.AcceptFail = appendUserDst(res.AcceptFail, user, dstLabel)
-
-					continue dstLoop
-				}
-			case assertDeny:
-				if a {
-					res.Passed = false
-					res.DenyFail = appendUserDst(res.DenyFail, user, dstLabel)
-
-					continue dstLoop
-				}
-			case assertCheck:
-				if !c {
-					res.Passed = false
-					res.CheckFail = appendUserDst(res.CheckFail, user, dstLabel)
-
-					// Record whether the accept side passed so
-					// the rendered error can say "ALLOWED via
-					// accept" instead of "DENIED".
-					if a {
-						res.AcceptOK = appendUserDst(res.AcceptOK, user, dstLabel)
-					}
-
-					continue dstLoop
-				}
-			}
+		if c {
+			checkHit = true
 		}
 
 		switch kind {
 		case assertAccept:
-			if acceptHit {
-				res.AcceptOK = appendUserDst(res.AcceptOK, user, dstLabel)
+			if !a {
+				res.Passed = false
+				res.AcceptFail = appendUserDst(res.AcceptFail, user, dstLabel)
+
+				return
 			}
 		case assertDeny:
-			res.DenyOK = appendUserDst(res.DenyOK, user, dstLabel)
-		case assertCheck:
-			if checkHit {
-				res.CheckOK = appendUserDst(res.CheckOK, user, dstLabel)
+			if a {
+				res.Passed = false
+				res.DenyFail = appendUserDst(res.DenyFail, user, dstLabel)
+
+				return
 			}
+		case assertCheck:
+			if !c {
+				res.Passed = false
+				res.CheckFail = appendUserDst(res.CheckFail, user, dstLabel)
+
+				// Record whether the accept side passed so
+				// the rendered error can say "ALLOWED via
+				// accept" instead of "DENIED".
+				if a {
+					res.AcceptOK = appendUserDst(res.AcceptOK, user, dstLabel)
+				}
+
+				return
+			}
+		}
+	}
+
+	switch kind {
+	case assertAccept:
+		if acceptHit {
+			res.AcceptOK = appendUserDst(res.AcceptOK, user, dstLabel)
+		}
+	case assertDeny:
+		res.DenyOK = appendUserDst(res.DenyOK, user, dstLabel)
+	case assertCheck:
+		if checkHit {
+			res.CheckOK = appendUserDst(res.CheckOK, user, dstLabel)
 		}
 	}
 }
@@ -424,7 +432,6 @@ func resolveSSHTestDestNodes(
 
 	for _, alias := range dsts {
 		dstLabel := alias.String()
-		matched := false
 
 		if ag, ok := alias.(*AutoGroup); ok && ag.Is(AutoGroupSelf) {
 			// autogroup:self resolves to non-tagged nodes owned by
@@ -435,73 +442,108 @@ func resolveSSHTestDestNodes(
 				continue
 			}
 
-			for _, n := range nodes.All() {
-				if n.IsTagged() {
-					continue
-				}
-
-				if !n.User().Valid() {
-					continue
-				}
-
-				if n.User().ID() != srcUserID {
-					continue
-				}
-
-				matched = true
-
-				if _, dup := seen[n.ID()]; dup {
-					continue
-				}
-
-				seen[n.ID()] = struct{}{}
-				out = append(out, n)
-			}
-
-			if !matched {
+			if !resolveAutogroupSelfDestNodes(nodes, srcUserID, seen, &out) {
 				emptyDsts = append(emptyDsts, dstLabel)
 			}
 
 			continue
 		}
 
-		ips, err := alias.Resolve(pol, users, nodes)
+		matched, empty, err := resolveAliasDestNodes(alias, pol, users, nodes, dstLabel, seen, &out)
 		if err != nil {
-			return nil, nil, fmt.Errorf("resolving destination %q: %w", dstLabel, err)
+			return nil, nil, err
 		}
 
-		if ips == nil || ips.Empty() {
-			emptyDsts = append(emptyDsts, dstLabel)
-
-			continue
-		}
-
-		set, err := prefixesToIPSet(ips.Prefixes())
-		if err != nil {
-			return nil, nil, fmt.Errorf("building IPSet for %q: %w", dstLabel, err)
-		}
-
-		for _, n := range nodes.All() {
-			if !n.InIPSet(set) {
-				continue
-			}
-
-			matched = true
-
-			if _, dup := seen[n.ID()]; dup {
-				continue
-			}
-
-			seen[n.ID()] = struct{}{}
-			out = append(out, n)
-		}
-
-		if !matched {
+		if empty || !matched {
 			emptyDsts = append(emptyDsts, dstLabel)
 		}
 	}
 
 	return out, emptyDsts, nil
+}
+
+// resolveAutogroupSelfDestNodes appends the non-tagged nodes owned by
+// srcUserID to *out, deduplicating against seen. It reports whether any
+// node matched.
+func resolveAutogroupSelfDestNodes(
+	nodes views.Slice[types.NodeView],
+	srcUserID uint,
+	seen map[types.NodeID]struct{},
+	out *[]types.NodeView,
+) bool {
+	matched := false
+
+	for _, n := range nodes.All() {
+		if n.IsTagged() {
+			continue
+		}
+
+		if !n.User().Valid() {
+			continue
+		}
+
+		if n.User().ID() != srcUserID {
+			continue
+		}
+
+		matched = true
+
+		if _, dup := seen[n.ID()]; dup {
+			continue
+		}
+
+		seen[n.ID()] = struct{}{}
+		*out = append(*out, n)
+	}
+
+	return matched
+}
+
+// resolveAliasDestNodes resolves alias to an IP set and appends every
+// matching node to *out, deduplicating against seen. empty reports that
+// the alias resolved to no addresses at all (distinct from resolving to
+// addresses that matched no node).
+func resolveAliasDestNodes(
+	alias Alias,
+	pol *Policy,
+	users []types.User,
+	nodes views.Slice[types.NodeView],
+	dstLabel string,
+	seen map[types.NodeID]struct{},
+	out *[]types.NodeView,
+) (bool, bool, error) {
+	ips, err := alias.Resolve(pol, users, nodes)
+	if err != nil {
+		return false, false, fmt.Errorf("resolving destination %q: %w", dstLabel, err)
+	}
+
+	if ips == nil || ips.Empty() {
+		return false, true, nil
+	}
+
+	set, err := prefixesToIPSet(ips.Prefixes())
+	if err != nil {
+		return false, false, fmt.Errorf("building IPSet for %q: %w", dstLabel, err)
+	}
+
+	matched := false
+
+	for _, n := range nodes.All() {
+		if !n.InIPSet(set) {
+			continue
+		}
+
+		matched = true
+
+		if _, dup := seen[n.ID()]; dup {
+			continue
+		}
+
+		seen[n.ID()] = struct{}{}
+		*out = append(*out, n)
+	}
+
+	return matched, false, nil
 }
 
 // prefixesToIPSet builds the [netipx.IPSet] that [types.NodeView.InIPSet]
@@ -513,7 +555,12 @@ func prefixesToIPSet(prefixes []netip.Prefix) (*netipx.IPSet, error) {
 		b.AddPrefix(p)
 	}
 
-	return b.IPSet()
+	ipset, err := b.IPSet()
+	if err != nil {
+		return nil, fmt.Errorf("building IP set from prefixes: %w", err)
+	}
+
+	return ipset, nil
 }
 
 // compiledSSHPolicy returns the per-node compiled [tailcfg.SSHPolicy], caching

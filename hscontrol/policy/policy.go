@@ -59,7 +59,11 @@ func ReduceRoutes(
 // - Previously approved routes are ALWAYS preserved (auto-approval never removes routes)
 // - New routes can be auto-approved according to policy
 // - Routes can only be removed by explicit admin action (not by auto-approval).
-func ApproveRoutesWithPolicy(pm PolicyManager, nv types.NodeView, currentApproved, announcedRoutes []netip.Prefix) ([]netip.Prefix, bool) {
+func ApproveRoutesWithPolicy(
+	pm PolicyManager,
+	nv types.NodeView,
+	currentApproved, announcedRoutes []netip.Prefix,
+) ([]netip.Prefix, bool) {
 	if pm == nil {
 		return currentApproved, false
 	}

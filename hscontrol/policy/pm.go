@@ -11,6 +11,12 @@ import (
 	"tailscale.com/types/views"
 )
 
+// PolicyManager is the policy engine contract the rest of hscontrol programs
+// against; the concrete implementation lives in policy/v2.
+//
+// exported: the name is used across packages, renaming is out of scope.
+//
+//nolint:revive,interfacebloat // interface mirrors the full policy engine contract
 type PolicyManager interface {
 	// Filter returns the current filter rules for the entire tailnet and the associated matchers.
 	Filter() ([]tailcfg.FilterRule, []matcher.Match)
@@ -106,6 +112,8 @@ func NewPolicyManager(pol []byte, users []types.User, nodes views.Slice[types.No
 // PolicyManagersForTest returns all available [PolicyManager] implementations to
 // be used in tests to validate them in tests that try to determine that they
 // behave the same.
+//
+//nolint:revive // exported: the name is used by tests in other packages
 func PolicyManagersForTest(pol []byte, users []types.User, nodes views.Slice[types.NodeView]) ([]PolicyManager, error) {
 	var polMans []PolicyManager
 
@@ -121,6 +129,10 @@ func PolicyManagersForTest(pol []byte, users []types.User, nodes views.Slice[typ
 	return polMans, nil
 }
 
+// PolicyManagerFuncsForTest returns constructors for every [PolicyManager]
+// implementation, for tests that need to build managers repeatedly.
+//
+//nolint:revive // exported: the name is used by tests in other packages
 func PolicyManagerFuncsForTest(pol []byte) []func([]types.User, views.Slice[types.NodeView]) (PolicyManager, error) {
 	polmanFuncs := make([]func([]types.User, views.Slice[types.NodeView]) (PolicyManager, error), 0, 1)
 

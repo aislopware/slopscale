@@ -48,7 +48,7 @@ func TestPolicyManagerConcurrentReads(t *testing.T) {
 			fmt.Sprintf("fd7a:115c:a1e0::%d", i+1),
 			users[i%len(users)],
 		)
-		n.ID = types.NodeID(i + 1) //nolint:gosec // safe in test
+		n.ID = types.NodeID(i + 1)
 		nodes = append(nodes, n)
 	}
 
@@ -96,7 +96,7 @@ func TestPolicyManagerConcurrentReads(t *testing.T) {
 	wg.Go(func() {
 		for range mutatorReloads {
 			_, err := pm.SetNodes(nodes.ViewSlice())
-			assert.NoError(t, err) //nolint:testifylint // assert (not require) is correct off the test goroutine
+			assert.NoError(t, err)
 		}
 	})
 

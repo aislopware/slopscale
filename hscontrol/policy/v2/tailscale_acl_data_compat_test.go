@@ -15,6 +15,7 @@
 package v2
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/netip"
@@ -106,7 +107,7 @@ func cmpOptions() []cmp.Option {
 			ja, _ := json.Marshal(va)
 			jb, _ := json.Marshal(vb)
 
-			return string(ja) == string(jb)
+			return bytes.Equal(ja, jb)
 		}),
 	}
 }
@@ -126,7 +127,7 @@ func buildACLUsersAndNodes(
 
 	for name, nodeDef := range tf.Topology.Nodes {
 		node := &types.Node{
-			ID:        types.NodeID(autoID), //nolint:gosec
+			ID:        types.NodeID(autoID),
 			GivenName: name,
 			IPv4:      ptrAddr(nodeDef.IPv4),
 			IPv6:      ptrAddr(nodeDef.IPv6),

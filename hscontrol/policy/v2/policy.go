@@ -98,6 +98,92 @@ type filterAndPolicy struct {
 	Policy *Policy
 }
 
+// checkUsernameRef resolves a single user@ token and records an error in
+// *errs when it is ambiguous. Missing-user tokens stay tolerant.
+func checkUsernameRef(u *Username, users types.Users, errs *[]error) {
+	if u == nil {
+		return
+	}
+
+	_, err := u.resolveUser(users)
+	if err != nil && errors.Is(err, ErrMultipleUsersFound) {
+		*errs = append(*errs, err)
+	}
+}
+
+// checkAliasUsernameRef checks a as a user@ token when it is one.
+func checkAliasUsernameRef(a Alias, users types.Users, errs *[]error) {
+	if u, ok := a.(*Username); ok {
+		checkUsernameRef(u, users, errs)
+	}
+}
+
+// validateGroupUserReferences checks user@ tokens in policy groups.
+func validateGroupUserReferences(pol *Policy, users types.Users, errs *[]error) {
+	for _, usernames := range pol.Groups {
+		for i := range usernames {
+			checkUsernameRef(&usernames[i], users, errs)
+		}
+	}
+}
+
+// validateTagOwnerUserReferences checks user@ tokens in tag owners.
+func validateTagOwnerUserReferences(pol *Policy, users types.Users, errs *[]error) {
+	for _, owners := range pol.TagOwners {
+		for _, o := range owners {
+			if u, ok := o.(*Username); ok {
+				checkUsernameRef(u, users, errs)
+			}
+		}
+	}
+}
+
+// validateAutoApproverUserReferences checks user@ tokens in route and
+// exit-node auto-approvers.
+func validateAutoApproverUserReferences(pol *Policy, users types.Users, errs *[]error) {
+	for _, approvers := range pol.AutoApprovers.Routes {
+		for _, aa := range approvers {
+			if u, ok := aa.(*Username); ok {
+				checkUsernameRef(u, users, errs)
+			}
+		}
+	}
+
+	for _, aa := range pol.AutoApprovers.ExitNode {
+		if u, ok := aa.(*Username); ok {
+			checkUsernameRef(u, users, errs)
+		}
+	}
+}
+
+// validateACLUserReferences checks user@ tokens in ACL sources and
+// destinations.
+func validateACLUserReferences(pol *Policy, users types.Users, errs *[]error) {
+	for _, acl := range pol.ACLs {
+		for _, src := range acl.Sources {
+			checkAliasUsernameRef(src, users, errs)
+		}
+
+		for _, dst := range acl.Destinations {
+			checkAliasUsernameRef(dst.Alias, users, errs)
+		}
+	}
+}
+
+// validateSSHUserReferences checks user@ tokens in SSH rule sources and
+// destinations.
+func validateSSHUserReferences(pol *Policy, users types.Users, errs *[]error) {
+	for _, ssh := range pol.SSHs {
+		for _, src := range ssh.Sources {
+			checkAliasUsernameRef(src, users, errs)
+		}
+
+		for _, dst := range ssh.Destinations {
+			checkAliasUsernameRef(dst, users, errs)
+		}
+	}
+}
+
 // validateUserReferences surfaces ambiguous user@ tokens at policy load so
 // duplicate DB rows fail loudly instead of silently dropping rules.
 // Missing-user tokens stay tolerant. Empty users → no-op for
@@ -109,78 +195,18 @@ func validateUserReferences(pol *Policy, users types.Users) error {
 
 	var errs []error
 
-	check := func(u *Username) {
-		if u == nil {
-			return
-		}
+	validateGroupUserReferences(pol, users, &errs)
+	validateTagOwnerUserReferences(pol, users, &errs)
+	validateAutoApproverUserReferences(pol, users, &errs)
+	validateACLUserReferences(pol, users, &errs)
+	validateSSHUserReferences(pol, users, &errs)
 
-		_, err := u.resolveUser(users)
-		if err != nil && errors.Is(err, ErrMultipleUsersFound) {
-			errs = append(errs, err)
-		}
+	err := multierr.New(errs...)
+	if err != nil {
+		return fmt.Errorf("validating user references: %w", err)
 	}
 
-	checkAlias := func(a Alias) {
-		if u, ok := a.(*Username); ok {
-			check(u)
-		}
-	}
-
-	checkOwner := func(o Owner) {
-		if u, ok := o.(*Username); ok {
-			check(u)
-		}
-	}
-
-	checkAutoApprover := func(aa AutoApprover) {
-		if u, ok := aa.(*Username); ok {
-			check(u)
-		}
-	}
-
-	for _, usernames := range pol.Groups {
-		for i := range usernames {
-			check(&usernames[i])
-		}
-	}
-
-	for _, owners := range pol.TagOwners {
-		for _, o := range owners {
-			checkOwner(o)
-		}
-	}
-
-	for _, approvers := range pol.AutoApprovers.Routes {
-		for _, aa := range approvers {
-			checkAutoApprover(aa)
-		}
-	}
-
-	for _, aa := range pol.AutoApprovers.ExitNode {
-		checkAutoApprover(aa)
-	}
-
-	for _, acl := range pol.ACLs {
-		for _, src := range acl.Sources {
-			checkAlias(src)
-		}
-
-		for _, dst := range acl.Destinations {
-			checkAlias(dst.Alias)
-		}
-	}
-
-	for _, ssh := range pol.SSHs {
-		for _, src := range ssh.Sources {
-			checkAlias(src)
-		}
-
-		for _, dst := range ssh.Destinations {
-			checkAlias(dst)
-		}
-	}
-
-	return multierr.New(errs...)
+	return nil
 }
 
 // NewPolicyManager creates a new [PolicyManager] from a policy file and a list of users and nodes.
@@ -217,168 +243,19 @@ func NewPolicyManager(b []byte, users []types.User, nodes views.Slice[types.Node
 	// was deleted while the server was offline) should not block
 	// boot; the operator finds out via logs and re-runs the write
 	// boundary when they are ready.
-	if testErr := pm.RunTests(); testErr != nil { //nolint:noinlineerr // boot path: warn-and-continue, not return
+	testErr := pm.RunTests()
+	if testErr != nil {
 		log.Warn().Err(testErr).Msg("policy tests failed at boot; server starting anyway, fix the policy and reload")
 	}
 
-	if testErr := pm.RunSSHTests(); testErr != nil { //nolint:noinlineerr // boot path: warn-and-continue, not return
-		log.Warn().Err(testErr).Msg("policy sshTests failed at boot; server starting anyway, fix the policy and reload")
+	sshTestErr := pm.RunSSHTests()
+	if sshTestErr != nil {
+		log.Warn().
+			Err(sshTestErr).
+			Msg("policy sshTests failed at boot; server starting anyway, fix the policy and reload")
 	}
 
 	return &pm, nil
-}
-
-// updateLocked updates the filter rules based on the current policy and nodes.
-// It must be called with the lock held.
-func (pm *PolicyManager) updateLocked() (bool, error) {
-	// Compile all grants once. Both global and per-node filter
-	// rules are derived from these compiled grants.
-	pm.compiledGrants = pm.pol.compileGrants(pm.users, pm.nodes)
-	pm.userNodeIdx = buildUserNodeIndex(pm.nodes)
-	pm.needsPerNodeFilter = hasPerNodeGrants(pm.compiledGrants)
-	pm.viaTargetTags = collectViaTargetTags(pm.compiledGrants)
-
-	relayTargetIPs, err := collectRelayTargetIPs(pm.compiledGrants)
-	if err != nil {
-		return false, fmt.Errorf("collecting relay target IPs: %w", err)
-	}
-
-	pm.relayTargetIPs = relayTargetIPs
-
-	var filter []tailcfg.FilterRule
-	if pm.pol == nil || (pm.pol.ACLs == nil && pm.pol.Grants == nil) {
-		filter = tailcfg.FilterAllowAll
-	} else {
-		filter = globalFilterRules(pm.compiledGrants)
-	}
-
-	// Hash both the compiled filter AND the policy content together.
-	// This ensures filterHash changes when policy changes, even for autogroup:self
-	// where the compiled filter is always empty. This eliminates the need for
-	// a separate policyHash field.
-	filterHash := deephash.Hash(&filterAndPolicy{
-		Filter: filter,
-		Policy: pm.pol,
-	})
-
-	filterChanged := filterHash != pm.filterHash
-	if filterChanged {
-		log.Debug().
-			Str("filter.hash.old", pm.filterHash.String()[:8]).
-			Str("filter.hash.new", filterHash.String()[:8]).
-			Int("filter.rules", len(pm.filter)).
-			Int("filter.rules.new", len(filter)).
-			Msg("Policy filter hash changed")
-	}
-
-	pm.filter = filter
-
-	pm.filterHash = filterHash
-	if filterChanged {
-		pm.matchers = matcher.MatchesFromFilterRules(pm.filter)
-	}
-
-	// Order matters, tags might be used in autoapprovers, so we need to ensure
-	// that the map for tag owners is resolved before resolving autoapprovers.
-	// TODO(kradalby): Order might not matter after #2417
-	tagMap, err := resolveTagOwners(pm.pol, pm.users, pm.nodes)
-	if err != nil {
-		return false, fmt.Errorf("resolving tag owners map: %w", err)
-	}
-
-	tagOwnerMapHash := deephash.Hash(&tagMap)
-
-	tagOwnerChanged := tagOwnerMapHash != pm.tagOwnerMapHash
-	if tagOwnerChanged {
-		log.Debug().
-			Str("tagOwner.hash.old", pm.tagOwnerMapHash.String()[:8]).
-			Str("tagOwner.hash.new", tagOwnerMapHash.String()[:8]).
-			Int("tagOwners.old", len(pm.tagOwnerMap)).
-			Int("tagOwners.new", len(tagMap)).
-			Msg("Tag owner hash changed")
-	}
-
-	pm.tagOwnerMap = tagMap
-	pm.tagOwnerMapHash = tagOwnerMapHash
-
-	autoMap, exitSet, err := resolveAutoApprovers(pm.pol, pm.users, pm.nodes)
-	if err != nil {
-		return false, fmt.Errorf("resolving auto approvers map: %w", err)
-	}
-
-	autoApproveMapHash := deephash.Hash(&autoMap)
-
-	autoApproveChanged := autoApproveMapHash != pm.autoApproveMapHash
-	if autoApproveChanged {
-		log.Debug().
-			Str("autoApprove.hash.old", pm.autoApproveMapHash.String()[:8]).
-			Str("autoApprove.hash.new", autoApproveMapHash.String()[:8]).
-			Int("autoApprovers.old", len(pm.autoApproveMap)).
-			Int("autoApprovers.new", len(autoMap)).
-			Msg("Auto-approvers hash changed")
-	}
-
-	pm.autoApproveMap = autoMap
-	pm.autoApproveMapHash = autoApproveMapHash
-
-	exitSetHash := deephash.Hash(&exitSet)
-
-	exitSetChanged := exitSetHash != pm.exitSetHash
-	if exitSetChanged {
-		log.Debug().
-			Str("exitSet.hash.old", pm.exitSetHash.String()[:8]).
-			Str("exitSet.hash.new", exitSetHash.String()[:8]).
-			Msg("Exit node set hash changed")
-	}
-
-	pm.exitSet = exitSet
-	pm.exitSetHash = exitSetHash
-
-	// Recompile per-node nodeAttrs CapMap and append the diff to
-	// pm.nodeAttrsChanged. The drain (NodesWithChangedCapMap) returns
-	// the accumulated union of every change since the last drain;
-	// SetUsers/SetNodes appending between SetPolicy and the drain
-	// cannot lose the policy-reload diff.
-	err = pm.refreshNodeAttrsLocked()
-	if err != nil {
-		return false, err
-	}
-
-	// Determine if we need to send updates to nodes
-	// filterChanged now includes policy content changes (via combined hash),
-	// so it will detect changes even for autogroup:self where compiled filter is empty
-	needsUpdate := filterChanged || tagOwnerChanged || autoApproveChanged || exitSetChanged
-
-	// Only clear caches if we're actually going to send updates
-	// This prevents clearing caches when nothing changed, which would leave nodes
-	// with stale filters until they reconnect. This is critical for autogroup:self
-	// where even reloading the same policy would clear caches but not send updates.
-	if needsUpdate {
-		// Clear the SSH policy map to ensure it's recalculated with the new policy.
-		// TODO(kradalby): This could potentially be optimized by only clearing the
-		// policies for nodes that have changed. Particularly if the only difference is
-		// that nodes has been added or removed.
-		pm.sshPolicyMap.Clear()
-		pm.filterRulesMap.Clear()
-		pm.matchersForNodeMap.Clear()
-	}
-
-	// If nothing changed, no need to update nodes
-	if !needsUpdate {
-		log.Trace().
-			Msg("Policy evaluation detected no changes - all hashes match")
-
-		return false, nil
-	}
-
-	log.Debug().
-		Bool("filter.changed", filterChanged).
-		Bool("tagOwners.changed", tagOwnerChanged).
-		Bool("autoApprovers.changed", autoApproveChanged).
-		Bool("exitNodes.changed", exitSetChanged).
-		Msg("Policy changes require node updates")
-
-	return true, nil
 }
 
 // NodeNeedsPeerRecompute reports whether peers must recompute their netmap
@@ -461,70 +338,15 @@ func (pm *PolicyManager) SSHCheckParams(
 		return 0, false
 	}
 
-	// Find the source and destination node views.
-	var srcNode, dstNode types.NodeView
-
-	for _, n := range pm.nodes.All() {
-		nid := n.ID()
-		if nid == srcNodeID {
-			srcNode = n
-		}
-
-		if nid == dstNodeID {
-			dstNode = n
-		}
-
-		if srcNode.Valid() && dstNode.Valid() {
-			break
-		}
-	}
-
+	srcNode, dstNode := pm.findNodePairLocked(srcNodeID, dstNodeID)
 	if !srcNode.Valid() || !dstNode.Valid() {
 		return 0, false
 	}
 
 	// Iterate SSH rules to find the first matching check rule.
 	for _, rule := range pm.pol.SSHs {
-		if rule.Action != SSHActionCheck {
-			continue
-		}
-
-		// Resolve sources and check if src node matches.
-		srcIPs, err := rule.Sources.Resolve(pm.pol, pm.users, pm.nodes)
-		if err != nil || srcIPs == nil {
-			continue
-		}
-
-		if !slices.ContainsFunc(srcNode.IPs(), srcIPs.Contains) {
-			continue
-		}
-
-		// Check if dst node matches any destination.
-		for _, dst := range rule.Destinations {
-			if ag, isAG := dst.(*AutoGroup); isAG && ag.Is(AutoGroupSelf) {
-				// User().Valid() guards the User().ID() dereference: the
-				// NodeStore can hold a non-tagged node with UserID set but
-				// the User association unhydrated (nil), and IsTagged()
-				// alone does not cover that. Mirrors filter.go's
-				// autogroup:self guard. Without it, a tailnet client on the
-				// Noise SSH-check path crashes the server (nil deref).
-				if !srcNode.IsTagged() && !dstNode.IsTagged() &&
-					srcNode.User().Valid() && dstNode.User().Valid() &&
-					srcNode.User().ID() == dstNode.User().ID() {
-					return checkPeriodFromRule(rule), true
-				}
-
-				continue
-			}
-
-			dstIPs, err := dst.Resolve(pm.pol, pm.users, pm.nodes)
-			if err != nil || dstIPs == nil {
-				continue
-			}
-
-			if slices.ContainsFunc(dstNode.IPs(), dstIPs.Contains) {
-				return checkPeriodFromRule(rule), true
-			}
+		if d, ok := pm.sshCheckPeriodForRule(rule, srcNode, dstNode); ok {
+			return d, true
 		}
 	}
 
@@ -562,7 +384,7 @@ func (pm *PolicyManager) SetPolicy(polB []byte) (bool, error) {
 		evaluateSSHTests(pol, pm.users, pm.nodes),
 	)
 	if testErr != nil {
-		return false, testErr
+		return false, fmt.Errorf("evaluating policy tests: %w", testErr)
 	}
 
 	// Log policy metadata for debugging
@@ -699,52 +521,6 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 	}
 
 	return ret
-}
-
-// filterRulesForNodeLocked returns the unreduced compiled filter rules
-// for a node, combining pre-compiled global rules with per-node self
-// and via rules from the stored compiled grants.
-func (pm *PolicyManager) filterRulesForNodeLocked(
-	node types.NodeView,
-) []tailcfg.FilterRule {
-	return filterRulesForNode(
-		pm.compiledGrants, node, pm.userNodeIdx,
-	)
-}
-
-// filterForNodeLocked returns the filter rules for a specific node,
-// already reduced to only include rules relevant to that node.
-//
-// Fast path (!needsPerNodeFilter): reduces global filter per-node.
-// Slow path (needsPerNodeFilter): combines global + self + via rules
-// from the stored compiled grants, then reduces.
-//
-// Both paths derive from the same compiledGrants, ensuring there is
-// no divergence between global and per-node filter output.
-//
-// Lock-free version for internal use when the lock is already held.
-func (pm *PolicyManager) filterForNodeLocked(
-	node types.NodeView,
-) []tailcfg.FilterRule {
-	if pm == nil {
-		return nil
-	}
-
-	if rules, ok := pm.filterRulesMap.Load(node.ID()); ok {
-		return rules
-	}
-
-	var unreduced []tailcfg.FilterRule
-	if !pm.needsPerNodeFilter {
-		unreduced = pm.filter
-	} else {
-		unreduced = pm.filterRulesForNodeLocked(node)
-	}
-
-	reduced := policyutil.ReduceFilterRules(node, unreduced)
-	pm.filterRulesMap.Store(node.ID(), reduced)
-
-	return reduced
 }
 
 // FilterForNode returns the filter rules for a specific node, already reduced
@@ -893,35 +669,6 @@ func nodeIDViewMap(s views.Slice[types.NodeView]) map[types.NodeID]types.NodeVie
 	return m
 }
 
-func (pm *PolicyManager) nodesHavePolicyAffectingChanges(newNodes views.Slice[types.NodeView]) bool {
-	if pm.nodes.Len() != newNodes.Len() {
-		return true
-	}
-
-	oldNodes := nodeIDViewMap(pm.nodes)
-
-	for _, newNode := range newNodes.All() {
-		oldNode, exists := oldNodes[newNode.ID()]
-		if !exists {
-			return true
-		}
-
-		if newNode.HasPolicyChange(oldNode) {
-			return true
-		}
-
-		// Via grants and autogroup:self compile filter rules per-node
-		// that depend on the node's route state (SubnetRoutes, ExitRoutes).
-		// Route changes are policy-affecting in this context because they
-		// alter which filter rules get generated for the via-designated node.
-		if pm.needsPerNodeFilter && newNode.HasNetworkChanges(oldNode) {
-			return true
-		}
-	}
-
-	return false
-}
-
 // NodeCanHaveTag checks if a node can have the specified tag during client-initiated
 // registration or reauth flows (e.g., tailscale up --advertise-tags).
 //
@@ -1063,50 +810,6 @@ func (pm *PolicyManager) TagOwnedByTags(tag string, ownerTags []string) bool {
 	return walk(Tag(tag))
 }
 
-// userMatchesOwner checks if a user matches a tag owner entry.
-// This is used as a fallback when the node's IP is not in the [PolicyManager.tagOwnerMap].
-func (pm *PolicyManager) userMatchesOwner(user types.UserView, owner Owner) bool {
-	switch o := owner.(type) {
-	case *Username:
-		if o == nil {
-			return false
-		}
-		// Resolve the username to find the user it refers to
-		resolvedUser, err := o.resolveUser(pm.users)
-		if err != nil {
-			return false
-		}
-
-		return user.ID() == resolvedUser.ID
-
-	case *Group:
-		if o == nil || pm.pol == nil {
-			return false
-		}
-		// Resolve the group to get usernames
-		usernames, ok := pm.pol.Groups[*o]
-		if !ok {
-			return false
-		}
-		// Check if the user matches any username in the group
-		for _, uname := range usernames {
-			resolvedUser, err := uname.resolveUser(pm.users)
-			if err != nil {
-				continue
-			}
-
-			if user.ID() == resolvedUser.ID {
-				return true
-			}
-		}
-
-		return false
-
-	default:
-		return false
-	}
-}
-
 // TagExists reports whether the given tag is defined in the policy.
 func (pm *PolicyManager) TagExists(tag string) bool {
 	if pm == nil {
@@ -1187,7 +890,10 @@ func (pm *PolicyManager) NodeCanApproveRoute(node types.NodeView, route netip.Pr
 // callers should memoise by (policy-hash, viewer-id) rather than invoking
 // this per-pair.
 //
-//nolint:gocyclo // three-pass via-grant resolution (match, primary election, regular-overlap)
+// legacy: three-pass via-grant resolution (match, primary election,
+// regular-overlap); splitting risks diverging the passes.
+//
+//nolint:gocyclo,gocognit,nestif,cyclop,funlen,maintidx // see above
 func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.ViaRouteResult {
 	var result types.ViaRouteResult
 
@@ -1485,172 +1191,6 @@ func (pm *PolicyManager) DebugString() string {
 	return sb.String()
 }
 
-// invalidateAutogroupSelfCache intelligently clears only the cache entries that need to be
-// invalidated when using autogroup:self policies. This is much more efficient than clearing
-// the entire cache.
-func (pm *PolicyManager) invalidateAutogroupSelfCache(oldNodes, newNodes views.Slice[types.NodeView]) {
-	// Build maps for efficient lookup
-	oldNodeMap := nodeIDViewMap(oldNodes)
-	newNodeMap := nodeIDViewMap(newNodes)
-
-	// Track which users are affected by changes.
-	// Tagged nodes don't participate in autogroup:self (identity is tag-based),
-	// so we skip them when collecting affected users, except when tag status changes
-	// (which affects the user's device set).
-	//
-	// Ownership is keyed on TypedUserID (the UserID field), not the User
-	// association view: the NodeStore holds nodes by value with User as a
-	// *User pointer, and not every write path hydrates that association. A
-	// non-tagged node always has UserID set, so it is the reliable owner key.
-	affectedUsers := make(map[types.UserID]struct{})
-
-	// Check for removed nodes (only non-tagged nodes affect autogroup:self)
-	for nodeID, oldNode := range oldNodeMap {
-		if _, exists := newNodeMap[nodeID]; !exists {
-			if !oldNode.IsTagged() {
-				affectedUsers[oldNode.TypedUserID()] = struct{}{}
-			}
-		}
-	}
-
-	// Check for added nodes (only non-tagged nodes affect autogroup:self)
-	for nodeID, newNode := range newNodeMap {
-		if _, exists := oldNodeMap[nodeID]; !exists {
-			if !newNode.IsTagged() {
-				affectedUsers[newNode.TypedUserID()] = struct{}{}
-			}
-		}
-	}
-
-	// Check for modified nodes (user changes, tag changes, IP changes)
-	for nodeID, newNode := range newNodeMap {
-		if oldNode, exists := oldNodeMap[nodeID]; exists {
-			// Check if tag status changed — this affects the user's autogroup:self device set.
-			// Use the non-tagged version to get the user ID safely.
-			if oldNode.IsTagged() != newNode.IsTagged() {
-				if !oldNode.IsTagged() {
-					// Was untagged, now tagged: user lost a device
-					affectedUsers[oldNode.TypedUserID()] = struct{}{}
-				} else {
-					// Was tagged, now untagged: user gained a device
-					affectedUsers[newNode.TypedUserID()] = struct{}{}
-				}
-
-				continue
-			}
-
-			// Skip tagged nodes for remaining checks — they don't participate in autogroup:self
-			if newNode.IsTagged() {
-				continue
-			}
-
-			// Check if user changed (both versions are non-tagged here)
-			if oldNode.TypedUserID() != newNode.TypedUserID() {
-				affectedUsers[oldNode.TypedUserID()] = struct{}{}
-				affectedUsers[newNode.TypedUserID()] = struct{}{}
-			}
-
-			// Check if IPs changed.
-			if !slices.Equal(oldNode.IPs(), newNode.IPs()) {
-				affectedUsers[newNode.TypedUserID()] = struct{}{}
-			}
-		}
-	}
-
-	// Clear cache entries for affected users only.
-	// For autogroup:self, we need to clear all nodes belonging to affected users
-	// because autogroup:self rules depend on the entire user's device set.
-	pm.filterRulesMap.Range(func(nodeID types.NodeID, _ []tailcfg.FilterRule) bool {
-		// Find the user for this cached node using the already-built indexes.
-		node, ok := newNodeMap[nodeID]
-		if !ok {
-			node, ok = oldNodeMap[nodeID]
-		}
-
-		// Node not found in either old or new list, clear it.
-		if !ok {
-			pm.filterRulesMap.Delete(nodeID)
-			pm.matchersForNodeMap.Delete(nodeID)
-
-			return true
-		}
-
-		// Tagged nodes don't participate in autogroup:self, so their cache
-		// doesn't need user-based invalidation; leave nodeUserID at zero.
-		var nodeUserID types.UserID
-		if !node.IsTagged() {
-			nodeUserID = node.TypedUserID()
-		}
-
-		// If the owning user is affected, clear this cache entry.
-		if _, affected := affectedUsers[nodeUserID]; affected {
-			pm.filterRulesMap.Delete(nodeID)
-			pm.matchersForNodeMap.Delete(nodeID)
-		}
-
-		return true
-	})
-
-	if len(affectedUsers) > 0 {
-		log.Debug().
-			Int("affected_users", len(affectedUsers)).
-			Int("remaining_cache_entries", pm.filterRulesMap.Size()).
-			Msg("Selectively cleared autogroup:self cache for affected users")
-	}
-}
-
-// invalidateNodeCache invalidates cache entries based on what changed.
-func (pm *PolicyManager) invalidateNodeCache(newNodes views.Slice[types.NodeView]) {
-	if pm.needsPerNodeFilter {
-		// For autogroup:self or via grants, a node's filter depends
-		// on its peers. When any node changes, invalidate affected
-		// users' caches.
-		pm.invalidateAutogroupSelfCache(pm.nodes, newNodes)
-	} else {
-		// For global policies, a node's filter depends only on its
-		// own properties. Only invalidate changed nodes.
-		pm.invalidateGlobalPolicyCache(newNodes)
-	}
-}
-
-// invalidateGlobalPolicyCache invalidates only nodes whose properties affecting
-// [policyutil.ReduceFilterRules] changed. For global policies, each node's filter is independent.
-func (pm *PolicyManager) invalidateGlobalPolicyCache(newNodes views.Slice[types.NodeView]) {
-	oldNodeMap := nodeIDViewMap(pm.nodes)
-	newNodeMap := nodeIDViewMap(newNodes)
-
-	// Invalidate nodes whose properties changed
-	for nodeID, newNode := range newNodeMap {
-		oldNode, existed := oldNodeMap[nodeID]
-		if !existed {
-			// New node - no cache entry yet, will be lazily calculated
-			continue
-		}
-
-		if newNode.HasNetworkChanges(oldNode) {
-			pm.filterRulesMap.Delete(nodeID)
-			pm.matchersForNodeMap.Delete(nodeID)
-		}
-	}
-
-	// Remove deleted nodes from cache
-	pm.filterRulesMap.Range(func(nodeID types.NodeID, _ []tailcfg.FilterRule) bool {
-		if _, exists := newNodeMap[nodeID]; !exists {
-			pm.filterRulesMap.Delete(nodeID)
-		}
-
-		return true
-	})
-
-	pm.matchersForNodeMap.Range(func(nodeID types.NodeID, _ []matcher.Match) bool {
-		if _, exists := newNodeMap[nodeID]; !exists {
-			pm.matchersForNodeMap.Delete(nodeID)
-		}
-
-		return true
-	})
-}
-
 // flattenTags resolves nested tag-owner references. Cycles
 // (tag:a -> tag:b -> tag:a, or tag:a -> tag:a) drop the cycle-causing
 // edge and contribute no addresses; non-cycle owners on the cycled tags
@@ -1755,70 +1295,13 @@ func resolveTagOwners(p *Policy, users types.Users, nodes views.Slice[types.Node
 
 		ipSet, err := ips.IPSet()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("building tag owner IP set for %s: %w", tag, err)
 		}
 
 		ret[tag] = ipSet
 	}
 
 	return ret, nil
-}
-
-// refreshNodeAttrsLocked recompiles the per-node nodeAttrs CapMap and
-// appends the IDs whose CapMap differs from the previous snapshot
-// (including newly-targeted nodes and nodes that lost all attrs) to
-// pm.nodeAttrsChanged. Append, not overwrite: a concurrent
-// SetUsers/SetNodes between SetPolicy and a NodesWithChangedCapMap
-// drain cannot clobber the policy-reload diff.
-//
-// Caller must hold pm.mu.
-func (pm *PolicyManager) refreshNodeAttrsLocked() error {
-	// Fast path for the common steady-state shape: tailnet has no
-	// nodeAttrs entries and never had any. Skip the compile + per-node
-	// hash walk entirely. As soon as the operator adds a nodeAttrs
-	// entry pm.nodeAttrsHashes becomes non-empty and the gate opens.
-	if pm.pol != nil &&
-		len(pm.pol.NodeAttrs) == 0 &&
-		!pm.pol.RandomizeClientPort &&
-		len(pm.nodeAttrsHashes) == 0 {
-		return nil
-	}
-
-	newMap, err := pm.pol.compileNodeAttrs(pm.users, pm.nodes)
-	if err != nil {
-		return fmt.Errorf("compiling nodeAttrs: %w", err)
-	}
-
-	newHashes := make(map[types.NodeID]deephash.Sum, len(newMap))
-	for id, capMap := range newMap {
-		newHashes[id] = deephash.Hash(&capMap)
-	}
-
-	// Walk the union of old and new node IDs and emit the delta.
-	seen := make(map[types.NodeID]struct{}, len(newHashes)+len(pm.nodeAttrsHashes))
-
-	var changed []types.NodeID
-
-	for id, h := range newHashes {
-		seen[id] = struct{}{}
-		if pm.nodeAttrsHashes[id] != h {
-			changed = append(changed, id)
-		}
-	}
-
-	for id := range pm.nodeAttrsHashes {
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		// Node lost all nodeAttrs since the last update.
-		changed = append(changed, id)
-	}
-
-	pm.nodeAttrsMap = newMap
-	pm.nodeAttrsHashes = newHashes
-	pm.nodeAttrsChanged = append(pm.nodeAttrsChanged, changed...)
-
-	return nil
 }
 
 // NodeCapMap returns the policy-derived CapMap for the given node, or
@@ -1886,4 +1369,610 @@ func (pm *PolicyManager) NodesWithChangedCapMap() []types.NodeID {
 	pm.nodeAttrsChanged = nil
 
 	return out
+}
+
+// updateLocked updates the filter rules based on the current policy and nodes.
+// It must be called with the lock held.
+func (pm *PolicyManager) updateLocked() (bool, error) {
+	// Compile all grants once. Both global and per-node filter
+	// rules are derived from these compiled grants.
+	pm.compiledGrants = pm.pol.compileGrants(pm.users, pm.nodes)
+	pm.userNodeIdx = buildUserNodeIndex(pm.nodes)
+	pm.needsPerNodeFilter = hasPerNodeGrants(pm.compiledGrants)
+	pm.viaTargetTags = collectViaTargetTags(pm.compiledGrants)
+
+	relayTargetIPs, err := collectRelayTargetIPs(pm.compiledGrants)
+	if err != nil {
+		return false, fmt.Errorf("collecting relay target IPs: %w", err)
+	}
+
+	pm.relayTargetIPs = relayTargetIPs
+
+	var filter []tailcfg.FilterRule
+	if pm.pol == nil || (pm.pol.ACLs == nil && pm.pol.Grants == nil) {
+		filter = tailcfg.FilterAllowAll
+	} else {
+		filter = globalFilterRules(pm.compiledGrants)
+	}
+
+	// Hash both the compiled filter AND the policy content together.
+	// This ensures filterHash changes when policy changes, even for autogroup:self
+	// where the compiled filter is always empty. This eliminates the need for
+	// a separate policyHash field.
+	filterHash := deephash.Hash(&filterAndPolicy{
+		Filter: filter,
+		Policy: pm.pol,
+	})
+
+	filterChanged := filterHash != pm.filterHash
+	if filterChanged {
+		log.Debug().
+			Str("filter.hash.old", pm.filterHash.String()[:8]).
+			Str("filter.hash.new", filterHash.String()[:8]).
+			Int("filter.rules", len(pm.filter)).
+			Int("filter.rules.new", len(filter)).
+			Msg("Policy filter hash changed")
+	}
+
+	pm.filter = filter
+
+	pm.filterHash = filterHash
+	if filterChanged {
+		pm.matchers = matcher.MatchesFromFilterRules(pm.filter)
+	}
+
+	// Order matters, tags might be used in autoapprovers, so we need to ensure
+	// that the map for tag owners is resolved before resolving autoapprovers.
+	// TODO(kradalby): Order might not matter after #2417
+	tagMap, err := resolveTagOwners(pm.pol, pm.users, pm.nodes)
+	if err != nil {
+		return false, fmt.Errorf("resolving tag owners map: %w", err)
+	}
+
+	tagOwnerMapHash := deephash.Hash(&tagMap)
+
+	tagOwnerChanged := tagOwnerMapHash != pm.tagOwnerMapHash
+	if tagOwnerChanged {
+		log.Debug().
+			Str("tagOwner.hash.old", pm.tagOwnerMapHash.String()[:8]).
+			Str("tagOwner.hash.new", tagOwnerMapHash.String()[:8]).
+			Int("tagOwners.old", len(pm.tagOwnerMap)).
+			Int("tagOwners.new", len(tagMap)).
+			Msg("Tag owner hash changed")
+	}
+
+	pm.tagOwnerMap = tagMap
+	pm.tagOwnerMapHash = tagOwnerMapHash
+
+	autoMap, exitSet, err := resolveAutoApprovers(pm.pol, pm.users, pm.nodes)
+	if err != nil {
+		return false, fmt.Errorf("resolving auto approvers map: %w", err)
+	}
+
+	autoApproveMapHash := deephash.Hash(&autoMap)
+
+	autoApproveChanged := autoApproveMapHash != pm.autoApproveMapHash
+	if autoApproveChanged {
+		log.Debug().
+			Str("autoApprove.hash.old", pm.autoApproveMapHash.String()[:8]).
+			Str("autoApprove.hash.new", autoApproveMapHash.String()[:8]).
+			Int("autoApprovers.old", len(pm.autoApproveMap)).
+			Int("autoApprovers.new", len(autoMap)).
+			Msg("Auto-approvers hash changed")
+	}
+
+	pm.autoApproveMap = autoMap
+	pm.autoApproveMapHash = autoApproveMapHash
+
+	exitSetHash := deephash.Hash(&exitSet)
+
+	exitSetChanged := exitSetHash != pm.exitSetHash
+	if exitSetChanged {
+		log.Debug().
+			Str("exitSet.hash.old", pm.exitSetHash.String()[:8]).
+			Str("exitSet.hash.new", exitSetHash.String()[:8]).
+			Msg("Exit node set hash changed")
+	}
+
+	pm.exitSet = exitSet
+	pm.exitSetHash = exitSetHash
+
+	// Recompile per-node nodeAttrs CapMap and append the diff to
+	// pm.nodeAttrsChanged. The drain (NodesWithChangedCapMap) returns
+	// the accumulated union of every change since the last drain;
+	// SetUsers/SetNodes appending between SetPolicy and the drain
+	// cannot lose the policy-reload diff.
+	err = pm.refreshNodeAttrsLocked()
+	if err != nil {
+		return false, err
+	}
+
+	// Determine if we need to send updates to nodes
+	// filterChanged now includes policy content changes (via combined hash),
+	// so it will detect changes even for autogroup:self where compiled filter is empty
+	needsUpdate := filterChanged || tagOwnerChanged || autoApproveChanged || exitSetChanged
+
+	// Only clear caches if we're actually going to send updates
+	// This prevents clearing caches when nothing changed, which would leave nodes
+	// with stale filters until they reconnect. This is critical for autogroup:self
+	// where even reloading the same policy would clear caches but not send updates.
+	if needsUpdate {
+		// Clear the SSH policy map to ensure it's recalculated with the new policy.
+		// TODO(kradalby): This could potentially be optimized by only clearing the
+		// policies for nodes that have changed. Particularly if the only difference is
+		// that nodes has been added or removed.
+		pm.sshPolicyMap.Clear()
+		pm.filterRulesMap.Clear()
+		pm.matchersForNodeMap.Clear()
+	}
+
+	// If nothing changed, no need to update nodes
+	if !needsUpdate {
+		log.Trace().
+			Msg("Policy evaluation detected no changes - all hashes match")
+
+		return false, nil
+	}
+
+	log.Debug().
+		Bool("filter.changed", filterChanged).
+		Bool("tagOwners.changed", tagOwnerChanged).
+		Bool("autoApprovers.changed", autoApproveChanged).
+		Bool("exitNodes.changed", exitSetChanged).
+		Msg("Policy changes require node updates")
+
+	return true, nil
+}
+
+// filterRulesForNodeLocked returns the unreduced compiled filter rules
+// for a node, combining pre-compiled global rules with per-node self
+// and via rules from the stored compiled grants.
+func (pm *PolicyManager) filterRulesForNodeLocked(
+	node types.NodeView,
+) []tailcfg.FilterRule {
+	return filterRulesForNode(
+		pm.compiledGrants, node, pm.userNodeIdx,
+	)
+}
+
+// filterForNodeLocked returns the filter rules for a specific node,
+// already reduced to only include rules relevant to that node.
+//
+// Fast path (!needsPerNodeFilter): reduces global filter per-node.
+// Slow path (needsPerNodeFilter): combines global + self + via rules
+// from the stored compiled grants, then reduces.
+//
+// Both paths derive from the same compiledGrants, ensuring there is
+// no divergence between global and per-node filter output.
+//
+// Lock-free version for internal use when the lock is already held.
+func (pm *PolicyManager) filterForNodeLocked(
+	node types.NodeView,
+) []tailcfg.FilterRule {
+	if pm == nil {
+		return nil
+	}
+
+	if rules, ok := pm.filterRulesMap.Load(node.ID()); ok {
+		return rules
+	}
+
+	var unreduced []tailcfg.FilterRule
+	if !pm.needsPerNodeFilter {
+		unreduced = pm.filter
+	} else {
+		unreduced = pm.filterRulesForNodeLocked(node)
+	}
+
+	reduced := policyutil.ReduceFilterRules(node, unreduced)
+	pm.filterRulesMap.Store(node.ID(), reduced)
+
+	return reduced
+}
+
+func (pm *PolicyManager) nodesHavePolicyAffectingChanges(newNodes views.Slice[types.NodeView]) bool {
+	if pm.nodes.Len() != newNodes.Len() {
+		return true
+	}
+
+	oldNodes := nodeIDViewMap(pm.nodes)
+
+	for _, newNode := range newNodes.All() {
+		oldNode, exists := oldNodes[newNode.ID()]
+		if !exists {
+			return true
+		}
+
+		if newNode.HasPolicyChange(oldNode) {
+			return true
+		}
+
+		// Via grants and autogroup:self compile filter rules per-node
+		// that depend on the node's route state (SubnetRoutes, ExitRoutes).
+		// Route changes are policy-affecting in this context because they
+		// alter which filter rules get generated for the via-designated node.
+		if pm.needsPerNodeFilter && newNode.HasNetworkChanges(oldNode) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// userMatchesOwner checks if a user matches a tag owner entry.
+// This is used as a fallback when the node's IP is not in the [PolicyManager.tagOwnerMap].
+func (pm *PolicyManager) userMatchesOwner(user types.UserView, owner Owner) bool {
+	switch o := owner.(type) {
+	case *Username:
+		if o == nil {
+			return false
+		}
+		// Resolve the username to find the user it refers to
+		resolvedUser, err := o.resolveUser(pm.users)
+		if err != nil {
+			return false
+		}
+
+		return user.ID() == resolvedUser.ID
+
+	case *Group:
+		if o == nil || pm.pol == nil {
+			return false
+		}
+		// Resolve the group to get usernames
+		usernames, ok := pm.pol.Groups[*o]
+		if !ok {
+			return false
+		}
+		// Check if the user matches any username in the group
+		for _, uname := range usernames {
+			resolvedUser, err := uname.resolveUser(pm.users)
+			if err != nil {
+				continue
+			}
+
+			if user.ID() == resolvedUser.ID {
+				return true
+			}
+		}
+
+		return false
+
+	default:
+		return false
+	}
+}
+
+// collectRemovedAutogroupSelfUsers adds the owners of nodes present in
+// oldNodeMap but absent from newNodeMap to affected. Only non-tagged nodes
+// affect autogroup:self.
+func collectRemovedAutogroupSelfUsers(
+	oldNodeMap, newNodeMap map[types.NodeID]types.NodeView,
+	affected map[types.UserID]struct{},
+) {
+	for nodeID, oldNode := range oldNodeMap {
+		if _, exists := newNodeMap[nodeID]; !exists && !oldNode.IsTagged() {
+			affected[oldNode.TypedUserID()] = struct{}{}
+		}
+	}
+}
+
+// collectAddedAutogroupSelfUsers adds the owners of nodes present in
+// newNodeMap but absent from oldNodeMap to affected. Only non-tagged nodes
+// affect autogroup:self.
+func collectAddedAutogroupSelfUsers(
+	oldNodeMap, newNodeMap map[types.NodeID]types.NodeView,
+	affected map[types.UserID]struct{},
+) {
+	for nodeID, newNode := range newNodeMap {
+		if _, exists := oldNodeMap[nodeID]; !exists && !newNode.IsTagged() {
+			affected[newNode.TypedUserID()] = struct{}{}
+		}
+	}
+}
+
+// collectModifiedAutogroupSelfUsers adds the owners affected by user, tag,
+// or IP changes on nodes present in both maps.
+func collectModifiedAutogroupSelfUsers(
+	oldNodeMap, newNodeMap map[types.NodeID]types.NodeView,
+	affected map[types.UserID]struct{},
+) {
+	for nodeID, newNode := range newNodeMap {
+		oldNode, exists := oldNodeMap[nodeID]
+		if !exists {
+			continue
+		}
+
+		// Check if tag status changed — this affects the user's autogroup:self device set.
+		// Use the non-tagged version to get the user ID safely.
+		if oldNode.IsTagged() != newNode.IsTagged() {
+			if !oldNode.IsTagged() {
+				// Was untagged, now tagged: user lost a device
+				affected[oldNode.TypedUserID()] = struct{}{}
+			} else {
+				// Was tagged, now untagged: user gained a device
+				affected[newNode.TypedUserID()] = struct{}{}
+			}
+
+			continue
+		}
+
+		// Skip tagged nodes for remaining checks — they don't participate in autogroup:self
+		if newNode.IsTagged() {
+			continue
+		}
+
+		// Check if user changed (both versions are non-tagged here)
+		if oldNode.TypedUserID() != newNode.TypedUserID() {
+			affected[oldNode.TypedUserID()] = struct{}{}
+			affected[newNode.TypedUserID()] = struct{}{}
+		}
+
+		// Check if IPs changed.
+		if !slices.Equal(oldNode.IPs(), newNode.IPs()) {
+			affected[newNode.TypedUserID()] = struct{}{}
+		}
+	}
+}
+
+// invalidateAutogroupSelfCache intelligently clears only the cache entries that need to be
+// invalidated when using autogroup:self policies. This is much more efficient than clearing
+// the entire cache.
+func (pm *PolicyManager) invalidateAutogroupSelfCache(oldNodes, newNodes views.Slice[types.NodeView]) {
+	// Build maps for efficient lookup
+	oldNodeMap := nodeIDViewMap(oldNodes)
+	newNodeMap := nodeIDViewMap(newNodes)
+
+	// Track which users are affected by changes.
+	// Tagged nodes don't participate in autogroup:self (identity is tag-based),
+	// so we skip them when collecting affected users, except when tag status changes
+	// (which affects the user's device set).
+	//
+	// Ownership is keyed on TypedUserID (the UserID field), not the User
+	// association view: the NodeStore holds nodes by value with User as a
+	// *User pointer, and not every write path hydrates that association. A
+	// non-tagged node always has UserID set, so it is the reliable owner key.
+	affectedUsers := make(map[types.UserID]struct{})
+
+	collectRemovedAutogroupSelfUsers(oldNodeMap, newNodeMap, affectedUsers)
+	collectAddedAutogroupSelfUsers(oldNodeMap, newNodeMap, affectedUsers)
+	collectModifiedAutogroupSelfUsers(oldNodeMap, newNodeMap, affectedUsers)
+
+	pm.clearAutogroupSelfCacheForAffectedUsers(oldNodeMap, newNodeMap, affectedUsers)
+
+	if len(affectedUsers) > 0 {
+		log.Debug().
+			Int("affected_users", len(affectedUsers)).
+			Int("remaining_cache_entries", pm.filterRulesMap.Size()).
+			Msg("Selectively cleared autogroup:self cache for affected users")
+	}
+}
+
+// clearAutogroupSelfCacheForAffectedUsers clears cache entries for affected
+// users only. For autogroup:self, all nodes belonging to affected users must
+// be cleared because autogroup:self rules depend on the entire user's device
+// set. Entries for nodes absent from both maps are always cleared.
+func (pm *PolicyManager) clearAutogroupSelfCacheForAffectedUsers(
+	oldNodeMap, newNodeMap map[types.NodeID]types.NodeView,
+	affectedUsers map[types.UserID]struct{},
+) {
+	pm.filterRulesMap.Range(func(nodeID types.NodeID, _ []tailcfg.FilterRule) bool {
+		// Find the user for this cached node using the already-built indexes.
+		node, ok := newNodeMap[nodeID]
+		if !ok {
+			node, ok = oldNodeMap[nodeID]
+		}
+
+		// Node not found in either old or new list, clear it.
+		if !ok {
+			pm.filterRulesMap.Delete(nodeID)
+			pm.matchersForNodeMap.Delete(nodeID)
+
+			return true
+		}
+
+		// Tagged nodes don't participate in autogroup:self, so their cache
+		// doesn't need user-based invalidation; leave nodeUserID at zero.
+		var nodeUserID types.UserID
+		if !node.IsTagged() {
+			nodeUserID = node.TypedUserID()
+		}
+
+		// If the owning user is affected, clear this cache entry.
+		if _, affected := affectedUsers[nodeUserID]; affected {
+			pm.filterRulesMap.Delete(nodeID)
+			pm.matchersForNodeMap.Delete(nodeID)
+		}
+
+		return true
+	})
+}
+
+// invalidateNodeCache invalidates cache entries based on what changed.
+func (pm *PolicyManager) invalidateNodeCache(newNodes views.Slice[types.NodeView]) {
+	if pm.needsPerNodeFilter {
+		// For autogroup:self or via grants, a node's filter depends
+		// on its peers. When any node changes, invalidate affected
+		// users' caches.
+		pm.invalidateAutogroupSelfCache(pm.nodes, newNodes)
+	} else {
+		// For global policies, a node's filter depends only on its
+		// own properties. Only invalidate changed nodes.
+		pm.invalidateGlobalPolicyCache(newNodes)
+	}
+}
+
+// invalidateGlobalPolicyCache invalidates only nodes whose properties affecting
+// [policyutil.ReduceFilterRules] changed. For global policies, each node's filter is independent.
+func (pm *PolicyManager) invalidateGlobalPolicyCache(newNodes views.Slice[types.NodeView]) {
+	oldNodeMap := nodeIDViewMap(pm.nodes)
+	newNodeMap := nodeIDViewMap(newNodes)
+
+	// Invalidate nodes whose properties changed
+	for nodeID, newNode := range newNodeMap {
+		oldNode, existed := oldNodeMap[nodeID]
+		if !existed {
+			// New node - no cache entry yet, will be lazily calculated
+			continue
+		}
+
+		if newNode.HasNetworkChanges(oldNode) {
+			pm.filterRulesMap.Delete(nodeID)
+			pm.matchersForNodeMap.Delete(nodeID)
+		}
+	}
+
+	// Remove deleted nodes from cache
+	pm.filterRulesMap.Range(func(nodeID types.NodeID, _ []tailcfg.FilterRule) bool {
+		if _, exists := newNodeMap[nodeID]; !exists {
+			pm.filterRulesMap.Delete(nodeID)
+		}
+
+		return true
+	})
+
+	pm.matchersForNodeMap.Range(func(nodeID types.NodeID, _ []matcher.Match) bool {
+		if _, exists := newNodeMap[nodeID]; !exists {
+			pm.matchersForNodeMap.Delete(nodeID)
+		}
+
+		return true
+	})
+}
+
+// refreshNodeAttrsLocked recompiles the per-node nodeAttrs CapMap and
+// appends the IDs whose CapMap differs from the previous snapshot
+// (including newly-targeted nodes and nodes that lost all attrs) to
+// pm.nodeAttrsChanged. Append, not overwrite: a concurrent
+// SetUsers/SetNodes between SetPolicy and a NodesWithChangedCapMap
+// drain cannot clobber the policy-reload diff.
+//
+// Caller must hold pm.mu.
+func (pm *PolicyManager) refreshNodeAttrsLocked() error {
+	// Fast path for the common steady-state shape: tailnet has no
+	// nodeAttrs entries and never had any. Skip the compile + per-node
+	// hash walk entirely. As soon as the operator adds a nodeAttrs
+	// entry pm.nodeAttrsHashes becomes non-empty and the gate opens.
+	if pm.pol != nil &&
+		len(pm.pol.NodeAttrs) == 0 &&
+		!pm.pol.RandomizeClientPort &&
+		len(pm.nodeAttrsHashes) == 0 {
+		return nil
+	}
+
+	newMap, err := pm.pol.compileNodeAttrs(pm.users, pm.nodes)
+	if err != nil {
+		return fmt.Errorf("compiling nodeAttrs: %w", err)
+	}
+
+	newHashes := make(map[types.NodeID]deephash.Sum, len(newMap))
+	for id, capMap := range newMap {
+		newHashes[id] = deephash.Hash(&capMap)
+	}
+
+	// Walk the union of old and new node IDs and emit the delta.
+	seen := make(map[types.NodeID]struct{}, len(newHashes)+len(pm.nodeAttrsHashes))
+
+	var changed []types.NodeID
+
+	for id, h := range newHashes {
+		seen[id] = struct{}{}
+		if pm.nodeAttrsHashes[id] != h {
+			changed = append(changed, id)
+		}
+	}
+
+	for id := range pm.nodeAttrsHashes {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		// Node lost all nodeAttrs since the last update.
+		changed = append(changed, id)
+	}
+
+	pm.nodeAttrsMap = newMap
+	pm.nodeAttrsHashes = newHashes
+	pm.nodeAttrsChanged = append(pm.nodeAttrsChanged, changed...)
+
+	return nil
+}
+
+// findNodePairLocked looks up the node views for srcNodeID and dstNodeID
+// among the currently known nodes. Callers must hold pm.mu.
+func (pm *PolicyManager) findNodePairLocked(srcNodeID, dstNodeID types.NodeID) (types.NodeView, types.NodeView) {
+	var srcNode, dstNode types.NodeView
+
+	for _, n := range pm.nodes.All() {
+		nid := n.ID()
+		if nid == srcNodeID {
+			srcNode = n
+		}
+
+		if nid == dstNodeID {
+			dstNode = n
+		}
+
+		if srcNode.Valid() && dstNode.Valid() {
+			break
+		}
+	}
+
+	return srcNode, dstNode
+}
+
+// sshCheckPeriodForRule reports the check period for rule when it is a
+// check rule matching the (srcNode, dstNode) pair, and whether it matched.
+func (pm *PolicyManager) sshCheckPeriodForRule(
+	rule SSH,
+	srcNode, dstNode types.NodeView,
+) (time.Duration, bool) {
+	if rule.Action != SSHActionCheck {
+		return 0, false
+	}
+
+	// Resolve sources and check if src node matches.
+	srcIPs, err := rule.Sources.Resolve(pm.pol, pm.users, pm.nodes)
+	if err != nil || srcIPs == nil {
+		return 0, false
+	}
+
+	if !slices.ContainsFunc(srcNode.IPs(), srcIPs.Contains) {
+		return 0, false
+	}
+
+	// Check if dst node matches any destination.
+	for _, dst := range rule.Destinations {
+		if ag, isAG := dst.(*AutoGroup); isAG && ag.Is(AutoGroupSelf) {
+			if sshAutogroupSelfMatches(srcNode, dstNode) {
+				return checkPeriodFromRule(rule), true
+			}
+
+			continue
+		}
+
+		dstIPs, err := dst.Resolve(pm.pol, pm.users, pm.nodes)
+		if err != nil || dstIPs == nil {
+			continue
+		}
+
+		if slices.ContainsFunc(dstNode.IPs(), dstIPs.Contains) {
+			return checkPeriodFromRule(rule), true
+		}
+	}
+
+	return 0, false
+}
+
+// sshAutogroupSelfMatches reports whether srcNode and dstNode belong to the
+// same non-tagged user, matching an autogroup:self SSH check destination.
+//
+// User().Valid() guards the User().ID() dereference: the NodeStore can hold
+// a non-tagged node with UserID set but the User association unhydrated
+// (nil), and IsTagged() alone does not cover that. Mirrors filter.go's
+// autogroup:self guard. Without it, a tailnet client on the Noise
+// SSH-check path crashes the server (nil deref).
+func sshAutogroupSelfMatches(srcNode, dstNode types.NodeView) bool {
+	return !srcNode.IsTagged() && !dstNode.IsTagged() &&
+		srcNode.User().Valid() && dstNode.User().Valid() &&
+		srcNode.User().ID() == dstNode.User().ID()
 }

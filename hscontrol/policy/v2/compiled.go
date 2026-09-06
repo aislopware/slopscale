@@ -264,8 +264,6 @@ func (pol *Policy) compileGrants(
 // All source resolution happens here. Non-self, non-via destination
 // resolution also happens here. Per-node data (self dests, via
 // matching) is stored for deferred compilation.
-//
-//nolint:gocyclo,cyclop
 func (pol *Policy) compileOneGrant(
 	grant Grant,
 	users types.Users,
@@ -299,11 +297,11 @@ func (pol *Policy) compileOneGrant(
 
 	// Literally empty src=[] or dst=[] produces no rules.
 	if len(grant.Sources) == 0 || len(grant.Destinations) == 0 {
-		return nil, nil //nolint:nilnil
+		return nil, nil //nolint:nilnil // intentional: empty sources or destinations produce no grant
 	}
 
 	if len(resolvedSrcs) == 0 && grant.App == nil {
-		return nil, nil //nolint:nilnil
+		return nil, nil //nolint:nilnil // intentional: empty resolved sources without app produce no grant
 	}
 
 	hasWildcard := sourcesHaveWildcard(grant.Sources)
@@ -364,7 +362,7 @@ func (pol *Policy) compileOneViaGrant(
 	nodes views.Slice[types.NodeView],
 ) (*compiledGrant, error) {
 	if len(grant.InternetProtocols) == 0 {
-		return nil, nil //nolint:nilnil
+		return nil, nil //nolint:nilnil // intentional: grant without internet protocols produces no via grant
 	}
 
 	resolvedSrcs, _, err := resolveSources(
@@ -375,7 +373,7 @@ func (pol *Policy) compileOneViaGrant(
 	}
 
 	if len(resolvedSrcs) == 0 {
-		return nil, nil //nolint:nilnil
+		return nil, nil //nolint:nilnil // intentional: empty resolved sources produce no via grant
 	}
 
 	// Build merged SrcIPs.
@@ -385,7 +383,7 @@ func (pol *Policy) compileOneViaGrant(
 	}
 
 	if srcResolved.Empty() {
-		return nil, nil //nolint:nilnil
+		return nil, nil //nolint:nilnil // intentional: empty merged source IP set produces no via grant
 	}
 
 	hasWildcard := sourcesHaveWildcard(grant.Sources)
@@ -611,7 +609,12 @@ func collectRelayTargetIPs(grants []compiledGrant) (*netipx.IPSet, error) {
 		}
 	}
 
-	return b.IPSet()
+	ipset, err := b.IPSet()
+	if err != nil {
+		return nil, fmt.Errorf("building relay target IP set: %w", err)
+	}
+
+	return ipset, nil
 }
 
 // collectViaTargetTags returns the set of tags used as via targets across all

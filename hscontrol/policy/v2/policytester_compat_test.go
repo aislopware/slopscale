@@ -34,7 +34,7 @@ import (
 // disagrees with Tailscale SaaS on whether the policy should be accepted.
 // Each entry is a real bug to fix in a follow-up; documenting them here
 // keeps the compat suite green and the divergence list visible.
-var knownPolicyTesterDivergences = map[string]string{} //nolint:gosec // strings here are human-readable notes, not credentials
+var knownPolicyTesterDivergences = map[string]string{}
 
 // policyTesterCompatUsers / policyTesterCompatNodes mirror the small
 // shared topology used to record the captures. When more captures land

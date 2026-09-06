@@ -97,7 +97,6 @@ func TestInvalidateAutogroupSelfCache(t *testing.T) {
 		{ID: 3, Name: "user3", Email: "user3@headscale.net"},
 	}
 
-	//nolint:goconst // test-specific inline policy for clarity
 	policy := `{
 		"acls": [
 			{
@@ -116,7 +115,7 @@ func TestInvalidateAutogroupSelfCache(t *testing.T) {
 	}
 
 	for i, n := range initialNodes {
-		n.ID = types.NodeID(i + 1) //nolint:gosec // safe conversion in test
+		n.ID = types.NodeID(i + 1)
 	}
 
 	tests := []struct {
@@ -200,7 +199,7 @@ func TestInvalidateAutogroupSelfCache(t *testing.T) {
 				}
 
 				if !found {
-					n.ID = types.NodeID(len(initialNodes) + i + 1) //nolint:gosec // safe conversion in test
+					n.ID = types.NodeID(len(initialNodes) + i + 1)
 				}
 			}
 
@@ -270,7 +269,7 @@ func TestSetNodesAutogroupSelfUnhydratedUser(t *testing.T) {
 		node("user2-node1", "100.64.0.2", "fd7a:115c:a1e0::2", users[1]),
 	}
 	for i, n := range initialNodes {
-		n.ID = types.NodeID(i + 1) //nolint:gosec // safe conversion in test
+		n.ID = types.NodeID(i + 1)
 	}
 
 	pm, err := NewPolicyManager([]byte(policy), users, initialNodes.ViewSlice())
@@ -286,7 +285,7 @@ func TestSetNodesAutogroupSelfUnhydratedUser(t *testing.T) {
 		node("user2-node1", "100.64.0.2", "fd7a:115c:a1e0::2", users[1]),
 	}
 	for i, n := range updatedNodes {
-		n.ID = types.NodeID(i + 1) //nolint:gosec // safe conversion in test
+		n.ID = types.NodeID(i + 1)
 	}
 
 	require.NotPanics(t, func() {
@@ -327,7 +326,7 @@ func TestSSHCheckParamsUnhydratedUserNoPanic(t *testing.T) {
 		node("user1-dst", "100.64.0.2", "fd7a:115c:a1e0::2", users[0]),
 	}
 	for i, n := range initialNodes {
-		n.ID = types.NodeID(i + 1) //nolint:gosec // safe conversion in test
+		n.ID = types.NodeID(i + 1)
 	}
 
 	pm, err := NewPolicyManager([]byte(policy), users, initialNodes.ViewSlice())
@@ -475,18 +474,28 @@ func TestInvalidateGlobalPolicyCache(t *testing.T) {
 			name: "routes changed - invalidates that node only",
 			oldNodes: types.Nodes{
 				&types.Node{
-					ID:             1,
-					IPv4:           mustIPPtr("100.64.0.1"),
-					Hostinfo:       &tailcfg.Hostinfo{RoutableIPs: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/24"), netip.MustParsePrefix("192.168.0.0/24")}},
+					ID:   1,
+					IPv4: mustIPPtr("100.64.0.1"),
+					Hostinfo: &tailcfg.Hostinfo{
+						RoutableIPs: []netip.Prefix{
+							netip.MustParsePrefix("10.0.0.0/24"),
+							netip.MustParsePrefix("192.168.0.0/24"),
+						},
+					},
 					ApprovedRoutes: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/24")},
 				},
 				&types.Node{ID: 2, IPv4: mustIPPtr("100.64.0.2")},
 			},
 			newNodes: types.Nodes{
 				&types.Node{
-					ID:             1,
-					IPv4:           mustIPPtr("100.64.0.1"),
-					Hostinfo:       &tailcfg.Hostinfo{RoutableIPs: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/24"), netip.MustParsePrefix("192.168.0.0/24")}},
+					ID:   1,
+					IPv4: mustIPPtr("100.64.0.1"),
+					Hostinfo: &tailcfg.Hostinfo{
+						RoutableIPs: []netip.Prefix{
+							netip.MustParsePrefix("10.0.0.0/24"),
+							netip.MustParsePrefix("192.168.0.0/24"),
+						},
+					},
 					ApprovedRoutes: []netip.Prefix{netip.MustParsePrefix("192.168.0.0/24")}, // Changed
 				},
 				&types.Node{ID: 2, IPv4: mustIPPtr("100.64.0.2")},
@@ -677,7 +686,8 @@ func TestAutogroupSelfWithOtherRules(t *testing.T) {
 	// Verify test-1 can see the router (group:home -> tag:node-router rule)
 	require.True(t, slices.ContainsFunc(test1Peers, func(n types.NodeView) bool {
 		return n.ID() == test2RouterNode.ID
-	}), "test-1 should see test-2's router via group:home -> tag:node-router rule, even when autogroup:self rule exists (issue #2838)")
+	}), "test-1 should see test-2's router via group:home -> tag:node-router rule,"+
+		" even when autogroup:self rule exists (issue #2838)")
 
 	// Verify that test-1 has filter rules (including autogroup:self and tag:node-router access)
 	rules, err := pm.FilterForNode(test1Node.View())
@@ -759,7 +769,12 @@ func TestAutogroupSelfPolicyUpdateTriggersMapResponse(t *testing.T) {
 	// SetPolicy should return true even though global filter hash didn't change
 	policyChanged, err := pm.SetPolicy([]byte(updatedPolicy))
 	require.NoError(t, err)
-	require.True(t, policyChanged, "SetPolicy should return true when policy content changes, even if global filter hash unchanged (autogroup:self)")
+	require.True(
+		t,
+		policyChanged,
+		"SetPolicy should return true when policy content changes,"+
+			" even if global filter hash unchanged (autogroup:self)",
+	)
 
 	// Verify that caches were cleared and new rules are generated
 	// The cache should be empty, so FilterForNode will recompile
@@ -882,7 +897,11 @@ func TestTagPropagationToPeerMap(t *testing.T) {
 	// This simulates what buildTailPeers does in the mapper
 	matchersForUser2, err := pm.MatchersForNode(user2Node.View())
 	require.NoError(t, err)
-	require.NotEmpty(t, matchersForUser2, "MatchersForNode should return non-empty matchers (at least self-access rule)")
+	require.NotEmpty(
+		t,
+		matchersForUser2,
+		"MatchersForNode should return non-empty matchers (at least self-access rule)",
+	)
 
 	// Test [policy.ReduceNodes] logic with the updated nodes and matchers
 	// This is what [mapper.MapResponseBuilder.buildTailPeers] does - it takes peers from
@@ -896,7 +915,11 @@ func TestTagPropagationToPeerMap(t *testing.T) {
 	canAccess := user2View.CanAccess(matchersForUser2, user1UpdatedView) ||
 		user1UpdatedView.CanAccess(matchersForUser2, user2View)
 
-	require.False(t, canAccess, "user2 should NOT be able to access user1 after tag:web is removed (ReduceNodes should filter out)")
+	require.False(
+		t,
+		canAccess,
+		"user2 should NOT be able to access user1 after tag:web is removed (ReduceNodes should filter out)",
+	)
 }
 
 // TestAutogroupSelfWithAdminOverride reproduces issue #2990:
@@ -1542,7 +1565,6 @@ func TestViaRoutesForPeer(t *testing.T) {
 			},
 		}
 
-		//nolint:goconst
 		pol := `{
 			"tagOwners": {
 				"tag:router": ["user1@"]
@@ -1589,7 +1611,6 @@ func TestViaRoutesForPeer(t *testing.T) {
 			},
 		}
 
-		//nolint:goconst
 		pol := `{
 			"tagOwners": {
 				"tag:router": ["user1@"]

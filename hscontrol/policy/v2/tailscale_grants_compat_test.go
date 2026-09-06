@@ -68,7 +68,7 @@ func buildGrantsNodesFromCapture(
 
 	for _, nodeDef := range tf.Topology.Nodes {
 		node := &types.Node{
-			ID:        types.NodeID(autoID), //nolint:gosec
+			ID:        types.NodeID(autoID),
 			GivenName: nodeDef.Hostname,
 			IPv4:      ptrAddr(nodeDef.IPv4),
 			IPv6:      ptrAddr(nodeDef.IPv6),
@@ -239,15 +239,18 @@ func testGrantError(t *testing.T, policyJSON []byte, tf *testcapture.Capture) {
 		return
 	}
 
-	t.Errorf("%s: expected error (api_response_code=400) but policy parsed and validated successfully; want message: %q",
-		tf.TestID, wantMsg)
+	t.Errorf(
+		"%s: expected error (api_response_code=400) but policy parsed and validated successfully; want message: %q",
+		tf.TestID,
+		wantMsg,
+	)
 }
 
 // assertGrantErrorContains requires that headscale's error contains
 // the Tailscale SaaS error message exactly. Divergence means an
 // emitter needs to be aligned, not papered over with a translation
 // table.
-func assertGrantErrorContains(t *testing.T, err error, wantMsg string, testID string) {
+func assertGrantErrorContains(t *testing.T, err error, wantMsg, testID string) {
 	t.Helper()
 
 	errStr := err.Error()

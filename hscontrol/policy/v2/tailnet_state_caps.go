@@ -49,11 +49,7 @@ func PeerCapMap(peer types.NodeView, peerSelfCaps tailcfg.NodeCapMap) tailcfg.No
 	// node.
 	if peer.IsExitNode() {
 		if v, ok := peerSelfCaps[nodecap.SuggestExitNode]; ok {
-			if out == nil {
-				out = tailcfg.NodeCapMap{}
-			}
-
-			out[nodecap.SuggestExitNode] = v
+			out = tailcfg.NodeCapMap{nodecap.SuggestExitNode: v}
 		}
 	}
 

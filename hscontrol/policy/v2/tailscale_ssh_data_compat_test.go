@@ -66,12 +66,15 @@ var sshSkipReasons = map[string]string{
 // rejects for reasons headscale cannot apply. Each entry names the
 // feature gap.
 var sshRejectSkipReasons = map[string]string{
-	"ssh-b4": "headscale has no associated-tailnet-domains config; user:*@domain / localpart:*@domain are not domain-validated",
-	"ssh-d1": "headscale has no associated-tailnet-domains config; user:*@domain / localpart:*@domain are not domain-validated",
-	"ssh-e1": "headscale has no associated-tailnet-domains config; user:*@domain / localpart:*@domain are not domain-validated",
-	"ssh-e2": "headscale has no associated-tailnet-domains config; user:*@domain / localpart:*@domain are not domain-validated",
-	"ssh-malformed-user-localpart-multi-glob": "headscale has no associated-tailnet-domains config; user:*@domain / localpart:*@domain are not domain-validated",
+	"ssh-b4": sshNoTailnetDomainsReason,
+	"ssh-d1": sshNoTailnetDomainsReason,
+	"ssh-e1": sshNoTailnetDomainsReason,
+	"ssh-e2": sshNoTailnetDomainsReason,
+	"ssh-malformed-user-localpart-multi-glob": sshNoTailnetDomainsReason,
 }
+
+const sshNoTailnetDomainsReason = "headscale has no associated-tailnet-domains config;" +
+	" user:*@domain / localpart:*@domain are not domain-validated"
 
 // TestSSHDataCompat loads every ssh-*.hujson capture, parses the policy
 // it pinned, and compiles the same per-node SSH rules to compare against

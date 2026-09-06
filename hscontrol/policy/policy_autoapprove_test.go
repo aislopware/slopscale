@@ -74,7 +74,11 @@ func TestApproveRoutesWithPolicy_NeverRemovesApprovedRoutes(t *testing.T) {
 		}
 	}`
 
-	pm, err := policyv2.NewPolicyManager([]byte(policyJSON), users, views.SliceOf([]types.NodeView{node1.View(), node2.View()}))
+	pm, err := policyv2.NewPolicyManager(
+		[]byte(policyJSON),
+		users,
+		views.SliceOf([]types.NodeView{node1.View(), node2.View()}),
+	)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -188,7 +192,12 @@ func TestApproveRoutesWithPolicy_NeverRemovesApprovedRoutes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotApproved, gotChanged := ApproveRoutesWithPolicy(pm, tt.node.View(), tt.currentApproved, tt.announcedRoutes)
+			gotApproved, gotChanged := ApproveRoutesWithPolicy(
+				pm,
+				tt.node.View(),
+				tt.currentApproved,
+				tt.announcedRoutes,
+			)
 
 			assert.Equal(t, tt.wantChanged, gotChanged, "changed flag mismatch: %s", tt.description)
 
@@ -324,7 +333,12 @@ func TestApproveRoutesWithPolicy_NilAndEmptyCases(t *testing.T) {
 					pm = nil
 				}
 
-				gotApproved, gotChanged := ApproveRoutesWithPolicy(pm, node.View(), tt.currentApproved, tt.announcedRoutes)
+				gotApproved, gotChanged := ApproveRoutesWithPolicy(
+					pm,
+					node.View(),
+					tt.currentApproved,
+					tt.announcedRoutes,
+				)
 
 				assert.Equal(t, tt.wantChanged, gotChanged, "changed flag mismatch")
 

@@ -335,9 +335,15 @@ func TestReduceNodes(t *testing.T) {
 		},
 		{
 			// Investigating 699
-			// Found some nodes: [ts-head-8w6paa ts-unstable-lys2ib ts-head-upcrmb ts-unstable-rlwpvr] nodes=ts-head-8w6paa
-			// ACL rules generated ACL=[{"DstPorts":[{"Bits":null,"IP":"*","Ports":{"First":0,"Last":65535}}],"SrcIPs":["fd7a:115c:a1e0::3","100.64.0.3","fd7a:115c:a1e0::4","100.64.0.4"]}]
-			// ACL Cache Map={"100.64.0.3":{"*":{}},"100.64.0.4":{"*":{}},"fd7a:115c:a1e0::3":{"*":{}},"fd7a:115c:a1e0::4":{"*":{}}}
+			// Found some nodes:
+			//   [ts-head-8w6paa ts-unstable-lys2ib ts-head-upcrmb ts-unstable-rlwpvr]
+			//   nodes=ts-head-8w6paa
+			// ACL rules generated ACL=[{
+			//   "DstPorts":[{"Bits":null,"IP":"*","Ports":{"First":0,"Last":65535}}],
+			//   "SrcIPs":["fd7a:115c:a1e0::3","100.64.0.3","fd7a:115c:a1e0::4","100.64.0.4"]}]
+			// ACL Cache Map={
+			//   "100.64.0.3":{"*":{}},"100.64.0.4":{"*":{}},
+			//   "fd7a:115c:a1e0::3":{"*":{}},"fd7a:115c:a1e0::4":{"*":{}}}
 			name: "issue-699-broken-star",
 			args: args{
 				nodes: types.Nodes{ //
@@ -1263,9 +1269,10 @@ func TestSSHPolicyRules(t *testing.T) {
 						"root": "",
 					},
 					Action: &tailcfg.SSHAction{
-						Accept:                    false,
-						SessionDuration:           0,
-						HoldAndDelegate:           "unused-url/machine/ssh/action/$SRC_NODE_ID/to/$DST_NODE_ID?local_user=$LOCAL_USER",
+						Accept:          false,
+						SessionDuration: 0,
+						HoldAndDelegate: "unused-url/machine/ssh/action/$SRC_NODE_ID/to/$DST_NODE_ID" +
+							"?local_user=$LOCAL_USER",
 						AllowAgentForwarding:      false,
 						AllowLocalPortForwarding:  false,
 						AllowRemotePortForwarding: false,
@@ -1921,7 +1928,9 @@ func TestReduceRoutes(t *testing.T) {
 			},
 			want: []netip.Prefix{
 				netip.MustParsePrefix("10.10.10.0/24"),
-				netip.MustParsePrefix("10.10.10.0/16"), // With current implementation, this is included because it overlaps with the allowed subnet
+				netip.MustParsePrefix(
+					"10.10.10.0/16",
+				), // With current implementation, this is included because it overlaps with the allowed subnet
 			},
 		},
 		{

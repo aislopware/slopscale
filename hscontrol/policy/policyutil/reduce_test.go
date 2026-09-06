@@ -518,9 +518,15 @@ func TestReduceFilterRules(t *testing.T) {
 				IPv6: ap("fd7a:115c:a1e0::100"),
 				User: new(users[3]),
 				Hostinfo: &tailcfg.Hostinfo{
-					RoutableIPs: []netip.Prefix{netip.MustParsePrefix("8.0.0.0/16"), netip.MustParsePrefix("16.0.0.0/16")},
+					RoutableIPs: []netip.Prefix{
+						netip.MustParsePrefix("8.0.0.0/16"),
+						netip.MustParsePrefix("16.0.0.0/16"),
+					},
 				},
-				ApprovedRoutes: []netip.Prefix{netip.MustParsePrefix("8.0.0.0/16"), netip.MustParsePrefix("16.0.0.0/16")},
+				ApprovedRoutes: []netip.Prefix{
+					netip.MustParsePrefix("8.0.0.0/16"),
+					netip.MustParsePrefix("16.0.0.0/16"),
+				},
 			},
 			peers: types.Nodes{
 				&types.Node{
@@ -602,7 +608,10 @@ func TestReduceFilterRules(t *testing.T) {
 				IPv6: ap("fd7a:115c:a1e0::100"),
 				User: new(users[3]),
 				Hostinfo: &tailcfg.Hostinfo{
-					RoutableIPs: []netip.Prefix{netip.MustParsePrefix("8.0.0.0/8"), netip.MustParsePrefix("16.0.0.0/8")},
+					RoutableIPs: []netip.Prefix{
+						netip.MustParsePrefix("8.0.0.0/8"),
+						netip.MustParsePrefix("16.0.0.0/8"),
+					},
 				},
 				ApprovedRoutes: []netip.Prefix{netip.MustParsePrefix("8.0.0.0/8"), netip.MustParsePrefix("16.0.0.0/8")},
 			},

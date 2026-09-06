@@ -251,7 +251,10 @@ func sshCheck(baseURL string) tailcfg.SSHAction {
 	}
 }
 
-//nolint:gocyclo // SSH compilation walks per-rule branches with intertwined autogroup:self handling
+// legacy: SSH compilation walks per-rule branches with intertwined
+// autogroup:self handling; splitting risks diverging the branches.
+//
+//nolint:gocyclo,gocognit,nestif,cyclop,funlen,maintidx // see above
 func (pol *Policy) compileSSHPolicy(
 	baseURL string,
 	users types.Users,
@@ -388,7 +391,7 @@ func (pol *Policy) compileSSHPolicy(
 
 			destSet, err := dest.IPSet()
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("building destination IP set: %w", err)
 			}
 
 			if node.InIPSet(destSet) {

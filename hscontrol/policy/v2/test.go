@@ -1,13 +1,13 @@
 package v2
 
 import (
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"net/netip"
 	"slices"
 	"strings"
 
-	"github.com/go-json-experiment/json"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
 	"tailscale.com/tailcfg"
@@ -88,7 +88,7 @@ func (d *SSHTestDestinations) UnmarshalJSON(b []byte) error {
 
 	err := json.Unmarshal(b, &aliases, policyJSONOpts...)
 	if err != nil {
-		return err
+		return fmt.Errorf("unmarshaling SSH test destinations: %w", err)
 	}
 
 	*d = make([]Alias, len(aliases))
@@ -113,7 +113,7 @@ func (t *SSHPolicyTest) UnmarshalJSON(b []byte) error {
 
 	err := json.Unmarshal(b, &raw, policyJSONOpts...)
 	if err != nil {
-		return err
+		return fmt.Errorf("unmarshaling SSH policy test: %w", err)
 	}
 
 	trimmedSrc := strings.TrimSpace(raw.Src)
@@ -249,7 +249,12 @@ func evaluateTests(pol *Policy, users []types.User, nodes views.Slice[types.Node
 // compiled filter rules derived from it, and the active users/nodes, run
 // every test and return the aggregated outcome. It does not lock anything
 // or mutate any input.
-func runPolicyTests(pol *Policy, filter []tailcfg.FilterRule, users []types.User, nodes views.Slice[types.NodeView]) PolicyTestResults {
+func runPolicyTests(
+	pol *Policy,
+	filter []tailcfg.FilterRule,
+	users []types.User,
+	nodes views.Slice[types.NodeView],
+) PolicyTestResults {
 	results := PolicyTestResults{
 		AllPassed: true,
 		Results:   make([]PolicyTestResult, 0, len(pol.Tests)),
@@ -268,7 +273,13 @@ func runPolicyTests(pol *Policy, filter []tailcfg.FilterRule, users []types.User
 }
 
 // runPolicyTest evaluates one [PolicyTest].
-func runPolicyTest(test PolicyTest, pol *Policy, filter []tailcfg.FilterRule, users []types.User, nodes views.Slice[types.NodeView]) PolicyTestResult {
+func runPolicyTest(
+	test PolicyTest,
+	pol *Policy,
+	filter []tailcfg.FilterRule,
+	users []types.User,
+	nodes views.Slice[types.NodeView],
+) PolicyTestResult {
 	res := PolicyTestResult{
 		Src:    test.Src,
 		Proto:  test.Proto,
@@ -319,7 +330,12 @@ func runPolicyTest(test PolicyTest, pol *Policy, filter []tailcfg.FilterRule, us
 // resolveTestSource resolves the Src alias of a [PolicyTest] into a slice of
 // [netip.Prefix]. [parseAlias] + [Alias.Resolve] cover every alias type the rest
 // of the policy engine supports, so tests inherit alias semantics for free.
-func resolveTestSource(src string, pol *Policy, users []types.User, nodes views.Slice[types.NodeView]) ([]netip.Prefix, error) {
+func resolveTestSource(
+	src string,
+	pol *Policy,
+	users []types.User,
+	nodes views.Slice[types.NodeView],
+) ([]netip.Prefix, error) {
 	alias, err := parseAlias(src)
 	if err != nil {
 		return nil, fmt.Errorf("invalid alias: %w", err)
@@ -343,7 +359,15 @@ func resolveTestSource(src string, pol *Policy, users []types.User, nodes views.
 // Empty proto means the default set the client applies when proto is
 // omitted (TCP/UDP/ICMP) — we accept a rule whose IPProto list contains
 // any of those, or rules with no IPProto restriction at all.
-func evalReachability(srcPrefixes []netip.Prefix, dst string, proto Protocol, pol *Policy, filter []tailcfg.FilterRule, users []types.User, nodes views.Slice[types.NodeView]) (bool, error) {
+func evalReachability(
+	srcPrefixes []netip.Prefix,
+	dst string,
+	proto Protocol,
+	pol *Policy,
+	filter []tailcfg.FilterRule,
+	users []types.User,
+	nodes views.Slice[types.NodeView],
+) (bool, error) {
 	awp, err := parseDestinationAlias(dst)
 	if err != nil {
 		return false, fmt.Errorf("invalid destination %q: %w", dst, err)
@@ -395,7 +419,13 @@ func parseDestinationAlias(dst string) (*AliasWithPorts, error) {
 // is omitted. The captured Tailscale matches show these four IANA
 // numbers explicitly when no proto is set, so a rule restricted to any
 // of them satisfies an empty-proto test.
-func srcReachesDst(src netip.Prefix, dstPrefixes []netip.Prefix, ports []tailcfg.PortRange, proto Protocol, filter []tailcfg.FilterRule) bool {
+func srcReachesDst(
+	src netip.Prefix,
+	dstPrefixes []netip.Prefix,
+	ports []tailcfg.PortRange,
+	proto Protocol,
+	filter []tailcfg.FilterRule,
+) bool {
 	requestedProtos := proto.toIANAProtocolNumbers()
 	if len(requestedProtos) == 0 {
 		requestedProtos = []int{ProtocolTCP, ProtocolUDP, ProtocolICMP, ProtocolIPv6ICMP}

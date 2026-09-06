@@ -26,7 +26,7 @@ func TestIssue3267ViaGrantBroaderDestination(t *testing.T) {
 	t.Parallel()
 
 	users := types.Users{
-		{ID: 1, Name: "alice", Email: issue3267AliceEmail}, //nolint:goconst
+		{ID: 1, Name: "alice", Email: issue3267AliceEmail},
 	}
 
 	cases := []struct {
@@ -108,8 +108,14 @@ func TestIssue3267ViaGrantBroaderDestination(t *testing.T) {
 				t.Parallel()
 
 				result := pm.ViaRoutesForPeer(aliceLaptop.View(), router.View())
-				require.Contains(t, result.Include, route,
-					"alice viewing tag:subnet-router must Include advertised prefix %s — drives AllowedIPs in state.RoutesForPeer", route)
+				require.Contains(
+					t,
+					result.Include,
+					route,
+					"alice viewing tag:subnet-router must Include advertised prefix %s"+
+						" — drives AllowedIPs in state.RoutesForPeer",
+					route,
+				)
 				require.Empty(t, result.Exclude,
 					"alice viewing tag:subnet-router must not Exclude any prefix — there is no competing via tag")
 			})

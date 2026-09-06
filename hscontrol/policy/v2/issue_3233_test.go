@@ -2,7 +2,9 @@
 // the matching exit node to the source — not strip every exit node
 // from the source's view.
 //
-// Spec: https://tailscale.com/docs/features/access-control/grants/grants-via#route-users-through-exit-nodes-based-on-location
+// Spec:
+//
+// https://tailscale.com/docs/features/access-control/grants/grants-via#route-users-through-exit-nodes-based-on-location
 package v2
 
 import (

@@ -30,7 +30,6 @@ import (
 	"net/netip"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"testing"
 
@@ -105,7 +104,7 @@ func buildRoutesUsersAndNodes(
 		autoID++
 
 		node := &types.Node{
-			ID:        types.NodeID(nodeID), //nolint:gosec
+			ID:        types.NodeID(nodeID),
 			GivenName: nodeDef.Hostname,
 			IPv4:      ptrAddr(nodeDef.IPv4),
 			IPv6:      ptrAddr(nodeDef.IPv6),
@@ -590,8 +589,8 @@ func TestRoutesCompatPeerVisibility(t *testing.T) {
 						continue
 					}
 
-					sort.Strings(peerNames)
-					sort.Strings(wantPeers)
+					slices.Sort(peerNames)
+					slices.Sort(wantPeers)
 
 					for _, wantPeer := range wantPeers {
 						assert.Containsf(t, peerNames, wantPeer,
@@ -1011,7 +1010,7 @@ func TestRoutesCompatExitNodePeerVisibility(t *testing.T) {
 			}
 		}
 
-		sort.Strings(exitNodeNames)
+		slices.Sort(exitNodeNames)
 		require.NotEmpty(t, exitNodeNames,
 			"%s: topology has no nodes with tag:exit", tf.TestID,
 		)
@@ -1375,7 +1374,7 @@ func prefixStrings(pfxs []netip.Prefix) []string {
 		out[i] = p.String()
 	}
 
-	sort.Strings(out)
+	slices.Sort(out)
 
 	return out
 }
