@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 	"net/netip"
+	"slices"
 	"strings"
 	"testing"
 
@@ -449,7 +450,7 @@ func TestBackfillIPAddresses(t *testing.T) {
 		},
 	}
 
-	comps := append(util.Comparers, cmpopts.IgnoreFields(types.Node{},
+	comps := append(slices.Clone(util.Comparers), cmpopts.IgnoreFields(types.Node{},
 		"ID",
 		"User",
 		"UserID",

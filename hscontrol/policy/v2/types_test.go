@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/netip"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -87,7 +88,7 @@ func TestMarshalJSON(t *testing.T) {
 	require.NoError(t, err)
 
 	// Compare the original and round-tripped policies
-	cmps := append(util.Comparers,
+	cmps := append(slices.Clone(util.Comparers),
 		cmp.Comparer(func(x, y Prefix) bool {
 			return x == y
 		}),
@@ -2290,7 +2291,7 @@ func TestUnmarshalPolicy(t *testing.T) {
 		},
 	}
 
-	cmps := append(util.Comparers,
+	cmps := append(slices.Clone(util.Comparers),
 		cmp.Comparer(func(x, y Prefix) bool {
 			return x == y
 		}),
@@ -2338,7 +2339,7 @@ func TestUnmarshalPolicy(t *testing.T) {
 				}
 
 				// Add EquateEmpty to handle nil vs empty maps/slices
-				roundTripCmps := append(cmps,
+				roundTripCmps := append(slices.Clone(cmps),
 					cmpopts.EquateEmpty(),
 					cmpopts.IgnoreUnexported(Policy{}),
 				)
@@ -2966,7 +2967,7 @@ func TestResolveAutoApprovers(t *testing.T) {
 		},
 	}
 
-	cmps := append(util.Comparers, cmp.Comparer(ipSetComparer))
+	cmps := append(slices.Clone(util.Comparers), cmp.Comparer(ipSetComparer))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3531,7 +3532,7 @@ func TestResolveTagOwners(t *testing.T) {
 		},
 	}
 
-	cmps := append(util.Comparers, cmp.Comparer(ipSetComparer))
+	cmps := append(slices.Clone(util.Comparers), cmp.Comparer(ipSetComparer))
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

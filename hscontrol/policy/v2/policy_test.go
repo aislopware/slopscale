@@ -119,17 +119,6 @@ func TestInvalidateAutogroupSelfCache(t *testing.T) {
 		n.ID = types.NodeID(i + 1) //nolint:gosec // safe conversion in test
 	}
 
-	pm, err := NewPolicyManager([]byte(policy), users, initialNodes.ViewSlice())
-	require.NoError(t, err)
-
-	// Add to cache by calling FilterForNode for each node
-	for _, n := range initialNodes {
-		_, err := pm.FilterForNode(n.View())
-		require.NoError(t, err)
-	}
-
-	require.Equal(t, len(initialNodes), pm.filterRulesMap.Size())
-
 	tests := []struct {
 		name            string
 		newNodes        types.Nodes
@@ -215,8 +204,11 @@ func TestInvalidateAutogroupSelfCache(t *testing.T) {
 				}
 			}
 
-			pm.filterRulesMap.Clear()
+			// Each subtest gets its own manager so they can run in parallel.
+			pm, err := NewPolicyManager([]byte(policy), users, initialNodes.ViewSlice())
+			require.NoError(t, err)
 
+			// Add to cache by calling FilterForNode for each node
 			for _, n := range initialNodes {
 				_, err := pm.FilterForNode(n.View())
 				require.NoError(t, err)
