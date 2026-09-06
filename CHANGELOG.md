@@ -26,6 +26,20 @@ keys remain all-access.
 
 [#3334](https://github.com/juanfont/headscale/pull/3334)
 
+### User roles
+
+Every user now has a role — `owner`, `admin`, `network-admin`, `it-admin`,
+`auditor` or `member` — that bounds what the user may do through the admin API,
+following Tailscale's user roles. The first user of a fresh server becomes the
+owner; existing users start as members, and `headscale users set-role` picks an
+owner and assigns the rest. An API key created for a user
+(`headscale apikeys create --user`) is bounded by that user's role, on the v1 and
+v2 APIs alike; keys without a user keep their all-access meaning. The policy
+gains `autogroup:owner`, `autogroup:admin`, `autogroup:network-admin`,
+`autogroup:it-admin` and `autogroup:auditor`, and the devices of the owner and
+admins carry Tailscale's `is-admin` capability. See
+[User roles](https://headscale.net/development/ref/roles/).
+
 ### BREAKING
 
 #### API
@@ -54,6 +68,9 @@ keys remain all-access.
 - Headscale now requires Go 1.27 to build
 - Fix `headscale policy set --bypass-server-and-access-database-directly` storing the policy with its comments blanked out; the file is now saved as written
 - Fix the OIDC success page always saying "Node registered"; a node logging in again now sees "Node reauthenticated"
+- User roles: `headscale users set-role`, a `Role` column in `headscale users list`, `POST /api/v1/user/{id}/role`, `GET /api/v1/whoami`, a `userId` on API keys and `headscale apikeys create --user`; the v2 user object's `role` field and `?role=` filter now reflect the real role
+- The `is-admin` node capability, previously stamped on every node, is now stamped only on devices of the owner and admins; `is-owner` on the owner's. Clients use these for admin-console affordances in their UI only
+- `POST /api/v1/apikey` without an `expiration` now mints a key that never expires instead of one that was already expired
 
 ## 0.29.4 (unreleased)
 

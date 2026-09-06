@@ -95,6 +95,17 @@ is authoritative; a tagged node may still carry a `UserID` as "created by", so
 `UserID().Valid()` alone says nothing about ownership. `validateNodeOwnership`
 in `hscontrol/state/tags.go` enforces this.
 
+Roles bound credentials, not devices. `hscontrol/api/principal` turns a
+credential into a `Principal` for both API versions: the socket and a key
+without a user are all-access, a user-owned key gets `scope.ForRole` of the
+user's _current_ role, an OAuth token its own scopes. Both middlewares check
+the scope each operation declares (`principal.RequireScope`); a guard test in
+each API package fails on an authenticated operation without one. Role rules
+(one owner, transfer only, nobody edits their own role) live in
+`State.SetUserRole`; the policy manager, not `Node.User`, is the source for
+role autogroups and the `is-admin`/`is-owner` caps because the node's user
+copy is loaded once and goes stale.
+
 API responses read through `NodeView`, `UserView`, and `PreAuthKeyView`.
 `AsStruct()` clones the whole record and is only for write/merge copies.
 

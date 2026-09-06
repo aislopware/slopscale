@@ -125,6 +125,23 @@ Includes all devices that [have at least one tag](registration.md/#identity-mode
 }
 ```
 
+### [`autogroup:owner`, `autogroup:admin`, `autogroup:network-admin`, `autogroup:it-admin`, `autogroup:auditor`](https://tailscale.com/docs/reference/targets-and-selectors#autogrouprole)
+
+Include the personal (untagged) devices of every user holding that
+[role](roles.md). Usable wherever `autogroup:member` is.
+
+```json title="policy.json"
+{
+  "grants": [
+    {
+      "src": ["autogroup:admin"],
+      "dst": ["tag:prod-app-servers"],
+      "ip": ["22"]
+    }
+  ]
+}
+```
+
 ### [`autogroup:self`](https://tailscale.com/docs/reference/targets-and-selectors#autogroupself)
 
 Includes devices where the same user is authenticated on both the source and destination. Does not include tagged
