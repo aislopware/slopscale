@@ -112,7 +112,12 @@ func TestNetInfoPreservationInRegistrationFlow(t *testing.T) {
 		// CORRECT: Using the existing node's hostinfo (has NetInfo)
 		correctResult := netInfoFromMapRequest(nodeID, existingNodeHostinfo, newRegistrationHostinfo)
 		assert.NotNil(t, correctResult, "Fix: Should preserve NetInfo when using correct hostinfo reference")
-		assert.Equal(t, tailcfg.DERPRegionID(5), correctResult.PreferredDERP, "Should preserve the DERP region from existing node")
+		assert.Equal(
+			t,
+			tailcfg.DERPRegionID(5),
+			correctResult.PreferredDERP,
+			"Should preserve the DERP region from existing node",
+		)
 	})
 
 	t.Run("new_node_creation_for_different_user_should_preserve_netinfo", func(t *testing.T) {

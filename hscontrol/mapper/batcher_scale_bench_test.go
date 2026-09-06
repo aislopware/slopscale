@@ -51,7 +51,7 @@ func BenchmarkScale_IsConnected(b *testing.B) {
 			b.ResetTimer()
 
 			for i := range b.N {
-				id := types.NodeID(1 + (i % n)) //nolint:gosec
+				id := types.NodeID(1 + (i % n))
 				_ = batcher.IsConnected(id)
 			}
 		})
@@ -73,12 +73,12 @@ func BenchmarkScale_AddToBatch_Targeted(b *testing.B) {
 			b.ResetTimer()
 
 			for i := range b.N {
-				targetID := types.NodeID(1 + (i % n)) //nolint:gosec
+				targetID := types.NodeID(1 + (i % n))
 				ch := change.Change{
 					Reason:     "scale-targeted",
 					TargetNode: targetID,
 					PeerPatches: []*tailcfg.PeerChange{
-						{NodeID: tailcfg.NodeID(targetID)}, //nolint:gosec
+						{NodeID: tailcfg.NodeID(targetID)},
 					},
 				}
 				batcher.addToBatch(ch)
@@ -109,7 +109,7 @@ func BenchmarkScale_ConnectionChurn(b *testing.B) {
 			b.ResetTimer()
 
 			for i := range b.N {
-				id := types.NodeID(1 + (i % n)) //nolint:gosec
+				id := types.NodeID(1 + (i % n))
 
 				mc, ok := batcher.nodes.Load(id)
 				if !ok {
@@ -205,7 +205,7 @@ func BenchmarkScale_ProcessBatchedChanges(b *testing.B) {
 				b.StopTimer()
 
 				for i := 1; i <= n; i++ {
-					if nc, ok := batcher.nodes.Load(types.NodeID(i)); ok { //nolint:gosec
+					if nc, ok := batcher.nodes.Load(types.NodeID(i)); ok {
 						nc.appendPending(change.DERPMap())
 					}
 				}
@@ -287,7 +287,7 @@ func BenchmarkScale_ConnectedMap(b *testing.B) {
 			// 10% disconnected for realism
 			for i := 1; i <= n; i++ {
 				if i%10 == 0 {
-					id := types.NodeID(i) //nolint:gosec
+					id := types.NodeID(i)
 					if mc, ok := batcher.nodes.Load(id); ok {
 						mc.removeConnectionByChannel(channels[id])
 						mc.markDisconnected()
@@ -404,7 +404,7 @@ func BenchmarkScale_MultiChannelBroadcast(b *testing.B) {
 			// Add extra connections to every 3rd node (also buffered)
 			for i := 1; i <= n; i++ {
 				if i%3 == 0 {
-					if mc, ok := batcher.nodes.Load(types.NodeID(i)); ok { //nolint:gosec
+					if mc, ok := batcher.nodes.Load(types.NodeID(i)); ok {
 						for j := range 2 {
 							ch := make(chan *tailcfg.MapResponse, b.N+1)
 							entry := &connectionEntry{
@@ -458,7 +458,8 @@ func BenchmarkScale_ConcurrentAddToBatch(b *testing.B) {
 							nc.drainPending()
 							return true
 						})
-						time.Sleep(time.Millisecond) //nolint:forbidigo
+						//nolint:forbidigo // pacing: throttles the drain loop; avoids busy-spinning; unsynchronized
+						time.Sleep(time.Millisecond)
 					}
 				}
 			}()
@@ -502,7 +503,7 @@ func BenchmarkScale_ConcurrentSendAndChurn(b *testing.B) {
 					case <-stopChurn:
 						return
 					default:
-						id := types.NodeID(1 + (i % n)) //nolint:gosec
+						id := types.NodeID(1 + (i % n))
 						if i%10 == 0 {
 							mc, ok := batcher.nodes.Load(id)
 							if ok {
@@ -574,7 +575,7 @@ func BenchmarkScale_MixedWorkload(b *testing.B) {
 					case <-stopChurn:
 						return
 					default:
-						id := types.NodeID(1 + (i % n)) //nolint:gosec
+						id := types.NodeID(1 + (i % n))
 						if i%10 == 0 {
 							mc, ok := batcher.nodes.Load(id)
 							if ok {
@@ -613,7 +614,8 @@ func BenchmarkScale_MixedWorkload(b *testing.B) {
 						return
 					default:
 						batcher.processBatchedChanges()
-						time.Sleep(time.Millisecond) //nolint:forbidigo
+						//nolint:forbidigo // pacing: throttles the batch loop; avoids busy-spinning; unsynchronized
+						time.Sleep(time.Millisecond)
 					}
 				}
 			}()
@@ -636,12 +638,12 @@ func BenchmarkScale_MixedWorkload(b *testing.B) {
 			for i := range b.N {
 				switch {
 				case i%10 < 7: // 70% targeted
-					targetID := types.NodeID(1 + (i % n)) //nolint:gosec
+					targetID := types.NodeID(1 + (i % n))
 					batcher.addToBatch(change.Change{
 						Reason:     "mixed-targeted",
 						TargetNode: targetID,
 						PeerPatches: []*tailcfg.PeerChange{
-							{NodeID: tailcfg.NodeID(targetID)}, //nolint:gosec
+							{NodeID: tailcfg.NodeID(targetID)},
 						},
 					})
 				case i%10 < 9: // 20% DERP map broadcast
@@ -761,7 +763,8 @@ func BenchmarkScale_SingleAddNode(b *testing.B) {
 				}
 			}
 
-			time.Sleep(200 * time.Millisecond) //nolint:forbidigo
+			//nolint:forbidigo // pacing: lets async initial maps settle before the timed loop starts; unsynchronized
+			time.Sleep(200 * time.Millisecond)
 
 			// Benchmark: repeatedly add and remove the last node
 			lastNode := &allNodes[len(allNodes)-1]
@@ -823,7 +826,8 @@ func BenchmarkScale_MapResponse_DERPMap(b *testing.B) {
 				}
 			}
 
-			time.Sleep(200 * time.Millisecond) //nolint:forbidigo
+			//nolint:forbidigo // pacing: lets async initial maps settle before the timed loop starts; unsynchronized
+			time.Sleep(200 * time.Millisecond)
 
 			ch := change.DERPMap()
 
@@ -872,7 +876,8 @@ func BenchmarkScale_MapResponse_FullUpdate(b *testing.B) {
 				}
 			}
 
-			time.Sleep(200 * time.Millisecond) //nolint:forbidigo
+			//nolint:forbidigo // pacing: lets async initial maps settle before the timed loop starts; unsynchronized
+			time.Sleep(200 * time.Millisecond)
 
 			ch := change.FullUpdate()
 

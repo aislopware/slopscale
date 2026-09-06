@@ -405,7 +405,7 @@ func (entry *connectionEntry) send(data *tailcfg.MapResponse) error {
 	//
 	// Use a timer rather than time.After so the timeout is explicitly released
 	// on the fast path; both are GC-recoverable since Go 1.23.
-	timer := time.NewTimer(50 * time.Millisecond) //nolint:mnd
+	timer := time.NewTimer(50 * time.Millisecond)
 	defer timer.Stop()
 
 	select {

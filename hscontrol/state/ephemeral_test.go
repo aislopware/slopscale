@@ -84,7 +84,9 @@ func TestEphemeralNodeDeleteWithConcurrentUpdate(t *testing.T) {
 		t.Logf("UpdateNode returned ok=true, valid=%v", updatedNode.Valid())
 		// This is the bug scenario - UpdateNode thinks it succeeded but node is gone
 		if updatedNode.Valid() {
-			t.Logf("WARNING: UpdateNode returned valid node but node was deleted - this indicates the race condition bug")
+			t.Logf(
+				"WARNING: UpdateNode returned valid node but node was deleted - this indicates the race condition bug",
+			)
 		}
 	} else {
 		t.Logf("UpdateNode correctly returned ok=false (node deleted in same batch)")

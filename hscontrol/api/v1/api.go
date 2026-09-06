@@ -9,6 +9,7 @@ package apiv1
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -88,14 +89,26 @@ func register(api huma.API, b Backend) {
 // handlers are registered but never invoked during emission.
 func Spec() ([]byte, error) {
 	api := NewAPI(chi.NewMux(), Backend{})
-	return api.OpenAPI().YAML()
+
+	yaml, err := api.OpenAPI().YAML()
+	if err != nil {
+		return nil, fmt.Errorf("generating OpenAPI 3.1 YAML: %w", err)
+	}
+
+	return yaml, nil
 }
 
 // Spec30 emits the document downgraded to OpenAPI 3.0.3, needed because the
 // client generator (oapi-codegen v2) cannot yet read the 3.1 spec.
 func Spec30() ([]byte, error) {
 	api := NewAPI(chi.NewMux(), Backend{})
-	return api.OpenAPI().DowngradeYAML()
+
+	yaml, err := api.OpenAPI().DowngradeYAML()
+	if err != nil {
+		return nil, fmt.Errorf("generating OpenAPI 3.0 YAML: %w", err)
+	}
+
+	return yaml, nil
 }
 
 // Handler builds the v1 API on a fresh mux and returns both. Callers mount the

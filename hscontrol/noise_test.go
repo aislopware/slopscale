@@ -20,11 +20,18 @@ import (
 	"tailscale.com/types/key"
 )
 
+// bodyCapture records what the test handler behind
+// [newNoiseRouterWithBodyLimit] read from the request body.
+type bodyCapture struct {
+	body []byte
+	err  error
+}
+
 // newNoiseRouterWithBodyLimit builds a chi router with the same body-limit
 // middleware used in the real Noise router but wired to a test handler that
 // captures the [io.ReadAll] result. This lets us verify the limit without
 // needing a full [Headscale] instance.
-func newNoiseRouterWithBodyLimit(readBody *[]byte, readErr *error) http.Handler {
+func newNoiseRouterWithBodyLimit(capture *bodyCapture) http.Handler {
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -34,8 +41,8 @@ func newNoiseRouterWithBodyLimit(readBody *[]byte, readErr *error) http.Handler 
 	})
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		*readBody, *readErr = io.ReadAll(r.Body)
-		if *readErr != nil {
+		capture.body, capture.err = io.ReadAll(r.Body)
+		if capture.err != nil {
 			http.Error(w, "body too large", http.StatusRequestEntityTooLarge)
 
 			return
@@ -56,42 +63,38 @@ func TestNoiseBodyLimit_MapEndpoint(t *testing.T) {
 	t.Run("normal_map_request", func(t *testing.T) {
 		t.Parallel()
 
-		var body []byte
+		var capture bodyCapture
 
-		var readErr error
-
-		router := newNoiseRouterWithBodyLimit(&body, &readErr)
+		router := newNoiseRouterWithBodyLimit(&capture)
 
 		mapReq := tailcfg.MapRequest{Version: 100, Stream: true}
 		payload, err := json.Marshal(mapReq)
 		require.NoError(t, err)
 
-		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/machine/map", bytes.NewReader(payload))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/machine/map", bytes.NewReader(payload))
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 
-		require.NoError(t, readErr)
+		require.NoError(t, capture.err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.Len(t, body, len(payload))
+		assert.Len(t, capture.body, len(payload))
 	})
 
 	t.Run("oversized_body_rejected", func(t *testing.T) {
 		t.Parallel()
 
-		var body []byte
+		var capture bodyCapture
 
-		var readErr error
-
-		router := newNoiseRouterWithBodyLimit(&body, &readErr)
+		router := newNoiseRouterWithBodyLimit(&capture)
 
 		oversized := bytes.Repeat([]byte("x"), int(noiseBodyLimit)+1)
-		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/machine/map", bytes.NewReader(oversized))
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/machine/map", bytes.NewReader(oversized))
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 
-		require.Error(t, readErr)
+		require.Error(t, capture.err)
 		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
-		assert.LessOrEqual(t, len(body), int(noiseBodyLimit))
+		assert.LessOrEqual(t, len(capture.body), int(noiseBodyLimit))
 	})
 }
 
@@ -101,62 +104,66 @@ func TestNoiseBodyLimit_RegisterEndpoint(t *testing.T) {
 	t.Run("normal_register_request", func(t *testing.T) {
 		t.Parallel()
 
-		var body []byte
+		var capture bodyCapture
 
-		var readErr error
-
-		router := newNoiseRouterWithBodyLimit(&body, &readErr)
+		router := newNoiseRouterWithBodyLimit(&capture)
 
 		regReq := tailcfg.RegisterRequest{Version: 100}
 		payload, err := json.Marshal(regReq)
 		require.NoError(t, err)
 
-		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/machine/register", bytes.NewReader(payload))
+		req := httptest.NewRequestWithContext(
+			t.Context(),
+			http.MethodPost,
+			"/machine/register",
+			bytes.NewReader(payload),
+		)
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 
-		require.NoError(t, readErr)
+		require.NoError(t, capture.err)
 		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.Len(t, body, len(payload))
+		assert.Len(t, capture.body, len(payload))
 	})
 
 	t.Run("oversized_body_rejected", func(t *testing.T) {
 		t.Parallel()
 
-		var body []byte
+		var capture bodyCapture
 
-		var readErr error
-
-		router := newNoiseRouterWithBodyLimit(&body, &readErr)
+		router := newNoiseRouterWithBodyLimit(&capture)
 
 		oversized := bytes.Repeat([]byte("x"), int(noiseBodyLimit)+1)
-		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/machine/register", bytes.NewReader(oversized))
+		req := httptest.NewRequestWithContext(
+			t.Context(),
+			http.MethodPost,
+			"/machine/register",
+			bytes.NewReader(oversized),
+		)
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 
-		require.Error(t, readErr)
+		require.Error(t, capture.err)
 		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
-		assert.LessOrEqual(t, len(body), int(noiseBodyLimit))
+		assert.LessOrEqual(t, len(capture.body), int(noiseBodyLimit))
 	})
 }
 
 func TestNoiseBodyLimit_AtExactLimit(t *testing.T) {
 	t.Parallel()
 
-	var body []byte
+	var capture bodyCapture
 
-	var readErr error
-
-	router := newNoiseRouterWithBodyLimit(&body, &readErr)
+	router := newNoiseRouterWithBodyLimit(&capture)
 
 	payload := bytes.Repeat([]byte("a"), int(noiseBodyLimit))
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/machine/map", bytes.NewReader(payload))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/machine/map", bytes.NewReader(payload))
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
-	require.NoError(t, readErr)
+	require.NoError(t, capture.err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Len(t, body, int(noiseBodyLimit))
+	assert.Len(t, capture.body, int(noiseBodyLimit))
 }
 
 // TestPollNetMapHandler_OversizedBody calls the real handler with a
@@ -168,7 +175,7 @@ func TestPollNetMapHandler_OversizedBody(t *testing.T) {
 	ns := &noiseServer{}
 
 	oversized := bytes.Repeat([]byte("x"), int(noiseBodyLimit)+1)
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/machine/map", bytes.NewReader(oversized))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/machine/map", bytes.NewReader(oversized))
 	rec := httptest.NewRecorder()
 	req.Body = http.MaxBytesReader(rec, req.Body, noiseBodyLimit)
 
@@ -187,7 +194,7 @@ func TestRegistrationHandler_OversizedBody(t *testing.T) {
 	ns := &noiseServer{}
 
 	oversized := bytes.Repeat([]byte("x"), int(noiseBodyLimit)+1)
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/machine/register", bytes.NewReader(oversized))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/machine/register", bytes.NewReader(oversized))
 	rec := httptest.NewRecorder()
 	req.Body = http.MaxBytesReader(rec, req.Body, noiseBodyLimit)
 
@@ -227,7 +234,7 @@ func TestSSHActionRoute_OldPathReturns404(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, tc.path, nil)
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, tc.path, nil)
 			rec := httptest.NewRecorder()
 			r.ServeHTTP(rec, req)
 
@@ -242,8 +249,8 @@ func TestSSHActionRoute_OldPathReturns404(t *testing.T) {
 func newSSHActionRequest(t *testing.T, src, dst types.NodeID) *http.Request {
 	t.Helper()
 
-	url := fmt.Sprintf("/machine/ssh/action/%d/to/%d", src.Uint64(), dst.Uint64())
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	target := fmt.Sprintf("/machine/ssh/action/%d/to/%d", src.Uint64(), dst.Uint64())
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("src_node_id", strconv.FormatUint(src.Uint64(), 10))
@@ -352,11 +359,11 @@ func TestSSHActionFollowUp_RejectsBindingMismatch(t *testing.T) {
 		machineKey: dstOther.MachineKey,
 	}
 
-	url := fmt.Sprintf(
+	target := fmt.Sprintf(
 		"/machine/ssh/action/%d/to/%d?auth_id=%s",
 		srcOther.ID.Uint64(), dstOther.ID.Uint64(), authID.String(),
 	)
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
 
 	rctx := chi.NewRouteContext()
 	rctx.URLParams.Add("src_node_id", strconv.FormatUint(srcOther.ID.Uint64(), 10))
@@ -508,7 +515,7 @@ func TestTS2021Route_AcceptsGETAndPOST(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			req := httptest.NewRequestWithContext(context.Background(), tt.method,
+			req := httptest.NewRequestWithContext(t.Context(), tt.method,
 				"/ts2021?X-Tailscale-Handshake=AAAA", nil)
 			for k, v := range tt.headers {
 				req.Header.Set(k, v)

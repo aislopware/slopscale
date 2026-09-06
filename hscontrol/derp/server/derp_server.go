@@ -55,7 +55,8 @@ func NewDERPServer(
 	cfg *types.DERPConfig,
 ) (*DERPServer, error) {
 	log.Trace().Caller().Msg("creating new embedded DERP server")
-	server := derpserver.New(derpKey, util.TSLogfWrapper()) // nolint // zerolinter complains
+
+	server := derpserver.New(derpKey, util.TSLogfWrapper())
 
 	if cfg.ServerVerifyClients {
 		server.SetVerifyClientURL(DerpVerifyScheme + "://verify")
@@ -73,7 +74,7 @@ func NewDERPServer(
 func (d *DERPServer) GenerateRegion() (tailcfg.DERPRegion, error) {
 	serverURL, err := url.Parse(d.serverURL)
 	if err != nil {
-		return tailcfg.DERPRegion{}, err
+		return tailcfg.DERPRegion{}, fmt.Errorf("parsing DERP server URL %q: %w", d.serverURL, err)
 	}
 
 	// Extract hostname and port from URL
@@ -91,15 +92,15 @@ func (d *DERPServer) GenerateRegion() (tailcfg.DERPRegion, error) {
 	} else {
 		port, err = strconv.Atoi(portStr)
 		if err != nil {
-			return tailcfg.DERPRegion{}, err
+			return tailcfg.DERPRegion{}, fmt.Errorf("parsing DERP port %q: %w", portStr, err)
 		}
 	}
 
 	// If debug flag is set, resolve hostname to IP address
 	if debugUseDERPIP {
-		ips, err := new(net.Resolver).LookupIPAddr(context.Background(), host)
-		if err != nil {
-			log.Error().Caller().Err(err).Msgf("failed to resolve DERP hostname %s to IP, using hostname", host)
+		ips, resolveErr := new(net.Resolver).LookupIPAddr(context.Background(), host)
+		if resolveErr != nil {
+			log.Error().Caller().Err(resolveErr).Msgf("failed to resolve DERP hostname %s to IP, using hostname", host)
 		} else if len(ips) > 0 {
 			// Use the first IP address
 			ipStr := ips[0].IP.String()
@@ -126,12 +127,12 @@ func (d *DERPServer) GenerateRegion() (tailcfg.DERPRegion, error) {
 
 	_, portSTUNStr, err := net.SplitHostPort(d.cfg.STUNAddr)
 	if err != nil {
-		return tailcfg.DERPRegion{}, err
+		return tailcfg.DERPRegion{}, fmt.Errorf("splitting STUN address %q: %w", d.cfg.STUNAddr, err)
 	}
 
 	portSTUN, err := strconv.Atoi(portSTUNStr)
 	if err != nil {
-		return tailcfg.DERPRegion{}, err
+		return tailcfg.DERPRegion{}, fmt.Errorf("parsing STUN port %q: %w", portSTUNStr, err)
 	}
 
 	localDERPregion.Nodes[0].STUNPort = portSTUN
@@ -153,7 +154,8 @@ func (d *DERPServer) DERPHandler(
 		if upgrade != "" {
 			log.Warn().
 				Caller().
-				Msg("No Upgrade header in DERP server request. If headscale is behind a reverse proxy, make sure it is configured to pass WebSockets through.")
+				Msg("No Upgrade header in DERP server request. If headscale is behind a reverse proxy, " +
+					"make sure it is configured to pass WebSockets through.")
 		}
 
 		writer.Header().Set("Content-Type", "text/plain")
@@ -170,11 +172,102 @@ func (d *DERPServer) DERPHandler(
 		return
 	}
 
-	if strings.Contains(req.Header.Get("Sec-Websocket-Protocol"), "derp") {
+	if strings.Contains(req.Header.Get("Sec-WebSocket-Protocol"), "derp") {
 		d.serveWebsocket(writer, req)
 	} else {
 		d.servePlain(writer, req)
 	}
+}
+
+// DERPProbeHandler is the endpoint that js/wasm clients hit to measure
+// DERP latency, since they can't do UDP STUN queries.
+func DERPProbeHandler(
+	writer http.ResponseWriter,
+	req *http.Request,
+) {
+	switch req.Method {
+	case http.MethodHead, http.MethodGet:
+		writer.Header().Set("Access-Control-Allow-Origin", "*")
+		writer.WriteHeader(http.StatusOK)
+	default:
+		writer.WriteHeader(http.StatusMethodNotAllowed)
+
+		_, err := writer.Write([]byte("bogus probe method"))
+		if err != nil {
+			log.Error().
+				Caller().
+				Err(err).
+				Msg("Failed to write HTTP response")
+		}
+	}
+}
+
+// DERPBootstrapDNSHandler implements the /bootstrap-dns endpoint
+// Described in https://github.com/tailscale/tailscale/issues/1405,
+// this endpoint provides a way to help a client when it fails to start up
+// because its DNS are broken.
+// The initial implementation is here https://github.com/tailscale/tailscale/pull/1406
+// They have a cache, but not clear if that is really necessary at Headscale, uh, scale.
+// An example implementation is found here https://derp.tailscale.com/bootstrap-dns
+// Coordination server is included automatically, since local DERP is using the same DNS Name in d.serverURL.
+func DERPBootstrapDNSHandler(
+	derpMap tailcfg.DERPMapView,
+) func(http.ResponseWriter, *http.Request) {
+	return func(
+		writer http.ResponseWriter,
+		req *http.Request,
+	) {
+		dnsEntries := make(map[string][]net.IP)
+
+		resolvCtx, cancel := context.WithTimeout(req.Context(), time.Minute)
+		defer cancel()
+
+		var resolver net.Resolver
+
+		for _, region := range derpMap.Regions().All() {
+			for _, node := range region.Nodes().All() {
+				addrs, err := resolver.LookupIP(resolvCtx, "ip", node.HostName())
+				if err != nil {
+					log.Trace().
+						Caller().
+						Err(err).
+						Msgf("bootstrap DNS lookup failed %q", node.HostName())
+
+					continue
+				}
+
+				dnsEntries[node.HostName()] = addrs
+			}
+		}
+
+		writer.Header().Set("Content-Type", "application/json")
+		writer.WriteHeader(http.StatusOK)
+
+		err := json.NewEncoder(writer).Encode(dnsEntries)
+		if err != nil {
+			log.Error().
+				Caller().
+				Err(err).
+				Msg("Failed to write HTTP response")
+		}
+	}
+}
+
+// ServeSTUN starts a STUN server on the configured addr.
+func (d *DERPServer) ServeSTUN() {
+	packetConn, err := new(net.ListenConfig).ListenPacket(context.Background(), "udp", d.cfg.STUNAddr)
+	if err != nil {
+		log.Fatal().Msgf("failed to open STUN listener: %v", err)
+	}
+
+	log.Info().Msgf("stun server started at %s", packetConn.LocalAddr())
+
+	udpConn, ok := packetConn.(*net.UDPConn)
+	if !ok {
+		log.Fatal().Msg("stun listener is not a UDP listener")
+	}
+
+	serverSTUNListener(context.Background(), udpConn)
 }
 
 func (d *DERPServer) serveWebsocket(writer http.ResponseWriter, req *http.Request) {
@@ -261,7 +354,7 @@ func (d *DERPServer) servePlain(writer http.ResponseWriter, req *http.Request) {
 
 	if !fastStart {
 		pubKey := d.key.Public()
-		pubKeyStr, _ := pubKey.MarshalText() //nolint
+		pubKeyStr, _ := pubKey.MarshalText()
 		fmt.Fprintf(conn, "HTTP/1.1 101 Switching Protocols\r\n"+
 			"Upgrade: DERP\r\n"+
 			"Connection: Upgrade\r\n"+
@@ -272,97 +365,6 @@ func (d *DERPServer) servePlain(writer http.ResponseWriter, req *http.Request) {
 	}
 
 	d.tailscaleDERP.Accept(req.Context(), netConn, conn, netConn.RemoteAddr().String())
-}
-
-// DERPProbeHandler is the endpoint that js/wasm clients hit to measure
-// DERP latency, since they can't do UDP STUN queries.
-func DERPProbeHandler(
-	writer http.ResponseWriter,
-	req *http.Request,
-) {
-	switch req.Method {
-	case http.MethodHead, http.MethodGet:
-		writer.Header().Set("Access-Control-Allow-Origin", "*")
-		writer.WriteHeader(http.StatusOK)
-	default:
-		writer.WriteHeader(http.StatusMethodNotAllowed)
-
-		_, err := writer.Write([]byte("bogus probe method"))
-		if err != nil {
-			log.Error().
-				Caller().
-				Err(err).
-				Msg("Failed to write HTTP response")
-		}
-	}
-}
-
-// DERPBootstrapDNSHandler implements the /bootstrap-dns endpoint
-// Described in https://github.com/tailscale/tailscale/issues/1405,
-// this endpoint provides a way to help a client when it fails to start up
-// because its DNS are broken.
-// The initial implementation is here https://github.com/tailscale/tailscale/pull/1406
-// They have a cache, but not clear if that is really necessary at Headscale, uh, scale.
-// An example implementation is found here https://derp.tailscale.com/bootstrap-dns
-// Coordination server is included automatically, since local DERP is using the same DNS Name in d.serverURL.
-func DERPBootstrapDNSHandler(
-	derpMap tailcfg.DERPMapView,
-) func(http.ResponseWriter, *http.Request) {
-	return func(
-		writer http.ResponseWriter,
-		req *http.Request,
-	) {
-		dnsEntries := make(map[string][]net.IP)
-
-		resolvCtx, cancel := context.WithTimeout(req.Context(), time.Minute)
-		defer cancel()
-
-		var resolver net.Resolver
-
-		for _, region := range derpMap.Regions().All() { //nolint:unqueryvet // not SQLBoiler, tailcfg iterator
-			for _, node := range region.Nodes().All() { //nolint:unqueryvet // not SQLBoiler, tailcfg iterator
-				addrs, err := resolver.LookupIP(resolvCtx, "ip", node.HostName())
-				if err != nil {
-					log.Trace().
-						Caller().
-						Err(err).
-						Msgf("bootstrap DNS lookup failed %q", node.HostName())
-
-					continue
-				}
-
-				dnsEntries[node.HostName()] = addrs
-			}
-		}
-
-		writer.Header().Set("Content-Type", "application/json")
-		writer.WriteHeader(http.StatusOK)
-
-		err := json.NewEncoder(writer).Encode(dnsEntries)
-		if err != nil {
-			log.Error().
-				Caller().
-				Err(err).
-				Msg("Failed to write HTTP response")
-		}
-	}
-}
-
-// ServeSTUN starts a STUN server on the configured addr.
-func (d *DERPServer) ServeSTUN() {
-	packetConn, err := new(net.ListenConfig).ListenPacket(context.Background(), "udp", d.cfg.STUNAddr)
-	if err != nil {
-		log.Fatal().Msgf("failed to open STUN listener: %v", err)
-	}
-
-	log.Info().Msgf("stun server started at %s", packetConn.LocalAddr())
-
-	udpConn, ok := packetConn.(*net.UDPConn)
-	if !ok {
-		log.Fatal().Msg("stun listener is not a UDP listener")
-	}
-
-	serverSTUNListener(context.Background(), udpConn)
 }
 
 func serverSTUNListener(ctx context.Context, packetConn *net.UDPConn) {
@@ -404,7 +406,10 @@ func serverSTUNListener(ctx context.Context, packetConn *net.UDPConn) {
 		}
 
 		addr, _ := netip.AddrFromSlice(udpAddr.IP)
-		res := stun.Response(txid, netip.AddrPortFrom(addr, uint16(udpAddr.Port))) //nolint:gosec // port is always <=65535
+		res := stun.Response(
+			txid,
+			netip.AddrPortFrom(addr, uint16(udpAddr.Port)), //nolint:gosec // port is always <=65535
+		)
 
 		_, err = packetConn.WriteTo(res, udpAddr)
 		if err != nil {
@@ -415,14 +420,14 @@ func serverSTUNListener(ctx context.Context, packetConn *net.UDPConn) {
 	}
 }
 
+type DERPVerifyTransport struct {
+	handleVerifyRequest func(*http.Request, io.Writer) error
+}
+
 func NewDERPVerifyTransport(handleVerifyRequest func(*http.Request, io.Writer) error) *DERPVerifyTransport {
 	return &DERPVerifyTransport{
 		handleVerifyRequest: handleVerifyRequest,
 	}
-}
-
-type DERPVerifyTransport struct {
-	handleVerifyRequest func(*http.Request, io.Writer) error
 }
 
 func (t *DERPVerifyTransport) RoundTrip(req *http.Request) (*http.Response, error) {

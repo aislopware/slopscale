@@ -94,7 +94,7 @@ func startDERPServer(t *testing.T, cfg *types.DERPConfig) (*DERPServer, string) 
 	return srv, httpSrv.URL
 }
 
-func newDERPClient(t *testing.T, ctx context.Context, priv key.NodePrivate, baseURL string) *derphttp.Client {
+func newDERPClient(ctx context.Context, t *testing.T, priv key.NodePrivate, baseURL string) *derphttp.Client {
 	t.Helper()
 
 	client, err := derphttp.NewClient(priv, baseURL+"/derp", t.Logf, netmon.NewStatic())
@@ -333,7 +333,7 @@ func TestDERPHandlerPlainUpgradeResponse(t *testing.T) {
 	_, err = io.WriteString(conn, "GET /derp HTTP/1.1\r\nHost: derp\r\nUpgrade: DERP\r\nConnection: Upgrade\r\n\r\n")
 	require.NoError(t, err)
 
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, baseURL+"/derp", nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, baseURL+"/derp", http.NoBody)
 	require.NoError(t, err)
 
 	resp, err := http.ReadResponse(bufio.NewReader(conn), req)
@@ -360,8 +360,8 @@ func TestDERPHandlerPlainHandshakeAndRelay(t *testing.T) {
 	srv, baseURL := startDERPServer(t, testDERPConfig())
 
 	alicePriv, bobPriv := key.NewNode(), key.NewNode()
-	alice := newDERPClient(t, ctx, alicePriv, baseURL)
-	bob := newDERPClient(t, ctx, bobPriv, baseURL)
+	alice := newDERPClient(ctx, t, alicePriv, baseURL)
+	bob := newDERPClient(ctx, t, bobPriv, baseURL)
 
 	assert.Equal(t, srv.key.Public(), alice.ServerPublicKey())
 
@@ -389,9 +389,13 @@ func TestDERPHandlerWebsocketHandshake(t *testing.T) {
 	srv, baseURL := startDERPServer(t, testDERPConfig())
 	wsURL := "ws://" + strings.TrimPrefix(baseURL, "http://") + "/derp"
 
-	wsConn, resp, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{ //nolint:bodyclose // coder/websocket nils resp.Body on success
-		Subprotocols: []string{"derp"},
-	})
+	wsConn, resp, err := websocket.Dial( //nolint:bodyclose // coder/websocket nils resp.Body on success
+		ctx,
+		wsURL,
+		&websocket.DialOptions{
+			Subprotocols: []string{"derp"},
+		},
+	)
 	require.NoError(t, err)
 
 	defer wsConn.Close(websocket.StatusNormalClosure, "done")
@@ -423,9 +427,13 @@ func TestDERPHandlerWebsocketRejectsWrongSubprotocol(t *testing.T) {
 
 	// "derp-v2" routes into serveWebsocket (the header contains "derp") but
 	// is not a subprotocol the server offers, so negotiation yields none.
-	wsConn, _, err := websocket.Dial(ctx, wsURL, &websocket.DialOptions{ //nolint:bodyclose // coder/websocket nils resp.Body on success
-		Subprotocols: []string{"derp-v2"},
-	})
+	wsConn, _, err := websocket.Dial( //nolint:bodyclose // coder/websocket nils resp.Body on success
+		ctx,
+		wsURL,
+		&websocket.DialOptions{
+			Subprotocols: []string{"derp-v2"},
+		},
+	)
 	require.NoError(t, err)
 
 	defer wsConn.Close(websocket.StatusNormalClosure, "done")
@@ -453,7 +461,7 @@ func TestDERPHandlerVerifyClients(t *testing.T) {
 	allowed := key.NewNode()
 	allowedDERPClients.Store(allowed.Public(), struct{}{})
 
-	client := newDERPClient(t, ctx, allowed, baseURL)
+	client := newDERPClient(ctx, t, allowed, baseURL)
 	require.NoError(t, client.SendPing([8]byte{1}))
 	assert.Equal(t, derp.PongMessage([8]byte{1}), recvOf[derp.PongMessage](t, client.Recv))
 
@@ -531,7 +539,12 @@ func TestDERPBootstrapDNSHandler(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	DERPBootstrapDNSHandler(derpMap.View())(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/bootstrap-dns", nil))
+	DERPBootstrapDNSHandler(
+		derpMap.View(),
+	)(
+		rec,
+		httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/bootstrap-dns", nil),
+	)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
@@ -548,7 +561,12 @@ func TestDERPBootstrapDNSHandlerEmptyMap(t *testing.T) {
 	t.Parallel()
 
 	rec := httptest.NewRecorder()
-	DERPBootstrapDNSHandler((&tailcfg.DERPMap{}).View())(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/bootstrap-dns", nil))
+	DERPBootstrapDNSHandler(
+		(&tailcfg.DERPMap{}).View(),
+	)(
+		rec,
+		httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/bootstrap-dns", nil),
+	)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.JSONEq(t, "{}", rec.Body.String())
@@ -632,7 +650,7 @@ func TestDERPVerifyTransportRoundTrip(t *testing.T) {
 			return json.NewEncoder(w).Encode(tailcfg.DERPAdmitClientResponse{Allow: true})
 		})
 
-		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, DerpVerifyScheme+"://verify", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, DerpVerifyScheme+"://verify", http.NoBody)
 		require.NoError(t, err)
 
 		resp, err := transport.RoundTrip(req)
@@ -655,7 +673,7 @@ func TestDERPVerifyTransportRoundTrip(t *testing.T) {
 			return errVerifyUnavailable
 		})
 
-		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, DerpVerifyScheme+"://verify", nil)
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, DerpVerifyScheme+"://verify", http.NoBody)
 		require.NoError(t, err)
 
 		resp, err := transport.RoundTrip(req) //nolint:bodyclose // resp is nil on error

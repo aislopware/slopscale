@@ -143,7 +143,11 @@ func TestAPIv2Key_Create_Tagged(t *testing.T) {
 		Capabilities:  *taggedCaps("tag:test"),
 		Tags:          []string{"tag:test"},
 	}
-	if diff := cmp.Diff(want, created, cmpopts.IgnoreFields(apiv2.Key{}, "ID", "Key", "Created", "Expires")); diff != "" {
+	if diff := cmp.Diff(
+		want,
+		created,
+		cmpopts.IgnoreFields(apiv2.Key{}, "ID", "Key", "Created", "Expires"),
+	); diff != "" {
 		t.Errorf("created key mismatch (-want +got):\n%s", diff)
 	}
 
@@ -177,7 +181,9 @@ func TestAPIv2Key_Create_Permutations(t *testing.T) {
 		{
 			name: "single-use",
 			req: apiv2.CreateKeyRequest{Capabilities: &apiv2.KeyCapabilities{
-				Devices: apiv2.KeyDeviceCapabilities{Create: apiv2.KeyDeviceCreateCapabilities{Tags: []string{"tag:test"}}},
+				Devices: apiv2.KeyDeviceCapabilities{
+					Create: apiv2.KeyDeviceCreateCapabilities{Tags: []string{"tag:test"}},
+				},
 			}},
 			wantSeconds: 7776000,
 		},

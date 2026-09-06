@@ -14,7 +14,9 @@ func Windows(url string) *elem.Element {
 			elem.Text(" and install it."),
 		),
 		P(
-			elem.Text("Open a Command Prompt or PowerShell and use Tailscale's login command to connect with headscale:"),
+			elem.Text(
+				"Open a Command Prompt or PowerShell and use Tailscale's login command to connect with headscale:",
+			),
 		),
 		codeBlockText("tailscale login --login-server "+url),
 	)

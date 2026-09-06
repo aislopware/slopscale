@@ -80,8 +80,8 @@ func TestSSHCheckAuthConcurrent(t *testing.T) {
 
 	for i := range 100 {
 		wg.Go(func() {
-			src := types.NodeID(uint64(i % 10))   //nolint:gosec
-			dst := types.NodeID(uint64(i%5 + 10)) //nolint:gosec
+			src := types.NodeID(uint64(i % 10))
+			dst := types.NodeID(uint64(i%5 + 10))
 
 			s.SetLastSSHAuth(src, dst)
 			s.GetLastSSHAuth(src, dst)

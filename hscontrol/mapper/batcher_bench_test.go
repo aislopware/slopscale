@@ -158,7 +158,7 @@ func benchBatcher(nodeCount, bufferSize int) (*Batcher, map[types.NodeID]chan *t
 
 	channels := make(map[types.NodeID]chan *tailcfg.MapResponse, nodeCount)
 	for i := 1; i <= nodeCount; i++ {
-		id := types.NodeID(i) //nolint:gosec // benchmark with small controlled values
+		id := types.NodeID(i)
 		mc := newMultiChannelNodeConn(id, nil)
 		ch := make(chan *tailcfg.MapResponse, bufferSize)
 		entry := &connectionEntry{
@@ -221,12 +221,12 @@ func BenchmarkAddToBatch_Targeted(b *testing.B) {
 			b.ResetTimer()
 
 			for i := range b.N {
-				targetID := types.NodeID(1 + (i % nodeCount)) //nolint:gosec // benchmark
+				targetID := types.NodeID(1 + (i % nodeCount))
 				ch := change.Change{
 					Reason:     "bench-targeted",
 					TargetNode: targetID,
 					PeerPatches: []*tailcfg.PeerChange{
-						{NodeID: tailcfg.NodeID(targetID)}, //nolint:gosec // benchmark
+						{NodeID: tailcfg.NodeID(targetID)},
 					},
 				}
 				batcher.addToBatch(ch)
@@ -282,7 +282,7 @@ func BenchmarkProcessBatchedChanges(b *testing.B) {
 				b.StopTimer()
 				// Seed pending changes
 				for i := 1; i <= nodeCount; i++ {
-					if nc, ok := batcher.nodes.Load(types.NodeID(i)); ok { //nolint:gosec // benchmark
+					if nc, ok := batcher.nodes.Load(types.NodeID(i)); ok {
 						nc.appendPending(change.DERPMap())
 					}
 				}
@@ -335,7 +335,7 @@ func BenchmarkMultiChannelBroadcast(b *testing.B) {
 			// Add extra connections to every 3rd node
 			for i := 1; i <= nodeCount; i++ {
 				if i%3 == 0 {
-					if mc, ok := batcher.nodes.Load(types.NodeID(i)); ok { //nolint:gosec // benchmark
+					if mc, ok := batcher.nodes.Load(types.NodeID(i)); ok {
 						for j := range 2 {
 							ch := make(chan *tailcfg.MapResponse, b.N+1)
 							entry := &connectionEntry{
@@ -392,7 +392,8 @@ func BenchmarkConcurrentAddToBatch(b *testing.B) {
 							nc.drainPending()
 							return true
 						})
-						time.Sleep(time.Millisecond) //nolint:forbidigo // benchmark drain loop
+						//nolint:forbidigo // pacing: throttles the drain loop; avoids busy-spinning; unsynchronized
+						time.Sleep(time.Millisecond)
 					}
 				}
 			}()
@@ -430,7 +431,7 @@ func BenchmarkIsConnected(b *testing.B) {
 			b.ResetTimer()
 
 			for i := range b.N {
-				id := types.NodeID(1 + (i % nodeCount)) //nolint:gosec // benchmark
+				id := types.NodeID(1 + (i % nodeCount))
 				_ = batcher.IsConnected(id)
 			}
 		})
@@ -451,7 +452,7 @@ func BenchmarkConnectedMap(b *testing.B) {
 			// Disconnect 10% of nodes for a realistic mix
 			for i := 1; i <= nodeCount; i++ {
 				if i%10 == 0 {
-					id := types.NodeID(i) //nolint:gosec // benchmark
+					id := types.NodeID(i)
 					if mc, ok := batcher.nodes.Load(id); ok {
 						mc.removeConnectionByChannel(channels[id])
 						mc.markDisconnected()
@@ -483,7 +484,7 @@ func BenchmarkConnectionChurn(b *testing.B) {
 			b.ResetTimer()
 
 			for i := range b.N {
-				id := types.NodeID(1 + (i % nodeCount)) //nolint:gosec // benchmark
+				id := types.NodeID(1 + (i % nodeCount))
 
 				mc, ok := batcher.nodes.Load(id)
 				if !ok {
@@ -532,8 +533,8 @@ func BenchmarkConcurrentSendAndChurn(b *testing.B) {
 					case <-stopChurn:
 						return
 					default:
-						id := types.NodeID(1 + (i % nodeCount)) //nolint:gosec // benchmark
-						if i%10 == 0 {                          // only churn 10%
+						id := types.NodeID(1 + (i % nodeCount))
+						if i%10 == 0 { // only churn 10%
 							mc, ok := batcher.nodes.Load(id)
 							if ok {
 								mu.Lock()
@@ -676,7 +677,8 @@ func BenchmarkFullPipeline(b *testing.B) {
 			}
 
 			// Wait for initial maps to settle
-			time.Sleep(200 * time.Millisecond) //nolint:forbidigo // benchmark coordination
+			//nolint:forbidigo // pacing: lets async initial maps settle before the timed loop starts; unsynchronized
+			time.Sleep(200 * time.Millisecond)
 
 			b.ResetTimer()
 
@@ -685,7 +687,8 @@ func BenchmarkFullPipeline(b *testing.B) {
 				// Allow workers to process (the batcher tick is what normally
 				// triggers processBatchedChanges, but for benchmarks we need
 				// to give the system time to process)
-				time.Sleep(20 * time.Millisecond) //nolint:forbidigo // benchmark coordination
+				//nolint:forbidigo // pacing: models the drain interval between AddWork() calls; unsynchronized
+				time.Sleep(20 * time.Millisecond)
 			}
 		})
 	}
@@ -727,7 +730,8 @@ func BenchmarkMapResponseFromChange(b *testing.B) {
 				}
 			}
 
-			time.Sleep(200 * time.Millisecond) //nolint:forbidigo // benchmark coordination
+			//nolint:forbidigo // pacing: lets async initial maps settle before the timed loop starts; unsynchronized
+			time.Sleep(200 * time.Millisecond)
 
 			ch := change.DERPMap()
 

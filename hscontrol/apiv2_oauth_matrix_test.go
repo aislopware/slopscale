@@ -127,7 +127,14 @@ func TestAPIv2OAuthMatrix_Enforcement(t *testing.T) {
 		{"getACL", http.MethodGet, "/api/v2/tailnet/-/acl", scope.PolicyFileRead, nil, false},
 		{"setACL", http.MethodPost, "/api/v2/tailnet/-/acl", scope.PolicyFile, map[string]any{}, false},
 		{"getSettings", http.MethodGet, "/api/v2/tailnet/-/settings", scope.FeatureSettingsRead, nil, false},
-		{"updateSettings", http.MethodPatch, "/api/v2/tailnet/-/settings", scope.FeatureSettings, map[string]any{}, false},
+		{
+			"updateSettings",
+			http.MethodPatch,
+			"/api/v2/tailnet/-/settings",
+			scope.FeatureSettings,
+			map[string]any{},
+			false,
+		},
 		{"getKeyClient", http.MethodGet, "/api/v2/tailnet/-/keys/" + clientID, scope.OAuthKeysRead, nil, true},
 		{"getKeyAuth", http.MethodGet, "/api/v2/tailnet/-/keys/" + authKeyID, scope.AuthKeysRead, nil, true},
 	}

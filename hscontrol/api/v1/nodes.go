@@ -36,24 +36,27 @@ var registerMethodToV1Enum = map[string]string{
 // fields: scalars and slices always (no omitempty), nested messages and optional
 // timestamps as JSON null when unset.
 type Node struct {
-	ID              string          `format:"uint64"                                                                                      json:"id"`
-	MachineKey      string          `json:"machineKey"`
-	NodeKey         string          `json:"nodeKey"`
-	DiscoKey        string          `json:"discoKey"`
-	IPAddresses     []string        `json:"ipAddresses"                                                                                   nullable:"false"`
-	Name            string          `json:"name"`
-	User            *User           `json:"user"`
-	LastSeen        *time.Time      `json:"lastSeen"                                                                                      nullable:"true"`
-	Expiry          *time.Time      `json:"expiry"                                                                                        nullable:"true"`
-	PreAuthKey      *NodePreAuthKey `json:"preAuthKey"`
-	CreatedAt       time.Time       `json:"createdAt"`
-	RegisterMethod  string          `enum:"REGISTER_METHOD_UNSPECIFIED,REGISTER_METHOD_AUTH_KEY,REGISTER_METHOD_CLI,REGISTER_METHOD_OIDC" json:"registerMethod"`
-	GivenName       string          `json:"givenName"`
-	Online          bool            `json:"online"`
-	ApprovedRoutes  []string        `json:"approvedRoutes"                                                                                nullable:"false"`
-	AvailableRoutes []string        `json:"availableRoutes"                                                                               nullable:"false"`
-	SubnetRoutes    []string        `json:"subnetRoutes"                                                                                  nullable:"false"`
-	Tags            []string        `json:"tags"                                                                                          nullable:"false"`
+	ID          string          `format:"uint64"    json:"id"`
+	MachineKey  string          `json:"machineKey"`
+	NodeKey     string          `json:"nodeKey"`
+	DiscoKey    string          `json:"discoKey"`
+	IPAddresses []string        `json:"ipAddresses" nullable:"false"`
+	Name        string          `json:"name"`
+	User        *User           `json:"user"`
+	LastSeen    *time.Time      `json:"lastSeen"    nullable:"true"`
+	Expiry      *time.Time      `json:"expiry"      nullable:"true"`
+	PreAuthKey  *NodePreAuthKey `json:"preAuthKey"`
+	CreatedAt   time.Time       `json:"createdAt"`
+
+	//nolint:lll // struct tag enum list cannot be wrapped
+	RegisterMethod string `enum:"REGISTER_METHOD_UNSPECIFIED,REGISTER_METHOD_AUTH_KEY,REGISTER_METHOD_CLI,REGISTER_METHOD_OIDC" json:"registerMethod"`
+
+	GivenName       string   `json:"givenName"`
+	Online          bool     `json:"online"`
+	ApprovedRoutes  []string `json:"approvedRoutes"  nullable:"false"`
+	AvailableRoutes []string `json:"availableRoutes" nullable:"false"`
+	SubnetRoutes    []string `json:"subnetRoutes"    nullable:"false"`
+	Tags            []string `json:"tags"            nullable:"false"`
 }
 
 // NodePreAuthKey is the PreAuthKey shape embedded in a Node response. The
@@ -67,7 +70,7 @@ type NodePreAuthKey struct {
 	Used       bool       `json:"used"`
 	Expiration *time.Time `json:"expiration" nullable:"true"`
 	CreatedAt  *time.Time `json:"createdAt"  nullable:"true"`
-	AclTags    []string   `json:"aclTags"    nullable:"false"`
+	ACLTags    []string   `json:"aclTags"    nullable:"false"`
 }
 
 // SetTagsRequestBody mirrors v1.SetTagsRequest.
@@ -179,7 +182,7 @@ func registerNodeReadOps(api huma.API, b Backend) {
 		Summary:     "Get node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *getNodeInput) (*nodeOutput, error) {
+	}, func(_ context.Context, in *getNodeInput) (*nodeOutput, error) {
 		nodeID, err := parseNodeID(in.NodeID)
 		if err != nil {
 			return nil, err
@@ -203,7 +206,7 @@ func registerNodeReadOps(api huma.API, b Backend) {
 		Summary:     "List nodes",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *listNodesInput) (*listNodesOutput, error) {
+	}, func(_ context.Context, in *listNodesInput) (*listNodesOutput, error) {
 		nodes := b.State.ListNodes()
 		if in.User != "" {
 			user, err := b.State.GetUserByName(in.User)
@@ -252,7 +255,7 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		Summary:     "Delete node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *deleteNodeInput) (*deleteNodeOutput, error) {
+	}, func(_ context.Context, in *deleteNodeInput) (*deleteNodeOutput, error) {
 		nodeID, err := parseNodeID(in.NodeID)
 		if err != nil {
 			return nil, err
@@ -280,58 +283,8 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		Summary:     "Expire node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *expireNodeInput) (*nodeOutput, error) {
-		nodeID, err := parseNodeID(in.NodeID)
-		if err != nil {
-			return nil, err
-		}
-
-		// gRPC parity: disableExpiry => nil expiry (never expires); explicit
-		// expiry honoured; absent/zero body expires now. Both set is a 400.
-		var (
-			disableExpiry bool
-			customExpiry  *time.Time
-		)
-
-		if in.Body != nil {
-			disableExpiry = in.Body.DisableExpiry
-			customExpiry = in.Body.Expiry
-		}
-
-		if disableExpiry && customExpiry != nil {
-			return nil, huma.Error400BadRequest("cannot set both disable_expiry and expiry")
-		}
-
-		expiry := time.Now()
-
-		switch {
-		case disableExpiry:
-			node, nodeChange, expErr := b.State.SetNodeExpiry(nodeID, nil)
-			if expErr != nil {
-				return nil, mapError("expiring node", expErr)
-			}
-
-			b.Change(nodeChange)
-
-			out := &nodeOutput{}
-			out.Body.Node = nodeFromView(node)
-
-			return out, nil
-		case customExpiry != nil:
-			expiry = *customExpiry
-		}
-
-		node, nodeChange, err := b.State.SetNodeExpiry(nodeID, &expiry)
-		if err != nil {
-			return nil, mapError("expiring node", err)
-		}
-
-		b.Change(nodeChange)
-
-		out := &nodeOutput{}
-		out.Body.Node = nodeFromView(node)
-
-		return out, nil
+	}, func(_ context.Context, in *expireNodeInput) (*nodeOutput, error) {
+		return handleExpireNode(b, in)
 	})
 
 	huma.Register(api, huma.Operation{
@@ -341,7 +294,7 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		Summary:     "Rename node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *renameNodeInput) (*nodeOutput, error) {
+	}, func(_ context.Context, in *renameNodeInput) (*nodeOutput, error) {
 		nodeID, err := parseNodeID(in.NodeID)
 		if err != nil {
 			return nil, err
@@ -367,35 +320,38 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		Summary:     "Set tags",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *setTagsInput) (*nodeOutput, error) {
-		nodeID, err := parseNodeID(in.NodeID)
-		if err != nil {
-			return nil, err
-		}
+	}, func(_ context.Context, in *setTagsInput) (*nodeOutput, error) {
+		return handleSetTags(b, in)
+	})
+}
 
-		// Tagged nodes must keep at least one tag, so reject an empty set
-		// before touching state, as gRPC does.
-		if len(in.Body.Tags) == 0 {
-			return nil, huma.Error400BadRequest(
-				"cannot remove all tags from a node - tagged nodes must have at least one tag",
-			)
-		}
+// handleExpireNode applies gRPC parity: disableExpiry => nil expiry (never
+// expires); explicit expiry honoured; absent/zero body expires now. Both set
+// is a 400.
+func handleExpireNode(b Backend, in *expireNodeInput) (*nodeOutput, error) {
+	nodeID, err := parseNodeID(in.NodeID)
+	if err != nil {
+		return nil, err
+	}
 
-		for _, tag := range in.Body.Tags {
-			tagErr := validateTag(tag)
-			if tagErr != nil {
-				return nil, huma.Error400BadRequest("setting tags", tagErr)
-			}
-		}
+	var (
+		disableExpiry bool
+		customExpiry  *time.Time
+	)
 
-		_, found := b.State.GetNodeByID(nodeID)
-		if !found {
-			return nil, huma.Error404NotFound("node not found")
-		}
+	if in.Body != nil {
+		disableExpiry = in.Body.DisableExpiry
+		customExpiry = in.Body.Expiry
+	}
 
-		node, nodeChange, err := b.State.SetNodeTags(nodeID, in.Body.Tags)
-		if err != nil {
-			return nil, huma.Error400BadRequest("setting tags", err)
+	if disableExpiry && customExpiry != nil {
+		return nil, huma.Error400BadRequest("cannot set both disable_expiry and expiry")
+	}
+
+	if disableExpiry {
+		node, nodeChange, expErr := b.State.SetNodeExpiry(nodeID, nil)
+		if expErr != nil {
+			return nil, mapError("expiring node", expErr)
 		}
 
 		b.Change(nodeChange)
@@ -404,7 +360,63 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		out.Body.Node = nodeFromView(node)
 
 		return out, nil
-	})
+	}
+
+	expiry := time.Now()
+	if customExpiry != nil {
+		expiry = *customExpiry
+	}
+
+	node, nodeChange, err := b.State.SetNodeExpiry(nodeID, &expiry)
+	if err != nil {
+		return nil, mapError("expiring node", err)
+	}
+
+	b.Change(nodeChange)
+
+	out := &nodeOutput{}
+	out.Body.Node = nodeFromView(node)
+
+	return out, nil
+}
+
+func handleSetTags(b Backend, in *setTagsInput) (*nodeOutput, error) {
+	nodeID, err := parseNodeID(in.NodeID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Tagged nodes must keep at least one tag, so reject an empty set
+	// before touching state, as gRPC does.
+	if len(in.Body.Tags) == 0 {
+		return nil, huma.Error400BadRequest(
+			"cannot remove all tags from a node - tagged nodes must have at least one tag",
+		)
+	}
+
+	for _, tag := range in.Body.Tags {
+		tagErr := validateTag(tag)
+		if tagErr != nil {
+			return nil, huma.Error400BadRequest("setting tags", tagErr)
+		}
+	}
+
+	_, found := b.State.GetNodeByID(nodeID)
+	if !found {
+		return nil, huma.Error404NotFound("node not found")
+	}
+
+	node, nodeChange, err := b.State.SetNodeTags(nodeID, in.Body.Tags)
+	if err != nil {
+		return nil, huma.Error400BadRequest("setting tags", err)
+	}
+
+	b.Change(nodeChange)
+
+	out := &nodeOutput{}
+	out.Body.Node = nodeFromView(node)
+
+	return out, nil
 }
 
 func registerNodeAdminOps(api huma.API, b Backend) {
@@ -415,47 +427,8 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 		Summary:     "Set approved routes",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *setApprovedRoutesInput) (*nodeOutput, error) {
-		nodeID, err := parseNodeID(in.NodeID)
-		if err != nil {
-			return nil, err
-		}
-
-		var newApproved []netip.Prefix
-
-		for _, route := range in.Body.Routes {
-			prefix, parseErr := netip.ParsePrefix(route)
-			if parseErr != nil {
-				return nil, huma.Error400BadRequest("parsing route", parseErr)
-			}
-
-			// One exit route implies both families, else the client won't
-			// annotate the node as an exit node.
-			if prefix == tsaddr.AllIPv4() || prefix == tsaddr.AllIPv6() {
-				newApproved = append(newApproved, tsaddr.AllIPv4(), tsaddr.AllIPv6())
-			} else {
-				newApproved = append(newApproved, prefix)
-			}
-		}
-
-		slices.SortFunc(newApproved, netip.Prefix.Compare)
-		newApproved = slices.Compact(newApproved)
-
-		node, nodeChange, err := b.State.SetApprovedRoutes(nodeID, newApproved)
-		if err != nil {
-			return nil, mapError("setting approved routes", err)
-		}
-
-		b.Change(nodeChange)
-
-		out := &nodeOutput{}
-		out.Body.Node = nodeFromView(node)
-		// SubnetRoutes here excludes exit routes, unlike the list handler.
-		out.Body.Node.SubnetRoutes = util.PrefixesToString(
-			b.State.GetNodePrimaryRoutes(node.ID()),
-		)
-
-		return out, nil
+	}, func(_ context.Context, in *setApprovedRoutesInput) (*nodeOutput, error) {
+		return handleSetApprovedRoutes(b, in)
 	})
 
 	huma.Register(api, huma.Operation{
@@ -465,7 +438,7 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 		Summary:     "Register node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *registerNodeInput) (*nodeOutput, error) {
+	}, func(_ context.Context, in *registerNodeInput) (*nodeOutput, error) {
 		registrationID, err := types.AuthIDFromString(in.Key)
 		if err != nil {
 			return nil, huma.Error400BadRequest("registering node", err)
@@ -507,7 +480,7 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 		Summary:     "Backfill node IPs",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *backfillNodeIPsInput) (*backfillNodeIPsOutput, error) {
+	}, func(_ context.Context, in *backfillNodeIPsInput) (*backfillNodeIPsOutput, error) {
 		if !in.Confirmed {
 			return nil, huma.Error400BadRequest("backfilling node IPs", errBackfillNotConfirmed)
 		}
@@ -534,53 +507,100 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 		Summary:     "Debug create node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *debugCreateNodeInput) (*nodeOutput, error) {
-		user, err := b.State.GetUserByName(in.Body.User)
-		if err != nil {
-			return nil, mapError("looking up user", err)
-		}
-
-		routes, err := util.StringToIPPrefix(in.Body.Routes)
-		if err != nil {
-			return nil, huma.Error400BadRequest("parsing routes", err)
-		}
-
-		registrationID, err := types.AuthIDFromString(in.Body.Key)
-		if err != nil {
-			return nil, huma.Error400BadRequest("debug creating node", err)
-		}
-
-		regData := &types.RegistrationData{
-			NodeKey:    key.NewNode().Public(),
-			MachineKey: key.NewMachine().Public(),
-			Hostname:   in.Body.Name,
-			Expiry:     &time.Time{}, // zero time, not nil, to keep proto JSON round-trip semantics
-		}
-
-		authRegReq := types.NewRegisterAuthRequest(regData)
-		b.State.SetAuthCacheEntry(registrationID, authRegReq)
-
-		// Synthetic echo; the real node is created later via the auth path
-		// from the cached registration data.
-		echoNode := types.Node{
-			NodeKey:    regData.NodeKey,
-			MachineKey: regData.MachineKey,
-			Hostname:   regData.Hostname,
-			User:       user,
-			Expiry:     &time.Time{},
-			LastSeen:   &time.Time{},
-			Hostinfo: &tailcfg.Hostinfo{
-				Hostname:    in.Body.Name,
-				OS:          "TestOS",
-				RoutableIPs: routes,
-			},
-		}
-
-		out := &nodeOutput{}
-		out.Body.Node = nodeFromView(echoNode.View())
-
-		return out, nil
+	}, func(_ context.Context, in *debugCreateNodeInput) (*nodeOutput, error) {
+		return handleDebugCreateNode(b, in)
 	})
+}
+
+func handleSetApprovedRoutes(b Backend, in *setApprovedRoutesInput) (*nodeOutput, error) {
+	nodeID, err := parseNodeID(in.NodeID)
+	if err != nil {
+		return nil, err
+	}
+
+	var newApproved []netip.Prefix
+
+	for _, route := range in.Body.Routes {
+		prefix, parseErr := netip.ParsePrefix(route)
+		if parseErr != nil {
+			return nil, huma.Error400BadRequest("parsing route", parseErr)
+		}
+
+		// One exit route implies both families, else the client won't
+		// annotate the node as an exit node.
+		if prefix == tsaddr.AllIPv4() || prefix == tsaddr.AllIPv6() {
+			newApproved = append(newApproved, tsaddr.AllIPv4(), tsaddr.AllIPv6())
+		} else {
+			newApproved = append(newApproved, prefix)
+		}
+	}
+
+	slices.SortFunc(newApproved, netip.Prefix.Compare)
+	newApproved = slices.Compact(newApproved)
+
+	node, nodeChange, err := b.State.SetApprovedRoutes(nodeID, newApproved)
+	if err != nil {
+		return nil, mapError("setting approved routes", err)
+	}
+
+	b.Change(nodeChange)
+
+	out := &nodeOutput{}
+	out.Body.Node = nodeFromView(node)
+	// SubnetRoutes here excludes exit routes, unlike the list handler.
+	out.Body.Node.SubnetRoutes = util.PrefixesToString(
+		b.State.GetNodePrimaryRoutes(node.ID()),
+	)
+
+	return out, nil
+}
+
+func handleDebugCreateNode(b Backend, in *debugCreateNodeInput) (*nodeOutput, error) {
+	user, err := b.State.GetUserByName(in.Body.User)
+	if err != nil {
+		return nil, mapError("looking up user", err)
+	}
+
+	routes, err := util.StringToIPPrefix(in.Body.Routes)
+	if err != nil {
+		return nil, huma.Error400BadRequest("parsing routes", err)
+	}
+
+	registrationID, err := types.AuthIDFromString(in.Body.Key)
+	if err != nil {
+		return nil, huma.Error400BadRequest("debug creating node", err)
+	}
+
+	regData := &types.RegistrationData{
+		NodeKey:    key.NewNode().Public(),
+		MachineKey: key.NewMachine().Public(),
+		Hostname:   in.Body.Name,
+		Expiry:     &time.Time{}, // zero time, not nil, to keep proto JSON round-trip semantics
+	}
+
+	authRegReq := types.NewRegisterAuthRequest(regData)
+	b.State.SetAuthCacheEntry(registrationID, authRegReq)
+
+	// Synthetic echo; the real node is created later via the auth path
+	// from the cached registration data.
+	echoNode := types.Node{
+		NodeKey:    regData.NodeKey,
+		MachineKey: regData.MachineKey,
+		Hostname:   regData.Hostname,
+		User:       user,
+		Expiry:     &time.Time{},
+		LastSeen:   &time.Time{},
+		Hostinfo: &tailcfg.Hostinfo{
+			Hostname:    in.Body.Name,
+			OS:          "TestOS",
+			RoutableIPs: routes,
+		},
+	}
+
+	out := &nodeOutput{}
+	out.Body.Node = nodeFromView(echoNode.View())
+
+	return out, nil
 }
 
 // nodeFromView builds the Node response from a NodeView, reading through the
@@ -628,28 +648,28 @@ func nodeFromView(view types.NodeView) Node {
 
 // nodePreAuthKeyFromView builds the embedded NodePreAuthKey, masking the key to
 // its prefix (legacy plaintext keys are shown in full).
-func nodePreAuthKeyFromView(key types.PreAuthKeyView) *NodePreAuthKey {
+func nodePreAuthKeyFromView(authKey types.PreAuthKeyView) *NodePreAuthKey {
 	pak := &NodePreAuthKey{
-		ID:        formatID(key.ID()),
-		Key:       maskedPreAuthKey(key),
-		Reusable:  key.Reusable(),
-		Ephemeral: key.Ephemeral(),
-		Used:      key.Used(),
-		AclTags:   nonNilStrings(key.Tags().AsSlice()),
+		ID:        formatID(authKey.ID()),
+		Key:       maskedPreAuthKey(authKey),
+		Reusable:  authKey.Reusable(),
+		Ephemeral: authKey.Ephemeral(),
+		Used:      authKey.Used(),
+		ACLTags:   nonNilStrings(authKey.Tags().AsSlice()),
 	}
 
-	if key.User().Valid() {
-		user := userFromView(key.User())
+	if authKey.User().Valid() {
+		user := userFromView(authKey.User())
 		pak.User = &user
 	}
 
-	if key.Expiration().Valid() {
-		exp := key.Expiration().Get()
+	if authKey.Expiration().Valid() {
+		exp := authKey.Expiration().Get()
 		pak.Expiration = &exp
 	}
 
-	if key.CreatedAt().Valid() {
-		created := key.CreatedAt().Get()
+	if authKey.CreatedAt().Valid() {
+		created := authKey.CreatedAt().Get()
 		pak.CreatedAt = &created
 	}
 

@@ -98,45 +98,8 @@ func (e *ExtraRecordsMan) Run() {
 				return
 			}
 
-			switch event.Op {
-			case fsnotify.Create, fsnotify.Write, fsnotify.Chmod:
-				log.Trace().Caller().Str("path", event.Name).Str("op", event.Op.String()).Msg("extra records received filewatch event")
-
-				if event.Name != e.path {
-					continue
-				}
-
-				e.updateRecords()
-
-				// If a file is removed or renamed, fsnotify will lose track of it
-				// and not watch it. We will therefore attempt to re-add it with a backoff.
-			case fsnotify.Remove, fsnotify.Rename:
-				err := e.waitUntilPathExists()
-				if err != nil {
-					select {
-					case <-e.closeCh:
-						return
-					default:
-					}
-
-					log.Error().Caller().Err(err).Msgf("extra records filewatcher retrying to find file after delete")
-
-					addErr := e.watcher.Add(filepath.Dir(e.path))
-					if addErr != nil {
-						log.Error().Caller().Err(addErr).Msgf("extra records filewatcher watching parent after delete failed")
-					}
-
-					continue
-				}
-
-				err = e.watcher.Add(e.path)
-				if err != nil {
-					log.Error().Caller().Err(err).Msgf("extra records filewatcher re-adding file after delete failed, giving up.")
-					return
-				} else {
-					log.Trace().Caller().Str("path", e.path).Msg("extra records file re-added after delete")
-					e.updateRecords()
-				}
+			if !e.handleWatchEvent(event) {
+				return
 			}
 
 		case err, ok := <-e.watcher.Errors:
@@ -155,6 +118,78 @@ func (e *ExtraRecordsMan) Close() {
 	close(e.closeCh)
 }
 
+func (e *ExtraRecordsMan) UpdateCh() <-chan []tailcfg.DNSRecord {
+	return e.updateCh
+}
+
+// handleWatchEvent processes a single fsnotify event for the watched file.
+// It reports whether Run should keep looping; false means the caller must
+// stop the goroutine.
+func (e *ExtraRecordsMan) handleWatchEvent(event fsnotify.Event) bool {
+	switch event.Op {
+	case fsnotify.Create, fsnotify.Write, fsnotify.Chmod:
+		log.Trace().
+			Caller().
+			Str("path", event.Name).
+			Str("op", event.Op.String()).
+			Msg("extra records received filewatch event")
+
+		if event.Name != e.path {
+			return true
+		}
+
+		e.updateRecords()
+
+	// If a file is removed or renamed, fsnotify will lose track of it
+	// and not watch it. We will therefore attempt to re-add it with a backoff.
+	case fsnotify.Remove, fsnotify.Rename:
+		return e.handleWatchRemoveOrRename()
+	}
+
+	return true
+}
+
+// handleWatchRemoveOrRename waits for the watched file to reappear after a
+// remove/rename event and re-adds it to the watcher. It reports whether Run
+// should keep looping; false means the caller must stop the goroutine.
+func (e *ExtraRecordsMan) handleWatchRemoveOrRename() bool {
+	err := e.waitUntilPathExists()
+	if err != nil {
+		select {
+		case <-e.closeCh:
+			return false
+		default:
+		}
+
+		log.Error().Caller().Err(err).Msgf("extra records filewatcher retrying to find file after delete")
+
+		addErr := e.watcher.Add(filepath.Dir(e.path))
+		if addErr != nil {
+			log.Error().
+				Caller().
+				Err(addErr).
+				Msgf("extra records filewatcher watching parent after delete failed")
+		}
+
+		return true
+	}
+
+	err = e.watcher.Add(e.path)
+	if err != nil {
+		log.Error().
+			Caller().
+			Err(err).
+			Msgf("extra records filewatcher re-adding file after delete failed, giving up.")
+
+		return false
+	}
+
+	log.Trace().Caller().Str("path", e.path).Msg("extra records file re-added after delete")
+	e.updateRecords()
+
+	return true
+}
+
 func (e *ExtraRecordsMan) waitUntilPathExists() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -168,18 +203,18 @@ func (e *ExtraRecordsMan) waitUntilPathExists() error {
 	}()
 
 	_, err := backoff.Retry(ctx, func() (struct{}, error) {
-		if _, err := os.Stat(e.path); err != nil { //nolint:noinlineerr
-			return struct{}{}, err
+		_, statErr := os.Stat(e.path)
+		if statErr != nil {
+			return struct{}{}, fmt.Errorf("stat extra records file %q: %w", e.path, statErr)
 		}
 
 		return struct{}{}, nil
 	}, backoff.WithBackOff(backoff.NewExponentialBackOff()))
+	if err != nil {
+		return fmt.Errorf("waiting for extra records file %q: %w", e.path, err)
+	}
 
-	return err
-}
-
-func (e *ExtraRecordsMan) UpdateCh() <-chan []tailcfg.DNSRecord {
-	return e.updateCh
+	return nil
 }
 
 func (e *ExtraRecordsMan) updateRecords() {
@@ -209,7 +244,10 @@ func (e *ExtraRecordsMan) updateRecords() {
 	e.hash = newHash
 	toSend := e.records.Slice()
 
-	log.Trace().Caller().Interface("records", e.records).Msgf("extra records updated from path, count old: %d, new: %d", oldCount, e.records.Len())
+	log.Trace().
+		Caller().
+		Interface("records", e.records).
+		Msgf("extra records updated from path, count old: %d, new: %d", oldCount, e.records.Len())
 
 	// Release the lock before the (potentially blocking) send so a slow or
 	// absent consumer cannot stall Records() readers, and abort the send on

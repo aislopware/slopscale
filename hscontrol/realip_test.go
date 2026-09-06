@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//nolint:goconst // repeated test fixtures (addresses, headers), not refactor candidates
 func TestPeerTrusted(t *testing.T) {
 	t.Parallel()
 
@@ -72,7 +71,6 @@ func TestPrefixToIPNet(t *testing.T) {
 	}
 }
 
-//nolint:goconst // repeated test fixtures (addresses, headers), not refactor candidates
 func TestTrustedProxyRealIP(t *testing.T) {
 	t.Parallel()
 
@@ -200,7 +198,7 @@ func TestTrustedProxyRealIP(t *testing.T) {
 
 			var observed *http.Request
 
-			handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handler := mw(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 				observed = r
 			}))
 
@@ -239,7 +237,7 @@ func TestTrustedProxyRealIPEmptyTrusted(t *testing.T) {
 
 	var observed *http.Request
 
-	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := mw(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		observed = r
 	}))
 

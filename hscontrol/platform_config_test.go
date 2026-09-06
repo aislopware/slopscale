@@ -51,8 +51,10 @@ func TestApplePlatformConfig_ServesProfilesViaChiRouter(t *testing.T) {
 		t.Run(platform, func(t *testing.T) {
 			t.Parallel()
 
-			//nolint:noctx // test fixture
-			resp, err := http.Get(srv.URL + "/apple/" + platform)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/apple/"+platform, http.NoBody)
+			require.NoError(t, err)
+
+			resp, err := http.DefaultClient.Do(req)
 			require.NoError(t, err)
 			t.Cleanup(func() { resp.Body.Close() })
 
@@ -94,8 +96,10 @@ func TestApplePlatformConfig_RejectsUnknownPlatform(t *testing.T) {
 	srv := httptest.NewServer(r)
 	t.Cleanup(srv.Close)
 
-	//nolint:noctx // test fixture
-	resp, err := http.Get(srv.URL + "/apple/windows-phone")
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/apple/windows-phone", http.NoBody)
+	require.NoError(t, err)
+
+	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	t.Cleanup(func() { resp.Body.Close() })
 

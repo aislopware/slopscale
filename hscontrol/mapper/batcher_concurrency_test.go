@@ -55,7 +55,7 @@ func setupLightweightBatcher(t *testing.T, nodeCount, bufferSize int) *lightweig
 
 	channels := make(map[types.NodeID]chan *tailcfg.MapResponse, nodeCount)
 	for i := 1; i <= nodeCount; i++ {
-		id := types.NodeID(i)                  //nolint:gosec // test with small controlled values
+		id := types.NodeID(i)
 		mc := newMultiChannelNodeConn(id, nil) // nil mapper is fine for channel tests
 		ch := make(chan *tailcfg.MapResponse, bufferSize)
 		entry := &connectionEntry{
@@ -207,7 +207,7 @@ func TestAddToBatch_ConcurrentTargeted_NoDataLoss(t *testing.T) {
 			Reason:     fmt.Sprintf("targeted-%d", i),
 			TargetNode: targetNode,
 			PeerPatches: []*tailcfg.PeerChange{
-				{NodeID: tailcfg.NodeID(i + 100)}, //nolint:gosec // test
+				{NodeID: tailcfg.NodeID(i + 100)},
 			},
 		}
 		lb.b.addToBatch(ch)
@@ -261,9 +261,9 @@ func TestAddToBatch_FullUpdateOverrides(t *testing.T) {
 	for i := 1; i <= 10; i++ {
 		lb.b.addToBatch(change.Change{
 			Reason:     "pre-existing",
-			TargetNode: types.NodeID(i), //nolint:gosec // test with small values
+			TargetNode: types.NodeID(i),
 			PeerPatches: []*tailcfg.PeerChange{
-				{NodeID: tailcfg.NodeID(100 + i)}, //nolint:gosec // test with small values
+				{NodeID: tailcfg.NodeID(100 + i)},
 			},
 		})
 	}
@@ -325,7 +325,7 @@ func TestProcessBatchedChanges_QueuesWork(t *testing.T) {
 
 	// Add pending changes for each node
 	for i := 1; i <= 3; i++ {
-		if nc, ok := lb.b.nodes.Load(types.NodeID(i)); ok { //nolint:gosec // test
+		if nc, ok := lb.b.nodes.Load(types.NodeID(i)); ok {
 			nc.appendPending(change.DERPMap())
 		}
 	}
@@ -373,7 +373,7 @@ func TestProcessBatchedChanges_ConcurrentAdd_NoDataLoss(t *testing.T) {
 				Reason:     fmt.Sprintf("add-%d", i),
 				TargetNode: types.NodeID(1),
 				PeerPatches: []*tailcfg.PeerChange{
-					{NodeID: tailcfg.NodeID(i + 100)}, //nolint:gosec // test
+					{NodeID: tailcfg.NodeID(i + 100)},
 				},
 			})
 			addedCount.Add(1)
@@ -513,18 +513,25 @@ func TestWorkMu_PreventsInterTickRace(t *testing.T) {
 
 	var wg sync.WaitGroup
 
+	worker1Locked := make(chan struct{})
+
 	// Simulate two workers grabbing consecutive tick bundles.
 	// Worker 1 holds workMu and sleeps, worker 2 must wait.
 	wg.Go(func() {
 		mc.workMu.Lock()
-		// Simulate processing time for tick N's bundle
-		time.Sleep(50 * time.Millisecond) //nolint:forbidigo
+		close(worker1Locked)
+		// Simulate processing time for tick N's bundle. The mutex, not this
+		// sleep, is what forces worker 2 to wait; it only models how long a
+		// tick's work is expected to hold the lock.
+		//nolint:forbidigo // pacing: models tick N's bundle-processing time while workMu is held; unsynchronized
+		time.Sleep(50 * time.Millisecond)
 		record(1)
 		mc.workMu.Unlock()
 	})
 
-	// Small delay so worker 1 grabs the lock first
-	time.Sleep(5 * time.Millisecond) //nolint:forbidigo
+	// Wait until worker 1 actually holds the lock before starting worker 2,
+	// instead of guessing at a fixed delay.
+	<-worker1Locked
 
 	wg.Go(func() {
 		mc.workMu.Lock()
@@ -705,7 +712,7 @@ func TestBatcher_IsConnectedReflectsState(t *testing.T) {
 
 	// All nodes should be connected
 	for i := 1; i <= 5; i++ {
-		assert.True(t, lb.b.IsConnected(types.NodeID(i)), //nolint:gosec // test
+		assert.True(t, lb.b.IsConnected(types.NodeID(i)),
 			"node %d should be connected", i)
 	}
 
@@ -886,8 +893,8 @@ func TestBug5_WorkerPanicKillsWorkerPermanently(t *testing.T) {
 	lb.b.workers = 2
 	lb.b.Start()
 
-	// Give workers time to start
-	time.Sleep(50 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
+	// Async work queued below only needs workCh to accept it; workers pick
+	// it up whenever they start, so there is nothing to wait for here.
 
 	// Store a nil value in b.nodes for a specific node ID.
 	// This simulates a race where a node entry exists but the value is nil
@@ -895,9 +902,12 @@ func TestBug5_WorkerPanicKillsWorkerPermanently(t *testing.T) {
 	nilNodeID := types.NodeID(55555)
 	lb.b.nodes.Store(nilNodeID, nil)
 
+	beforeNil := lb.b.workProcessed.Load()
+
 	// Queue async work (resultCh=nil) targeting the nil node.
 	// Without the nil guard, this would panic: nc.change(w.c) on nil nc.
-	for range 10 {
+	const asyncNilWork = 10
+	for range asyncNilWork {
 		lb.b.queueWork(work{
 			changes: []change.Change{change.DERPMap()},
 			nodeID:  nilNodeID,
@@ -907,7 +917,8 @@ func TestBug5_WorkerPanicKillsWorkerPermanently(t *testing.T) {
 	// Queue sync work (with resultCh) targeting the nil node.
 	// Without the nil guard, this would panic: generateMapResponse(nc, ...)
 	// on nil nc.
-	for range 5 {
+	const syncNilWork = 5
+	for range syncNilWork {
 		resultCh := make(chan workResult, 1)
 		lb.b.queueWork(work{
 			changes:  []change.Change{change.DERPMap()},
@@ -925,19 +936,28 @@ func TestBug5_WorkerPanicKillsWorkerPermanently(t *testing.T) {
 		}
 	}
 
-	// Wait for async work to drain
-	time.Sleep(100 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
+	// Wait for the async nil-node work to actually drain through
+	// workProcessed instead of guessing at a fixed delay. The sync work
+	// above is already accounted for (we waited on each resultCh), so only
+	// the async batch can still be in flight.
+	require.Eventually(t, func() bool {
+		return lb.b.workProcessed.Load()-beforeNil >= int64(asyncNilWork+syncNilWork)
+	}, 2*time.Second, 5*time.Millisecond, "nil-node work should have fully drained")
 
 	// Now queue valid work for a real node to prove workers are still alive.
 	beforeValid := lb.b.workProcessed.Load()
-	for range 5 {
+
+	const validWork = 5
+	for range validWork {
 		lb.b.queueWork(work{
 			changes: []change.Change{change.DERPMap()},
 			nodeID:  types.NodeID(1),
 		})
 	}
 
-	time.Sleep(200 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
+	require.Eventually(t, func() bool {
+		return lb.b.workProcessed.Load()-beforeValid >= int64(validWork)
+	}, 2*time.Second, 5*time.Millisecond, "workers should still process valid work after the nil-node work")
 
 	afterValid := lb.b.workProcessed.Load()
 	validProcessed := afterValid - beforeValid
@@ -960,10 +980,15 @@ func TestBug6_StartCalledMultipleTimes_GoroutineLeak(t *testing.T) {
 
 	goroutinesBefore := runtime.NumGoroutine()
 
+	const perStartGoroutines = 3 // 1 for doWork + workers(2) for worker()
+
 	// Call Start() once - this should launch (workers + 1) goroutines
-	// (1 for doWork + workers for worker())
+	// (1 for doWork + workers for worker()). Wait for them to actually be
+	// scheduled rather than guessing at a fixed delay.
 	lb.b.Start()
-	time.Sleep(50 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
+	require.Eventually(t, func() bool {
+		return runtime.NumGoroutine()-goroutinesBefore >= perStartGoroutines
+	}, time.Second, 2*time.Millisecond, "doWork and workers should start")
 
 	goroutinesAfterFirst := runtime.NumGoroutine()
 	firstStartDelta := goroutinesAfterFirst - goroutinesBefore
@@ -974,7 +999,11 @@ func TestBug6_StartCalledMultipleTimes_GoroutineLeak(t *testing.T) {
 	// BUG: it creates a NEW done channel (orphaning goroutines listening on the old one)
 	// and launches another doWork()+workers set
 	lb.b.Start()
-	time.Sleep(50 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
+	// There is no positive condition to wait on here: we are proving that
+	// NOTHING extra gets spawned, so give any (buggy) extra goroutines a
+	// window to schedule before we sample the count below.
+	//nolint:forbidigo // scheduler perturbation: gives a leaked goroutine time to schedule before sampling; unsynced
+	time.Sleep(50 * time.Millisecond)
 
 	goroutinesAfterSecond := runtime.NumGoroutine()
 	secondStartDelta := goroutinesAfterSecond - goroutinesAfterFirst
@@ -983,7 +1012,8 @@ func TestBug6_StartCalledMultipleTimes_GoroutineLeak(t *testing.T) {
 
 	// Call Start() a third time
 	lb.b.Start()
-	time.Sleep(50 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
+	//nolint:forbidigo // scheduler perturbation: gives a leaked goroutine time to schedule before sampling; unsynced
+	time.Sleep(50 * time.Millisecond)
 
 	goroutinesAfterThird := runtime.NumGoroutine()
 	thirdStartDelta := goroutinesAfterThird - goroutinesAfterSecond
@@ -992,7 +1022,11 @@ func TestBug6_StartCalledMultipleTimes_GoroutineLeak(t *testing.T) {
 
 	// Close() only closes the LAST done channel, leaving earlier goroutines leaked
 	lb.b.Close()
-	time.Sleep(100 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
+	// Close() already waits on b.wg internally; this only lets the runtime
+	// finish tearing down the now-exited goroutines before the log line
+	// below samples NumGoroutine(). Nothing is asserted on goroutinesAfterClose.
+	//nolint:forbidigo // pacing: lets Close()'s goroutines unwind before the log line samples the count; unsynchronized
+	time.Sleep(100 * time.Millisecond)
 
 	goroutinesAfterClose := runtime.NumGoroutine()
 	t.Logf("goroutines after Close: %d (leaked: %d)",
@@ -1087,8 +1121,13 @@ func TestBug8_SerialTimeoutUnderWriteLock(t *testing.T) {
 	lockAcquired := make(chan time.Duration, 1)
 
 	go func() {
-		// Give send() a moment to start (it will be in the unlocked send window)
-		time.Sleep(20 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
+		// send() is production code with no test hook to signal "I've entered
+		// the unlocked window", so this models the expected delay before it
+		// gets past the snapshot-and-release step and into its 5*50ms of
+		// per-connection timeouts. The assertion below, not this sleep,
+		// verifies the lock was actually free.
+		//nolint:forbidigo // pacing: models delay before send() enters its unlocked timeout window; unsynchronized
+		time.Sleep(20 * time.Millisecond)
 
 		// Try to acquire the write lock. It should succeed quickly because
 		// the lock is only held briefly for the snapshot and cleanup.
@@ -1232,7 +1271,8 @@ func TestScale1000_ProcessBatchedWithConcurrentAdd(t *testing.T) {
 	wg.Go(func() {
 		for range 50 {
 			lb.b.processBatchedChanges()
-			time.Sleep(1 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
+			//nolint:forbidigo // scheduler perturbation: lets the producer goroutine run between calls; unsynchronized
+			time.Sleep(1 * time.Millisecond)
 		}
 	})
 
@@ -1290,7 +1330,7 @@ func TestScale1000_MultiChannelBroadcast(t *testing.T) {
 	allNodeChannels := make(map[types.NodeID]*nodeChannels, nodeCount)
 
 	for i := 1; i <= nodeCount; i++ {
-		id := types.NodeID(i) //nolint:gosec // test with small controlled values
+		id := types.NodeID(i)
 		mc := newMultiChannelNodeConn(id, nil)
 
 		connCount := 1 + (i % 3) // 1, 2, or 3 connections
@@ -1320,7 +1360,7 @@ func TestScale1000_MultiChannelBroadcast(t *testing.T) {
 
 	start := time.Now()
 
-	b.nodes.Range(func(id types.NodeID, mc *multiChannelNodeConn) bool {
+	b.nodes.Range(func(_ types.NodeID, mc *multiChannelNodeConn) bool {
 		err := mc.send(data)
 		if err != nil {
 			failCount.Add(1)
@@ -1383,7 +1423,7 @@ func TestScale1000_ConnectionChurn(t *testing.T) {
 	wg.Go(func() {
 		for cycle := range churnCycles {
 			for i := 901; i <= 901+churnNodes-1; i++ {
-				id := types.NodeID(i) //nolint:gosec // test with small controlled values
+				id := types.NodeID(i)
 
 				mc, exists := lb.b.nodes.Load(id)
 				if !exists {
@@ -1446,7 +1486,7 @@ func TestScale1000_ConnectionChurn(t *testing.T) {
 	stableConnected := 0
 
 	for i := 1; i <= 900; i++ {
-		if mc, exists := lb.b.nodes.Load(types.NodeID(i)); exists { //nolint:gosec // test
+		if mc, exists := lb.b.nodes.Load(types.NodeID(i)); exists {
 			if mc.hasActiveConnections() {
 				stableConnected++
 			}
@@ -1473,7 +1513,7 @@ func TestScale1000_ConcurrentAddRemove(t *testing.T) {
 	const goroutines = 200
 
 	panics := runConcurrentlyWithTimeout(t, goroutines, 30*time.Second, func(i int) {
-		id := types.NodeID(1 + (i % 1000)) //nolint:gosec // test
+		id := types.NodeID(1 + (i % 1000))
 
 		mc, exists := lb.b.nodes.Load(id)
 		if !exists {
@@ -1530,7 +1570,7 @@ func TestScale1000_IsConnectedConsistency(t *testing.T) {
 				}()
 
 				for i := 1; i <= 1000; i++ {
-					_ = lb.b.IsConnected(types.NodeID(i)) //nolint:gosec // test
+					_ = lb.b.IsConnected(types.NodeID(i))
 				}
 			}()
 		}
@@ -1540,7 +1580,7 @@ func TestScale1000_IsConnectedConsistency(t *testing.T) {
 
 	wg.Go(func() {
 		for i := range 100 {
-			id := types.NodeID(1 + (i % 1000)) //nolint:gosec // test
+			id := types.NodeID(1 + (i % 1000))
 			if mc, ok := lb.b.nodes.Load(id); ok {
 				if i%2 == 0 {
 					mc.markDisconnected() // disconnect
@@ -1598,7 +1638,7 @@ func TestScale1000_BroadcastDuringNodeChurn(t *testing.T) {
 						}
 					}()
 
-					id := types.NodeID(i) //nolint:gosec // test
+					id := types.NodeID(i)
 					if cycle%2 == 0 {
 						// "Remove" node
 						lb.b.nodes.Delete(id)
@@ -1680,7 +1720,7 @@ func TestScale1000_WorkChannelSaturation(t *testing.T) {
 
 	// Add 1000 nodes
 	for i := 1; i <= 1000; i++ {
-		id := types.NodeID(i) //nolint:gosec // test
+		id := types.NodeID(i)
 		mc := newMultiChannelNodeConn(id, nil)
 		ch := make(chan *tailcfg.MapResponse, 1)
 		entry := &connectionEntry{
@@ -1696,7 +1736,7 @@ func TestScale1000_WorkChannelSaturation(t *testing.T) {
 
 	// Add pending changes for all 1000 nodes
 	for i := 1; i <= 1000; i++ {
-		if nc, ok := b.nodes.Load(types.NodeID(i)); ok { //nolint:gosec // test
+		if nc, ok := b.nodes.Load(types.NodeID(i)); ok {
 			nc.appendPending(change.DERPMap())
 		}
 	}
@@ -1803,7 +1843,8 @@ func TestScale1000_AllToAll_FullPipeline(t *testing.T) {
 		}
 		// Yield periodically to avoid overwhelming the work queue
 		if i%50 == 49 {
-			time.Sleep(10 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
+			//nolint:forbidigo // pacing: throttles AddNode() so the work queue doesn't outrun the workers; unsynced
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 

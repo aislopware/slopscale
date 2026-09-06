@@ -2,7 +2,6 @@ package hscontrol
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,7 +31,7 @@ func TestHandleVerifyRequest_OversizedBodyRejected(t *testing.T) {
 	body := strings.Repeat("x", int(verifyBodyLimit)+128)
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(
-		context.Background(),
+		t.Context(),
 		http.MethodPost,
 		"/verify",
 		bytes.NewReader([]byte(body)),
@@ -102,7 +101,7 @@ func TestVerifyHandler_SuccessSetsJSONContentType(t *testing.T) {
 	defer srv.Close()
 
 	httpReq, err := http.NewRequestWithContext(
-		context.Background(),
+		t.Context(),
 		http.MethodPost,
 		srv.URL+"/verify",
 		bytes.NewReader(reqBody),
@@ -137,7 +136,7 @@ func TestKeyHandler_UnsupportedCapVerDoesNotLeakKey(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(
-		context.Background(),
+		t.Context(),
 		http.MethodGet,
 		fmt.Sprintf("/key?v=%d", unsupported),
 		nil,
@@ -153,7 +152,7 @@ func TestKeyHandler_UnsupportedCapVerDoesNotLeakKey(t *testing.T) {
 	// A supported client still receives the key.
 	recOK := httptest.NewRecorder()
 	reqOK := httptest.NewRequestWithContext(
-		context.Background(),
+		t.Context(),
 		http.MethodGet,
 		fmt.Sprintf("/key?v=%d", capver.MinSupportedCapabilityVersion),
 		nil,

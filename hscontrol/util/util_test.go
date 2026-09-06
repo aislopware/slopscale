@@ -153,7 +153,8 @@ To authenticate, visit:
 
 Success.`,
 			wantURL: "",
-			wantErr: "multiple URLs found: https://headscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi and http://headscale.example.com/register/dv1l2k5FackOYl-7-V3mSd_E",
+			wantErr: "multiple URLs found: https://headscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi" +
+				" and http://headscale.example.com/register/dv1l2k5FackOYl-7-V3mSd_E",
 		},
 		{
 			name: "invalid URL",
@@ -186,6 +187,27 @@ Success.`,
 			}
 		})
 	}
+}
+
+// mkHop builds a [TraceroutePath] for a traceroute test table, with
+// latencies given in microseconds, to avoid repeating verbose literals.
+func mkHop(hop int, hostname, ip string, latenciesUs ...int) TraceroutePath {
+	lats := make([]time.Duration, len(latenciesUs))
+	for i, us := range latenciesUs {
+		lats[i] = time.Duration(us) * time.Microsecond
+	}
+
+	return TraceroutePath{
+		Hop:       hop,
+		Hostname:  hostname,
+		IP:        netip.MustParseAddr(ip),
+		Latencies: lats,
+	}
+}
+
+// starHop builds a [TraceroutePath] for a hop that timed out ("* * *").
+func starHop(hop int) TraceroutePath {
+	return TraceroutePath{Hop: hop, Hostname: "*"}
 }
 
 func TestParseTraceroute(t *testing.T) {
@@ -241,40 +263,10 @@ func TestParseTraceroute(t *testing.T) {
 				Hostname: "8.8.8.8",
 				IP:       netip.MustParseAddr("8.8.8.8"),
 				Route: []TraceroutePath{
-					{
-						Hop:      1,
-						Hostname: "router.local",
-						IP:       netip.MustParseAddr("192.168.1.1"),
-						Latencies: []time.Duration{
-							1234 * time.Microsecond,
-							1123 * time.Microsecond,
-							1121 * time.Microsecond,
-						},
-					},
-					{
-						Hop:      2,
-						Hostname: "*",
-					},
-					{
-						Hop:      3,
-						Hostname: "isp-gateway.net",
-						IP:       netip.MustParseAddr("10.0.0.1"),
-						Latencies: []time.Duration{
-							15678 * time.Microsecond,
-							14789 * time.Microsecond,
-							15432 * time.Microsecond,
-						},
-					},
-					{
-						Hop:      4,
-						Hostname: "8.8.8.8",
-						IP:       netip.MustParseAddr("8.8.8.8"),
-						Latencies: []time.Duration{
-							20123 * time.Microsecond,
-							19876 * time.Microsecond,
-							20345 * time.Microsecond,
-						},
-					},
+					mkHop(1, "router.local", "192.168.1.1", 1234, 1123, 1121),
+					starHop(2),
+					mkHop(3, "isp-gateway.net", "10.0.0.1", 15678, 14789, 15432),
+					mkHop(4, "8.8.8.8", "8.8.8.8", 20123, 19876, 20345),
 				},
 				Success: true,
 				Err:     nil,
@@ -574,40 +566,10 @@ over a maximum of 30 hops:
 				Hostname: "google.com",
 				IP:       netip.MustParseAddr("8.8.8.8"),
 				Route: []TraceroutePath{
-					{
-						Hop:      1,
-						Hostname: "router.home",
-						IP:       netip.MustParseAddr("192.168.1.1"),
-						Latencies: []time.Duration{
-							2345 * time.Microsecond,
-							1234 * time.Microsecond,
-							1567 * time.Microsecond,
-						},
-					},
-					{
-						Hop:      2,
-						Hostname: "*",
-					},
-					{
-						Hop:      3,
-						Hostname: "isp-gw.net",
-						IP:       netip.MustParseAddr("10.1.1.1"),
-						Latencies: []time.Duration{
-							15234 * time.Microsecond,
-							14567 * time.Microsecond,
-							15890 * time.Microsecond,
-						},
-					},
-					{
-						Hop:      4,
-						Hostname: "google.com",
-						IP:       netip.MustParseAddr("8.8.8.8"),
-						Latencies: []time.Duration{
-							20123 * time.Microsecond,
-							19456 * time.Microsecond,
-							20789 * time.Microsecond,
-						},
-					},
+					mkHop(1, "router.home", "192.168.1.1", 2345, 1234, 1567),
+					starHop(2),
+					mkHop(3, "isp-gw.net", "10.1.1.1", 15234, 14567, 15890),
+					mkHop(4, "google.com", "8.8.8.8", 20123, 19456, 20789),
 				},
 				Success: true,
 				Err:     nil,

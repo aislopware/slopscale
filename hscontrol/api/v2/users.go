@@ -74,7 +74,7 @@ func registerUsers(api huma.API, b Backend) {
 		Tags:        usersTags,
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.UsersRead), func(ctx context.Context, in *userByIDInput) (*userOutput, error) {
+	}, scope.UsersRead), func(_ context.Context, in *userByIDInput) (*userOutput, error) {
 		view, err := lookupUser(b, in.UserID)
 		if err != nil {
 			return nil, err
@@ -91,7 +91,7 @@ func registerUsers(api huma.API, b Backend) {
 		Tags:        usersTags,
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.UsersRead), func(ctx context.Context, in *listUsersInput) (*listUsersOutput, error) {
+	}, scope.UsersRead), func(_ context.Context, in *listUsersInput) (*listUsersOutput, error) {
 		err := requireDefaultTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err

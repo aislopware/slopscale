@@ -72,7 +72,8 @@ func ValidateUsername(username string) error {
 	return nil
 }
 
-// generateMagicDNSRootDomains generates a list of DNS entries to be included in [tailcfg.DNSConfig.Routes] in [tailcfg.MapResponse].
+// generateMagicDNSRootDomains generates a list of DNS entries to be included
+// in [tailcfg.DNSConfig.Routes] in [tailcfg.MapResponse].
 // This list of reverse DNS entries instructs the OS on what subnets and domains the Tailscale embedded DNS
 // server (listening in 100.100.100.100 udp/53) should be used for.
 //
@@ -126,7 +127,7 @@ func GenerateIPv4DNSRootDomain(ipPrefix netip.Prefix) []dnsname.FQDN {
 	// minVal is the value in the lastOctet byte of the IP
 	// maxVal is basically 2^wildcardBits - i.e., the value when all the wildcardBits are set to 1
 	minVal := uint(netRange.IP[lastOctet])
-	maxVal := (minVal + 1<<uint(wildcardBits)) - 1 //nolint:gosec // wildcardBits is always < 8, no overflow
+	maxVal := (minVal + 1<<uint(wildcardBits)) - 1
 
 	// here we generate the base domain (e.g., 100.in-addr.arpa., 16.172.in-addr.arpa., etc.)
 	rdnsSlice := []string{}

@@ -197,7 +197,7 @@ func (s *NodeStore) PutNode(n types.Node) types.NodeView {
 	timer := prometheus.NewTimer(nodeStoreOperationDuration.WithLabelValues("put"))
 	defer timer.ObserveDuration()
 
-	work := work{
+	w := work{
 		op:         put,
 		nodeID:     n.ID,
 		node:       n,
@@ -208,17 +208,17 @@ func (s *NodeStore) PutNode(n types.Node) types.NodeView {
 	nodeStoreQueueDepth.Inc()
 
 	select {
-	case s.writeQueue <- work:
+	case s.writeQueue <- w:
 	case <-s.stopped:
 		nodeStoreQueueDepth.Dec()
 
 		return types.NodeView{}
 	}
 
-	<-work.result
+	<-w.result
 	nodeStoreQueueDepth.Dec()
 
-	resultNode := <-work.nodeResult
+	resultNode := <-w.nodeResult
 
 	nodeStoreOperations.WithLabelValues("put").Inc()
 
@@ -292,7 +292,7 @@ func (s *NodeStore) DeleteNode(id types.NodeID) {
 	timer := prometheus.NewTimer(nodeStoreOperationDuration.WithLabelValues("delete"))
 	defer timer.ObserveDuration()
 
-	work := work{
+	w := work{
 		op:     del,
 		nodeID: id,
 		result: make(chan struct{}),
@@ -301,14 +301,14 @@ func (s *NodeStore) DeleteNode(id types.NodeID) {
 	nodeStoreQueueDepth.Inc()
 
 	select {
-	case s.writeQueue <- work:
+	case s.writeQueue <- w:
 	case <-s.stopped:
 		nodeStoreQueueDepth.Dec()
 
 		return
 	}
 
-	<-work.result
+	<-w.result
 	nodeStoreQueueDepth.Dec()
 
 	nodeStoreOperations.WithLabelValues("delete").Inc()
@@ -377,189 +377,6 @@ func (s *NodeStore) Stop() {
 	s.stopOnce.Do(func() {
 		close(s.stopped)
 	})
-}
-
-// processWrite processes the write queue in batches.
-func (s *NodeStore) processWrite() {
-	c := time.NewTicker(s.batchTimeout)
-	defer c.Stop()
-
-	batch := make([]work, 0, s.batchSize)
-
-	for {
-		select {
-		case w := <-s.writeQueue:
-			batch = append(batch, w)
-			if len(batch) >= s.batchSize {
-				s.applyBatch(batch)
-				batch = batch[:0]
-
-				c.Reset(s.batchTimeout)
-			}
-		case <-c.C:
-			if len(batch) != 0 {
-				s.applyBatch(batch)
-				batch = batch[:0]
-			}
-
-			c.Reset(s.batchTimeout)
-		case <-s.stopped:
-			// Apply any remaining batch so in-flight writers receive their
-			// results, then exit.
-			if len(batch) != 0 {
-				s.applyBatch(batch)
-			}
-
-			return
-		}
-	}
-}
-
-// applyBatch applies a batch of work to the node store.
-// This means that it takes a copy of the current nodes,
-// then applies the batch of operations to that copy,
-// runs any precomputation needed (like calculating peers),
-// and finally replaces the snapshot in the store with the new one.
-// The replacement of the snapshot is atomic, ensuring that reads
-// are never blocked by writes.
-// Each write item is blocked until the batch is applied to ensure
-// the caller knows the operation is complete and do not send any
-// updates that are dependent on a read that is yet to be written.
-func (s *NodeStore) applyBatch(batch []work) {
-	timer := prometheus.NewTimer(nodeStoreBatchDuration)
-	defer timer.ObserveDuration()
-
-	nodeStoreBatchSize.Observe(float64(len(batch)))
-
-	nodes := make(map[types.NodeID]types.Node)
-	maps.Copy(nodes, s.data.Load().nodesByID)
-
-	// Track which work items need node results
-	nodeResultRequests := make(map[types.NodeID][]*work)
-
-	// Track rebuildPeerMaps operations
-	var rebuildOps []*work
-
-	// setErrResults collects per-work errors from the setName path so
-	// they can be delivered after the snapshot swap, together with the
-	// NodeView for that work.
-	setErrResults := make(map[*work]error)
-
-	for i := range batch {
-		w := &batch[i]
-		switch w.op {
-		case put:
-			n := w.node
-			n.GivenName = resolveGivenName(nodes, n.ID, n.GivenName)
-
-			nodes[w.nodeID] = n
-			if w.nodeResult != nil {
-				nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
-			}
-		case updateMulti:
-			for id, fn := range w.multiUpdates {
-				n, exists := nodes[id]
-				if !exists {
-					continue
-				}
-
-				oldGivenName := n.GivenName
-				fn(&n)
-
-				if n.GivenName != oldGivenName {
-					n.GivenName = resolveGivenName(nodes, n.ID, n.GivenName)
-				}
-
-				nodes[id] = n
-			}
-		case del:
-			delete(nodes, w.nodeID)
-			// For delete operations, send an invalid NodeView if requested
-			if w.nodeResult != nil {
-				nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
-			}
-		case setName:
-			n, exists := nodes[w.nodeID]
-			if !exists {
-				setErrResults[w] = ErrNodeNotFound
-				nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
-
-				continue
-			}
-
-			if dnsname.ValidLabel(w.name) != nil {
-				setErrResults[w] = ErrGivenNameInvalid
-				nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
-
-				continue
-			}
-
-			taken := false
-
-			for id, other := range nodes {
-				if id != w.nodeID && other.GivenName == w.name {
-					taken = true
-					break
-				}
-			}
-
-			if taken {
-				setErrResults[w] = ErrGivenNameTaken
-				nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
-
-				continue
-			}
-
-			n.GivenName = w.name
-			nodes[w.nodeID] = n
-			nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
-		case rebuildPeerMaps:
-			// rebuildPeerMaps doesn't modify nodes, it just forces the snapshot rebuild
-			// below to recalculate peer relationships using the current peersFunc
-			rebuildOps = append(rebuildOps, w)
-		}
-	}
-
-	prev := s.data.Load()
-	newSnap := snapshotFromNodes(nodes, s.peersFunc, prev.routes)
-	s.data.Store(&newSnap)
-
-	// Update node count gauge
-	nodeStoreNodesCount.Set(float64(len(nodes)))
-
-	// Send the resulting nodes to all work items that requested them.
-	// A zero-value NodeView{} reports Valid()==false, matching node.View()
-	// for a node that was deleted or never existed.
-	for nodeID, workItems := range nodeResultRequests {
-		var nodeView types.NodeView
-		if node, exists := nodes[nodeID]; exists {
-			nodeView = node.View()
-		}
-
-		for _, w := range workItems {
-			w.nodeResult <- nodeView
-
-			close(w.nodeResult)
-
-			if w.errResult != nil {
-				w.errResult <- setErrResults[w]
-
-				close(w.errResult)
-			}
-		}
-	}
-
-	// Signal completion for rebuildPeerMaps operations
-	for _, w := range rebuildOps {
-		close(w.rebuildResult)
-	}
-
-	// Signal completion for all other work items
-	for _, w := range batch {
-		if w.op != rebuildPeerMaps {
-			close(w.result)
-		}
-	}
 }
 
 // resolveGivenName returns a unique DNS label for the node identified
@@ -1000,4 +817,192 @@ func (s *NodeStore) ListNodesByUser(uid types.UserID) views.Slice[types.NodeView
 	nodeStoreOperations.WithLabelValues("list_by_user").Inc()
 
 	return views.SliceOf(s.data.Load().nodesByUser[uid])
+}
+
+// applyBatch applies a batch of work to the node store.
+// This means that it takes a copy of the current nodes,
+// then applies the batch of operations to that copy,
+// runs any precomputation needed (like calculating peers),
+// and finally replaces the snapshot in the store with the new one.
+// The replacement of the snapshot is atomic, ensuring that reads
+// are never blocked by writes.
+// Each write item is blocked until the batch is applied to ensure
+// the caller knows the operation is complete and do not send any
+// updates that are dependent on a read that is yet to be written.
+//
+// legacy: NodeStore write path; CLAUDE.md requires a benchmark before restructuring it,
+// so it stays one function until measured.
+//
+//nolint:gocognit // NodeStore write path; CLAUDE.md requires benchmark before restructuring
+func (s *NodeStore) applyBatch(batch []work) {
+	timer := prometheus.NewTimer(nodeStoreBatchDuration)
+	defer timer.ObserveDuration()
+
+	nodeStoreBatchSize.Observe(float64(len(batch)))
+
+	nodes := make(map[types.NodeID]types.Node)
+	maps.Copy(nodes, s.data.Load().nodesByID)
+
+	// Track which work items need node results
+	nodeResultRequests := make(map[types.NodeID][]*work)
+
+	// Track rebuildPeerMaps operations
+	var rebuildOps []*work
+
+	// setErrResults collects per-work errors from the setName path so
+	// they can be delivered after the snapshot swap, together with the
+	// NodeView for that work.
+	setErrResults := make(map[*work]error)
+
+	for i := range batch {
+		w := &batch[i]
+		switch w.op {
+		case put:
+			n := w.node
+			n.GivenName = resolveGivenName(nodes, n.ID, n.GivenName)
+
+			nodes[w.nodeID] = n
+			if w.nodeResult != nil {
+				nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
+			}
+		case updateMulti:
+			for id, fn := range w.multiUpdates {
+				n, exists := nodes[id]
+				if !exists {
+					continue
+				}
+
+				oldGivenName := n.GivenName
+				fn(&n)
+
+				if n.GivenName != oldGivenName {
+					n.GivenName = resolveGivenName(nodes, n.ID, n.GivenName)
+				}
+
+				nodes[id] = n
+			}
+		case del:
+			delete(nodes, w.nodeID)
+			// For delete operations, send an invalid NodeView if requested
+			if w.nodeResult != nil {
+				nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
+			}
+		case setName:
+			n, exists := nodes[w.nodeID]
+			if !exists {
+				setErrResults[w] = ErrNodeNotFound
+				nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
+
+				continue
+			}
+
+			if dnsname.ValidLabel(w.name) != nil {
+				setErrResults[w] = ErrGivenNameInvalid
+				nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
+
+				continue
+			}
+
+			taken := false
+
+			for id, other := range nodes {
+				if id != w.nodeID && other.GivenName == w.name {
+					taken = true
+					break
+				}
+			}
+
+			if taken {
+				setErrResults[w] = ErrGivenNameTaken
+				nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
+
+				continue
+			}
+
+			n.GivenName = w.name
+			nodes[w.nodeID] = n
+			nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
+		case rebuildPeerMaps:
+			// rebuildPeerMaps doesn't modify nodes, it just forces the snapshot rebuild
+			// below to recalculate peer relationships using the current peersFunc
+			rebuildOps = append(rebuildOps, w)
+		}
+	}
+
+	prev := s.data.Load()
+	newSnap := snapshotFromNodes(nodes, s.peersFunc, prev.routes)
+	s.data.Store(&newSnap)
+
+	// Update node count gauge
+	nodeStoreNodesCount.Set(float64(len(nodes)))
+
+	// Send the resulting nodes to all work items that requested them.
+	// A zero-value NodeView{} reports Valid()==false, matching node.View()
+	// for a node that was deleted or never existed.
+	for nodeID, workItems := range nodeResultRequests {
+		var nodeView types.NodeView
+		if node, exists := nodes[nodeID]; exists {
+			nodeView = node.View()
+		}
+
+		for _, w := range workItems {
+			w.nodeResult <- nodeView
+
+			close(w.nodeResult)
+
+			if w.errResult != nil {
+				w.errResult <- setErrResults[w]
+
+				close(w.errResult)
+			}
+		}
+	}
+
+	// Signal completion for rebuildPeerMaps operations
+	for _, w := range rebuildOps {
+		close(w.rebuildResult)
+	}
+
+	// Signal completion for all other work items
+	for _, w := range batch {
+		if w.op != rebuildPeerMaps {
+			close(w.result)
+		}
+	}
+}
+
+// processWrite processes the write queue in batches.
+func (s *NodeStore) processWrite() {
+	c := time.NewTicker(s.batchTimeout)
+	defer c.Stop()
+
+	batch := make([]work, 0, s.batchSize)
+
+	for {
+		select {
+		case w := <-s.writeQueue:
+			batch = append(batch, w)
+			if len(batch) >= s.batchSize {
+				s.applyBatch(batch)
+				batch = batch[:0]
+
+				c.Reset(s.batchTimeout)
+			}
+		case <-c.C:
+			if len(batch) != 0 {
+				s.applyBatch(batch)
+				batch = batch[:0]
+			}
+
+			c.Reset(s.batchTimeout)
+		case <-s.stopped:
+			// Apply any remaining batch so in-flight writers receive their
+			// results, then exit.
+			if len(batch) != 0 {
+				s.applyBatch(batch)
+			}
+
+			return
+		}
+	}
 }

@@ -889,13 +889,20 @@ func TestConnectionEntry_ConcurrentSendAndClose(t *testing.T) {
 	entry := makeConnectionEntry("race", ch)
 
 	var (
-		wg       sync.WaitGroup
-		panicked atomic.Bool
+		wg        sync.WaitGroup
+		panicked  atomic.Bool
+		sendCount atomic.Int64
+	)
+
+	const (
+		senders        = 20
+		sendsPerSender = 10
+		totalSends     = senders * sendsPerSender
 	)
 
 	// Goroutines sending rapidly
 
-	for range 20 {
+	for range senders {
 		wg.Go(func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -903,16 +910,23 @@ func TestConnectionEntry_ConcurrentSendAndClose(t *testing.T) {
 				}
 			}()
 
-			for range 10 {
+			for range sendsPerSender {
 				_ = entry.send(testMapResponse())
+
+				sendCount.Add(1)
 			}
 		})
 	}
 
-	// Close midway through
+	// Close once roughly half the sends have gone through, so the close
+	// races with in-flight sends instead of running before or after all
+	// of them.
 
 	wg.Go(func() {
-		time.Sleep(1 * time.Millisecond) //nolint:forbidigo // concurrency test coordination
+		assert.Eventually(t, func() bool {
+			return sendCount.Load() >= totalSends/2
+		}, time.Second, 100*time.Microsecond,
+			"sends did not reach the halfway point before closing")
 		entry.closed.Store(true)
 	})
 
@@ -1041,13 +1055,11 @@ func TestBatcher_CloseWaitsForWorkers(t *testing.T) {
 
 	b.Start()
 
-	// Give workers time to start.
-	time.Sleep(20 * time.Millisecond) //nolint:forbidigo // test timing
-
-	goroutinesDuring := runtime.NumGoroutine()
-
-	// We expect at least 5 new goroutines: 1 doWork + 4 workers.
-	assert.GreaterOrEqual(t, goroutinesDuring-goroutinesBefore, 5,
+	// Wait for doWork + all 4 workers to actually be running instead of
+	// guessing at a fixed delay before checking the goroutine count.
+	require.Eventually(t, func() bool {
+		return runtime.NumGoroutine()-goroutinesBefore >= 5
+	}, time.Second, time.Millisecond,
 		"expected doWork + 4 workers to be running")
 
 	// Close should block until all workers have exited.
@@ -1075,8 +1087,11 @@ func TestBatcher_CloseThenStartIsNoop(t *testing.T) {
 	// Second Start should be a no-op because started is already true.
 	b.Start()
 
-	// Allow a moment for any hypothetical goroutine to appear.
-	time.Sleep(10 * time.Millisecond) //nolint:forbidigo // test timing
+	// There is no positive condition to wait on: we're proving that a
+	// no-op Start() spawns nothing, so give a hypothetical goroutine a
+	// window to schedule before sampling the count below.
+	//nolint:forbidigo // scheduler perturbation: gives a hypothetical goroutine time to schedule; unsynchronized
+	time.Sleep(10 * time.Millisecond)
 
 	goroutinesAfter := runtime.NumGoroutine()
 
@@ -1100,7 +1115,7 @@ func TestBatcher_CloseStopsTicker(t *testing.T) {
 	select {
 	case <-b.tick.C:
 		t.Fatal("ticker fired after Close(); ticker.Stop() was not called")
-	case <-time.After(50 * time.Millisecond): //nolint:forbidigo // test timing
+	case <-time.After(50 * time.Millisecond):
 		// Expected: no tick received.
 	}
 }
@@ -1130,7 +1145,7 @@ func TestBatcher_CloseBeforeStart_DoesNotHang(t *testing.T) {
 	select {
 	case <-done:
 		// Success: Close returned promptly.
-	case <-time.After(2 * time.Second): //nolint:forbidigo // test timing
+	case <-time.After(2 * time.Second):
 		t.Fatal("Close() before Start() hung; done channel was likely nil")
 	}
 }
@@ -1155,7 +1170,7 @@ func TestBatcher_QueueWorkAfterClose_DoesNotHang(t *testing.T) {
 	select {
 	case <-done:
 		// Success
-	case <-time.After(2 * time.Second): //nolint:forbidigo // test timing
+	case <-time.After(2 * time.Second):
 		t.Fatal("queueWork hung after Close(); done channel select not working")
 	}
 }

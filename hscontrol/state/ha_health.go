@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"net/netip"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -47,19 +48,6 @@ func NewHAHealthProber(
 	}
 }
 
-// markSessionStable records session and returns true iff the same
-// value was already present from a prior cycle.
-func (p *HAHealthProber) markSessionStable(id types.NodeID, session uint64) bool {
-	prev, loaded := p.lastStableSession.LoadAndStore(id, session)
-	return loaded && prev == session
-}
-
-// forgetSession drops the recorded session so a node returning to
-// HA candidacy starts fresh.
-func (p *HAHealthProber) forgetSession(id types.NodeID) {
-	p.lastStableSession.Delete(id)
-}
-
 // ProbeOnce pings every HA subnet router and applies the cycle's
 // results in one batch so the election sees a single transition.
 // Per-result snapshots could otherwise elect a node that the next
@@ -73,32 +61,7 @@ func (p *HAHealthProber) ProbeOnce(
 	dispatch func(...change.Change),
 ) {
 	haNodes := p.state.nodeStore.HANodes()
-
-	// Build the deduplicated node-ID set and slice in one pass.
-	var nodeIDs []types.NodeID
-
-	seen := make(set.Set[types.NodeID])
-
-	for _, nodes := range haNodes {
-		for _, id := range nodes {
-			if seen.Contains(id) {
-				continue
-			}
-
-			seen.Add(id)
-			nodeIDs = append(nodeIDs, id)
-		}
-	}
-
-	// Drop stable-session entries for nodes that are no longer HA
-	// candidates so a future reappearance starts fresh.
-	p.lastStableSession.Range(func(id types.NodeID, _ uint64) bool {
-		if !seen.Contains(id) {
-			p.lastStableSession.Delete(id)
-		}
-
-		return true
-	})
+	nodeIDs := p.haCandidates(haNodes)
 
 	if len(haNodes) == 0 {
 		return
@@ -130,78 +93,23 @@ func (p *HAHealthProber) ProbeOnce(
 			continue
 		}
 
-		probeSession := nv.SessionEpoch()
-		stable := p.markSessionStable(id, probeSession)
+		probe := probeAttempt{
+			id:      id,
+			session: nv.SessionEpoch(),
+		}
+		probe.stable = p.markSessionStable(id, probe.session)
 
-		pingID, responseCh := p.state.RegisterPing(id)
-		callbackURL := p.serverURL + "/machine/ping-response?id=" + pingID
+		var responseCh <-chan time.Duration
+
+		probe.pingID, responseCh = p.state.RegisterPing(id)
+		callbackURL := p.serverURL + "/machine/ping-response?id=" + probe.pingID
 
 		dispatch(change.PingNode(id, &tailcfg.PingRequest{
 			URL: callbackURL,
 		}))
 
 		wg.Go(func() {
-			timer := time.NewTimer(p.cfg.ProbeTimeout)
-			defer timer.Stop()
-
-			select {
-			case latency := <-responseCh:
-				log.Debug().
-					Uint64(zf.NodeID, id.Uint64()).
-					Dur("latency", latency).
-					Msg("HA probe: node responded")
-
-				results.Store(id, true)
-
-			case <-timer.C:
-				p.state.CancelPing(pingID)
-
-				if !p.isConnected(id) {
-					log.Debug().
-						Uint64(zf.NodeID, id.Uint64()).
-						Msg("HA probe: node went offline during probe, skipping")
-
-					return
-				}
-
-				curr, ok := p.state.GetNodeByID(id)
-				if !ok {
-					return
-				}
-
-				if curr.SessionEpoch() != probeSession {
-					log.Debug().
-						Uint64(zf.NodeID, id.Uint64()).
-						Uint64("probe_session", probeSession).
-						Uint64("current_session", curr.SessionEpoch()).
-						Msg("HA probe: node reconnected during probe, skipping")
-
-					deferred.Store(true)
-
-					return
-				}
-
-				if !stable {
-					log.Debug().
-						Uint64(zf.NodeID, id.Uint64()).
-						Uint64("probe_session", probeSession).
-						Msg("HA probe: probe of fresh session timed out, deferring to next cycle")
-
-					deferred.Store(true)
-
-					return
-				}
-
-				log.Warn().
-					Uint64(zf.NodeID, id.Uint64()).
-					Dur("timeout", p.cfg.ProbeTimeout).
-					Msg("HA probe: node did not respond")
-
-				results.Store(id, false)
-
-			case <-ctx.Done():
-				p.state.CancelPing(pingID)
-			}
+			p.awaitProbe(ctx, probe, responseCh, results, &deferred)
 		})
 	}
 
@@ -230,4 +138,139 @@ func (p *HAHealthProber) ProbeOnce(
 			Int("haNodes", len(healthByNode)).
 			Msg("HA probe: health changed, triggering failover/recovery")
 	}
+}
+
+// probeAttempt carries the per-node state of one probe: which ping
+// was sent and which session it was sent against.
+type probeAttempt struct {
+	id      types.NodeID
+	pingID  string
+	session uint64
+	stable  bool
+}
+
+// haCandidates returns the deduplicated HA node IDs and drops
+// stable-session entries for nodes that are no longer HA candidates
+// so a future reappearance starts fresh.
+func (p *HAHealthProber) haCandidates(haNodes map[netip.Prefix][]types.NodeID) []types.NodeID {
+	var nodeIDs []types.NodeID
+
+	seen := make(set.Set[types.NodeID])
+
+	for _, nodes := range haNodes {
+		for _, id := range nodes {
+			if seen.Contains(id) {
+				continue
+			}
+
+			seen.Add(id)
+			nodeIDs = append(nodeIDs, id)
+		}
+	}
+
+	p.lastStableSession.Range(func(id types.NodeID, _ uint64) bool {
+		if !seen.Contains(id) {
+			p.lastStableSession.Delete(id)
+		}
+
+		return true
+	})
+
+	return nodeIDs
+}
+
+// awaitProbe waits for the ping response or the probe timeout and
+// records the outcome in results, or marks the cycle deferred when the
+// silence cannot be attributed to the probed session.
+func (p *HAHealthProber) awaitProbe(
+	ctx context.Context,
+	probe probeAttempt,
+	responseCh <-chan time.Duration,
+	results *xsync.Map[types.NodeID, bool],
+	deferred *atomic.Bool,
+) {
+	timer := time.NewTimer(p.cfg.ProbeTimeout)
+	defer timer.Stop()
+
+	select {
+	case latency := <-responseCh:
+		log.Debug().
+			Uint64(zf.NodeID, probe.id.Uint64()).
+			Dur("latency", latency).
+			Msg("HA probe: node responded")
+
+		results.Store(probe.id, true)
+
+	case <-timer.C:
+		p.state.CancelPing(probe.pingID)
+
+		if p.probeTimedOut(probe, deferred) {
+			results.Store(probe.id, false)
+		}
+
+	case <-ctx.Done():
+		p.state.CancelPing(probe.pingID)
+	}
+}
+
+// probeTimedOut classifies a timed-out probe. It returns true when the
+// node must be recorded as unhealthy, and false when the timeout says
+// nothing about the node (offline, gone, reconnected or fresh session).
+// It sets deferred when the whole cycle must be dropped.
+func (p *HAHealthProber) probeTimedOut(probe probeAttempt, deferred *atomic.Bool) bool {
+	if !p.isConnected(probe.id) {
+		log.Debug().
+			Uint64(zf.NodeID, probe.id.Uint64()).
+			Msg("HA probe: node went offline during probe, skipping")
+
+		return false
+	}
+
+	curr, found := p.state.GetNodeByID(probe.id)
+	if !found {
+		return false
+	}
+
+	if curr.SessionEpoch() != probe.session {
+		log.Debug().
+			Uint64(zf.NodeID, probe.id.Uint64()).
+			Uint64("probe_session", probe.session).
+			Uint64("current_session", curr.SessionEpoch()).
+			Msg("HA probe: node reconnected during probe, skipping")
+
+		deferred.Store(true)
+
+		return false
+	}
+
+	if !probe.stable {
+		log.Debug().
+			Uint64(zf.NodeID, probe.id.Uint64()).
+			Uint64("probe_session", probe.session).
+			Msg("HA probe: probe of fresh session timed out, deferring to next cycle")
+
+		deferred.Store(true)
+
+		return false
+	}
+
+	log.Warn().
+		Uint64(zf.NodeID, probe.id.Uint64()).
+		Dur("timeout", p.cfg.ProbeTimeout).
+		Msg("HA probe: node did not respond")
+
+	return true
+}
+
+// markSessionStable records session and returns true iff the same
+// value was already present from a prior cycle.
+func (p *HAHealthProber) markSessionStable(id types.NodeID, session uint64) bool {
+	prev, loaded := p.lastStableSession.LoadAndStore(id, session)
+	return loaded && prev == session
+}
+
+// forgetSession drops the recorded session so a node returning to
+// HA candidacy starts fresh.
+func (p *HAHealthProber) forgetSession(id types.NodeID) {
+	p.lastStableSession.Delete(id)
 }

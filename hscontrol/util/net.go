@@ -2,6 +2,7 @@ package util
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"net/netip"
 	"sync"
@@ -15,7 +16,12 @@ import (
 func SocketDialer(ctx context.Context, addr string) (net.Conn, error) {
 	var d net.Dialer
 
-	return d.DialContext(ctx, "unix", addr)
+	conn, err := d.DialContext(ctx, "unix", addr)
+	if err != nil {
+		return nil, fmt.Errorf("dialing unix socket %q: %w", addr, err)
+	}
+
+	return conn, nil
 }
 
 func PrefixesToString(prefixes []netip.Prefix) []string {

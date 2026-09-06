@@ -13,6 +13,8 @@ import "github.com/rs/zerolog"
 // This init defends against that changing in the future: if a future import
 // chain pulls in hscontrol/types, this file will still ensure trace-level
 // output is available for zlog's assertions.
+//
+//nolint:gochecknoinits // must run at import so the global level is set before any test logs
 func init() {
 	zerolog.SetGlobalLevel(zerolog.TraceLevel)
 }

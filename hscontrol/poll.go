@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
 	"math/rand/v2"
 	"net/http"
 	"sync/atomic"
@@ -24,6 +26,10 @@ const (
 	keepAliveInterval = 50 * time.Second
 )
 
+// errMapResponseTooLarge is returned when a marshalled map response would
+// overflow the uint32 length prefix written ahead of it on the wire.
+var errMapResponseTooLarge = errors.New("map response body exceeds uint32 length prefix")
+
 type contextKey string
 
 const nodeNameContextKey = contextKey("nodeName")
@@ -31,7 +37,7 @@ const nodeNameContextKey = contextKey("nodeName")
 type mapSession struct {
 	h      *Headscale
 	req    tailcfg.MapRequest
-	ctx    context.Context //nolint:containedctx
+	ctx    context.Context //nolint:containedctx // mapSession is a per-stream session struct whose lifetime matches ctx
 	capVer tailcfg.CapabilityVersion
 
 	ch             chan *tailcfg.MapResponse
@@ -53,7 +59,8 @@ func (h *Headscale) newMapSession(
 	w http.ResponseWriter,
 	node *types.Node,
 ) *mapSession {
-	ka := keepAliveInterval + (time.Duration(rand.IntN(9000)) * time.Millisecond) //nolint:gosec // weak random is fine for jitter
+	//nolint:gosec // weak random is fine for jitter
+	ka := keepAliveInterval + (time.Duration(rand.IntN(9000)) * time.Millisecond)
 
 	return &mapSession{
 		h:      h,
@@ -133,10 +140,68 @@ func (m *mapSession) serve() {
 	}
 }
 
+// cleanupAfterLongPoll releases the long-poll session's [state.State.Connect]
+// reservation and disconnects the node. connectGen is 0 when the session
+// never reached [state.State.Connect], in which case there is no session to
+// release.
+func (m *mapSession) cleanupAfterLongPoll(connectGen uint64) {
+	m.stopFromBatcher()
+
+	stillConnected := m.h.mapBatcher.RemoveNode(m.node.ID, m.ch)
+
+	// This session never reached [state.State.Connect]; there is no
+	// session to release.
+	if connectGen == 0 {
+		return
+	}
+
+	// When a node disconnects, it might rapidly reconnect (e.g. mobile clients, network weather).
+	// Instead of immediately marking the node as offline, we wait a few seconds to see if it reconnects.
+	// If it reconnects during the wait, the new session's Connect raises the
+	// session count, so the release below keeps the node online.
+	//
+	// This avoids flapping nodes in the UI and unnecessary churn in the network.
+	// This is not my favourite solution, but it kind of works in our eventually consistent world.
+	//
+	// When another session already replaced this one (stillConnected), skip
+	// the wait — but never the release itself. A cancelled map request whose
+	// handler ran late is exactly such a session: if it kept its session
+	// acquired on this path, the surviving session's release could never
+	// take the node offline (the relogin flake).
+	if !stillConnected {
+		// Wait up to 10 seconds for the node to reconnect.
+		// 10 seconds was arbitrary chosen as a reasonable time to reconnect.
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+
+		for range 10 {
+			if m.h.mapBatcher.IsConnected(m.node.ID) {
+				break
+			}
+
+			<-ticker.C
+		}
+	}
+
+	// Release this session. The node goes offline exactly when the last
+	// live session is released, so releases from replaced or stale
+	// sessions are harmless regardless of the order they run in.
+	disconnectChanges, err := m.h.state.Disconnect(m.node.ID, connectGen)
+	if err != nil {
+		m.log.Error().Caller().Err(err).Msg("failed to disconnect node")
+	}
+
+	if len(disconnectChanges) == 0 {
+		return
+	}
+
+	m.h.Change(disconnectChanges...)
+	m.afterServeLongPoll()
+	m.log.Info().Caller().Str(zf.Chan, fmt.Sprintf("%p", m.ch)).Msg("node has disconnected")
+}
+
 // serveLongPoll ensures the node gets the appropriate updates from either
 // polling or immediate responses.
-//
-//nolint:gocyclo
 func (m *mapSession) serveLongPoll() {
 	m.log.Trace().Caller().Msg("long poll session started")
 
@@ -148,59 +213,7 @@ func (m *mapSession) serveLongPoll() {
 
 	// Clean up the session when the client disconnects
 	defer func() {
-		m.stopFromBatcher()
-
-		stillConnected := m.h.mapBatcher.RemoveNode(m.node.ID, m.ch)
-
-		// This session never reached [state.State.Connect]; there is no
-		// session to release.
-		if connectGen == 0 {
-			return
-		}
-
-		// When a node disconnects, it might rapidly reconnect (e.g. mobile clients, network weather).
-		// Instead of immediately marking the node as offline, we wait a few seconds to see if it reconnects.
-		// If it reconnects during the wait, the new session's Connect raises the
-		// session count, so the release below keeps the node online.
-		//
-		// This avoids flapping nodes in the UI and unnecessary churn in the network.
-		// This is not my favourite solution, but it kind of works in our eventually consistent world.
-		//
-		// When another session already replaced this one (stillConnected), skip
-		// the wait — but never the release itself. A cancelled map request whose
-		// handler ran late is exactly such a session: if it kept its session
-		// acquired on this path, the surviving session's release could never
-		// take the node offline (the relogin flake).
-		if !stillConnected {
-			// Wait up to 10 seconds for the node to reconnect.
-			// 10 seconds was arbitrary chosen as a reasonable time to reconnect.
-			ticker := time.NewTicker(time.Second)
-			defer ticker.Stop()
-
-			for range 10 {
-				if m.h.mapBatcher.IsConnected(m.node.ID) {
-					break
-				}
-
-				<-ticker.C
-			}
-		}
-
-		// Release this session. The node goes offline exactly when the last
-		// live session is released, so releases from replaced or stale
-		// sessions are harmless regardless of the order they run in.
-		disconnectChanges, err := m.h.state.Disconnect(m.node.ID, connectGen)
-		if err != nil {
-			m.log.Error().Caller().Err(err).Msg("failed to disconnect node")
-		}
-
-		if len(disconnectChanges) == 0 {
-			return
-		}
-
-		m.h.Change(disconnectChanges...)
-		m.afterServeLongPoll()
-		m.log.Info().Caller().Str(zf.Chan, fmt.Sprintf("%p", m.ch)).Msg("node has disconnected")
+		m.cleanupAfterLongPoll(connectGen)
 	}()
 
 	// Set up the client stream
@@ -254,7 +267,8 @@ func (m *mapSession) serveLongPoll() {
 	// adding this before connecting it to the state ensure that
 	// it does not miss any updates that might be sent in the split
 	// time between the node connecting and the batcher being ready.
-	if err := m.h.mapBatcher.AddNode(m.node.ID, m.ch, m.capVer, m.stopFromBatcher); err != nil { //nolint:noinlineerr
+	err = m.h.mapBatcher.AddNode(m.node.ID, m.ch, m.capVer, m.stopFromBatcher)
+	if err != nil {
 		m.log.Error().Caller().Err(err).Msg("failed to add node to batcher")
 		// Write an explicit error rather than returning silently: a bare
 		// return leaves net/http to send an empty 200, which the client
@@ -312,7 +326,8 @@ func (m *mapSession) serveLongPoll() {
 			}
 
 			if debugHighCardinalityMetrics {
-				mapResponseLastSentSeconds.WithLabelValues("keepalive", m.node.ID.String()).Set(float64(time.Now().Unix()))
+				mapResponseLastSentSeconds.WithLabelValues("keepalive", m.node.ID.String()).
+					Set(float64(time.Now().Unix()))
 			}
 
 			mapResponseSent.WithLabelValues("ok", "keepalive").Inc()
@@ -335,8 +350,12 @@ func (m *mapSession) writeMap(msg *tailcfg.MapResponse) error {
 		jsonBody = zstdframe.AppendEncode(nil, jsonBody, zstdframe.FastestCompression)
 	}
 
+	if len(jsonBody) > math.MaxUint32 {
+		return fmt.Errorf("%w: %d bytes", errMapResponseTooLarge, len(jsonBody))
+	}
+
 	data := make([]byte, reservedResponseHeaderSize, reservedResponseHeaderSize+len(jsonBody))
-	//nolint:gosec // G115: JSON response size will not exceed uint32 max
+	//nolint:gosec // checked against math.MaxUint32 above; gosec cannot see the guard
 	binary.LittleEndian.PutUint32(data, uint32(len(jsonBody)))
 	data = append(data, jsonBody...)
 
@@ -344,7 +363,7 @@ func (m *mapSession) writeMap(msg *tailcfg.MapResponse) error {
 
 	_, err = m.w.Write(data)
 	if err != nil {
-		return err
+		return fmt.Errorf("writing map response: %w", err)
 	}
 
 	if m.isStreaming() {

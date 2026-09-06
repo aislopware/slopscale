@@ -27,7 +27,13 @@ func newOAuthTestServer(t *testing.T) (*Headscale, string, string) {
 	// Tag creation now requires the tag to exist in policy (matching
 	// SetNodeTags), so define the tags these tests assign. Tests needing
 	// specific tag ownership (e.g. delegation) override this policy.
-	const policy = `{"tagOwners":{"tag:a":[],"tag:b":[],"tag:c":[],"tag:ci":[],"tag:k8s":[],"tag:k8s-operator":[],"tag:other":[],"tag:anything":[]},"acls":[{"action":"accept","src":["*"],"dst":["*:*"]}]}`
+	const policy = `{
+		"tagOwners": {
+			"tag:a": [], "tag:b": [], "tag:c": [], "tag:ci": [],
+			"tag:k8s": [], "tag:k8s-operator": [], "tag:other": [], "tag:anything": []
+		},
+		"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}]
+	}`
 
 	_, err := app.state.SetPolicy([]byte(policy))
 	require.NoError(t, err)
@@ -77,7 +83,7 @@ func apiPost(t *testing.T, target, bearer string, body any) (int, []byte) {
 func apiGet(t *testing.T, target, bearer string) int {
 	t.Helper()
 
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, target, http.NoBody)
 	require.NoError(t, err)
 
 	if bearer != "" {
@@ -299,7 +305,10 @@ func TestAPIv2OAuth_TagOwnedBy(t *testing.T) {
 	// tag:k8s is owned by tag:k8s-operator: the operator's tag delegation.
 	// tag:other exists but is owned by no one, so it tests grant denial (403)
 	// rather than tag-not-in-policy (400).
-	const policy = `{"tagOwners":{"tag:k8s-operator":[],"tag:k8s":["tag:k8s-operator"],"tag:other":[]},"acls":[{"action":"accept","src":["*"],"dst":["*:*"]}]}`
+	const policy = `{
+		"tagOwners": {"tag:k8s-operator": [], "tag:k8s": ["tag:k8s-operator"], "tag:other": []},
+		"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}]
+	}`
 
 	_, err := app.state.SetPolicy([]byte(policy))
 	require.NoError(t, err)

@@ -1,4 +1,4 @@
-// Package state provides pure functions for processing [tailcfg.MapRequest] data.
+// This file provides pure functions for processing [tailcfg.MapRequest] data.
 // These functions are extracted from [State.UpdateNodeFromMapRequest] to improve
 // testability and maintainability.
 

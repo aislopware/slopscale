@@ -60,8 +60,13 @@ func registerACL(api huma.API, b Backend) {
 		Summary:     "Get the policy file",
 		Tags:        aclTags,
 		Security:    security,
-		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusInternalServerError},
-	}, scope.PolicyFileRead), func(ctx context.Context, in *getACLInput) (*huma.StreamResponse, error) {
+		Errors: []int{
+			http.StatusUnauthorized,
+			http.StatusForbidden,
+			http.StatusNotFound,
+			http.StatusInternalServerError,
+		},
+	}, scope.PolicyFileRead), func(_ context.Context, in *getACLInput) (*huma.StreamResponse, error) {
 		err := requireDefaultTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
@@ -90,7 +95,7 @@ func registerACL(api huma.API, b Backend) {
 			http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden,
 			http.StatusNotFound, http.StatusPreconditionFailed, http.StatusInternalServerError,
 		},
-	}, scope.PolicyFile), func(ctx context.Context, in *setACLInput) (*huma.StreamResponse, error) {
+	}, scope.PolicyFile), func(_ context.Context, in *setACLInput) (*huma.StreamResponse, error) {
 		err := requireDefaultTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
@@ -103,9 +108,9 @@ func registerACL(api huma.API, b Backend) {
 		}
 
 		if in.IfMatch != "" {
-			current, err := currentPolicy(b)
-			if err != nil {
-				return nil, err
+			current, currentErr := currentPolicy(b)
+			if currentErr != nil {
+				return nil, currentErr
 			}
 
 			if !etagMatches(in.IfMatch, current) {

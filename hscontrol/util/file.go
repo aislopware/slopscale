@@ -40,23 +40,24 @@ func AbsolutePathFromConfigPath(path string) string {
 func GetFileMode(key string) fs.FileMode {
 	modeStr := viper.GetString(key)
 
-	mode, err := strconv.ParseUint(modeStr, Base8, BitSize64)
+	mode, err := strconv.ParseUint(modeStr, Base8, BitSize32)
 	if err != nil {
 		return PermissionFallback
 	}
 
-	return fs.FileMode(mode) //nolint:gosec // file mode is bounded by ParseUint
+	return fs.FileMode(mode)
 }
 
 func EnsureDir(dir string) error {
-	if _, err := os.Stat(dir); os.IsNotExist(err) { //nolint:noinlineerr
-		err := os.MkdirAll(dir, PermissionFallback)
-		if err != nil {
-			if errors.Is(err, os.ErrPermission) {
+	_, err := os.Stat(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		mkdirErr := os.MkdirAll(dir, PermissionFallback)
+		if mkdirErr != nil {
+			if errors.Is(mkdirErr, os.ErrPermission) {
 				return fmt.Errorf("%w: %s", ErrDirectoryPermission, dir)
 			}
 
-			return fmt.Errorf("creating directory %s: %w", dir, err)
+			return fmt.Errorf("creating directory %s: %w", dir, mkdirErr)
 		}
 	}
 

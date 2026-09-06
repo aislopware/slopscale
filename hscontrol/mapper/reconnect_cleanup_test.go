@@ -10,6 +10,13 @@ import (
 	"tailscale.com/tailcfg"
 )
 
+// drainMapResponses discards every response sent on ch until it is closed.
+func drainMapResponses(ch <-chan *tailcfg.MapResponse) {
+	for range ch {
+		continue
+	}
+}
+
 // TestAddNodeReconnectNotOrphanedByCleanup ensures a node reconnecting via
 // AddNode is not deleted from b.nodes by a concurrent cleanupOfflineNodes pass.
 // AddNode must register the connection atomically with the get-or-create, so
@@ -27,10 +34,7 @@ func TestAddNodeReconnectNotOrphanedByCleanup(t *testing.T) {
 
 	testData.State.Connect(node.n.ID)
 
-	go func() {
-		for range node.ch {
-		}
-	}()
+	go drainMapResponses(node.ch)
 
 	require.NoError(t, b.AddNode(node.n.ID, node.ch, tailcfg.CapabilityVersion(100), nil))
 

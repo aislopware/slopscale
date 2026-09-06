@@ -10,6 +10,7 @@ var debugHighCardinalityMetrics = envknob.Bool("HEADSCALE_DEBUG_HIGH_CARDINALITY
 
 var mapResponseLastSentSeconds *prometheus.GaugeVec
 
+//nolint:gochecknoinits // promauto registration is gated on an env knob read at import time
 func init() {
 	if debugHighCardinalityMetrics {
 		mapResponseLastSentSeconds = promauto.NewGaugeVec(prometheus.GaugeOpts{

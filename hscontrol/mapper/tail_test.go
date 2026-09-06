@@ -115,8 +115,12 @@ func TestTailNode(t *testing.T) {
 						netip.MustParsePrefix("172.0.0.0/10"),
 					},
 				},
-				ApprovedRoutes: []netip.Prefix{tsaddr.AllIPv4(), tsaddr.AllIPv6(), netip.MustParsePrefix("192.168.0.0/24")},
-				CreatedAt:      created,
+				ApprovedRoutes: []netip.Prefix{
+					tsaddr.AllIPv4(),
+					tsaddr.AllIPv6(),
+					netip.MustParsePrefix("192.168.0.0/24"),
+				},
+				CreatedAt: created,
 			},
 			dnsConfig:  &tailcfg.DNSConfig{},
 			baseDomain: "",
@@ -368,10 +372,16 @@ func TestTailNodeDisableIPv4(t *testing.T) {
 		wantAddrs   []netip.Prefix
 	}{
 		{
-			name:        "no-cap_emits_both_families",
-			hasCap:      false,
-			wantAllowed: []netip.Prefix{netip.MustParsePrefix("100.64.0.1/32"), netip.MustParsePrefix("fd7a:115c:a1e0::1/128")},
-			wantAddrs:   []netip.Prefix{netip.MustParsePrefix("100.64.0.1/32"), netip.MustParsePrefix("fd7a:115c:a1e0::1/128")},
+			name:   "no-cap_emits_both_families",
+			hasCap: false,
+			wantAllowed: []netip.Prefix{
+				netip.MustParsePrefix("100.64.0.1/32"),
+				netip.MustParsePrefix("fd7a:115c:a1e0::1/128"),
+			},
+			wantAddrs: []netip.Prefix{
+				netip.MustParsePrefix("100.64.0.1/32"),
+				netip.MustParsePrefix("fd7a:115c:a1e0::1/128"),
+			},
 		},
 		{
 			name:        "cap_strips_own_ipv4",
@@ -434,15 +444,27 @@ func TestTailNodeDisableIPv4(t *testing.T) {
 				return out
 			}
 
-			if diff := cmp.Diff(prefStrings(tt.wantAddrs), prefStrings(got.Addresses), cmpopts.EquateEmpty()); diff != "" {
+			if diff := cmp.Diff(
+				prefStrings(tt.wantAddrs),
+				prefStrings(got.Addresses),
+				cmpopts.EquateEmpty(),
+			); diff != "" {
 				t.Errorf("Addresses (-want +got):\n%s", diff)
 			}
 
-			if diff := cmp.Diff(prefStrings(tt.wantAllowed), prefStrings(got.AllowedIPs), cmpopts.EquateEmpty()); diff != "" {
+			if diff := cmp.Diff(
+				prefStrings(tt.wantAllowed),
+				prefStrings(got.AllowedIPs),
+				cmpopts.EquateEmpty(),
+			); diff != "" {
 				t.Errorf("AllowedIPs (-want +got):\n%s", diff)
 			}
 
-			if diff := cmp.Diff(prefStrings(tt.wantPrimary), prefStrings(got.PrimaryRoutes), cmpopts.EquateEmpty()); diff != "" {
+			if diff := cmp.Diff(
+				prefStrings(tt.wantPrimary),
+				prefStrings(got.PrimaryRoutes),
+				cmpopts.EquateEmpty(),
+			); diff != "" {
 				t.Errorf("PrimaryRoutes (-want +got):\n%s", diff)
 			}
 		})
@@ -473,7 +495,7 @@ func TestNodeExpiry(t *testing.T) {
 		},
 		{
 			name:         "localtime",
-			exp:          tp(time.Time{}.Local()), //nolint:gosmopolitan
+			exp:          tp(time.Time{}.Local()), //nolint:gosmopolitan // test verifies Local time handling
 			wantTimeZero: true,
 		},
 	}
@@ -490,7 +512,7 @@ func TestNodeExpiry(t *testing.T) {
 
 			tn, err := node.View().TailNode(
 				0,
-				func(id types.NodeID) []netip.Prefix {
+				func(_ types.NodeID) []netip.Prefix {
 					return []netip.Prefix{}
 				},
 				&types.Config{Taildrop: types.TaildropConfig{Enabled: true}},

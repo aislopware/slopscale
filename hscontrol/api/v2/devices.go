@@ -126,13 +126,8 @@ func registerDevices(api huma.API, b Backend) {
 		Tags:        deviceTags,
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesCoreRead), func(ctx context.Context, in *deviceByIDInput) (*deviceOutput, error) {
-		node, err := lookupNode(b, in.DeviceID)
-		if err != nil {
-			return nil, err
-		}
-
-		return &deviceOutput{Body: deviceFromView(node, in.Fields == "all")}, nil
+	}, scope.DevicesCoreRead), func(_ context.Context, in *deviceByIDInput) (*deviceOutput, error) {
+		return handleGetDevice(b, in)
 	})
 
 	huma.Register(api, requireScope(huma.Operation{
@@ -143,23 +138,8 @@ func registerDevices(api huma.API, b Backend) {
 		Tags:        deviceTags,
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesCoreRead), func(ctx context.Context, in *listDevicesInput) (*listDevicesOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
-		if err != nil {
-			return nil, err
-		}
-
-		nodes := b.State.ListNodes()
-		allFields := in.Fields == "all"
-
-		out := &listDevicesOutput{}
-		out.Body.Devices = make([]Device, 0, nodes.Len())
-
-		for _, node := range nodes.All() {
-			out.Body.Devices = append(out.Body.Devices, deviceFromView(node, allFields))
-		}
-
-		return out, nil
+	}, scope.DevicesCoreRead), func(_ context.Context, in *listDevicesInput) (*listDevicesOutput, error) {
+		return handleListDevices(b, in)
 	})
 
 	huma.Register(api, requireScope(huma.Operation{
@@ -171,20 +151,8 @@ func registerDevices(api huma.API, b Backend) {
 		Security:      security,
 		DefaultStatus: http.StatusOK,
 		Errors:        []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesCore), func(ctx context.Context, in *deviceByIDInput) (*emptyOutput, error) {
-		node, err := lookupNode(b, in.DeviceID)
-		if err != nil {
-			return nil, err
-		}
-
-		nodeChange, err := b.State.DeleteNode(node)
-		if err != nil {
-			return nil, mapError("deleting device", err)
-		}
-
-		b.Change(nodeChange)
-
-		return &emptyOutput{}, nil
+	}, scope.DevicesCore), func(_ context.Context, in *deviceByIDInput) (*emptyOutput, error) {
+		return handleDeleteDevice(b, in)
 	})
 
 	huma.Register(api, requireScope(huma.Operation{
@@ -196,22 +164,8 @@ func registerDevices(api huma.API, b Backend) {
 		Security:      security,
 		DefaultStatus: http.StatusOK,
 		Errors:        []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesCore), func(ctx context.Context, in *setAuthorizedInput) (*emptyOutput, error) {
-		_, err := lookupNode(b, in.DeviceID)
-		if err != nil {
-			return nil, err
-		}
-
-		// Headscale nodes are authorized the moment they register; there is no
-		// de-authorize state. Accept authorized=true as a no-op; reject false so
-		// callers are not misled into thinking the device is fenced off.
-		if !in.Body.Authorized {
-			return nil, huma.Error400BadRequest(
-				"Headscale does not support de-authorizing a device; delete or expire it instead",
-			)
-		}
-
-		return &emptyOutput{}, nil
+	}, scope.DevicesCore), func(_ context.Context, in *setAuthorizedInput) (*emptyOutput, error) {
+		return handleAuthorizeDevice(b, in)
 	})
 
 	huma.Register(api, requireScope(huma.Operation{
@@ -223,20 +177,8 @@ func registerDevices(api huma.API, b Backend) {
 		Security:      security,
 		DefaultStatus: http.StatusOK,
 		Errors:        []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesCore), func(ctx context.Context, in *setNameInput) (*emptyOutput, error) {
-		node, err := lookupNode(b, in.DeviceID)
-		if err != nil {
-			return nil, err
-		}
-
-		_, nodeChange, err := b.State.RenameNode(node.ID(), in.Body.Name)
-		if err != nil {
-			return nil, mapError("renaming device", err)
-		}
-
-		b.Change(nodeChange)
-
-		return &emptyOutput{}, nil
+	}, scope.DevicesCore), func(_ context.Context, in *setNameInput) (*emptyOutput, error) {
+		return handleSetDeviceName(b, in)
 	})
 
 	huma.Register(api, requireScope(huma.Operation{
@@ -249,40 +191,7 @@ func registerDevices(api huma.API, b Backend) {
 		DefaultStatus: http.StatusOK,
 		Errors:        []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
 	}, scope.DevicesCore), func(ctx context.Context, in *setTagsInput) (*emptyOutput, error) {
-		node, err := lookupNode(b, in.DeviceID)
-		if err != nil {
-			return nil, err
-		}
-
-		// Headscale cannot make a node untagged (tags-as-identity is one-way), so
-		// an empty/null tag set is accepted as a no-op rather than rejected. This
-		// keeps tooling lifecycles such as Terraform destroy working; the SDK
-		// sends "tags":null for "make untagged".
-		if len(in.Body.Tags) == 0 {
-			return &emptyOutput{}, nil
-		}
-
-		// An OAuth token may only assign tags within its grant (held directly or
-		// owned by a held tag per policy); an admin API key is unrestricted. The
-		// devices:core scope alone must not let a token stamp an arbitrary policy
-		// tag (e.g. tag:prod) onto any node. SetNodeTags still enforces that each
-		// tag exists in policy.
-		if tokenTags, isOAuth := principalTags(ctx); isOAuth {
-			for _, tag := range in.Body.Tags {
-				if !b.State.TagOwnedByTags(tag, tokenTags) {
-					return nil, huma.Error403Forbidden("token may not assign tag " + tag)
-				}
-			}
-		}
-
-		_, nodeChange, err := b.State.SetNodeTags(node.ID(), in.Body.Tags)
-		if err != nil {
-			return nil, mapError("setting device tags", err)
-		}
-
-		b.Change(nodeChange)
-
-		return &emptyOutput{}, nil
+		return handleSetDeviceTags(ctx, b, in)
 	})
 
 	huma.Register(api, requireScope(huma.Operation{
@@ -294,28 +203,8 @@ func registerDevices(api huma.API, b Backend) {
 		Security:      security,
 		DefaultStatus: http.StatusOK,
 		Errors:        []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesCore), func(ctx context.Context, in *setKeyInput) (*emptyOutput, error) {
-		node, err := lookupNode(b, in.DeviceID)
-		if err != nil {
-			return nil, err
-		}
-
-		// Only disabling expiry maps cleanly (expiry=nil never expires).
-		// Re-enabling has no target expiry in the Tailscale request and Headscale
-		// stores no original, so it is accepted as a no-op (keeps Terraform
-		// destroy working) rather than guessing a lifetime.
-		if !in.Body.KeyExpiryDisabled {
-			return &emptyOutput{}, nil
-		}
-
-		_, nodeChange, err := b.State.SetNodeExpiry(node.ID(), nil)
-		if err != nil {
-			return nil, mapError("setting device key expiry", err)
-		}
-
-		b.Change(nodeChange)
-
-		return &emptyOutput{}, nil
+	}, scope.DevicesCore), func(_ context.Context, in *setKeyInput) (*emptyOutput, error) {
+		return handleSetDeviceKey(b, in)
 	})
 
 	huma.Register(api, requireScope(huma.Operation{
@@ -327,25 +216,8 @@ func registerDevices(api huma.API, b Backend) {
 		Security:      security,
 		DefaultStatus: http.StatusOK,
 		Errors:        []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesRoutes), func(ctx context.Context, in *setSubnetRoutesInput) (*deviceRoutesOutput, error) {
-		node, err := lookupNode(b, in.DeviceID)
-		if err != nil {
-			return nil, err
-		}
-
-		approved, err := parseRoutes(in.Body.Routes)
-		if err != nil {
-			return nil, err
-		}
-
-		updated, nodeChange, err := b.State.SetApprovedRoutes(node.ID(), approved)
-		if err != nil {
-			return nil, mapError("setting device routes", err)
-		}
-
-		b.Change(nodeChange)
-
-		return &deviceRoutesOutput{Body: routesFromView(updated)}, nil
+	}, scope.DevicesRoutes), func(_ context.Context, in *setSubnetRoutesInput) (*deviceRoutesOutput, error) {
+		return handleSetDeviceRoutes(b, in)
 	})
 
 	huma.Register(api, requireScope(huma.Operation{
@@ -356,14 +228,179 @@ func registerDevices(api huma.API, b Backend) {
 		Tags:        deviceTags,
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesRoutesRead), func(ctx context.Context, in *deviceByIDInput) (*deviceRoutesOutput, error) {
-		node, err := lookupNode(b, in.DeviceID)
-		if err != nil {
-			return nil, err
-		}
-
-		return &deviceRoutesOutput{Body: routesFromView(node)}, nil
+	}, scope.DevicesRoutesRead), func(_ context.Context, in *deviceByIDInput) (*deviceRoutesOutput, error) {
+		return handleGetDeviceRoutes(b, in)
 	})
+}
+
+func handleGetDevice(b Backend, in *deviceByIDInput) (*deviceOutput, error) {
+	node, err := lookupNode(b, in.DeviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &deviceOutput{Body: deviceFromView(node, in.Fields == "all")}, nil
+}
+
+func handleListDevices(b Backend, in *listDevicesInput) (*listDevicesOutput, error) {
+	err := requireDefaultTailnet(in.Tailnet)
+	if err != nil {
+		return nil, err
+	}
+
+	nodes := b.State.ListNodes()
+	allFields := in.Fields == "all"
+
+	out := &listDevicesOutput{}
+	out.Body.Devices = make([]Device, 0, nodes.Len())
+
+	for _, node := range nodes.All() {
+		out.Body.Devices = append(out.Body.Devices, deviceFromView(node, allFields))
+	}
+
+	return out, nil
+}
+
+func handleDeleteDevice(b Backend, in *deviceByIDInput) (*emptyOutput, error) {
+	node, err := lookupNode(b, in.DeviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeChange, err := b.State.DeleteNode(node)
+	if err != nil {
+		return nil, mapError("deleting device", err)
+	}
+
+	b.Change(nodeChange)
+
+	return &emptyOutput{}, nil
+}
+
+// handleAuthorizeDevice accepts authorized=true as a no-op: Headscale nodes
+// are authorized the moment they register, so there is no de-authorize state.
+// authorized=false is rejected so callers are not misled into thinking the
+// device is fenced off.
+func handleAuthorizeDevice(b Backend, in *setAuthorizedInput) (*emptyOutput, error) {
+	_, err := lookupNode(b, in.DeviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !in.Body.Authorized {
+		return nil, huma.Error400BadRequest(
+			"Headscale does not support de-authorizing a device; delete or expire it instead",
+		)
+	}
+
+	return &emptyOutput{}, nil
+}
+
+func handleSetDeviceName(b Backend, in *setNameInput) (*emptyOutput, error) {
+	node, err := lookupNode(b, in.DeviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	_, nodeChange, err := b.State.RenameNode(node.ID(), in.Body.Name)
+	if err != nil {
+		return nil, mapError("renaming device", err)
+	}
+
+	b.Change(nodeChange)
+
+	return &emptyOutput{}, nil
+}
+
+// handleSetDeviceTags accepts an empty/null tag set as a no-op rather than
+// rejecting it: Headscale cannot make a node untagged (tags-as-identity is
+// one-way), and the SDK sends "tags":null for "make untagged", so treating it
+// as a no-op keeps tooling lifecycles such as Terraform destroy working.
+func handleSetDeviceTags(ctx context.Context, b Backend, in *setTagsInput) (*emptyOutput, error) {
+	node, err := lookupNode(b, in.DeviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(in.Body.Tags) == 0 {
+		return &emptyOutput{}, nil
+	}
+
+	// An OAuth token may only assign tags within its grant (held directly or
+	// owned by a held tag per policy); an admin API key is unrestricted. The
+	// devices:core scope alone must not let a token stamp an arbitrary policy
+	// tag (e.g. tag:prod) onto any node. SetNodeTags still enforces that each
+	// tag exists in policy.
+	if tokenTags, isOAuth := principalTags(ctx); isOAuth {
+		for _, tag := range in.Body.Tags {
+			if !b.State.TagOwnedByTags(tag, tokenTags) {
+				return nil, huma.Error403Forbidden("token may not assign tag " + tag)
+			}
+		}
+	}
+
+	_, nodeChange, err := b.State.SetNodeTags(node.ID(), in.Body.Tags)
+	if err != nil {
+		return nil, mapError("setting device tags", err)
+	}
+
+	b.Change(nodeChange)
+
+	return &emptyOutput{}, nil
+}
+
+// handleSetDeviceKey only handles disabling expiry (expiry=nil never
+// expires). Re-enabling has no target expiry in the Tailscale request and
+// Headscale stores no original, so it is accepted as a no-op (keeps Terraform
+// destroy working) rather than guessing a lifetime.
+func handleSetDeviceKey(b Backend, in *setKeyInput) (*emptyOutput, error) {
+	node, err := lookupNode(b, in.DeviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !in.Body.KeyExpiryDisabled {
+		return &emptyOutput{}, nil
+	}
+
+	_, nodeChange, err := b.State.SetNodeExpiry(node.ID(), nil)
+	if err != nil {
+		return nil, mapError("setting device key expiry", err)
+	}
+
+	b.Change(nodeChange)
+
+	return &emptyOutput{}, nil
+}
+
+func handleSetDeviceRoutes(b Backend, in *setSubnetRoutesInput) (*deviceRoutesOutput, error) {
+	node, err := lookupNode(b, in.DeviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	approved, err := parseRoutes(in.Body.Routes)
+	if err != nil {
+		return nil, err
+	}
+
+	updated, nodeChange, err := b.State.SetApprovedRoutes(node.ID(), approved)
+	if err != nil {
+		return nil, mapError("setting device routes", err)
+	}
+
+	b.Change(nodeChange)
+
+	return &deviceRoutesOutput{Body: routesFromView(updated)}, nil
+}
+
+func handleGetDeviceRoutes(b Backend, in *deviceByIDInput) (*deviceRoutesOutput, error) {
+	node, err := lookupNode(b, in.DeviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &deviceRoutesOutput{Body: routesFromView(node)}, nil
 }
 
 // lookupNode resolves a device id to its NodeView, mapping a malformed or

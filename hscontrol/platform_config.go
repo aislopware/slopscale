@@ -2,7 +2,6 @@ package hscontrol
 
 import (
 	"bytes"
-	_ "embed"
 	"net/http"
 	textTemplate "text/template"
 	"uuid"
@@ -14,17 +13,18 @@ import (
 // WindowsConfigMessage shows a simple message in the browser for how to configure the Windows Tailscale client.
 func (h *Headscale) WindowsConfigMessage(
 	writer http.ResponseWriter,
-	req *http.Request,
+	_ *http.Request,
 ) {
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	writer.WriteHeader(http.StatusOK)
 	_, _ = writer.Write([]byte(templates.Windows(h.cfg.ServerURL).Render()))
 }
 
-// AppleConfigMessage shows a simple message in the browser to point the user to the iOS/MacOS profile and instructions for how to install it.
+// AppleConfigMessage shows a simple message in the browser to point the user to
+// the iOS/MacOS profile and instructions for how to install it.
 func (h *Headscale) AppleConfigMessage(
 	writer http.ResponseWriter,
-	req *http.Request,
+	_ *http.Request,
 ) {
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	writer.WriteHeader(http.StatusOK)
@@ -51,14 +51,20 @@ func (h *Headscale) ApplePlatformConfig(
 
 	payloadType, ok := applePayloadType[platform]
 	if !ok {
-		httpError(writer, NewHTTPError(http.StatusBadRequest, "platform must be ios, macos-app-store or macos-standalone", nil))
+		httpError(
+			writer,
+			NewHTTPError(http.StatusBadRequest, "platform must be ios, macos-app-store or macos-standalone", nil),
+		)
+
 		return
 	}
 
 	platformConfig.PayloadType = payloadType
 
 	var payload bytes.Buffer
-	if err := payloadTemplate.Execute(&payload, platformConfig); err != nil { //nolint:noinlineerr
+
+	err := payloadTemplate.Execute(&payload, platformConfig)
+	if err != nil {
 		httpError(writer, err)
 		return
 	}
@@ -70,7 +76,9 @@ func (h *Headscale) ApplePlatformConfig(
 	}
 
 	var content bytes.Buffer
-	if err := commonTemplate.Execute(&content, config); err != nil { //nolint:noinlineerr
+
+	err = commonTemplate.Execute(&content, config)
+	if err != nil {
 		httpError(writer, err)
 		return
 	}

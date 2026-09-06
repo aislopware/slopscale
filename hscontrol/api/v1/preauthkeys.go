@@ -89,7 +89,7 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 		Summary:     "Create pre-auth key",
 		Tags:        []string{"PreAuthKeys"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *createPreAuthKeyInput) (*preAuthKeyOutput, error) {
+	}, func(_ context.Context, in *createPreAuthKeyInput) (*preAuthKeyOutput, error) {
 		user, err := parsePreAuthKeyUser(in.Body.User)
 		if err != nil {
 			return nil, err
@@ -144,7 +144,7 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 		Summary:     "Expire pre-auth key",
 		Tags:        []string{"PreAuthKeys"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *expirePreAuthKeyInput) (*expirePreAuthKeyOutput, error) {
+	}, func(_ context.Context, in *expirePreAuthKeyInput) (*expirePreAuthKeyOutput, error) {
 		id, err := parsePreAuthKeyID(in.Body.ID)
 		if err != nil {
 			return nil, err
@@ -166,7 +166,7 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 		Summary:     "Delete pre-auth key",
 		Tags:        []string{"PreAuthKeys"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *deletePreAuthKeyInput) (*deletePreAuthKeyOutput, error) {
+	}, func(_ context.Context, in *deletePreAuthKeyInput) (*deletePreAuthKeyOutput, error) {
 		// DELETE has no body: id is bound from the query string.
 		id, err := parsePreAuthKeyID(in.ID)
 		if err != nil {
@@ -189,7 +189,7 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 		Summary:     "List pre-auth keys",
 		Tags:        []string{"PreAuthKeys"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, _ *struct{}) (*listPreAuthKeysOutput, error) {
+	}, func(_ context.Context, _ *struct{}) (*listPreAuthKeysOutput, error) {
 		preAuthKeys, err := b.State.ListPreAuthKeys()
 		if err != nil {
 			return nil, huma.Error500InternalServerError("listing pre-auth keys", err)

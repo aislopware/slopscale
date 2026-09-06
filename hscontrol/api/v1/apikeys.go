@@ -13,12 +13,14 @@ import (
 )
 
 func init() {
-	registrations = append(registrations, registerApiKeys)
+	registrations = append(registrations, registerAPIKeys)
 }
 
 // ApiKey is the v1 ApiKey message. Timestamps are pointers so a nil source is
 // emitted as JSON null, matching protojson's unset Timestamp (e.g. lastSeen on
 // a fresh key).
+//
+//nolint:staticcheck,revive // ST1003: name is the OpenAPI schema name
 type ApiKey struct {
 	ID         string     `format:"uint64"   json:"id"`
 	Prefix     string     `json:"prefix"`
@@ -28,21 +30,25 @@ type ApiKey struct {
 }
 
 // CreateApiKeyRequestBody is the v1.CreateApiKeyRequest body.
+//
+//nolint:staticcheck,revive // ST1003: name is the OpenAPI schema name
 type CreateApiKeyRequestBody struct {
 	Expiration *time.Time `json:"expiration,omitempty"`
 }
 
 // ExpireApiKeyRequestBody is the v1.ExpireApiKeyRequest body.
+//
+//nolint:staticcheck,revive // ST1003: name is the OpenAPI schema name
 type ExpireApiKeyRequestBody struct {
 	Prefix string `json:"prefix,omitempty"`
 	ID     string `format:"uint64"         json:"id,omitempty"`
 }
 
 type (
-	createApiKeyInput struct {
+	createAPIKeyInput struct {
 		Body CreateApiKeyRequestBody
 	}
-	createApiKeyOutput struct {
+	createAPIKeyOutput struct {
 		Body struct {
 			APIKey string `json:"apiKey"`
 		}
@@ -50,16 +56,16 @@ type (
 )
 
 type (
-	expireApiKeyInput struct {
+	expireAPIKeyInput struct {
 		Body ExpireApiKeyRequestBody
 	}
-	expireApiKeyOutput struct {
+	expireAPIKeyOutput struct {
 		Body struct{}
 	}
 )
 
 type (
-	listApiKeysOutput struct {
+	listAPIKeysOutput struct {
 		Body struct {
 			APIKeys []ApiKey `json:"apiKeys" nullable:"false"`
 		}
@@ -67,16 +73,16 @@ type (
 )
 
 type (
-	deleteApiKeyInput struct {
+	deleteAPIKeyInput struct {
 		Prefix string `path:"prefix"`
 		ID     string `format:"uint64" query:"id"`
 	}
-	deleteApiKeyOutput struct {
+	deleteAPIKeyOutput struct {
 		Body struct{}
 	}
 )
 
-func registerApiKeys(api huma.API, b Backend) {
+func registerAPIKeys(api huma.API, b Backend) {
 	huma.Register(api, huma.Operation{
 		OperationID: "createApiKey",
 		Method:      http.MethodPost,
@@ -84,7 +90,7 @@ func registerApiKeys(api huma.API, b Backend) {
 		Summary:     "Create API key",
 		Tags:        []string{"ApiKeys"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *createApiKeyInput) (*createApiKeyOutput, error) {
+	}, func(_ context.Context, in *createAPIKeyInput) (*createAPIKeyOutput, error) {
 		// CreateAPIKey requires a non-nil pointer; default a missing expiration
 		// to the zero time as the gRPC handler does.
 		var expiration time.Time
@@ -97,7 +103,7 @@ func registerApiKeys(api huma.API, b Backend) {
 			return nil, huma.Error500InternalServerError("creating api key", err)
 		}
 
-		out := &createApiKeyOutput{}
+		out := &createAPIKeyOutput{}
 		out.Body.APIKey = keyStr
 
 		return out, nil
@@ -110,8 +116,8 @@ func registerApiKeys(api huma.API, b Backend) {
 		Summary:     "Expire API key",
 		Tags:        []string{"ApiKeys"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *expireApiKeyInput) (*expireApiKeyOutput, error) {
-		key, err := lookupApiKey(b, in.Body.ID, in.Body.Prefix)
+	}, func(_ context.Context, in *expireAPIKeyInput) (*expireAPIKeyOutput, error) {
+		key, err := lookupAPIKey(b, in.Body.ID, in.Body.Prefix)
 		if err != nil {
 			return nil, err
 		}
@@ -121,7 +127,7 @@ func registerApiKeys(api huma.API, b Backend) {
 			return nil, huma.Error500InternalServerError("expiring api key", err)
 		}
 
-		return &expireApiKeyOutput{}, nil
+		return &expireAPIKeyOutput{}, nil
 	})
 
 	huma.Register(api, huma.Operation{
@@ -131,7 +137,7 @@ func registerApiKeys(api huma.API, b Backend) {
 		Summary:     "List API keys",
 		Tags:        []string{"ApiKeys"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, _ *struct{}) (*listApiKeysOutput, error) {
+	}, func(_ context.Context, _ *struct{}) (*listAPIKeysOutput, error) {
 		keys, err := b.State.ListAPIKeys()
 		if err != nil {
 			return nil, huma.Error500InternalServerError("listing api keys", err)
@@ -142,7 +148,7 @@ func registerApiKeys(api huma.API, b Backend) {
 			return cmp.Compare(a.ID, b.ID)
 		})
 
-		out := &listApiKeysOutput{}
+		out := &listAPIKeysOutput{}
 
 		out.Body.APIKeys = make([]ApiKey, len(keys))
 		for i := range keys {
@@ -159,8 +165,8 @@ func registerApiKeys(api huma.API, b Backend) {
 		Summary:     "Delete API key",
 		Tags:        []string{"ApiKeys"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *deleteApiKeyInput) (*deleteApiKeyOutput, error) {
-		key, err := lookupApiKey(b, in.ID, in.Prefix)
+	}, func(_ context.Context, in *deleteAPIKeyInput) (*deleteAPIKeyOutput, error) {
+		key, err := lookupAPIKey(b, in.ID, in.Prefix)
 		if err != nil {
 			return nil, err
 		}
@@ -170,15 +176,15 @@ func registerApiKeys(api huma.API, b Backend) {
 			return nil, huma.Error500InternalServerError("deleting api key", err)
 		}
 
-		return &deleteApiKeyOutput{}, nil
+		return &deleteAPIKeyOutput{}, nil
 	})
 }
 
-// lookupApiKey resolves an API key by id or prefix; exactly one must be
+// lookupAPIKey resolves an API key by id or prefix; exactly one must be
 // supplied. An empty or zero id counts as "no id". Unknown id/prefix maps to
 // 404 via mapError.
-func lookupApiKey(b Backend, idStr, prefix string) (*types.APIKey, error) {
-	id, err := parseApiKeyID(idStr)
+func lookupAPIKey(b Backend, idStr, prefix string) (*types.APIKey, error) {
+	id, err := parseAPIKeyID(idStr)
 	if err != nil {
 		return nil, err
 	}
@@ -208,9 +214,9 @@ func lookupApiKey(b Backend, idStr, prefix string) (*types.APIKey, error) {
 	}
 }
 
-// parseApiKeyID decodes the optional uint64 id. Empty maps to zero; non-numeric
+// parseAPIKeyID decodes the optional uint64 id. Empty maps to zero; non-numeric
 // is rejected with 400.
-func parseApiKeyID(s string) (uint64, error) {
+func parseAPIKeyID(s string) (uint64, error) {
 	if s == "" {
 		return 0, nil
 	}

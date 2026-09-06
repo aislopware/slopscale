@@ -97,10 +97,7 @@ func TestSyncInitialMapNoPhantomPeersOnTimeout(t *testing.T) {
 		t.Fatalf("adding peer node: %v", err)
 	}
 
-	go func() {
-		for range peerNode.ch {
-		}
-	}()
+	go drainMapResponses(peerNode.ch)
 
 	state.Connect(targetNode.n.ID)
 

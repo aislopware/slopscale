@@ -18,13 +18,12 @@ func newConfirmRequest(t *testing.T, authID types.AuthID, formCSRF, cookieCSRF s
 
 	form := strings.NewReader(registerConfirmCSRFCookie + "=" + formCSRF)
 	req := httptest.NewRequestWithContext(
-		context.Background(),
+		t.Context(),
 		http.MethodPost,
 		"/register/confirm/"+authID.String(),
 		form,
 	)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	//nolint:gosec // G124: test fixture
 	req.AddCookie(&http.Cookie{
 		Name:  registerConfirmCSRFCookie,
 		Value: cookieCSRF,

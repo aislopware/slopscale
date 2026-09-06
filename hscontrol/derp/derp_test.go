@@ -8,6 +8,32 @@ import (
 	"tailscale.com/tailcfg"
 )
 
+// derpNode returns a [tailcfg.DERPNode] test fixture named name in regionID,
+// with a host name derived from name.
+func derpNode(name string, regionID tailcfg.DERPRegionID) *tailcfg.DERPNode {
+	return &tailcfg.DERPNode{Name: name, RegionID: regionID, HostName: "derp" + name + ".tailscale.com"}
+}
+
+// derpMapOf builds a single-region [tailcfg.DERPMap] test fixture, with one
+// node per name in nodeNames, in the given order.
+func derpMapOf(id tailcfg.DERPRegionID, code, name string, nodeNames ...string) *tailcfg.DERPMap {
+	nodes := make([]*tailcfg.DERPNode, len(nodeNames))
+	for i, n := range nodeNames {
+		nodes[i] = derpNode(n, id)
+	}
+
+	return &tailcfg.DERPMap{
+		Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
+			id: {
+				RegionID:   id,
+				RegionCode: code,
+				RegionName: name,
+				Nodes:      nodes,
+			},
+		},
+	}
+}
+
 func TestShuffleDERPMapDeterministic(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -18,36 +44,8 @@ func TestShuffleDERPMapDeterministic(t *testing.T) {
 		{
 			name:       "single region with 4 nodes",
 			baseDomain: "test1.example.com",
-			derpMap: &tailcfg.DERPMap{
-				Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
-					1: {
-						RegionID:   1,
-						RegionCode: "nyc",
-						RegionName: "New York City",
-						Nodes: []*tailcfg.DERPNode{
-							{Name: "1f", RegionID: 1, HostName: "derp1f.tailscale.com"},
-							{Name: "1g", RegionID: 1, HostName: "derp1g.tailscale.com"},
-							{Name: "1h", RegionID: 1, HostName: "derp1h.tailscale.com"},
-							{Name: "1i", RegionID: 1, HostName: "derp1i.tailscale.com"},
-						},
-					},
-				},
-			},
-			expected: &tailcfg.DERPMap{
-				Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
-					1: {
-						RegionID:   1,
-						RegionCode: "nyc",
-						RegionName: "New York City",
-						Nodes: []*tailcfg.DERPNode{
-							{Name: "1g", RegionID: 1, HostName: "derp1g.tailscale.com"},
-							{Name: "1f", RegionID: 1, HostName: "derp1f.tailscale.com"},
-							{Name: "1i", RegionID: 1, HostName: "derp1i.tailscale.com"},
-							{Name: "1h", RegionID: 1, HostName: "derp1h.tailscale.com"},
-						},
-					},
-				},
-			},
+			derpMap:    derpMapOf(1, "nyc", "New York City", "1f", "1g", "1h", "1i"),
+			expected:   derpMapOf(1, "nyc", "New York City", "1h", "1f", "1g", "1i"),
 		},
 		{
 			name:       "multiple regions with nodes",
@@ -83,9 +81,9 @@ func TestShuffleDERPMapDeterministic(t *testing.T) {
 						RegionCode: "sea",
 						RegionName: "Seattle",
 						Nodes: []*tailcfg.DERPNode{
-							{Name: "10d", RegionID: 10, HostName: "derp10d.tailscale.com"},
 							{Name: "10c", RegionID: 10, HostName: "derp10c.tailscale.com"},
 							{Name: "10b", RegionID: 10, HostName: "derp10b.tailscale.com"},
+							{Name: "10d", RegionID: 10, HostName: "derp10d.tailscale.com"},
 						},
 					},
 					2: {
@@ -93,9 +91,9 @@ func TestShuffleDERPMapDeterministic(t *testing.T) {
 						RegionCode: "sfo",
 						RegionName: "San Francisco",
 						Nodes: []*tailcfg.DERPNode{
+							{Name: "2f", RegionID: 2, HostName: "derp2f.tailscale.com"},
 							{Name: "2d", RegionID: 2, HostName: "derp2d.tailscale.com"},
 							{Name: "2e", RegionID: 2, HostName: "derp2e.tailscale.com"},
-							{Name: "2f", RegionID: 2, HostName: "derp2f.tailscale.com"},
 						},
 					},
 				},
@@ -104,138 +102,26 @@ func TestShuffleDERPMapDeterministic(t *testing.T) {
 		{
 			name:       "large region with many nodes",
 			baseDomain: "test3.example.com",
-			derpMap: &tailcfg.DERPMap{
-				Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
-					4: {
-						RegionID:   4,
-						RegionCode: "fra",
-						RegionName: "Frankfurt",
-						Nodes: []*tailcfg.DERPNode{
-							{Name: "4f", RegionID: 4, HostName: "derp4f.tailscale.com"},
-							{Name: "4g", RegionID: 4, HostName: "derp4g.tailscale.com"},
-							{Name: "4h", RegionID: 4, HostName: "derp4h.tailscale.com"},
-							{Name: "4i", RegionID: 4, HostName: "derp4i.tailscale.com"},
-						},
-					},
-				},
-			},
-			expected: &tailcfg.DERPMap{
-				Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
-					4: {
-						RegionID:   4,
-						RegionCode: "fra",
-						RegionName: "Frankfurt",
-						Nodes: []*tailcfg.DERPNode{
-							{Name: "4f", RegionID: 4, HostName: "derp4f.tailscale.com"},
-							{Name: "4h", RegionID: 4, HostName: "derp4h.tailscale.com"},
-							{Name: "4g", RegionID: 4, HostName: "derp4g.tailscale.com"},
-							{Name: "4i", RegionID: 4, HostName: "derp4i.tailscale.com"},
-						},
-					},
-				},
-			},
+			derpMap:    derpMapOf(4, "fra", "Frankfurt", "4f", "4g", "4h", "4i"),
+			expected:   derpMapOf(4, "fra", "Frankfurt", "4f", "4g", "4h", "4i"),
 		},
 		{
 			name:       "same region different base domain",
 			baseDomain: "different.example.com",
-			derpMap: &tailcfg.DERPMap{
-				Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
-					4: {
-						RegionID:   4,
-						RegionCode: "fra",
-						RegionName: "Frankfurt",
-						Nodes: []*tailcfg.DERPNode{
-							{Name: "4f", RegionID: 4, HostName: "derp4f.tailscale.com"},
-							{Name: "4g", RegionID: 4, HostName: "derp4g.tailscale.com"},
-							{Name: "4h", RegionID: 4, HostName: "derp4h.tailscale.com"},
-							{Name: "4i", RegionID: 4, HostName: "derp4i.tailscale.com"},
-						},
-					},
-				},
-			},
-			expected: &tailcfg.DERPMap{
-				Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
-					4: {
-						RegionID:   4,
-						RegionCode: "fra",
-						RegionName: "Frankfurt",
-						Nodes: []*tailcfg.DERPNode{
-							{Name: "4g", RegionID: 4, HostName: "derp4g.tailscale.com"},
-							{Name: "4i", RegionID: 4, HostName: "derp4i.tailscale.com"},
-							{Name: "4f", RegionID: 4, HostName: "derp4f.tailscale.com"},
-							{Name: "4h", RegionID: 4, HostName: "derp4h.tailscale.com"},
-						},
-					},
-				},
-			},
+			derpMap:    derpMapOf(4, "fra", "Frankfurt", "4f", "4g", "4h", "4i"),
+			expected:   derpMapOf(4, "fra", "Frankfurt", "4h", "4f", "4g", "4i"),
 		},
 		{
 			name:       "same dataset with another base domain",
 			baseDomain: "another.example.com",
-			derpMap: &tailcfg.DERPMap{
-				Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
-					4: {
-						RegionID:   4,
-						RegionCode: "fra",
-						RegionName: "Frankfurt",
-						Nodes: []*tailcfg.DERPNode{
-							{Name: "4f", RegionID: 4, HostName: "derp4f.tailscale.com"},
-							{Name: "4g", RegionID: 4, HostName: "derp4g.tailscale.com"},
-							{Name: "4h", RegionID: 4, HostName: "derp4h.tailscale.com"},
-							{Name: "4i", RegionID: 4, HostName: "derp4i.tailscale.com"},
-						},
-					},
-				},
-			},
-			expected: &tailcfg.DERPMap{
-				Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
-					4: {
-						RegionID:   4,
-						RegionCode: "fra",
-						RegionName: "Frankfurt",
-						Nodes: []*tailcfg.DERPNode{
-							{Name: "4h", RegionID: 4, HostName: "derp4h.tailscale.com"},
-							{Name: "4f", RegionID: 4, HostName: "derp4f.tailscale.com"},
-							{Name: "4g", RegionID: 4, HostName: "derp4g.tailscale.com"},
-							{Name: "4i", RegionID: 4, HostName: "derp4i.tailscale.com"},
-						},
-					},
-				},
-			},
+			derpMap:    derpMapOf(4, "fra", "Frankfurt", "4f", "4g", "4h", "4i"),
+			expected:   derpMapOf(4, "fra", "Frankfurt", "4h", "4i", "4g", "4f"),
 		},
 		{
 			name:       "same dataset with yet another base domain",
 			baseDomain: "yetanother.example.com",
-			derpMap: &tailcfg.DERPMap{
-				Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
-					4: {
-						RegionID:   4,
-						RegionCode: "fra",
-						RegionName: "Frankfurt",
-						Nodes: []*tailcfg.DERPNode{
-							{Name: "4f", RegionID: 4, HostName: "derp4f.tailscale.com"},
-							{Name: "4g", RegionID: 4, HostName: "derp4g.tailscale.com"},
-							{Name: "4h", RegionID: 4, HostName: "derp4h.tailscale.com"},
-							{Name: "4i", RegionID: 4, HostName: "derp4i.tailscale.com"},
-						},
-					},
-				},
-			},
-			expected: &tailcfg.DERPMap{
-				Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
-					4: {
-						RegionID:   4,
-						RegionCode: "fra",
-						RegionName: "Frankfurt",
-						Nodes: []*tailcfg.DERPNode{
-							{Name: "4i", RegionID: 4, HostName: "derp4i.tailscale.com"},
-							{Name: "4h", RegionID: 4, HostName: "derp4h.tailscale.com"},
-							{Name: "4f", RegionID: 4, HostName: "derp4f.tailscale.com"},
-							{Name: "4g", RegionID: 4, HostName: "derp4g.tailscale.com"},
-						},
-					},
-				},
-			},
+			derpMap:    derpMapOf(4, "fra", "Frankfurt", "4f", "4g", "4h", "4i"),
+			expected:   derpMapOf(4, "fra", "Frankfurt", "4i", "4h", "4g", "4f"),
 		},
 	}
 
@@ -303,7 +189,7 @@ func TestShuffleDERPMapEdgeCases(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(_ *testing.T) {
 			shuffleDERPMap(tt.derpMap)
 		})
 	}

@@ -17,6 +17,7 @@ package apiv2
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"maps"
 	"net/http"
 	"strings"
@@ -63,7 +64,8 @@ func Register(api huma.API, b Backend) {
 // out of the emitted bodies, matching the Tailscale wire contract.
 func Config() huma.Config {
 	config := huma.DefaultConfig("Headscale API", "v2")
-	config.Info.Description = "Headscale v2 API. Some endpoints are ported from / compatible with the Tailscale API (tagged \"Tailscale compat\")."
+	config.Info.Description = "Headscale v2 API. Some endpoints are ported from / compatible with " +
+		"the Tailscale API (tagged \"Tailscale compat\")."
 
 	config.OpenAPIPath = "/api/v2/openapi"
 	config.DocsPath = "/api/v2/docs"
@@ -119,7 +121,12 @@ func Handler(backend Backend) (*chi.Mux, huma.API) {
 func Spec() ([]byte, error) {
 	api := NewAPI(chi.NewMux(), Backend{})
 
-	return api.OpenAPI().YAML()
+	yaml, err := api.OpenAPI().YAML()
+	if err != nil {
+		return nil, fmt.Errorf("generating OpenAPI 3.1 YAML: %w", err)
+	}
+
+	return yaml, nil
 }
 
 // Spec30 emits the document downgraded to OpenAPI 3.0.3, needed because
@@ -127,7 +134,12 @@ func Spec() ([]byte, error) {
 func Spec30() ([]byte, error) {
 	api := NewAPI(chi.NewMux(), Backend{})
 
-	return api.OpenAPI().DowngradeYAML()
+	yaml, err := api.OpenAPI().DowngradeYAML()
+	if err != nil {
+		return nil, fmt.Errorf("generating OpenAPI 3.0 YAML: %w", err)
+	}
+
+	return yaml, nil
 }
 
 type contextKey int

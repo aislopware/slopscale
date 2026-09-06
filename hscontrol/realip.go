@@ -18,6 +18,11 @@ const (
 
 var proxyHeaders = [...]string{headerTrueClientIP, headerXRealIP, headerXForwardedFor}
 
+const (
+	ipv4Bits = 32
+	ipv6Bits = 128
+)
+
 // trustedProxyRealIP rewrites r.RemoteAddr from proxy headers when the
 // peer is in trusted; for any other peer the headers are stripped so a
 // downstream handler cannot read a spoofed value. X-Forwarded-For uses
@@ -112,10 +117,10 @@ func prefixToIPNet(p netip.Prefix) net.IPNet {
 	if addr.Is4() {
 		b := addr.As4()
 
-		return net.IPNet{IP: b[:], Mask: net.CIDRMask(p.Bits(), 32)}
+		return net.IPNet{IP: b[:], Mask: net.CIDRMask(p.Bits(), ipv4Bits)}
 	}
 
 	b := addr.As16()
 
-	return net.IPNet{IP: b[:], Mask: net.CIDRMask(p.Bits(), 128)}
+	return net.IPNet{IP: b[:], Mask: net.CIDRMask(p.Bits(), ipv6Bits)}
 }

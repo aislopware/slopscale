@@ -16,10 +16,13 @@ import (
 	"github.com/juanfont/headscale/hscontrol/templates"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tsweb"
 )
+
+const maxPingBodyBytes = 4096
 
 // protectedDebugHandler wraps an [http.Handler] with an access check that
 // allows requests from loopback, Tailscale CGNAT IPs, and private
@@ -87,7 +90,7 @@ func (h *Headscale) debugHTTPServer() *http.Server {
 	}))
 
 	// Configuration endpoint
-	debug.Handle("config", "Current configuration", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	debug.Handle("config", "Current configuration", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, h.state.DebugConfig())
 	}))
 
@@ -112,7 +115,7 @@ func (h *Headscale) debugHTTPServer() *http.Server {
 	}))
 
 	// Filter rules endpoint
-	debug.Handle("filter", "Current filter rules", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	debug.Handle("filter", "Current filter rules", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		filter, err := h.state.DebugFilter()
 		if err != nil {
 			httpError(w, err)
@@ -123,7 +126,7 @@ func (h *Headscale) debugHTTPServer() *http.Server {
 	}))
 
 	// SSH policies endpoint
-	debug.Handle("ssh", "SSH policies per node", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	debug.Handle("ssh", "SSH policies per node", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, h.state.DebugSSHPolicies())
 	}))
 
@@ -138,9 +141,13 @@ func (h *Headscale) debugHTTPServer() *http.Server {
 	}))
 
 	// Registration cache endpoint
-	debug.Handle("registration-cache", "Registration cache information", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, h.state.DebugRegistrationCache())
-	}))
+	debug.Handle(
+		"registration-cache",
+		"Registration cache information",
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, h.state.DebugRegistrationCache())
+		}),
+	)
 
 	// Routes endpoint
 	debug.Handle("routes", "Primary routes", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -148,26 +155,15 @@ func (h *Headscale) debugHTTPServer() *http.Server {
 	}))
 
 	// Policy manager endpoint
-	debug.Handle("policy-manager", "Policy manager state", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		writeDebug(w, r, func() any { return h.state.DebugPolicyManagerJSON() }, h.state.DebugPolicyManager)
-	}))
+	debug.Handle(
+		"policy-manager",
+		"Policy manager state",
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			writeDebug(w, r, func() any { return h.state.DebugPolicyManagerJSON() }, h.state.DebugPolicyManager)
+		}),
+	)
 
-	debug.Handle("mapresponses", "Map responses for all nodes", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		res, err := h.mapBatcher.DebugMapResponses()
-		if err != nil {
-			httpError(w, err)
-			return
-		}
-
-		if res == nil {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("HEADSCALE_DEBUG_DUMP_MAPRESPONSE_PATH not set"))
-
-			return
-		}
-
-		writeJSON(w, res)
-	}))
+	debug.Handle("mapresponses", "Map responses for all nodes", http.HandlerFunc(h.debugMapResponses))
 
 	// [mapper.Batcher] endpoint
 	debug.Handle("batcher", "Batcher connected nodes", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -176,38 +172,43 @@ func (h *Headscale) debugHTTPServer() *http.Server {
 
 	// Ping endpoint: sends a [tailcfg.PingRequest] to a node and waits for it to respond.
 	// Supports POST (form submit) and GET with ?node= (clickable quick-ping links).
-	debug.Handle("ping", "Ping a node to check connectivity", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var (
-			query  string
-			result *templates.PingResult
-		)
+	debug.Handle(
+		"ping",
+		"Ping a node to check connectivity",
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			var (
+				query  string
+				result *templates.PingResult
+			)
 
-		switch r.Method {
-		case http.MethodPost:
-			r.Body = http.MaxBytesReader(w, r.Body, 4096) //nolint:mnd
+			switch r.Method {
+			case http.MethodPost:
+				r.Body = http.MaxBytesReader(w, r.Body, maxPingBodyBytes)
 
-			err := r.ParseForm()
-			if err != nil {
-				http.Error(w, "bad form data", http.StatusBadRequest)
-				return
-			}
+				err := r.ParseForm()
+				if err != nil {
+					http.Error(w, "bad form data", http.StatusBadRequest)
+					return
+				}
 
-			query = r.FormValue("node")
-			result = h.doPing(r.Context(), query)
-		case http.MethodGet:
-			// Support ?node= for auto-ping links from other debug pages.
-			if q := r.URL.Query().Get("node"); q != "" {
-				query = q
+				query = r.FormValue("node")
 				result = h.doPing(r.Context(), query)
+			case http.MethodGet:
+				// Support ?node= for auto-ping links from other debug pages.
+				if q := r.URL.Query().Get("node"); q != "" {
+					query = q
+					result = h.doPing(r.Context(), query)
+				}
 			}
-		}
 
-		nodes := h.connectedNodesList()
+			nodes := h.connectedNodesList()
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(templates.PingPage(query, result, nodes).Render())) //nolint:gosec // G705: templ component auto-escapes
-	}))
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusOK)
+			//nolint:gosec // G705: templ component auto-escapes
+			_, _ = w.Write([]byte(templates.PingPage(query, result, nodes).Render()))
+		}),
+	)
 
 	// [statsviz.Register] would mount handlers directly on the raw mux,
 	// bypassing the access gate. Build the server by hand and wrap
@@ -220,7 +221,16 @@ func (h *Headscale) debugHTTPServer() *http.Server {
 	}
 
 	debug.URL("/metrics", "Prometheus metrics")
-	debugMux.Handle("/metrics", promhttp.Handler())
+	// InstrumentMetricHandler keeps the promhttp_metric_handler_* series that
+	// promhttp.Handler() used to register; CoalesceGather lets overlapping
+	// scrapes share one gather cycle.
+	debugMux.Handle(
+		"/metrics",
+		promhttp.InstrumentMetricHandler(
+			prometheus.DefaultRegisterer,
+			promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{CoalesceGather: true}),
+		),
+	)
 
 	debugHTTPServer := &http.Server{
 		Addr:         h.cfg.MetricsAddr,
@@ -230,6 +240,23 @@ func (h *Headscale) debugHTTPServer() *http.Server {
 	}
 
 	return debugHTTPServer
+}
+
+func (h *Headscale) debugMapResponses(w http.ResponseWriter, _ *http.Request) {
+	res, err := h.mapBatcher.DebugMapResponses()
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	if res == nil {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("HEADSCALE_DEBUG_DUMP_MAPRESPONSE_PATH not set"))
+
+		return
+	}
+
+	writeJSON(w, res)
 }
 
 // debugBatcher returns debug information about the batcher's connected nodes.

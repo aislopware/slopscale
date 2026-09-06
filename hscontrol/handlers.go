@@ -88,13 +88,13 @@ type HTTPError struct {
 	Err  error  // Detailed error to log on the server
 }
 
-func (e HTTPError) Error() string { return fmt.Sprintf("http error[%d]: %s, %s", e.Code, e.Msg, e.Err) }
-func (e HTTPError) Unwrap() error { return e.Err }
-
 // NewHTTPError returns an HTTPError containing the given information.
 func NewHTTPError(code int, msg string, err error) HTTPError {
 	return HTTPError{Code: code, Msg: msg, Err: err}
 }
+
+func (e HTTPError) Error() string { return fmt.Sprintf("http error[%d]: %s, %s", e.Code, e.Msg, e.Err) }
+func (e HTTPError) Unwrap() error { return e.Err }
 
 var errMethodNotAllowed = NewHTTPError(http.StatusMethodNotAllowed, "method not allowed", nil)
 
@@ -111,7 +111,11 @@ func parseCapabilityVersion(req *http.Request) (tailcfg.CapabilityVersion, error
 
 	clientCapabilityVersion, err := strconv.Atoi(clientCapabilityStr)
 	if err != nil {
-		return 0, NewHTTPError(http.StatusBadRequest, "invalid capability version", fmt.Errorf("parsing capability version: %w", err))
+		return 0, NewHTTPError(
+			http.StatusBadRequest,
+			"invalid capability version",
+			fmt.Errorf("parsing capability version: %w", err),
+		)
 	}
 
 	return tailcfg.CapabilityVersion(clientCapabilityVersion), nil
@@ -129,12 +133,22 @@ func (h *Headscale) handleVerifyRequest(
 ) error {
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
-		return NewHTTPError(http.StatusRequestEntityTooLarge, "request body too large", fmt.Errorf("reading request body: %w", err))
+		return NewHTTPError(
+			http.StatusRequestEntityTooLarge,
+			"request body too large",
+			fmt.Errorf("reading request body: %w", err),
+		)
 	}
 
 	var derpAdmitClientRequest tailcfg.DERPAdmitClientRequest
-	if err := json.Unmarshal(body, &derpAdmitClientRequest); err != nil { //nolint:noinlineerr
-		return NewHTTPError(http.StatusBadRequest, "Bad Request: invalid JSON", fmt.Errorf("parsing DERP client request: %w", err))
+
+	err = json.Unmarshal(body, &derpAdmitClientRequest)
+	if err != nil {
+		return NewHTTPError(
+			http.StatusBadRequest,
+			"Bad Request: invalid JSON",
+			fmt.Errorf("parsing DERP client request: %w", err),
+		)
 	}
 
 	allow := h.state.ListNodes().ContainsFunc(func(n types.NodeView) bool {
@@ -145,11 +159,18 @@ func (h *Headscale) handleVerifyRequest(
 		Allow: allow,
 	}
 
-	return json.NewEncoder(writer).Encode(resp)
+	err = json.NewEncoder(writer).Encode(resp)
+	if err != nil {
+		return fmt.Errorf("encoding DERP admit client response: %w", err)
+	}
+
+	return nil
 }
 
-// VerifyHandler see https://github.com/tailscale/tailscale/blob/964282d34f06ecc06ce644769c66b0b31d118340/derp/derp_server.go#L1159
-// DERP use verifyClientsURL to verify whether a client is allowed to connect to the DERP server.
+// VerifyHandler answers the DERP server's verifyClientsURL check on whether a
+// client is allowed to connect. See:
+//
+// https://github.com/tailscale/tailscale/blob/964282d34f06ecc06ce644769c66b0b31d118340/derp/derp_server.go#L1159
 func (h *Headscale) VerifyHandler(
 	writer http.ResponseWriter,
 	req *http.Request,
@@ -196,7 +217,11 @@ func (h *Headscale) KeyHandler(
 	// instead of a key that only serves as a version-boundary oracle.
 	// See https://github.com/juanfont/headscale/issues/3380.
 	if !isSupportedVersion(capVer) {
-		httpError(writer, NewHTTPError(http.StatusBadRequest, "unsupported client version", unsupportedClientError(capVer)))
+		httpError(
+			writer,
+			NewHTTPError(http.StatusBadRequest, "unsupported client version", unsupportedClientError(capVer)),
+		)
+
 		return
 	}
 
@@ -249,7 +274,7 @@ func (h *Headscale) HealthHandler(
 
 func (h *Headscale) RobotsHandler(
 	writer http.ResponseWriter,
-	req *http.Request,
+	_ *http.Request,
 ) {
 	writer.Header().Set("Content-Type", "text/plain")
 	writer.WriteHeader(http.StatusOK)
@@ -267,7 +292,7 @@ func (h *Headscale) RobotsHandler(
 // Listens in /version.
 func (h *Headscale) VersionHandler(
 	writer http.ResponseWriter,
-	req *http.Request,
+	_ *http.Request,
 ) {
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(http.StatusOK)
@@ -338,18 +363,26 @@ func (a *AuthProviderWeb) AuthHandler(
 func authIDFromRequest(req *http.Request) (types.AuthID, error) {
 	raw, err := stringParam(req, "auth_id")
 	if err != nil {
-		return "", NewHTTPError(http.StatusBadRequest, "invalid auth id", fmt.Errorf("parsing auth_id from URL: %w", err))
+		return "", NewHTTPError(
+			http.StatusBadRequest,
+			"invalid auth id",
+			fmt.Errorf("parsing auth_id from URL: %w", err),
+		)
 	}
 
 	// We need to make sure we dont open for XSS style injections, if the parameter that
 	// is passed as a key is not parsable/validated as a NodePublic key, then fail to render
 	// the template and log an error.
-	authId, err := types.AuthIDFromString(raw)
+	authID, err := types.AuthIDFromString(raw)
 	if err != nil {
-		return "", NewHTTPError(http.StatusBadRequest, "invalid auth id", fmt.Errorf("parsing auth_id from URL: %w", err))
+		return "", NewHTTPError(
+			http.StatusBadRequest,
+			"invalid auth id",
+			fmt.Errorf("parsing auth_id from URL: %w", err),
+		)
 	}
 
-	return authId, nil
+	return authID, nil
 }
 
 // RegisterHandler shows a simple message in the browser to point to the CLI
@@ -361,7 +394,7 @@ func (a *AuthProviderWeb) RegisterHandler(
 	writer http.ResponseWriter,
 	req *http.Request,
 ) {
-	authId, err := authIDFromRequest(req)
+	authID, err := authIDFromRequest(req)
 	if err != nil {
 		httpError(writer, err)
 		return
@@ -373,7 +406,7 @@ func (a *AuthProviderWeb) RegisterHandler(
 	_, err = writer.Write([]byte(templates.AuthWeb(
 		"Node registration",
 		"Run the command below in the headscale server to add this node to your network:",
-		fmt.Sprintf("headscale auth register --auth-id %s --user USERNAME", authId.String()),
+		fmt.Sprintf("headscale auth register --auth-id %s --user USERNAME", authID.String()),
 	).Render()))
 	if err != nil {
 		log.Error().Err(err).Msg("failed to write register response")
@@ -386,7 +419,7 @@ func FaviconHandler(writer http.ResponseWriter, req *http.Request) {
 }
 
 // BlankHandler returns a blank page with favicon linked.
-func BlankHandler(writer http.ResponseWriter, res *http.Request) {
+func BlankHandler(writer http.ResponseWriter, _ *http.Request) {
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	writer.WriteHeader(http.StatusOK)
 

@@ -45,7 +45,12 @@ func policyETagOf(data string) string {
 
 // setACL POSTs a raw policy body with the given content type and optional
 // headers (e.g. "If-Match: ...").
-func setACL(t *testing.T, api humatest.TestAPI, body, contentType string, headers ...string) *httptest.ResponseRecorder {
+func setACL(
+	t *testing.T,
+	api humatest.TestAPI,
+	body, contentType string,
+	headers ...string,
+) *httptest.ResponseRecorder {
 	t.Helper()
 
 	args := make([]any, 0, 2+len(headers))
@@ -66,14 +71,14 @@ func TestAPIv2ACLDefaultWhenUnset(t *testing.T) {
 
 	resp := api.Get("/api/v2/tailnet/-/acl")
 	require.Equalf(t, http.StatusOK, resp.Code, "body: %s", resp.Body)
-	assert.NotEmpty(t, resp.Header().Get("Etag"))
+	assert.NotEmpty(t, resp.Header().Get("ETag"))
 	assert.Contains(t, resp.Body.String(), `"acls"`)
 
 	// GET did not materialize a stored policy.
 	assert.Empty(t, storedPolicy(t, app))
 
 	// Content-addressed: a second GET returns the same ETag.
-	assert.Equal(t, resp.Header().Get("Etag"), api.Get("/api/v2/tailnet/-/acl").Header().Get("Etag"))
+	assert.Equal(t, resp.Header().Get("ETag"), api.Get("/api/v2/tailnet/-/acl").Header().Get("ETag"))
 }
 
 func TestAPIv2ACLContentNegotiation(t *testing.T) {
@@ -88,7 +93,7 @@ func TestAPIv2ACLContentNegotiation(t *testing.T) {
 	assert.Equal(t, "application/hujson", huResp.Header().Get("Content-Type"))
 	// Same bytes, same ETag — the ETag is over content, not type.
 	assert.Equal(t, jsonResp.Body.Bytes(), huResp.Body.Bytes())
-	assert.Equal(t, jsonResp.Header().Get("Etag"), huResp.Header().Get("Etag"))
+	assert.Equal(t, jsonResp.Header().Get("ETag"), huResp.Header().Get("ETag"))
 }
 
 func TestAPIv2ACLSetCanonicalJSON(t *testing.T) {
@@ -99,13 +104,13 @@ func TestAPIv2ACLSetCanonicalJSON(t *testing.T) {
 
 	set := setACL(t, api, allowAllPolicy, "application/json")
 	require.Equalf(t, http.StatusOK, set.Code, "body: %s", set.Body)
-	setETag := set.Header().Get("Etag")
+	setETag := set.Header().Get("ETag")
 	assert.NotEmpty(t, setETag)
 
 	// (a) tool's own get reflects it, same ETag.
 	get := api.Get("/api/v2/tailnet/-/acl")
 	assert.Contains(t, get.Body.String(), `"action":"accept"`)
-	assert.Equal(t, setETag, get.Header().Get("Etag"))
+	assert.Equal(t, setETag, get.Header().Get("ETag"))
 
 	// (b) server-side: exact stored bytes.
 	assert.JSONEq(t, allowAllPolicy, storedPolicy(t, app))
@@ -135,7 +140,7 @@ func TestAPIv2ACLSetHuJSONWithComments(t *testing.T) {
 	// GET round-trips the stored form and its content-addressed ETag.
 	raw := api.Get("/api/v2/tailnet/-/acl", "Accept: application/hujson")
 	assert.Equal(t, stored, raw.Body.String())
-	assert.Equal(t, policyETagOf(stored), raw.Header().Get("Etag"))
+	assert.Equal(t, policyETagOf(stored), raw.Header().Get("ETag"))
 }
 
 func TestAPIv2ACLETagChangesOnChangeStableOnNoop(t *testing.T) {
@@ -144,16 +149,16 @@ func TestAPIv2ACLETagChangesOnChangeStableOnNoop(t *testing.T) {
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
-	etag1 := setACL(t, api, allowAllPolicy, "application/json").Header().Get("Etag")
+	etag1 := setACL(t, api, allowAllPolicy, "application/json").Header().Get("ETag")
 	stored1 := storedPolicy(t, app)
 
 	p2 := `{"hosts":{"h":"100.64.0.1"},"acls":[{"action":"accept","src":["*"],"dst":["*:*"]}]}`
-	etag2 := setACL(t, api, p2, "application/json").Header().Get("Etag")
+	etag2 := setACL(t, api, p2, "application/json").Header().Get("ETag")
 	assert.NotEqual(t, etag1, etag2, "etag changes when policy changes")
 	assert.NotEqual(t, stored1, storedPolicy(t, app))
 
 	// No-op re-set keeps the ETag stable.
-	etag3 := setACL(t, api, p2, "application/json").Header().Get("Etag")
+	etag3 := setACL(t, api, p2, "application/json").Header().Get("ETag")
 	assert.Equal(t, etag2, etag3)
 	assert.Equal(t, p2, storedPolicy(t, app))
 }
@@ -164,7 +169,7 @@ func TestAPIv2ACLIfMatchPreconditions(t *testing.T) {
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
-	etag := setACL(t, api, allowAllPolicy, "application/json").Header().Get("Etag")
+	etag := setACL(t, api, allowAllPolicy, "application/json").Header().Get("ETag")
 
 	p2 := `{"hosts":{"h":"100.64.0.1"},"acls":[{"action":"accept","src":["*"],"dst":["*:*"]}]}`
 
@@ -206,7 +211,7 @@ func TestAPIv2ACLInvalidPolicyAtomicity(t *testing.T) {
 
 	good := setACL(t, api, allowAllPolicy, "application/json")
 	require.Equal(t, http.StatusOK, good.Code)
-	goodETag := good.Header().Get("Etag")
+	goodETag := good.Header().Get("ETag")
 
 	// Malformed body -> 400, and the stored policy is unchanged (atomicity).
 	bad := setACL(t, api, `{ this is not valid`, "application/json")
@@ -216,7 +221,7 @@ func TestAPIv2ACLInvalidPolicyAtomicity(t *testing.T) {
 
 	// Wire-level: GET still serves the good policy + its ETag (no drift).
 	get := api.Get("/api/v2/tailnet/-/acl")
-	assert.Equal(t, goodETag, get.Header().Get("Etag"))
+	assert.Equal(t, goodETag, get.Header().Get("ETag"))
 	assert.JSONEq(t, allowAllPolicy, storedPolicy(t, app))
 }
 
@@ -246,7 +251,7 @@ func TestAPIv2ACLFileModeReadOnly(t *testing.T) {
 	get := api.Get("/api/v2/tailnet/-/acl")
 	require.Equalf(t, http.StatusOK, get.Code, "body: %s", get.Body)
 	assert.Equal(t, fileBytes, get.Body.String())
-	assert.Equal(t, policyETagOf(fileBytes), get.Header().Get("Etag"))
+	assert.Equal(t, policyETagOf(fileBytes), get.Header().Get("ETag"))
 
 	// POST is rejected in file mode; the file is unchanged.
 	set := setACL(t, api, allowAllPolicy, "application/json")

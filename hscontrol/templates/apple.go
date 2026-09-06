@@ -7,8 +7,17 @@ import (
 )
 
 func Apple(url string) *elem.Element {
-	return page(
-		"headscale - Apple",
+	content := appleIOSSection(url)
+	content = append(content, appleMacOSSection(url)...)
+	content = append(content, appleMacOSProfileSection(url)...)
+	content = append(content, appleTVOSSection(url)...)
+
+	return page("headscale - Apple", content...)
+}
+
+// appleIOSSection renders the iOS configuration instructions.
+func appleIOSSection(url string) []elem.Node {
+	return []elem.Node{
 		H1(elem.Text("iOS configuration")),
 		H2(elem.Text("GUI")),
 		Ol(
@@ -45,12 +54,19 @@ func Apple(url string) *elem.Element {
 				),
 			),
 		),
+	}
+}
+
+// appleMacOSSection renders the macOS configuration instructions' command
+// line and GUI flows. appleMacOSProfileSection covers the profile-based flow.
+func appleMacOSSection(url string) []elem.Node {
+	return []elem.Node{
 		H1(elem.Text("macOS configuration")),
 		H2(elem.Text("Command line")),
 		P(
 			elem.Text("Use Tailscale's login command to add your profile:"),
 		),
-		codeBlockText("tailscale login --login-server "+url),
+		codeBlockText("tailscale login --login-server " + url),
 		H2(elem.Text("GUI")),
 		Ol(
 			elem.Li(
@@ -80,6 +96,13 @@ func Apple(url string) *elem.Element {
 				elem.Text("Follow the login procedure in the browser"),
 			),
 		),
+	}
+}
+
+// appleMacOSProfileSection renders the profile-download flow, split out of
+// appleMacOSSection to keep it under the function-length limit.
+func appleMacOSProfileSection(url string) []elem.Node {
+	return []elem.Node{
 		H2(elem.Text("Profiles")),
 		P(
 			elem.Text(
@@ -95,7 +118,8 @@ func Apple(url string) *elem.Element {
 			elem.Li(
 				nil,
 				elem.Text(
-					"Download the profile, then open it. When it has been opened, there should be a notification that a profile can be installed",
+					"Download the profile, then open it. When it has been opened, there should be a "+
+						"notification that a profile can be installed",
 				),
 			),
 			elem.Li(
@@ -121,13 +145,14 @@ func Apple(url string) *elem.Element {
 		orDivider(),
 		P(
 			elem.Text(
-				"Use your terminal to configure the default setting for Tailscale by issuing one of the following commands:",
+				"Use your terminal to configure the default setting for Tailscale by issuing one of the " +
+					"following commands:",
 			),
 		),
 		P(elem.Text("For app store client:")),
-		codeBlockText("defaults write io.tailscale.ipn.macos ControlURL "+url),
+		codeBlockText("defaults write io.tailscale.ipn.macos ControlURL " + url),
 		P(elem.Text("For standalone client:")),
-		codeBlockText("defaults write io.tailscale.ipn.macsys ControlURL "+url),
+		codeBlockText("defaults write io.tailscale.ipn.macsys ControlURL " + url),
 		P(
 			elem.Text("Restart "),
 			elem.Strong(nil, elem.Text("Tailscale.app")),
@@ -135,9 +160,15 @@ func Apple(url string) *elem.Element {
 		),
 		warningBox("Caution", "You should always download and inspect the profile before installing it."),
 		P(elem.Text("For app store client:")),
-		codeBlockText("curl "+url+"/apple/macos-app-store"),
+		codeBlockText("curl " + url + "/apple/macos-app-store"),
 		P(elem.Text("For standalone client:")),
-		codeBlockText("curl "+url+"/apple/macos-standalone"),
+		codeBlockText("curl " + url + "/apple/macos-standalone"),
+	}
+}
+
+// appleTVOSSection renders the tvOS configuration instructions.
+func appleTVOSSection(url string) []elem.Node {
+	return []elem.Node{
 		H1(elem.Text("tvOS configuration")),
 		H2(elem.Text("GUI")),
 		Ol(
@@ -194,5 +225,5 @@ func Apple(url string) *elem.Element {
 				elem.Text("Headscale should now be working on your tvOS device"),
 			),
 		),
-	)
+	}
 }

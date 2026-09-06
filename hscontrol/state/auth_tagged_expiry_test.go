@@ -512,7 +512,12 @@ func (n seededTaggedNode) reopen(t *testing.T) types.NodeView {
 // machine as authUser, advertising requestTags. clientExpiry is the expiry the
 // tailscale client requests (nil for none); it must be ignored while the node
 // stays tagged.
-func (n seededTaggedNode) reauth(t *testing.T, authUser *types.User, requestTags []string, clientExpiry *time.Time) (types.NodeView, error) {
+func (n seededTaggedNode) reauth(
+	t *testing.T,
+	authUser *types.User,
+	requestTags []string,
+	clientExpiry *time.Time,
+) (types.NodeView, error) {
 	t.Helper()
 
 	// Sync the policy manager's user cache. Production keeps it current because

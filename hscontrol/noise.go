@@ -102,7 +102,8 @@ func (h *Headscale) NoiseUpgradeHandler(
 		// be passed to Headscale. Let's give them a hint.
 		log.Warn().
 			Caller().
-			Msg("no upgrade header in TS2021 request. If headscale is behind a reverse proxy, make sure it is configured to pass WebSockets through.")
+			Msg("no upgrade header in TS2021 request. If headscale is behind a reverse proxy, " +
+				"make sure it is configured to pass WebSockets through.")
 		http.Error(writer, "Internal error", http.StatusInternalServerError)
 
 		return
@@ -176,6 +177,8 @@ func (h *Headscale) NoiseUpgradeHandler(
 		//
 		// /whoami is a debug endpoint to validate that the client can communicate over the connection,
 		// not clear if there is a specific response, it looks like it is just logged.
+		//
+		//nolint:lll // URL
 		// https://github.com/tailscale/tailscale/blob/dfba01ca9bd8c4df02c3c32f400d9aeb897c5fc7/cmd/tailscale/cli/debug.go#L1138
 		r.Get("/whoami", ns.NotImplementedHandler)
 
@@ -202,7 +205,7 @@ func (h *Headscale) NoiseUpgradeHandler(
 
 		r.Post("/update-health", ns.NotImplementedHandler)
 
-		r.Route("/webclient", func(r chi.Router) {})
+		r.Route("/webclient", func(_ chi.Router) {})
 
 		r.Post("/c2n", ns.NotImplementedHandler)
 	})
@@ -223,43 +226,6 @@ func (h *Headscale) NoiseUpgradeHandler(
 
 func unsupportedClientError(version tailcfg.CapabilityVersion) error {
 	return fmt.Errorf("%w: %s (%d)", ErrUnsupportedClientVersion, capver.TailscaleVersion(version), version)
-}
-
-func (ns *noiseServer) earlyNoise(protocolVersion int, writer io.Writer) error {
-	if !isSupportedVersion(tailcfg.CapabilityVersion(protocolVersion)) {
-		return unsupportedClientError(tailcfg.CapabilityVersion(protocolVersion))
-	}
-
-	earlyJSON, err := json.Marshal(&tailcfg.EarlyNoise{
-		NodeKeyChallenge: ns.challenge.Public(),
-	})
-	if err != nil {
-		return err
-	}
-
-	// 5 bytes that won't be mistaken for an HTTP/2 frame:
-	// https://httpwg.org/specs/rfc7540.html#rfc.section.4.1 (Especially not
-	// an HTTP/2 settings frame, which isn't of type 'T')
-	var notH2Frame [5]byte
-	copy(notH2Frame[:], earlyPayloadMagic)
-
-	var lenBuf [4]byte
-	binary.BigEndian.PutUint32(lenBuf[:], uint32(len(earlyJSON))) //nolint:gosec // JSON length is bounded
-	// These writes are all buffered by caller, so fine to do them
-	// separately:
-	if _, err := writer.Write(notH2Frame[:]); err != nil { //nolint:noinlineerr
-		return err
-	}
-
-	if _, err := writer.Write(lenBuf[:]); err != nil { //nolint:noinlineerr
-		return err
-	}
-
-	if _, err := writer.Write(earlyJSON); err != nil { //nolint:noinlineerr
-		return err
-	}
-
-	return nil
 }
 
 func isSupportedVersion(version tailcfg.CapabilityVersion) bool {
@@ -335,24 +301,24 @@ func (h *Headscale) PingResponseHandler(
 	}
 }
 
-func stringParam(req *http.Request, key string) (string, error) {
-	param := chi.URLParam(req, key)
+func stringParam(req *http.Request, paramName string) (string, error) {
+	param := chi.URLParam(req, paramName)
 	if param == "" {
-		return "", fmt.Errorf("%w: %s", ErrMissingURLParameter, key)
+		return "", fmt.Errorf("%w: %s", ErrMissingURLParameter, paramName)
 	}
 
 	return param, nil
 }
 
-func nodeIDParam(req *http.Request, key string) (types.NodeID, error) {
-	param := chi.URLParam(req, key)
+func nodeIDParam(req *http.Request, paramName string) (types.NodeID, error) {
+	param := chi.URLParam(req, paramName)
 	if param == "" {
-		return 0, fmt.Errorf("%w: %s", ErrMissingURLParameter, key)
+		return 0, fmt.Errorf("%w: %s", ErrMissingURLParameter, paramName)
 	}
 
 	id, err := types.ParseNodeID(param)
 	if err != nil {
-		return 0, fmt.Errorf("parsing %s: %w", key, err)
+		return 0, fmt.Errorf("parsing %s: %w", paramName, err)
 	}
 
 	return id, nil
@@ -452,6 +418,151 @@ func (ns *noiseServer) SSHActionHandler(
 	if flusher, ok := writer.(http.Flusher); ok {
 		flusher.Flush()
 	}
+}
+
+// PollNetMapHandler takes care of /machine/:id/map using the Noise protocol
+//
+// This is the busiest endpoint, as it keeps the HTTP long poll that updates
+// the clients when something in the network changes.
+//
+// The clients POST stuff like [tailcfg.Hostinfo] and their Endpoints here, but
+// only after their first request (marked with the [tailcfg.MapRequest.ReadOnly] field).
+//
+// At this moment the updates are sent in a quite horrendous way, but they kinda work.
+func (ns *noiseServer) PollNetMapHandler(
+	writer http.ResponseWriter,
+	req *http.Request,
+) {
+	var mapRequest tailcfg.MapRequest
+
+	err := json.NewDecoder(req.Body).Decode(&mapRequest)
+	if err != nil {
+		httpError(writer, err)
+		return
+	}
+
+	// Reject unsupported versions
+	if rejectUnsupported(writer, mapRequest.Version, ns.machineKey, mapRequest.NodeKey) {
+		return
+	}
+
+	nv, err := ns.getAndValidateNode(mapRequest)
+	if err != nil {
+		httpError(writer, err)
+		return
+	}
+
+	sess := ns.headscale.newMapSession(req.Context(), mapRequest, writer, nv.AsStruct())
+	sess.log.Trace().Caller().Msg("a node sending a MapRequest with Noise protocol")
+
+	if !sess.isStreaming() {
+		sess.serve()
+	} else {
+		sess.serveLongPoll()
+	}
+}
+
+func regErr(err error) *tailcfg.RegisterResponse {
+	return &tailcfg.RegisterResponse{Error: err.Error()}
+}
+
+// RegistrationHandler handles the actual registration process of a node.
+func (ns *noiseServer) RegistrationHandler(
+	writer http.ResponseWriter,
+	req *http.Request,
+) {
+	if req.Method != http.MethodPost {
+		httpError(writer, errMethodNotAllowed)
+
+		return
+	}
+
+	//nolint:contextcheck // req.Context() is passed to handleRegister inside the anonymous closure
+	registerRequest, registerResponse := func() (*tailcfg.RegisterRequest, *tailcfg.RegisterResponse) {
+		var resp *tailcfg.RegisterResponse
+
+		var regReq tailcfg.RegisterRequest
+
+		err := json.NewDecoder(req.Body).Decode(&regReq)
+		if err != nil {
+			return &regReq, regErr(err)
+		}
+
+		resp, err = ns.headscale.handleRegister(req.Context(), regReq, ns.conn.Peer())
+		if err != nil {
+			if httpErr, ok := errors.AsType[HTTPError](err); ok {
+				resp = &tailcfg.RegisterResponse{
+					Error: httpErr.Msg,
+				}
+
+				return &regReq, resp
+			}
+
+			return &regReq, regErr(err)
+		}
+
+		return &regReq, resp
+	}()
+
+	// Reject unsupported versions
+	if rejectUnsupported(writer, registerRequest.Version, ns.machineKey, registerRequest.NodeKey) {
+		return
+	}
+
+	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+	writer.WriteHeader(http.StatusOK)
+
+	err := json.NewEncoder(writer).Encode(registerResponse)
+	if err != nil {
+		log.Error().Caller().Err(err).Msg("noise registration handler: failed to encode RegisterResponse")
+		return
+	}
+
+	// Ensure response is flushed to client
+	if flusher, ok := writer.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func (ns *noiseServer) earlyNoise(protocolVersion int, writer io.Writer) error {
+	if !isSupportedVersion(tailcfg.CapabilityVersion(protocolVersion)) {
+		return unsupportedClientError(tailcfg.CapabilityVersion(protocolVersion))
+	}
+
+	earlyJSON, err := json.Marshal(&tailcfg.EarlyNoise{
+		NodeKeyChallenge: ns.challenge.Public(),
+	})
+	if err != nil {
+		return fmt.Errorf("marshaling EarlyNoise response: %w", err)
+	}
+
+	// 5 bytes that won't be mistaken for an HTTP/2 frame:
+	// https://httpwg.org/specs/rfc7540.html#rfc.section.4.1 (Especially not
+	// an HTTP/2 settings frame, which isn't of type 'T')
+	var notH2Frame [5]byte
+	copy(notH2Frame[:], earlyPayloadMagic)
+
+	var lenBuf [4]byte
+	//nolint:gosec // earlyJSON marshals EarlyNoise, holding only a base64 ChallengePublic: always a few dozen bytes
+	binary.BigEndian.PutUint32(lenBuf[:], uint32(len(earlyJSON)))
+	// These writes are all buffered by caller, so fine to do them
+	// separately:
+	_, err = writer.Write(notH2Frame[:])
+	if err != nil {
+		return fmt.Errorf("writing EarlyNoise magic: %w", err)
+	}
+
+	_, err = writer.Write(lenBuf[:])
+	if err != nil {
+		return fmt.Errorf("writing EarlyNoise length: %w", err)
+	}
+
+	_, err = writer.Write(earlyJSON)
+	if err != nil {
+		return fmt.Errorf("writing EarlyNoise payload: %w", err)
+	}
+
+	return nil
 }
 
 // sshAction resolves the SSH action for the given request parameters.
@@ -680,109 +791,6 @@ func (ns *noiseServer) sshActionFollowUp(
 	return action, nil
 }
 
-// PollNetMapHandler takes care of /machine/:id/map using the Noise protocol
-//
-// This is the busiest endpoint, as it keeps the HTTP long poll that updates
-// the clients when something in the network changes.
-//
-// The clients POST stuff like [tailcfg.Hostinfo] and their Endpoints here, but
-// only after their first request (marked with the [tailcfg.MapRequest.ReadOnly] field).
-//
-// At this moment the updates are sent in a quite horrendous way, but they kinda work.
-func (ns *noiseServer) PollNetMapHandler(
-	writer http.ResponseWriter,
-	req *http.Request,
-) {
-	var mapRequest tailcfg.MapRequest
-
-	err := json.NewDecoder(req.Body).Decode(&mapRequest)
-	if err != nil {
-		httpError(writer, err)
-		return
-	}
-
-	// Reject unsupported versions
-	if rejectUnsupported(writer, mapRequest.Version, ns.machineKey, mapRequest.NodeKey) {
-		return
-	}
-
-	nv, err := ns.getAndValidateNode(mapRequest)
-	if err != nil {
-		httpError(writer, err)
-		return
-	}
-
-	sess := ns.headscale.newMapSession(req.Context(), mapRequest, writer, nv.AsStruct())
-	sess.log.Trace().Caller().Msg("a node sending a MapRequest with Noise protocol")
-
-	if !sess.isStreaming() {
-		sess.serve()
-	} else {
-		sess.serveLongPoll()
-	}
-}
-
-func regErr(err error) *tailcfg.RegisterResponse {
-	return &tailcfg.RegisterResponse{Error: err.Error()}
-}
-
-// RegistrationHandler handles the actual registration process of a node.
-func (ns *noiseServer) RegistrationHandler(
-	writer http.ResponseWriter,
-	req *http.Request,
-) {
-	if req.Method != http.MethodPost {
-		httpError(writer, errMethodNotAllowed)
-
-		return
-	}
-
-	registerRequest, registerResponse := func() (*tailcfg.RegisterRequest, *tailcfg.RegisterResponse) { //nolint:contextcheck
-		var resp *tailcfg.RegisterResponse
-
-		var regReq tailcfg.RegisterRequest
-
-		err := json.NewDecoder(req.Body).Decode(&regReq)
-		if err != nil {
-			return &regReq, regErr(err)
-		}
-
-		resp, err = ns.headscale.handleRegister(req.Context(), regReq, ns.conn.Peer())
-		if err != nil {
-			if httpErr, ok := errors.AsType[HTTPError](err); ok {
-				resp = &tailcfg.RegisterResponse{
-					Error: httpErr.Msg,
-				}
-
-				return &regReq, resp
-			}
-
-			return &regReq, regErr(err)
-		}
-
-		return &regReq, resp
-	}()
-
-	// Reject unsupported versions
-	if rejectUnsupported(writer, registerRequest.Version, ns.machineKey, registerRequest.NodeKey) {
-		return
-	}
-
-	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-	writer.WriteHeader(http.StatusOK)
-
-	err := json.NewEncoder(writer).Encode(registerResponse)
-	if err != nil {
-		log.Error().Caller().Err(err).Msg("noise registration handler: failed to encode RegisterResponse")
-		return
-	}
-
-	// Ensure response is flushed to client
-	if flusher, ok := writer.(http.Flusher); ok {
-		flusher.Flush()
-	}
-}
-
 // getAndValidateNode retrieves the node from the database using the NodeKey
 // and validates that it matches the MachineKey from the Noise session.
 func (ns *noiseServer) getAndValidateNode(mapRequest tailcfg.MapRequest) (types.NodeView, error) {
@@ -793,7 +801,11 @@ func (ns *noiseServer) getAndValidateNode(mapRequest tailcfg.MapRequest) (types.
 
 	// Validate that the MachineKey in the Noise session matches the one associated with the NodeKey.
 	if ns.machineKey != nv.MachineKey() {
-		return types.NodeView{}, NewHTTPError(http.StatusNotFound, "node key in request does not match the one associated with this machine key", nil)
+		return types.NodeView{}, NewHTTPError(
+			http.StatusNotFound,
+			"node key in request does not match the one associated with this machine key",
+			nil,
+		)
 	}
 
 	return nv, nil

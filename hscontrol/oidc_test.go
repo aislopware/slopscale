@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
@@ -274,4 +275,39 @@ func TestSetCSRFCookieSecure(t *testing.T) {
 	require.Len(t, plainRec.Result().Cookies(), 1)
 	assert.False(t, plainRec.Result().Cookies()[0].Secure,
 		"plain-http server_url without req.TLS must not set Secure")
+}
+
+func TestNewAuthProviderOIDCIssuerMismatch(t *testing.T) {
+	t.Parallel()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/.well-known/openid-configuration" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"issuer": "https://different-issuer.example.com",
+				"authorization_endpoint": "https://different-issuer.example.com/auth",
+				"token_endpoint": "https://different-issuer.example.com/token",
+				"jwks_uri": "https://different-issuer.example.com/jwks"
+			}`))
+
+			return
+		}
+
+		http.NotFound(w, r)
+	}))
+	defer ts.Close()
+
+	cfg := &types.OIDCConfig{
+		Issuer:   ts.URL,
+		ClientID: "test-client",
+	}
+
+	_, err := NewAuthProviderOIDC(t.Context(), nil, "https://headscale.example.com", cfg)
+	require.Error(t, err)
+
+	var mismatchErr *oidc.IssuerMismatchError
+	require.ErrorAs(t, err, &mismatchErr)
+	assert.Contains(t, err.Error(), "OIDC issuer mismatch")
+	assert.Contains(t, err.Error(), ts.URL)
+	assert.Contains(t, err.Error(), "https://different-issuer.example.com")
 }

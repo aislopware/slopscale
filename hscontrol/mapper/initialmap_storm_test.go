@@ -173,7 +173,7 @@ func TestInitialMapNotStarvedByReconnectStorm(t *testing.T) {
 			err := td.Batcher.AddNode(n.n.ID, n.ch, tailcfg.CapabilityVersion(100), nil)
 			latencies[i] = time.Since(start)
 
-			assert.NoError(t, err) //nolint:testifylint // assert (not require) is correct off the test goroutine
+			assert.NoError(t, err)
 		})
 	}
 
@@ -186,6 +186,11 @@ func TestInitialMapNotStarvedByReconnectStorm(t *testing.T) {
 	t.Logf("initial-map latency over %d nodes (workers=%d): p50=%s p95=%s max=%s",
 		nodeCount, workers, p50, p95, maxLatency)
 
-	require.Less(t, maxLatency, maxAcceptableLatency,
-		"slowest initial map took %s: policy reads are serialising instead of running concurrently (issue #3346)", maxLatency)
+	require.Less(
+		t,
+		maxLatency,
+		maxAcceptableLatency,
+		"slowest initial map took %s: policy reads are serialising instead of running concurrently (issue #3346)",
+		maxLatency,
+	)
 }

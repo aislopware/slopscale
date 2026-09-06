@@ -15,6 +15,10 @@ func init() {
 	registrations = append(registrations, registerSettings)
 }
 
+// hoursPerDay converts Node.Expiry (a duration) into days for
+// devicesKeyDurationDays.
+const hoursPerDay = 24
+
 // TailnetSettings is the Tailscale tailnet-settings response. Headscale's config
 // is file-based and mostly not runtime-mutable, so only a few fields carry a
 // real value; the rest report the default "off".
@@ -60,7 +64,7 @@ func registerSettings(api huma.API, b Backend) {
 		Tags:        settingsTags,
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.FeatureSettingsRead), func(ctx context.Context, in *getSettingsInput) (*settingsOutput, error) {
+	}, scope.FeatureSettingsRead), func(_ context.Context, in *getSettingsInput) (*settingsOutput, error) {
 		err := requireDefaultTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
@@ -71,7 +75,7 @@ func registerSettings(api huma.API, b Backend) {
 		return &settingsOutput{Body: TailnetSettings{
 			// File-mode policy is genuinely externally managed (read-only via API).
 			ACLsExternallyManagedOn:                cfg.Policy.Mode == types.PolicyModeFile,
-			DevicesKeyDurationDays:                 int(cfg.Node.Expiry / (24 * time.Hour)),
+			DevicesKeyDurationDays:                 int(cfg.Node.Expiry / (hoursPerDay * time.Hour)),
 			HTTPSEnabled:                           cfg.TLS.CertPath != "" || cfg.TLS.LetsEncrypt.Hostname != "",
 			UsersRoleAllowedToJoinExternalTailnets: "none",
 		}}, nil
@@ -86,8 +90,13 @@ func registerSettings(api huma.API, b Backend) {
 		Security:    security,
 		// The body is accepted but ignored; skip validation.
 		SkipValidateBody: true,
-		Errors:           []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusNotImplemented},
-	}, scope.FeatureSettings), func(ctx context.Context, in *patchSettingsInput) (*settingsOutput, error) {
+		Errors: []int{
+			http.StatusUnauthorized,
+			http.StatusForbidden,
+			http.StatusNotFound,
+			http.StatusNotImplemented,
+		},
+	}, scope.FeatureSettings), func(_ context.Context, in *patchSettingsInput) (*settingsOutput, error) {
 		err := requireDefaultTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err

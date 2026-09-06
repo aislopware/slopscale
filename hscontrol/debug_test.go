@@ -229,6 +229,7 @@ func TestDebugConfig(t *testing.T) {
 
 	var cfg types.Config
 
+	//nolint:musttag // types.Config carries no json tags; the debug endpoint marshals it by field name
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &cfg))
 	assert.Equal(t, env.app.cfg.ServerURL, cfg.ServerURL)
 	assert.Equal(t, env.app.cfg.Policy.Mode, cfg.Policy.Mode)
@@ -497,7 +498,12 @@ func TestDebugPing(t *testing.T) {
 	t.Run("disconnected node via post", func(t *testing.T) {
 		t.Parallel()
 
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/debug/ping", strings.NewReader("node="+idStr))
+		req := httptest.NewRequestWithContext(
+			t.Context(),
+			http.MethodPost,
+			"/debug/ping",
+			strings.NewReader("node="+idStr),
+		)
 		req.RemoteAddr = debugLoopbackAddr
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -511,7 +517,12 @@ func TestDebugPing(t *testing.T) {
 	t.Run("malformed form", func(t *testing.T) {
 		t.Parallel()
 
-		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/debug/ping", strings.NewReader("node=%zz"))
+		req := httptest.NewRequestWithContext(
+			t.Context(),
+			http.MethodPost,
+			"/debug/ping",
+			strings.NewReader("node=%zz"),
+		)
 		req.RemoteAddr = debugLoopbackAddr
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 

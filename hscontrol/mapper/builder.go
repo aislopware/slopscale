@@ -2,6 +2,7 @@ package mapper
 
 import (
 	"cmp"
+	"fmt"
 	"net/netip"
 	"slices"
 	"time"
@@ -49,28 +50,6 @@ func (m *mapper) NewMapResponseBuilder(nodeID types.NodeID) *MapResponseBuilder 
 		nodeID: nodeID,
 		errs:   nil,
 	}
-}
-
-// addError adds an error to the builder's error list.
-func (b *MapResponseBuilder) addError(err error) {
-	if err != nil {
-		b.errs = append(b.errs, err)
-	}
-}
-
-// hasErrors returns true if the builder has accumulated any errors.
-func (b *MapResponseBuilder) hasErrors() bool {
-	return len(b.errs) > 0
-}
-
-// node looks up the requesting node, recording ErrNodeNotFoundMapper on miss.
-func (b *MapResponseBuilder) node() (types.NodeView, bool) {
-	nv, ok := b.mapper.state.GetNodeByID(b.nodeID)
-	if !ok {
-		b.addError(ErrNodeNotFoundMapper)
-	}
-
-	return nv, ok
 }
 
 // WithCapabilityVersion sets the capability version for the response.
@@ -249,6 +228,65 @@ func (b *MapResponseBuilder) WithPeerChanges(peers views.Slice[types.NodeView]) 
 	return b
 }
 
+// WithPingRequest adds a PingRequest to the response.
+func (b *MapResponseBuilder) WithPingRequest(pr *tailcfg.PingRequest) *MapResponseBuilder {
+	b.resp.PingRequest = pr
+	return b
+}
+
+// WithPeerChangedPatch adds peer change patches.
+func (b *MapResponseBuilder) WithPeerChangedPatch(changes []*tailcfg.PeerChange) *MapResponseBuilder {
+	b.resp.PeersChangedPatch = changes
+	return b
+}
+
+// WithPeersRemoved adds removed peer IDs.
+func (b *MapResponseBuilder) WithPeersRemoved(removedIDs ...types.NodeID) *MapResponseBuilder {
+	tailscaleIDs := make([]tailcfg.NodeID, 0, len(removedIDs))
+	for _, id := range removedIDs {
+		tailscaleIDs = append(tailscaleIDs, id.NodeID())
+	}
+
+	b.resp.PeersRemoved = tailscaleIDs
+
+	return b
+}
+
+// Build finalizes the response and returns marshaled bytes.
+func (b *MapResponseBuilder) Build() (*tailcfg.MapResponse, error) {
+	if len(b.errs) > 0 {
+		return nil, fmt.Errorf("building map response: %w", multierr.New(b.errs...))
+	}
+
+	if debugDumpMapResponsePath != "" {
+		writeDebugMapResponse(b.resp, b.debugType, b.nodeID)
+	}
+
+	return b.resp, nil
+}
+
+// addError adds an error to the builder's error list.
+func (b *MapResponseBuilder) addError(err error) {
+	if err != nil {
+		b.errs = append(b.errs, err)
+	}
+}
+
+// hasErrors returns true if the builder has accumulated any errors.
+func (b *MapResponseBuilder) hasErrors() bool {
+	return len(b.errs) > 0
+}
+
+// node looks up the requesting node, recording ErrNodeNotFoundMapper on miss.
+func (b *MapResponseBuilder) node() (types.NodeView, bool) {
+	nv, ok := b.mapper.state.GetNodeByID(b.nodeID)
+	if !ok {
+		b.addError(ErrNodeNotFoundMapper)
+	}
+
+	return nv, ok
+}
+
 // buildTailPeers converts [views.Slice] of [types.NodeView] to a slice of [tailcfg.Node]
 // with policy filtering and sorting.
 func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) ([]*tailcfg.Node, error) {
@@ -304,7 +342,12 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 				Uint64(zf.NodeID, peer.ID().Uint64()).
 				Str(zf.NodeHostname, peer.Hostname()).
 				Uint64("map.viewer.node.id", b.nodeID.Uint64()).
-				Msgf("dropping peer %d from map response: invalid node data; fix with `headscale nodes rename %d <name>`", peer.ID(), peer.ID())
+				Msgf(
+					"dropping peer %d from map response: invalid node data; "+
+						"fix with `headscale nodes rename %d <name>`",
+					peer.ID(),
+					peer.ID(),
+				)
 
 			continue
 		}
@@ -328,41 +371,4 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 	})
 
 	return tailPeers, nil
-}
-
-// WithPingRequest adds a PingRequest to the response.
-func (b *MapResponseBuilder) WithPingRequest(pr *tailcfg.PingRequest) *MapResponseBuilder {
-	b.resp.PingRequest = pr
-	return b
-}
-
-// WithPeerChangedPatch adds peer change patches.
-func (b *MapResponseBuilder) WithPeerChangedPatch(changes []*tailcfg.PeerChange) *MapResponseBuilder {
-	b.resp.PeersChangedPatch = changes
-	return b
-}
-
-// WithPeersRemoved adds removed peer IDs.
-func (b *MapResponseBuilder) WithPeersRemoved(removedIDs ...types.NodeID) *MapResponseBuilder {
-	tailscaleIDs := make([]tailcfg.NodeID, 0, len(removedIDs))
-	for _, id := range removedIDs {
-		tailscaleIDs = append(tailscaleIDs, id.NodeID())
-	}
-
-	b.resp.PeersRemoved = tailscaleIDs
-
-	return b
-}
-
-// Build finalizes the response and returns marshaled bytes.
-func (b *MapResponseBuilder) Build() (*tailcfg.MapResponse, error) {
-	if len(b.errs) > 0 {
-		return nil, multierr.New(b.errs...)
-	}
-
-	if debugDumpMapResponsePath != "" {
-		writeDebugMapResponse(b.resp, b.debugType, b.nodeID)
-	}
-
-	return b.resp, nil
 }

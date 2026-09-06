@@ -71,7 +71,7 @@ func registerAuth(api huma.API, b Backend) {
 		Summary:     "Register node via auth flow",
 		Tags:        []string{"Auth"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *authRegisterInput) (*authRegisterOutput, error) {
+	}, func(_ context.Context, in *authRegisterInput) (*authRegisterOutput, error) {
 		// Malformed auth_id is 400; unknown user and missing pending session are
 		// 404 via mapError, matching the Approve/Reject handlers.
 		registrationID, err := types.AuthIDFromString(in.Body.AuthID)
@@ -114,7 +114,7 @@ func registerAuth(api huma.API, b Backend) {
 		Summary:     "Approve a pending auth session",
 		Tags:        []string{"Auth"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *authApproveInput) (*authApproveOutput, error) {
+	}, func(_ context.Context, in *authApproveInput) (*authApproveOutput, error) {
 		authReq, err := pendingAuthRequest(b, in.Body.AuthID)
 		if err != nil {
 			return nil, err
@@ -132,7 +132,7 @@ func registerAuth(api huma.API, b Backend) {
 		Summary:     "Reject a pending auth session",
 		Tags:        []string{"Auth"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *authRejectInput) (*authRejectOutput, error) {
+	}, func(_ context.Context, in *authRejectInput) (*authRejectOutput, error) {
 		authReq, err := pendingAuthRequest(b, in.Body.AuthID)
 		if err != nil {
 			return nil, err

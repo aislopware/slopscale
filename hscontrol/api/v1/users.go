@@ -3,6 +3,7 @@ package apiv1
 import (
 	"cmp"
 	"context"
+	"fmt"
 	"net/http"
 	"slices"
 	"strconv"
@@ -69,7 +70,7 @@ func registerUsers(api huma.API, b Backend) {
 		Summary:     "Create user",
 		Tags:        []string{"Users"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *createUserInput) (*userOutput, error) {
+	}, func(_ context.Context, in *createUserInput) (*userOutput, error) {
 		// Pre-check yields a 409 for the common case; the DB unique constraint
 		// is the real guard.
 		if in.Body.Name != "" {
@@ -104,7 +105,7 @@ func registerUsers(api huma.API, b Backend) {
 		Summary:     "Rename user",
 		Tags:        []string{"Users"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *renameUserInput) (*userOutput, error) {
+	}, func(_ context.Context, in *renameUserInput) (*userOutput, error) {
 		oldID, err := parseUserID(in.OldID)
 		if err != nil {
 			return nil, err
@@ -140,7 +141,7 @@ func registerUsers(api huma.API, b Backend) {
 		Summary:     "Delete user",
 		Tags:        []string{"Users"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *deleteUserInput) (*deleteUserOutput, error) {
+	}, func(_ context.Context, in *deleteUserInput) (*deleteUserOutput, error) {
 		id, err := parseUserID(in.ID)
 		if err != nil {
 			return nil, err
@@ -168,7 +169,7 @@ func registerUsers(api huma.API, b Backend) {
 		Summary:     "List users",
 		Tags:        []string{"Users"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *listUsersInput) (*listUsersOutput, error) {
+	}, func(_ context.Context, in *listUsersInput) (*listUsersOutput, error) {
 		// Gateway parity: a non-numeric id is a 400 even when other filters win.
 		if in.ID != "" {
 			_, err := strconv.ParseUint(in.ID, 10, 64)
@@ -209,7 +210,7 @@ func listUsersFiltered(b Backend, in *listUsersInput) ([]types.User, error) {
 	case in.ID != "":
 		id, err := strconv.ParseUint(in.ID, 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parsing user id %q: %w", in.ID, err)
 		}
 
 		if id == 0 {

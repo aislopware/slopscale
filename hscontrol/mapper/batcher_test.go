@@ -43,7 +43,12 @@ type testBatcherWrapper struct {
 	connectGens sync.Map // types.NodeID → uint64
 }
 
-func (t *testBatcherWrapper) AddNode(id types.NodeID, c chan<- *tailcfg.MapResponse, version tailcfg.CapabilityVersion, stop func()) error {
+func (t *testBatcherWrapper) AddNode(
+	id types.NodeID,
+	c chan<- *tailcfg.MapResponse,
+	version tailcfg.CapabilityVersion,
+	stop func(),
+) error {
 	// Mark node as online in state before AddNode to match production behavior
 	// This ensures the NodeStore has correct online status for change processing
 	if t.state != nil {
@@ -98,8 +103,8 @@ func (t *testBatcherWrapper) RemoveNode(id types.NodeID, c chan<- *tailcfg.MapRe
 }
 
 // wrapBatcherForTest wraps a batcher with test-specific behavior.
-func wrapBatcherForTest(b *Batcher, state *state.State) *testBatcherWrapper {
-	return &testBatcherWrapper{Batcher: b, state: state}
+func wrapBatcherForTest(b *Batcher, st *state.State) *testBatcherWrapper {
+	return &testBatcherWrapper{Batcher: b, state: st}
 }
 
 // allBatcherFunctions contains all batcher implementations to test.
@@ -224,7 +229,7 @@ func setupBatcherWithTestData(
 	}
 
 	// Now create state using the same database
-	state, err := state.NewState(cfg)
+	st, err := state.NewState(cfg)
 	if err != nil {
 		tb.Fatalf("Failed to create state: %v", err)
 	}
@@ -233,7 +238,7 @@ func setupBatcherWithTestData(
 	require.NoError(tb, err)
 	require.NotNil(tb, derpMap)
 
-	state.SetDERPMap(derpMap)
+	st.SetDERPMap(derpMap)
 
 	// Set up a permissive policy that allows all communication for testing
 	allowAllPolicy := `{
@@ -246,27 +251,27 @@ func setupBatcherWithTestData(
 		]
 	}`
 
-	_, err = state.SetPolicy([]byte(allowAllPolicy))
+	_, err = st.SetPolicy([]byte(allowAllPolicy))
 	if err != nil {
 		tb.Fatalf("Failed to set allow-all policy: %v", err)
 	}
 
 	// Create batcher with the state and wrap it for testing
-	batcher := wrapBatcherForTest(bf(cfg, state), state)
+	batcher := wrapBatcherForTest(bf(cfg, st), st)
 	batcher.Start()
 
 	testData := &TestData{
 		Database: database,
 		Users:    users,
 		Nodes:    allNodes,
-		State:    state,
+		State:    st,
 		Config:   cfg,
 		Batcher:  batcher,
 	}
 
 	cleanup := func() {
 		batcher.Close()
-		state.Close()
+		st.Close()
 		database.Close()
 	}
 
@@ -305,25 +310,6 @@ func (ut *updateTracker) recordUpdate(nodeID types.NodeID, updateSize int) {
 	stats.TotalUpdates++
 	stats.UpdateSizes = append(stats.UpdateSizes, updateSize)
 	stats.LastUpdate = time.Now()
-}
-
-// getStats returns a copy of the statistics for a node.
-//
-//nolint:unused
-func (ut *updateTracker) getStats(nodeID types.NodeID) UpdateStats {
-	ut.mu.RLock()
-	defer ut.mu.RUnlock()
-
-	if stats, exists := ut.stats[nodeID]; exists {
-		// Return a copy to avoid race conditions
-		return UpdateStats{
-			TotalUpdates: stats.TotalUpdates,
-			UpdateSizes:  append([]int{}, stats.UpdateSizes...),
-			LastUpdate:   stats.LastUpdate,
-		}
-	}
-
-	return UpdateStats{}
 }
 
 // getAllStats returns a copy of all statistics.
@@ -407,36 +393,34 @@ func (n *node) start() {
 
 				// Parse update and track detailed stats
 				info := parseUpdateAndAnalyze(data)
-				{
-					// Track update types
-					if info.IsFull {
-						n.fullCount.Add(1)
-						n.lastPeerCount.Store(int64(info.PeerCount))
-						// Update max peers seen using compare-and-swap for thread safety
-						for {
-							current := n.maxPeersCount.Load()
-							if int64(info.PeerCount) <= current {
-								break
-							}
+				// Track update types
+				if info.IsFull {
+					n.fullCount.Add(1)
+					n.lastPeerCount.Store(int64(info.PeerCount))
+					// Update max peers seen using compare-and-swap for thread safety
+					for {
+						current := n.maxPeersCount.Load()
+						if int64(info.PeerCount) <= current {
+							break
+						}
 
-							if n.maxPeersCount.CompareAndSwap(current, int64(info.PeerCount)) {
-								break
-							}
+						if n.maxPeersCount.CompareAndSwap(current, int64(info.PeerCount)) {
+							break
 						}
 					}
+				}
 
-					if info.IsPatch {
-						n.patchCount.Add(1)
-						// For patches, we track how many patch items using compare-and-swap
-						for {
-							current := n.maxPeersCount.Load()
-							if int64(info.PatchCount) <= current {
-								break
-							}
+				if info.IsPatch {
+					n.patchCount.Add(1)
+					// For patches, we track how many patch items using compare-and-swap
+					for {
+						current := n.maxPeersCount.Load()
+						if int64(info.PatchCount) <= current {
+							break
+						}
 
-							if n.maxPeersCount.CompareAndSwap(current, int64(info.PatchCount)) {
-								break
-							}
+						if n.maxPeersCount.CompareAndSwap(current, int64(info.PatchCount)) {
+							break
 						}
 					}
 				}
@@ -783,8 +767,15 @@ func TestBatcherScalabilityAllToAll(t *testing.T) {
 					} else {
 						// This should not happen since we loop until success, but handle it just in case
 						failedNodes := len(allNodes) - successfulNodes
-						t.Errorf("UNEXPECTED: %d/%d nodes still failed after waiting for connectivity (expected %d, some saw %d-%d)",
-							failedNodes, len(allNodes), expectedPeers, minPeersSeen, maxPeersGlobal)
+						t.Errorf(
+							"UNEXPECTED: %d/%d nodes still failed after waiting for connectivity "+
+								"(expected %d, some saw %d-%d)",
+							failedNodes,
+							len(allNodes),
+							expectedPeers,
+							minPeersSeen,
+							maxPeersGlobal,
+						)
 
 						// Show details of failed nodes for debugging
 						if len(nodeDetails) > 5 {
@@ -883,27 +874,6 @@ func TestBatcherBasicOperations(t *testing.T) {
 			case <-time.After(500 * time.Millisecond):
 				t.Error("Did not receive expected Online response update")
 			}
-
-			// // Test node-specific update with real node data
-			// batcher.AddWork(change.NodeKeyChanged(tn.n.ID))
-
-			// // Wait for node update (may be empty for certain node changes)
-			// select {
-			// case data := <-tn.ch:
-			// 	t.Logf("Received node update: %d bytes", len(data))
-			// 	if len(data) == 0 {
-			// 		t.Logf("Empty node update (expected for some node changes in test environment)")
-			// 	} else {
-			// 		if valid, updateType := validateUpdateContent(data); !valid {
-			// 			t.Errorf("Invalid node update content: %s", updateType)
-			// 		} else {
-			// 			t.Logf("Valid node update type: %s", updateType)
-			// 		}
-			// 	}
-			// case <-time.After(200 * time.Millisecond):
-			// 	// Node changes might not always generate updates in test environment
-			// 	t.Logf("No node update received (may be expected in test environment)")
-			// }
 
 			// Test RemoveNode
 			batcher.RemoveNode(tn.n.ID, tn.ch)
@@ -1334,8 +1304,6 @@ func TestBatcherWorkerChannelSafety(t *testing.T) {
 // real node data. The test validates that stable clients continue to function
 // normally and receive proper updates despite the connection churn from other clients,
 // ensuring system stability under concurrent load.
-//
-//nolint:gocyclo // complex concurrent test scenario
 func TestBatcherConcurrentClients(t *testing.T) {
 	t.Parallel()
 
@@ -1422,10 +1390,10 @@ func TestBatcherConcurrentClients(t *testing.T) {
 					for j := range churningNodes {
 						node := &churningNodes[j]
 
-						wg.Add(2)
-
 						// Connect churning node
-						go func(nodeID types.NodeID) {
+						wg.Go(func() {
+							nodeID := node.n.ID
+
 							defer func() {
 								if r := recover(); r != nil {
 									panicMutex.Lock()
@@ -1435,8 +1403,6 @@ func TestBatcherConcurrentClients(t *testing.T) {
 									panicMutex.Unlock()
 									t.Logf("Panic in churning connect: %v", r)
 								}
-
-								wg.Done()
 							}()
 
 							ch := make(chan *tailcfg.MapResponse, smallBufferSize)
@@ -1471,10 +1437,12 @@ func TestBatcherConcurrentClients(t *testing.T) {
 									}
 								}
 							}()
-						}(node.n.ID)
+						})
 
 						// Disconnect churning node
-						go func(nodeID types.NodeID) {
+						wg.Go(func() {
+							nodeID := node.n.ID
+
 							defer func() {
 								if r := recover(); r != nil {
 									panicMutex.Lock()
@@ -1484,8 +1452,6 @@ func TestBatcherConcurrentClients(t *testing.T) {
 									panicMutex.Unlock()
 									t.Logf("Panic in churning disconnect: %v", r)
 								}
-
-								wg.Done()
 							}()
 
 							for range i % 5 {
@@ -1501,7 +1467,7 @@ func TestBatcherConcurrentClients(t *testing.T) {
 							if exists {
 								batcher.RemoveNode(nodeID, ch)
 							}
-						}(node.n.ID)
+						})
 					}
 
 					// Generate various types of work during racing
@@ -1704,12 +1670,14 @@ func TestBatcherFullPeerUpdates(t *testing.T) {
 						}
 
 						updateType := "unknown"
-						if len(data.Peers) > 0 {
+
+						switch {
+						case len(data.Peers) > 0:
 							updateType = "FULL"
 							foundFullUpdate = true
-						} else if len(data.PeersChangedPatch) > 0 {
+						case len(data.PeersChangedPatch) > 0:
 							updateType = "PATCH"
-						} else if data.DERPMap != nil {
+						case data.DERPMap != nil:
 							updateType = "DERP"
 						}
 
@@ -1902,7 +1870,6 @@ func TestBatcherRapidReconnection(t *testing.T) {
 	}
 }
 
-//nolint:gocyclo // complex multi-connection test scenario
 func TestBatcherMultiConnection(t *testing.T) {
 	t.Parallel()
 
@@ -2288,7 +2255,11 @@ func TestRemoveNodeChannelAlreadyRemoved(t *testing.T) {
 				assert.False(t, removed, "RemoveNode should report no remaining active connections")
 
 				assert.EventuallyWithT(t, func(c *assert.CollectT) {
-					assert.False(c, lfb.IsConnected(nodeID), "node should be disconnected after last connection is gone")
+					assert.False(
+						c,
+						lfb.IsConnected(nodeID),
+						"node should be disconnected after last connection is gone",
+					)
 				}, 5*time.Second, 50*time.Millisecond, "waiting for node to be disconnected")
 
 				close(ch)
@@ -2319,7 +2290,11 @@ func TestRemoveNodeChannelAlreadyRemoved(t *testing.T) {
 
 				removed := lfb.RemoveNode(nodeID, ch1)
 				assert.True(t, removed, "RemoveNode should report node still has active connections")
-				assert.True(t, lfb.IsConnected(nodeID), "node should still be connected while another connection exists")
+				assert.True(
+					t,
+					lfb.IsConnected(nodeID),
+					"node should still be connected while another connection exists",
+				)
 				assert.Equal(t, 1, nodeConn.getActiveConnectionCount(), "exactly one active connection should remain")
 
 				close(ch1)

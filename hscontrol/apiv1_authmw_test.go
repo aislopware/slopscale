@@ -1,7 +1,6 @@
 package hscontrol
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -43,7 +42,7 @@ func TestAPIV1AuthMiddleware(t *testing.T) {
 			t.Parallel()
 
 			req := httptest.NewRequestWithContext(
-				context.Background(), http.MethodGet, "/api/v1/node", nil,
+				t.Context(), http.MethodGet, "/api/v1/node", nil,
 			)
 			if tt.authHeader != "" {
 				req.Header.Set("Authorization", tt.authHeader)
@@ -81,7 +80,7 @@ func TestAPIV1DocsArePublic(t *testing.T) {
 
 			// No Authorization header: these must be public.
 			req := httptest.NewRequestWithContext(
-				context.Background(), http.MethodGet, tt.path, nil,
+				t.Context(), http.MethodGet, tt.path, nil,
 			)
 
 			rec := httptest.NewRecorder()
@@ -103,7 +102,7 @@ func TestAPIV1Unauthorized401(t *testing.T) {
 	handler := app.HTTPHandler()
 
 	req := httptest.NewRequestWithContext(
-		context.Background(), http.MethodGet, "/api/v1/node", nil,
+		t.Context(), http.MethodGet, "/api/v1/node", nil,
 	)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
