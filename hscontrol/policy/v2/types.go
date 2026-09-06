@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"iter"
@@ -3123,7 +3124,9 @@ func unmarshalPolicy(b []byte) (*Policy, error) {
 
 	var policy Policy
 
-	ast, err := hujson.Parse(b)
+	// hujson aliases the input and Standardize blanks comments in place,
+	// which would strip them from the bytes callers go on to store.
+	ast, err := hujson.Parse(bytes.Clone(b))
 	if err != nil {
 		return nil, fmt.Errorf("parsing HuJSON: %w", err)
 	}

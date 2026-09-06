@@ -6410,3 +6410,20 @@ func TestValidateCapabilityName(t *testing.T) {
 		})
 	}
 }
+
+// TestUnmarshalPolicyLeavesInputIntact guards against hujson blanking
+// comments in the caller's buffer: the CLI bypass path and the API both
+// validate a policy and then store the same bytes.
+func TestUnmarshalPolicyLeavesInputIntact(t *testing.T) {
+	t.Parallel()
+
+	input := []byte(`{
+		// keep me
+		"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"],},],
+	}`)
+	want := string(input)
+
+	_, err := unmarshalPolicy(input)
+	require.NoError(t, err)
+	require.Equal(t, want, string(input))
+}
