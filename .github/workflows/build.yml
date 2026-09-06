@@ -77,17 +77,17 @@ jobs:
         env:
           - "GOARCH=arm64 GOOS=linux"
           - "GOARCH=amd64 GOOS=linux"
-          - "GOARCH=arm64 GOOS=darwin"
-          - "GOARCH=amd64 GOOS=darwin"
+          - "GOARCH=arm GOARM=7 GOOS=linux"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: NixOS/nix-installer-action@62c1943b776c509394b550f3f983adc14e9212d6 # v1.0.0
       - uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
 
+      # cgo cross build: zigcc (Nix devShell) maps GOOS/GOARCH to a zig
+      # target and the binary links statically against musl.
       - name: Run go cross compile
-        env:
-          CGO_ENABLED: 0
-        run: env ${{ matrix.env }} go build -o "headscale"
+        run: env ${{ matrix.env }} CC=zigcc go build -trimpath -tags netgo,osusergo
+          -ldflags '-s -w -linkmode=external -extldflags=-static' -o "headscale"
           ./cmd/headscale
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

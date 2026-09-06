@@ -17,8 +17,11 @@ RUN go mod download
 # Copy source and build - invalidated on any source change
 COPY . .
 
-# Build debug binary with debug symbols for delve
-RUN CGO_ENABLED=0 GOOS=linux go build -gcflags="all=-N -l" -o /go/bin/headscale ./cmd/headscale
+# Build debug binary with debug symbols for delve. The SQLite driver is C
+# compiled by cgo with the flags from sqlite.cflags; the builder and the
+# runtime image share the same Debian release, so dynamic linking is fine.
+RUN CGO_ENABLED=1 CGO_CFLAGS="$(grep -v '^#' sqlite.cflags | tr '\n' ' ')" GOOS=linux \
+    go build -gcflags="all=-N -l" -o /go/bin/headscale ./cmd/headscale
 
 # Runtime stage
 FROM debian:trixie-slim

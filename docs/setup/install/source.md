@@ -16,8 +16,9 @@ README](https://github.com/juanfont/headscale#contributing) for more information
 ### Install from source
 
 ```shell
-# Install prerequisites
-pkg_add go git
+# Install prerequisites: Go, git, GNU make and a C compiler (clang ships
+# with the base system; the SQLite driver is C compiled through cgo)
+pkg_add go git gmake
 
 git clone https://github.com/juanfont/headscale.git
 
@@ -30,34 +31,12 @@ latestTag=$(git describe --tags `git rev-list --tags --max-count=1`)
 
 git checkout $latestTag
 
-go build -ldflags="-s -w -X github.com/juanfont/headscale/hscontrol/types.Version=$latestTag" -X github.com/juanfont/headscale/hscontrol/types.GitCommitHash=HASH" github.com/juanfont/headscale
+# gmake build passes the compiler flags from sqlite.cflags that the server expects
+gmake build
 
 # make it executable
 chmod a+x headscale
 
 # copy it to /usr/local/sbin
 cp headscale /usr/local/sbin
-```
-
-### Install from source via cross compile
-
-```shell
-# Install prerequisites
-# 1. go v1.27+: see the go directive in go.mod for the exact minimum
-# 2. gmake: Makefile in the headscale repo is written in GNU make syntax
-
-git clone https://github.com/juanfont/headscale.git
-
-cd headscale
-
-# optionally checkout a release
-# option a. you can find official release at https://github.com/juanfont/headscale/releases/latest
-# option b. get latest tag, this may be a beta release
-latestTag=$(git describe --tags `git rev-list --tags --max-count=1`)
-
-git checkout $latestTag
-
-make build GOOS=openbsd
-
-# copy headscale to openbsd machine and put it in /usr/local/sbin
 ```

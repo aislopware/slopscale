@@ -13,20 +13,30 @@ release:
 
     Please follow the steps outlined in the [upgrade guide](https://headscale.net/stable/setup/upgrade/) to update your existing Headscale installation.
 
+# The SQLite driver is C compiled by cgo, so every target needs a C
+# compiler: zigcc (from the Nix devShell, which also exports CGO_CFLAGS from
+# sqlite.cflags) maps GOOS/GOARCH to a zig target and links statically
+# against musl. Only Linux targets are cross-compiled; macOS and FreeBSD
+# users build natively or through the Nix flake.
 builds:
   - id: headscale
     main: ./cmd/headscale
     mod_timestamp: "{{ .CommitTimestamp }}"
     env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
+      - CC=zigcc
     targets:
-      - darwin_amd64
-      - darwin_arm64
-      - freebsd_amd64
       - linux_amd64
       - linux_arm64
+      - linux_arm_7
     flags:
       - -mod=readonly
+      - -trimpath
+      - -tags=netgo,osusergo
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+      - -linkmode=external
+      - -extldflags=-static
 
 archives:
   - id: golang-cross
@@ -109,7 +119,15 @@ kos:
     build: headscale
     main: ./cmd/headscale
     env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
+      - CC=zigcc
+    flags:
+      - -trimpath
+      - -tags=netgo,osusergo
+    ldflags:
+      - -s -w
+      - -linkmode=external
+      - -extldflags=-static
     platforms:
       - linux/amd64
       - linux/arm64
@@ -142,7 +160,15 @@ kos:
     build: headscale
     main: ./cmd/headscale
     env:
-      - CGO_ENABLED=0
+      - CGO_ENABLED=1
+      - CC=zigcc
+    flags:
+      - -trimpath
+      - -tags=netgo,osusergo
+    ldflags:
+      - -s -w
+      - -linkmode=external
+      - -extldflags=-static
     platforms:
       - linux/amd64
       - linux/arm64
