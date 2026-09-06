@@ -170,6 +170,7 @@ func userFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("picture-url", "p", "", "")
 	cmd.Flags().StringP("new-name", "r", "", "")
 	cmd.Flags().String("role", "", "")
+	cmd.Flags().Bool("revoke", false, "")
 }
 
 func TestUserCommands(t *testing.T) {
@@ -308,6 +309,53 @@ func TestUserCommands(t *testing.T) {
 				},
 			},
 			want: "User role set to auditor\n",
+		},
+		{
+			name:  "approve resolves by name and posts the approval",
+			src:   approveUserCmd,
+			flags: map[string]string{"name": "bob"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/user": listFiltered,
+				"POST /api/v1/user/{id}/approve": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+					assert.Equal(t, "2", r.PathValue("id"))
+
+					var body clientv1.SetApprovalRequestBody
+
+					decodeBody(t, r, &body)
+
+					if assert.NotNil(t, body.Approved) {
+						assert.True(t, *body.Approved)
+					}
+
+					approved := bob
+					approved.Approved = true
+					writeJSON(t, w, clientv1.UserOutputBody{User: approved})
+				},
+			},
+			want: "User approved\n",
+		},
+		{
+			name:  "approve --revoke withdraws the approval",
+			src:   approveUserCmd,
+			flags: map[string]string{"identifier": "2", "revoke": "true"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/user": listFiltered,
+				"POST /api/v1/user/{id}/approve": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+
+					var body clientv1.SetApprovalRequestBody
+
+					decodeBody(t, r, &body)
+
+					if assert.NotNil(t, body.Approved) {
+						assert.False(t, *body.Approved)
+					}
+
+					writeJSON(t, w, clientv1.UserOutputBody{User: bob})
+				},
+			},
+			want: "User approval revoked\n",
 		},
 		{
 			name:  "set-role surfaces the api error",

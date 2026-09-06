@@ -31,6 +31,8 @@ func init() {
 	createPreAuthKeyCmd.Flags().
 		StringSlice("tags", []string{}, "Tags to automatically assign to node")
 	createPreAuthKeyCmd.PersistentFlags().Uint64P("user", "u", 0, "User identifier (ID)")
+	createPreAuthKeyCmd.Flags().
+		Bool("preauthorized", true, "Nodes registered with the key skip device approval")
 	expirePreAuthKeyCmd.PersistentFlags().Uint64P("id", "i", 0, "Authkey ID")
 	deletePreAuthKeyCmd.PersistentFlags().Uint64P("id", "i", 0, "Authkey ID")
 }
@@ -109,6 +111,7 @@ var createPreAuthKeyCmd = &cobra.Command{
 			reusable, _ := cmd.Flags().GetBool("reusable")
 			ephemeral, _ := cmd.Flags().GetBool("ephemeral")
 			tags, _ := cmd.Flags().GetStringSlice("tags")
+			preauthorized, _ := cmd.Flags().GetBool("preauthorized")
 
 			expiryTime, err := expirationFromFlag(cmd)
 			if err != nil {
@@ -123,6 +126,8 @@ var createPreAuthKeyCmd = &cobra.Command{
 				Ephemeral:  &ephemeral,
 				AclTags:    &tags,
 				Expiration: &expiryTime,
+
+				Preauthorized: &preauthorized,
 			}
 
 			resp, err := client.CreatePreAuthKeyWithResponse(ctx, request)

@@ -26,6 +26,7 @@ func nodeFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolP("disable", "d", false, "")
 	cmd.Flags().StringSliceP("tags", "t", []string{}, "")
 	cmd.Flags().StringSliceP("routes", "r", []string{}, "")
+	cmd.Flags().Bool("revoke", false, "")
 }
 
 // laptopNode is a user-owned, online node with no routes. Timestamps are
@@ -45,6 +46,7 @@ func laptopNode() clientv1.Node {
 		LastSeen:       &lastSeen,
 		Expiry:         &expiry,
 		Online:         true,
+		Approved:       true,
 		CreatedAt:      time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC),
 		RegisterMethod: "REGISTER_METHOD_AUTH_KEY",
 	}
@@ -175,6 +177,51 @@ func TestNodeCommands(t *testing.T) {
 				},
 			},
 			wantErr: "registration id not found",
+		},
+		{
+			name:  "approve posts approved=true and reports it",
+			src:   approveNodeCmd,
+			flags: map[string]string{"identifier": "7"},
+			routes: map[string]apiHandler{
+				"POST /api/v1/node/{id}/approve": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+					assert.Equal(t, "7", r.PathValue("id"))
+
+					var body clientv1.SetApprovalRequestBody
+
+					decodeBody(t, r, &body)
+
+					if assert.NotNil(t, body.Approved) {
+						assert.True(t, *body.Approved)
+					}
+
+					writeJSON(t, w, clientv1.NodeOutputBody{Node: laptop})
+				},
+			},
+			want: "Node approved\n",
+		},
+		{
+			name:  "approve --revoke posts approved=false",
+			src:   approveNodeCmd,
+			flags: map[string]string{"identifier": "7", "revoke": "true"},
+			routes: map[string]apiHandler{
+				"POST /api/v1/node/{id}/approve": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+
+					var body clientv1.SetApprovalRequestBody
+
+					decodeBody(t, r, &body)
+
+					if assert.NotNil(t, body.Approved) {
+						assert.False(t, *body.Approved)
+					}
+
+					pending := laptop
+					pending.Approved = false
+					writeJSON(t, w, clientv1.NodeOutputBody{Node: pending})
+				},
+			},
+			want: "Node approval revoked\n",
 		},
 		{
 			name:  "expire without a time expires now",
@@ -524,7 +571,7 @@ func TestNodesToPtables(t *testing.T) {
 				"7", "laptop", "laptop", "[ASNFZ]", "[/ty6m]", "alice", "",
 				"100.64.0.7\nfd7a:115c:a1e0::7", "false",
 				"2026-03-01 11:30:00", "2100-01-01 00:00:00",
-				pterm.LightGreen("online"), pterm.LightGreen("no"),
+				pterm.LightGreen("online"), pterm.LightGreen("yes"), pterm.LightGreen("no"),
 			},
 		},
 		{
@@ -534,7 +581,7 @@ func TestNodesToPtables(t *testing.T) {
 				"8", "router", "router", "[ASNFZ]", "[/ty6m]", "", "tag:router",
 				"100.64.0.8", "true",
 				"", "2000-01-01 00:00:00",
-				pterm.LightRed("offline"), pterm.LightRed("yes"),
+				pterm.LightRed("offline"), pterm.LightRed("pending"), pterm.LightRed("yes"),
 			},
 		},
 		{
@@ -545,7 +592,7 @@ func TestNodesToPtables(t *testing.T) {
 				"7", "laptop", "laptop", "[ASNFZ]", "[/ty6m]", "alice", "",
 				"100.64.0.7\nfd7a:115c:a1e0::7", "false",
 				"2026-03-01 11:30:00", "N/A",
-				pterm.LightGreen("online"), pterm.LightGreen("no"),
+				pterm.LightGreen("online"), pterm.LightGreen("yes"), pterm.LightGreen("no"),
 			},
 		},
 		{
@@ -556,7 +603,7 @@ func TestNodesToPtables(t *testing.T) {
 				"7", "laptop", "laptop", "", "[/ty6m]", "alice", "",
 				"100.64.0.7\nfd7a:115c:a1e0::7", "false",
 				"2026-03-01 11:30:00", "2100-01-01 00:00:00",
-				pterm.LightGreen("online"), pterm.LightGreen("no"),
+				pterm.LightGreen("online"), pterm.LightGreen("yes"), pterm.LightGreen("no"),
 			},
 		},
 		{
@@ -567,7 +614,7 @@ func TestNodesToPtables(t *testing.T) {
 				"7", "laptop", "laptop", "[ASNFZ]", "[/ty6m]", "alice", "",
 				"100.64.0.7", "false",
 				"2026-03-01 11:30:00", "2100-01-01 00:00:00",
-				pterm.LightGreen("online"), pterm.LightGreen("no"),
+				pterm.LightGreen("online"), pterm.LightGreen("yes"), pterm.LightGreen("no"),
 			},
 		},
 		{
@@ -609,7 +656,7 @@ func TestNodesToPtablesEmpty(t *testing.T) {
 	table, err := nodesToPtables(nil)
 	require.NoError(t, err)
 	require.Len(t, table, 1, "header only")
-	assert.Len(t, table[0], 13)
+	assert.Len(t, table[0], 14)
 }
 
 func TestNodeRoutesToPtables(t *testing.T) {

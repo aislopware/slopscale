@@ -59,6 +59,11 @@ func init() {
 				`or empty string to remove all approved routes)`)
 	nodeCmd.AddCommand(approveRoutesCmd)
 
+	approveNodeCmd.Flags().Uint64P("identifier", "i", 0, "Node identifier (ID)")
+	mustMarkRequired(approveNodeCmd, "identifier")
+	approveNodeCmd.Flags().Bool("revoke", false, "Withdraw the approval instead of granting it")
+	nodeCmd.AddCommand(approveNodeCmd)
+
 	nodeCmd.AddCommand(backfillNodeIPsCmd)
 }
 
@@ -175,6 +180,42 @@ var listNodeRoutesCmd = &cobra.Command{
 			return printListOutput(cmd, nodes, func() error {
 				return pterm.DefaultTable.WithHasHeader().WithData(nodeRoutesToPtables(nodes)).Render()
 			})
+		},
+	),
+}
+
+var approveNodeCmd = &cobra.Command{
+	Use:   "approve",
+	Short: "Approve a node that is waiting for device approval",
+	Long: `Admits a node that registered while device approval was on. A node waiting
+for approval stays registered but has no peers and is not visible to any.
+
+Use --revoke to withdraw the approval again.`,
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			identifier, _ := cmd.Flags().GetUint64("identifier")
+			revoke, _ := cmd.Flags().GetBool("revoke")
+			approved := !revoke
+
+			resp, err := client.ApproveNodeWithResponse(
+				ctx,
+				strconv.FormatUint(identifier, util.Base10),
+				clientv1.ApproveNodeJSONRequestBody{Approved: &approved},
+			)
+			if err != nil {
+				return fmt.Errorf("approving node: %w", err)
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			msg := "Node approved"
+			if revoke {
+				msg = "Node approval revoked"
+			}
+
+			return printOutput(cmd, resp.JSON200.Node, msg)
 		},
 	),
 }
@@ -369,6 +410,7 @@ func nodesToPtables(nodes []clientv1.Node) (pterm.TableData, error) {
 		"Last seen",
 		colExpiration,
 		"Connected",
+		"Approved",
 		"Expired",
 	}
 	tableData := make(pterm.TableData, 1, 1+len(nodes))
@@ -413,6 +455,11 @@ func nodesToPtables(nodes []clientv1.Node) (pterm.TableData, error) {
 			expired = pterm.LightRed("yes")
 		}
 
+		approved := pterm.LightRed("pending")
+		if node.Approved {
+			approved = pterm.LightGreen("yes")
+		}
+
 		tags := strings.Join(node.Tags, "\n")
 
 		var ipBuilder strings.Builder
@@ -443,6 +490,7 @@ func nodesToPtables(nodes []clientv1.Node) (pterm.TableData, error) {
 			lastSeenTime,
 			expiryTime,
 			online,
+			approved,
 			expired,
 		}
 		tableData = append(

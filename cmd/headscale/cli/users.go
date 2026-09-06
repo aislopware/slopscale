@@ -98,6 +98,9 @@ func init() {
 	mustMarkRequired(renameUserCmd, "new-name")
 	userCmd.AddCommand(setUserRoleCmd)
 	usernameAndIDFlag(setUserRoleCmd)
+	userCmd.AddCommand(approveUserCmd)
+	usernameAndIDFlag(approveUserCmd)
+	approveUserCmd.Flags().Bool("revoke", false, "Withdraw the approval instead of granting it")
 	setUserRoleCmd.Flags().StringP("role", "r", "", "Role: owner, admin, network-admin, it-admin, auditor or member")
 	mustMarkRequired(setUserRoleCmd, "role")
 }
@@ -235,12 +238,13 @@ var listUsersCmd = &cobra.Command{
 							user.Name,
 							user.Email,
 							user.Role,
+							approvedLabel(user.Approved),
 							user.CreatedAt.Format(HeadscaleDateTimeFormat),
 						},
 					)
 				}
 
-				return renderTable([]string{"ID", "Name", "Username", "Email", "Role", colCreated}, rows)
+				return renderTable([]string{"ID", "Name", "Username", "Email", "Role", "Approved", colCreated}, rows)
 			})
 		},
 	),
@@ -269,6 +273,44 @@ var renameUserCmd = &cobra.Command{
 			}
 
 			return printOutput(cmd, resp.JSON200.User, "User renamed")
+		},
+	),
+}
+
+var approveUserCmd = &cobra.Command{
+	Use:   "approve --identifier ID or --name NAME",
+	Short: "Approve a user that is waiting for users approval",
+	Long: `
+Admits a user created by OIDC login while users approval was on. Until then
+the user cannot register nodes. Use --revoke to withdraw the approval again,
+which also withdraws every node the user owns.`,
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			userID, _, err := resolveSingleUser(ctx, client, cmd)
+			if err != nil {
+				return err
+			}
+
+			revoke, _ := cmd.Flags().GetBool("revoke")
+			approved := !revoke
+
+			resp, err := client.ApproveUserWithResponse(ctx, userID, clientv1.ApproveUserJSONRequestBody{
+				Approved: &approved,
+			})
+			if err != nil {
+				return fmt.Errorf("approving user: %w", err)
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			msg := "User approved"
+			if revoke {
+				msg = "User approval revoked"
+			}
+
+			return printOutput(cmd, resp.JSON200.User, msg)
 		},
 	),
 }
@@ -302,4 +344,14 @@ admin. The owner's role changes only by such a transfer.`,
 			return printOutput(cmd, resp.JSON200.User, "User role set to "+resp.JSON200.User.Role)
 		},
 	),
+}
+
+// approvedLabel renders a user's approval for the table: pending users are
+// the ones an administrator has to act on.
+func approvedLabel(approved bool) string {
+	if approved {
+		return "yes"
+	}
+
+	return "pending"
 }

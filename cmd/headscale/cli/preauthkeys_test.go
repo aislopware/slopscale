@@ -19,6 +19,7 @@ func preAuthKeyFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSlice("tags", []string{}, "")
 	cmd.Flags().Uint64P("user", "u", 0, "")
 	cmd.Flags().Uint64P("id", "i", 0, "")
+	cmd.Flags().Bool("preauthorized", true, "")
 }
 
 func preAuthKeys() []clientv1.PreAuthKey {
@@ -103,7 +104,7 @@ func TestPreAuthKeyCommands(t *testing.T) {
 			src:  createPreAuthKeyCmd,
 			flags: map[string]string{
 				"user": "1", "reusable": "true", "ephemeral": "true",
-				"tags": "tag:ci,tag:dev", "expiration": "24h",
+				"tags": "tag:ci,tag:dev", "expiration": "24h", "preauthorized": "false",
 			},
 			routes: map[string]apiHandler{
 				"POST /api/v1/preauthkey": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
@@ -114,6 +115,10 @@ func TestPreAuthKeyCommands(t *testing.T) {
 					decodeBody(t, r, &body)
 					assert.Equal(t, "1", ptrStr(body.User))
 					assert.Equal(t, []string{"tag:ci", "tag:dev"}, ptrStrs(body.AclTags))
+
+					if assert.NotNil(t, body.Preauthorized) {
+						assert.False(t, *body.Preauthorized)
+					}
 
 					if assert.NotNil(t, body.Reusable) {
 						assert.True(t, *body.Reusable)
