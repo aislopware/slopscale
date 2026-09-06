@@ -11,12 +11,14 @@ package mapper
 
 import (
 	"fmt"
+	"io"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/juanfont/headscale/hscontrol/wire"
 	"github.com/puzpuzpuz/xsync/v4"
 	"tailscale.com/tailcfg"
 )
@@ -742,5 +744,56 @@ func BenchmarkMapResponseFromChange(b *testing.B) {
 				_, _ = batcher.MapResponseFromChange(allNodes[nodeIdx].n.ID, ch)
 			}
 		})
+	}
+}
+
+// BenchmarkFullMapResponse measures building and encoding a full map
+// response for one node of a 100-node tailnet, the work every node costs
+// on (re)connect and on policy changes.
+func BenchmarkFullMapResponse(b *testing.B) {
+	if testing.Short() {
+		b.Skip("skipping full map benchmark in short mode")
+	}
+
+	testData, cleanup := setupBatcherWithTestData(b, NewBatcherAndMapper, 1, 100, largeBufferSize)
+	defer cleanup()
+
+	batcher := testData.Batcher
+	allNodes := testData.Nodes
+
+	for i := range allNodes {
+		allNodes[i].start()
+	}
+
+	defer func() {
+		for i := range allNodes {
+			allNodes[i].cleanup()
+		}
+	}()
+
+	for i := range allNodes {
+		node := &allNodes[i]
+
+		err := batcher.AddNode(node.n.ID, node.ch, tailcfg.CapabilityVersion(100), nil)
+		if err != nil {
+			b.Fatalf("failed to add node %d: %v", i, err)
+		}
+	}
+
+	ch := change.FullSelf(allNodes[0].n.ID)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := range b.N {
+		resp, err := batcher.MapResponseFromChange(allNodes[i%len(allNodes)].n.ID, ch)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		err = wire.MarshalWrite(io.Discard, resp)
+		if err != nil {
+			b.Fatal(err)
+		}
 	}
 }

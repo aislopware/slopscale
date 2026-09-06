@@ -323,12 +323,10 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 	tailPeers := make([]*tailcfg.Node, 0, changedViews.Len())
 
 	for _, peer := range changedViews.All() {
-		// Pass the peer's policy CapMap as selfPolicyCaps so per-peer
-		// address-shape rules (today: disable-ipv4) apply consistently
-		// in the viewer's netmap. The CapMap merge into tn.CapMap is
-		// overwritten by the PeerCapMap call below; only the address
-		// filtering side-effect inside TailNode survives.
-		tn, err := peer.TailNode(b.capVer, func(_ types.NodeID) []netip.Prefix {
+		// Pass the peer's policy CapMap so per-peer address-shape rules
+		// (today: disable-ipv4) apply consistently in the viewer's
+		// netmap; the entry's own CapMap is set by PeerCapMap below.
+		tn, err := peer.PeerTailNode(b.capVer, func(_ types.NodeID) []netip.Prefix {
 			return b.mapper.state.RoutesForPeer(node, peer, matchers)
 		}, b.mapper.cfg, allCapMaps[peer.ID()])
 		if err != nil {

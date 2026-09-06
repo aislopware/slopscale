@@ -239,17 +239,7 @@ func (node *Node) IsEphemeral() bool {
 // deterministic: IPv4 (if allocated) first, IPv6 second. At most one
 // of each family.
 func (node *Node) IPs() []netip.Addr {
-	var ret []netip.Addr
-
-	if node.IPv4 != nil {
-		ret = append(ret, *node.IPv4)
-	}
-
-	if node.IPv6 != nil {
-		ret = append(ret, *node.IPv6)
-	}
-
-	return ret
+	return node.appendIPs(nil)
 }
 
 // HasIP reports if a node has a given IP address.
@@ -465,11 +455,7 @@ func (node *Node) GetFQDN(baseDomain string) (string, error) {
 	hostname := node.GivenName
 
 	if baseDomain != "" {
-		hostname = fmt.Sprintf(
-			"%s.%s.",
-			node.GivenName,
-			baseDomain,
-		)
+		hostname = node.GivenName + "." + baseDomain + "."
 	}
 
 	if len(hostname) > MaxHostnameLength {
@@ -731,6 +717,20 @@ func (node *Node) DebugString() string {
 	return sb.String()
 }
 
+// appendIPs appends the node's addresses to dst. Callers on the peer
+// visibility path pass a stack array to keep the check allocation free.
+func (node *Node) appendIPs(dst []netip.Addr) []netip.Addr {
+	if node.IPv4 != nil {
+		dst = append(dst, *node.IPv4)
+	}
+
+	if node.IPv6 != nil {
+		dst = append(dst, *node.IPv6)
+	}
+
+	return dst
+}
+
 // canAccess is [Node.CanAccess] with the snapshot-stable route data supplied by
 // the caller. The peer-map build precomputes each node's SubnetRoutes and
 // exit-node status once and passes them here, so the O(n^2) pair scan does not
@@ -741,8 +741,10 @@ func (node *Node) canAccess(
 	srcRoutes, dstRoutes []netip.Prefix,
 	dstIsExit bool,
 ) bool {
-	src := node.IPs()
-	allowedIPs := node2.IPs()
+	var srcBuf, dstBuf [2]netip.Addr
+
+	src := node.appendIPs(srcBuf[:0])
+	allowedIPs := node2.appendIPs(dstBuf[:0])
 
 	for _, m := range matchers {
 		srcMatchesIP := m.SrcsContainsIPs(src...)
@@ -1154,6 +1156,29 @@ func (nv NodeView) TailNode(
 	cfg *Config,
 	selfPolicyCaps tailcfg.NodeCapMap,
 ) (*tailcfg.Node, error) {
+	return nv.tailNode(capVer, primaryRouteFunc, cfg, selfPolicyCaps, true)
+}
+
+// PeerTailNode is [NodeView.TailNode] for a peer entry of another node's
+// map: policyCaps still shapes the addresses, but the entry carries no
+// CapMap, because the caller replaces it with [policyv2.PeerCapMap] and
+// building the baseline map for every peer was pure waste.
+func (nv NodeView) PeerTailNode(
+	capVer tailcfg.CapabilityVersion,
+	primaryRouteFunc RouteFunc,
+	cfg *Config,
+	policyCaps tailcfg.NodeCapMap,
+) (*tailcfg.Node, error) {
+	return nv.tailNode(capVer, primaryRouteFunc, cfg, policyCaps, false)
+}
+
+func (nv NodeView) tailNode(
+	capVer tailcfg.CapabilityVersion,
+	primaryRouteFunc RouteFunc,
+	cfg *Config,
+	selfPolicyCaps tailcfg.NodeCapMap,
+	withCapMap bool,
+) (*tailcfg.Node, error) {
 	if !nv.Valid() {
 		return nil, ErrInvalidNodeView
 	}
@@ -1200,33 +1225,10 @@ func (nv NodeView) TailNode(
 		}
 	}
 
-	// Baseline caps every node receives, regardless of policy. Mirrors
-	// what Tailscale SaaS emits for a default tailnet.
-	// cfg.Taildrop.Enabled gates CapabilityFileSharing.
-	capMap := tailcfg.NodeCapMap{
-		nodecap.Admin: []tailcfg.RawMessage{},
-		nodecap.SSH:   []tailcfg.RawMessage{},
+	var capMap tailcfg.NodeCapMap
+	if withCapMap {
+		capMap = selfCapMap(cfg, selfPolicyCaps)
 	}
-
-	if cfg.Taildrop.Enabled {
-		capMap[nodecap.FileSharing] = []tailcfg.RawMessage{}
-	}
-
-	// default-auto-update is always emitted; the value is a JSON bool
-	// reflecting cfg.AutoUpdate.Enabled. Clients read this on first
-	// netmap and store the default locally; subsequent control-plane
-	// changes are ignored unless the client has not yet opted in or
-	// out.
-	autoUpdateVal := tailcfg.RawMessage("false")
-	if cfg.AutoUpdate.Enabled {
-		autoUpdateVal = tailcfg.RawMessage("true")
-	}
-
-	capMap[nodecap.DefaultAutoUpdate] = []tailcfg.RawMessage{autoUpdateVal}
-
-	// Policy nodeAttrs overlay the baseline on the self view. Peers
-	// pass nil; their CapMap is replaced downstream by [policyv2.PeerCapMap].
-	maps.Copy(capMap, selfPolicyCaps)
 
 	tNode := tailcfg.Node{
 		//nolint:gosec // NodeID is a database autoincrement value, int64 on SQLite/PostgreSQL, so it fits
@@ -1268,4 +1270,35 @@ func (nv NodeView) TailNode(
 	}
 
 	return &tNode, nil
+}
+
+// selfCapMap is the CapMap of a node's own entry: the baseline caps every
+// node receives, regardless of policy, overlaid with its policy nodeAttrs.
+// Mirrors what Tailscale SaaS emits for a default tailnet.
+func selfCapMap(cfg *Config, policyCaps tailcfg.NodeCapMap) tailcfg.NodeCapMap {
+	capMap := tailcfg.NodeCapMap{
+		nodecap.Admin: []tailcfg.RawMessage{},
+		nodecap.SSH:   []tailcfg.RawMessage{},
+	}
+
+	// cfg.Taildrop.Enabled gates CapabilityFileSharing.
+	if cfg.Taildrop.Enabled {
+		capMap[nodecap.FileSharing] = []tailcfg.RawMessage{}
+	}
+
+	// default-auto-update is always emitted; the value is a JSON bool
+	// reflecting cfg.AutoUpdate.Enabled. Clients read this on first
+	// netmap and store the default locally; subsequent control-plane
+	// changes are ignored unless the client has not yet opted in or
+	// out.
+	autoUpdateVal := tailcfg.RawMessage("false")
+	if cfg.AutoUpdate.Enabled {
+		autoUpdateVal = tailcfg.RawMessage("true")
+	}
+
+	capMap[nodecap.DefaultAutoUpdate] = []tailcfg.RawMessage{autoUpdateVal}
+
+	maps.Copy(capMap, policyCaps)
+
+	return capMap
 }
