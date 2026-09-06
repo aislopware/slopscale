@@ -1,14 +1,15 @@
 package hscontrol
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"math/rand/v2"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/types/change"
 	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/juanfont/headscale/hscontrol/wire"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
@@ -336,28 +338,77 @@ func (m *mapSession) serveLongPoll() {
 	}
 }
 
+// mapBuffers pools the buffers map responses are encoded and compressed
+// into, so a stream reuses one allocation across responses instead of
+// paying for a netmap-sized slice on each.
+var mapBuffers = sync.Pool{New: func() any { return new(bytes.Buffer) }}
+
+// maxPooledMapBuffer keeps one unusually large netmap from pinning memory
+// for the life of the process: a buffer that grew past it is dropped.
+const maxPooledMapBuffer = 1 << 20
+
+var mapHeaderPlaceholder [reservedResponseHeaderSize]byte
+
+func getMapBuffer() *bytes.Buffer {
+	buf, ok := mapBuffers.Get().(*bytes.Buffer)
+	if !ok {
+		buf = new(bytes.Buffer)
+	}
+
+	buf.Reset()
+
+	return buf
+}
+
+func putMapBuffer(buf *bytes.Buffer) {
+	if buf.Cap() <= maxPooledMapBuffer {
+		mapBuffers.Put(buf)
+	}
+}
+
+// encodeMap writes msg into out behind the length header, compressed when
+// the client asked for zstd.
+func (m *mapSession) encodeMap(out *bytes.Buffer, msg *tailcfg.MapResponse) error {
+	out.Write(mapHeaderPlaceholder[:])
+
+	if m.req.Compress != util.ZstdCompression {
+		return wire.MarshalWrite(out, msg)
+	}
+
+	raw := getMapBuffer()
+	defer putMapBuffer(raw)
+
+	err := wire.MarshalWrite(raw, msg)
+	if err != nil {
+		return err
+	}
+
+	out.Write(zstdframe.AppendEncode(out.AvailableBuffer(), raw.Bytes(), zstdframe.FastestCompression))
+
+	return nil
+}
+
 // writeMap writes the map response to the client.
 // It handles compression if requested and any headers that need to be set.
 // It also handles flushing the response if the [http.ResponseWriter]
 // implements [http.Flusher].
 func (m *mapSession) writeMap(msg *tailcfg.MapResponse) error {
-	jsonBody, err := json.Marshal(msg)
+	out := getMapBuffer()
+	defer putMapBuffer(out)
+
+	err := m.encodeMap(out, msg)
 	if err != nil {
 		return fmt.Errorf("marshalling map response: %w", err)
 	}
 
-	if m.req.Compress == util.ZstdCompression {
-		jsonBody = zstdframe.AppendEncode(nil, jsonBody, zstdframe.FastestCompression)
+	data := out.Bytes()
+
+	body := len(data) - reservedResponseHeaderSize
+	if body > math.MaxUint32 {
+		return fmt.Errorf("%w: %d bytes", errMapResponseTooLarge, body)
 	}
 
-	if len(jsonBody) > math.MaxUint32 {
-		return fmt.Errorf("%w: %d bytes", errMapResponseTooLarge, len(jsonBody))
-	}
-
-	data := make([]byte, reservedResponseHeaderSize, reservedResponseHeaderSize+len(jsonBody))
-	//nolint:gosec // checked against math.MaxUint32 above; gosec cannot see the guard
-	binary.LittleEndian.PutUint32(data, uint32(len(jsonBody)))
-	data = append(data, jsonBody...)
+	binary.LittleEndian.PutUint32(data, uint32(body))
 
 	startWrite := time.Now()
 

@@ -14,6 +14,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/assets"
 	"github.com/juanfont/headscale/hscontrol/templates"
 	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/juanfont/headscale/hscontrol/wire"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 )
@@ -142,7 +143,7 @@ func (h *Headscale) handleVerifyRequest(
 
 	var derpAdmitClientRequest tailcfg.DERPAdmitClientRequest
 
-	err = json.Unmarshal(body, &derpAdmitClientRequest)
+	err = wire.Unmarshal(body, &derpAdmitClientRequest)
 	if err != nil {
 		return NewHTTPError(
 			http.StatusBadRequest,
@@ -159,7 +160,7 @@ func (h *Headscale) handleVerifyRequest(
 		Allow: allow,
 	}
 
-	err = json.NewEncoder(writer).Encode(resp)
+	err = wire.MarshalWrite(writer, resp)
 	if err != nil {
 		return fmt.Errorf("encoding DERP admit client response: %w", err)
 	}

@@ -3,7 +3,6 @@ package hscontrol
 import (
 	"context"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -16,6 +15,7 @@ import (
 	"github.com/go-chi/metrics"
 	"github.com/juanfont/headscale/hscontrol/capver"
 	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/juanfont/headscale/hscontrol/wire"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/http2"
@@ -407,7 +407,7 @@ func (ns *noiseServer) SSHActionHandler(
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	writer.WriteHeader(http.StatusOK)
 
-	err = json.NewEncoder(writer).Encode(action)
+	err = wire.MarshalWrite(writer, action)
 	if err != nil {
 		reqLog.Error().Caller().Err(err).
 			Msg("failed to encode SSH action response")
@@ -435,7 +435,7 @@ func (ns *noiseServer) PollNetMapHandler(
 ) {
 	var mapRequest tailcfg.MapRequest
 
-	err := json.NewDecoder(req.Body).Decode(&mapRequest)
+	err := wire.UnmarshalRead(req.Body, &mapRequest)
 	if err != nil {
 		httpError(writer, err)
 		return
@@ -483,7 +483,7 @@ func (ns *noiseServer) RegistrationHandler(
 
 		var regReq tailcfg.RegisterRequest
 
-		err := json.NewDecoder(req.Body).Decode(&regReq)
+		err := wire.UnmarshalRead(req.Body, &regReq)
 		if err != nil {
 			return &regReq, regErr(err)
 		}
@@ -512,7 +512,7 @@ func (ns *noiseServer) RegistrationHandler(
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	writer.WriteHeader(http.StatusOK)
 
-	err := json.NewEncoder(writer).Encode(registerResponse)
+	err := wire.MarshalWrite(writer, registerResponse)
 	if err != nil {
 		log.Error().Caller().Err(err).Msg("noise registration handler: failed to encode RegisterResponse")
 		return
@@ -529,7 +529,7 @@ func (ns *noiseServer) earlyNoise(protocolVersion int, writer io.Writer) error {
 		return unsupportedClientError(tailcfg.CapabilityVersion(protocolVersion))
 	}
 
-	earlyJSON, err := json.Marshal(&tailcfg.EarlyNoise{
+	earlyJSON, err := wire.Marshal(&tailcfg.EarlyNoise{
 		NodeKeyChallenge: ns.challenge.Public(),
 	})
 	if err != nil {
