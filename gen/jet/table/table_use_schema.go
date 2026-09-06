@@ -18,5 +18,6 @@ func UseSchema(schema string) {
 	OAuthClients = OAuthClients.FromSchema(schema)
 	Policies = Policies.FromSchema(schema)
 	PreAuthKeys = PreAuthKeys.FromSchema(schema)
+	Settings = Settings.FromSchema(schema)
 	Users = Users.FromSchema(schema)
 }

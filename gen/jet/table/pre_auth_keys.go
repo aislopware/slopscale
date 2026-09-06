@@ -17,19 +17,20 @@ type preAuthKeysTable struct {
 	sqlite.Table
 
 	// Columns
-	ID          sqlite.ColumnInteger
-	Key         sqlite.ColumnString
-	Prefix      sqlite.ColumnString
-	Hash        sqlite.ColumnBlob
-	UserID      sqlite.ColumnInteger
-	Description sqlite.ColumnString
-	Reusable    sqlite.ColumnBool
-	Ephemeral   sqlite.ColumnBool
-	Used        sqlite.ColumnBool
-	Tags        sqlite.ColumnString
-	Expiration  sqlite.ColumnTimestamp
-	Revoked     sqlite.ColumnTimestamp
-	CreatedAt   sqlite.ColumnTimestamp
+	ID            sqlite.ColumnInteger
+	Key           sqlite.ColumnString
+	Prefix        sqlite.ColumnString
+	Hash          sqlite.ColumnBlob
+	UserID        sqlite.ColumnInteger
+	Description   sqlite.ColumnString
+	Reusable      sqlite.ColumnBool
+	Ephemeral     sqlite.ColumnBool
+	Used          sqlite.ColumnBool
+	Tags          sqlite.ColumnString
+	Preauthorized sqlite.ColumnBool
+	Expiration    sqlite.ColumnTimestamp
+	Revoked       sqlite.ColumnTimestamp
+	CreatedAt     sqlite.ColumnTimestamp
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -71,41 +72,43 @@ func newPreAuthKeysTable(schemaName, tableName, alias string) *PreAuthKeysTable 
 
 func newPreAuthKeysTableImpl(schemaName, tableName, alias string) preAuthKeysTable {
 	var (
-		IDColumn          = sqlite.IntegerColumn("id")
-		KeyColumn         = sqlite.StringColumn("key")
-		PrefixColumn      = sqlite.StringColumn("prefix")
-		HashColumn        = sqlite.BlobColumn("hash")
-		UserIDColumn      = sqlite.IntegerColumn("user_id")
-		DescriptionColumn = sqlite.StringColumn("description")
-		ReusableColumn    = sqlite.BoolColumn("reusable")
-		EphemeralColumn   = sqlite.BoolColumn("ephemeral")
-		UsedColumn        = sqlite.BoolColumn("used")
-		TagsColumn        = sqlite.StringColumn("tags")
-		ExpirationColumn  = sqlite.TimestampColumn("expiration")
-		RevokedColumn     = sqlite.TimestampColumn("revoked")
-		CreatedAtColumn   = sqlite.TimestampColumn("created_at")
-		allColumns        = sqlite.ColumnList{IDColumn, KeyColumn, PrefixColumn, HashColumn, UserIDColumn, DescriptionColumn, ReusableColumn, EphemeralColumn, UsedColumn, TagsColumn, ExpirationColumn, RevokedColumn, CreatedAtColumn}
-		mutableColumns    = sqlite.ColumnList{KeyColumn, PrefixColumn, HashColumn, UserIDColumn, DescriptionColumn, ReusableColumn, EphemeralColumn, UsedColumn, TagsColumn, ExpirationColumn, RevokedColumn, CreatedAtColumn}
-		defaultColumns    = sqlite.ColumnList{EphemeralColumn, UsedColumn}
+		IDColumn            = sqlite.IntegerColumn("id")
+		KeyColumn           = sqlite.StringColumn("key")
+		PrefixColumn        = sqlite.StringColumn("prefix")
+		HashColumn          = sqlite.BlobColumn("hash")
+		UserIDColumn        = sqlite.IntegerColumn("user_id")
+		DescriptionColumn   = sqlite.StringColumn("description")
+		ReusableColumn      = sqlite.BoolColumn("reusable")
+		EphemeralColumn     = sqlite.BoolColumn("ephemeral")
+		UsedColumn          = sqlite.BoolColumn("used")
+		TagsColumn          = sqlite.StringColumn("tags")
+		PreauthorizedColumn = sqlite.BoolColumn("preauthorized")
+		ExpirationColumn    = sqlite.TimestampColumn("expiration")
+		RevokedColumn       = sqlite.TimestampColumn("revoked")
+		CreatedAtColumn     = sqlite.TimestampColumn("created_at")
+		allColumns          = sqlite.ColumnList{IDColumn, KeyColumn, PrefixColumn, HashColumn, UserIDColumn, DescriptionColumn, ReusableColumn, EphemeralColumn, UsedColumn, TagsColumn, PreauthorizedColumn, ExpirationColumn, RevokedColumn, CreatedAtColumn}
+		mutableColumns      = sqlite.ColumnList{KeyColumn, PrefixColumn, HashColumn, UserIDColumn, DescriptionColumn, ReusableColumn, EphemeralColumn, UsedColumn, TagsColumn, PreauthorizedColumn, ExpirationColumn, RevokedColumn, CreatedAtColumn}
+		defaultColumns      = sqlite.ColumnList{EphemeralColumn, UsedColumn, PreauthorizedColumn}
 	)
 
 	return preAuthKeysTable{
 		Table: sqlite.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		ID:          IDColumn,
-		Key:         KeyColumn,
-		Prefix:      PrefixColumn,
-		Hash:        HashColumn,
-		UserID:      UserIDColumn,
-		Description: DescriptionColumn,
-		Reusable:    ReusableColumn,
-		Ephemeral:   EphemeralColumn,
-		Used:        UsedColumn,
-		Tags:        TagsColumn,
-		Expiration:  ExpirationColumn,
-		Revoked:     RevokedColumn,
-		CreatedAt:   CreatedAtColumn,
+		ID:            IDColumn,
+		Key:           KeyColumn,
+		Prefix:        PrefixColumn,
+		Hash:          HashColumn,
+		UserID:        UserIDColumn,
+		Description:   DescriptionColumn,
+		Reusable:      ReusableColumn,
+		Ephemeral:     EphemeralColumn,
+		Used:          UsedColumn,
+		Tags:          TagsColumn,
+		Preauthorized: PreauthorizedColumn,
+		Expiration:    ExpirationColumn,
+		Revoked:       RevokedColumn,
+		CreatedAt:     CreatedAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,
