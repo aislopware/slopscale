@@ -1,6 +1,7 @@
 package testcapture_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -105,7 +106,8 @@ func sampleSSHCapture() *testcapture.Capture {
 		ToolVersion:   "capture-test-0.0.0",
 		Tailnet:       "kratail2tid@passkey",
 		Input: testcapture.Input{
-			FullPolicy:      `{"ssh":[{"action":"accept","src":["autogroup:member"],"dst":["autogroup:self"],"users":["root"]}]}`,
+			FullPolicy: `{"ssh":[{"action":"accept","src":["autogroup:member"],` +
+				`"dst":["autogroup:self"],"users":["root"]}]}`,
 			APIResponseCode: 200,
 			Tailnet: testcapture.TailnetInput{
 				DNS: testcapture.DNSInput{
@@ -155,7 +157,7 @@ func equalViaJSON(t *testing.T, want, got *testcapture.Capture) {
 		t.Fatalf("marshal got: %v", err)
 	}
 
-	if string(wantJSON) != string(gotJSON) {
+	if !bytes.Equal(wantJSON, gotJSON) {
 		t.Errorf("roundtrip mismatch\n--- want ---\n%s\n--- got ---\n%s",
 			string(wantJSON), string(gotJSON))
 	}

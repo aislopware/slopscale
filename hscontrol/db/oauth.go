@@ -2,6 +2,7 @@ package db
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
@@ -11,9 +12,10 @@ import (
 	"strings"
 	"time"
 
+	jet "github.com/go-jet/jet/v2/sqlite"
+	"github.com/juanfont/headscale/gen/jet/table"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"golang.org/x/crypto/argon2"
-	"gorm.io/gorm"
 	"tailscale.com/util/rands"
 	"tailscale.com/util/set"
 )
@@ -34,11 +36,11 @@ const (
 )
 
 var (
-	ErrOAuthClientNotFound      = fmt.Errorf("oauth client not found: %w", gorm.ErrRecordNotFound)
+	ErrOAuthClientNotFound      = fmt.Errorf("oauth client not found: %w", ErrNotFound)
 	ErrOAuthClientFailedToParse = errors.New("failed to parse oauth client secret")
 	ErrOAuthClientRevoked       = errors.New("oauth client revoked")
 
-	ErrAccessTokenNotFound      = fmt.Errorf("oauth access token not found: %w", gorm.ErrRecordNotFound)
+	ErrAccessTokenNotFound      = fmt.Errorf("oauth access token not found: %w", ErrNotFound)
 	ErrAccessTokenFailedToParse = errors.New("failed to parse oauth access token")
 	ErrAccessTokenExpired       = errors.New("oauth access token expired")
 	ErrAccessTokenClientRevoked = errors.New("oauth access token issuing client revoked or deleted")
@@ -92,16 +94,19 @@ func verifySecret(encoded []byte, secret string) error {
 	}
 
 	var version int
-	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil || version != argon2.Version { //nolint:noinlineerr
+
+	_, err := fmt.Sscanf(parts[2], "v=%d", &version)
+	if err != nil || version != argon2.Version {
 		return errSecretHashMalformed
 	}
 
 	var (
-		memory, time uint32
-		threads      uint8
+		memory, timeCost uint32
+		threads          uint8
 	)
 
-	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &time, &threads); err != nil { //nolint:noinlineerr
+	_, err = fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &timeCost, &threads)
+	if err != nil {
 		return errSecretHashMalformed
 	}
 
@@ -115,9 +120,13 @@ func verifySecret(encoded []byte, secret string) error {
 		return errSecretHashMalformed
 	}
 
+	if len(want) != sha256.Size {
+		return errSecretHashMalformed
+	}
+
 	argon2Limiter <- struct{}{}
-	//nolint:gosec // want is a 32-byte hash read back from storage, no overflow
-	got := argon2.IDKey([]byte(secret), salt, time, memory, threads, uint32(len(want)))
+	//nolint:gosec // G115: want is checked above to be exactly sha256.Size (32) bytes, well within uint32
+	got := argon2.IDKey([]byte(secret), salt, timeCost, memory, threads, uint32(len(want)))
 
 	<-argon2Limiter
 
@@ -164,14 +173,50 @@ func (hsdb *HSDatabase) CreateOAuthClient(
 		CreatedAt:   &now,
 	}
 
-	err = hsdb.Write(func(tx *gorm.DB) error {
-		return tx.Save(&client).Error
-	})
+	err = insertOAuthClient(hsdb, &client)
 	if err != nil {
 		return "", nil, fmt.Errorf("saving oauth client: %w", err)
 	}
 
 	return secretStr, &client, nil
+}
+
+func insertOAuthClient(q Querier, client *types.OAuthClient) error {
+	row, err := oauthClientRowFrom(client)
+	if err != nil {
+		return err
+	}
+
+	var inserted idRow
+
+	err = q.executor().query(
+		table.OAuthClients.INSERT(table.OAuthClients.MutableColumns).MODEL(row).
+			RETURNING(table.OAuthClients.ID.AS("id_row.id")),
+		&inserted,
+	)
+	if err != nil {
+		return err
+	}
+
+	client.ID = inserted.ID
+
+	return nil
+}
+
+// getOAuthClient returns the client with the given public id, or [ErrNotFound].
+func getOAuthClient(q Querier, clientID string) (*types.OAuthClient, error) {
+	var record oauthClientRecord
+
+	err := q.executor().query(
+		jet.SELECT(table.OAuthClients.AllColumns).FROM(table.OAuthClients).
+			WHERE(table.OAuthClients.ClientID.EQ(jet.String(clientID))).LIMIT(1),
+		&record,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return record.Client.client()
 }
 
 // AuthenticateOAuthClient validates a presented client secret and returns the
@@ -203,12 +248,13 @@ func (hsdb *HSDatabase) AuthenticateOAuthClient(secretStr string) (*types.OAuthC
 		return nil, err
 	}
 
-	var client types.OAuthClient
-	if err := hsdb.DB.First(&client, "client_id = ?", clientID).Error; err != nil { //nolint:noinlineerr
+	client, err := getOAuthClient(hsdb, clientID)
+	if err != nil {
 		return nil, ErrOAuthClientNotFound
 	}
 
-	if err := verifySecret(client.SecretHash, secret); err != nil { //nolint:noinlineerr
+	err = verifySecret(client.SecretHash, secret)
+	if err != nil {
 		return nil, fmt.Errorf("invalid oauth client secret: %w", err)
 	}
 
@@ -216,26 +262,35 @@ func (hsdb *HSDatabase) AuthenticateOAuthClient(secretStr string) (*types.OAuthC
 		return nil, ErrOAuthClientRevoked
 	}
 
-	return &client, nil
+	return client, nil
 }
 
 // GetOAuthClientByClientID returns a [types.OAuthClient] by its public client id.
 func (hsdb *HSDatabase) GetOAuthClientByClientID(clientID string) (*types.OAuthClient, error) {
-	var client types.OAuthClient
-	if result := hsdb.DB.First(&client, "client_id = ?", clientID); result.Error != nil {
-		return nil, result.Error
-	}
-
-	return &client, nil
+	return getOAuthClient(hsdb, clientID)
 }
 
 // ListOAuthClients returns every [types.OAuthClient].
 func (hsdb *HSDatabase) ListOAuthClients() ([]types.OAuthClient, error) {
-	clients := []types.OAuthClient{}
+	var records []oauthClientRecord
 
-	err := hsdb.DB.Find(&clients).Error
+	err := hsdb.ex.query(
+		jet.SELECT(table.OAuthClients.AllColumns).FROM(table.OAuthClients).ORDER_BY(table.OAuthClients.ID.ASC()),
+		&records,
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	clients := make([]types.OAuthClient, 0, len(records))
+
+	for i := range records {
+		client, err := records[i].Client.client()
+		if err != nil {
+			return nil, err
+		}
+
+		clients = append(clients, *client)
 	}
 
 	return clients, nil
@@ -246,19 +301,22 @@ func (hsdb *HSDatabase) ListOAuthClients() ([]types.OAuthClient, error) {
 // 404. Unlike pre-auth keys (which soft-revoke for node-registration history), an
 // OAuth client has no such history and is removed outright, matching Tailscale.
 func (hsdb *HSDatabase) RevokeOAuthClient(clientID string) error {
-	return hsdb.Write(func(tx *gorm.DB) error {
-		err := tx.Where("client_id = ?", clientID).
-			Delete(&types.OAuthAccessToken{}).Error
+	return hsdb.Write(func(tx *Tx) error {
+		_, err := tx.ex.exec(
+			table.OAuthAccessTokens.DELETE().WHERE(table.OAuthAccessTokens.ClientID.EQ(jet.String(clientID))),
+		)
 		if err != nil {
 			return fmt.Errorf("deleting oauth access tokens: %w", err)
 		}
 
-		res := tx.Where("client_id = ?", clientID).Delete(&types.OAuthClient{})
-		if res.Error != nil {
-			return res.Error
+		affected, err := tx.ex.exec(
+			table.OAuthClients.DELETE().WHERE(table.OAuthClients.ClientID.EQ(jet.String(clientID))),
+		)
+		if err != nil {
+			return err
 		}
 
-		if res.RowsAffected == 0 {
+		if affected == 0 {
 			return ErrOAuthClientNotFound
 		}
 
@@ -296,11 +354,9 @@ func (hsdb *HSDatabase) MintAccessToken(
 
 	// Mint inside a transaction that re-checks the client still exists and is
 	// not revoked, so a mint cannot complete against a client being deleted.
-	err = hsdb.Write(func(tx *gorm.DB) error {
-		var client types.OAuthClient
-
-		err := tx.First(&client, "client_id = ?", clientID).Error
-		if err != nil {
+	err = hsdb.Write(func(tx *Tx) error {
+		client, findErr := getOAuthClient(tx, clientID)
+		if findErr != nil {
 			return ErrOAuthClientNotFound
 		}
 
@@ -308,7 +364,25 @@ func (hsdb *HSDatabase) MintAccessToken(
 			return ErrOAuthClientRevoked
 		}
 
-		return tx.Save(&token).Error
+		row, rowErr := oauthAccessTokenRowFrom(&token)
+		if rowErr != nil {
+			return rowErr
+		}
+
+		var inserted idRow
+
+		insertErr := tx.ex.query(
+			table.OAuthAccessTokens.INSERT(table.OAuthAccessTokens.MutableColumns).MODEL(row).
+				RETURNING(table.OAuthAccessTokens.ID.AS("id_row.id")),
+			&inserted,
+		)
+		if insertErr != nil {
+			return insertErr
+		}
+
+		token.ID = inserted.ID
+
+		return nil
 	})
 	if err != nil {
 		return "", nil, fmt.Errorf("saving oauth access token: %w", err)
@@ -340,12 +414,24 @@ func (hsdb *HSDatabase) AuthenticateAccessToken(tokenStr string) (*types.OAuthAc
 		return nil, err
 	}
 
-	var token types.OAuthAccessToken
-	if err := hsdb.DB.First(&token, "prefix = ?", prefix).Error; err != nil { //nolint:noinlineerr
+	var record oauthAccessTokenRecord
+
+	err = hsdb.ex.query(
+		jet.SELECT(table.OAuthAccessTokens.AllColumns).FROM(table.OAuthAccessTokens).
+			WHERE(table.OAuthAccessTokens.Prefix.EQ(jet.String(prefix))).LIMIT(1),
+		&record,
+	)
+	if err != nil {
 		return nil, ErrAccessTokenNotFound
 	}
 
-	if err := verifySecret(token.Hash, secret); err != nil { //nolint:noinlineerr
+	token, err := record.Token.token()
+	if err != nil {
+		return nil, err
+	}
+
+	err = verifySecret(token.Hash, secret)
+	if err != nil {
 		return nil, fmt.Errorf("invalid oauth access token: %w", err)
 	}
 
@@ -357,8 +443,8 @@ func (hsdb *HSDatabase) AuthenticateAccessToken(tokenStr string) (*types.OAuthAc
 	// revoked or deleted is rejected. This closes a mint/revoke race (where a
 	// token could be inserted after the client's tokens were purged) and any
 	// orphan left by manual deletion or a future soft-revoke path.
-	var client types.OAuthClient
-	if err := hsdb.DB.First(&client, "client_id = ?", token.ClientID).Error; err != nil { //nolint:noinlineerr
+	client, err := getOAuthClient(hsdb, token.ClientID)
+	if err != nil {
 		return nil, ErrAccessTokenClientRevoked
 	}
 
@@ -366,7 +452,7 @@ func (hsdb *HSDatabase) AuthenticateAccessToken(tokenStr string) (*types.OAuthAc
 		return nil, ErrAccessTokenClientRevoked
 	}
 
-	return &token, nil
+	return token, nil
 }
 
 // DeleteExpiredAccessTokens hard-deletes every access token that expired before
@@ -374,8 +460,10 @@ func (hsdb *HSDatabase) AuthenticateAccessToken(tokenStr string) (*types.OAuthAc
 // expired tokens; the hourly reaper (see app.go) calls this only to keep the
 // table from growing unbounded.
 func (hsdb *HSDatabase) DeleteExpiredAccessTokens(cutoff time.Time) (int64, error) {
-	res := hsdb.DB.Where("expiration IS NOT NULL AND expiration < ?", cutoff).
-		Delete(&types.OAuthAccessToken{})
-
-	return res.RowsAffected, res.Error
+	return hsdb.ex.exec(
+		table.OAuthAccessTokens.DELETE().WHERE(
+			table.OAuthAccessTokens.Expiration.IS_NOT_NULL().
+				AND(table.OAuthAccessTokens.Expiration.LT(jet.TimestampExp(timeArg(cutoff)))),
+		),
+	)
 }

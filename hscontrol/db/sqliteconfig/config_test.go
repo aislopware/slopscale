@@ -167,12 +167,24 @@ func TestConfigToURL(t *testing.T) {
 		{
 			name:   "default config includes txlock immediate",
 			config: Default("/path/to/db.sqlite"),
-			want:   "file:/path/to/db.sqlite?_txlock=immediate&_pragma=busy_timeout=10000&_pragma=journal_mode=WAL&_pragma=auto_vacuum=INCREMENTAL&_pragma=wal_autocheckpoint=1000&_pragma=synchronous=NORMAL&_pragma=foreign_keys=ON",
+			want: "file:/path/to/db.sqlite?_txlock=immediate&_defensive=1&_dqs=0&_pragma=busy_timeout=10000" +
+				"&_pragma=journal_mode=WAL&_pragma=auto_vacuum=INCREMENTAL&_pragma=wal_autocheckpoint=1000" +
+				"&_pragma=synchronous=NORMAL&_pragma=cache_size=-65536&_pragma=foreign_keys=ON",
 		},
 		{
 			name:   "memory config",
 			config: Memory(),
-			want:   ":memory:?_pragma=foreign_keys=ON",
+			want:   ":memory:?_defensive=1&_dqs=0&_pragma=foreign_keys=ON",
+		},
+		{
+			name: "hardening switches only",
+			config: &Config{
+				Path:               "/test.db",
+				WALAutocheckpoint:  -1,
+				Defensive:          true,
+				StrictDoubleQuotes: true,
+			},
+			want: "file:/test.db?_defensive=1&_dqs=0",
 		},
 		{
 			name: "minimal config",
@@ -192,7 +204,8 @@ func TestConfigToURL(t *testing.T) {
 				Synchronous:       SynchronousFull,
 				ForeignKeys:       true,
 			},
-			want: "file:/custom/db.sqlite?_pragma=busy_timeout=5000&_pragma=journal_mode=DELETE&_pragma=synchronous=FULL&_pragma=foreign_keys=ON",
+			want: "file:/custom/db.sqlite?_pragma=busy_timeout=5000&_pragma=journal_mode=DELETE" +
+				"&_pragma=synchronous=FULL&_pragma=foreign_keys=ON",
 		},
 		{
 			name: "memory with custom timeout",
@@ -223,7 +236,8 @@ func TestConfigToURL(t *testing.T) {
 				Synchronous:       SynchronousExtra,
 				ForeignKeys:       true,
 			},
-			want: "file:/full.db?_pragma=busy_timeout=15000&_pragma=journal_mode=WAL&_pragma=auto_vacuum=FULL&_pragma=wal_autocheckpoint=1000&_pragma=synchronous=EXTRA&_pragma=foreign_keys=ON",
+			want: "file:/full.db?_pragma=busy_timeout=15000&_pragma=journal_mode=WAL&_pragma=auto_vacuum=FULL" +
+				"&_pragma=wal_autocheckpoint=1000&_pragma=synchronous=EXTRA&_pragma=foreign_keys=ON",
 		},
 		{
 			name: "with txlock immediate",
@@ -299,5 +313,17 @@ func TestDefaultConfigHasTxLockImmediate(t *testing.T) {
 	config := Default("/test.db")
 	if config.TxLock != TxLockImmediate {
 		t.Errorf("Default().TxLock = %q, want %q", config.TxLock, TxLockImmediate)
+	}
+}
+
+func TestDefaultConfigIsHardened(t *testing.T) {
+	for name, config := range map[string]*Config{"default": Default("/test.db"), "memory": Memory()} {
+		if !config.Defensive {
+			t.Errorf("%s config must enable defensive mode", name)
+		}
+
+		if !config.StrictDoubleQuotes {
+			t.Errorf("%s config must disable double-quoted string literals", name)
+		}
 	}
 }

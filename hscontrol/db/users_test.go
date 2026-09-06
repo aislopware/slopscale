@@ -7,7 +7,6 @@ import (
 	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
 
 func TestCreateAndDestroyUser(t *testing.T) {
@@ -60,10 +59,8 @@ func TestDestroyUserErrors(t *testing.T) {
 				require.NoError(t, err)
 
 				// Verify preauth key was deleted (need to search by prefix for new keys)
-				var foundPak types.PreAuthKey
-
-				result := db.DB.First(&foundPak, "id = ?", pak.ID)
-				assert.ErrorIs(t, result.Error, gorm.ErrRecordNotFound)
+				_, err = db.GetPreAuthKeyByID(pak.ID)
+				assert.ErrorIs(t, err, ErrNotFound)
 			},
 		},
 		{
@@ -86,8 +83,7 @@ func TestDestroyUserErrors(t *testing.T) {
 					RegisterMethod: util.RegisterMethodAuthKey,
 					AuthKeyID:      &pakID,
 				}
-				trx := db.DB.Save(&node)
-				require.NoError(t, trx.Error)
+				require.NoError(t, CreateNode(db, &node))
 
 				err = db.DestroyUser(types.UserID(user.ID))
 				assert.ErrorIs(t, err, ErrUserStillHasNodes)
@@ -111,8 +107,7 @@ func TestDestroyUserErrors(t *testing.T) {
 					RegisterMethod: util.RegisterMethodAuthKey,
 					Tags:           []string{"tag:server"},
 				}
-				trx := db.DB.Save(&node)
-				require.NoError(t, trx.Error)
+				require.NoError(t, CreateNode(db, &node))
 
 				err = db.DestroyUser(types.UserID(user.ID))
 				require.NoError(t, err)
@@ -122,10 +117,8 @@ func TestDestroyUserErrors(t *testing.T) {
 				require.ErrorIs(t, err, ErrUserNotFound)
 
 				// Tagged node survives.
-				var survivingNode types.Node
-
-				result := db.DB.First(&survivingNode, "id = ?", node.ID)
-				require.NoError(t, result.Error)
+				survivingNode, err := GetNodeByID(db, node.ID)
+				require.NoError(t, err)
 				assert.Nil(t, survivingNode.UserID)
 				assert.Equal(t, []string{"tag:server"}, survivingNode.Tags.List())
 			},
@@ -147,8 +140,7 @@ func TestDestroyUserErrors(t *testing.T) {
 					RegisterMethod: util.RegisterMethodAuthKey,
 					Tags:           []string{"tag:server"},
 				}
-				trx := db.DB.Save(&taggedNode)
-				require.NoError(t, trx.Error)
+				require.NoError(t, CreateNode(db, &taggedNode))
 
 				// User-owned node: has user_id.
 				ownedNode := types.Node{
@@ -157,8 +149,7 @@ func TestDestroyUserErrors(t *testing.T) {
 					UserID:         &user.ID,
 					RegisterMethod: util.RegisterMethodAuthKey,
 				}
-				trx = db.DB.Save(&ownedNode)
-				require.NoError(t, trx.Error)
+				require.NoError(t, CreateNode(db, &ownedNode))
 
 				err = db.DestroyUser(types.UserID(user.ID))
 				require.ErrorIs(t, err, ErrUserStillHasNodes)

@@ -10,7 +10,6 @@ import (
 	"net/netip"
 	"time"
 
-	"gorm.io/gorm"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
 )
@@ -23,12 +22,18 @@ func (src *User) Clone() *User {
 	}
 	dst := new(User)
 	*dst = *src
+	if dst.DeletedAt != nil {
+		dst.DeletedAt = new(*src.DeletedAt)
+	}
 	return dst
 }
 
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _UserCloneNeedsRegeneration = User(struct {
-	gorm.Model
+	ID                 uint
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	DeletedAt          *time.Time
 	Name               string
 	DisplayName        string
 	Email              string
@@ -56,9 +61,7 @@ func (src *Node) Clone() *Node {
 	if dst.UserID != nil {
 		dst.UserID = new(*src.UserID)
 	}
-	if dst.User != nil {
-		dst.User = new(*src.User)
-	}
+	dst.User = src.User.Clone()
 	dst.Tags = append(src.Tags[:0:0], src.Tags...)
 	if dst.AuthKeyID != nil {
 		dst.AuthKeyID = new(*src.AuthKeyID)
@@ -122,9 +125,7 @@ func (src *PreAuthKey) Clone() *PreAuthKey {
 	if dst.UserID != nil {
 		dst.UserID = new(*src.UserID)
 	}
-	if dst.User != nil {
-		dst.User = new(*src.User)
-	}
+	dst.User = src.User.Clone()
 	dst.Tags = append(src.Tags[:0:0], src.Tags...)
 	if dst.CreatedAt != nil {
 		dst.CreatedAt = new(*src.CreatedAt)

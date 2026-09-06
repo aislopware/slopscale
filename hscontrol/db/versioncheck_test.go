@@ -1,14 +1,13 @@
 package db
 
 import (
-	"fmt"
+	"database/sql"
 	"testing"
 	"time"
 
-	"github.com/glebarez/sqlite"
+	"github.com/juanfont/headscale/hscontrol/db/sqliteconfig"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
 
 func TestParseVersion(t *testing.T) {
@@ -281,16 +280,20 @@ func TestCheckVersionUpgradePath_CurrentPseudoDoesNotPoison(t *testing.T) {
 
 // versionTestDB creates an in-memory SQLite database with the
 // database_versions table already bootstrapped.
-func versionTestDB(t *testing.T) *gorm.DB {
+func versionTestDB(t *testing.T) *executor {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
+	pool, err := sql.Open(sqliteconfig.DriverName, "file::memory:")
 	require.NoError(t, err)
 
-	err = ensureDatabaseVersionTable(db)
+	t.Cleanup(func() { _ = pool.Close() })
+
+	e := &executor{ctx: t.Context(), db: pool, dialect: dialectSQLite}
+
+	err = e.ensureDatabaseVersionTable()
 	require.NoError(t, err)
 
-	return db
+	return e
 }
 
 func TestSetAndGetDatabaseVersion(t *testing.T) {
@@ -323,14 +326,18 @@ func TestSetAndGetDatabaseVersion(t *testing.T) {
 func TestEnsureDatabaseVersionTableIdempotent(t *testing.T) {
 	t.Parallel()
 
-	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
+	pool, err := sql.Open(sqliteconfig.DriverName, "file::memory:")
 	require.NoError(t, err)
+
+	t.Cleanup(func() { _ = pool.Close() })
+
+	e := &executor{ctx: t.Context(), db: pool, dialect: dialectSQLite}
 
 	// Call twice — should not error
-	err = ensureDatabaseVersionTable(db)
+	err = e.ensureDatabaseVersionTable()
 	require.NoError(t, err)
 
-	err = ensureDatabaseVersionTable(db)
+	err = e.ensureDatabaseVersionTable()
 	require.NoError(t, err)
 }
 
@@ -483,59 +490,5 @@ func TestCheckVersionUpgradePathDirect(t *testing.T) {
 				assert.NoError(t, err)
 			}
 		})
-	}
-}
-
-// checkVersionUpgradePathFromVersions is a test helper that runs the
-// version comparison logic with a specific currentVersion string,
-// bypassing types.GetVersionInfo(). It replicates the logic from
-// checkVersionUpgradePath but accepts the version as a parameter.
-func checkVersionUpgradePathFromVersions(db *gorm.DB, currentVersion string) error {
-	if isDev(currentVersion) {
-		return nil
-	}
-
-	storedVersion, err := getDatabaseVersion(db)
-	if err != nil {
-		return err
-	}
-
-	if storedVersion == "" {
-		return nil
-	}
-
-	if isDev(storedVersion) {
-		return nil
-	}
-
-	current, err := parseVersion(currentVersion)
-	if err != nil {
-		return err
-	}
-
-	stored, err := parseVersion(storedVersion)
-	if err != nil {
-		return err
-	}
-
-	if current.Major != stored.Major {
-		return errVersionMajorChange
-	}
-
-	minorDiff := current.Minor - stored.Minor
-
-	switch {
-	case minorDiff == 0:
-		return nil
-	case minorDiff == 1:
-		return nil
-	case minorDiff > 1:
-		return fmt.Errorf(
-			"please upgrade to the latest v%d.%d.x release first: %w",
-			stored.Major, stored.Minor+1,
-			errVersionUpgrade,
-		)
-	default:
-		return fmt.Errorf("downgrading: %w", errVersionDowngrade)
 	}
 }

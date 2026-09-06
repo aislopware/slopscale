@@ -1,9 +1,7 @@
 package db
 
 import (
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"net/netip"
 	"runtime"
 	"sync"
@@ -17,7 +15,6 @@ import (
 	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
@@ -128,7 +125,7 @@ func TestExpireNode(t *testing.T) {
 		AuthKeyID:      &pakID,
 		Expiry:         &time.Time{},
 	}
-	db.DB.Save(node)
+	require.NoError(t, CreateNode(db, node))
 
 	nodeFromDB, err := db.getNode(types.UserID(user.ID), "testnode")
 	require.NoError(t, err)
@@ -169,7 +166,7 @@ func TestDisableNodeExpiry(t *testing.T) {
 		AuthKeyID:      &pakID,
 		Expiry:         &time.Time{},
 	}
-	db.DB.Save(node)
+	require.NoError(t, CreateNode(db, node))
 
 	// Set an expiry first.
 	past := time.Now().Add(-time.Hour)
@@ -342,7 +339,7 @@ func TestAutoApproveRoutes(t *testing.T) {
 					IPv4: new(netip.MustParseAddr("100.64.0.1")),
 				}
 
-				err = adb.DB.Save(&node).Error
+				err = CreateNode(adb, &node)
 				require.NoError(t, err)
 
 				nodeTagged := types.Node{
@@ -359,7 +356,7 @@ func TestAutoApproveRoutes(t *testing.T) {
 					IPv4: new(netip.MustParseAddr("100.64.0.2")),
 				}
 
-				err = adb.DB.Save(&nodeTagged).Error
+				err = CreateNode(adb, &nodeTagged)
 				require.NoError(t, err)
 
 				users, err := adb.ListUsers(nil)
@@ -377,14 +374,19 @@ func TestAutoApproveRoutes(t *testing.T) {
 
 				if changed1 {
 					node.ApprovedRoutes = types.Prefixes(newRoutes1)
-					err = adb.DB.Save(&node).Error
+					err = SaveNode(adb, &node)
 					require.NoError(t, err)
 				}
 
-				newRoutes2, changed2 := policy.ApproveRoutesWithPolicy(pm, nodeTagged.View(), nodeTagged.ApprovedRoutes, tt.routes)
+				newRoutes2, changed2 := policy.ApproveRoutesWithPolicy(
+					pm,
+					nodeTagged.View(),
+					nodeTagged.ApprovedRoutes,
+					tt.routes,
+				)
 				if changed2 {
 					nodeTagged.ApprovedRoutes = types.Prefixes(newRoutes2)
-					err = adb.DB.Save(&nodeTagged).Error
+					err = SaveNode(adb, &nodeTagged)
 					require.NoError(t, err)
 				}
 
@@ -506,7 +508,7 @@ func TestEphemeralGarbageCollectorLoads(t *testing.T) {
 
 	// Use shorter expiry for faster tests
 	for i := range want {
-		go e.Schedule(types.NodeID(i), 100*time.Millisecond) //nolint:gosec // test code, no overflow risk
+		go e.Schedule(types.NodeID(i), 100*time.Millisecond)
 	}
 
 	// Wait for all deletions to complete
@@ -523,20 +525,6 @@ func TestEphemeralGarbageCollectorLoads(t *testing.T) {
 	if len(got) != want {
 		t.Errorf("expected %d, got %d", want, len(got))
 	}
-}
-
-//nolint:unused
-func generateRandomNumber(t *testing.T, maxVal int64) int64 {
-	t.Helper()
-
-	maxB := big.NewInt(maxVal)
-
-	n, err := rand.Int(rand.Reader, maxB)
-	if err != nil {
-		t.Fatalf("getting random number: %s", err)
-	}
-
-	return n.Int64() + 1
 }
 
 func TestListEphemeralNodes(t *testing.T) {
@@ -579,10 +567,10 @@ func TestListEphemeralNodes(t *testing.T) {
 		AuthKeyID:      &pakEphID,
 	}
 
-	err = db.DB.Save(&node).Error
+	err = CreateNode(db, &node)
 	require.NoError(t, err)
 
-	err = db.DB.Save(&nodeEph).Error
+	err = CreateNode(db, &nodeEph)
 	require.NoError(t, err)
 
 	nodes, err := db.ListNodes()
@@ -635,21 +623,21 @@ func TestListPeers(t *testing.T) {
 		Hostinfo:       &tailcfg.Hostinfo{},
 	}
 
-	err = db.DB.Save(&node1).Error
+	err = CreateNode(db, &node1)
 	require.NoError(t, err)
 
-	err = db.DB.Save(&node2).Error
+	err = CreateNode(db, &node2)
 	require.NoError(t, err)
 
-	err = db.DB.Transaction(func(tx *gorm.DB) error {
-		_, err := RegisterNodeForTest(tx, node1, nil, nil)
-		if err != nil {
-			return err
+	err = db.Write(func(tx *Tx) error {
+		_, txErr := RegisterNodeForTest(tx, node1, nil, nil)
+		if txErr != nil {
+			return txErr
 		}
 
-		_, err = RegisterNodeForTest(tx, node2, nil, nil)
+		_, txErr = RegisterNodeForTest(tx, node2, nil, nil)
 
-		return err
+		return txErr
 	})
 	require.NoError(t, err)
 
@@ -723,21 +711,21 @@ func TestListNodes(t *testing.T) {
 		Hostinfo:       &tailcfg.Hostinfo{},
 	}
 
-	err = db.DB.Save(&node1).Error
+	err = CreateNode(db, &node1)
 	require.NoError(t, err)
 
-	err = db.DB.Save(&node2).Error
+	err = CreateNode(db, &node2)
 	require.NoError(t, err)
 
-	err = db.DB.Transaction(func(tx *gorm.DB) error {
-		_, err := RegisterNodeForTest(tx, node1, nil, nil)
-		if err != nil {
-			return err
+	err = db.Write(func(tx *Tx) error {
+		_, txErr := RegisterNodeForTest(tx, node1, nil, nil)
+		if txErr != nil {
+			return txErr
 		}
 
-		_, err = RegisterNodeForTest(tx, node2, nil, nil)
+		_, txErr = RegisterNodeForTest(tx, node2, nil, nil)
 
-		return err
+		return txErr
 	})
 	require.NoError(t, err)
 

@@ -9,7 +9,7 @@ import (
 const (
 	// OAuthClientPrefix prefixes an OAuth client secret:
 	// hskey-client-<clientID>-<secret>.
-	OAuthClientPrefix = "hskey-client-" //nolint:gosec // prefix, not a credential
+	OAuthClientPrefix = "hskey-client-"
 
 	// AccessTokenPrefix prefixes an OAuth access token:
 	// hskey-oauthtok-<prefix>-<secret>. The v2 auth middleware dispatches a
@@ -30,14 +30,14 @@ const (
 // UserID only records who created the client (informational), mirroring
 // [APIKey].
 type OAuthClient struct {
-	ID         uint64 `gorm:"primary_key"`
-	ClientID   string `gorm:"uniqueIndex"`
+	ID         uint64
+	ClientID   string
 	SecretHash []byte
 
 	// Scopes the client may grant. Tags the client may assign to access tokens
 	// (and, transitively, to the auth keys and nodes those tokens create).
-	Scopes []string `gorm:"serializer:json"`
-	Tags   []string `gorm:"serializer:json"`
+	Scopes []string
+	Tags   []string
 
 	Description string
 
@@ -49,41 +49,23 @@ type OAuthClient struct {
 	Revoked   *time.Time
 }
 
-// TableName pins the table name. GORM's naming strategy would otherwise render
-// OAuthClient as "o_auth_clients" (it breaks the OAuth initialism), diverging
-// from the hand-written migration DDL and schema.sql.
-func (*OAuthClient) TableName() string { return "oauth_clients" }
-
 // OAuthAccessToken is a short-lived bearer token minted by an [OAuthClient] via
 // the client-credentials grant. It carries the scope/tag set granted at mint
 // time (a subset of the issuing client's), is stored as an Argon2id hash of its
 // secret, and authenticates v2 API requests as Authorization: Bearer.
 type OAuthAccessToken struct {
-	ID     uint64 `gorm:"primary_key"`
-	Prefix string `gorm:"uniqueIndex"`
+	ID     uint64
+	Prefix string
 	Hash   []byte
 
 	// ClientID links back to the issuing [OAuthClient].
 	ClientID string
 
-	Scopes []string `gorm:"serializer:json"`
-	Tags   []string `gorm:"serializer:json"`
+	Scopes []string
+	Tags   []string
 
 	Expiration *time.Time
 	CreatedAt  *time.Time
-}
-
-// TableName pins the table name (see [OAuthClient.TableName]).
-func (*OAuthAccessToken) TableName() string { return "oauth_access_tokens" }
-
-// maskedClientID returns the client id in masked form for safe logging.
-// SECURITY: never log the secret or its hash.
-func (c *OAuthClient) maskedClientID() string {
-	if c.ClientID != "" {
-		return OAuthClientPrefix + c.ClientID + "-***"
-	}
-
-	return ""
 }
 
 // MarshalZerologObject implements [zerolog.LogObjectMarshaler] for safe logging.
@@ -112,11 +94,11 @@ func (c *OAuthClient) MarshalZerologObject(e *zerolog.Event) {
 	}
 }
 
-// maskedPrefix returns the token prefix in masked form for safe logging.
+// maskedClientID returns the client id in masked form for safe logging.
 // SECURITY: never log the secret or its hash.
-func (t *OAuthAccessToken) maskedPrefix() string {
-	if t.Prefix != "" {
-		return AccessTokenPrefix + t.Prefix + "-***"
+func (c *OAuthClient) maskedClientID() string {
+	if c.ClientID != "" {
+		return OAuthClientPrefix + c.ClientID + "-***"
 	}
 
 	return ""
@@ -150,4 +132,14 @@ func (t *OAuthAccessToken) MarshalZerologObject(e *zerolog.Event) {
 	if t.Expiration != nil {
 		e.Time("oauth_token_expiration", *t.Expiration)
 	}
+}
+
+// maskedPrefix returns the token prefix in masked form for safe logging.
+// SECURITY: never log the secret or its hash.
+func (t *OAuthAccessToken) maskedPrefix() string {
+	if t.Prefix != "" {
+		return AccessTokenPrefix + t.Prefix + "-***"
+	}
+
+	return ""
 }

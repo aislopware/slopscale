@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"strconv"
 	"testing"
+	"time"
 
+	jet "github.com/go-jet/jet/v2/sqlite"
+	"github.com/juanfont/headscale/gen/jet/table"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
-	"gorm.io/gorm"
 )
 
 var (
@@ -18,21 +20,62 @@ var (
 	ErrUserNotUnique     = errors.New("expected exactly one user")
 )
 
+// selectUsers is the base query for users that have not been soft-deleted,
+// ordered by id.
+func selectUsers() jet.SelectStatement {
+	return jet.SELECT(table.Users.AllColumns).
+		FROM(table.Users).
+		WHERE(table.Users.DeletedAt.IS_NULL()).
+		ORDER_BY(table.Users.ID.ASC())
+}
+
+func queryUsers(q Querier, stmt jet.SelectStatement) ([]types.User, error) {
+	var records []userRecord
+
+	err := q.executor().query(stmt, &records)
+	if err != nil {
+		return nil, err
+	}
+
+	return userRecordsToUsers(records), nil
+}
+
+// queryUser returns the first user matched by where, or [ErrUserNotFound].
+func queryUser(q Querier, where jet.BoolExpression) (*types.User, error) {
+	var record userRecord
+
+	err := q.executor().query(
+		jet.SELECT(table.Users.AllColumns).FROM(table.Users).
+			WHERE(where.AND(table.Users.DeletedAt.IS_NULL())).
+			ORDER_BY(table.Users.ID.ASC()).LIMIT(1),
+		&record,
+	)
+	if errors.Is(err, ErrNotFound) {
+		return nil, ErrUserNotFound
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &record.User, nil
+}
+
 func (hsdb *HSDatabase) CreateUser(user types.User) (*types.User, error) {
-	return Write(hsdb.DB, func(tx *gorm.DB) (*types.User, error) {
+	return Write(hsdb, func(tx *Tx) (*types.User, error) {
 		return CreateUser(tx, user)
 	})
 }
 
 // CreateUser creates a new [types.User]. Returns error if could not be created
 // or another user already exists.
-func CreateUser(tx *gorm.DB, user types.User) (*types.User, error) {
+func CreateUser(q Querier, user types.User) (*types.User, error) {
 	err := util.ValidateUsername(user.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	err = tx.Create(&user).Error
+	err = SaveUser(q, &user)
 	if err != nil {
 		return nil, fmt.Errorf("creating user: %w", err)
 	}
@@ -40,8 +83,64 @@ func CreateUser(tx *gorm.DB, user types.User) (*types.User, error) {
 	return &user, nil
 }
 
+// SaveUser overwrites every column of user's row when a row with its ID
+// exists and inserts it otherwise, keeping an explicit ID. The timestamps
+// are stamped when unset.
+func SaveUser(q Querier, user *types.User) error {
+	if user.ID != 0 {
+		affected, err := updateUser(q, user)
+		if err != nil || affected > 0 {
+			return err
+		}
+	}
+
+	now := time.Now()
+	if user.CreatedAt.IsZero() {
+		user.CreatedAt = now
+	}
+
+	if user.UpdatedAt.IsZero() {
+		user.UpdatedAt = now
+	}
+
+	columns := table.Users.MutableColumns
+	if user.ID != 0 {
+		columns = table.Users.AllColumns
+	}
+
+	var inserted idRow
+
+	err := q.executor().query(
+		table.Users.INSERT(columns).MODEL(user).RETURNING(table.Users.ID.AS("id_row.id")),
+		&inserted,
+	)
+	if err != nil {
+		return err
+	}
+
+	user.ID = uint(inserted.ID)
+
+	return nil
+}
+
+// UpdateUser writes every column of user's row by id and stamps UpdatedAt.
+func UpdateUser(q Querier, user *types.User) error {
+	_, err := updateUser(q, user)
+
+	return err
+}
+
+func updateUser(q Querier, user *types.User) (int64, error) {
+	user.UpdatedAt = time.Now()
+
+	return q.executor().exec(
+		table.Users.UPDATE(table.Users.MutableColumns).MODEL(user).
+			WHERE(table.Users.ID.EQ(jet.Uint64(uint64(user.ID)))),
+	)
+}
+
 func (hsdb *HSDatabase) DestroyUser(uid types.UserID) error {
-	return hsdb.Write(func(tx *gorm.DB) error {
+	return hsdb.Write(func(tx *Tx) error {
 		return DestroyUser(tx, uid)
 	})
 }
@@ -49,13 +148,13 @@ func (hsdb *HSDatabase) DestroyUser(uid types.UserID) error {
 // DestroyUser destroys a [types.User]. Returns error if the [types.User] does
 // not exist or if there are user-owned nodes associated with it.
 // Tagged nodes have user_id = NULL so they do not block deletion.
-func DestroyUser(tx *gorm.DB, uid types.UserID) error {
-	user, err := GetUserByID(tx, uid)
+func DestroyUser(q Querier, uid types.UserID) error {
+	user, err := GetUserByID(q, uid)
 	if err != nil {
 		return err
 	}
 
-	nodes, err := ListNodesByUser(tx, uid)
+	nodes, err := ListNodesByUser(q, uid)
 	if err != nil {
 		return err
 	}
@@ -64,27 +163,25 @@ func DestroyUser(tx *gorm.DB, uid types.UserID) error {
 		return ErrUserStillHasNodes
 	}
 
-	keys, err := ListPreAuthKeysByUser(tx, uid)
+	keys, err := ListPreAuthKeysByUser(q, uid)
 	if err != nil {
 		return err
 	}
 
 	for _, key := range keys {
-		err = DestroyPreAuthKey(tx, key.ID)
+		err = DestroyPreAuthKey(q, key.ID)
 		if err != nil {
 			return err
 		}
 	}
 
-	if result := tx.Unscoped().Delete(&user); result.Error != nil {
-		return result.Error
-	}
+	_, err = q.executor().exec(table.Users.DELETE().WHERE(table.Users.ID.EQ(jet.Uint64(uint64(user.ID)))))
 
-	return nil
+	return err
 }
 
 func (hsdb *HSDatabase) RenameUser(uid types.UserID, newName string) error {
-	return hsdb.Write(func(tx *gorm.DB) error {
+	return hsdb.Write(func(tx *Tx) error {
 		return RenameUser(tx, uid, newName)
 	})
 }
@@ -93,14 +190,15 @@ var ErrCannotChangeOIDCUser = errors.New("cannot edit OIDC user")
 
 // RenameUser renames a [types.User]. Returns error if the [types.User] does
 // not exist or if another [types.User] exists with the new name.
-func RenameUser(tx *gorm.DB, uid types.UserID, newName string) error {
-	oldUser, err := GetUserByID(tx, uid)
+func RenameUser(q Querier, uid types.UserID, newName string) error {
+	oldUser, err := GetUserByID(q, uid)
 	if err != nil {
 		return err
 	}
 
-	if err = util.ValidateUsername(newName); err != nil { //nolint:noinlineerr
-		return err
+	valErr := util.ValidateUsername(newName)
+	if valErr != nil {
+		return valErr
 	}
 
 	if oldUser.Provider == util.RegisterMethodOIDC {
@@ -109,62 +207,83 @@ func RenameUser(tx *gorm.DB, uid types.UserID, newName string) error {
 
 	oldUser.Name = newName
 
-	err = tx.Updates(&oldUser).Error
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return UpdateUser(q, oldUser)
 }
 
 func (hsdb *HSDatabase) GetUserByID(uid types.UserID) (*types.User, error) {
-	return GetUserByID(hsdb.DB, uid)
+	return GetUserByID(hsdb, uid)
 }
 
-func GetUserByID(tx *gorm.DB, uid types.UserID) (*types.User, error) {
-	user := types.User{}
-	if result := tx.First(&user, "id = ?", uid); errors.Is(
-		result.Error,
-		gorm.ErrRecordNotFound,
-	) {
-		return nil, ErrUserNotFound
-	}
-
-	return &user, nil
+func GetUserByID(q Querier, uid types.UserID) (*types.User, error) {
+	return queryUser(q, table.Users.ID.EQ(jet.Uint64(uint64(uid))))
 }
 
 func (hsdb *HSDatabase) GetUserByOIDCIdentifier(id string) (*types.User, error) {
-	return Read(hsdb.DB, func(rx *gorm.DB) (*types.User, error) {
+	return Read(hsdb, func(rx *Tx) (*types.User, error) {
 		return GetUserByOIDCIdentifier(rx, id)
 	})
 }
 
-func GetUserByOIDCIdentifier(tx *gorm.DB, id string) (*types.User, error) {
-	user := types.User{}
-	if result := tx.First(&user, "provider_identifier = ?", id); errors.Is(
-		result.Error,
-		gorm.ErrRecordNotFound,
-	) {
-		return nil, ErrUserNotFound
-	}
-
-	return &user, nil
+func GetUserByOIDCIdentifier(q Querier, id string) (*types.User, error) {
+	return queryUser(q, table.Users.ProviderIdentifier.EQ(jet.String(id)))
 }
 
 func (hsdb *HSDatabase) ListUsers(filter *types.User) ([]types.User, error) {
-	return ListUsers(hsdb.DB, filter)
+	return ListUsers(hsdb, filter)
 }
 
-// ListUsers gets all the existing users, optionally filtered by a non-nil filter.
-func ListUsers(tx *gorm.DB, filter *types.User) ([]types.User, error) {
-	users := []types.User{}
+// ListUsers gets all the existing users, optionally filtered by a non-nil
+// filter. Every set field of the filter must match.
+func ListUsers(q Querier, filter *types.User) ([]types.User, error) {
+	stmt := selectUsers()
 
-	err := tx.Where(filter).Find(&users).Error
-	if err != nil {
-		return nil, err
+	if filter != nil {
+		if where := userFilter(filter); where != nil {
+			stmt = stmt.WHERE(table.Users.DeletedAt.IS_NULL().AND(where))
+		}
 	}
 
-	return users, nil
+	return queryUsers(q, stmt)
+}
+
+// userFilter turns the set fields of filter into a conjunction, or nil when
+// no field is set.
+func userFilter(filter *types.User) jet.BoolExpression {
+	var conds []jet.BoolExpression
+
+	if filter.ID != 0 {
+		conds = append(conds, table.Users.ID.EQ(jet.Uint64(uint64(filter.ID))))
+	}
+
+	if filter.Name != "" {
+		conds = append(conds, table.Users.Name.EQ(jet.String(filter.Name)))
+	}
+
+	if filter.DisplayName != "" {
+		conds = append(conds, table.Users.DisplayName.EQ(jet.String(filter.DisplayName)))
+	}
+
+	if filter.Email != "" {
+		conds = append(conds, table.Users.Email.EQ(jet.String(filter.Email)))
+	}
+
+	if filter.ProviderIdentifier.Valid {
+		conds = append(conds, table.Users.ProviderIdentifier.EQ(jet.String(filter.ProviderIdentifier.String)))
+	}
+
+	if filter.Provider != "" {
+		conds = append(conds, table.Users.Provider.EQ(jet.String(filter.Provider)))
+	}
+
+	if filter.ProfilePicURL != "" {
+		conds = append(conds, table.Users.ProfilePicURL.EQ(jet.String(filter.ProfilePicURL)))
+	}
+
+	if len(conds) == 0 {
+		return nil
+	}
+
+	return jet.AND(conds...)
 }
 
 // GetUserByName returns a user if the provided username is
@@ -187,17 +306,8 @@ func (hsdb *HSDatabase) GetUserByName(name string) (*types.User, error) {
 }
 
 // ListNodesByUser gets all the nodes in a given user.
-func ListNodesByUser(tx *gorm.DB, uid types.UserID) (types.Nodes, error) {
-	nodes := types.Nodes{}
-
-	uidPtr := uint(uid)
-
-	err := preloadNode(tx).Where(&types.Node{UserID: &uidPtr}).Find(&nodes).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return nodes, nil
+func ListNodesByUser(q Querier, uid types.UserID) (types.Nodes, error) {
+	return queryNodes(q, selectNodes().WHERE(table.Nodes.UserID.EQ(jet.Uint64(uint64(uid)))))
 }
 
 func (hsdb *HSDatabase) CreateUserForTest(name ...string) *types.User {

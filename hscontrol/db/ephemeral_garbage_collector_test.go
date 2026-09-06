@@ -59,7 +59,7 @@ func TestEphemeralGarbageCollectorGoRoutineLeak(t *testing.T) {
 	deletionWg.Add(numNodes)
 
 	for i := 1; i <= numNodes; i++ {
-		gc.Schedule(types.NodeID(i), expiry) //nolint:gosec // safe conversion in test
+		gc.Schedule(types.NodeID(i), expiry)
 	}
 
 	// Wait for all scheduled deletions to complete
@@ -72,7 +72,7 @@ func TestEphemeralGarbageCollectorGoRoutineLeak(t *testing.T) {
 
 	// Schedule and immediately cancel to test that part of the code
 	for i := numNodes + 1; i <= numNodes*2; i++ {
-		nodeID := types.NodeID(i) //nolint:gosec // safe conversion in test
+		nodeID := types.NodeID(i)
 		gc.Schedule(nodeID, time.Hour)
 		gc.Cancel(nodeID)
 	}
@@ -227,7 +227,8 @@ func TestEphemeralGarbageCollectorReschedule(t *testing.T) {
 	deleteMutex.Unlock()
 }
 
-// TestEphemeralGarbageCollectorCancelAndReschedule is a test for the cancellation and rescheduling of nodes in [EphemeralGarbageCollector].
+// TestEphemeralGarbageCollectorCancelAndReschedule is a test for the cancellation
+// and rescheduling of nodes in [EphemeralGarbageCollector].
 // It creates a new [EphemeralGarbageCollector], schedules a node for deletion, cancels it, and then reschedules it,
 // and verifies that the node is deleted only once.
 func TestEphemeralGarbageCollectorCancelAndReschedule(t *testing.T) {
@@ -298,8 +299,10 @@ func TestEphemeralGarbageCollectorCancelAndReschedule(t *testing.T) {
 	deleteMutex.Unlock()
 }
 
-// TestEphemeralGarbageCollectorCloseBeforeTimerFires is a test for the closing of the [EphemeralGarbageCollector] before the timer fires.
-// It creates a new [EphemeralGarbageCollector], schedules a node for deletion, closes the GC, and verifies that the node is not deleted.
+// TestEphemeralGarbageCollectorCloseBeforeTimerFires is a test for the closing
+// of the [EphemeralGarbageCollector] before the timer fires.
+// It creates a new [EphemeralGarbageCollector], schedules a node for deletion,
+// closes the GC, and verifies that the node is not deleted.
 func TestEphemeralGarbageCollectorCloseBeforeTimerFires(t *testing.T) {
 	t.Parallel()
 
@@ -350,7 +353,8 @@ func TestEphemeralGarbageCollectorCloseBeforeTimerFires(t *testing.T) {
 	deleteMutex.Unlock()
 }
 
-// TestEphemeralGarbageCollectorScheduleAfterClose verifies that calling [EphemeralGarbageCollector.Schedule] after [EphemeralGarbageCollector.Close]
+// TestEphemeralGarbageCollectorScheduleAfterClose verifies that calling
+// [EphemeralGarbageCollector.Schedule] after [EphemeralGarbageCollector.Close]
 // is a no-op and doesn't cause any panics, goroutine leaks, or other issues.
 func TestEphemeralGarbageCollectorScheduleAfterClose(t *testing.T) {
 	// Count initial goroutines to check for leaks
@@ -425,7 +429,8 @@ func TestEphemeralGarbageCollectorScheduleAfterClose(t *testing.T) {
 }
 
 // TestEphemeralGarbageCollectorConcurrentScheduleAndClose tests the behavior of the garbage collector
-// when [EphemeralGarbageCollector.Schedule] and [EphemeralGarbageCollector.Close] are called concurrently from multiple goroutines.
+// when [EphemeralGarbageCollector.Schedule] and [EphemeralGarbageCollector.Close]
+// are called concurrently from multiple goroutines.
 func TestEphemeralGarbageCollectorConcurrentScheduleAndClose(t *testing.T) {
 	// Count initial goroutines
 	initialGoroutines := runtime.NumGoroutine()
@@ -459,7 +464,6 @@ func TestEphemeralGarbageCollectorConcurrentScheduleAndClose(t *testing.T) {
 
 	// Use WaitGroup to wait for all scheduling goroutines to finish
 	var wg sync.WaitGroup
-	wg.Add(numSchedulers + 1) // +1 for the closer goroutine
 
 	// Create a stopper channel to signal scheduling goroutines to stop
 	stopScheduling := make(chan struct{})
@@ -469,10 +473,8 @@ func TestEphemeralGarbageCollectorConcurrentScheduleAndClose(t *testing.T) {
 
 	// Launch goroutines that continuously schedule nodes
 	for schedulerIndex := range numSchedulers {
-		go func(schedulerID int) {
-			defer wg.Done()
-
-			baseNodeID := schedulerID * nodesPerScheduler
+		wg.Go(func() {
+			baseNodeID := schedulerIndex * nodesPerScheduler
 
 			// Keep scheduling nodes until signaled to stop
 			for j := range nodesPerScheduler {
@@ -480,21 +482,20 @@ func TestEphemeralGarbageCollectorConcurrentScheduleAndClose(t *testing.T) {
 				case <-stopScheduling:
 					return
 				default:
-					nodeID := types.NodeID(baseNodeID + j + 1) //nolint:gosec // safe conversion in test
-					gc.Schedule(nodeID, 1*time.Hour)           // Long expiry to ensure it doesn't trigger during test
+					idx := baseNodeID + j + 1
+					nodeID := types.NodeID(idx)
+					gc.Schedule(nodeID, 1*time.Hour) // Long expiry to ensure it doesn't trigger during test
 					scheduledCount.Add(1)
 
 					// Yield to other goroutines to introduce variability
 					runtime.Gosched()
 				}
 			}
-		}(schedulerIndex)
+		})
 	}
 
 	// Close the garbage collector after some nodes have been scheduled
-	go func() {
-		defer wg.Done()
-
+	wg.Go(func() {
 		// Wait until enough nodes have been scheduled
 		for scheduledCount.Load() < int64(numSchedulers*closeAfterNodes) {
 			runtime.Gosched()
@@ -505,7 +506,7 @@ func TestEphemeralGarbageCollectorConcurrentScheduleAndClose(t *testing.T) {
 
 		// Signal schedulers to stop
 		close(stopScheduling)
-	}()
+	})
 
 	// Wait for all goroutines to complete
 	wg.Wait()

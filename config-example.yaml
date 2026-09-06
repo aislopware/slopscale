@@ -184,16 +184,14 @@ database:
   # Enable debug mode. This setting requires the log.level to be set to "debug" or "trace".
   debug: false
 
-  # GORM configuration settings.
-  gorm:
-    # Enable prepared statements.
-    prepare_stmt: true
+  # SQL query log, written at debug level when database.debug is enabled.
+  # The former `gorm` block is still read but deprecated.
+  query_log:
+    # Log placeholders instead of the bound query arguments.
+    parameterized: true
 
-    # Enable parameterized queries.
-    parameterized_queries: true
-
-    # Skip logging "record not found" errors.
-    skip_err_record_not_found: true
+    # Log queries that returned no rows as errors.
+    log_not_found: false
 
     # Threshold for slow queries in milliseconds.
     slow_threshold: 1000

@@ -373,6 +373,8 @@ func TestBuildFromChangeFiltersUserProfilesByVisibility(t *testing.T) {
 // must hide every peer on the incremental path rather than fall open to "no
 // matchers => all visible", and per-node policies (autogroup:self) must agree
 // across paths.
+//
+//nolint:tparallel // subtests install different policies on one shared State
 func TestBuildFromChangeVisibilityMatchesFullMap(t *testing.T) {
 	t.Parallel()
 
@@ -522,10 +524,10 @@ func TestBuildFromChangeVisibilityMatchesFullMap(t *testing.T) {
 		},
 	}
 
+	// The subtests share one State and each installs its own policy, so
+	// they must run one after another.
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			_, err := s.SetPolicy([]byte(tt.policy))
 			require.NoError(t, err)
 
@@ -608,10 +610,9 @@ func TestFullMapResponseSurvivesPeerWithInvalidName(t *testing.T) {
 			good := database.CreateRegisteredNodeForTest(user, "good") // peer, valid control
 
 			// Simulate a legacy/corrupt row that v29 loads verbatim.
-			require.NoError(t, database.DB.
-				Model(&types.Node{}).
-				Where("id = ?", bad.ID).
-				Update("given_name", tt.badName).Error)
+			_, err = database.DB.ExecContext(t.Context(),
+				"UPDATE nodes SET given_name = $1 WHERE id = $2", tt.badName, bad.ID)
+			require.NoError(t, err)
 			require.NoError(t, database.Close())
 
 			s, err := state.NewState(cfg)

@@ -1,21 +1,20 @@
 package db
 
 import (
-	"cmp"
 	"errors"
 	"fmt"
 	"net/netip"
-	"slices"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
+	jet "github.com/go-jet/jet/v2/sqlite"
+	"github.com/juanfont/headscale/gen/jet/table"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog/log"
-	"gorm.io/gorm"
 	"tailscale.com/types/key"
 	"tailscale.com/util/dnsname"
 )
@@ -31,15 +30,6 @@ const (
 // ErrNodeNameNotUnique is returned when a node name is not unique.
 var ErrNodeNameNotUnique = errors.New("node name is not unique")
 
-// preloadNode returns a session that eager-loads a node's AuthKey, the
-// AuthKey's User, and the node's User.
-func preloadNode(tx *gorm.DB) *gorm.DB {
-	return tx.
-		Preload("AuthKey").
-		Preload("AuthKey.User").
-		Preload("User")
-}
-
 var (
 	ErrNodeNotFound                  = errors.New("node not found")
 	ErrNodeRouteIsNotAvailable       = errors.New("route is not available on node")
@@ -49,27 +39,98 @@ var (
 	ErrCouldNotConvertNodeInterface = errors.New("failed to convert node interface")
 )
 
-// ListPeers returns peers of node, regardless of any Policy or if the node is expired.
-// If no peer IDs are given, all peers are returned.
-// If at least one peer ID is given, only these peer nodes will be returned.
-func (hsdb *HSDatabase) ListPeers(nodeID types.NodeID, peerIDs ...types.NodeID) (types.Nodes, error) {
-	return ListPeers(hsdb.DB, nodeID, peerIDs...)
+// Aliased tables for the pre-auth key a node was registered with and that
+// key's user, joined next to the node's own user.
+var (
+	authKeyTable     = table.PreAuthKeys.AS("auth_key")
+	authKeyUserTable = table.Users.AS("auth_key_user")
+)
+
+// selectNodes is the base query for nodes with their user, their pre-auth
+// key and the key's user joined in, ordered by id.
+func selectNodes() jet.SelectStatement {
+	return jet.SELECT(
+		table.Nodes.AllColumns,
+		table.Users.AllColumns,
+		authKeyTable.AllColumns,
+		authKeyUserTable.AllColumns,
+	).FROM(
+		table.Nodes.
+			LEFT_JOIN(table.Users, table.Nodes.UserID.EQ(table.Users.ID).AND(table.Users.DeletedAt.IS_NULL())).
+			LEFT_JOIN(authKeyTable, table.Nodes.AuthKeyID.EQ(authKeyTable.ID)).
+			LEFT_JOIN(authKeyUserTable, authKeyTable.UserID.EQ(authKeyUserTable.ID).
+				AND(authKeyUserTable.DeletedAt.IS_NULL())),
+	).ORDER_BY(table.Nodes.ID.ASC())
+}
+
+// listNodesWithoutAuthKeys loads nodes with their users only. Migrations
+// that predate columns of the pre_auth_keys table use it.
+func listNodesWithoutAuthKeys(q Querier) (types.Nodes, error) {
+	stmt := jet.SELECT(table.Nodes.AllColumns, table.Users.AllColumns).
+		FROM(table.Nodes.LEFT_JOIN(table.Users, table.Nodes.UserID.EQ(table.Users.ID))).
+		ORDER_BY(table.Nodes.ID.ASC())
+
+	var records []nodeRecord
+
+	err := q.executor().query(stmt, &records)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodeRecordsToNodes(records)
+}
+
+func queryNodes(q Querier, stmt jet.SelectStatement) (types.Nodes, error) {
+	var records []nodeRecord
+
+	err := q.executor().query(stmt, &records)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodeRecordsToNodes(records)
+}
+
+func queryNode(q Querier, stmt jet.SelectStatement) (*types.Node, error) {
+	var record nodeRecord
+
+	err := q.executor().query(stmt.LIMIT(1), &record)
+	if err != nil {
+		return nil, err
+	}
+
+	return record.node()
+}
+
+func nodeIDList(ids []types.NodeID) []jet.Expression {
+	exprs := make([]jet.Expression, len(ids))
+	for i, id := range ids {
+		exprs[i] = jet.Uint64(id.Uint64())
+	}
+
+	return exprs
 }
 
 // ListPeers returns peers of node, regardless of any Policy or if the node is expired.
 // If no peer IDs are given, all peers are returned.
 // If at least one peer ID is given, only these peer nodes will be returned.
-func ListPeers(tx *gorm.DB, nodeID types.NodeID, peerIDs ...types.NodeID) (types.Nodes, error) {
-	nodes := types.Nodes{}
+func (hsdb *HSDatabase) ListPeers(nodeID types.NodeID, peerIDs ...types.NodeID) (types.Nodes, error) {
+	return ListPeers(hsdb, nodeID, peerIDs...)
+}
 
-	err := preloadNode(tx).
-		Where("id <> ?", nodeID).
-		Where(peerIDs).Find(&nodes).Error
+// ListPeers returns peers of node, regardless of any Policy or if the node is expired.
+// If no peer IDs are given, all peers are returned.
+// If at least one peer ID is given, only these peer nodes will be returned.
+func ListPeers(q Querier, nodeID types.NodeID, peerIDs ...types.NodeID) (types.Nodes, error) {
+	where := table.Nodes.ID.NOT_EQ(jet.Uint64(nodeID.Uint64()))
+	if len(peerIDs) > 0 {
+		where = where.AND(table.Nodes.ID.IN(nodeIDList(peerIDs)...))
+	}
+
+	nodes, err := queryNodes(q, selectNodes().WHERE(where))
 	if err != nil {
 		return types.Nodes{}, err
 	}
-
-	slices.SortFunc(nodes, func(a, b *types.Node) int { return cmp.Compare(a.ID, b.ID) })
 
 	return nodes, nil
 }
@@ -77,112 +138,205 @@ func ListPeers(tx *gorm.DB, nodeID types.NodeID, peerIDs ...types.NodeID) (types
 // ListNodes queries the database for either all nodes if no parameters are given
 // or for the given nodes if at least one node ID is given as parameter.
 func (hsdb *HSDatabase) ListNodes(nodeIDs ...types.NodeID) (types.Nodes, error) {
-	return ListNodes(hsdb.DB, nodeIDs...)
+	return ListNodes(hsdb, nodeIDs...)
 }
 
 // ListNodes queries the database for either all nodes if no parameters are given
 // or for the given nodes if at least one node ID is given as parameter.
-func ListNodes(tx *gorm.DB, nodeIDs ...types.NodeID) (types.Nodes, error) {
-	nodes := types.Nodes{}
-
-	err := preloadNode(tx).
-		Where(nodeIDs).Find(&nodes).Error
-	if err != nil {
-		return nil, err
+func ListNodes(q Querier, nodeIDs ...types.NodeID) (types.Nodes, error) {
+	stmt := selectNodes()
+	if len(nodeIDs) > 0 {
+		stmt = stmt.WHERE(table.Nodes.ID.IN(nodeIDList(nodeIDs)...))
 	}
 
-	return nodes, nil
+	return queryNodes(q, stmt)
 }
 
+// ListEphemeralNodes returns the nodes registered with an ephemeral pre-auth key.
 func (hsdb *HSDatabase) ListEphemeralNodes() (types.Nodes, error) {
-	return Read(hsdb.DB, func(rx *gorm.DB) (types.Nodes, error) {
-		nodes := types.Nodes{}
-
-		err := rx.Joins("AuthKey").Where(`"AuthKey"."ephemeral" = true`).Find(&nodes).Error
-		if err != nil {
-			return nil, err
-		}
-
-		return nodes, nil
+	return Read(hsdb, func(rx *Tx) (types.Nodes, error) {
+		return queryNodes(rx, selectNodes().WHERE(authKeyTable.Ephemeral.EQ(jet.Bool(true))))
 	})
 }
 
+// getNode finds a node by owner and hostname. Only tests use it, but it
+// stays a query so those tests exercise the same joins as production reads.
 func (hsdb *HSDatabase) getNode(uid types.UserID, name string) (*types.Node, error) {
-	return Read(hsdb.DB, func(rx *gorm.DB) (*types.Node, error) {
-		return getNode(rx, uid, name)
-	})
-}
-
-// getNode finds a [types.Node] by name and user and returns the [types.Node] struct.
-func getNode(tx *gorm.DB, uid types.UserID, name string) (*types.Node, error) {
-	uidPtr := uint(uid)
-
-	node := types.Node{}
-
-	err := preloadNode(tx).
-		Where(&types.Node{UserID: &uidPtr, Hostname: name}).
-		First(&node).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNodeNotFound
-		}
-
-		return nil, err
-	}
-
-	return &node, nil
+	return queryNode(hsdb, selectNodes().WHERE(
+		table.Nodes.UserID.EQ(jet.Uint64(uint64(uid))).AND(table.Nodes.Hostname.EQ(jet.String(name))),
+	))
 }
 
 func (hsdb *HSDatabase) GetNodeByID(id types.NodeID) (*types.Node, error) {
-	return GetNodeByID(hsdb.DB, id)
+	return GetNodeByID(hsdb, id)
 }
 
 // GetNodeByID finds a [types.Node] by ID and returns the [types.Node] struct.
-func GetNodeByID(tx *gorm.DB, id types.NodeID) (*types.Node, error) {
-	mach := types.Node{}
-	if result := preloadNode(tx).
-		First(&mach, "id = ?", id); result.Error != nil {
-		return nil, result.Error
-	}
-
-	return &mach, nil
+func GetNodeByID(q Querier, id types.NodeID) (*types.Node, error) {
+	return queryNode(q, selectNodes().WHERE(table.Nodes.ID.EQ(jet.Uint64(id.Uint64()))))
 }
 
 func (hsdb *HSDatabase) GetNodeByNodeKey(nodeKey key.NodePublic) (*types.Node, error) {
-	return GetNodeByNodeKey(hsdb.DB, nodeKey)
+	return GetNodeByNodeKey(hsdb, nodeKey)
 }
 
 // GetNodeByNodeKey finds a [types.Node] by its [key.NodePublic] and returns the [types.Node] struct.
 func GetNodeByNodeKey(
-	tx *gorm.DB,
+	q Querier,
 	nodeKey key.NodePublic,
 ) (*types.Node, error) {
-	mach := types.Node{}
-	if result := preloadNode(tx).
-		First(&mach, "node_key = ?", nodeKey.String()); result.Error != nil {
-		return nil, result.Error
+	return queryNode(q, selectNodes().WHERE(table.Nodes.NodeKey.EQ(jet.String(nodeKey.String()))))
+}
+
+// CreateNode inserts node and sets its ID. CreatedAt and UpdatedAt are
+// stamped with the current time when unset.
+func CreateNode(q Querier, node *types.Node) error {
+	now := time.Now()
+	if node.CreatedAt.IsZero() {
+		node.CreatedAt = now
 	}
 
-	return &mach, nil
+	if node.UpdatedAt.IsZero() {
+		node.UpdatedAt = now
+	}
+
+	row, err := nodeRowFrom(node)
+	if err != nil {
+		return err
+	}
+
+	columns := table.Nodes.MutableColumns
+	if node.ID != 0 {
+		columns = table.Nodes.AllColumns
+	}
+
+	var inserted idRow
+
+	err = q.executor().query(
+		table.Nodes.INSERT(columns).MODEL(row).RETURNING(table.Nodes.ID.AS("id_row.id")),
+		&inserted,
+	)
+	if err != nil {
+		return err
+	}
+
+	node.ID = types.NodeID(inserted.ID)
+
+	return nil
+}
+
+// NodeUpdate selects which optional columns [UpdateNode] writes on top of
+// the node state it always writes: keys, endpoints, host info, addresses,
+// names, user, registration method, tags, last seen and approved routes.
+type NodeUpdate struct {
+	// Expiry writes the expiry column. Map request updates leave it out:
+	// expiry only changes through explicit expiry updates or
+	// re-registration.
+	Expiry bool
+	// AuthKey writes auth_key_id. Left out on map request updates so a
+	// deleted key's stale reference is never persisted (#2862); written
+	// on registration, which presents a freshly validated key, and when
+	// clearing the key, which can never violate the foreign key.
+	AuthKey bool
+}
+
+// UpdateNode writes node's state to its row by id and stamps UpdatedAt.
+// Every selected column is written, including nil and zero values, so a
+// node converted from user-owned to tagged persists its cleared user.
+func UpdateNode(q Querier, node *types.Node, update NodeUpdate) error {
+	node.UpdatedAt = time.Now()
+
+	row, err := nodeRowFrom(node)
+	if err != nil {
+		return err
+	}
+
+	columns := jet.ColumnList{
+		table.Nodes.MachineKey,
+		table.Nodes.NodeKey,
+		table.Nodes.DiscoKey,
+		table.Nodes.Endpoints,
+		table.Nodes.HostInfo,
+		table.Nodes.Ipv4,
+		table.Nodes.Ipv6,
+		table.Nodes.Hostname,
+		table.Nodes.GivenName,
+		table.Nodes.UserID,
+		table.Nodes.RegisterMethod,
+		table.Nodes.Tags,
+		table.Nodes.LastSeen,
+		table.Nodes.ApprovedRoutes,
+		table.Nodes.UpdatedAt,
+	}
+
+	if update.Expiry {
+		columns = append(columns, table.Nodes.Expiry)
+	}
+
+	if update.AuthKey {
+		columns = append(columns, table.Nodes.AuthKeyID)
+	}
+
+	_, err = q.executor().exec(
+		table.Nodes.UPDATE(columns).MODEL(row).WHERE(table.Nodes.ID.EQ(jet.Uint64(node.ID.Uint64()))),
+	)
+
+	return err
+}
+
+// SaveNode overwrites every column of node's row when a row with its ID
+// exists and inserts it otherwise, keeping an explicit ID.
+func SaveNode(q Querier, node *types.Node) error {
+	if node.ID == 0 {
+		return CreateNode(q, node)
+	}
+
+	node.UpdatedAt = time.Now()
+
+	row, err := nodeRowFrom(node)
+	if err != nil {
+		return err
+	}
+
+	affected, err := q.executor().exec(
+		table.Nodes.UPDATE(table.Nodes.MutableColumns).MODEL(row).
+			WHERE(table.Nodes.ID.EQ(jet.Uint64(node.ID.Uint64()))),
+	)
+	if err != nil || affected > 0 {
+		return err
+	}
+
+	return CreateNode(q, node)
+}
+
+// updateNodeColumn sets a single column of a node and stamps updated_at.
+func updateNodeColumn(q Querier, nodeID types.NodeID, column jet.Column, value any) error {
+	_, err := q.executor().exec(
+		table.Nodes.UPDATE(column, table.Nodes.UpdatedAt).
+			SET(value, time.Now()).
+			WHERE(table.Nodes.ID.EQ(jet.Uint64(nodeID.Uint64()))),
+	)
+
+	return err
 }
 
 // SetLastSeen sets a node's last seen field indicating that we
 // have recently communicating with this node.
 func (hsdb *HSDatabase) SetLastSeen(nodeID types.NodeID, lastSeen time.Time) error {
-	return hsdb.Write(func(tx *gorm.DB) error {
+	return hsdb.Write(func(tx *Tx) error {
 		return SetLastSeen(tx, nodeID, lastSeen)
 	})
 }
 
 // SetLastSeen sets a node's last seen field indicating that we
 // have recently communicating with this node.
-func SetLastSeen(tx *gorm.DB, nodeID types.NodeID, lastSeen time.Time) error {
-	return tx.Model(&types.Node{}).Where("id = ?", nodeID).Update("last_seen", lastSeen).Error
+func SetLastSeen(q Querier, nodeID types.NodeID, lastSeen time.Time) error {
+	return updateNodeColumn(q, nodeID, table.Nodes.LastSeen, lastSeen)
 }
 
 // RenameNode takes a [types.Node] struct and a new [types.Node.GivenName] for the nodes
 // and renames it. Validation should be done in the state layer before calling this function.
-func RenameNode(tx *gorm.DB,
+func RenameNode(q Querier,
 	nodeID types.NodeID, newName string,
 ) error {
 	err := dnsname.ValidLabel(newName)
@@ -191,17 +345,24 @@ func RenameNode(tx *gorm.DB,
 	}
 
 	// Check if the new name is unique
-	var count int64
+	var count struct{ Count int64 }
 
-	if err := tx.Model(&types.Node{}).Where("given_name = ? AND id != ?", newName, nodeID).Count(&count).Error; err != nil { //nolint:noinlineerr
+	err = q.executor().query(
+		jet.SELECT(jet.COUNT(jet.STAR).AS("count")).FROM(table.Nodes).
+			WHERE(table.Nodes.GivenName.EQ(jet.String(newName)).
+				AND(table.Nodes.ID.NOT_EQ(jet.Uint64(nodeID.Uint64())))),
+		&count,
+	)
+	if err != nil {
 		return fmt.Errorf("checking name uniqueness: %w", err)
 	}
 
-	if count > 0 {
+	if count.Count > 0 {
 		return ErrNodeNameNotUnique
 	}
 
-	if err := tx.Model(&types.Node{}).Where("id = ?", nodeID).Update("given_name", newName).Error; err != nil { //nolint:noinlineerr
+	err = updateNodeColumn(q, nodeID, table.Nodes.GivenName, newName)
+	if err != nil {
 		return fmt.Errorf("renaming node in database: %w", err)
 	}
 
@@ -209,35 +370,29 @@ func RenameNode(tx *gorm.DB,
 }
 
 func (hsdb *HSDatabase) NodeSetExpiry(nodeID types.NodeID, expiry *time.Time) error {
-	return hsdb.Write(func(tx *gorm.DB) error {
+	return hsdb.Write(func(tx *Tx) error {
 		return NodeSetExpiry(tx, nodeID, expiry)
 	})
 }
 
 // NodeSetExpiry sets a new expiry time for a node.
 // If expiry is nil, the node's expiry is disabled (node will never expire).
-func NodeSetExpiry(tx *gorm.DB, nodeID types.NodeID, expiry *time.Time) error {
-	return tx.Model(&types.Node{}).Where("id = ?", nodeID).Update("expiry", expiry).Error
+func NodeSetExpiry(q Querier, nodeID types.NodeID, expiry *time.Time) error {
+	return updateNodeColumn(q, nodeID, table.Nodes.Expiry, expiry)
 }
 
 func (hsdb *HSDatabase) DeleteNode(node *types.Node) error {
-	return hsdb.Write(func(tx *gorm.DB) error {
+	return hsdb.Write(func(tx *Tx) error {
 		return DeleteNode(tx, node)
 	})
 }
 
 // DeleteNode deletes a [types.Node] from the database.
 // Caller is responsible for notifying all of change.
-func DeleteNode(tx *gorm.DB,
+func DeleteNode(q Querier,
 	node *types.Node,
 ) error {
-	// Unscoped causes the node to be fully removed from the database.
-	err := tx.Unscoped().Delete(&types.Node{}, node.ID).Error
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return deleteNodeByID(q, node.ID)
 }
 
 // DeleteEphemeralNode deletes a [types.Node] from the database, note that this method
@@ -246,19 +401,20 @@ func DeleteNode(tx *gorm.DB,
 func (hsdb *HSDatabase) DeleteEphemeralNode(
 	nodeID types.NodeID,
 ) error {
-	return hsdb.Write(func(tx *gorm.DB) error {
-		err := tx.Unscoped().Delete(&types.Node{}, nodeID).Error
-		if err != nil {
-			return err
-		}
-
-		return nil
+	return hsdb.Write(func(tx *Tx) error {
+		return deleteNodeByID(tx, nodeID)
 	})
+}
+
+func deleteNodeByID(q Querier, nodeID types.NodeID) error {
+	_, err := q.executor().exec(table.Nodes.DELETE().WHERE(table.Nodes.ID.EQ(jet.Uint64(nodeID.Uint64()))))
+
+	return err
 }
 
 // RegisterNodeForTest is used only for testing purposes to register a node directly in the database.
 // Production code should use [state.State.HandleNodeFromAuthPath] or [state.State.HandleNodeFromPreAuthKey].
-func RegisterNodeForTest(tx *gorm.DB, node types.Node, ipv4 *netip.Addr, ipv6 *netip.Addr) (*types.Node, error) {
+func RegisterNodeForTest(q Querier, node types.Node, ipv4, ipv6 *netip.Addr) (*types.Node, error) {
 	if !testing.Testing() {
 		panic("RegisterNodeForTest can only be called during tests")
 	}
@@ -268,11 +424,12 @@ func RegisterNodeForTest(tx *gorm.DB, node types.Node, ipv4 *netip.Addr, ipv6 *n
 		Str(zf.MachineKey, node.MachineKey.ShortString()).
 		Str(zf.NodeKey, node.NodeKey.ShortString())
 
-	if node.User != nil {
+	switch {
+	case node.User != nil:
 		logEvent = logEvent.Str(zf.UserName, node.User.Username())
-	} else if node.UserID != nil {
+	case node.UserID != nil:
 		logEvent = logEvent.Uint(zf.UserID, *node.UserID)
-	} else {
+	default:
 		logEvent = logEvent.Str(zf.UserName, "none")
 	}
 
@@ -282,22 +439,23 @@ func RegisterNodeForTest(tx *gorm.DB, node types.Node, ipv4 *netip.Addr, ipv6 *n
 	// re-registers for the same user; a different user is a new node. Match on
 	// (machine_key, user_id) precisely - a machine key can map to several nodes
 	// (one per user), so a machine-key-only lookup would be ambiguous.
-	var oldNode types.Node
+	if node.UserID != nil {
+		oldNode, err := queryNode(q, selectNodes().WHERE(
+			table.Nodes.MachineKey.EQ(jet.String(node.MachineKey.String())).
+				AND(table.Nodes.UserID.EQ(jet.Uint64(uint64(*node.UserID)))),
+		))
+		if err == nil {
+			node.ID = oldNode.ID
+			node.GivenName = oldNode.GivenName
+			node.ApprovedRoutes = oldNode.ApprovedRoutes
+			// Don't overwrite the provided IPs with old ones when they exist
+			if ipv4 == nil {
+				ipv4 = oldNode.IPv4
+			}
 
-	err := tx.
-		Where("machine_key = ? AND user_id = ?", node.MachineKey.String(), node.UserID).
-		First(&oldNode).Error
-	if err == nil {
-		node.ID = oldNode.ID
-		node.GivenName = oldNode.GivenName
-		node.ApprovedRoutes = oldNode.ApprovedRoutes
-		// Don't overwrite the provided IPs with old ones when they exist
-		if ipv4 == nil {
-			ipv4 = oldNode.IPv4
-		}
-
-		if ipv6 == nil {
-			ipv6 = oldNode.IPv6
+			if ipv6 == nil {
+				ipv6 = oldNode.IPv6
+			}
 		}
 	}
 
@@ -305,7 +463,7 @@ func RegisterNodeForTest(tx *gorm.DB, node types.Node, ipv4 *netip.Addr, ipv6 *n
 	// so we store the node.Expire and node.Nodekey that has been set when
 	// adding it to the registrationCache
 	if node.IPv4 != nil || node.IPv6 != nil {
-		err := tx.Save(&node).Error
+		err := SaveNode(q, &node)
 		if err != nil {
 			return nil, fmt.Errorf("registering existing node in database: %w", err)
 		}
@@ -331,7 +489,8 @@ func RegisterNodeForTest(tx *gorm.DB, node types.Node, ipv4 *netip.Addr, ipv6 *n
 		}
 	}
 
-	if err := tx.Save(&node).Error; err != nil { //nolint:noinlineerr
+	err := SaveNode(q, &node)
+	if err != nil {
 		return nil, fmt.Errorf("saving node to database: %w", err)
 	}
 
@@ -344,30 +503,40 @@ func RegisterNodeForTest(tx *gorm.DB, node types.Node, ipv4 *netip.Addr, ipv6 *n
 }
 
 // NodeSetNodeKey sets the node key of a node and saves it to the database.
-func NodeSetNodeKey(tx *gorm.DB, node *types.Node, nodeKey key.NodePublic) error {
-	return tx.Model(node).Updates(types.Node{
-		NodeKey: nodeKey,
-	}).Error
+func NodeSetNodeKey(q Querier, node *types.Node, nodeKey key.NodePublic) error {
+	err := updateNodeColumn(q, node.ID, table.Nodes.NodeKey, nodeKey.String())
+	if err != nil {
+		return err
+	}
+
+	node.NodeKey = nodeKey
+
+	return nil
 }
 
 func (hsdb *HSDatabase) NodeSetMachineKey(
 	node *types.Node,
 	machineKey key.MachinePublic,
 ) error {
-	return hsdb.Write(func(tx *gorm.DB) error {
+	return hsdb.Write(func(tx *Tx) error {
 		return NodeSetMachineKey(tx, node, machineKey)
 	})
 }
 
 // NodeSetMachineKey sets the node key of a node and saves it to the database.
 func NodeSetMachineKey(
-	tx *gorm.DB,
+	q Querier,
 	node *types.Node,
 	machineKey key.MachinePublic,
 ) error {
-	return tx.Model(node).Updates(types.Node{
-		MachineKey: machineKey,
-	}).Error
+	err := updateNodeColumn(q, node.ID, table.Nodes.MachineKey, machineKey.String())
+	if err != nil {
+		return err
+	}
+
+	node.MachineKey = machineKey
+
+	return nil
 }
 
 // EphemeralGarbageCollector is a garbage collector that will delete nodes after
@@ -575,7 +744,7 @@ func (hsdb *HSDatabase) CreateNodeForTest(user *types.User, hostname ...string) 
 		AuthKeyID:      &pakID,
 	}
 
-	err = hsdb.DB.Save(node).Error
+	err = CreateNode(hsdb, node)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create test node: %v", err))
 	}
@@ -599,12 +768,12 @@ func (hsdb *HSDatabase) CreateRegisteredNodeForTest(user *types.User, hostname .
 
 	var registeredNode *types.Node
 
-	err = hsdb.DB.Transaction(func(tx *gorm.DB) error {
-		var err error
+	err = hsdb.Write(func(tx *Tx) error {
+		var registerErr error
 
-		registeredNode, err = RegisterNodeForTest(tx, *node, ipv4, ipv6)
+		registeredNode, registerErr = RegisterNodeForTest(tx, *node, ipv4, ipv6)
 
-		return err
+		return registerErr
 	})
 	if err != nil {
 		panic(fmt.Sprintf("failed to register test node: %v", err))
@@ -633,7 +802,11 @@ func (hsdb *HSDatabase) CreateNodesForTest(user *types.User, count int, hostname
 	return nodes
 }
 
-func (hsdb *HSDatabase) CreateRegisteredNodesForTest(user *types.User, count int, hostnamePrefix ...string) []*types.Node {
+func (hsdb *HSDatabase) CreateRegisteredNodesForTest(
+	user *types.User,
+	count int,
+	hostnamePrefix ...string,
+) []*types.Node {
 	if !testing.Testing() {
 		panic("CreateRegisteredNodesForTest can only be called during tests")
 	}

@@ -55,11 +55,10 @@ type mapper struct {
 
 func newMapper(
 	cfg *types.Config,
-	state *state.State,
+	st *state.State,
 ) *mapper {
-	// uid, _ := util.GenerateRandomStringDNSSafe(mapperIDLength)
 	return &mapper{
-		state: state,
+		state: st,
 		cfg:   cfg,
 
 		created: time.Now(),
@@ -82,7 +81,7 @@ func generateUserProfiles(
 		return nil
 	}
 
-	userMap[user.Model().ID] = &user
+	userMap[user.ID()] = &user
 
 	for _, peer := range peers.All() {
 		peerUser := peer.Owner()
@@ -90,7 +89,7 @@ func generateUserProfiles(
 			continue
 		}
 
-		userMap[peerUser.Model().ID] = &peerUser
+		userMap[peerUser.ID()] = &peerUser
 	}
 
 	var profiles []tailcfg.UserProfile
@@ -260,8 +259,6 @@ func addNextDNSMetadata(resolvers []*dnstype.Resolver, node types.NodeView) {
 }
 
 // fullMapResponse returns a [tailcfg.MapResponse] for the given node.
-//
-//nolint:unused
 func (m *mapper) fullMapResponse(
 	nodeID types.NodeID,
 	capVer tailcfg.CapabilityVersion,
@@ -345,7 +342,7 @@ func (m *mapper) policyChangeResponse(
 		// Convert [tailcfg.NodeID] to [types.NodeID] for [MapResponseBuilder.WithPeersRemoved]
 		removedIDs := make([]types.NodeID, len(removedPeers))
 		for i, id := range removedPeers {
-			removedIDs[i] = types.NodeID(id) //nolint:gosec // NodeID types are equivalent
+			removedIDs[i] = types.NodeID(id) //nolint:gosec // tailcfg.NodeID values are never negative
 		}
 
 		builder.WithPeersRemoved(removedIDs...)
@@ -577,7 +574,7 @@ func (m *mapper) debugMapResponses() (map[types.NodeID][]tailcfg.MapResponse, er
 func ReadMapResponsesFromDirectory(dir string) (map[types.NodeID][]tailcfg.MapResponse, error) {
 	nodes, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading map responses directory %q: %w", dir, err)
 	}
 
 	result := make(map[types.NodeID][]tailcfg.MapResponse)

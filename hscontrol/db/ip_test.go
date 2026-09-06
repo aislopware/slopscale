@@ -92,13 +92,14 @@ func TestIPAllocatorSequential(t *testing.T) {
 			dbFunc: func() *HSDatabase {
 				db := dbForTest(t)
 				user := types.User{Name: ""}
-				db.DB.Save(&user)
+				require.NoError(t, SaveUser(db, &user))
 
-				db.DB.Save(&types.Node{
+				node := types.Node{
 					User: &user,
 					IPv4: nap("100.64.0.1"),
 					IPv6: nap("fd7a:115c:a1e0::1"),
-				})
+				}
+				require.NoError(t, CreateNode(db, &node))
 
 				return db
 			},
@@ -120,13 +121,14 @@ func TestIPAllocatorSequential(t *testing.T) {
 			dbFunc: func() *HSDatabase {
 				db := dbForTest(t)
 				user := types.User{Name: ""}
-				db.DB.Save(&user)
+				require.NoError(t, SaveUser(db, &user))
 
-				db.DB.Save(&types.Node{
+				node := types.Node{
 					User: &user,
 					IPv4: nap("100.64.0.2"),
 					IPv6: nap("fd7a:115c:a1e0::2"),
-				})
+				}
+				require.NoError(t, CreateNode(db, &node))
 
 				return db
 			},
@@ -318,12 +320,13 @@ func TestBackfillIPAddresses(t *testing.T) {
 			dbFunc: func() *HSDatabase {
 				db := dbForTest(t)
 				user := types.User{Name: ""}
-				db.DB.Save(&user)
+				require.NoError(t, SaveUser(db, &user))
 
-				db.DB.Save(&types.Node{
+				node := types.Node{
 					User: &user,
 					IPv4: nap("100.64.0.1"),
-				})
+				}
+				require.NoError(t, CreateNode(db, &node))
 
 				return db
 			},
@@ -343,12 +346,13 @@ func TestBackfillIPAddresses(t *testing.T) {
 			dbFunc: func() *HSDatabase {
 				db := dbForTest(t)
 				user := types.User{Name: ""}
-				db.DB.Save(&user)
+				require.NoError(t, SaveUser(db, &user))
 
-				db.DB.Save(&types.Node{
+				node := types.Node{
 					User: &user,
 					IPv6: nap("fd7a:115c:a1e0::1"),
-				})
+				}
+				require.NoError(t, CreateNode(db, &node))
 
 				return db
 			},
@@ -368,13 +372,14 @@ func TestBackfillIPAddresses(t *testing.T) {
 			dbFunc: func() *HSDatabase {
 				db := dbForTest(t)
 				user := types.User{Name: ""}
-				db.DB.Save(&user)
+				require.NoError(t, SaveUser(db, &user))
 
-				db.DB.Save(&types.Node{
+				node := types.Node{
 					User: &user,
 					IPv4: nap("100.64.0.1"),
 					IPv6: nap("fd7a:115c:a1e0::1"),
-				})
+				}
+				require.NoError(t, CreateNode(db, &node))
 
 				return db
 			},
@@ -392,13 +397,14 @@ func TestBackfillIPAddresses(t *testing.T) {
 			dbFunc: func() *HSDatabase {
 				db := dbForTest(t)
 				user := types.User{Name: ""}
-				db.DB.Save(&user)
+				require.NoError(t, SaveUser(db, &user))
 
-				db.DB.Save(&types.Node{
+				node := types.Node{
 					User: &user,
 					IPv4: nap("100.64.0.1"),
 					IPv6: nap("fd7a:115c:a1e0::1"),
-				})
+				}
+				require.NoError(t, CreateNode(db, &node))
 
 				return db
 			},
@@ -416,24 +422,17 @@ func TestBackfillIPAddresses(t *testing.T) {
 			dbFunc: func() *HSDatabase {
 				db := dbForTest(t)
 				user := types.User{Name: ""}
-				db.DB.Save(&user)
+				require.NoError(t, SaveUser(db, &user))
 
-				db.DB.Save(&types.Node{
-					User: &user,
-					IPv4: nap("100.64.0.1"),
-				})
-				db.DB.Save(&types.Node{
-					User: &user,
-					IPv4: nap("100.64.0.2"),
-				})
-				db.DB.Save(&types.Node{
-					User: &user,
-					IPv4: nap("100.64.0.3"),
-				})
-				db.DB.Save(&types.Node{
-					User: &user,
-					IPv4: nap("100.64.0.4"),
-				})
+				for _, addr := range []string{
+					"100.64.0.1", "100.64.0.2", "100.64.0.3", "100.64.0.4",
+				} {
+					node := types.Node{
+						User: &user,
+						IPv4: nap(addr),
+					}
+					require.NoError(t, CreateNode(db, &node))
+				}
 
 				return db
 			},

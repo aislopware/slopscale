@@ -31,7 +31,9 @@ type Change struct {
 	IncludeDERPMap bool
 	IncludeDNS     bool
 	IncludeDomain  bool
-	IncludePolicy  bool // [tailcfg.MapResponse.PacketFilters] and [tailcfg.MapResponse.SSHPolicy] - always sent together
+	// IncludePolicy covers [tailcfg.MapResponse.PacketFilters] and
+	// [tailcfg.MapResponse.SSHPolicy], which are always sent together.
+	IncludePolicy bool
 
 	// Peer changes.
 	PeersChanged []types.NodeID
@@ -48,21 +50,6 @@ type Change struct {
 	// Used by the debug ping endpoint to verify node connectivity.
 	// [Change.PingRequest] is always targeted to a specific node via [Change.TargetNode].
 	PingRequest *tailcfg.PingRequest
-}
-
-// boolFieldNames returns all boolean field names for exhaustive testing.
-// When adding a new boolean field to [Change], add it here.
-// Tests use reflection to verify this matches the struct.
-func (r Change) boolFieldNames() []string {
-	return []string{
-		"IncludeSelf",
-		"IncludeDERPMap",
-		"IncludeDNS",
-		"IncludeDomain",
-		"IncludePolicy",
-		"SendAllPeers",
-		"RequiresRuntimePeerComputation",
-	}
 }
 
 func (r Change) Merge(other Change) Change {
@@ -251,6 +238,21 @@ func FilterForNode(nodeID types.NodeID, rs []Change) []Change {
 // not one of these.
 func (r Change) IsBroadcastPolicyChange() bool {
 	return r.RequiresRuntimePeerComputation && !r.IsTargetedToNode() && r.OriginNode == 0
+}
+
+// boolFieldNames returns all boolean field names for exhaustive testing.
+// When adding a new boolean field to [Change], add it here.
+// Tests use reflection to verify this matches the struct.
+func (r Change) boolFieldNames() []string {
+	return []string{
+		"IncludeSelf",
+		"IncludeDERPMap",
+		"IncludeDNS",
+		"IncludeDomain",
+		"IncludePolicy",
+		"SendAllPeers",
+		"RequiresRuntimePeerComputation",
+	}
 }
 
 // DedupePolicyChanges keeps the first broadcast policy change in a tick and
@@ -486,7 +488,8 @@ func NodeKeyRotated(node types.NodeView) Change {
 	}
 
 	c := PeerPatched("node key rotated (relogin)", &tailcfg.PeerChange{
-		NodeID:    tailcfg.NodeID(node.ID()), //nolint:gosec // NodeID is bounded
+		//nolint:gosec // NodeID is a database autoincrement value, int64 on SQLite/PostgreSQL, so it fits
+		NodeID:    tailcfg.NodeID(node.ID()),
 		Key:       &nk,
 		DiscoKey:  &dk,
 		KeyExpiry: &expiry,

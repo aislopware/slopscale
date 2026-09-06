@@ -10,8 +10,6 @@ import (
 
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 var errVersionUpgrade = errors.New("version upgrade not supported")
@@ -25,15 +23,6 @@ var errVersionParse = errors.New("cannot parse version")
 var errVersionFormat = errors.New(
 	"version does not follow semver major.minor.patch format",
 )
-
-// DatabaseVersion tracks the headscale version that last
-// successfully started against this database.
-// It is a single-row table (ID is always 1).
-type DatabaseVersion struct {
-	ID        uint   `gorm:"primaryKey"`
-	Version   string `gorm:"not null"`
-	UpdatedAt time.Time
-}
 
 // semver holds parsed major.minor.patch components.
 type semver struct {
@@ -62,8 +51,10 @@ func parseVersion(s string) (semver, error) {
 		v = v[:idx]
 	}
 
+	const semverComponentCount = 3
+
 	parts := strings.Split(v, ".")
-	if len(parts) != 3 {
+	if len(parts) != semverComponentCount {
 		return semver{}, fmt.Errorf("%q: %w", s, errVersionFormat)
 	}
 
@@ -83,44 +74,32 @@ func parseVersion(s string) (semver, error) {
 	return semver{Major: out[0], Minor: out[1], Patch: out[2]}, nil
 }
 
-// ensureDatabaseVersionTable creates the database_versions table if it
-// does not already exist. Uses [gorm.DB.AutoMigrate] to handle dialect
-// differences between SQLite (datetime) and PostgreSQL (timestamp).
-// This runs before gormigrate migrations.
-func ensureDatabaseVersionTable(db *gorm.DB) error {
-	err := db.AutoMigrate(&DatabaseVersion{})
-	if err != nil {
-		return fmt.Errorf("creating database version table: %w", err)
-	}
-
-	return nil
-}
-
 // getDatabaseVersion reads the stored version from the database.
 // Returns an empty string if no version has been stored yet.
-func getDatabaseVersion(db *gorm.DB) (string, error) {
+func getDatabaseVersion(e *executor) (string, error) {
 	var version string
 
-	result := db.Raw("SELECT version FROM database_versions WHERE id = 1").Scan(&version)
-	if result.Error != nil {
-		return "", fmt.Errorf("reading database version: %w", result.Error)
+	err := e.scanRow("SELECT version FROM database_versions WHERE id = 1", nil, &version)
+	if errors.Is(err, ErrNotFound) {
+		return "", nil
 	}
 
-	if result.RowsAffected == 0 {
-		return "", nil
+	if err != nil {
+		return "", fmt.Errorf("reading database version: %w", err)
 	}
 
 	return version, nil
 }
 
 // setDatabaseVersion upserts the version row in the database.
-func setDatabaseVersion(db *gorm.DB, version string) error {
+func setDatabaseVersion(e *executor, version string) error {
 	now := time.Now().UTC()
 
-	err := db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"version", "updated_at"}),
-	}).Create(&DatabaseVersion{ID: 1, Version: version, UpdatedAt: now}).Error
+	_, err := e.execRaw(
+		`INSERT INTO database_versions (id, version, updated_at) VALUES (1, $1, $2) `+
+			`ON CONFLICT (id) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at`,
+		version, now,
+	)
 	if err != nil {
 		return fmt.Errorf("upserting database version: %w", err)
 	}
@@ -183,22 +162,21 @@ func isDev(version string) bool {
 //   - Same minor version: always allowed (patch changes in either direction).
 //   - Single minor version upgrade (stored.minor+1 == current.minor): allowed.
 //   - Multi-minor upgrade or any minor downgrade: blocked with a fatal error.
-func checkVersionUpgradePath(db *gorm.DB) error {
-	err := ensureDatabaseVersionTable(db)
+func (hsdb *HSDatabase) checkVersionUpgradePath() error {
+	return checkVersionUpgradePathFromVersions(&hsdb.ex, types.GetVersionInfo().Version)
+}
+
+// checkVersionUpgradePathFromVersions applies the upgrade rules for a
+// binary reporting currentVersion against the version stored in e.
+func checkVersionUpgradePathFromVersions(e *executor, currentVersion string) error {
+	storedVersion, err := getDatabaseVersion(e)
 	if err != nil {
 		return err
 	}
 
-	currentVersion := types.GetVersionInfo().Version
-
-	// Running binary has no real version — skip the check but
+	// Running binary has no real version: skip the check but
 	// preserve whatever version is already stored.
 	if isDev(currentVersion) {
-		storedVersion, err := getDatabaseVersion(db)
-		if err != nil {
-			return err
-		}
-
 		if storedVersion != "" && !isDev(storedVersion) {
 			log.Warn().
 				Str("database_version", storedVersion).
@@ -209,18 +187,13 @@ func checkVersionUpgradePath(db *gorm.DB) error {
 		return nil
 	}
 
-	storedVersion, err := getDatabaseVersion(db)
-	if err != nil {
-		return err
-	}
-
-	// No stored version — first run with this feature. Allow startup;
+	// No stored version: first run with this feature. Allow startup;
 	// the version will be stored after migrations succeed.
 	if storedVersion == "" {
 		return nil
 	}
 
-	// Previous run was an unversioned build — no meaningful comparison.
+	// Previous run was an unversioned build: no meaningful comparison.
 	if isDev(storedVersion) {
 		return nil
 	}
@@ -246,15 +219,15 @@ func checkVersionUpgradePath(db *gorm.DB) error {
 
 	switch {
 	case minorDiff == 0:
-		// Same minor version — patch changes are always fine.
+		// Same minor version: patch changes are always fine.
 		return nil
 
 	case minorDiff == 1:
-		// Single minor version upgrade — allowed.
+		// Single minor version upgrade: allowed.
 		return nil
 
 	case minorDiff > 1:
-		// Multi-minor upgrade — blocked.
+		// Multi-minor upgrade: blocked.
 		return fmt.Errorf(
 			"headscale version %s cannot be used with a database last used by %s, "+
 				"upgrading more than one minor version at a time is not supported, "+
@@ -267,7 +240,7 @@ func checkVersionUpgradePath(db *gorm.DB) error {
 		)
 
 	default:
-		// minorDiff < 0 — any minor downgrade is blocked.
+		// minorDiff < 0: any minor downgrade is blocked.
 		return fmt.Errorf(
 			"headscale version %s cannot be used with a database last used by %s, "+
 				"downgrading to a previous minor version is not supported, "+

@@ -203,7 +203,7 @@ func (s *State) DebugPolicy() (string, error) {
 
 		return p.Data, nil
 	case types.PolicyModeFile:
-		pol, err := hsdb.PolicyBytes(s.db.DB, s.cfg)
+		pol, err := hsdb.PolicyBytes(s.db, s.cfg)
 		if err != nil {
 			return "", err
 		}
@@ -301,21 +301,23 @@ func (s *State) DebugOverviewJSON() DebugOverviewInfo {
 	now := time.Now()
 
 	for _, node := range allNodes.All() {
-		if node.Valid() {
-			userName := node.Owner().Name()
-			info.Users[userName]++
+		if !node.Valid() {
+			continue
+		}
 
-			if node.IsOnline().Valid() && node.IsOnline().Get() {
-				info.Nodes.Online++
-			}
+		userName := node.Owner().Name()
+		info.Users[userName]++
 
-			if node.Expiry().Valid() && node.Expiry().Get().Before(now) {
-				info.Nodes.Expired++
-			}
+		if node.IsOnline().Valid() && node.IsOnline().Get() {
+			info.Nodes.Online++
+		}
 
-			if node.AuthKey().Valid() && node.AuthKey().Ephemeral() {
-				info.Nodes.Ephemeral++
-			}
+		if node.Expiry().Valid() && node.Expiry().Get().Before(now) {
+			info.Nodes.Expired++
+		}
+
+		if node.AuthKey().Valid() && node.AuthKey().Ephemeral() {
+			info.Nodes.Ephemeral++
 		}
 	}
 

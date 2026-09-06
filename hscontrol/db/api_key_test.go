@@ -201,10 +201,10 @@ func TestAPIKeyWithPrefix(t *testing.T) {
 				require.NoError(t, err)
 
 				now := time.Now()
-				err = db.DB.Exec(`
+				_, err = db.DB.ExecContext(t.Context(), `
 					INSERT INTO api_keys (prefix, hash, created_at)
-					VALUES (?, ?, ?)
-				`, legacyPrefix, hash, now).Error
+					VALUES ($1, $2, $3)
+				`, legacyPrefix, hash, now)
 				require.NoError(t, err)
 
 				// Validate legacy key

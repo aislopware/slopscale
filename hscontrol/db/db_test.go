@@ -12,7 +12,6 @@ import (
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
 
 // TestSQLiteMigrationAndDataValidation tests specific SQLite migration scenarios
@@ -37,7 +36,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 				// Expected data from dump: 1 user, 2 api_keys, 6 nodes
 
 				// Verify users data preservation
-				users, err := Read(hsdb.DB, func(rx *gorm.DB) ([]types.User, error) {
+				users, err := Read(hsdb, func(rx *Tx) ([]types.User, error) {
 					return ListUsers(rx, nil)
 				})
 				require.NoError(t, err)
@@ -46,12 +45,12 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 				// Verify api_keys data preservation
 				var apiKeyCount int
 
-				err = hsdb.DB.Raw("SELECT COUNT(*) FROM api_keys").Scan(&apiKeyCount).Error
+				err = hsdb.DB.QueryRowContext(t.Context(), "SELECT COUNT(*) FROM api_keys").Scan(&apiKeyCount)
 				require.NoError(t, err)
 				assert.Equal(t, 2, apiKeyCount, "should preserve all 2 api_keys from original schema")
 
 				// Verify nodes data preservation and field validation
-				nodes, err := Read(hsdb.DB, func(rx *gorm.DB) (types.Nodes, error) {
+				nodes, err := Read(hsdb, func(rx *Tx) (types.Nodes, error) {
 					return ListNodes(rx)
 				})
 				require.NoError(t, err)
@@ -84,7 +83,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 			wantFunc: func(t *testing.T, hsdb *HSDatabase) {
 				t.Helper()
 
-				nodes, err := Read(hsdb.DB, func(rx *gorm.DB) (types.Nodes, error) {
+				nodes, err := Read(hsdb, func(rx *Tx) (types.Nodes, error) {
 					return ListNodes(rx)
 				})
 				require.NoError(t, err)
@@ -124,7 +123,12 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 				// Expected: tags = ["tag:server"] (no duplicates)
 				node4 := findNode("node4")
 				require.NotNil(t, node4, "node4 should exist")
-				assert.Equal(t, []string{"tag:server"}, node4.Tags.List(), "node4 should have tag:server without duplicates") //nolint:goconst // descriptive test assertions read better with the literal inline
+				assert.Equal(
+					t,
+					[]string{"tag:server"},
+					node4.Tags.List(),
+					"node4 should have tag:server without duplicates",
+				)
 
 				// Node 5: user2 has no RequestTags
 				// Expected: tags = [] (unchanged)
@@ -156,7 +160,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 			wantFunc: func(t *testing.T, hsdb *HSDatabase) {
 				t.Helper()
 
-				nodes, err := Read(hsdb.DB, func(rx *gorm.DB) (types.Nodes, error) {
+				nodes, err := Read(hsdb, func(rx *Tx) (types.Nodes, error) {
 					return ListNodes(rx)
 				})
 				require.NoError(t, err)
@@ -211,7 +215,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 			wantFunc: func(t *testing.T, hsdb *HSDatabase) {
 				t.Helper()
 
-				nodes, err := Read(hsdb.DB, func(rx *gorm.DB) (types.Nodes, error) {
+				nodes, err := Read(hsdb, func(rx *Tx) (types.Nodes, error) {
 					return ListNodes(rx)
 				})
 				require.NoError(t, err)
@@ -261,7 +265,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 			wantFunc: func(t *testing.T, hsdb *HSDatabase) {
 				t.Helper()
 
-				nodes, err := Read(hsdb.DB, func(rx *gorm.DB) (types.Nodes, error) {
+				nodes, err := Read(hsdb, func(rx *Tx) (types.Nodes, error) {
 					return ListNodes(rx)
 				})
 				require.NoError(t, err)
@@ -308,7 +312,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 			wantFunc: func(t *testing.T, hsdb *HSDatabase) {
 				t.Helper()
 
-				nodes, err := Read(hsdb.DB, func(rx *gorm.DB) (types.Nodes, error) {
+				nodes, err := Read(hsdb, func(rx *Tx) (types.Nodes, error) {
 					return ListNodes(rx)
 				})
 				require.NoError(t, err)
@@ -396,7 +400,8 @@ func requireConstraintFailed(t *testing.T, err error) {
 	t.Helper()
 	require.Error(t, err)
 
-	if !strings.Contains(err.Error(), "UNIQUE constraint failed:") && !strings.Contains(err.Error(), "violates unique constraint") {
+	if !strings.Contains(err.Error(), "UNIQUE constraint failed:") &&
+		!strings.Contains(err.Error(), "violates unique constraint") {
 		require.Failf(t, "expected error to contain a constraint failure, got: %s", err.Error())
 	}
 }
@@ -406,11 +411,11 @@ func TestConstraints(t *testing.T) {
 
 	tests := []struct {
 		name string
-		run  func(*testing.T, *gorm.DB)
+		run  func(*testing.T, *HSDatabase)
 	}{
 		{
 			name: "no-duplicate-username-if-no-oidc",
-			run: func(t *testing.T, db *gorm.DB) { //nolint:thelper
+			run: func(t *testing.T, db *HSDatabase) {
 				_, err := CreateUser(db, types.User{Name: "user1"})
 				require.NoError(t, err)
 				_, err = CreateUser(db, types.User{Name: "user1"})
@@ -419,14 +424,14 @@ func TestConstraints(t *testing.T) {
 		},
 		{
 			name: "no-oidc-duplicate-username-and-id",
-			run: func(t *testing.T, db *gorm.DB) { //nolint:thelper
+			run: func(t *testing.T, db *HSDatabase) {
 				user := types.User{
 					ID:   1,
 					Name: "user1",
 				}
 				user.ProviderIdentifier = sql.NullString{String: "http://test.com/user1", Valid: true}
 
-				err := db.Save(&user).Error
+				err := SaveUser(db, &user)
 				require.NoError(t, err)
 
 				user = types.User{
@@ -435,20 +440,20 @@ func TestConstraints(t *testing.T) {
 				}
 				user.ProviderIdentifier = sql.NullString{String: "http://test.com/user1", Valid: true}
 
-				err = db.Save(&user).Error
+				err = SaveUser(db, &user)
 				requireConstraintFailed(t, err)
 			},
 		},
 		{
 			name: "no-oidc-duplicate-id",
-			run: func(t *testing.T, db *gorm.DB) { //nolint:thelper
+			run: func(t *testing.T, db *HSDatabase) {
 				user := types.User{
 					ID:   1,
 					Name: "user1",
 				}
 				user.ProviderIdentifier = sql.NullString{String: "http://test.com/user1", Valid: true}
 
-				err := db.Save(&user).Error
+				err := SaveUser(db, &user)
 				require.NoError(t, err)
 
 				user = types.User{
@@ -457,13 +462,13 @@ func TestConstraints(t *testing.T) {
 				}
 				user.ProviderIdentifier = sql.NullString{String: "http://test.com/user1", Valid: true}
 
-				err = db.Save(&user).Error
+				err = SaveUser(db, &user)
 				requireConstraintFailed(t, err)
 			},
 		},
 		{
 			name: "allow-duplicate-username-cli-then-oidc",
-			run: func(t *testing.T, db *gorm.DB) { //nolint:thelper
+			run: func(t *testing.T, db *HSDatabase) {
 				_, err := CreateUser(db, types.User{Name: "user1"}) // Create CLI username
 				require.NoError(t, err)
 
@@ -472,19 +477,19 @@ func TestConstraints(t *testing.T) {
 					ProviderIdentifier: sql.NullString{String: "http://test.com/user1", Valid: true},
 				}
 
-				err = db.Save(&user).Error
+				err = SaveUser(db, &user)
 				require.NoError(t, err)
 			},
 		},
 		{
 			name: "allow-duplicate-username-oidc-then-cli",
-			run: func(t *testing.T, db *gorm.DB) { //nolint:thelper
+			run: func(t *testing.T, db *HSDatabase) {
 				user := types.User{
 					Name:               "user1",
 					ProviderIdentifier: sql.NullString{String: "http://test.com/user1", Valid: true},
 				}
 
-				err := db.Save(&user).Error
+				err := SaveUser(db, &user)
 				require.NoError(t, err)
 
 				_, err = CreateUser(db, types.User{Name: "user1"}) // Create CLI username
@@ -498,7 +503,7 @@ func TestConstraints(t *testing.T) {
 			t.Parallel()
 
 			db := newPostgresTestDB(t)
-			tt.run(t, db.DB.Debug())
+			tt.run(t, db)
 		})
 		t.Run(tt.name+"-sqlite", func(t *testing.T) {
 			t.Parallel()
@@ -508,7 +513,7 @@ func TestConstraints(t *testing.T) {
 				t.Fatalf("creating database: %s", err)
 			}
 
-			tt.run(t, db.DB.Debug())
+			tt.run(t, db)
 		})
 	}
 }
@@ -540,7 +545,17 @@ func TestPostgresMigrationAndDataValidation(t *testing.T) {
 			}
 
 			// Construct the pg_restore command
-			cmd := exec.CommandContext(context.Background(), pgRestorePath, "--verbose", "--if-exists", "--clean", "--no-owner", "--dbname", u.String(), tt.dbPath)
+			cmd := exec.CommandContext(
+				t.Context(),
+				pgRestorePath,
+				"--verbose",
+				"--if-exists",
+				"--clean",
+				"--no-owner",
+				"--dbname",
+				u.String(),
+				tt.dbPath,
+			)
 
 			// Set the output streams
 			cmd.Stdout = os.Stdout
@@ -639,7 +654,7 @@ func TestSQLiteAllTestdataMigrations(t *testing.T) {
 			dbPath := t.TempDir() + "/headscale_test.db"
 
 			// Setup a database with the old schema
-			schemaPath := filepath.Join("testdata/sqlite", schema.Name())
+			schemaPath := filepath.Join("testdata", "sqlite", schema.Name())
 			err := createSQLiteFromSQLFile(schemaPath, dbPath)
 			require.NoError(t, err)
 

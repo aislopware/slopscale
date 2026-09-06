@@ -78,32 +78,6 @@ type (
 	NodeIDs []NodeID
 )
 
-func (id NodeID) StableID() tailcfg.StableNodeID {
-	return tailcfg.StableNodeID(strconv.FormatUint(uint64(id), util.Base10))
-}
-
-func (id NodeID) NodeID() tailcfg.NodeID {
-	return tailcfg.NodeID(id) //nolint:gosec // NodeID is bounded
-}
-
-func (id NodeID) Uint64() uint64 {
-	return uint64(id)
-}
-
-func (id NodeID) String() string {
-	return strconv.FormatUint(id.Uint64(), util.Base10)
-}
-
-// StringID returns the node's id as a decimal string, the form the HTTP APIs
-// render it as.
-func (node *Node) StringID() string {
-	if node == nil {
-		return ""
-	}
-
-	return node.ID.String()
-}
-
 func ParseNodeID(s string) (NodeID, error) {
 	id, err := strconv.ParseUint(s, util.Base10, 64)
 	return NodeID(id), err
@@ -118,20 +92,37 @@ func MustParseNodeID(s string) NodeID {
 	return id
 }
 
+func (id NodeID) StableID() tailcfg.StableNodeID {
+	return tailcfg.StableNodeID(strconv.FormatUint(uint64(id), util.Base10))
+}
+
+func (id NodeID) NodeID() tailcfg.NodeID {
+	//nolint:gosec // NodeID is a database autoincrement value, int64 on SQLite/PostgreSQL, so it fits
+	return tailcfg.NodeID(id)
+}
+
+func (id NodeID) Uint64() uint64 {
+	return uint64(id)
+}
+
+func (id NodeID) String() string {
+	return strconv.FormatUint(id.Uint64(), util.Base10)
+}
+
 // Node is a Headscale client.
 type Node struct {
-	ID NodeID `gorm:"primary_key"`
+	ID NodeID
 
-	MachineKey key.MachinePublic `gorm:"serializer:text"`
-	NodeKey    key.NodePublic    `gorm:"serializer:text"`
-	DiscoKey   key.DiscoPublic   `gorm:"serializer:text"`
+	MachineKey key.MachinePublic
+	NodeKey    key.NodePublic
+	DiscoKey   key.DiscoPublic
 
-	Endpoints AddrPorts `gorm:"serializer:json"`
+	Endpoints AddrPorts
 
-	Hostinfo *tailcfg.Hostinfo `gorm:"column:host_info;serializer:json"`
+	Hostinfo *tailcfg.Hostinfo
 
-	IPv4 *netip.Addr `gorm:"column:ipv4;serializer:text"`
-	IPv6 *netip.Addr `gorm:"column:ipv6;serializer:text"`
+	IPv4 *netip.Addr
+	IPv6 *netip.Addr
 
 	// Hostname represents the name given by the Tailscale
 	// client during registration
@@ -143,12 +134,12 @@ type Node struct {
 	//
 	// GivenName is the name used in all DNS related
 	// parts of headscale.
-	GivenName string `gorm:"type:varchar(63);unique_index"`
+	GivenName string
 
 	// UserID identifies the owning user for user-owned nodes.
 	// Nil for tagged nodes, which are owned by their tags.
 	UserID *uint
-	User   *User `gorm:"constraint:OnDelete:CASCADE;"`
+	User   *User
 
 	RegisterMethod string
 
@@ -156,7 +147,7 @@ type Node struct {
 	// When non-empty, the node is "tagged" and tags define its identity.
 	// Empty for user-owned nodes.
 	// Tags cannot be removed once set (one-way transition).
-	Tags Strings `gorm:"column:tags;serializer:json"`
+	Tags Strings
 
 	// When a node has been created with a [PreAuthKey], we need to
 	// prevent the preauthkey from being deleted before the node.
@@ -169,23 +160,23 @@ type Node struct {
 
 	// LastSeen is when the node was last in contact with
 	// headscale. It is best effort and not persisted.
-	LastSeen *time.Time `gorm:"column:last_seen"`
+	LastSeen *time.Time
 
 	// ApprovedRoutes is a list of routes that the node is allowed to announce
 	// as a subnet router. They are not necessarily the routes that the node
 	// announces at the moment.
 	// See [Node.Hostinfo]
-	ApprovedRoutes Prefixes `gorm:"column:approved_routes;serializer:json"`
+	ApprovedRoutes Prefixes
 
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time
 
-	IsOnline *bool `gorm:"-"`
+	IsOnline *bool
 
 	// Unhealthy excludes the node from primary route election while
 	// online. Written by the HA prober. Runtime-only.
-	Unhealthy bool `gorm:"-"`
+	Unhealthy bool
 
 	// ActiveSessions counts live poll sessions for this node.
 	// [State.Connect] increments it and every session release
@@ -193,7 +184,7 @@ type Node struct {
 	// exactly when its last session ends — regardless of the order in
 	// which overlapping sessions' cleanups run. Never persisted, like
 	// SessionEpoch.
-	ActiveSessions int `gorm:"-"`
+	ActiveSessions int
 
 	// SessionEpoch identifies a poll session generation; Connect bumps
 	// it. It complements ActiveSessions rather than duplicating it:
@@ -202,18 +193,28 @@ type Node struct {
 	// its old value, a generation cannot. poll.go also uses the epoch
 	// returned by Connect as a "Connect ran" sentinel for its cleanup,
 	// and Disconnect logs it. Runtime-only.
-	SessionEpoch uint64 `gorm:"-"`
+	SessionEpoch uint64
 }
 
 type Nodes []*Node
 
-func (ns Nodes) ViewSlice() views.Slice[NodeView] {
-	vs := make([]NodeView, len(ns))
-	for i, n := range ns {
+func (nodes Nodes) ViewSlice() views.Slice[NodeView] {
+	vs := make([]NodeView, len(nodes))
+	for i, n := range nodes {
 		vs[i] = n.View()
 	}
 
 	return views.SliceOf(vs)
+}
+
+// StringID returns the node's id as a decimal string, the form the HTTP APIs
+// render it as.
+func (node *Node) StringID() string {
+	if node == nil {
+		return ""
+	}
+
+	return node.ID.String()
 }
 
 // IsExpired returns whether the node registration has expired.
@@ -375,43 +376,6 @@ func (node *Node) AppendToIPSet(build *netipx.IPSetBuilder) {
 // internet" when node2 is an exit node — grants access.
 func (node *Node) CanAccess(matchers []matcher.Match, node2 *Node) bool {
 	return node.canAccess(matchers, node2, node.SubnetRoutes(), node2.SubnetRoutes(), node2.IsExitNode())
-}
-
-// canAccess is [Node.CanAccess] with the snapshot-stable route data supplied by
-// the caller. The peer-map build precomputes each node's SubnetRoutes and
-// exit-node status once and passes them here, so the O(n^2) pair scan does not
-// recompute them for every pair.
-func (node *Node) canAccess(
-	matchers []matcher.Match,
-	node2 *Node,
-	srcRoutes, dstRoutes []netip.Prefix,
-	dstIsExit bool,
-) bool {
-	src := node.IPs()
-	allowedIPs := node2.IPs()
-
-	for _, m := range matchers {
-		srcMatchesIP := m.SrcsContainsIPs(src...)
-		srcMatchesRoutes := len(srcRoutes) > 0 && m.SrcsOverlapsPrefixes(srcRoutes...)
-
-		if !srcMatchesIP && !srcMatchesRoutes {
-			continue
-		}
-
-		if m.DestsContainsIP(allowedIPs...) {
-			return true
-		}
-
-		if len(dstRoutes) > 0 && m.DestsOverlapsPrefixes(dstRoutes...) {
-			return true
-		}
-
-		if dstIsExit && m.DestsIsTheInternet() {
-			return true
-		}
-	}
-
-	return false
 }
 
 // CanAccessRoute determines whether a specific route prefix should be
@@ -628,7 +592,8 @@ func (node *Node) MarshalZerologObject(e *zerolog.Event) {
 // - logTracePeerChange in poll.go.
 func (node *Node) PeerChangeFromMapRequest(req tailcfg.MapRequest) tailcfg.PeerChange {
 	ret := tailcfg.PeerChange{
-		NodeID: tailcfg.NodeID(node.ID), //nolint:gosec // NodeID is bounded
+		//nolint:gosec // NodeID is a database autoincrement value, int64 on SQLite/PostgreSQL, so it fits
+		NodeID: tailcfg.NodeID(node.ID),
 	}
 
 	if node.NodeKey.String() != req.NodeKey.String() {
@@ -743,15 +708,16 @@ func (node *Node) DebugString() string {
 	fmt.Fprintf(&sb, "%s(%s):\n", node.Hostname, node.ID)
 
 	// Show ownership status
-	if node.IsTagged() {
+	switch {
+	case node.IsTagged():
 		fmt.Fprintf(&sb, "\tTagged: %v\n", node.Tags)
 
 		if node.User != nil {
 			fmt.Fprintf(&sb, "\tCreated by: %s (%d, %q)\n", node.User.Display(), node.User.ID, node.User.Username())
 		}
-	} else if node.User != nil {
+	case node.User != nil:
 		fmt.Fprintf(&sb, "\tUser-owned: %s (%d, %q)\n", node.User.Display(), node.User.ID, node.User.Username())
-	} else {
+	default:
 		fmt.Fprintf(&sb, "\tOrphaned: no user or tags\n")
 	}
 
@@ -763,6 +729,43 @@ func (node *Node) DebugString() string {
 	sb.WriteString("\n")
 
 	return sb.String()
+}
+
+// canAccess is [Node.CanAccess] with the snapshot-stable route data supplied by
+// the caller. The peer-map build precomputes each node's SubnetRoutes and
+// exit-node status once and passes them here, so the O(n^2) pair scan does not
+// recompute them for every pair.
+func (node *Node) canAccess(
+	matchers []matcher.Match,
+	node2 *Node,
+	srcRoutes, dstRoutes []netip.Prefix,
+	dstIsExit bool,
+) bool {
+	src := node.IPs()
+	allowedIPs := node2.IPs()
+
+	for _, m := range matchers {
+		srcMatchesIP := m.SrcsContainsIPs(src...)
+		srcMatchesRoutes := len(srcRoutes) > 0 && m.SrcsOverlapsPrefixes(srcRoutes...)
+
+		if !srcMatchesIP && !srcMatchesRoutes {
+			continue
+		}
+
+		if m.DestsContainsIP(allowedIPs...) {
+			return true
+		}
+
+		if len(dstRoutes) > 0 && m.DestsOverlapsPrefixes(dstRoutes...) {
+			return true
+		}
+
+		if dstIsExit && m.DestsIsTheInternet() {
+			return true
+		}
+	}
+
+	return false
 }
 
 // MarshalZerologObject implements [zerolog.LogObjectMarshaler] for [NodeView].
@@ -1013,7 +1016,7 @@ func (nv NodeView) TailscaleUserID() tailcfg.UserID {
 	}
 
 	if nv.IsTagged() {
-		//nolint:gosec // G115: TaggedDevices.ID is a constant that fits in int64
+		//nolint:gosec // TaggedDevicesUserID is a fixed constant far below int64 max, so this always fits
 		return tailcfg.UserID(int64(TaggedDevices.ID))
 	}
 
@@ -1021,7 +1024,7 @@ func (nv NodeView) TailscaleUserID() tailcfg.UserID {
 		return 0
 	}
 
-	//nolint:gosec // G115: UserID values are within int64 range
+	//nolint:gosec // UserID is a database autoincrement value, int64 on SQLite/PostgreSQL, so it fits
 	return tailcfg.UserID(int64(nv.UserID().Get()))
 }
 
@@ -1226,7 +1229,7 @@ func (nv NodeView) TailNode(
 	maps.Copy(capMap, selfPolicyCaps)
 
 	tNode := tailcfg.Node{
-		//nolint:gosec // G115: NodeID values are within int64 range
+		//nolint:gosec // NodeID is a database autoincrement value, int64 on SQLite/PostgreSQL, so it fits
 		ID:       tailcfg.NodeID(nv.ID()),
 		StableID: nv.ID().StableID(),
 		Name:     hostname,

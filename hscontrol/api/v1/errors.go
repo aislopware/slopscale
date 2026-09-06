@@ -6,7 +6,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/state"
-	"gorm.io/gorm"
 )
 
 // mapError translates a state/db-layer error into a Huma HTTP error
@@ -19,7 +18,7 @@ func mapError(msg string, err error) error {
 	}
 
 	switch {
-	case errors.Is(err, gorm.ErrRecordNotFound),
+	case errors.Is(err, db.ErrNotFound),
 		errors.Is(err, state.ErrNodeNotFound),
 		errors.Is(err, state.ErrNodeNotInNodeStore),
 		errors.Is(err, db.ErrUserNotFound),

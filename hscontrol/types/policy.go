@@ -2,8 +2,7 @@ package types
 
 import (
 	"errors"
-
-	"gorm.io/gorm"
+	"time"
 )
 
 var (
@@ -13,7 +12,10 @@ var (
 
 // Policy represents a policy in the database.
 type Policy struct {
-	gorm.Model
+	ID        uint
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time
 
 	// Data contains the policy in HuJSON format.
 	Data string

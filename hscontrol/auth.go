@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
-	"gorm.io/gorm"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
 )
@@ -44,79 +44,26 @@ func (h *Headscale) handleRegister(
 	// Tailscale clients may send logout requests with BOTH a past expiry AND an auth key.
 	// A past expiry takes precedence - it's a logout regardless of other fields.
 	if !req.Expiry.IsZero() && req.Expiry.Before(time.Now()) {
-		log.Debug().
-			Str("node.key", req.NodeKey.ShortString()).
-			Time("expiry", req.Expiry).
-			Bool("has_auth", req.Auth != nil).
-			Msg("Detected logout attempt with past expiry")
+		resp, err := h.handleExpiredLogoutAttempt(req, machineKey)
+		if err != nil {
+			return nil, err
+		}
 
-		// This is a logout attempt (expiry in the past)
-		if node, ok := h.state.GetNodeByNodeKey(req.NodeKey); ok {
-			log.Debug().
-				EmbedObject(node).
-				Bool("is_ephemeral", node.IsEphemeral()).
-				Bool("has_authkey", node.AuthKey().Valid()).
-				Msg("Found existing node for logout, calling handleLogout")
-
-			resp, err := h.handleLogout(node, req, machineKey)
-			if err != nil {
-				return nil, fmt.Errorf("handling logout: %w", err)
-			}
-
-			if resp != nil {
-				return resp, nil
-			}
-		} else {
-			log.Warn().
-				Str("node.key", req.NodeKey.ShortString()).
-				Msg("Logout attempt but node not found in NodeStore")
+		if resp != nil {
+			return resp, nil
 		}
 	}
 
 	// If the register request does not contain a Auth struct, it means we are logging
 	// out an existing node (legacy logout path for clients that send Auth=nil).
 	if req.Auth == nil {
-		// If the register request present a NodeKey that is currently in use, we will
-		// check if the node needs to be sent to re-auth, or if the node is logging out.
-		// We do not look up nodes by [key.MachinePublic] as it might belong to multiple
-		// nodes, separated by users and this path is handling expiring/logout paths.
-		if node, ok := h.state.GetNodeByNodeKey(req.NodeKey); ok {
-			// Refuse to act on a node looked up purely by NodeKey unless
-			// the Noise session's machine key matches the cached node.
-			// Without this check anyone holding a target's NodeKey could
-			// open a Noise session with a throwaway machine key and read
-			// the owner's User/Login back through [nodeToRegisterResponse].
-			// [Headscale.handleLogout] enforces the same check on its own path.
-			err := machineKeyMismatch(node, machineKey)
-			if err != nil {
-				return nil, err
-			}
+		resp, err := h.handleNilAuthRegister(req, machineKey)
+		if err != nil {
+			return nil, err
+		}
 
-			// When tailscaled restarts, it sends [tailcfg.RegisterRequest] with Auth=nil and Expiry=zero.
-			// Return the current node state without modification.
-			if req.Expiry.IsZero() && !node.IsExpired() {
-				return nodeToRegisterResponse(node), nil
-			}
-
-			resp, err := h.handleLogout(node, req, machineKey)
-			if err != nil {
-				return nil, fmt.Errorf("handling existing node: %w", err)
-			}
-
-			// If resp is not nil, we have a response to return to the node.
-			// If resp is nil, we should proceed and see if the node is trying to re-auth.
-			if resp != nil {
-				return resp, nil
-			}
-		} else {
-			// If the register request is not attempting to register a node, and
-			// we cannot match it with an existing node, we consider that unexpected
-			// as only register nodes should attempt to log out.
-			log.Debug().
-				Str("node.key", req.NodeKey.ShortString()).
-				Str("machine.key", machineKey.ShortString()).
-				Bool("unexpected", true).
-				Msg("received register request with no auth, and no existing node")
+		if resp != nil {
+			return resp, nil
 		}
 	}
 
@@ -149,6 +96,98 @@ func (h *Headscale) handleRegister(
 		return nil, fmt.Errorf("handling register interactive: %w", err)
 	}
 
+	return resp, nil
+}
+
+// handleExpiredLogoutAttempt handles a [tailcfg.RegisterRequest] whose Expiry
+// is in the past, which Tailscale clients send as a logout regardless of
+// whether an auth key is also present. It returns a nil response, nil error
+// when there is no matching node to log out, in which case the caller should
+// proceed with the rest of the registration flow.
+func (h *Headscale) handleExpiredLogoutAttempt(
+	req tailcfg.RegisterRequest,
+	machineKey key.MachinePublic,
+) (*tailcfg.RegisterResponse, error) {
+	log.Debug().
+		Str("node.key", req.NodeKey.ShortString()).
+		Time("expiry", req.Expiry).
+		Bool("has_auth", req.Auth != nil).
+		Msg("Detected logout attempt with past expiry")
+
+	// This is a logout attempt (expiry in the past)
+	node, ok := h.state.GetNodeByNodeKey(req.NodeKey)
+	if !ok {
+		log.Warn().
+			Str("node.key", req.NodeKey.ShortString()).
+			Msg("Logout attempt but node not found in NodeStore")
+
+		return nil, nil //nolint:nilnil // intentional: no matching node, caller proceeds with registration
+	}
+
+	log.Debug().
+		EmbedObject(node).
+		Bool("is_ephemeral", node.IsEphemeral()).
+		Bool("has_authkey", node.AuthKey().Valid()).
+		Msg("Found existing node for logout, calling handleLogout")
+
+	resp, err := h.handleLogout(node, req, machineKey)
+	if err != nil {
+		return nil, fmt.Errorf("handling logout: %w", err)
+	}
+
+	return resp, nil
+}
+
+// handleNilAuthRegister handles a [tailcfg.RegisterRequest] with a nil Auth
+// struct (the legacy logout path for clients that send Auth=nil). It returns
+// a nil response, nil error when the caller should proceed and see if the
+// node is trying to re-auth instead.
+func (h *Headscale) handleNilAuthRegister(
+	req tailcfg.RegisterRequest,
+	machineKey key.MachinePublic,
+) (*tailcfg.RegisterResponse, error) {
+	// If the register request present a NodeKey that is currently in use, we will
+	// check if the node needs to be sent to re-auth, or if the node is logging out.
+	// We do not look up nodes by [key.MachinePublic] as it might belong to multiple
+	// nodes, separated by users and this path is handling expiring/logout paths.
+	node, ok := h.state.GetNodeByNodeKey(req.NodeKey)
+	if !ok {
+		// If the register request is not attempting to register a node, and
+		// we cannot match it with an existing node, we consider that unexpected
+		// as only register nodes should attempt to log out.
+		log.Debug().
+			Str("node.key", req.NodeKey.ShortString()).
+			Str("machine.key", machineKey.ShortString()).
+			Bool("unexpected", true).
+			Msg("received register request with no auth, and no existing node")
+
+		return nil, nil //nolint:nilnil // intentional: no matching node, caller proceeds with registration
+	}
+
+	// Refuse to act on a node looked up purely by NodeKey unless
+	// the Noise session's machine key matches the cached node.
+	// Without this check anyone holding a target's NodeKey could
+	// open a Noise session with a throwaway machine key and read
+	// the owner's User/Login back through [nodeToRegisterResponse].
+	// [Headscale.handleLogout] enforces the same check on its own path.
+	err := machineKeyMismatch(node, machineKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// When tailscaled restarts, it sends [tailcfg.RegisterRequest] with Auth=nil and Expiry=zero.
+	// Return the current node state without modification.
+	if req.Expiry.IsZero() && !node.IsExpired() {
+		return nodeToRegisterResponse(node), nil
+	}
+
+	resp, err := h.handleLogout(node, req, machineKey)
+	if err != nil {
+		return nil, fmt.Errorf("handling existing node: %w", err)
+	}
+
+	// If resp is not nil, we have a response to return to the node.
+	// If resp is nil, we should proceed and see if the node is trying to re-auth.
 	return resp, nil
 }
 
@@ -215,9 +254,9 @@ func (h *Headscale) handleLogout(
 				EmbedObject(node).
 				Msg("Deleting ephemeral node during logout")
 
-			c, err := h.state.DeleteNode(node)
-			if err != nil {
-				return nil, fmt.Errorf("deleting ephemeral node: %w", err)
+			c, deleteErr := h.state.DeleteNode(node)
+			if deleteErr != nil {
+				return nil, fmt.Errorf("deleting ephemeral node: %w", deleteErr)
 			}
 
 			h.Change(c)
@@ -418,7 +457,7 @@ func (h *Headscale) handleRegisterWithAuthKey(
 		machineKey,
 	)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, db.ErrNotFound) {
 			return nil, NewHTTPError(http.StatusUnauthorized, "invalid pre auth key", nil)
 		}
 

@@ -32,12 +32,19 @@ const (
 )
 
 var (
-	errOidcMutuallyExclusive     = errors.New("oidc_client_secret and oidc_client_secret_path are mutually exclusive")
-	errOIDCIssuerInvalid         = errors.New("oidc.issuer must be a valid http(s) URL")
-	errOIDCClientIDRequired      = errors.New("oidc.client_id is required when oidc.issuer is set")
-	errOIDCClientSecretRequired  = errors.New("oidc.client_secret or oidc.client_secret_path is required when oidc.issuer is set")
-	errServerURLSuffix           = errors.New("server_url cannot be part of base_domain in a way that could make the DERP and headscale server unreachable")
-	errServerURLSame             = errors.New("server_url cannot use the same domain as base_domain in a way that could make the DERP and headscale server unreachable")
+	errOidcMutuallyExclusive    = errors.New("oidc_client_secret and oidc_client_secret_path are mutually exclusive")
+	errOIDCIssuerInvalid        = errors.New("oidc.issuer must be a valid http(s) URL")
+	errOIDCClientIDRequired     = errors.New("oidc.client_id is required when oidc.issuer is set")
+	errOIDCClientSecretRequired = errors.New(
+		"oidc.client_secret or oidc.client_secret_path is required when oidc.issuer is set",
+	)
+	errServerURLSuffix = errors.New(
+		"server_url cannot be part of base_domain in a way that could make the DERP and headscale server unreachable",
+	)
+	errServerURLSame = errors.New(
+		"server_url cannot use the same domain as base_domain in a way that could make the DERP and " +
+			"headscale server unreachable",
+	)
 	errInvalidPKCEMethod         = errors.New("pkce.method must be either 'plain' or 'S256'")
 	errTrustedProxyZeroRange     = errors.New("0.0.0.0/0 and ::/0 are not allowed")
 	ErrNoPrefixConfigured        = errors.New("no IPv4 or IPv6 prefix configured, minimum one prefix is required")
@@ -187,12 +194,17 @@ type PostgresConfig struct {
 	ConnMaxIdleTimeSecs int
 }
 
-type GormConfig struct {
-	Debug                 bool
-	SlowThreshold         time.Duration
-	SkipErrRecordNotFound bool
-	ParameterizedQueries  bool
-	PrepareStmt           bool
+// QueryLogConfig controls the SQL query log written at debug level.
+type QueryLogConfig struct {
+	// Enabled turns the query log on. It follows database.debug.
+	Enabled bool
+	// SlowThreshold marks queries that take longer as slow; zero disables
+	// the slow-query warning.
+	SlowThreshold time.Duration
+	// LogNotFound logs queries that returned no rows as errors.
+	LogNotFound bool
+	// Parameterized logs placeholders instead of the bound arguments.
+	Parameterized bool
 }
 
 type DatabaseConfig struct {
@@ -200,8 +212,8 @@ type DatabaseConfig struct {
 	Type  string
 	Debug bool
 
-	// Type sets the gorm configuration
-	Gorm GormConfig
+	// QueryLog configures the SQL query log.
+	QueryLog QueryLogConfig
 
 	Sqlite   SqliteConfig
 	Postgres PostgresConfig
@@ -468,7 +480,7 @@ func LoadConfig(path string, isFile bool) error {
 	viper.SetDefault("database.sqlite.write_ahead_log", true)
 	viper.SetDefault("database.sqlite.wal_autocheckpoint", 1000) // SQLite default
 
-	viper.SetDefault("oidc.scope", []string{oidc.ScopeOpenID, "profile", "email"})
+	viper.SetDefault("oidc.scope", []string{oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeEmail})
 	viper.SetDefault("oidc.only_start_if_oidc_is_available", true)
 	viper.SetDefault("oidc.use_expiry_from_token", false)
 	viper.SetDefault("oidc.pkce.enabled", false)
@@ -608,7 +620,9 @@ func validateServerConfig() error {
 	depr.Log()
 
 	if viper.IsSet("dns.extra_records") && viper.IsSet("dns.extra_records_path") {
-		log.Fatal().Msg("fatal config error: dns.extra_records and dns.extra_records_path are mutually exclusive. Please remove one of them from your config file")
+		log.Fatal().
+			Msg("fatal config error: dns.extra_records and dns.extra_records_path are mutually exclusive. " +
+				"Please remove one of them from your config file")
 	}
 
 	// Collect any validation errors and return them all at once
@@ -619,20 +633,24 @@ func validateServerConfig() error {
 	}
 
 	if viper.GetString("noise.private_key_path") == "" {
-		errorText += "Fatal config error: headscale now requires a new `noise.private_key_path` field in the config file for the Tailscale v2 protocol\n"
+		errorText += "Fatal config error: headscale now requires a new `noise.private_key_path` field in the config " +
+			"file for the Tailscale v2 protocol\n"
 	}
 
 	if (viper.GetString("tls_letsencrypt_hostname") != "") &&
 		(viper.GetString("tls_letsencrypt_challenge_type") == TLSALPN01ChallengeType) &&
 		(!strings.HasSuffix(viper.GetString("listen_addr"), ":443")) {
-		// this is only a warning because there could be something sitting in front of headscale that redirects the traffic (e.g. an iptables rule)
+		// this is only a warning because there could be something sitting in front of
+		// headscale that redirects the traffic (e.g. an iptables rule)
 		log.Warn().
-			Msg("Warning: when using tls_letsencrypt_hostname with TLS-ALPN-01 as challenge type, headscale must be reachable on port 443, i.e. listen_addr should probably end in :443")
+			Msg("Warning: when using tls_letsencrypt_hostname with TLS-ALPN-01 as challenge type, " +
+				"headscale must be reachable on port 443, i.e. listen_addr should probably end in :443")
 	}
 
 	if (viper.GetString("tls_letsencrypt_challenge_type") != HTTP01ChallengeType) &&
 		(viper.GetString("tls_letsencrypt_challenge_type") != TLSALPN01ChallengeType) {
-		errorText += "Fatal config error: the only supported values for tls_letsencrypt_challenge_type are HTTP-01 and TLS-ALPN-01\n"
+		errorText += "Fatal config error: the only supported values for tls_letsencrypt_challenge_type are " +
+			"HTTP-01 and TLS-ALPN-01\n"
 	}
 
 	if !strings.HasPrefix(viper.GetString("server_url"), "http://") &&
@@ -642,7 +660,7 @@ func validateServerConfig() error {
 
 	// Minimum inactivity time out is keepalive timeout (60s) plus a few seconds
 	// to avoid races
-	minInactivityTimeout := 65 * time.Second
+	const minInactivityTimeout = 65 * time.Second
 
 	ephemeralTimeout := resolveEphemeralInactivityTimeout()
 	if ephemeralTimeout <= minInactivityTimeout {
@@ -680,7 +698,8 @@ func validateServerConfig() error {
 
 		if haTimeout >= haInterval {
 			errorText += fmt.Sprintf(
-				"Fatal config error: node.routes.ha.probe_timeout (%s) must be less than node.routes.ha.probe_interval (%s)\n",
+				"Fatal config error: node.routes.ha.probe_timeout (%s) must be less than "+
+					"node.routes.ha.probe_interval (%s)\n",
 				haTimeout,
 				haInterval,
 			)
@@ -703,7 +722,7 @@ func validateServerConfig() error {
 	}
 
 	if errorText != "" {
-		// nolint
+		//nolint:err113 // aggregated validation text, not a sentinel
 		return errors.New(strings.TrimSuffix(errorText, "\n"))
 	}
 
@@ -772,7 +791,8 @@ func derpConfig() DERPConfig {
 
 	if serverEnabled && !automaticallyAddEmbeddedDerpRegion && len(paths) == 0 {
 		log.Fatal().
-			Msg("Disabling derp.server.automatically_add_embedded_derp_region requires to configure the derp server in derp.paths")
+			Msg("Disabling derp.server.automatically_add_embedded_derp_region requires to configure " +
+				"the derp server in derp.paths")
 	}
 
 	autoUpdate := viper.GetBool("derp.auto_update_enabled")
@@ -846,36 +866,55 @@ func logConfig() LogConfig {
 	}
 }
 
+// queryLogConfig reads database.query_log. The pre-jet database.gorm keys
+// are honoured with a deprecation warning so existing configs keep working.
+func queryLogConfig(enabled bool) QueryLogConfig {
+	cfg := QueryLogConfig{Enabled: enabled}
+
+	if viper.IsSet("database.gorm") {
+		log.Warn().Msg("database.gorm is deprecated, move its settings to database.query_log")
+
+		cfg.SlowThreshold = time.Duration(viper.GetInt64("database.gorm.slow_threshold")) * time.Millisecond
+		cfg.LogNotFound = !viper.GetBool("database.gorm.skip_err_record_not_found")
+		cfg.Parameterized = viper.GetBool("database.gorm.parameterized_queries")
+	}
+
+	if viper.IsSet("database.query_log.slow_threshold") {
+		cfg.SlowThreshold = time.Duration(viper.GetInt64("database.query_log.slow_threshold")) * time.Millisecond
+	}
+
+	if viper.IsSet("database.query_log.log_not_found") {
+		cfg.LogNotFound = viper.GetBool("database.query_log.log_not_found")
+	}
+
+	if viper.IsSet("database.query_log.parameterized") {
+		cfg.Parameterized = viper.GetBool("database.query_log.parameterized")
+	}
+
+	return cfg
+}
+
 func databaseConfig() DatabaseConfig {
 	debug := viper.GetBool("database.debug")
 
-	type_ := viper.GetString("database.type")
+	dbType := viper.GetString("database.type")
 
-	skipErrRecordNotFound := viper.GetBool("database.gorm.skip_err_record_not_found")
-	slowThreshold := time.Duration(viper.GetInt64("database.gorm.slow_threshold")) * time.Millisecond
-	parameterizedQueries := viper.GetBool("database.gorm.parameterized_queries")
-	prepareStmt := viper.GetBool("database.gorm.prepare_stmt")
+	queryLog := queryLogConfig(debug)
 
-	switch type_ {
+	switch dbType {
 	case DatabaseSqlite, DatabasePostgres:
 		break
 	case "sqlite":
-		type_ = "sqlite3"
+		dbType = "sqlite3"
 	default:
 		log.Fatal().
-			Msgf("invalid database type %q, must be sqlite, sqlite3 or postgres", type_)
+			Msgf("invalid database type %q, must be sqlite, sqlite3 or postgres", dbType)
 	}
 
 	return DatabaseConfig{
-		Type:  type_,
-		Debug: debug,
-		Gorm: GormConfig{
-			Debug:                 debug,
-			SkipErrRecordNotFound: skipErrRecordNotFound,
-			SlowThreshold:         slowThreshold,
-			ParameterizedQueries:  parameterizedQueries,
-			PrepareStmt:           prepareStmt,
-		},
+		Type:     dbType,
+		Debug:    debug,
+		QueryLog: queryLog,
 		Sqlite: SqliteConfig{
 			Path: util.AbsolutePathFromConfigPath(
 				viper.GetString("database.sqlite.path"),
@@ -940,7 +979,8 @@ func parseResolvers(nameservers []string, domain string) []*dnstype.Resolver {
 	var resolvers []*dnstype.Resolver
 
 	for _, nsStr := range nameservers {
-		if _, err := netip.ParseAddr(nsStr); err == nil { //nolint:noinlineerr
+		_, addrErr := netip.ParseAddr(nsStr)
+		if addrErr == nil {
 			resolvers = append(resolvers, &dnstype.Resolver{
 				Addr: nsStr,
 			})
@@ -948,7 +988,8 @@ func parseResolvers(nameservers []string, domain string) []*dnstype.Resolver {
 			continue
 		}
 
-		if _, err := url.Parse(nsStr); err == nil { //nolint:noinlineerr
+		_, urlErr := url.Parse(nsStr)
+		if urlErr == nil {
 			resolvers = append(resolvers, &dnstype.Resolver{
 				Addr: nsStr,
 			})
@@ -1107,8 +1148,11 @@ func LoadCLIConfig() (*Config, error) {
 
 // LoadServerConfig returns the full Headscale configuration to
 // host a Headscale server. This is called as part of `headscale serve`.
+//
+//nolint:funlen // legacy: one linear read of every viper key; splitting it would only scatter the key list
 func LoadServerConfig() (*Config, error) {
-	if err := validateServerConfig(); err != nil { //nolint:noinlineerr
+	err := validateServerConfig()
+	if err != nil {
 		return nil, err
 	}
 
@@ -1190,9 +1234,11 @@ func LoadServerConfig() (*Config, error) {
 	}
 
 	if oidcClientSecretPath != "" {
-		secretBytes, err := os.ReadFile(os.ExpandEnv(oidcClientSecretPath))
+		secretPath := os.ExpandEnv(oidcClientSecretPath)
+
+		secretBytes, err := os.ReadFile(secretPath)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("reading OIDC client secret from %q: %w", secretPath, err)
 		}
 
 		oidcClientSecret = strings.TrimSpace(string(secretBytes))
@@ -1332,7 +1378,7 @@ func LoadServerConfig() (*Config, error) {
 func isSafeServerURL(serverURL, baseDomain string) error {
 	server, err := url.Parse(serverURL)
 	if err != nil {
-		return err
+		return fmt.Errorf("parsing server URL %q: %w", serverURL, err)
 	}
 
 	if server.Hostname() == baseDomain {
@@ -1349,6 +1395,28 @@ func isSafeServerURL(serverURL, baseDomain string) error {
 type deprecator struct {
 	warns  set.Set[string]
 	fatals set.Set[string]
+}
+
+func (d *deprecator) String() string {
+	var b strings.Builder
+
+	for _, w := range d.warns.Slice() {
+		fmt.Fprintf(&b, "WARN: %s\n", w)
+	}
+
+	for _, f := range d.fatals.Slice() {
+		fmt.Fprintf(&b, "FATAL: %s\n", f)
+	}
+
+	return b.String()
+}
+
+func (d *deprecator) Log() {
+	if len(d.fatals) > 0 {
+		log.Fatal().Msg("\n" + d.String())
+	} else if len(d.warns) > 0 {
+		log.Warn().Msg("\n" + d.String())
+	}
 }
 
 // fatal deprecates and adds an entry to the fatal list of options if the oldKey is set.
@@ -1379,7 +1447,8 @@ func (d *deprecator) fatalWithHint(oldKey, hint string) {
 	}
 }
 
-// fatalIfNewKeyIsNotUsed deprecates and adds an entry to the fatal list of options if the oldKey is set and the new key is _not_ set.
+// fatalIfNewKeyIsNotUsed deprecates and adds an entry to the fatal list of options if the oldKey
+// is set and the new key is _not_ set.
 // If the new key is set, a warning is emitted instead.
 func (d *deprecator) fatalIfNewKeyIsNotUsed(newKey, oldKey string) {
 	if viper.IsSet(oldKey) && !viper.IsSet(newKey) {
@@ -1392,7 +1461,14 @@ func (d *deprecator) fatalIfNewKeyIsNotUsed(newKey, oldKey string) {
 			),
 		)
 	} else if viper.IsSet(oldKey) {
-		d.warns.Add(fmt.Sprintf("The %q configuration key is deprecated. Please use %q instead. %q has been removed.", oldKey, newKey, oldKey))
+		d.warns.Add(
+			fmt.Sprintf(
+				"The %q configuration key is deprecated. Please use %q instead. %q has been removed.",
+				oldKey,
+				newKey,
+				oldKey,
+			),
+		)
 	}
 }
 
@@ -1411,9 +1487,7 @@ func (d *deprecator) fatalIfSet(oldKey, newKey string) {
 	}
 }
 
-// warn deprecates and adds an option to log a warning if the oldKey is set.
-//
-//nolint:unused
+// warnNoAlias deprecates and adds an option to log a warning if the oldKey is set.
 func (d *deprecator) warnNoAlias(newKey, oldKey string) {
 	if viper.IsSet(oldKey) {
 		d.warns.Add(
@@ -1424,28 +1498,6 @@ func (d *deprecator) warnNoAlias(newKey, oldKey string) {
 				oldKey,
 			),
 		)
-	}
-}
-
-func (d *deprecator) String() string {
-	var b strings.Builder
-
-	for _, w := range d.warns.Slice() {
-		fmt.Fprintf(&b, "WARN: %s\n", w)
-	}
-
-	for _, f := range d.fatals.Slice() {
-		fmt.Fprintf(&b, "FATAL: %s\n", f)
-	}
-
-	return b.String()
-}
-
-func (d *deprecator) Log() {
-	if len(d.fatals) > 0 {
-		log.Fatal().Msg("\n" + d.String())
-	} else if len(d.warns) > 0 {
-		log.Warn().Msg("\n" + d.String())
 	}
 }
 

@@ -382,8 +382,11 @@ func TestNodeFQDN(t *testing.T) {
 			node: Node{
 				GivenName: strings.Repeat("a", 256),
 			},
-			domain:  "example.com",
-			wantErr: fmt.Sprintf("creating valid FQDN (%s.example.com.): hostname too long, cannot accept more than 255 ASCII chars", strings.Repeat("a", 256)),
+			domain: "example.com",
+			wantErr: fmt.Sprintf(
+				"creating valid FQDN (%s.example.com.): hostname too long, cannot accept more than 255 ASCII chars",
+				strings.Repeat("a", 256),
+			),
 		},
 		{
 			name: "no-dnsconfig",
@@ -430,7 +433,12 @@ func TestValidateGivenName(t *testing.T) {
 		{"label too long", strings.Repeat("a", 64), "example.com", true},
 		// A valid 63-char label whose FQDN overflows only because the base
 		// domain is long: ValidLabel passes, the FQDN-length bound rejects it.
-		{"fqdn too long under long base domain", strings.Repeat("a", 63), strings.Repeat("b", 200) + ".example.com", true},
+		{
+			"fqdn too long under long base domain",
+			strings.Repeat("a", 63),
+			strings.Repeat("b", 200) + ".example.com",
+			true,
+		},
 	}
 
 	for _, tc := range tests {
@@ -820,15 +828,25 @@ func TestHasNetworkChanges(t *testing.T) {
 		{
 			name: "SubnetRoutes changed",
 			old: &Node{
-				ID:             1,
-				IPv4:           mustIPPtr("100.64.0.1"),
-				Hostinfo:       &tailcfg.Hostinfo{RoutableIPs: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/24"), netip.MustParsePrefix("192.168.0.0/24")}},
+				ID:   1,
+				IPv4: mustIPPtr("100.64.0.1"),
+				Hostinfo: &tailcfg.Hostinfo{
+					RoutableIPs: []netip.Prefix{
+						netip.MustParsePrefix("10.0.0.0/24"),
+						netip.MustParsePrefix("192.168.0.0/24"),
+					},
+				},
 				ApprovedRoutes: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/24")},
 			},
 			new: &Node{
-				ID:             1,
-				IPv4:           mustIPPtr("100.64.0.1"),
-				Hostinfo:       &tailcfg.Hostinfo{RoutableIPs: []netip.Prefix{netip.MustParsePrefix("10.0.0.0/24"), netip.MustParsePrefix("192.168.0.0/24")}},
+				ID:   1,
+				IPv4: mustIPPtr("100.64.0.1"),
+				Hostinfo: &tailcfg.Hostinfo{
+					RoutableIPs: []netip.Prefix{
+						netip.MustParsePrefix("10.0.0.0/24"),
+						netip.MustParsePrefix("192.168.0.0/24"),
+					},
+				},
 				ApprovedRoutes: []netip.Prefix{netip.MustParsePrefix("192.168.0.0/24")},
 			},
 			changed: true,
@@ -850,14 +868,18 @@ func TestHasNetworkChanges(t *testing.T) {
 		{
 			name: "ExitRoutes approved",
 			old: &Node{
-				ID:       1,
-				IPv4:     mustIPPtr("100.64.0.1"),
-				Hostinfo: &tailcfg.Hostinfo{RoutableIPs: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0"), netip.MustParsePrefix("::/0")}},
+				ID:   1,
+				IPv4: mustIPPtr("100.64.0.1"),
+				Hostinfo: &tailcfg.Hostinfo{
+					RoutableIPs: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0"), netip.MustParsePrefix("::/0")},
+				},
 			},
 			new: &Node{
-				ID:             1,
-				IPv4:           mustIPPtr("100.64.0.1"),
-				Hostinfo:       &tailcfg.Hostinfo{RoutableIPs: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0"), netip.MustParsePrefix("::/0")}},
+				ID:   1,
+				IPv4: mustIPPtr("100.64.0.1"),
+				Hostinfo: &tailcfg.Hostinfo{
+					RoutableIPs: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0"), netip.MustParsePrefix("::/0")},
+				},
 				ApprovedRoutes: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0"), netip.MustParsePrefix("::/0")},
 			},
 			changed: true,
@@ -865,16 +887,32 @@ func TestHasNetworkChanges(t *testing.T) {
 		{
 			name: "ExitRoutes unchanged when SubnetRoutes change",
 			old: &Node{
-				ID:             1,
-				IPv4:           mustIPPtr("100.64.0.1"),
-				Hostinfo:       &tailcfg.Hostinfo{RoutableIPs: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0"), netip.MustParsePrefix("::/0"), netip.MustParsePrefix("10.0.0.0/24")}},
+				ID:   1,
+				IPv4: mustIPPtr("100.64.0.1"),
+				Hostinfo: &tailcfg.Hostinfo{
+					RoutableIPs: []netip.Prefix{
+						netip.MustParsePrefix("0.0.0.0/0"),
+						netip.MustParsePrefix("::/0"),
+						netip.MustParsePrefix("10.0.0.0/24"),
+					},
+				},
 				ApprovedRoutes: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0"), netip.MustParsePrefix("::/0")},
 			},
 			new: &Node{
-				ID:             1,
-				IPv4:           mustIPPtr("100.64.0.1"),
-				Hostinfo:       &tailcfg.Hostinfo{RoutableIPs: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0"), netip.MustParsePrefix("::/0"), netip.MustParsePrefix("10.0.0.0/24")}},
-				ApprovedRoutes: []netip.Prefix{netip.MustParsePrefix("0.0.0.0/0"), netip.MustParsePrefix("::/0"), netip.MustParsePrefix("10.0.0.0/24")},
+				ID:   1,
+				IPv4: mustIPPtr("100.64.0.1"),
+				Hostinfo: &tailcfg.Hostinfo{
+					RoutableIPs: []netip.Prefix{
+						netip.MustParsePrefix("0.0.0.0/0"),
+						netip.MustParsePrefix("::/0"),
+						netip.MustParsePrefix("10.0.0.0/24"),
+					},
+				},
+				ApprovedRoutes: []netip.Prefix{
+					netip.MustParsePrefix("0.0.0.0/0"),
+					netip.MustParsePrefix("::/0"),
+					netip.MustParsePrefix("10.0.0.0/24"),
+				},
 			},
 			changed: true,
 		},

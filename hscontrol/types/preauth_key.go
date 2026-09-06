@@ -14,6 +14,57 @@ type PAKError string
 
 func (e PAKError) Error() string { return string(e) }
 
+// PreAuthKey describes a pre-authorization key usable in a particular user.
+type PreAuthKey struct {
+	ID uint64
+
+	// Legacy plaintext key (for backwards compatibility)
+	Key string
+
+	// New bcrypt-based authentication
+	Prefix string
+	Hash   []byte // bcrypt
+
+	// For tagged keys: [PreAuthKey.UserID] tracks who created the key (informational)
+	// For user-owned keys: [PreAuthKey.UserID] tracks the node owner
+	// Can be nil for system-created tagged keys
+	UserID *uint
+	User   *User
+
+	// Free-text description, set via the v2 API. Empty for keys created through
+	// the v1 API or CLI.
+	Description string
+
+	Reusable  bool
+	Ephemeral bool
+	Used      bool
+
+	// Tags to assign to nodes registered with this key.
+	// Tags are copied to the node during registration.
+	// If non-empty, this creates tagged nodes (not user-owned).
+	Tags []string
+
+	CreatedAt  *time.Time
+	Expiration *time.Time
+
+	// Revoked is set when the key is revoked through the v2 API (Tailscale's
+	// DELETE). A revoked key is invalid but kept retrievable until the
+	// background collector reaps it after the configured retention window.
+	Revoked *time.Time
+}
+
+// PreAuthKeyNew is returned once when the key is created.
+type PreAuthKeyNew struct {
+	ID         uint64
+	Key        string
+	Reusable   bool
+	Ephemeral  bool
+	Tags       []string
+	Expiration *time.Time
+	CreatedAt  *time.Time
+	User       *User // Can be nil for system-created tagged keys
+}
+
 // StringID returns the key's id as a decimal string, the form the HTTP APIs
 // render it as.
 func (pak *PreAuthKey) StringID() string {
@@ -32,57 +83,6 @@ func (pak *PreAuthKeyNew) StringID() string {
 	}
 
 	return strconv.FormatUint(pak.ID, util.Base10)
-}
-
-// PreAuthKey describes a pre-authorization key usable in a particular user.
-type PreAuthKey struct {
-	ID uint64 `gorm:"primary_key"`
-
-	// Legacy plaintext key (for backwards compatibility)
-	Key string
-
-	// New bcrypt-based authentication
-	Prefix string
-	Hash   []byte // bcrypt
-
-	// For tagged keys: [PreAuthKey.UserID] tracks who created the key (informational)
-	// For user-owned keys: [PreAuthKey.UserID] tracks the node owner
-	// Can be nil for system-created tagged keys
-	UserID *uint
-	User   *User `gorm:"constraint:OnDelete:SET NULL;"`
-
-	// Free-text description, set via the v2 API. Empty for keys created through
-	// the v1 API or CLI.
-	Description string
-
-	Reusable  bool
-	Ephemeral bool `gorm:"default:false"`
-	Used      bool `gorm:"default:false"`
-
-	// Tags to assign to nodes registered with this key.
-	// Tags are copied to the node during registration.
-	// If non-empty, this creates tagged nodes (not user-owned).
-	Tags []string `gorm:"serializer:json"`
-
-	CreatedAt  *time.Time
-	Expiration *time.Time
-
-	// Revoked is set when the key is revoked through the v2 API (Tailscale's
-	// DELETE). A revoked key is invalid but kept retrievable until the
-	// background collector reaps it after the configured retention window.
-	Revoked *time.Time
-}
-
-// PreAuthKeyNew is returned once when the key is created.
-type PreAuthKeyNew struct {
-	ID         uint64 `gorm:"primary_key"`
-	Key        string
-	Reusable   bool
-	Ephemeral  bool
-	Tags       []string
-	Expiration *time.Time
-	CreatedAt  *time.Time
-	User       *User // Can be nil for system-created tagged keys
 }
 
 // Validate checks if a pre auth key can be used.
@@ -123,16 +123,6 @@ func (pak *PreAuthKey) IsTagged() bool {
 	return len(pak.Tags) > 0
 }
 
-// maskedPrefix returns the key prefix in masked format for safe logging.
-// SECURITY: Never log the full key or hash, only the masked prefix.
-func (pak *PreAuthKey) maskedPrefix() string {
-	if pak.Prefix != "" {
-		return "hskey-auth-" + pak.Prefix + "-***"
-	}
-
-	return ""
-}
-
 // MarshalZerologObject implements [zerolog.LogObjectMarshaler] for safe logging.
 // SECURITY: This method intentionally does NOT log the full key or hash.
 // Only the masked prefix is logged for identification purposes.
@@ -163,4 +153,14 @@ func (pak *PreAuthKey) MarshalZerologObject(e *zerolog.Event) {
 	if pak.Expiration != nil {
 		e.Time(zf.PAKExpiration, *pak.Expiration)
 	}
+}
+
+// maskedPrefix returns the key prefix in masked format for safe logging.
+// SECURITY: Never log the full key or hash, only the masked prefix.
+func (pak *PreAuthKey) maskedPrefix() string {
+	if pak.Prefix != "" {
+		return "hskey-auth-" + pak.Prefix + "-***"
+	}
+
+	return ""
 }

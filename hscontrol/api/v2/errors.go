@@ -6,7 +6,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/state"
-	"gorm.io/gorm"
 )
 
 // apiError is the Tailscale API error body. The official Tailscale Go client
@@ -64,7 +63,7 @@ func mapError(msg string, err error) error {
 	}
 
 	switch {
-	case errors.Is(err, gorm.ErrRecordNotFound),
+	case errors.Is(err, db.ErrNotFound),
 		errors.Is(err, db.ErrPreAuthKeyNotFound),
 		errors.Is(err, db.ErrUserNotFound),
 		errors.Is(err, state.ErrNodeNotFound):

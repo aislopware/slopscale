@@ -1,12 +1,12 @@
 package db
 
 import (
+	"encoding/base64"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,17 +27,13 @@ func TestVerifySecretConcurrent(t *testing.T) {
 	errs := make([]error, n)
 
 	for i := range n {
-		wg.Add(1)
-
-		go func(i int) {
-			defer wg.Done()
-
+		wg.Go(func() {
 			if i%2 == 0 {
 				errs[i] = verifySecret(hash, "s3cr3t")
 			} else {
 				errs[i] = verifySecret(hash, "wrong")
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -108,6 +104,16 @@ func TestHashSecretRoundTrip(t *testing.T) {
 	require.NoError(t, verifySecret(encoded, secret))
 	require.ErrorIs(t, verifySecret(encoded, "wrong-secret"), errSecretMismatch)
 	require.ErrorIs(t, verifySecret([]byte("not-a-phc-string"), secret), errSecretHashMalformed)
+
+	// A well-formed PHC string whose hash segment decodes to something other
+	// than sha256.Size bytes (e.g. a truncated or corrupted stored hash) must
+	// be rejected before the constant-time compare, not misread as a shorter
+	// Argon2 key.
+	parts := strings.Split(string(encoded), "$")
+	require.Len(t, parts, 6)
+	parts[5] = base64.RawStdEncoding.EncodeToString(make([]byte, 16))
+	shortHash := strings.Join(parts, "$")
+	require.ErrorIs(t, verifySecret([]byte(shortHash), secret), errSecretHashMalformed)
 }
 
 func TestOAuthClientRevoke(t *testing.T) {
@@ -195,7 +201,8 @@ func TestAccessTokenRejectedWhenClientGone(t *testing.T) {
 
 	// Delete only the client row, leaving the token orphaned (the state a
 	// mint/revoke race or manual deletion would produce).
-	require.NoError(t, db.DB.Where("client_id = ?", client.ClientID).Delete(&types.OAuthClient{}).Error)
+	_, err = db.DB.ExecContext(t.Context(), "DELETE FROM oauth_clients WHERE client_id = $1", client.ClientID)
+	require.NoError(t, err)
 
 	_, err = db.AuthenticateAccessToken(tokenStr)
 	require.ErrorIs(t, err, ErrAccessTokenClientRevoked)
@@ -208,8 +215,9 @@ func TestAccessTokenRejectedWhenClientGone(t *testing.T) {
 	require.NoError(t, err)
 
 	now := time.Now()
-	require.NoError(t, db.DB.Model(&types.OAuthClient{}).
-		Where("client_id = ?", client2.ClientID).Update("revoked", now).Error)
+	_, err = db.DB.ExecContext(t.Context(),
+		"UPDATE oauth_clients SET revoked = $1 WHERE client_id = $2", now, client2.ClientID)
+	require.NoError(t, err)
 
 	_, err = db.AuthenticateAccessToken(tokenStr2)
 	require.ErrorIs(t, err, ErrAccessTokenClientRevoked)

@@ -14,7 +14,6 @@ import (
 
 	jsonv2 "github.com/go-json-experiment/json"
 	"github.com/go-json-experiment/json/jsontext"
-	"gorm.io/gorm"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
 	"tailscale.com/types/views"
@@ -89,7 +88,14 @@ func (v *UserView) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	return nil
 }
 
-func (v UserView) Model() gorm.Model { return v.ж.Model }
+func (v UserView) ID() uint             { return v.ж.ID }
+func (v UserView) CreatedAt() time.Time { return v.ж.CreatedAt }
+func (v UserView) UpdatedAt() time.Time { return v.ж.UpdatedAt }
+
+// DeletedAt marks a soft-deleted user; reads skip rows that carry it.
+func (v UserView) DeletedAt() views.ValuePointer[time.Time] {
+	return views.ValuePointerOf(v.ж.DeletedAt)
+}
 
 // Name (username) for the user, is used if email is empty
 // Should not be used, please use [User.Username].
@@ -119,7 +125,10 @@ func (v UserView) ProfilePicURL() string { return v.ж.ProfilePicURL }
 
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _UserViewNeedsRegeneration = User(struct {
-	gorm.Model
+	ID                 uint
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	DeletedAt          *time.Time
 	Name               string
 	DisplayName        string
 	Email              string

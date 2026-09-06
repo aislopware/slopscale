@@ -11,7 +11,6 @@ import (
 	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
 
 func TestCreatePreAuthKey(t *testing.T) {
@@ -139,9 +138,9 @@ func TestCannotDeleteAssignedPreAuthKey(t *testing.T) {
 		RegisterMethod: util.RegisterMethodAuthKey,
 		AuthKeyID:      new(key.ID),
 	}
-	db.DB.Save(&node)
+	require.NoError(t, CreateNode(db, &node))
 
-	err = db.DB.Delete(&types.PreAuthKey{ID: key.ID}).Error
+	_, err = db.DB.ExecContext(t.Context(), "DELETE FROM pre_auth_keys WHERE id = $1", key.ID)
 	require.ErrorContains(t, err, "constraint failed: FOREIGN KEY constraint failed")
 }
 
@@ -170,10 +169,10 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 				now := time.Now()
 
 				// Use raw SQL to insert with empty prefix to avoid UNIQUE constraint
-				err := db.DB.Exec(`
+				_, err := db.DB.ExecContext(t.Context(), `
 					INSERT INTO pre_auth_keys (key, user_id, reusable, ephemeral, used, created_at)
-					VALUES (?, ?, ?, ?, ?, ?)
-				`, legacyKey, user.ID, true, false, false, now).Error
+					VALUES ($1, $2, $3, $4, $5, $6)
+				`, legacyKey, user.ID, true, false, false, now)
 				require.NoError(t, err)
 
 				return legacyKey
@@ -258,7 +257,9 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 				_, prefixAndHash, _ := strings.Cut(keyStr, "hskey-auth-")
 				prefix := prefixAndHash[:12]
 
-				return "hskey-auth-" + prefix + "-" + "wrong_hash_here_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+				wrongHash := "wrong_hash_here_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+				return "hskey-auth-" + prefix + "-" + wrongHash
 			},
 			wantFindErr:     true,
 			wantValidateErr: false,
@@ -328,10 +329,10 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 				expiration := time.Now().Add(-1 * time.Hour) // Expired 1 hour ago
 
 				// Use raw SQL to avoid UNIQUE constraint on empty prefix
-				err := db.DB.Exec(`
+				_, err := db.DB.ExecContext(t.Context(), `
 					INSERT INTO pre_auth_keys (key, user_id, reusable, ephemeral, used, created_at, expiration)
-					VALUES (?, ?, ?, ?, ?, ?, ?)
-				`, legacyKey, user.ID, true, false, false, now, expiration).Error
+					VALUES ($1, $2, $3, $4, $5, $6, $7)
+				`, legacyKey, user.ID, true, false, false, now, expiration)
 				require.NoError(t, err)
 
 				return legacyKey
@@ -346,10 +347,10 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 				now := time.Now()
 
 				// Use raw SQL to avoid UNIQUE constraint on empty prefix
-				err := db.DB.Exec(`
+				_, err := db.DB.ExecContext(t.Context(), `
 					INSERT INTO pre_auth_keys (key, user_id, reusable, ephemeral, used, created_at)
-					VALUES (?, ?, ?, ?, ?, ?)
-				`, legacyKey, user.ID, false, false, true, now).Error
+					VALUES ($1, $2, $3, $4, $5, $6)
+				`, legacyKey, user.ID, false, false, true, now)
 				require.NoError(t, err)
 
 				return legacyKey
@@ -407,18 +408,25 @@ func TestMultipleLegacyKeysAllowed(t *testing.T) {
 	for i := range 5 {
 		legacyKey := fmt.Sprintf("legacy_key_%d_%s", i, strings.Repeat("x", 40))
 
-		err := db.DB.Exec(`
+		_, execErr := db.DB.ExecContext(t.Context(), `
 			INSERT INTO pre_auth_keys (key, prefix, hash, user_id, reusable, ephemeral, used, created_at)
-			VALUES (?, '', NULL, ?, ?, ?, ?, ?)
-		`, legacyKey, user.ID, true, false, false, now).Error
-		require.NoError(t, err, "should allow multiple legacy keys with empty prefix")
+			VALUES ($1, '', NULL, $2, $3, $4, $5, $6)
+		`, legacyKey, user.ID, true, false, false, now)
+		require.NoError(t, execErr, "should allow multiple legacy keys with empty prefix")
 	}
 
 	// Verify all legacy keys can be retrieved
+	allPaks, err := ListPreAuthKeys(db)
+	require.NoError(t, err)
+
 	var legacyKeys []types.PreAuthKey
 
-	err = db.DB.Where("prefix = '' OR prefix IS NULL").Find(&legacyKeys).Error
-	require.NoError(t, err)
+	for _, pak := range allPaks {
+		if pak.Prefix == "" {
+			legacyKeys = append(legacyKeys, pak)
+		}
+	}
+
 	assert.Len(t, legacyKeys, 5, "should have created 5 legacy keys")
 
 	// Now create new bcrypt-based keys - these should have unique prefixes
@@ -447,17 +455,17 @@ func TestMultipleLegacyKeysAllowed(t *testing.T) {
 	hash2 := []byte("hash2")
 
 	// First insert should succeed
-	err = db.DB.Exec(`
+	_, err = db.DB.ExecContext(t.Context(), `
 		INSERT INTO pre_auth_keys (key, prefix, hash, user_id, reusable, ephemeral, used, created_at)
-		VALUES ('', ?, ?, ?, ?, ?, ?, ?)
-	`, duplicatePrefix, hash1, user.ID, true, false, false, now).Error
+		VALUES ('', $1, $2, $3, $4, $5, $6, $7)
+	`, duplicatePrefix, hash1, user.ID, true, false, false, now)
 	require.NoError(t, err, "first key with prefix should succeed")
 
 	// Second insert with same prefix should fail
-	err = db.DB.Exec(`
+	_, err = db.DB.ExecContext(t.Context(), `
 		INSERT INTO pre_auth_keys (key, prefix, hash, user_id, reusable, ephemeral, used, created_at)
-		VALUES ('', ?, ?, ?, ?, ?, ?, ?)
-	`, duplicatePrefix, hash2, user.ID, true, false, false, now).Error
+		VALUES ('', $1, $2, $3, $4, $5, $6, $7)
+	`, duplicatePrefix, hash2, user.ID, true, false, false, now)
 	require.Error(t, err, "duplicate non-empty prefix should be rejected")
 	assert.Contains(t, err.Error(), "UNIQUE constraint failed", "should fail with UNIQUE constraint error")
 }
@@ -482,7 +490,7 @@ func TestUsePreAuthKeyAtomicCAS(t *testing.T) {
 	require.False(t, pak.Reusable, "test sanity: key must be single-use")
 
 	// First Use should commit cleanly.
-	err = db.Write(func(tx *gorm.DB) error {
+	err = db.Write(func(tx *Tx) error {
 		return UsePreAuthKey(tx, pak)
 	})
 	require.NoError(t, err, "first UsePreAuthKey should succeed")
@@ -495,7 +503,7 @@ func TestUsePreAuthKeyAtomicCAS(t *testing.T) {
 
 	stale.Used = false
 
-	err = db.Write(func(tx *gorm.DB) error {
+	err = db.Write(func(tx *Tx) error {
 		return UsePreAuthKey(tx, stale)
 	})
 	require.Error(t, err, "second UsePreAuthKey on the same single-use key must fail")
@@ -517,6 +525,6 @@ func TestGetPreAuthKeyUnknownMapsToRecordNotFound(t *testing.T) {
 
 	_, err = db.GetPreAuthKey("nonexistent-key")
 	require.Error(t, err)
-	require.ErrorIs(t, err, gorm.ErrRecordNotFound,
+	require.ErrorIs(t, err, ErrNotFound,
 		"unknown pre-auth key must map to record-not-found (handled as 401)")
 }

@@ -20,6 +20,7 @@ package testcapture
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"tailscale.com/client/tailscale/apitype"
@@ -146,7 +147,12 @@ func (i Input) MarshalJSON() ([]byte, error) {
 		raw.FullPolicy = json.RawMessage(i.FullPolicy)
 	}
 
-	return json.Marshal(raw)
+	b, err := json.Marshal(raw)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling input: %w", err)
+	}
+
+	return b, nil
 }
 
 // UnmarshalJSON handles both the current on-disk shape (full_policy
@@ -165,7 +171,7 @@ func (i *Input) UnmarshalJSON(data []byte) error {
 
 	err := json.Unmarshal(data, &raw)
 	if err != nil {
-		return err
+		return fmt.Errorf("unmarshaling input: %w", err)
 	}
 
 	*i = Input(raw.alias)
@@ -180,9 +186,9 @@ func (i *Input) UnmarshalJSON(data []byte) error {
 	if raw.FullPolicy[0] == '"' {
 		var s string
 
-		err := json.Unmarshal(raw.FullPolicy, &s)
+		err = json.Unmarshal(raw.FullPolicy, &s)
 		if err != nil {
-			return err
+			return fmt.Errorf("unmarshaling full policy string: %w", err)
 		}
 
 		i.FullPolicy = s
@@ -196,7 +202,7 @@ func (i *Input) UnmarshalJSON(data []byte) error {
 
 	err = json.Compact(&buf, raw.FullPolicy)
 	if err != nil {
-		return err
+		return fmt.Errorf("compacting full policy JSON: %w", err)
 	}
 
 	i.FullPolicy = buf.String()

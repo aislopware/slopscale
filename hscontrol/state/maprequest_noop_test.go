@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 	"tailscale.com/tailcfg"
 )
 
@@ -22,20 +21,14 @@ func TestNoOpMapRequestSkipsPersist(t *testing.T) {
 
 	var nodeUpdateCount atomic.Int64
 
-	gdb := s.DB().DB
-	cbName := "noop_count_node_updates"
-	err := gdb.Callback().Update().After("gorm:update").Register(cbName, func(tx *gorm.DB) {
-		if tx.Statement == nil {
-			return
-		}
-
-		if tx.Statement.Table == "nodes" ||
-			strings.Contains(strings.ToLower(tx.Statement.SQL.String()), "update \"nodes\"") {
+	s.DB().SetQueryHook(func(query string) error {
+		if strings.HasPrefix(query, "UPDATE nodes") {
 			nodeUpdateCount.Add(1)
 		}
+
+		return nil
 	})
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = gdb.Callback().Update().Remove(cbName) })
+	t.Cleanup(func() { s.DB().SetQueryHook(nil) })
 
 	nv, ok := s.GetNodeByID(nodeID)
 	require.True(t, ok, "node should exist in NodeStore")
@@ -52,7 +45,7 @@ func TestNoOpMapRequestSkipsPersist(t *testing.T) {
 	}
 
 	// First request establishes the Hostinfo/DERP state (expected to persist).
-	_, err = s.UpdateNodeFromMapRequest(nodeID, req)
+	_, err := s.UpdateNodeFromMapRequest(nodeID, req)
 	require.NoError(t, err)
 
 	nodeUpdateCount.Store(0)

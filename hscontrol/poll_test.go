@@ -10,7 +10,6 @@ import (
 	"github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/mapper"
 	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -162,10 +161,9 @@ func TestServeLongPollWritesErrorWhenInitialMapFails(t *testing.T) {
 
 	database, err := db.NewHeadscaleDatabase(app.cfg)
 	require.NoError(t, err)
-	require.NoError(t, database.DB.
-		Model(&types.Node{}).
-		Where("id = ?", createdNode.ID).
-		Update("given_name", "").Error)
+	_, err = database.DB.ExecContext(t.Context(),
+		"UPDATE nodes SET given_name = $1 WHERE id = $2", "", createdNode.ID)
+	require.NoError(t, err)
 	require.NoError(t, database.Close())
 
 	app.state, err = state.NewState(app.cfg)
@@ -184,7 +182,7 @@ func TestServeLongPollWritesErrorWhenInitialMapFails(t *testing.T) {
 
 	node := nodeView.AsStruct()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	writer := &recordingResponseWriter{}
 	session := app.newMapSession(ctx, tailcfg.MapRequest{
 		Stream:  true,
@@ -237,7 +235,7 @@ func TestFailedReconnectDoesNotCancelEphemeralGC(t *testing.T) {
 	machineKey := key.NewMachine()
 	nodeKey := key.NewNode()
 
-	_, err = app.handleRegister(context.Background(), tailcfg.RegisterRequest{
+	_, err = app.handleRegister(t.Context(), tailcfg.RegisterRequest{
 		Auth: &tailcfg.RegisterResponseAuth{
 			AuthKey: pak.Key,
 		},
@@ -267,7 +265,7 @@ func TestFailedReconnectDoesNotCancelEphemeralGC(t *testing.T) {
 	app.state.DeleteNodeFromStoreForTest(node.ID)
 
 	writer := &recordingResponseWriter{}
-	session := app.newMapSession(context.Background(), tailcfg.MapRequest{
+	session := app.newMapSession(t.Context(), tailcfg.MapRequest{
 		Stream:  true,
 		Version: tailcfg.CapabilityVersion(100),
 	}, writer, node)
@@ -327,7 +325,7 @@ func TestGitHubIssue3129_TransientlyBlockedWriteDoesNotLeaveLiveStaleSession(t *
 	require.True(t, nodeView.Valid(), "expected valid node view after reload")
 	node := nodeView.AsStruct()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	writer := newDelayedSuccessResponseWriter(250 * time.Millisecond)
 	session := app.newMapSession(ctx, tailcfg.MapRequest{
 		Stream:  true,

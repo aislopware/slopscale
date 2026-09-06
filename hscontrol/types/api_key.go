@@ -13,8 +13,8 @@ const NewAPIKeyPrefixLength = 12
 // APIKey describes the datamodel for API keys used to remotely authenticate with
 // headscale.
 type APIKey struct {
-	ID     uint64 `gorm:"primary_key"`
-	Prefix string `gorm:"uniqueIndex"`
+	ID     uint64
+	Prefix string
 	Hash   []byte
 
 	// Optional owning user id. When set, an auth key created through the v2 API
@@ -27,16 +27,6 @@ type APIKey struct {
 	CreatedAt  *time.Time
 	Expiration *time.Time
 	LastSeen   *time.Time
-}
-
-// maskedPrefix returns the API key prefix in masked format for safe logging.
-// SECURITY: Never log the full key or hash, only the masked prefix.
-func (k *APIKey) maskedPrefix() string {
-	if len(k.Prefix) == NewAPIKeyPrefixLength {
-		return "hskey-api-" + k.Prefix + "-***"
-	}
-
-	return k.Prefix + "***"
 }
 
 // MarshalZerologObject implements [zerolog.LogObjectMarshaler] for safe logging.
@@ -57,4 +47,14 @@ func (k *APIKey) MarshalZerologObject(e *zerolog.Event) {
 	if k.LastSeen != nil {
 		e.Time(zf.APIKeyLastSeen, *k.LastSeen)
 	}
+}
+
+// maskedPrefix returns the API key prefix in masked format for safe logging.
+// SECURITY: Never log the full key or hash, only the masked prefix.
+func (k *APIKey) maskedPrefix() string {
+	if len(k.Prefix) == NewAPIKeyPrefixLength {
+		return "hskey-api-" + k.Prefix + "-***"
+	}
+
+	return k.Prefix + "***"
 }

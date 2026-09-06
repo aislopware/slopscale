@@ -7,18 +7,19 @@ import (
 	"strings"
 	"time"
 
+	jet "github.com/go-jet/jet/v2/sqlite"
+	"github.com/juanfont/headscale/gen/jet/table"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 	"tailscale.com/util/rands"
 	"tailscale.com/util/set"
 )
 
 var (
-	// ErrPreAuthKeyNotFound wraps gorm.ErrRecordNotFound so an unknown or
-	// deleted key is treated as a missing record by callers, which the
-	// registration handler maps to a 401 rather than a raw server error.
-	ErrPreAuthKeyNotFound          = fmt.Errorf("auth-key not found: %w", gorm.ErrRecordNotFound)
+	// ErrPreAuthKeyNotFound wraps [ErrNotFound] so an unknown or deleted
+	// key is treated as a missing record by callers, which the registration
+	// handler maps to a 401 rather than a raw server error.
+	ErrPreAuthKeyNotFound          = fmt.Errorf("auth-key not found: %w", ErrNotFound)
 	ErrPreAuthKeyExpired           = errors.New("auth-key expired")
 	ErrSingleUseAuthKeyHasBeenUsed = errors.New("auth-key has already been used")
 	ErrUserMismatch                = errors.New("user mismatch")
@@ -52,9 +53,75 @@ func (hsdb *HSDatabase) CreatePreAuthKey(
 	expiration *time.Time,
 	aclTags []string,
 ) (*types.PreAuthKeyNew, error) {
-	return Write(hsdb.DB, func(tx *gorm.DB) (*types.PreAuthKeyNew, error) {
+	return Write(hsdb, func(tx *Tx) (*types.PreAuthKeyNew, error) {
 		return CreatePreAuthKey(tx, uid, reusable, ephemeral, expiration, aclTags)
 	})
+}
+
+// selectPreAuthKeys is the base query for pre-auth keys with their user
+// joined in, ordered by id.
+func selectPreAuthKeys() jet.SelectStatement {
+	return jet.SELECT(table.PreAuthKeys.AllColumns, table.Users.AllColumns).
+		FROM(table.PreAuthKeys.LEFT_JOIN(
+			table.Users,
+			table.PreAuthKeys.UserID.EQ(table.Users.ID).AND(table.Users.DeletedAt.IS_NULL()),
+		)).
+		ORDER_BY(table.PreAuthKeys.ID.ASC())
+}
+
+func queryPreAuthKeys(q Querier, stmt jet.SelectStatement) ([]types.PreAuthKey, error) {
+	var records []preAuthKeyRecord
+
+	err := q.executor().query(stmt, &records)
+	if err != nil {
+		return nil, err
+	}
+
+	return preAuthKeyRecordsToKeys(records)
+}
+
+func queryPreAuthKey(q Querier, where jet.BoolExpression) (*types.PreAuthKey, error) {
+	var record preAuthKeyRecord
+
+	err := q.executor().query(selectPreAuthKeys().WHERE(where).LIMIT(1), &record)
+	if err != nil {
+		return nil, err
+	}
+
+	return record.preAuthKey()
+}
+
+// insertPreAuthKey inserts key and sets its ID.
+func insertPreAuthKey(q Querier, key *types.PreAuthKey) error {
+	row, err := preAuthKeyRowFrom(key)
+	if err != nil {
+		return err
+	}
+
+	columns := table.PreAuthKeys.MutableColumns
+	if key.ID != 0 {
+		columns = table.PreAuthKeys.AllColumns
+	}
+
+	var inserted idRow
+
+	err = q.executor().query(
+		table.PreAuthKeys.INSERT(columns).MODEL(row).RETURNING(table.PreAuthKeys.ID.AS("id_row.id")),
+		&inserted,
+	)
+	if err != nil {
+		return err
+	}
+
+	key.ID = inserted.ID
+
+	return nil
+}
+
+// updatePreAuthKeyColumn sets a single column on the keys matched by where
+// and returns how many rows changed.
+func updatePreAuthKeyColumn(q Querier, where jet.BoolExpression, column jet.Column, value any) (int64, error) {
+	return q.executor().exec(table.PreAuthKeys.UPDATE(column).SET(value).WHERE(where))
 }
 
 const (
@@ -68,7 +135,7 @@ const (
 // For tagged keys, uid tracks "created by" (who created the key).
 // For user-owned keys, uid tracks the node owner.
 func CreatePreAuthKey(
-	tx *gorm.DB,
+	q Querier,
 	uid *types.UserID,
 	reusable bool,
 	ephemeral bool,
@@ -88,7 +155,7 @@ func CreatePreAuthKey(
 	if uid != nil {
 		var err error
 
-		user, err = GetUserByID(tx, *uid)
+		user, err = GetUserByID(q, *uid)
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +178,7 @@ func CreatePreAuthKey(
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(toBeHashed), bcryptCost)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("hashing pre-auth key: %w", err)
 	}
 
 	key := types.PreAuthKey{
@@ -126,7 +193,8 @@ func CreatePreAuthKey(
 		Hash:       hash,    // Store hash
 	}
 
-	if err := tx.Save(&key).Error; err != nil { //nolint:noinlineerr
+	err = insertPreAuthKey(q, &key)
+	if err != nil {
 		return nil, fmt.Errorf("creating key in database: %w", err)
 	}
 
@@ -146,37 +214,27 @@ func CreatePreAuthKey(
 // The v2 keys API sets it after creation rather than threading it through the
 // many-armed CreatePreAuthKey signature shared by every other caller.
 func (hsdb *HSDatabase) SetPreAuthKeyDescription(id uint64, description string) error {
-	return hsdb.DB.Model(&types.PreAuthKey{}).
-		Where("id = ?", id).
-		Update("description", description).Error
+	_, err := updatePreAuthKeyColumn(
+		hsdb, table.PreAuthKeys.ID.EQ(jet.Uint64(id)), table.PreAuthKeys.Description, description,
+	)
+
+	return err
 }
 
 func (hsdb *HSDatabase) ListPreAuthKeys() ([]types.PreAuthKey, error) {
-	return Read(hsdb.DB, ListPreAuthKeys)
+	return Read(hsdb, func(rx *Tx) ([]types.PreAuthKey, error) {
+		return ListPreAuthKeys(rx)
+	})
 }
 
 // ListPreAuthKeys returns all [types.PreAuthKey] values in the database.
-func ListPreAuthKeys(tx *gorm.DB) ([]types.PreAuthKey, error) {
-	var keys []types.PreAuthKey
-
-	err := tx.Preload("User").Find(&keys).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return keys, nil
+func ListPreAuthKeys(q Querier) ([]types.PreAuthKey, error) {
+	return queryPreAuthKeys(q, selectPreAuthKeys())
 }
 
 // ListPreAuthKeysByUser returns all [types.PreAuthKey] values belonging to a specific user.
-func ListPreAuthKeysByUser(tx *gorm.DB, uid types.UserID) ([]types.PreAuthKey, error) {
-	var keys []types.PreAuthKey
-
-	err := tx.Preload("User").Where("user_id = ?", uint(uid)).Find(&keys).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return keys, nil
+func ListPreAuthKeysByUser(q Querier, uid types.UserID) ([]types.PreAuthKey, error) {
+	return queryPreAuthKeys(q, selectPreAuthKeys().WHERE(table.PreAuthKeys.UserID.EQ(jet.Uint64(uint64(uid)))))
 }
 
 var (
@@ -184,9 +242,7 @@ var (
 	ErrPreAuthKeyNotTaggedOrOwned = errors.New("auth-key must be either tagged or owned by user")
 )
 
-func findAuthKey(tx *gorm.DB, keyStr string) (*types.PreAuthKey, error) {
-	var pak types.PreAuthKey
-
+func findAuthKey(q Querier, keyStr string) (*types.PreAuthKey, error) {
 	// Validate input is not empty
 	if keyStr == "" {
 		return nil, ErrPreAuthKeyFailedToParse
@@ -196,12 +252,12 @@ func findAuthKey(tx *gorm.DB, keyStr string) (*types.PreAuthKey, error) {
 
 	if !found {
 		// Legacy format (plaintext) - backwards compatibility
-		err := tx.Preload("User").First(&pak, "key = ?", keyStr).Error
+		pak, err := queryPreAuthKey(q, table.PreAuthKeys.Key.EQ(jet.String(keyStr)))
 		if err != nil {
 			return nil, ErrPreAuthKeyNotFound
 		}
 
-		return &pak, nil
+		return pak, nil
 	}
 
 	// New format: hskey-auth-{12-char-prefix}-{64-char-hash}
@@ -216,7 +272,7 @@ func findAuthKey(tx *gorm.DB, keyStr string) (*types.PreAuthKey, error) {
 	}
 
 	// Look up key by prefix
-	err = tx.Preload("User").First(&pak, "prefix = ?", prefix).Error
+	pak, err := queryPreAuthKey(q, table.PreAuthKeys.Prefix.EQ(jet.String(prefix)))
 	if err != nil {
 		return nil, ErrPreAuthKeyNotFound
 	}
@@ -227,7 +283,7 @@ func findAuthKey(tx *gorm.DB, keyStr string) (*types.PreAuthKey, error) {
 		return nil, fmt.Errorf("invalid auth key: %w", err)
 	}
 
-	return &pak, nil
+	return pak, nil
 }
 
 // parsePrefixedKey splits the prefix-and-secret portion of a new-format key
@@ -305,70 +361,61 @@ func isValidBase64URLSafe(s string) bool {
 }
 
 func (hsdb *HSDatabase) GetPreAuthKey(key string) (*types.PreAuthKey, error) {
-	return GetPreAuthKey(hsdb.DB, key)
+	return GetPreAuthKey(hsdb, key)
 }
 
 // GetPreAuthKey returns a [types.PreAuthKey] for a given key. The caller is responsible
 // for checking if the key is usable (expired or used).
-func GetPreAuthKey(tx *gorm.DB, key string) (*types.PreAuthKey, error) {
-	return findAuthKey(tx, key)
+func GetPreAuthKey(q Querier, key string) (*types.PreAuthKey, error) {
+	return findAuthKey(q, key)
 }
 
 // GetPreAuthKeyByID returns a [types.PreAuthKey] by its primary key, with the
 // owning user preloaded.
 func (hsdb *HSDatabase) GetPreAuthKeyByID(id uint64) (*types.PreAuthKey, error) {
-	pak := types.PreAuthKey{}
-	// Explicit primary-key clause: a struct condition would drop a zero-valued
-	// ID, making the lookup unconditional and returning the first row instead
-	// of not-found.
-	if result := hsdb.DB.Preload("User").First(&pak, "id = ?", id); result.Error != nil {
-		return nil, result.Error
-	}
-
-	return &pak, nil
+	return queryPreAuthKey(hsdb, table.PreAuthKeys.ID.EQ(jet.Uint64(id)))
 }
 
 // DestroyPreAuthKey destroys a preauthkey. Returns error if the [types.PreAuthKey]
 // does not exist. This also clears the auth_key_id on any nodes that reference
 // this key.
-func DestroyPreAuthKey(tx *gorm.DB, id uint64) error {
-	return tx.Transaction(func(db *gorm.DB) error {
-		// First, clear the foreign key reference on any nodes using this key
-		err := db.Model(&types.Node{}).
-			Where("auth_key_id = ?", id).
-			Update("auth_key_id", nil).Error
-		if err != nil {
-			return fmt.Errorf("clearing auth_key_id on nodes: %w", err)
-		}
+func DestroyPreAuthKey(q Querier, id uint64) error {
+	// First, clear the foreign key reference on any nodes using this key
+	_, err := q.executor().exec(
+		table.Nodes.UPDATE(table.Nodes.AuthKeyID).SET(jet.NULL).
+			WHERE(table.Nodes.AuthKeyID.EQ(jet.Uint64(id))),
+	)
+	if err != nil {
+		return fmt.Errorf("destroying pre-auth key: clearing auth_key_id on nodes: %w", err)
+	}
 
-		// Then delete the pre-auth key
-		res := tx.Unscoped().Delete(&types.PreAuthKey{}, id)
-		if res.Error != nil {
-			return res.Error
-		}
+	// Then delete the pre-auth key
+	affected, err := q.executor().exec(table.PreAuthKeys.DELETE().WHERE(table.PreAuthKeys.ID.EQ(jet.Uint64(id))))
+	if err != nil {
+		return fmt.Errorf("destroying pre-auth key: deleting pre-auth key: %w", err)
+	}
 
-		if res.RowsAffected == 0 {
-			return ErrPreAuthKeyNotFound
-		}
+	if affected == 0 {
+		return fmt.Errorf("destroying pre-auth key: %w", ErrPreAuthKeyNotFound)
+	}
 
-		return nil
-	})
+	return nil
 }
 
 func (hsdb *HSDatabase) ExpirePreAuthKey(id uint64) error {
-	return hsdb.Write(func(tx *gorm.DB) error {
+	return hsdb.Write(func(tx *Tx) error {
 		return ExpirePreAuthKey(tx, id)
 	})
 }
 
 func (hsdb *HSDatabase) DeletePreAuthKey(id uint64) error {
-	return hsdb.Write(func(tx *gorm.DB) error {
+	return hsdb.Write(func(tx *Tx) error {
 		return DestroyPreAuthKey(tx, id)
 	})
 }
 
 func (hsdb *HSDatabase) RevokePreAuthKey(id uint64) error {
-	return hsdb.Write(func(tx *gorm.DB) error {
+	return hsdb.Write(func(tx *Tx) error {
 		return RevokePreAuthKey(tx, id)
 	})
 }
@@ -378,15 +425,17 @@ func (hsdb *HSDatabase) RevokePreAuthKey(id uint64) error {
 // authorize nodes. The background collector hard-deletes it after the retention
 // window. An already-revoked or unknown id returns [ErrPreAuthKeyNotFound], so a
 // repeated DELETE is a clean 404.
-func RevokePreAuthKey(tx *gorm.DB, id uint64) error {
-	res := tx.Model(&types.PreAuthKey{}).
-		Where("id = ? AND revoked IS NULL", id).
-		Update("revoked", time.Now())
-	if res.Error != nil {
-		return res.Error
+func RevokePreAuthKey(q Querier, id uint64) error {
+	affected, err := updatePreAuthKeyColumn(
+		q,
+		table.PreAuthKeys.ID.EQ(jet.Uint64(id)).AND(table.PreAuthKeys.Revoked.IS_NULL()),
+		table.PreAuthKeys.Revoked, time.Now(),
+	)
+	if err != nil {
+		return err
 	}
 
-	if res.RowsAffected == 0 {
+	if affected == 0 {
 		return ErrPreAuthKeyNotFound
 	}
 
@@ -399,18 +448,21 @@ func RevokePreAuthKey(tx *gorm.DB, id uint64) error {
 func (hsdb *HSDatabase) DestroyRevokedPreAuthKeysBefore(cutoff time.Time) (int, error) {
 	var count int
 
-	err := hsdb.Write(func(tx *gorm.DB) error {
-		var ids []uint64
+	err := hsdb.Write(func(tx *Tx) error {
+		var ids []idRow
 
-		err := tx.Model(&types.PreAuthKey{}).
-			Where("revoked IS NOT NULL AND revoked < ?", cutoff).
-			Pluck("id", &ids).Error
+		err := tx.ex.query(
+			jet.SELECT(table.PreAuthKeys.ID.AS("id_row.id")).FROM(table.PreAuthKeys).
+				WHERE(table.PreAuthKeys.Revoked.IS_NOT_NULL().
+					AND(table.PreAuthKeys.Revoked.LT(jet.TimestampExp(timeArg(cutoff))))),
+			&ids,
+		)
 		if err != nil {
 			return err
 		}
 
 		for _, id := range ids {
-			err := DestroyPreAuthKey(tx, id)
+			err := DestroyPreAuthKey(tx, id.ID)
 			if err != nil {
 				return err
 			}
@@ -430,15 +482,17 @@ func (hsdb *HSDatabase) DestroyRevokedPreAuthKeysBefore(cutoff time.Time) (int, 
 // the second returns [types.PAKError]("authkey already used"). Without the
 // guard the previous code (Update("used", true) with no WHERE) would
 // silently let both transactions claim the key.
-func UsePreAuthKey(tx *gorm.DB, k *types.PreAuthKey) error {
-	res := tx.Model(&types.PreAuthKey{}).
-		Where("id = ? AND used = ?", k.ID, false).
-		Update("used", true)
-	if res.Error != nil {
-		return fmt.Errorf("updating key used status in database: %w", res.Error)
+func UsePreAuthKey(q Querier, k *types.PreAuthKey) error {
+	affected, err := updatePreAuthKeyColumn(
+		q,
+		table.PreAuthKeys.ID.EQ(jet.Uint64(k.ID)).AND(table.PreAuthKeys.Used.EQ(jet.Bool(false))),
+		table.PreAuthKeys.Used, true,
+	)
+	if err != nil {
+		return fmt.Errorf("updating key used status in database: %w", err)
 	}
 
-	if res.RowsAffected == 0 {
+	if affected == 0 {
 		return types.PAKError("authkey already used")
 	}
 
@@ -449,15 +503,15 @@ func UsePreAuthKey(tx *gorm.DB, k *types.PreAuthKey) error {
 
 // ExpirePreAuthKey marks a [types.PreAuthKey] as expired, returning
 // [ErrPreAuthKeyNotFound] rather than succeeding silently when no such key exists.
-func ExpirePreAuthKey(tx *gorm.DB, id uint64) error {
-	now := time.Now()
-
-	res := tx.Model(&types.PreAuthKey{}).Where("id = ?", id).Update("expiration", now)
-	if res.Error != nil {
-		return res.Error
+func ExpirePreAuthKey(q Querier, id uint64) error {
+	affected, err := updatePreAuthKeyColumn(
+		q, table.PreAuthKeys.ID.EQ(jet.Uint64(id)), table.PreAuthKeys.Expiration, time.Now(),
+	)
+	if err != nil {
+		return err
 	}
 
-	if res.RowsAffected == 0 {
+	if affected == 0 {
 		return ErrPreAuthKeyNotFound
 	}
 

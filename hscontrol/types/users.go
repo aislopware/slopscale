@@ -16,7 +16,6 @@ import (
 	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"gorm.io/gorm"
 	"tailscale.com/tailcfg"
 )
 
@@ -62,13 +61,17 @@ func (u Users) String() string {
 //
 // At the end of the day, users in Tailscale are some kind of 'bubbles' or users
 // that contain our machines.
+//
+// The index `idx_name_provider_identifier` is to enforce uniqueness
+// between Name and ProviderIdentifier. This ensures that
+// you can have multiple users with the same name in OIDC,
+// but not if you only run with CLI users.
 type User struct {
-	gorm.Model //nolint:embeddedstructfieldcheck
-
-	// The index `idx_name_provider_identifier` is to enforce uniqueness
-	// between Name and ProviderIdentifier. This ensures that
-	// you can have multiple users with the same name in OIDC,
-	// but not if you only run with CLI users.
+	ID        uint
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	// DeletedAt marks a soft-deleted user; reads skip rows that carry it.
+	DeletedAt *time.Time
 
 	// Name (username) for the user, is used if email is empty
 	// Should not be used, please use [User.Username].
@@ -152,38 +155,24 @@ func (v UserView) Display() string {
 	return v.ж.Display()
 }
 
-// CreatedAt returns when the user was created.
-func (v UserView) CreatedAt() time.Time {
-	if !v.Valid() {
-		return time.Time{}
-	}
-
-	return v.ж.CreatedAt
-}
-
 func (u *User) TailscaleUser() tailcfg.User {
 	return tailcfg.User{
-		ID:            tailcfg.UserID(u.ID), //nolint:gosec // UserID is bounded
+		//nolint:gosec // UserID is a database autoincrement value, int64 on SQLite/PostgreSQL, so it fits
+		ID:            tailcfg.UserID(u.ID),
 		DisplayName:   u.Display(),
 		ProfilePicURL: u.ProfilePicURL,
 		Created:       u.CreatedAt,
 	}
 }
 
-func (u UserView) TailscaleUser() tailcfg.User {
-	return u.ж.TailscaleUser()
-}
-
-// ID returns the user's ID.
-// This is a custom accessor because [gorm.Model].ID is embedded
-// and the viewer generator doesn't always produce it.
-func (u UserView) ID() uint {
-	return u.ж.ID
+func (v UserView) TailscaleUser() tailcfg.User {
+	return v.ж.TailscaleUser()
 }
 
 func (u *User) TailscaleLogin() tailcfg.Login {
 	return tailcfg.Login{
-		ID:            tailcfg.LoginID(u.ID), //nolint:gosec // safe conversion for user ID
+		//nolint:gosec // UserID is a database autoincrement value, int64 on SQLite/PostgreSQL, so it fits
+		ID:            tailcfg.LoginID(u.ID),
 		Provider:      u.Provider,
 		LoginName:     u.Username(),
 		DisplayName:   u.Display(),
@@ -191,21 +180,22 @@ func (u *User) TailscaleLogin() tailcfg.Login {
 	}
 }
 
-func (u UserView) TailscaleLogin() tailcfg.Login {
-	return u.ж.TailscaleLogin()
+func (v UserView) TailscaleLogin() tailcfg.Login {
+	return v.ж.TailscaleLogin()
 }
 
 func (u *User) TailscaleUserProfile() tailcfg.UserProfile {
 	return tailcfg.UserProfile{
-		ID:            tailcfg.UserID(u.ID), //nolint:gosec // UserID is bounded
+		//nolint:gosec // UserID is a database autoincrement value, int64 on SQLite/PostgreSQL, so it fits
+		ID:            tailcfg.UserID(u.ID),
 		LoginName:     u.Username(),
 		DisplayName:   u.Display(),
 		ProfilePicURL: u.ProfilePicURL,
 	}
 }
 
-func (u UserView) TailscaleUserProfile() tailcfg.UserProfile {
-	return u.ж.TailscaleUserProfile()
+func (v UserView) TailscaleUserProfile() tailcfg.UserProfile {
+	return v.ж.TailscaleUserProfile()
 }
 
 // MarshalZerologObject implements [zerolog.LogObjectMarshaler] for safe logging.
@@ -224,12 +214,12 @@ func (u *User) MarshalZerologObject(e *zerolog.Event) {
 }
 
 // MarshalZerologObject implements [zerolog.LogObjectMarshaler] for [UserView].
-func (u UserView) MarshalZerologObject(e *zerolog.Event) {
-	if !u.Valid() {
+func (v UserView) MarshalZerologObject(e *zerolog.Event) {
+	if !v.Valid() {
 		return
 	}
 
-	u.ж.MarshalZerologObject(e)
+	v.ж.MarshalZerologObject(e)
 }
 
 // FlexibleStringSlice handles OIDC providers (e.g. JumpCloud) that return the

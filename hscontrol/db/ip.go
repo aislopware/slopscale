@@ -8,12 +8,14 @@ import (
 	"math/big"
 	"net/netip"
 	"sync"
+	"time"
 
+	jet "github.com/go-jet/jet/v2/sqlite"
+	"github.com/juanfont/headscale/gen/jet/table"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/rs/zerolog/log"
 	"go4.org/netipx"
-	"gorm.io/gorm"
 	"tailscale.com/net/tsaddr"
 )
 
@@ -72,18 +74,30 @@ func NewIPAllocator(
 	)
 
 	if db != nil {
-		err := db.Read(func(rx *gorm.DB) error {
-			return rx.Model(&types.Node{}).Pluck("ipv4", &v4s).Error
-		})
-		if err != nil {
-			return nil, fmt.Errorf("reading IPv4 addresses from database: %w", err)
-		}
+		err := db.Read(func(rx *Tx) error {
+			rows, err := rx.ex.queryRaw("SELECT ipv4, ipv6 FROM nodes")
+			if err != nil {
+				return err
+			}
 
-		err = db.Read(func(rx *gorm.DB) error {
-			return rx.Model(&types.Node{}).Pluck("ipv6", &v6s).Error
+			defer rows.Close()
+
+			for rows.Next() {
+				var v4, v6 sql.NullString
+
+				err := rows.Scan(&v4, &v6)
+				if err != nil {
+					return fmt.Errorf("scanning node addresses: %w", err)
+				}
+
+				v4s = append(v4s, v4)
+				v6s = append(v6s, v6)
+			}
+
+			return rows.Err()
 		})
 		if err != nil {
-			return nil, fmt.Errorf("reading IPv6 addresses from database: %w", err)
+			return nil, fmt.Errorf("reading IP addresses from database: %w", err)
 		}
 	}
 
@@ -161,6 +175,15 @@ func (i *IPAllocator) Next() (*netip.Addr, *netip.Addr, error) {
 	return ret4, ret6, nil
 }
 
+func (i *IPAllocator) FreeIPs(ips []netip.Addr) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	for _, ip := range ips {
+		i.usedIPs.Remove(ip)
+	}
+}
+
 var ErrCouldNotAllocateIP = errors.New("failed to allocate IP")
 
 // allocateNext allocates the next address from prefix under i.mu, advancing
@@ -201,7 +224,7 @@ func (i *IPAllocator) next(prev netip.Addr, prefix *netip.Prefix) (*netip.Addr, 
 	// TODO(kradalby): maybe this can be done less often.
 	set, err := i.usedIPs.IPSet()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("building used IP set: %w", err)
 	}
 
 	// Walk forward from the starting address until a free, non-reserved
@@ -303,77 +326,30 @@ func isTailscaleReservedIP(ip netip.Addr) bool {
 // it will be added.
 // If a prefix type has been removed (IPv4 or IPv6), it
 // will remove the IPs in that family from the node.
-func (db *HSDatabase) BackfillNodeIPs(i *IPAllocator) ([]string, error) {
-	var (
-		err error
-		ret []string
-	)
+func (hsdb *HSDatabase) BackfillNodeIPs(i *IPAllocator) ([]string, error) {
+	var ret []string
 
-	err = db.Write(func(tx *gorm.DB) error {
+	err := hsdb.Write(func(tx *Tx) error {
 		if i == nil {
 			return fmt.Errorf("backfilling IPs: %w", errIPAllocatorNil)
 		}
 
 		log.Trace().Caller().Msgf("starting to backfill IPs")
 
-		nodes, err := ListNodes(tx)
-		if err != nil {
-			return fmt.Errorf("listing nodes to backfill IPs: %w", err)
+		nodes, listErr := ListNodes(tx)
+		if listErr != nil {
+			return fmt.Errorf("listing nodes to backfill IPs: %w", listErr)
 		}
 
 		for _, node := range nodes {
 			log.Trace().Caller().EmbedObject(node).Msg("ip backfill check started because node found in database")
 
-			changed := false
-			// IPv4 prefix is set, but node ip is missing, alloc
-			if i.prefix4 != nil && node.IPv4 == nil {
-				ret4, err := i.allocateNext(&i.prev4, i.prefix4)
-				if err != nil {
-					return fmt.Errorf("allocating IPv4 for node(%d): %w", node.ID, err)
-				}
-
-				node.IPv4 = ret4
-				changed = true
-
-				ret = append(ret, fmt.Sprintf("assigned IPv4 %q to Node(%d) %q", ret4.String(), node.ID, node.Hostname))
+			msgs, err := backfillNodeIPs(tx, i, node)
+			if err != nil {
+				return err
 			}
 
-			// IPv6 prefix is set, but node ip is missing, alloc
-			if i.prefix6 != nil && node.IPv6 == nil {
-				ret6, err := i.allocateNext(&i.prev6, i.prefix6)
-				if err != nil {
-					return fmt.Errorf("allocating IPv6 for node(%d): %w", node.ID, err)
-				}
-
-				node.IPv6 = ret6
-				changed = true
-
-				ret = append(ret, fmt.Sprintf("assigned IPv6 %q to Node(%d) %q", ret6.String(), node.ID, node.Hostname))
-			}
-
-			// IPv4 prefix is not set, but node has IP, remove
-			if i.prefix4 == nil && node.IPv4 != nil {
-				ret = append(ret, fmt.Sprintf("removing IPv4 %q from Node(%d) %q", node.IPv4.String(), node.ID, node.Hostname))
-				node.IPv4 = nil
-				changed = true
-			}
-
-			// IPv6 prefix is not set, but node has IP, remove
-			if i.prefix6 == nil && node.IPv6 != nil {
-				ret = append(ret, fmt.Sprintf("removing IPv6 %q from Node(%d) %q", node.IPv6.String(), node.ID, node.Hostname))
-				node.IPv6 = nil
-				changed = true
-			}
-
-			if changed {
-				// Use Updates() with Select() to only update IP fields, avoiding overwriting
-				// other fields like Expiry. We need Select() because Updates() alone skips
-				// zero values, but we DO want to update IPv4/IPv6 to nil when removing them.
-				err := tx.Model(node).Select("ipv4", "ipv6").Updates(node).Error
-				if err != nil {
-					return fmt.Errorf("saving node(%d) after adding IPs: %w", node.ID, err)
-				}
-			}
+			ret = append(ret, msgs...)
 		}
 
 		return nil
@@ -382,11 +358,72 @@ func (db *HSDatabase) BackfillNodeIPs(i *IPAllocator) ([]string, error) {
 	return ret, err
 }
 
-func (i *IPAllocator) FreeIPs(ips []netip.Addr) {
-	i.mu.Lock()
-	defer i.mu.Unlock()
+// backfillNodeIPs allocates or removes the IPv4/IPv6 addresses of a single
+// node to match the allocator's configured prefixes, persists any change,
+// and returns human-readable messages describing what changed.
+func backfillNodeIPs(q Querier, i *IPAllocator, node *types.Node) ([]string, error) {
+	var msgs []string
 
-	for _, ip := range ips {
-		i.usedIPs.Remove(ip)
+	changed := false
+
+	// IPv4 prefix is set, but node ip is missing, alloc
+	if i.prefix4 != nil && node.IPv4 == nil {
+		ret4, err := i.allocateNext(&i.prev4, i.prefix4)
+		if err != nil {
+			return nil, fmt.Errorf("allocating IPv4 for node(%d): %w", node.ID, err)
+		}
+
+		node.IPv4 = ret4
+		changed = true
+
+		msgs = append(msgs, fmt.Sprintf("assigned IPv4 %q to Node(%d) %q", ret4.String(), node.ID, node.Hostname))
 	}
+
+	// IPv6 prefix is set, but node ip is missing, alloc
+	if i.prefix6 != nil && node.IPv6 == nil {
+		ret6, err := i.allocateNext(&i.prev6, i.prefix6)
+		if err != nil {
+			return nil, fmt.Errorf("allocating IPv6 for node(%d): %w", node.ID, err)
+		}
+
+		node.IPv6 = ret6
+		changed = true
+
+		msgs = append(msgs, fmt.Sprintf("assigned IPv6 %q to Node(%d) %q", ret6.String(), node.ID, node.Hostname))
+	}
+
+	// IPv4 prefix is not set, but node has IP, remove
+	if i.prefix4 == nil && node.IPv4 != nil {
+		msgs = append(
+			msgs,
+			fmt.Sprintf("removing IPv4 %q from Node(%d) %q", node.IPv4.String(), node.ID, node.Hostname),
+		)
+		node.IPv4 = nil
+		changed = true
+	}
+
+	// IPv6 prefix is not set, but node has IP, remove
+	if i.prefix6 == nil && node.IPv6 != nil {
+		msgs = append(
+			msgs,
+			fmt.Sprintf("removing IPv6 %q from Node(%d) %q", node.IPv6.String(), node.ID, node.Hostname),
+		)
+		node.IPv6 = nil
+		changed = true
+	}
+
+	if changed {
+		// Only the address columns are written, so a removed address is
+		// persisted as NULL without touching fields such as Expiry.
+		_, err := q.executor().exec(
+			table.Nodes.UPDATE(table.Nodes.Ipv4, table.Nodes.Ipv6, table.Nodes.UpdatedAt).
+				SET(addrColumn(node.IPv4), addrColumn(node.IPv6), time.Now()).
+				WHERE(table.Nodes.ID.EQ(jet.Uint64(node.ID.Uint64()))),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("saving node(%d) after adding IPs: %w", node.ID, err)
+		}
+	}
+
+	return msgs, nil
 }

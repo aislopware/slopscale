@@ -6,9 +6,10 @@ import (
 	"strings"
 	"time"
 
+	jet "github.com/go-jet/jet/v2/sqlite"
+	"github.com/juanfont/headscale/gen/jet/table"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 	"tailscale.com/util/rands"
 )
 
@@ -44,62 +45,88 @@ func (hsdb *HSDatabase) CreateAPIKey(
 	// bcrypt hash of secret
 	hash, err := bcrypt.GenerateFromPassword([]byte(secret), bcryptCost)
 	if err != nil {
-		return "", nil, err
+		return "", nil, fmt.Errorf("hashing API key secret: %w", err)
 	}
 
+	now := time.Now()
 	key := types.APIKey{
 		Prefix:     prefix,
 		Hash:       hash,
+		CreatedAt:  &now,
 		Expiration: expiration,
 	}
 
-	if err := hsdb.DB.Save(&key).Error; err != nil { //nolint:noinlineerr
+	var inserted idRow
+
+	err = hsdb.ex.query(
+		table.APIKeys.INSERT(table.APIKeys.MutableColumns).MODEL(&key).RETURNING(table.APIKeys.ID.AS("id_row.id")),
+		&inserted,
+	)
+	if err != nil {
 		return "", nil, fmt.Errorf("saving API key to database: %w", err)
 	}
+
+	key.ID = inserted.ID
 
 	return keyStr, &key, nil
 }
 
 // ListAPIKeys returns the list of [types.APIKey] values for a user.
 func (hsdb *HSDatabase) ListAPIKeys() ([]types.APIKey, error) {
-	keys := []types.APIKey{}
+	var records []apiKeyRecord
 
-	err := hsdb.DB.Find(&keys).Error
+	err := hsdb.ex.query(
+		jet.SELECT(table.APIKeys.AllColumns).FROM(table.APIKeys).ORDER_BY(table.APIKeys.ID.ASC()),
+		&records,
+	)
 	if err != nil {
 		return nil, err
+	}
+
+	keys := make([]types.APIKey, len(records))
+	for i := range records {
+		keys[i] = records[i].Key
 	}
 
 	return keys, nil
 }
 
-// GetAPIKey returns a [types.APIKey] for a given key.
-func (hsdb *HSDatabase) GetAPIKey(prefix string) (*types.APIKey, error) {
-	key := types.APIKey{}
-	if result := hsdb.DB.First(&key, "prefix = ?", prefix); result.Error != nil {
-		return nil, result.Error
+// queryAPIKey returns the API key matched by where, or [ErrNotFound].
+func queryAPIKey(q Querier, where jet.BoolExpression) (*types.APIKey, error) {
+	var record apiKeyRecord
+
+	err := q.executor().query(
+		jet.SELECT(table.APIKeys.AllColumns).FROM(table.APIKeys).WHERE(where).
+			ORDER_BY(table.APIKeys.ID.ASC()).LIMIT(1),
+		&record,
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	return &key, nil
+	return &record.Key, nil
+}
+
+// GetAPIKey returns a [types.APIKey] for a given key.
+func (hsdb *HSDatabase) GetAPIKey(prefix string) (*types.APIKey, error) {
+	return queryAPIKey(hsdb, table.APIKeys.Prefix.EQ(jet.String(prefix)))
 }
 
 // GetAPIKeyByID returns a [types.APIKey] for a given id.
 func (hsdb *HSDatabase) GetAPIKeyByID(id uint64) (*types.APIKey, error) {
-	key := types.APIKey{}
-	// Query on an explicit primary-key clause: a struct condition would drop a
-	// zero-valued ID, making the lookup unconditional and returning the first
-	// row instead of not-found.
-	if result := hsdb.DB.First(&key, "id = ?", id); result.Error != nil {
-		return nil, result.Error
-	}
-
-	return &key, nil
+	return queryAPIKey(hsdb, table.APIKeys.ID.EQ(jet.Uint64(id)))
 }
 
 // DestroyAPIKey destroys a [types.APIKey]. Returns error if the [types.APIKey]
 // does not exist.
 func (hsdb *HSDatabase) DestroyAPIKey(key types.APIKey) error {
-	if result := hsdb.DB.Unscoped().Delete(key); result.Error != nil {
-		return result.Error
+	affected, err := hsdb.ex.exec(table.APIKeys.DELETE().WHERE(table.APIKeys.ID.EQ(jet.Uint64(key.ID))))
+	if err != nil {
+		return err
+	}
+
+	if affected == 0 {
+		return ErrNotFound
 	}
 
 	return nil
@@ -107,16 +134,22 @@ func (hsdb *HSDatabase) DestroyAPIKey(key types.APIKey) error {
 
 // ExpireAPIKey marks a [types.APIKey] as expired.
 func (hsdb *HSDatabase) ExpireAPIKey(key *types.APIKey) error {
-	err := hsdb.DB.Model(&key).Update("Expiration", time.Now()).Error
+	now := time.Now()
+
+	_, err := hsdb.ex.exec(
+		table.APIKeys.UPDATE(table.APIKeys.Expiration).SET(now).WHERE(table.APIKeys.ID.EQ(jet.Uint64(key.ID))),
+	)
 	if err != nil {
 		return err
 	}
+
+	key.Expiration = &now
 
 	return nil
 }
 
 func (hsdb *HSDatabase) ValidateAPIKey(keyStr string) (bool, error) {
-	key, err := validateAPIKey(hsdb.DB, keyStr)
+	key, err := validateAPIKey(hsdb, keyStr)
 	if err != nil {
 		return false, err
 	}
@@ -133,7 +166,7 @@ func (hsdb *HSDatabase) ValidateAPIKey(keyStr string) (bool, error) {
 // returns the key itself, so the v2 API can act as the key's owning user. A
 // non-nil error means the key is missing, malformed, or expired.
 func (hsdb *HSDatabase) AuthenticateAPIKey(keyStr string) (*types.APIKey, error) {
-	key, err := validateAPIKey(hsdb.DB, keyStr)
+	key, err := validateAPIKey(hsdb, keyStr)
 	if err != nil {
 		return nil, err
 	}
@@ -148,9 +181,11 @@ func (hsdb *HSDatabase) AuthenticateAPIKey(keyStr string) (*types.APIKey, error)
 // SetAPIKeyUser sets the owning user of an API key. Used when an admin mints a
 // key on behalf of a user (headscale apikeys create --user).
 func (hsdb *HSDatabase) SetAPIKeyUser(keyID uint64, userID types.UserID) error {
-	return hsdb.DB.Model(&types.APIKey{}).
-		Where("id = ?", keyID).
-		Update("user_id", uint(userID)).Error
+	_, err := hsdb.ex.exec(
+		table.APIKeys.UPDATE(table.APIKeys.UserID).SET(uint(userID)).WHERE(table.APIKeys.ID.EQ(jet.Uint64(keyID))),
+	)
+
+	return err
 }
 
 // ParseAPIKeyPrefix extracts the database prefix from a display prefix.
@@ -191,7 +226,7 @@ func ParseAPIKeyPrefix(displayPrefix string) (string, error) {
 
 // validateAPIKey validates an API key and returns the key if valid.
 // Handles both new (hskey-api-{prefix}-{secret}) and legacy (prefix.secret) formats.
-func validateAPIKey(db *gorm.DB, keyStr string) (*types.APIKey, error) {
+func validateAPIKey(q Querier, keyStr string) (*types.APIKey, error) {
 	// Validate input is not empty
 	if keyStr == "" {
 		return nil, ErrAPIKeyFailedToParse
@@ -202,7 +237,7 @@ func validateAPIKey(db *gorm.DB, keyStr string) (*types.APIKey, error) {
 
 	if !found {
 		// Legacy format: prefix.secret
-		return validateLegacyAPIKey(db, keyStr)
+		return validateLegacyAPIKey(q, keyStr)
 	}
 
 	// New format: parse and verify
@@ -217,9 +252,7 @@ func validateAPIKey(db *gorm.DB, keyStr string) (*types.APIKey, error) {
 	}
 
 	// Look up by prefix (indexed)
-	var key types.APIKey
-
-	err = db.First(&key, "prefix = ?", prefix).Error
+	key, err := queryAPIKey(q, table.APIKeys.Prefix.EQ(jet.String(prefix)))
 	if err != nil {
 		return nil, fmt.Errorf("API key not found: %w", err)
 	}
@@ -230,11 +263,11 @@ func validateAPIKey(db *gorm.DB, keyStr string) (*types.APIKey, error) {
 		return nil, fmt.Errorf("invalid API key: %w", err)
 	}
 
-	return &key, nil
+	return key, nil
 }
 
 // validateLegacyAPIKey validates a legacy format API key (prefix.secret).
-func validateLegacyAPIKey(db *gorm.DB, keyStr string) (*types.APIKey, error) {
+func validateLegacyAPIKey(q Querier, keyStr string) (*types.APIKey, error) {
 	// Legacy format uses "." as separator
 	prefix, secret, found := strings.Cut(keyStr, ".")
 	if !found {
@@ -246,9 +279,7 @@ func validateLegacyAPIKey(db *gorm.DB, keyStr string) (*types.APIKey, error) {
 		return nil, fmt.Errorf("%w: legacy prefix length mismatch", ErrAPIKeyFailedToParse)
 	}
 
-	var key types.APIKey
-
-	err := db.First(&key, "prefix = ?", prefix).Error
+	key, err := queryAPIKey(q, table.APIKeys.Prefix.EQ(jet.String(prefix)))
 	if err != nil {
 		return nil, fmt.Errorf("API key not found: %w", err)
 	}
@@ -259,5 +290,5 @@ func validateLegacyAPIKey(db *gorm.DB, keyStr string) (*types.APIKey, error) {
 		return nil, fmt.Errorf("invalid API key: %w", err)
 	}
 
-	return &key, nil
+	return key, nil
 }

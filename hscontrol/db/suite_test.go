@@ -1,7 +1,6 @@
 package db
 
 import (
-	"log"
 	"net/url"
 	"os"
 	"strconv"
@@ -9,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/rs/zerolog/log"
 	"zombiezen.com/go/postgrestest"
 )
 
@@ -18,7 +18,7 @@ func newSQLiteTestDB() (*HSDatabase, error) {
 		return nil, err
 	}
 
-	log.Printf("database path: %s", tmpDir+"/headscale_test.db")
+	log.Info().Str("path", tmpDir+"/headscale_test.db").Msg("database path")
 
 	db, err := NewHeadscaleDatabase(
 		&types.Config{

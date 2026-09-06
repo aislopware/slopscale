@@ -22,6 +22,11 @@ var (
 	argon2Memory uint32 = 19 * 1024
 )
 
+// argon2MinMemoryPerThread is the smallest per-thread memory cost (in KiB)
+// the argon2 implementation accepts.
+const argon2MinMemoryPerThread = 8
+
+//nolint:gochecknoinits // lowers credential-hashing cost for tests before any hash is computed
 func init() {
 	if !testing.Testing() {
 		return
@@ -29,5 +34,5 @@ func init() {
 
 	bcryptCost = bcrypt.MinCost
 	argon2Time = 1
-	argon2Memory = 8 * argon2Threads // the smallest argon2 accepts
+	argon2Memory = argon2MinMemoryPerThread * argon2Threads // the smallest argon2 accepts
 }

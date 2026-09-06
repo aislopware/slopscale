@@ -1,10 +1,10 @@
 package hscontrol
 
 import (
-	"context"
 	"testing"
 	"time"
 
+	"github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/mapper"
 	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -743,7 +743,7 @@ func TestTaggedNodeRestartPreservesNilExpiry(t *testing.T) {
 		Expiry:  time.Time{},
 	}
 
-	restartResp, err := app.handleRegister(context.Background(), restartReq, machineKey.Public())
+	restartResp, err := app.handleRegister(t.Context(), restartReq, machineKey.Public())
 	require.NoError(t, err)
 
 	require.True(t, restartResp.MachineAuthorized,
@@ -761,9 +761,8 @@ func TestTaggedNodeRestartPreservesNilExpiry(t *testing.T) {
 	assert.False(t, nodeAfterRestart.Expiry().Valid(),
 		"tagged node expiry must remain nil (not zero-time) after restart")
 
-	var dbNode types.Node
-	require.NoError(t,
-		app.state.DB().DB.First(&dbNode, nodeAfterRestart.ID().Uint64()).Error)
+	dbNode, err := db.GetNodeByID(app.state.DB(), nodeAfterRestart.ID())
+	require.NoError(t, err)
 	assert.Nil(t, dbNode.Expiry,
 		"database expiry column must be NULL after restart, not a pointer to zero-time")
 }
@@ -814,7 +813,7 @@ func TestUntaggedNodeRestartPreservesNilExpiry(t *testing.T) {
 		Expiry:  time.Time{},
 	}
 
-	restartResp, err := app.handleRegister(context.Background(), restartReq, machineKey.Public())
+	restartResp, err := app.handleRegister(t.Context(), restartReq, machineKey.Public())
 	require.NoError(t, err)
 
 	require.True(t, restartResp.MachineAuthorized,
@@ -830,9 +829,8 @@ func TestUntaggedNodeRestartPreservesNilExpiry(t *testing.T) {
 	assert.False(t, nodeAfterRestart.Expiry().Valid(),
 		"untagged node expiry must remain nil (not zero-time) after restart")
 
-	var dbNode types.Node
-	require.NoError(t,
-		app.state.DB().DB.First(&dbNode, nodeAfterRestart.ID().Uint64()).Error)
+	dbNode, err := db.GetNodeByID(app.state.DB(), nodeAfterRestart.ID())
+	require.NoError(t, err)
 	assert.Nil(t, dbNode.Expiry,
 		"database expiry column must be NULL after restart, not a pointer to zero-time "+
 			"(this is what `sqlite3 ... 'select expiry from nodes'` sees)")
@@ -1425,7 +1423,7 @@ func TestIssue3371_TaggedNodeLogoutReloginSingleUseKey(t *testing.T) {
 		Hostinfo: &tailcfg.Hostinfo{Hostname: "headscale-debug"},
 	}
 
-	resp, err := app.handleRegister(context.Background(), regReq, machineKey.Public())
+	resp, err := app.handleRegister(t.Context(), regReq, machineKey.Public())
 	require.NoError(t, err)
 	require.True(t, resp.MachineAuthorized)
 	require.False(t, resp.NodeKeyExpired)
@@ -1444,7 +1442,7 @@ func TestIssue3371_TaggedNodeLogoutReloginSingleUseKey(t *testing.T) {
 		Expiry:  tsLogoutSentinelExpiry(),
 	}
 
-	_, err = app.handleRegister(context.Background(), logoutReq, machineKey.Public())
+	_, err = app.handleRegister(t.Context(), logoutReq, machineKey.Public())
 	require.NoError(t, err)
 
 	// A tagged node must NOT be expired by logout — tagged nodes never expire.
@@ -1468,7 +1466,7 @@ func TestIssue3371_TaggedNodeLogoutReloginSingleUseKey(t *testing.T) {
 		Hostinfo: &tailcfg.Hostinfo{Hostname: "headscale-debug"},
 	}
 
-	reloginResp, err := app.handleRegister(context.Background(), reloginReq, machineKey.Public())
+	reloginResp, err := app.handleRegister(t.Context(), reloginReq, machineKey.Public())
 	require.NoError(t, err,
 		"issue #3371: a fresh valid key must re-authenticate the tagged node after logout")
 	require.NotNil(t, reloginResp)
@@ -1516,7 +1514,7 @@ func TestIssue3371_TaggedNodeLogoutReloginReusableKey(t *testing.T) {
 		Hostinfo: &tailcfg.Hostinfo{Hostname: "reusable-tagged"},
 	}
 
-	_, err = app.handleRegister(context.Background(), regReq, machineKey.Public())
+	_, err = app.handleRegister(t.Context(), regReq, machineKey.Public())
 	require.NoError(t, err)
 
 	node, found := app.state.GetNodeByNodeKey(nodeKey.Public())
@@ -1530,7 +1528,7 @@ func TestIssue3371_TaggedNodeLogoutReloginReusableKey(t *testing.T) {
 		NodeKey: nodeKey.Public(),
 		Expiry:  tsLogoutSentinelExpiry(),
 	}
-	_, err = app.handleRegister(context.Background(), logoutReq, machineKey.Public())
+	_, err = app.handleRegister(t.Context(), logoutReq, machineKey.Public())
 	require.NoError(t, err)
 
 	// Relogin with the same reusable key, rotating the node key.
@@ -1540,7 +1538,7 @@ func TestIssue3371_TaggedNodeLogoutReloginReusableKey(t *testing.T) {
 		NodeKey:  nodeKey2.Public(),
 		Hostinfo: &tailcfg.Hostinfo{Hostname: "reusable-tagged"},
 	}
-	reloginResp, err := app.handleRegister(context.Background(), reloginReq, machineKey.Public())
+	reloginResp, err := app.handleRegister(t.Context(), reloginReq, machineKey.Public())
 	require.NoError(t, err)
 	require.NotNil(t, reloginResp)
 
@@ -1582,7 +1580,7 @@ func TestIssue3371_TaggedNodeLogoutDoesNotSetExpiry(t *testing.T) {
 		NodeKey:  nodeKey.Public(),
 		Hostinfo: &tailcfg.Hostinfo{Hostname: "noexpiry-tagged"},
 	}
-	_, err = app.handleRegister(context.Background(), regReq, machineKey.Public())
+	_, err = app.handleRegister(t.Context(), regReq, machineKey.Public())
 	require.NoError(t, err)
 
 	logoutReq := tailcfg.RegisterRequest{
@@ -1590,7 +1588,7 @@ func TestIssue3371_TaggedNodeLogoutDoesNotSetExpiry(t *testing.T) {
 		NodeKey: nodeKey.Public(),
 		Expiry:  tsLogoutSentinelExpiry(),
 	}
-	_, err = app.handleRegister(context.Background(), logoutReq, machineKey.Public())
+	_, err = app.handleRegister(t.Context(), logoutReq, machineKey.Public())
 	require.NoError(t, err)
 
 	nodeAfterLogout, found := app.state.GetNodeByNodeKey(nodeKey.Public())
@@ -1603,9 +1601,8 @@ func TestIssue3371_TaggedNodeLogoutDoesNotSetExpiry(t *testing.T) {
 
 	// The database column must be NULL, not a clamped 'now' timestamp — a
 	// persisted expiry survives restart and re-triggers the lockout.
-	var dbNode types.Node
-	require.NoError(t,
-		app.state.DB().DB.First(&dbNode, nodeAfterLogout.ID().Uint64()).Error)
+	dbNode, err := db.GetNodeByID(app.state.DB(), nodeAfterLogout.ID())
+	require.NoError(t, err)
 	assert.Nil(t, dbNode.Expiry,
 		"issue #3371 root cause (a): tagged node's DB expiry must remain NULL after logout")
 }
@@ -1633,7 +1630,7 @@ func TestIssue3371_UserOwnedNodeLogoutStillExpires(t *testing.T) {
 		Hostinfo: &tailcfg.Hostinfo{Hostname: "user-node"},
 		Expiry:   time.Now().Add(24 * time.Hour),
 	}
-	_, err = app.handleRegister(context.Background(), regReq, machineKey.Public())
+	_, err = app.handleRegister(t.Context(), regReq, machineKey.Public())
 	require.NoError(t, err)
 
 	node, found := app.state.GetNodeByNodeKey(nodeKey.Public())
@@ -1645,7 +1642,7 @@ func TestIssue3371_UserOwnedNodeLogoutStillExpires(t *testing.T) {
 		NodeKey: nodeKey.Public(),
 		Expiry:  tsLogoutSentinelExpiry(),
 	}
-	logoutResp, err := app.handleRegister(context.Background(), logoutReq, machineKey.Public())
+	logoutResp, err := app.handleRegister(t.Context(), logoutReq, machineKey.Public())
 	require.NoError(t, err)
 	require.NotNil(t, logoutResp)
 
@@ -1686,7 +1683,7 @@ func TestIssue3371_TaggedNodeFutureExpirySurvivesRelogin(t *testing.T) {
 		NodeKey:  nodeKey.Public(),
 		Hostinfo: &tailcfg.Hostinfo{Hostname: "future-expiry-tagged"},
 	}
-	_, err = app.handleRegister(context.Background(), regReq, machineKey.Public())
+	_, err = app.handleRegister(t.Context(), regReq, machineKey.Public())
 	require.NoError(t, err)
 
 	node, found := app.state.GetNodeByNodeKey(nodeKey.Public())
@@ -1710,7 +1707,7 @@ func TestIssue3371_TaggedNodeFutureExpirySurvivesRelogin(t *testing.T) {
 		NodeKey:  nodeKey2.Public(),
 		Hostinfo: &tailcfg.Hostinfo{Hostname: "future-expiry-tagged"},
 	}
-	_, err = app.handleRegister(context.Background(), reregReq, machineKey.Public())
+	_, err = app.handleRegister(t.Context(), reregReq, machineKey.Public())
 	require.NoError(t, err)
 
 	after, found := app.state.GetNodeByNodeKey(nodeKey2.Public())
@@ -1749,7 +1746,7 @@ func TestIssue3371_EphemeralTaggedNodeLogoutDeletes(t *testing.T) {
 		NodeKey:  nodeKey.Public(),
 		Hostinfo: &tailcfg.Hostinfo{Hostname: "ephemeral-tagged"},
 	}
-	_, err = app.handleRegister(context.Background(), regReq, machineKey.Public())
+	_, err = app.handleRegister(t.Context(), regReq, machineKey.Public())
 	require.NoError(t, err)
 
 	node, found := app.state.GetNodeByNodeKey(nodeKey.Public())
@@ -1763,7 +1760,7 @@ func TestIssue3371_EphemeralTaggedNodeLogoutDeletes(t *testing.T) {
 		NodeKey: nodeKey.Public(),
 		Expiry:  tsLogoutSentinelExpiry(),
 	}
-	_, err = app.handleRegister(context.Background(), logoutReq, machineKey.Public())
+	_, err = app.handleRegister(t.Context(), logoutReq, machineKey.Public())
 	require.NoError(t, err)
 
 	require.EventuallyWithT(t, func(c *assert.CollectT) {

@@ -1,5 +1,10 @@
 // Package sqliteconfig provides type-safe configuration for SQLite databases
-// with proper enum validation and URL generation for modernc.org/sqlite driver.
+// with proper enum validation and URL generation for the modernc.org/sqlite
+// driver, which hscontrol/db opens through database/sql. Besides pragmas it
+// carries two connection-level hardening switches: defensive mode, which
+// refuses SQL that can deliberately corrupt the file (writable_schema and
+// friends), and strict double quotes, which stops SQLite from silently
+// treating an unknown double-quoted identifier as a string literal.
 package sqliteconfig
 
 import (
@@ -8,6 +13,9 @@ import (
 	"slices"
 	"strings"
 )
+
+// DriverName is the database/sql driver name modernc.org/sqlite registers.
+const DriverName = "sqlite"
 
 // Errors returned by config validation.
 var (
@@ -18,11 +26,20 @@ var (
 	ErrWALAutocheckpoint   = errors.New("wal_autocheckpoint must be >= -1")
 	ErrInvalidSynchronous  = errors.New("invalid synchronous")
 	ErrInvalidTxLock       = errors.New("invalid txlock")
+	ErrCacheSizeNegative   = errors.New("cache_size must be >= 0")
 )
 
 const (
 	// DefaultBusyTimeout is the default busy timeout in milliseconds.
 	DefaultBusyTimeout = 10000
+	// DefaultWALAutocheckpoint is the default number of WAL pages before
+	// an automatic checkpoint.
+	DefaultWALAutocheckpoint = 1000
+	// DefaultCacheSize is the default page cache size in KiB (64 MiB).
+	// SQLite's own default of 2 MiB is sized for tiny embedded uses; the
+	// whole working set of a control server fits in this cache, so reads
+	// stop touching the file at all once warm.
+	DefaultCacheSize = 64 * 1024
 )
 
 // JournalMode represents SQLite journal_mode pragma values.
@@ -276,6 +293,17 @@ type Config struct {
 	Synchronous       Synchronous // synchronous mode (affects durability vs performance)
 	ForeignKeys       bool        // enable foreign key constraints (data integrity)
 	TxLock            TxLock      // transaction lock mode (affects write concurrency)
+	// CacheSize is the page cache size per connection in KiB; 0 leaves
+	// SQLite's default (2 MiB).
+	CacheSize int
+	// Defensive enables SQLITE_DBCONFIG_DEFENSIVE (_defensive=1): PRAGMA
+	// writable_schema, journal_mode=OFF, schema_version writes and direct
+	// shadow-table writes are refused, closing the SQL-level corruption vectors.
+	Defensive bool
+	// StrictDoubleQuotes disables the double-quoted string literal
+	// misfeature (_dqs=0), so a mistyped "identifier" is an error instead of
+	// a string.
+	StrictDoubleQuotes bool
 }
 
 // Default returns the production configuration optimized for Headscale's usage patterns.
@@ -286,25 +314,31 @@ type Config struct {
 //   - Data integrity (foreign key constraints enabled)
 //   - Safe concurrent writes (IMMEDIATE transaction lock)
 //   - Reasonable timeout for busy database scenarios (10s)
+//   - Corruption-resistant connections (defensive mode, strict double quotes)
 func Default(path string) *Config {
 	return &Config{
-		Path:              path,
-		BusyTimeout:       DefaultBusyTimeout,
-		JournalMode:       JournalModeWAL,
-		AutoVacuum:        AutoVacuumIncremental,
-		WALAutocheckpoint: 1000,
-		Synchronous:       SynchronousNormal,
-		ForeignKeys:       true,
-		TxLock:            TxLockImmediate,
+		Path:               path,
+		BusyTimeout:        DefaultBusyTimeout,
+		JournalMode:        JournalModeWAL,
+		AutoVacuum:         AutoVacuumIncremental,
+		WALAutocheckpoint:  DefaultWALAutocheckpoint,
+		Synchronous:        SynchronousNormal,
+		ForeignKeys:        true,
+		TxLock:             TxLockImmediate,
+		CacheSize:          DefaultCacheSize,
+		Defensive:          true,
+		StrictDoubleQuotes: true,
 	}
 }
 
 // Memory returns a configuration for in-memory databases.
 func Memory() *Config {
 	return &Config{
-		Path:              ":memory:",
-		WALAutocheckpoint: -1, // not set, use driver default
-		ForeignKeys:       true,
+		Path:               ":memory:",
+		WALAutocheckpoint:  -1, // not set, use driver default
+		ForeignKeys:        true,
+		Defensive:          true,
+		StrictDoubleQuotes: true,
 	}
 }
 
@@ -334,6 +368,10 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("%w: %s", ErrInvalidSynchronous, c.Synchronous)
 	}
 
+	if c.CacheSize < 0 {
+		return fmt.Errorf("%w: %d", ErrCacheSizeNegative, c.CacheSize)
+	}
+
 	if c.TxLock != "" && !c.TxLock.IsValid() {
 		return fmt.Errorf("%w: %s", ErrInvalidTxLock, c.TxLock)
 	}
@@ -360,9 +398,18 @@ func (c *Config) ToURL() (string, error) {
 	// Build query parameters
 	var queryParts []string
 
-	// Add _txlock first (it's a connection parameter, not a pragma)
+	// Connection parameters come first, then pragmas. _txlock leads because
+	// it changes how every transaction below is opened.
 	if c.TxLock != "" {
 		queryParts = append(queryParts, "_txlock="+string(c.TxLock))
+	}
+
+	if c.Defensive {
+		queryParts = append(queryParts, "_defensive=1")
+	}
+
+	if c.StrictDoubleQuotes {
+		queryParts = append(queryParts, "_dqs=0")
 	}
 
 	// Add pragma parameters only if they're set (non-zero/non-empty)
@@ -384,6 +431,11 @@ func (c *Config) ToURL() (string, error) {
 
 	if c.Synchronous != "" {
 		queryParts = append(queryParts, fmt.Sprintf("_pragma=synchronous=%s", c.Synchronous))
+	}
+
+	// A negative cache_size is a size in KiB rather than a page count.
+	if c.CacheSize > 0 {
+		queryParts = append(queryParts, fmt.Sprintf("_pragma=cache_size=-%d", c.CacheSize))
 	}
 
 	if c.ForeignKeys {

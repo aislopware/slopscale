@@ -467,6 +467,7 @@ func TestOIDCClaimsJSONToUser(t *testing.T) {
 			// From https://github.com/juanfont/headscale/issues/2333
 			name:                  "okta-oidc-claim-20250121",
 			emailVerifiedRequired: true,
+			//nolint:lll // verbatim token claims from the linked issue
 			jsonstr: `
 {
   "aud": "79xxxxxx-xxxx-xxxx-xxxx-892146xxxxxx",

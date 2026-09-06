@@ -31,6 +31,8 @@ const EnvTestLogLevel = "HEADSCALE_TEST_LOG_LEVEL"
 //   - Local buffer loggers ([zerolog.New] with a buffer) are also gated by the global
 //     level. Tests that assert on log output (currently only
 //     hscontrol/util/zlog) re-enable trace level via their own init_test.go.
+//
+//nolint:gochecknoinits // must run at import so every test binary starts quiet
 func init() {
 	if !testing.Testing() {
 		return

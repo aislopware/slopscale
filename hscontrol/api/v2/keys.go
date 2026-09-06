@@ -59,8 +59,8 @@ type CreateKeyRequest struct {
 	// but an OAuth client (keyType:"client") has none and the Tailscale clients
 	// omit the field entirely, so it must not be required.
 	Capabilities  *KeyCapabilities `json:"capabilities,omitempty"`
-	ExpirySeconds int64            `doc:"Lifetime in seconds; defaults to 90 days. Auth keys only." json:"expirySeconds,omitempty"`
-	Description   string           `json:"description,omitempty"                                    maxLength:"50"`
+	ExpirySeconds int64            `doc:"Lifetime in seconds; default 90d for auth keys" json:"expirySeconds,omitempty"`
+	Description   string           `json:"description,omitempty"                         maxLength:"50"`
 	// Scopes and Tags are top-level and apply only to keyType "client" (an OAuth
 	// client). Auth-key tags live under Capabilities.Devices.Create.Tags.
 	Scopes []string `doc:"OAuth scopes granted to the client. keyType=client only." json:"scopes,omitempty"`
@@ -129,9 +129,10 @@ func registerKeys(api huma.API, b Backend) {
 		Method:      http.MethodPost,
 		Path:        "/api/v2/tailnet/{tailnet}/keys",
 		Summary:     "Create an auth key or OAuth client",
-		Description: "Requires the `auth_keys` scope for an auth key, or `oauth_keys` for an OAuth client (an admin API key is all-access).",
-		Tags:        keysTags,
-		Security:    security,
+		Description: "Requires the `auth_keys` scope for an auth key, or `oauth_keys` for an OAuth client " +
+			"(an admin API key is all-access).",
+		Tags:     keysTags,
+		Security: security,
 		Errors: []int{
 			http.StatusBadRequest,
 			http.StatusUnauthorized,
@@ -139,16 +140,7 @@ func registerKeys(api huma.API, b Backend) {
 			http.StatusNotFound,
 		},
 	}, func(ctx context.Context, in *createKeyInput) (*keyOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
-		if err != nil {
-			return nil, err
-		}
-
-		if in.Body.KeyType == keyTypeClient {
-			return createOAuthClient(ctx, b, in.Body)
-		}
-
-		return createAuthKey(ctx, b, in.Body)
+		return handleCreateKey(ctx, b, in)
 	})
 
 	huma.Register(api, huma.Operation{
@@ -156,49 +148,17 @@ func registerKeys(api huma.API, b Backend) {
 		Method:      http.MethodGet,
 		Path:        "/api/v2/tailnet/{tailnet}/keys",
 		Summary:     "List auth keys and OAuth clients",
-		Description: "A token sees the kinds it can read: `auth_keys:read` for auth keys, `oauth_keys:read` for OAuth clients (an admin API key sees all).",
-		Tags:        keysTags,
-		Security:    security,
+		Description: "A token sees the kinds it can read: `auth_keys:read` for auth keys, `oauth_keys:read` " +
+			"for OAuth clients (an admin API key sees all).",
+		Tags:     keysTags,
+		Security: security,
 		Errors: []int{
 			http.StatusUnauthorized,
 			http.StatusForbidden,
 			http.StatusNotFound,
 		},
 	}, func(ctx context.Context, in *listKeysInput) (*listKeysOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
-		if err != nil {
-			return nil, err
-		}
-
-		scopes, isOAuth := principalScopes(ctx)
-
-		out := &listKeysOutput{}
-		out.Body.Keys = []Key{}
-
-		// A token sees the key kinds it has read scope for; an admin key sees all.
-		if !isOAuth || scope.Grants(scope.Parse(scopes), scope.AuthKeysRead) {
-			keys, err := b.State.ListPreAuthKeys()
-			if err != nil {
-				return nil, huma.Error500InternalServerError("listing auth keys", err)
-			}
-
-			for i := range keys {
-				out.Body.Keys = append(out.Body.Keys, keyFromStored(&keys[i]))
-			}
-		}
-
-		if !isOAuth || scope.Grants(scope.Parse(scopes), scope.OAuthKeysRead) {
-			clients, err := b.State.ListOAuthClients()
-			if err != nil {
-				return nil, huma.Error500InternalServerError("listing oauth clients", err)
-			}
-
-			for i := range clients {
-				out.Body.Keys = append(out.Body.Keys, oauthClientToKey(&clients[i], ""))
-			}
-		}
-
-		return out, nil
+		return handleListKeys(ctx, b, in)
 	})
 
 	huma.Register(api, huma.Operation{
@@ -206,51 +166,26 @@ func registerKeys(api huma.API, b Backend) {
 		Method:      http.MethodGet,
 		Path:        "/api/v2/tailnet/{tailnet}/keys/{keyId}",
 		Summary:     "Get an auth key or OAuth client",
-		Description: "Requires `auth_keys:read` for an auth key, or `oauth_keys:read` for an OAuth client (an admin API key is all-access).",
-		Tags:        keysTags,
-		Security:    security,
+		Description: "Requires `auth_keys:read` for an auth key, or `oauth_keys:read` for an OAuth client " +
+			"(an admin API key is all-access).",
+		Tags:     keysTags,
+		Security: security,
 		Errors: []int{
 			http.StatusUnauthorized,
 			http.StatusForbidden,
 			http.StatusNotFound,
 		},
 	}, func(ctx context.Context, in *keyByIDInput) (*keyOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
-		if err != nil {
-			return nil, err
-		}
-
-		// An OAuth client id is a hex string distinct from a numeric auth-key id,
-		// so a client lookup that hits is authoritative; otherwise fall through to
-		// the auth-key path. The lookup is gated on the caller actually holding
-		// oauth_keys:read so a token without it cannot tell a real client id (403)
-		// from an unknown key (404) — i.e. no client-existence oracle.
-		if requireKeyScope(ctx, scope.OAuthKeysRead) == nil {
-			client, err := b.State.GetOAuthClientByClientID(in.KeyID)
-			if err == nil {
-				return &keyOutput{Body: oauthClientToKey(client, "")}, nil
-			}
-		}
-
-		err = requireKeyScope(ctx, scope.AuthKeysRead)
-		if err != nil {
-			return nil, err
-		}
-
-		key, err := findKeyByID(b, in.KeyID)
-		if err != nil {
-			return nil, err
-		}
-
-		return &keyOutput{Body: keyFromStored(key)}, nil
+		return handleGetKey(ctx, b, in)
 	})
 
 	huma.Register(api, huma.Operation{
-		OperationID:   "deleteKey",
-		Method:        http.MethodDelete,
-		Path:          "/api/v2/tailnet/{tailnet}/keys/{keyId}",
-		Summary:       "Delete an auth key or OAuth client",
-		Description:   "Requires the `auth_keys` scope for an auth key, or `oauth_keys` for an OAuth client (an admin API key is all-access).",
+		OperationID: "deleteKey",
+		Method:      http.MethodDelete,
+		Path:        "/api/v2/tailnet/{tailnet}/keys/{keyId}",
+		Summary:     "Delete an auth key or OAuth client",
+		Description: "Requires the `auth_keys` scope for an auth key, or `oauth_keys` for an OAuth client " +
+			"(an admin API key is all-access).",
 		Tags:          keysTags,
 		Security:      security,
 		DefaultStatus: http.StatusOK,
@@ -260,45 +195,131 @@ func registerKeys(api huma.API, b Backend) {
 			http.StatusNotFound,
 		},
 	}, func(ctx context.Context, in *keyByIDInput) (*deleteKeyOutput, error) {
-		err := requireDefaultTailnet(in.Tailnet)
-		if err != nil {
-			return nil, err
-		}
-
-		// Gated on oauth_keys (write) for the same no-existence-oracle reason as
-		// getKey: a token without it must not learn that an id is an OAuth client.
-		if requireKeyScope(ctx, scope.OAuthKeys) == nil {
-			_, err = b.State.GetOAuthClientByClientID(in.KeyID)
-			if err == nil {
-				err = b.State.RevokeOAuthClient(in.KeyID)
-				if err != nil {
-					return nil, mapError("deleting oauth client", err)
-				}
-
-				return &deleteKeyOutput{}, nil
-			}
-		}
-
-		err = requireKeyScope(ctx, scope.AuthKeys)
-		if err != nil {
-			return nil, err
-		}
-
-		id, err := parseID(in.KeyID, "auth key")
-		if err != nil {
-			return nil, err
-		}
-
-		// Tailscale's DELETE revokes the key but keeps it retrievable (invalid)
-		// rather than destroying it; the collector reaps it after the retention
-		// window.
-		err = b.State.RevokePreAuthKey(id)
-		if err != nil {
-			return nil, mapError("revoking auth key", err)
-		}
-
-		return &deleteKeyOutput{}, nil
+		return handleDeleteKey(ctx, b, in)
 	})
+}
+
+func handleCreateKey(ctx context.Context, b Backend, in *createKeyInput) (*keyOutput, error) {
+	err := requireDefaultTailnet(in.Tailnet)
+	if err != nil {
+		return nil, err
+	}
+
+	if in.Body.KeyType == keyTypeClient {
+		return createOAuthClient(ctx, b, in.Body)
+	}
+
+	return createAuthKey(ctx, b, in.Body)
+}
+
+func handleListKeys(ctx context.Context, b Backend, in *listKeysInput) (*listKeysOutput, error) {
+	err := requireDefaultTailnet(in.Tailnet)
+	if err != nil {
+		return nil, err
+	}
+
+	scopes, isOAuth := principalScopes(ctx)
+
+	out := &listKeysOutput{}
+	out.Body.Keys = []Key{}
+
+	// A token sees the key kinds it has read scope for; an admin key sees all.
+	if !isOAuth || scope.Grants(scope.Parse(scopes), scope.AuthKeysRead) {
+		keys, keysErr := b.State.ListPreAuthKeys()
+		if keysErr != nil {
+			return nil, huma.Error500InternalServerError("listing auth keys", keysErr)
+		}
+
+		for i := range keys {
+			out.Body.Keys = append(out.Body.Keys, keyFromStored(&keys[i]))
+		}
+	}
+
+	if !isOAuth || scope.Grants(scope.Parse(scopes), scope.OAuthKeysRead) {
+		clients, clientsErr := b.State.ListOAuthClients()
+		if clientsErr != nil {
+			return nil, huma.Error500InternalServerError("listing oauth clients", clientsErr)
+		}
+
+		for i := range clients {
+			out.Body.Keys = append(out.Body.Keys, oauthClientToKey(&clients[i], ""))
+		}
+	}
+
+	return out, nil
+}
+
+// handleGetKey tries the OAuth-client path first: a client id is a hex string
+// distinct from a numeric auth-key id, so a lookup that hits is authoritative.
+// The lookup is gated on the caller actually holding oauth_keys:read so a
+// token without it cannot tell a real client id (403) from an unknown key
+// (404) — i.e. no client-existence oracle.
+func handleGetKey(ctx context.Context, b Backend, in *keyByIDInput) (*keyOutput, error) {
+	err := requireDefaultTailnet(in.Tailnet)
+	if err != nil {
+		return nil, err
+	}
+
+	if requireKeyScope(ctx, scope.OAuthKeysRead) == nil {
+		client, clientErr := b.State.GetOAuthClientByClientID(in.KeyID)
+		if clientErr == nil {
+			return &keyOutput{Body: oauthClientToKey(client, "")}, nil
+		}
+	}
+
+	err = requireKeyScope(ctx, scope.AuthKeysRead)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := findKeyByID(b, in.KeyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &keyOutput{Body: keyFromStored(key)}, nil
+}
+
+// handleDeleteKey tries the OAuth-client path first, gated on oauth_keys
+// (write) for the same no-existence-oracle reason as handleGetKey: a token
+// without it must not learn that an id is an OAuth client.
+func handleDeleteKey(ctx context.Context, b Backend, in *keyByIDInput) (*deleteKeyOutput, error) {
+	err := requireDefaultTailnet(in.Tailnet)
+	if err != nil {
+		return nil, err
+	}
+
+	if requireKeyScope(ctx, scope.OAuthKeys) == nil {
+		_, clientErr := b.State.GetOAuthClientByClientID(in.KeyID)
+		if clientErr == nil {
+			revokeErr := b.State.RevokeOAuthClient(in.KeyID)
+			if revokeErr != nil {
+				return nil, mapError("deleting oauth client", revokeErr)
+			}
+
+			return &deleteKeyOutput{}, nil
+		}
+	}
+
+	err = requireKeyScope(ctx, scope.AuthKeys)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := parseID(in.KeyID, "auth key")
+	if err != nil {
+		return nil, err
+	}
+
+	// Tailscale's DELETE revokes the key but keeps it retrievable (invalid)
+	// rather than destroying it; the collector reaps it after the retention
+	// window.
+	err = b.State.RevokePreAuthKey(id)
+	if err != nil {
+		return nil, mapError("revoking auth key", err)
+	}
+
+	return &deleteKeyOutput{}, nil
 }
 
 // requireKeyScope authorizes a keys operation for an OAuth access token. An admin
@@ -459,7 +480,7 @@ func createOAuthClient(ctx context.Context, b Backend, body CreateKeyRequest) (*
 }
 
 // findKeyByID looks up a stored pre-auth key by its (stringified) id with a
-// direct by-id query; an unknown id surfaces as gorm.ErrRecordNotFound, which
+// direct by-id query; an unknown id surfaces as db.ErrNotFound, which
 // mapError turns into a 404.
 func findKeyByID(b Backend, rawID string) (*types.PreAuthKey, error) {
 	id, err := parseID(rawID, "auth key")

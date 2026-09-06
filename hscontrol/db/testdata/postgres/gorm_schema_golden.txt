@@ -1,0 +1,116 @@
+COL api_keys.id bigint null=NO default=nextval('api_keys_id_seq'::regclass)
+COL api_keys.prefix text null=YES
+COL api_keys.hash bytea null=YES
+COL api_keys.user_id bigint null=YES
+COL api_keys.created_at timestamp with time zone null=YES
+COL api_keys.expiration timestamp with time zone null=YES
+COL api_keys.last_seen timestamp with time zone null=YES
+COL database_versions.id bigint null=NO default=nextval('database_versions_id_seq'::regclass)
+COL database_versions.version text null=NO
+COL database_versions.updated_at timestamp with time zone null=YES
+COL migrations.id character varying len=255 null=NO
+COL nodes.id bigint null=NO default=nextval('nodes_id_seq'::regclass)
+COL nodes.machine_key text null=YES
+COL nodes.node_key text null=YES
+COL nodes.disco_key text null=YES
+COL nodes.endpoints text null=YES
+COL nodes.host_info text null=YES
+COL nodes.ipv4 text null=YES
+COL nodes.ipv6 text null=YES
+COL nodes.hostname text null=YES
+COL nodes.given_name character varying len=63 null=YES
+COL nodes.user_id bigint null=YES
+COL nodes.register_method text null=YES
+COL nodes.tags text null=YES
+COL nodes.auth_key_id bigint null=YES
+COL nodes.expiry timestamp with time zone null=YES
+COL nodes.last_seen timestamp with time zone null=YES
+COL nodes.approved_routes text null=YES
+COL nodes.created_at timestamp with time zone null=YES
+COL nodes.updated_at timestamp with time zone null=YES
+COL nodes.deleted_at timestamp with time zone null=YES
+COL oauth_access_tokens.id bigint null=NO default=nextval('oauth_access_tokens_id_seq'::regclass)
+COL oauth_access_tokens.prefix text null=YES
+COL oauth_access_tokens.hash bytea null=YES
+COL oauth_access_tokens.client_id text null=YES
+COL oauth_access_tokens.scopes text null=YES
+COL oauth_access_tokens.tags text null=YES
+COL oauth_access_tokens.expiration timestamp with time zone null=YES
+COL oauth_access_tokens.created_at timestamp with time zone null=YES
+COL oauth_clients.id bigint null=NO default=nextval('oauth_clients_id_seq'::regclass)
+COL oauth_clients.client_id text null=YES
+COL oauth_clients.secret_hash bytea null=YES
+COL oauth_clients.scopes text null=YES
+COL oauth_clients.tags text null=YES
+COL oauth_clients.description text null=YES
+COL oauth_clients.user_id bigint null=YES
+COL oauth_clients.created_at timestamp with time zone null=YES
+COL oauth_clients.revoked timestamp with time zone null=YES
+COL policies.id bigint null=NO default=nextval('policies_id_seq'::regclass)
+COL policies.created_at timestamp with time zone null=YES
+COL policies.updated_at timestamp with time zone null=YES
+COL policies.deleted_at timestamp with time zone null=YES
+COL policies.data text null=YES
+COL pre_auth_keys.id bigint null=NO default=nextval('pre_auth_keys_id_seq'::regclass)
+COL pre_auth_keys.key text null=YES
+COL pre_auth_keys.prefix text null=YES
+COL pre_auth_keys.hash bytea null=YES
+COL pre_auth_keys.user_id bigint null=YES
+COL pre_auth_keys.description text null=YES
+COL pre_auth_keys.reusable boolean null=YES
+COL pre_auth_keys.ephemeral boolean null=YES default=false
+COL pre_auth_keys.used boolean null=YES default=false
+COL pre_auth_keys.tags text null=YES
+COL pre_auth_keys.created_at timestamp with time zone null=YES
+COL pre_auth_keys.expiration timestamp with time zone null=YES
+COL pre_auth_keys.revoked timestamp with time zone null=YES
+COL users.id bigint null=NO default=nextval('users_id_seq'::regclass)
+COL users.created_at timestamp with time zone null=YES
+COL users.updated_at timestamp with time zone null=YES
+COL users.deleted_at timestamp with time zone null=YES
+COL users.name text null=YES
+COL users.display_name text null=YES
+COL users.email text null=YES
+COL users.provider_identifier text null=YES
+COL users.provider text null=YES
+COL users.profile_pic_url text null=YES
+IDX CREATE INDEX idx_policies_deleted_at ON public.policies USING btree (deleted_at)
+IDX CREATE INDEX idx_users_deleted_at ON public.users USING btree (deleted_at)
+IDX CREATE UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)
+IDX CREATE UNIQUE INDEX database_versions_pkey ON public.database_versions USING btree (id)
+IDX CREATE UNIQUE INDEX idx_api_keys_prefix ON public.api_keys USING btree (prefix)
+IDX CREATE UNIQUE INDEX idx_name_no_provider_identifier ON public.users USING btree (name) WHERE (provider_identifier IS NULL)
+IDX CREATE UNIQUE INDEX idx_name_provider_identifier ON public.users USING btree (name, provider_identifier)
+IDX CREATE UNIQUE INDEX idx_oauth_access_tokens_prefix ON public.oauth_access_tokens USING btree (prefix)
+IDX CREATE UNIQUE INDEX idx_oauth_clients_client_id ON public.oauth_clients USING btree (client_id)
+IDX CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON public.pre_auth_keys USING btree (prefix) WHERE ((prefix IS NOT NULL) AND (prefix <> ''::text))
+IDX CREATE UNIQUE INDEX idx_provider_identifier ON public.users USING btree (provider_identifier) WHERE (provider_identifier IS NOT NULL)
+IDX CREATE UNIQUE INDEX migrations_pkey ON public.migrations USING btree (id)
+IDX CREATE UNIQUE INDEX nodes_pkey ON public.nodes USING btree (id)
+IDX CREATE UNIQUE INDEX oauth_access_tokens_pkey ON public.oauth_access_tokens USING btree (id)
+IDX CREATE UNIQUE INDEX oauth_clients_pkey ON public.oauth_clients USING btree (id)
+IDX CREATE UNIQUE INDEX policies_pkey ON public.policies USING btree (id)
+IDX CREATE UNIQUE INDEX pre_auth_keys_pkey ON public.pre_auth_keys USING btree (id)
+IDX CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)
+CON api_keys api_keys_id_not_null NOT NULL id
+CON api_keys api_keys_pkey PRIMARY KEY (id)
+CON database_versions database_versions_id_not_null NOT NULL id
+CON database_versions database_versions_pkey PRIMARY KEY (id)
+CON database_versions database_versions_version_not_null NOT NULL version
+CON migrations migrations_id_not_null NOT NULL id
+CON migrations migrations_pkey PRIMARY KEY (id)
+CON nodes fk_nodes_auth_key FOREIGN KEY (auth_key_id) REFERENCES pre_auth_keys(id)
+CON nodes fk_nodes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+CON nodes nodes_id_not_null NOT NULL id
+CON nodes nodes_pkey PRIMARY KEY (id)
+CON oauth_access_tokens oauth_access_tokens_id_not_null NOT NULL id
+CON oauth_access_tokens oauth_access_tokens_pkey PRIMARY KEY (id)
+CON oauth_clients oauth_clients_id_not_null NOT NULL id
+CON oauth_clients oauth_clients_pkey PRIMARY KEY (id)
+CON policies policies_id_not_null NOT NULL id
+CON policies policies_pkey PRIMARY KEY (id)
+CON pre_auth_keys fk_pre_auth_keys_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+CON pre_auth_keys pre_auth_keys_id_not_null NOT NULL id
+CON pre_auth_keys pre_auth_keys_pkey PRIMARY KEY (id)
+CON users users_id_not_null NOT NULL id
+CON users users_pkey PRIMARY KEY (id)

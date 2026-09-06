@@ -3,6 +3,7 @@ package state
 import (
 	"errors"
 	"net/netip"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -12,7 +13,6 @@ import (
 	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
 )
@@ -527,17 +527,18 @@ func TestPreAuthKeyReauthRevertsNodeStoreOnDBFailure(t *testing.T) {
 
 	// Fail the node row update so the re-registration's database write errors
 	// after the NodeStore has already been mutated.
-	require.NoError(t, s.db.DB.Callback().Update().Before("gorm:update").
-		Register("fail_node_update", func(tx *gorm.DB) {
-			if tx.Statement.Table == "nodes" {
-				_ = tx.AddError(errInjectedNodeUpdate)
-			}
-		}))
+	s.db.SetQueryHook(func(query string) error {
+		if strings.HasPrefix(query, "UPDATE nodes") {
+			return errInjectedNodeUpdate
+		}
+
+		return nil
+	})
 
 	reReg := regReq
 	reReg.NodeKey = key.NewNode().Public() // rotate -> NodeStore mutation, then DB write fails
 	_, _, err = s.HandleNodeFromPreAuthKey(reReg, machineKey.Public())
-	require.NoError(t, s.db.DB.Callback().Update().Remove("fail_node_update"))
+	s.db.SetQueryHook(nil)
 	require.Error(t, err, "re-registration must fail when the database write fails")
 
 	got, ok := s.nodeStore.GetNode(node.ID())
