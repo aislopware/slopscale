@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/juanfont/headscale/hscontrol/mapper"
+	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -3159,8 +3160,9 @@ func createTestApp(t *testing.T) *Headscale {
 			Mode: types.PolicyModeDB,
 		},
 		Tuning: types.Tuning{
-			BatchChangeDelay: 100 * time.Millisecond,
-			BatcherWorkers:   1,
+			BatchChangeDelay:      100 * time.Millisecond,
+			BatcherWorkers:        1,
+			NodeStoreBatchTimeout: state.TestBatchTimeout,
 		},
 	}
 
