@@ -49,7 +49,7 @@ type ApiKey struct {
 	LastSeen   *time.Time `json:"lastSeen"`
 	Prefix     string     `json:"prefix"`
 
-	// UserId Owning user id; null for a legacy all-access key.
+	// UserId Owning user id; null for a legacy key.
 	UserId *string `json:"userId"`
 }
 
@@ -106,8 +106,11 @@ type CreatePreAuthKeyRequestBody struct {
 	AclTags    *[]string  `json:"aclTags,omitempty"`
 	Ephemeral  *bool      `json:"ephemeral,omitempty"`
 	Expiration *time.Time `json:"expiration,omitempty"`
-	Reusable   *bool      `json:"reusable,omitempty"`
-	User       *string    `json:"user,omitempty"`
+
+	// Preauthorized Defaults to true.
+	Preauthorized *bool   `json:"preauthorized,omitempty"`
+	Reusable      *bool   `json:"reusable,omitempty"`
+	User          *string `json:"user,omitempty"`
 }
 
 // CreateUserRequestBody defines model for CreateUserRequestBody.
@@ -231,6 +234,9 @@ type ListUsersOutputBody struct {
 
 // Node defines model for Node.
 type Node struct {
+	// Approved false while the node waits for an administrator.
+	Approved        bool               `json:"approved"`
+	ApprovedAt      *time.Time         `json:"approvedAt"`
 	ApprovedRoutes  []string           `json:"approvedRoutes"`
 	AvailableRoutes []string           `json:"availableRoutes"`
 	CreatedAt       time.Time          `json:"createdAt"`
@@ -261,15 +267,16 @@ type NodeOutputBody struct {
 
 // NodePreAuthKey defines model for NodePreAuthKey.
 type NodePreAuthKey struct {
-	AclTags    []string   `json:"aclTags"`
-	CreatedAt  *time.Time `json:"createdAt"`
-	Ephemeral  bool       `json:"ephemeral"`
-	Expiration *time.Time `json:"expiration"`
-	Id         string     `json:"id"`
-	Key        string     `json:"key"`
-	Reusable   bool       `json:"reusable"`
-	Used       bool       `json:"used"`
-	User       User       `json:"user"`
+	AclTags       []string   `json:"aclTags"`
+	CreatedAt     *time.Time `json:"createdAt"`
+	Ephemeral     bool       `json:"ephemeral"`
+	Expiration    *time.Time `json:"expiration"`
+	Id            string     `json:"id"`
+	Key           string     `json:"key"`
+	Preauthorized bool       `json:"preauthorized"`
+	Reusable      bool       `json:"reusable"`
+	Used          bool       `json:"used"`
+	User          User       `json:"user"`
 }
 
 // PolicyRequestBody defines model for PolicyRequestBody.
@@ -291,14 +298,23 @@ type PreAuthKey struct {
 	Expiration time.Time `json:"expiration"`
 	Id         string    `json:"id"`
 	Key        string    `json:"key"`
-	Reusable   bool      `json:"reusable"`
-	Used       bool      `json:"used"`
-	User       User      `json:"user"`
+
+	// Preauthorized Nodes registered with the key skip device approval.
+	Preauthorized bool `json:"preauthorized"`
+	Reusable      bool `json:"reusable"`
+	Used          bool `json:"used"`
+	User          User `json:"user"`
 }
 
 // PreAuthKeyOutputBody defines model for PreAuthKeyOutputBody.
 type PreAuthKeyOutputBody struct {
 	PreAuthKey PreAuthKey `json:"preAuthKey"`
+}
+
+// SetApprovalRequestBody defines model for SetApprovalRequestBody.
+type SetApprovalRequestBody struct {
+	// Approved false withdraws the approval.
+	Approved *bool `json:"approved,omitempty"`
 }
 
 // SetApprovedRoutesRequestBody defines model for SetApprovedRoutesRequestBody.
@@ -317,18 +333,36 @@ type SetUserRoleRequestBody struct {
 	Role string `json:"role"`
 }
 
+// Settings defines model for Settings.
+type Settings struct {
+	// DevicesApprovalOn New nodes wait for an administrator unless they register with a preauthorized key.
+	DevicesApprovalOn bool `json:"devicesApprovalOn"`
+
+	// UsersApprovalOn Users created by OIDC login wait for an administrator before registering nodes.
+	UsersApprovalOn bool `json:"usersApprovalOn"`
+}
+
+// UpdateSettingsRequestBody defines model for UpdateSettingsRequestBody.
+type UpdateSettingsRequestBody struct {
+	DevicesApprovalOn *bool `json:"devicesApprovalOn,omitempty"`
+	UsersApprovalOn   *bool `json:"usersApprovalOn,omitempty"`
+}
+
 // User defines model for User.
 type User struct {
-	CreatedAt     time.Time `json:"createdAt"`
-	DisplayName   string    `json:"displayName"`
-	Email         string    `json:"email"`
-	Id            string    `json:"id"`
-	Name          string    `json:"name"`
-	ProfilePicUrl string    `json:"profilePicUrl"`
-	Provider      string    `json:"provider"`
-	ProviderId    string    `json:"providerId"`
+	// Approved false while the user waits for an administrator.
+	Approved      bool       `json:"approved"`
+	ApprovedAt    *time.Time `json:"approvedAt"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	DisplayName   string     `json:"displayName"`
+	Email         string     `json:"email"`
+	Id            string     `json:"id"`
+	Name          string     `json:"name"`
+	ProfilePicUrl string     `json:"profilePicUrl"`
+	Provider      string     `json:"provider"`
+	ProviderId    string     `json:"providerId"`
 
-	// Role Admin role: owner, admin, network-admin, it-admin, auditor or member.
+	// Role owner, admin, network-admin, it-admin, auditor or member
 	Role string `json:"role"`
 }
 
@@ -400,6 +434,9 @@ type AuthRejectJSONRequestBody = AuthRejectRequestBody
 // DebugCreateNodeJSONRequestBody defines body for DebugCreateNode for application/json ContentType.
 type DebugCreateNodeJSONRequestBody = DebugCreateNodeRequestBody
 
+// ApproveNodeJSONRequestBody defines body for ApproveNode for application/json ContentType.
+type ApproveNodeJSONRequestBody = SetApprovalRequestBody
+
 // SetApprovedRoutesJSONRequestBody defines body for SetApprovedRoutes for application/json ContentType.
 type SetApprovedRoutesJSONRequestBody = SetApprovedRoutesRequestBody
 
@@ -421,8 +458,14 @@ type CreatePreAuthKeyJSONRequestBody = CreatePreAuthKeyRequestBody
 // ExpirePreAuthKeyJSONRequestBody defines body for ExpirePreAuthKey for application/json ContentType.
 type ExpirePreAuthKeyJSONRequestBody = ExpirePreAuthKeyRequestBody
 
+// UpdateSettingsJSONRequestBody defines body for UpdateSettings for application/json ContentType.
+type UpdateSettingsJSONRequestBody = UpdateSettingsRequestBody
+
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = CreateUserRequestBody
+
+// ApproveUserJSONRequestBody defines body for ApproveUser for application/json ContentType.
+type ApproveUserJSONRequestBody = SetApprovalRequestBody
 
 // SetUserRoleJSONRequestBody defines body for SetUserRole for application/json ContentType.
 type SetUserRoleJSONRequestBody = SetUserRoleRequestBody
@@ -657,6 +700,28 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/node/{nodeId} (the `GetNode` operationId).
 	GetNode(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ApproveNodeWithBody Approve node
+	//
+	// Admits a node that registered while device approval was on, or withdraws the approval again. A node waiting for approval stays registered but has no peers and is not visible to any.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/approve (the `ApproveNode` operationId).
+	ApproveNodeWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveNode Approve node
+	//
+	// Admits a node that registered while device approval was on, or withdraws the approval again. A node waiting for approval stays registered but has no peers and is not visible to any.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/approve (the `ApproveNode` operationId).
+	ApproveNode(ctx context.Context, nodeId string, body ApproveNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// SetApprovedRoutesWithBody Set approved routes
 	//
 	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -815,6 +880,35 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
 	ExpirePreAuthKey(ctx context.Context, body ExpirePreAuthKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetSettings Get settings
+	//
+	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/settings (the `GetSettings` operationId).
+	GetSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSettingsWithBody Update settings
+	//
+	// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/settings (the `UpdateSettings` operationId).
+	UpdateSettingsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSettings Update settings
+	//
+	// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/settings (the `UpdateSettings` operationId).
+	UpdateSettings(ctx context.Context, body UpdateSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListUsers List users
 	//
 	// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -846,6 +940,28 @@ type ClientInterface interface {
 	//
 	// Corresponds with DELETE /api/v1/user/{id} (the `DeleteUser` operationId).
 	DeleteUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveUserWithBody Approve user
+	//
+	// Admits a user created by OIDC login while users approval was on, or withdraws the approval again, which also withdraws every node the user owns.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/user/{id}/approve (the `ApproveUser` operationId).
+	ApproveUserWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveUser Approve user
+	//
+	// Admits a user created by OIDC login while users approval was on, or withdraws the approval again, which also withdraws every node the user owns.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/user/{id}/approve (the `ApproveUser` operationId).
+	ApproveUser(ctx context.Context, id string, body ApproveUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetUserRoleWithBody Set user role
 	//
@@ -1240,6 +1356,48 @@ func (c *Client) GetNode(ctx context.Context, nodeId string, reqEditors ...Reque
 	return c.Client.Do(req)
 }
 
+// ApproveNodeWithBody Approve node
+//
+// Admits a node that registered while device approval was on, or withdraws the approval again. A node waiting for approval stays registered but has no peers and is not visible to any.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/node/{nodeId}/approve (the `ApproveNode` operationId).
+func (c *Client) ApproveNodeWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveNodeRequestWithBody(c.Server, nodeId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveNode Approve node
+//
+// Admits a node that registered while device approval was on, or withdraws the approval again. A node waiting for approval stays registered but has no peers and is not visible to any.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/node/{nodeId}/approve (the `ApproveNode` operationId).
+func (c *Client) ApproveNode(ctx context.Context, nodeId string, body ApproveNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveNodeRequest(c.Server, nodeId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // SetApprovedRoutesWithBody Set approved routes
 //
 // Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -1578,6 +1736,65 @@ func (c *Client) ExpirePreAuthKey(ctx context.Context, body ExpirePreAuthKeyJSON
 	return c.Client.Do(req)
 }
 
+// GetSettings Get settings
+//
+// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/settings (the `GetSettings` operationId).
+func (c *Client) GetSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSettingsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSettingsWithBody Update settings
+//
+// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/settings (the `UpdateSettings` operationId).
+func (c *Client) UpdateSettingsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSettingsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSettings Update settings
+//
+// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/settings (the `UpdateSettings` operationId).
+func (c *Client) UpdateSettings(ctx context.Context, body UpdateSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSettingsRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListUsers List users
 //
 // Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -1640,6 +1857,48 @@ func (c *Client) CreateUser(ctx context.Context, body CreateUserJSONRequestBody,
 // Corresponds with DELETE /api/v1/user/{id} (the `DeleteUser` operationId).
 func (c *Client) DeleteUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteUserRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveUserWithBody Approve user
+//
+// Admits a user created by OIDC login while users approval was on, or withdraws the approval again, which also withdraws every node the user owns.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/user/{id}/approve (the `ApproveUser` operationId).
+func (c *Client) ApproveUserWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveUserRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveUser Approve user
+//
+// Admits a user created by OIDC login while users approval was on, or withdraws the approval again, which also withdraws every node the user owns.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/user/{id}/approve (the `ApproveUser` operationId).
+func (c *Client) ApproveUser(ctx context.Context, id string, body ApproveUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveUserRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2323,6 +2582,53 @@ func NewGetNodeRequest(server string, nodeId string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewApproveNodeRequest calls the generic ApproveNode builder with application/json body
+func NewApproveNodeRequest(server string, nodeId string, body ApproveNodeJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewApproveNodeRequestWithBody(server, nodeId, "application/json", bodyReader)
+}
+
+// NewApproveNodeRequestWithBody constructs an http.Request for the ApproveNode method, with any body, and a specified content type
+func NewApproveNodeRequestWithBody(server string, nodeId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/approve", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewSetApprovedRoutesRequest calls the generic SetApprovedRoutes builder with application/json body
 func NewSetApprovedRoutesRequest(server string, nodeId string, body SetApprovedRoutesJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -2773,6 +3079,73 @@ func NewExpirePreAuthKeyRequestWithBody(server string, contentType string, body 
 	return req, nil
 }
 
+// NewGetSettingsRequest constructs an http.Request for the GetSettings method
+func NewGetSettingsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateSettingsRequest calls the generic UpdateSettings builder with application/json body
+func NewUpdateSettingsRequest(server string, body UpdateSettingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateSettingsRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUpdateSettingsRequestWithBody constructs an http.Request for the UpdateSettings method, with any body, and a specified content type
+func NewUpdateSettingsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/settings")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListUsersRequest constructs an http.Request for the ListUsers method
 func NewListUsersRequest(server string, params *ListUsersParams) (*http.Request, error) {
 	var err error
@@ -2921,6 +3294,53 @@ func NewDeleteUserRequest(server string, id string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewApproveUserRequest calls the generic ApproveUser builder with application/json body
+func NewApproveUserRequest(server string, id string, body ApproveUserJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewApproveUserRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewApproveUserRequestWithBody constructs an http.Request for the ApproveUser method, with any body, and a specified content type
+func NewApproveUserRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/user/%s/approve", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -3256,6 +3676,28 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/node/{nodeId} (the `GetNode` operationId).
 	GetNodeWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodeResponse, error)
 
+	// ApproveNodeWithBodyWithResponse Approve node
+	//
+	// Admits a node that registered while device approval was on, or withdraws the approval again. A node waiting for approval stays registered but has no peers and is not visible to any.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/approve (the `ApproveNode` operationId).
+	ApproveNodeWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveNodeResponse, error)
+
+	// ApproveNodeWithResponse Approve node
+	//
+	// Admits a node that registered while device approval was on, or withdraws the approval again. A node waiting for approval stays registered but has no peers and is not visible to any.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/approve (the `ApproveNode` operationId).
+	ApproveNodeWithResponse(ctx context.Context, nodeId string, body ApproveNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveNodeResponse, error)
+
 	// SetApprovedRoutesWithBodyWithResponse Set approved routes
 	//
 	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -3422,6 +3864,37 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
 	ExpirePreAuthKeyWithResponse(ctx context.Context, body ExpirePreAuthKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*ExpirePreAuthKeyResponse, error)
 
+	// GetSettingsWithResponse Get settings
+	//
+	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/settings (the `GetSettings` operationId).
+	GetSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSettingsResponse, error)
+
+	// UpdateSettingsWithBodyWithResponse Update settings
+	//
+	// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/settings (the `UpdateSettings` operationId).
+	UpdateSettingsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSettingsResponse, error)
+
+	// UpdateSettingsWithResponse Update settings
+	//
+	// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/settings (the `UpdateSettings` operationId).
+	UpdateSettingsWithResponse(ctx context.Context, body UpdateSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSettingsResponse, error)
+
 	// ListUsersWithResponse List users
 	//
 	// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -3457,6 +3930,28 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with DELETE /api/v1/user/{id} (the `DeleteUser` operationId).
 	DeleteUserWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteUserResponse, error)
+
+	// ApproveUserWithBodyWithResponse Approve user
+	//
+	// Admits a user created by OIDC login while users approval was on, or withdraws the approval again, which also withdraws every node the user owns.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/user/{id}/approve (the `ApproveUser` operationId).
+	ApproveUserWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveUserResponse, error)
+
+	// ApproveUserWithResponse Approve user
+	//
+	// Admits a user created by OIDC login while users approval was on, or withdraws the approval again, which also withdraws every node the user owns.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/user/{id}/approve (the `ApproveUser` operationId).
+	ApproveUserWithResponse(ctx context.Context, id string, body ApproveUserJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveUserResponse, error)
 
 	// SetUserRoleWithBodyWithResponse Set user role
 	//
@@ -4171,6 +4666,54 @@ func (r GetNodeResponse) ContentType() string {
 	return ""
 }
 
+type ApproveNodeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodeOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ApproveNodeResponse) GetJSON200() *NodeOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ApproveNodeResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ApproveNodeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ApproveNodeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ApproveNodeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ApproveNodeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type SetApprovedRoutesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4699,6 +5242,102 @@ func (r ExpirePreAuthKeyResponse) ContentType() string {
 	return ""
 }
 
+type GetSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Settings
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSettingsResponse) GetJSON200() *Settings {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetSettingsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Settings
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateSettingsResponse) GetJSON200() *Settings {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateSettingsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4837,6 +5476,54 @@ func (r DeleteUserResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r DeleteUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ApproveUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UserOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ApproveUserResponse) GetJSON200() *UserOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ApproveUserResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ApproveUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ApproveUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ApproveUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ApproveUserResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -5279,6 +5966,40 @@ func (c *ClientWithResponses) GetNodeWithResponse(ctx context.Context, nodeId st
 	return ParseGetNodeResponse(rsp)
 }
 
+// ApproveNodeWithBodyWithResponse Approve node
+//
+// Admits a node that registered while device approval was on, or withdraws the approval again. A node waiting for approval stays registered but has no peers and is not visible to any.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/approve (the `ApproveNode` operationId).
+func (c *ClientWithResponses) ApproveNodeWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveNodeResponse, error) {
+	rsp, err := c.ApproveNodeWithBody(ctx, nodeId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveNodeResponse(rsp)
+}
+
+// ApproveNodeWithResponse Approve node
+//
+// Admits a node that registered while device approval was on, or withdraws the approval again. A node waiting for approval stays registered but has no peers and is not visible to any.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/approve (the `ApproveNode` operationId).
+func (c *ClientWithResponses) ApproveNodeWithResponse(ctx context.Context, nodeId string, body ApproveNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveNodeResponse, error) {
+	rsp, err := c.ApproveNode(ctx, nodeId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveNodeResponse(rsp)
+}
+
 // SetApprovedRoutesWithBodyWithResponse Set approved routes
 //
 // Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -5553,6 +6274,55 @@ func (c *ClientWithResponses) ExpirePreAuthKeyWithResponse(ctx context.Context, 
 	return ParseExpirePreAuthKeyResponse(rsp)
 }
 
+// GetSettingsWithResponse Get settings
+//
+// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/settings (the `GetSettings` operationId).
+func (c *ClientWithResponses) GetSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSettingsResponse, error) {
+	rsp, err := c.GetSettings(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSettingsResponse(rsp)
+}
+
+// UpdateSettingsWithBodyWithResponse Update settings
+//
+// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/settings (the `UpdateSettings` operationId).
+func (c *ClientWithResponses) UpdateSettingsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSettingsResponse, error) {
+	rsp, err := c.UpdateSettingsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSettingsResponse(rsp)
+}
+
+// UpdateSettingsWithResponse Update settings
+//
+// Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/settings (the `UpdateSettings` operationId).
+func (c *ClientWithResponses) UpdateSettingsWithResponse(ctx context.Context, body UpdateSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSettingsResponse, error) {
+	rsp, err := c.UpdateSettings(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSettingsResponse(rsp)
+}
+
 // ListUsersWithResponse List users
 //
 // Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -5611,6 +6381,40 @@ func (c *ClientWithResponses) DeleteUserWithResponse(ctx context.Context, id str
 		return nil, err
 	}
 	return ParseDeleteUserResponse(rsp)
+}
+
+// ApproveUserWithBodyWithResponse Approve user
+//
+// Admits a user created by OIDC login while users approval was on, or withdraws the approval again, which also withdraws every node the user owns.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/user/{id}/approve (the `ApproveUser` operationId).
+func (c *ClientWithResponses) ApproveUserWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveUserResponse, error) {
+	rsp, err := c.ApproveUserWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveUserResponse(rsp)
+}
+
+// ApproveUserWithResponse Approve user
+//
+// Admits a user created by OIDC login while users approval was on, or withdraws the approval again, which also withdraws every node the user owns.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/user/{id}/approve (the `ApproveUser` operationId).
+func (c *ClientWithResponses) ApproveUserWithResponse(ctx context.Context, id string, body ApproveUserJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveUserResponse, error) {
+	rsp, err := c.ApproveUser(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveUserResponse(rsp)
 }
 
 // SetUserRoleWithBodyWithResponse Set user role
@@ -6139,6 +6943,39 @@ func ParseGetNodeResponse(rsp *http.Response) (*GetNodeResponse, error) {
 	return response, nil
 }
 
+// ParseApproveNodeResponse parses an HTTP response from a ApproveNodeWithResponse call
+func ParseApproveNodeResponse(rsp *http.Response) (*ApproveNodeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ApproveNodeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodeOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseSetApprovedRoutesResponse parses an HTTP response from a SetApprovedRoutesWithResponse call
 func ParseSetApprovedRoutesResponse(rsp *http.Response) (*SetApprovedRoutesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -6502,6 +7339,72 @@ func ParseExpirePreAuthKeyResponse(rsp *http.Response) (*ExpirePreAuthKeyRespons
 	return response, nil
 }
 
+// ParseGetSettingsResponse parses an HTTP response from a GetSettingsWithResponse call
+func ParseGetSettingsResponse(rsp *http.Response) (*GetSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Settings
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateSettingsResponse parses an HTTP response from a UpdateSettingsWithResponse call
+func ParseUpdateSettingsResponse(rsp *http.Response) (*UpdateSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Settings
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListUsersResponse parses an HTTP response from a ListUsersWithResponse call
 func ParseListUsersResponse(rsp *http.Response) (*ListUsersResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -6584,6 +7487,39 @@ func ParseDeleteUserResponse(rsp *http.Response) (*DeleteUserResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest DeleteUserOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseApproveUserResponse parses an HTTP response from a ApproveUserWithResponse call
+func ParseApproveUserResponse(rsp *http.Response) (*ApproveUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ApproveUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UserOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

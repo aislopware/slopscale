@@ -205,6 +205,12 @@ type TailnetSettings struct {
 	UsersRoleAllowedToJoinExternalTailnets string `json:"usersRoleAllowedToJoinExternalTailnets"`
 }
 
+// UpdateTailnetSettings defines model for UpdateTailnetSettings.
+type UpdateTailnetSettings struct {
+	DevicesApprovalOn *bool `json:"devicesApprovalOn,omitempty"`
+	UsersApprovalOn   *bool `json:"usersApprovalOn,omitempty"`
+}
+
 // User defines model for User.
 type User struct {
 	Created            time.Time `json:"created"`
@@ -266,15 +272,12 @@ type ListKeysParams struct {
 	All *bool `form:"all,omitempty" json:"all,omitempty"`
 }
 
-// UpdateTailnetSettingsJSONBody defines parameters for UpdateTailnetSettings.
-type UpdateTailnetSettingsJSONBody = interface{}
-
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
 	// Type Filter by user type; Headscale users are all "member".
 	Type *string `form:"type,omitempty" json:"type,omitempty"`
 
-	// Role Filter by user role: owner, admin, network-admin, it-admin, auditor or member.
+	// Role Filter by role: owner, admin, network-admin, it-admin, auditor, member.
 	Role *string `form:"role,omitempty" json:"role,omitempty"`
 }
 
@@ -300,7 +303,7 @@ type SetACLJSONRequestBody = SetACLJSONBody
 type CreateKeyJSONRequestBody = CreateKeyRequest
 
 // UpdateTailnetSettingsJSONRequestBody defines body for UpdateTailnetSettings for application/json ContentType.
-type UpdateTailnetSettingsJSONRequestBody = UpdateTailnetSettingsJSONBody
+type UpdateTailnetSettingsJSONRequestBody = UpdateTailnetSettings
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -567,6 +570,8 @@ type ClientInterface interface {
 
 	// UpdateTailnetSettingsWithBody Update tailnet settings
 	//
+	// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
+	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
@@ -575,6 +580,8 @@ type ClientInterface interface {
 	UpdateTailnetSettingsWithBody(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateTailnetSettings Update tailnet settings
+	//
+	// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -596,6 +603,27 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v2/users/{id} (the `GetUser` operationId).
 	GetUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveUser Approve a user
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with POST /api/v2/users/{id}/approve (the `ApproveUser` operationId).
+	ApproveUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RestoreUser Restore a user
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with POST /api/v2/users/{id}/restore (the `RestoreUser` operationId).
+	RestoreUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SuspendUser Suspend a user
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with POST /api/v2/users/{id}/suspend (the `SuspendUser` operationId).
+	SuspendUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // DeleteDevice Delete a device
@@ -1019,6 +1047,8 @@ func (c *Client) GetTailnetSettings(ctx context.Context, tailnet string, reqEdit
 
 // UpdateTailnetSettingsWithBody Update tailnet settings
 //
+// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
+//
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
@@ -1037,6 +1067,8 @@ func (c *Client) UpdateTailnetSettingsWithBody(ctx context.Context, tailnet stri
 }
 
 // UpdateTailnetSettings Update tailnet settings
+//
+// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -1079,6 +1111,57 @@ func (c *Client) ListUsers(ctx context.Context, tailnet string, params *ListUser
 // Corresponds with GET /api/v2/users/{id} (the `GetUser` operationId).
 func (c *Client) GetUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetUserRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveUser Approve a user
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with POST /api/v2/users/{id}/approve (the `ApproveUser` operationId).
+func (c *Client) ApproveUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveUserRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RestoreUser Restore a user
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with POST /api/v2/users/{id}/restore (the `RestoreUser` operationId).
+func (c *Client) RestoreUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRestoreUserRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SuspendUser Suspend a user
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with POST /api/v2/users/{id}/suspend (the `SuspendUser` operationId).
+func (c *Client) SuspendUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSuspendUserRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -2095,6 +2178,108 @@ func NewGetUserRequest(server string, id string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewApproveUserRequest constructs an http.Request for the ApproveUser method
+func NewApproveUserRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/users/%s/approve", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRestoreUserRequest constructs an http.Request for the RestoreUser method
+func NewRestoreUserRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/users/%s/restore", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSuspendUserRequest constructs an http.Request for the SuspendUser method
+func NewSuspendUserRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/users/%s/suspend", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -2348,6 +2533,8 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateTailnetSettingsWithBodyWithResponse Update tailnet settings
 	//
+	// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
+	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -2356,6 +2543,8 @@ type ClientWithResponsesInterface interface {
 	UpdateTailnetSettingsWithBodyWithResponse(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTailnetSettingsResponse, error)
 
 	// UpdateTailnetSettingsWithResponse Update tailnet settings
+	//
+	// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -2381,6 +2570,33 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v2/users/{id} (the `GetUser` operationId).
 	GetUserWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetUserResponse, error)
+
+	// ApproveUserWithResponse Approve a user
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/users/{id}/approve (the `ApproveUser` operationId).
+	ApproveUserWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*ApproveUserResponse, error)
+
+	// RestoreUserWithResponse Restore a user
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/users/{id}/restore (the `RestoreUser` operationId).
+	RestoreUserWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*RestoreUserResponse, error)
+
+	// SuspendUserWithResponse Suspend a user
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/users/{id}/suspend (the `SuspendUser` operationId).
+	SuspendUserWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*SuspendUserResponse, error)
 }
 
 type DeleteDeviceResponse struct {
@@ -3646,6 +3862,8 @@ type UpdateTailnetSettingsResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *TailnetSettings
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *ErrorModel
 	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
 	ApplicationproblemJSON401 *ErrorModel
 	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
@@ -3656,13 +3874,16 @@ type UpdateTailnetSettingsResponse struct {
 	ApplicationproblemJSON422 *ErrorModel
 	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
 	ApplicationproblemJSON500 *ErrorModel
-	// ApplicationproblemJSON501 the response for an HTTP 501 `application/problem+json` response
-	ApplicationproblemJSON501 *ErrorModel
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r UpdateTailnetSettingsResponse) GetJSON200() *TailnetSettings {
 	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdateTailnetSettingsResponse) GetApplicationproblemJSON400() *ErrorModel {
+	return r.ApplicationproblemJSON400
 }
 
 // GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
@@ -3688,11 +3909,6 @@ func (r UpdateTailnetSettingsResponse) GetApplicationproblemJSON422() *ErrorMode
 // GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
 func (r UpdateTailnetSettingsResponse) GetApplicationproblemJSON500() *ErrorModel {
 	return r.ApplicationproblemJSON500
-}
-
-// GetApplicationproblemJSON501 returns the response for an HTTP 501 `application/problem+json` response
-func (r UpdateTailnetSettingsResponse) GetApplicationproblemJSON501() *ErrorModel {
-	return r.ApplicationproblemJSON501
 }
 
 // GetBody returns the raw response body bytes
@@ -3870,6 +4086,234 @@ func (r GetUserResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ApproveUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmptyOutputBody
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ApproveUserResponse) GetJSON200() *EmptyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ApproveUserResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ApproveUserResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ApproveUserResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ApproveUserResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r ApproveUserResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ApproveUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ApproveUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ApproveUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ApproveUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RestoreUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmptyOutputBody
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RestoreUserResponse) GetJSON200() *EmptyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r RestoreUserResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r RestoreUserResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RestoreUserResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r RestoreUserResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r RestoreUserResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r RestoreUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RestoreUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RestoreUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RestoreUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SuspendUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmptyOutputBody
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SuspendUserResponse) GetJSON200() *EmptyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SuspendUserResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SuspendUserResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SuspendUserResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r SuspendUserResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r SuspendUserResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r SuspendUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SuspendUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SuspendUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SuspendUserResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -4223,6 +4667,8 @@ func (c *ClientWithResponses) GetTailnetSettingsWithResponse(ctx context.Context
 
 // UpdateTailnetSettingsWithBodyWithResponse Update tailnet settings
 //
+// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
+//
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -4237,6 +4683,8 @@ func (c *ClientWithResponses) UpdateTailnetSettingsWithBodyWithResponse(ctx cont
 }
 
 // UpdateTailnetSettingsWithResponse Update tailnet settings
+//
+// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -4279,6 +4727,51 @@ func (c *ClientWithResponses) GetUserWithResponse(ctx context.Context, id string
 		return nil, err
 	}
 	return ParseGetUserResponse(rsp)
+}
+
+// ApproveUserWithResponse Approve a user
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/users/{id}/approve (the `ApproveUser` operationId).
+func (c *ClientWithResponses) ApproveUserWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*ApproveUserResponse, error) {
+	rsp, err := c.ApproveUser(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveUserResponse(rsp)
+}
+
+// RestoreUserWithResponse Restore a user
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/users/{id}/restore (the `RestoreUser` operationId).
+func (c *ClientWithResponses) RestoreUserWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*RestoreUserResponse, error) {
+	rsp, err := c.RestoreUser(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRestoreUserResponse(rsp)
+}
+
+// SuspendUserWithResponse Suspend a user
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/users/{id}/suspend (the `SuspendUser` operationId).
+func (c *ClientWithResponses) SuspendUserWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*SuspendUserResponse, error) {
+	rsp, err := c.SuspendUser(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSuspendUserResponse(rsp)
 }
 
 // ParseDeleteDeviceResponse parses an HTTP response from a DeleteDeviceWithResponse call
@@ -5326,6 +5819,13 @@ func ParseUpdateTailnetSettingsResponse(rsp *http.Response) (*UpdateTailnetSetti
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorModel
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -5360,13 +5860,6 @@ func ParseUpdateTailnetSettingsResponse(rsp *http.Response) (*UpdateTailnetSetti
 			return nil, err
 		}
 		response.ApplicationproblemJSON500 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest ErrorModel
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON501 = &dest
 
 	}
 
@@ -5450,6 +5943,189 @@ func ParseGetUserResponse(rsp *http.Response) (*GetUserResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest User
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseApproveUserResponse parses an HTTP response from a ApproveUserWithResponse call
+func ParseApproveUserResponse(rsp *http.Response) (*ApproveUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ApproveUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmptyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRestoreUserResponse parses an HTTP response from a RestoreUserWithResponse call
+func ParseRestoreUserResponse(rsp *http.Response) (*RestoreUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RestoreUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmptyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSuspendUserResponse parses an HTTP response from a SuspendUserWithResponse call
+func ParseSuspendUserResponse(rsp *http.Response) (*SuspendUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SuspendUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmptyOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
