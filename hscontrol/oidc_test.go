@@ -13,6 +13,8 @@ import (
 )
 
 func TestDoOIDCAuthorization(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name    string
 		cfg     *types.OIDCConfig
@@ -170,6 +172,8 @@ func TestDoOIDCAuthorization(t *testing.T) {
 
 	for _, tC := range testCases {
 		t.Run(tC.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := doOIDCAuthorization(tC.cfg, tC.claims)
 			if ((err != nil) && !tC.wantErr) || ((err == nil) && tC.wantErr) {
 				t.Errorf("bad authorization: %s > want=%v | got=%v", tC.name, tC.wantErr, err)
@@ -185,6 +189,8 @@ func TestDoOIDCAuthorization(t *testing.T) {
 // previously set no SameSite (despite a comment claiming it did), leaving
 // browsers that do not default to Lax sending it on cross-site requests.
 func TestSetCSRFCookieSameSite(t *testing.T) {
+	t.Parallel()
+
 	w := httptest.NewRecorder()
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/auth/abcdef0123456789", nil)
 
@@ -200,6 +206,8 @@ func TestSetCSRFCookieSameSite(t *testing.T) {
 // checks: both params required, and a too-short state is rejected before
 // getCookieName can slice out of range.
 func TestExtractCodeAndStateParam(t *testing.T) {
+	t.Parallel()
+
 	_, _, err := extractCodeAndStateParamFromRequest(
 		httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/oidc/callback", nil))
 	require.Error(t, err)
@@ -218,6 +226,8 @@ func TestExtractCodeAndStateParam(t *testing.T) {
 // TestGetAuthInfoFromStateSingleUse asserts a consumed OIDC state cannot be
 // resolved twice, so a replayed callback cannot re-bind the same session.
 func TestGetAuthInfoFromStateSingleUse(t *testing.T) {
+	t.Parallel()
+
 	a := &AuthProviderOIDC{
 		authCache: expirable.NewLRU[string, AuthInfo](16, nil, time.Minute),
 	}
@@ -233,6 +243,8 @@ func TestGetAuthInfoFromStateSingleUse(t *testing.T) {
 // TestClearOIDCCallbackCookie asserts the cookie is expired (negative MaxAge) on
 // the same path it was set with, so the browser drops it.
 func TestClearOIDCCallbackCookie(t *testing.T) {
+	t.Parallel()
+
 	w := httptest.NewRecorder()
 	clearOIDCCallbackCookie(w, "state_abcdef")
 
@@ -247,6 +259,8 @@ func TestClearOIDCCallbackCookie(t *testing.T) {
 // cookies stay Secure behind a TLS-terminating reverse proxy where req.TLS is
 // nil.
 func TestSetCSRFCookieSecure(t *testing.T) {
+	t.Parallel()
+
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/auth/abcdef0123456789", nil)
 
 	secureRec := httptest.NewRecorder()

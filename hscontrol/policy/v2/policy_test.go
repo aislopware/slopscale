@@ -26,6 +26,8 @@ func node(name, ipv4, ipv6 string, user types.User) *types.Node {
 }
 
 func TestPolicyManager(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "testuser", Email: "testuser@headscale.net"},
 		{ID: 2, Name: "otheruser", Email: "otheruser@headscale.net"},
@@ -63,6 +65,8 @@ func TestPolicyManager(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pm, err := NewPolicyManager([]byte(tt.pol), users, tt.nodes.ViewSlice())
 			require.NoError(t, err)
 
@@ -85,6 +89,8 @@ func TestPolicyManager(t *testing.T) {
 }
 
 func TestInvalidateAutogroupSelfCache(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
 		{ID: 2, Name: "user2", Email: "user2@headscale.net"},
@@ -190,6 +196,8 @@ func TestInvalidateAutogroupSelfCache(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			for i, n := range tt.newNodes {
 				found := false
 
@@ -235,6 +243,8 @@ func TestInvalidateAutogroupSelfCache(t *testing.T) {
 // association, so the autogroup:self cache invalidation must derive the
 // owning user from UserID, not from the User view.
 func TestSetNodesAutogroupSelfUnhydratedUser(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
 		{ID: 2, Name: "user2", Email: "user2@headscale.net"},
@@ -303,6 +313,8 @@ func TestSetNodesAutogroupSelfUnhydratedUser(t *testing.T) {
 // and crashes the server (DoS) whenever an SSH check rule with an
 // autogroup:self destination is active.
 func TestSSHCheckParamsUnhydratedUserNoPanic(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
 	}
@@ -357,6 +369,8 @@ func TestSSHCheckParamsUnhydratedUserNoPanic(t *testing.T) {
 
 // TestInvalidateGlobalPolicyCache tests the cache invalidation logic for global policies.
 func TestInvalidateGlobalPolicyCache(t *testing.T) {
+	t.Parallel()
+
 	mustIPPtr := func(s string) *netip.Addr {
 		ip := netip.MustParseAddr(s)
 		return &ip
@@ -498,6 +512,8 @@ func TestInvalidateGlobalPolicyCache(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pm := &PolicyManager{
 				nodes:              tt.oldNodes.ViewSlice(),
 				filterRulesMap:     xsync.NewMap[types.NodeID, []tailcfg.FilterRule](),
@@ -522,6 +538,8 @@ func TestInvalidateGlobalPolicyCache(t *testing.T) {
 // 1. BuildPeerMap uses unreduced compiled rules for determining peer relationships
 // 2. FilterForNode returns reduced compiled rules for packet filters.
 func TestAutogroupSelfReducedVsUnreducedRules(t *testing.T) {
+	t.Parallel()
+
 	user1 := types.User{ID: 1, Name: "user1", Email: "user1@headscale.net"}
 	user2 := types.User{ID: 2, Name: "user2", Email: "user2@headscale.net"}
 	users := types.Users{user1, user2}
@@ -598,6 +616,8 @@ func TestAutogroupSelfReducedVsUnreducedRules(t *testing.T) {
 // the autogroup:self rule should not prevent the tag:router rule from working.
 // This ensures that autogroup:self doesn't interfere with other ACL rules.
 func TestAutogroupSelfWithOtherRules(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "test-1", Email: "test-1@example.com"},
 		{ID: 2, Name: "test-2", Email: "test-2@example.com"},
@@ -679,6 +699,8 @@ func TestAutogroupSelfWithOtherRules(t *testing.T) {
 // This fixes the issue where policy updates would clear caches but not trigger updates,
 // leaving nodes with stale filter rules until reconnect.
 func TestAutogroupSelfPolicyUpdateTriggersMapResponse(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "test-1", Email: "test-1@example.com"},
 		{ID: 2, Name: "test-2", Email: "test-2@example.com"},
@@ -763,6 +785,8 @@ func TestAutogroupSelfPolicyUpdateTriggersMapResponse(t *testing.T) {
 // the peer map is correctly updated. This is a regression test for
 // https://github.com/juanfont/headscale/issues/2389
 func TestTagPropagationToPeerMap(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
 		{ID: 2, Name: "user2", Email: "user2@headscale.net"},
@@ -891,6 +915,8 @@ func TestTagPropagationToPeerMap(t *testing.T) {
 // The fix requires symmetric visibility: if admin can access tagged node,
 // BOTH admin and tagged node should see each other as peers.
 func TestAutogroupSelfWithAdminOverride(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "admin", Email: "admin@example.com"},
 		{ID: 2, Name: "user1", Email: "user1@example.com"},
@@ -974,6 +1000,8 @@ func TestAutogroupSelfWithAdminOverride(t *testing.T) {
 // if node A can access node B, then both A and B should see each other as peers.
 // This is the same behavior as the global filter path.
 func TestAutogroupSelfSymmetricVisibility(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1", Email: "user1@example.com"},
 		{ID: 2, Name: "user2", Email: "user2@example.com"},
@@ -1057,6 +1085,8 @@ func TestAutogroupSelfSymmetricVisibility(t *testing.T) {
 // - Direction sees: tag:common
 // - All tagged nodes should be visible to users who can access them.
 func TestAutogroupSelfDoesNotBreakOtherUsersAccess(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "superadmin", Email: "superadmin@example.com"},
 		{ID: 2, Name: "admin", Email: "admin@example.com"},
@@ -1227,6 +1257,8 @@ func TestAutogroupSelfDoesNotBreakOtherUsersAccess(t *testing.T) {
 // (e.g., tagged servers that are only destinations, never sources) are still
 // visible to nodes that can access them.
 func TestEmptyFilterNodesStillVisible(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "admin", Email: "admin@example.com"},
 		{ID: 2, Name: "tagowner", Email: "tagowner@example.com"},
@@ -1295,6 +1327,8 @@ func TestEmptyFilterNodesStillVisible(t *testing.T) {
 // specific tags in the same rule provides "combined access" - users get both
 // tagged nodes AND their own devices.
 func TestAutogroupSelfCombinedWithTags(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "admin", Email: "admin@example.com"},
 		{ID: 2, Name: "tagowner", Email: "tagowner@example.com"},
@@ -1391,6 +1425,8 @@ func TestAutogroupSelfCombinedWithTags(t *testing.T) {
 //
 // Expected: node1 should be able to reach node2 via group:admin -> *:* rule.
 func TestIssue2990SameUserTaggedDevice(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1", Email: "user1@"},
 	}
@@ -2139,6 +2175,8 @@ func TestBuildPeerMap_AutogroupInternetMakesExitNodeVisible(t *testing.T) {
 
 // Reproduction for #3160: ambiguous user@ used to silently drop rules.
 func TestNewPolicyManager_DuplicateUsername(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 2, Name: "yala"},
 		{ID: 7, Name: "yala", Email: "yala@yala.yala"},
@@ -2162,6 +2200,8 @@ func TestNewPolicyManager_DuplicateUsername(t *testing.T) {
 
 // Missing-user tokens stay tolerant per #2863; only multi-match blocks load.
 func TestNewPolicyManager_UnknownUsernameTolerant(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "alice"},
 	}
@@ -2176,6 +2216,8 @@ func TestNewPolicyManager_UnknownUsernameTolerant(t *testing.T) {
 
 // Rejected SetPolicy must keep the previous policy intact.
 func TestSetPolicy_DuplicateUsername(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 2, Name: "yala"},
 		{ID: 7, Name: "yala", Email: "yala@yala.yala"},
@@ -2203,6 +2245,8 @@ func TestSetPolicy_DuplicateUsername(t *testing.T) {
 
 // Empty users → syntax-only check, used by `headscale policy check`.
 func TestValidateUserReferences_EmptyUsersTolerant(t *testing.T) {
+	t.Parallel()
+
 	polB := []byte(`{
   "groups":    {"group:admins": ["yala@"]},
   "tagOwners": {"tag:ssh": ["group:admins"]},
@@ -2221,6 +2265,8 @@ func TestValidateUserReferences_EmptyUsersTolerant(t *testing.T) {
 
 // One case per AST site so a dropped walk fails the matching subtest.
 func TestValidateUserReferences_AllSites(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "alice"},
 		{ID: 2, Name: "dup"},
@@ -2291,6 +2337,8 @@ func TestValidateUserReferences_AllSites(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			_, err := NewPolicyManager([]byte(tt.pol), users, types.Nodes{}.ViewSlice())
 			require.Error(t, err, "site %q must surface duplicate-user errors", tt.name)
 			require.ErrorIs(t, err, ErrMultipleUsersFound)
@@ -2315,6 +2363,8 @@ func TestValidateUserReferences_AllSites(t *testing.T) {
 // visibility between sources and the relay node without any companion
 // IP-level grant.
 func TestPeerRelayGrantMakesRelayVisible(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "alice", Email: "alice@headscale.net"},
 		{ID: 2, Name: "tagowner", Email: "tagowner@headscale.net"},
@@ -2457,6 +2507,8 @@ func TestPeerRelayGrantMakesRelayVisible(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pm, err := NewPolicyManager(
 				[]byte(tt.policy), users, tt.nodes.ViewSlice(),
 			)
@@ -2477,6 +2529,8 @@ func TestPeerRelayGrantMakesRelayVisible(t *testing.T) {
 }
 
 func TestTagOwnedByTags(t *testing.T) {
+	t.Parallel()
+
 	// tag:leaf is owned by tag:mid, which is owned by tag:root: a tag-to-tag
 	// delegation chain, the shape an operator token uses to mint narrower keys.
 	const policy = `{
@@ -2538,11 +2592,15 @@ func TestTagOwnedByTags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			require.Equal(t, tt.want, pm.TagOwnedByTags(tt.tag, tt.ownerTags))
 		})
 	}
 
 	t.Run("nil policy manager denies", func(t *testing.T) {
+		t.Parallel()
+
 		var nilPM *PolicyManager
 		require.False(t, nilPM.TagOwnedByTags("tag:leaf", []string{"tag:root"}))
 	})

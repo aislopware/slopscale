@@ -10,6 +10,8 @@ import (
 
 // TestSplitDestinationAndPort tests the splitDestinationAndPort function using table-driven tests.
 func TestSplitDestinationAndPort(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		input       string
 		wantDst     string
@@ -122,6 +124,8 @@ func TestSplitDestinationAndPort(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.input, func(t *testing.T) {
+			t.Parallel()
+
 			dst, port, err := splitDestinationAndPort(tc.input)
 
 			if tc.wantNoError {
@@ -152,6 +156,8 @@ func TestSplitDestinationAndPort(t *testing.T) {
 }
 
 func TestParsePort(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    string
 		expected uint16
@@ -183,6 +189,8 @@ func TestParsePort(t *testing.T) {
 }
 
 func TestParsePortRange(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input    string
 		expected []tailcfg.PortRange

@@ -15,6 +15,8 @@ import (
 // persistNodeToDB). The node state is unchanged, so persisting is pure waste on
 // the hot map-request path.
 func TestNoOpMapRequestSkipsPersist(t *testing.T) {
+	t.Parallel()
+
 	_, s, nodeID := persistTestSetup(t)
 	t.Cleanup(func() { _ = s.Close() })
 

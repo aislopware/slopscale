@@ -17,6 +17,8 @@ import (
 // because the in-flight initial map may have been generated from a snapshot
 // older than the change.
 func TestUnreadyConnectionDefersBroadcastsUntilInitialMap(t *testing.T) {
+	t.Parallel()
+
 	testData, cleanup := setupBatcherWithTestData(t, NewBatcherAndMapper, 1, 2, normalBufferSize)
 	defer cleanup()
 
@@ -77,6 +79,8 @@ func TestUnreadyConnectionDefersBroadcastsUntilInitialMap(t *testing.T) {
 // lastSentPeers must stay empty; otherwise future computePeerDiff calculations
 // miss peer additions or removals after reconnect.
 func TestSyncInitialMapNoPhantomPeersOnTimeout(t *testing.T) {
+	t.Parallel()
+
 	testData, cleanup := setupBatcherWithTestData(t, NewBatcherAndMapper, 1, 2, normalBufferSize)
 	defer cleanup()
 

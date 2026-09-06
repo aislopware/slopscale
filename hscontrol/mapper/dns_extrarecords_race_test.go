@@ -13,6 +13,8 @@ import (
 // builds (generateDNSConfig -> Config.CloneTailcfgDNSConfig). Both must go
 // through the shared lock so the run is race-free under -race.
 func TestExtraRecordsConcurrentUpdateNoRace(t *testing.T) {
+	t.Parallel()
+
 	uid := uint(1)
 	cfg := &types.Config{
 		TailcfgDNSConfig: &tailcfg.DNSConfig{

@@ -15,6 +15,8 @@ import (
 // oldest entry, and that the eviction callback resolves the parked
 // AuthRequest with ErrRegistrationExpired so any waiting goroutine wakes.
 func TestAuthCacheBoundedLRU(t *testing.T) {
+	t.Parallel()
+
 	const maxEntries = 4
 
 	cache := expirable.NewLRU[types.AuthID, *types.AuthRequest](

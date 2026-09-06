@@ -12,6 +12,8 @@ import (
 )
 
 func TestPingTracker_RegisterComplete(t *testing.T) {
+	t.Parallel()
+
 	pt := newPingTracker()
 
 	pingID, ch := pt.register(types.NodeID(1))
@@ -32,11 +34,15 @@ func TestPingTracker_RegisterComplete(t *testing.T) {
 }
 
 func TestPingTracker_CompleteUnknown(t *testing.T) {
+	t.Parallel()
+
 	pt := newPingTracker()
 	assert.False(t, pt.complete("nonexistent"))
 }
 
 func TestPingTracker_CancelThenComplete(t *testing.T) {
+	t.Parallel()
+
 	pt := newPingTracker()
 
 	pingID, ch := pt.register(types.NodeID(1))
@@ -53,6 +59,8 @@ func TestPingTracker_CancelThenComplete(t *testing.T) {
 }
 
 func TestPingTracker_DoubleComplete(t *testing.T) {
+	t.Parallel()
+
 	pt := newPingTracker()
 
 	pingID, ch := pt.register(types.NodeID(1))
@@ -66,6 +74,8 @@ func TestPingTracker_DoubleComplete(t *testing.T) {
 }
 
 func TestPingTracker_ConcurrentDifferentIDs(t *testing.T) {
+	t.Parallel()
+
 	pt := newPingTracker()
 
 	const count = 10
@@ -100,6 +110,8 @@ func TestPingTracker_ConcurrentDifferentIDs(t *testing.T) {
 }
 
 func TestPingTracker_TwoToSameNode(t *testing.T) {
+	t.Parallel()
+
 	pt := newPingTracker()
 	nodeID := types.NodeID(42)
 
@@ -138,6 +150,8 @@ func TestPingTracker_TwoToSameNode(t *testing.T) {
 }
 
 func TestPingTracker_Drain(t *testing.T) {
+	t.Parallel()
+
 	pt := newPingTracker()
 
 	_, ch1 := pt.register(types.NodeID(1))
@@ -159,6 +173,8 @@ func TestPingTracker_Drain(t *testing.T) {
 }
 
 func TestPingTracker_LatencyNonNegative(t *testing.T) {
+	t.Parallel()
+
 	pt := newPingTracker()
 
 	pingID, ch := pt.register(types.NodeID(1))

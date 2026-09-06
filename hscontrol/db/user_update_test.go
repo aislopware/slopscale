@@ -14,6 +14,8 @@ import (
 // preserves fields that aren't modified. This test validates the fix
 // for using Updates() instead of Save() in UpdateUser-like operations.
 func TestUserUpdatePreservesUnchangedFields(t *testing.T) {
+	t.Parallel()
+
 	database := dbForTest(t)
 
 	// Create a user with all fields set
@@ -80,6 +82,8 @@ func TestUserUpdatePreservesUnchangedFields(t *testing.T) {
 // TestUserUpdateWithUpdatesMethod tests that using Updates() instead of Save()
 // works correctly and only updates modified fields.
 func TestUserUpdateWithUpdatesMethod(t *testing.T) {
+	t.Parallel()
+
 	database := dbForTest(t)
 
 	// Create a user

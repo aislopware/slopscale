@@ -9,6 +9,8 @@ import (
 )
 
 func TestGivenNameMapsToValidFQDNCheck(t *testing.T) {
+	t.Parallel()
+
 	cfg := &types.Config{BaseDomain: "example.com"}
 
 	_, _, ok := givenNameMapsToValidFQDN.check((&types.Node{ID: 1, GivenName: "valid"}).View(), cfg)
@@ -25,6 +27,8 @@ func TestGivenNameMapsToValidFQDNCheck(t *testing.T) {
 // with an actionable fix, and that it never rewrites the stored name — the
 // maintainer's decision is log-only, no silent mutation.
 func TestScanNodeHealthReportsInvalidNameWithoutMutating(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 

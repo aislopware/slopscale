@@ -17,6 +17,8 @@ import (
 // node's NodeKey onto a victim's NodeKey: doing so poisons the NodeStore
 // NodeKey index and denies the victim service.
 func TestPreAuthKeyReauthRejectsVictimNodeKey(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 

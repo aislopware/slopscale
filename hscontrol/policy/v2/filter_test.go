@@ -28,6 +28,8 @@ func aliasWithPorts(alias Alias, ports ...tailcfg.PortRange) AliasWithPorts {
 }
 
 func TestParsing(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "testuser"},
 	}
@@ -353,6 +355,8 @@ func TestParsing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pol, err := unmarshalPolicy([]byte(tt.acl))
 			if tt.wantErr && err == nil {
 				t.Errorf("parsing() error = %v, wantErr %v", err, tt.wantErr)
@@ -389,6 +393,8 @@ func TestParsing(t *testing.T) {
 }
 
 func TestCompileSSHPolicy_UserMapping(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{Name: "user1", ID: 1},
 		{Name: "user2", ID: 2},
@@ -624,6 +630,8 @@ func TestCompileSSHPolicy_UserMapping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			require.NoError(t, tt.policy.validate())
 
 			got, err := tt.policy.compileSSHPolicy("unused-server-url", users, tt.targetNode.View(), nodes.ViewSlice())
@@ -637,6 +645,8 @@ func TestCompileSSHPolicy_UserMapping(t *testing.T) {
 }
 
 func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{Name: "alice", Email: "alice@example.com", ID: 1},
 		{Name: "bob", Email: "bob@example.com", ID: 2},
@@ -979,6 +989,8 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			testUsers := users
 			if tt.users != nil {
 				testUsers = tt.users
@@ -1004,6 +1016,8 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 }
 
 func TestCompileSSHPolicy_CheckAction(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{Name: "user1", ID: 1},
 		{Name: "user2", ID: 2},
@@ -1076,6 +1090,8 @@ func TestCompileSSHPolicy_CheckAction(t *testing.T) {
 // (HoldAndDelegate) rules are sorted before accept rules, even when
 // the accept rule appears first in the policy definition.
 func TestCompileSSHPolicy_CheckBeforeAcceptOrdering(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{Name: "user1", ID: 1},
 		{Name: "user2", ID: 2},
@@ -1151,6 +1167,8 @@ func TestCompileSSHPolicy_CheckBeforeAcceptOrdering(t *testing.T) {
 // TestSSHIntegrationReproduction reproduces the exact scenario from the integration test
 // TestSSHOneUserToAll that was failing with empty sshUsers.
 func TestSSHIntegrationReproduction(t *testing.T) {
+	t.Parallel()
+
 	// Create users matching the integration test
 	users := types.Users{
 		{Name: "user1", ID: 1},
@@ -1217,6 +1235,8 @@ func TestSSHIntegrationReproduction(t *testing.T) {
 // TestSSHJSONSerialization verifies that the SSH policy can be properly serialized
 // to JSON and that the sshUsers field is not empty.
 func TestSSHJSONSerialization(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{Name: "user1", ID: 1},
 	}
@@ -1277,6 +1297,8 @@ func TestSSHJSONSerialization(t *testing.T) {
 }
 
 func TestCompileFilterRulesForNodeWithAutogroupSelf(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -1438,6 +1460,8 @@ func TestCompileFilterRulesForNodeWithAutogroupSelf(t *testing.T) {
 // rules, user-owned nodes and tagged nodes are isolated from each other.
 // It also verifies that tag-to-tag rules work correctly.
 func TestTagUserMutualExclusivity(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -1540,6 +1564,8 @@ func TestTagUserMutualExclusivity(t *testing.T) {
 // model separates identity classes, but explicit ACL grants across classes
 // are valid and should produce filter rules.
 func TestUserToTagCrossIdentityGrant(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -1750,6 +1776,8 @@ func TestAutogroupTagged(t *testing.T) {
 }
 
 func TestAutogroupSelfInSourceIsRejected(t *testing.T) {
+	t.Parallel()
+
 	// Test that autogroup:self cannot be used in sources (per Tailscale spec)
 	policy := &Policy{
 		ACLs: []ACL{
@@ -1777,6 +1805,8 @@ func TestAutogroupSelfInSourceIsRejected(t *testing.T) {
 // the destination and a specific user is in the source, only that user's devices
 // are allowed (and only if they match the target user).
 func TestAutogroupSelfWithSpecificUserSource(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -1844,6 +1874,8 @@ func TestAutogroupSelfWithSpecificUserSource(t *testing.T) {
 // and autogroup:self as destination, only group members who are the same user
 // as the target are allowed.
 func TestAutogroupSelfWithGroupSource(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -1913,6 +1945,8 @@ func createAddr(ip string) *netip.Addr {
 // TestSSHWithAutogroupSelfInDestination verifies that SSH policies work correctly
 // with autogroup:self in destinations.
 func TestSSHWithAutogroupSelfInDestination(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -1995,6 +2029,8 @@ func TestSSHWithAutogroupSelfInDestination(t *testing.T) {
 // is in the source and autogroup:self in destination, only that user's devices
 // can SSH (and only if they match the target user).
 func TestSSHWithAutogroupSelfAndSpecificUser(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -2050,6 +2086,8 @@ func TestSSHWithAutogroupSelfAndSpecificUser(t *testing.T) {
 
 // TestSSHWithAutogroupSelfAndGroup verifies SSH with group sources and autogroup:self destinations.
 func TestSSHWithAutogroupSelfAndGroup(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -2111,6 +2149,8 @@ func TestSSHWithAutogroupSelfAndGroup(t *testing.T) {
 // TestSSHWithAutogroupSelfExcludesTaggedDevices verifies that tagged devices
 // are excluded from both sources and destinations when autogroup:self is used.
 func TestSSHWithAutogroupSelfExcludesTaggedDevices(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 	}
@@ -2172,6 +2212,8 @@ func TestSSHWithAutogroupSelfExcludesTaggedDevices(t *testing.T) {
 // autogroup:self and other destinations (like tag:router) in the same rule, and that
 // autogroup:self filtering only applies to autogroup:self destinations, not others.
 func TestSSHWithAutogroupSelfAndMixedDestinations(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -2245,6 +2287,8 @@ func TestSSHWithAutogroupSelfAndMixedDestinations(t *testing.T) {
 // where autogroup:self breaks when groups contain users that don't have
 // registered nodes.
 func TestAutogroupSelfWithNonExistentUserInGroup(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "superadmin"},
 		{ID: 2, Name: "admin"},
@@ -2390,6 +2434,8 @@ func TestAutogroupSelfWithNonExistentUserInGroup(t *testing.T) {
 }
 
 func TestMergeFilterRules(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		input []tailcfg.FilterRule
@@ -2590,6 +2636,8 @@ func TestMergeFilterRules(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := mergeFilterRules(tt.input)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("mergeFilterRules() mismatch (-want +got):\n%s", diff)
@@ -2599,6 +2647,8 @@ func TestMergeFilterRules(t *testing.T) {
 }
 
 func TestCompileSSHPolicy_CheckPeriodVariants(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{Name: "user1", ID: 1},
 	}
@@ -2635,6 +2685,8 @@ func TestCompileSSHPolicy_CheckPeriodVariants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			policy := &Policy{
 				SSHs: []SSH{
 					{
@@ -2671,6 +2723,8 @@ func TestCompileSSHPolicy_CheckPeriodVariants(t *testing.T) {
 }
 
 func TestIPSetToPrincipals(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		ips  []string // IPs to add to the set
@@ -2711,6 +2765,8 @@ func TestIPSetToPrincipals(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var ipSet *netipx.IPSet
 
 			if tt.ips != nil {
@@ -2754,6 +2810,8 @@ func TestIPSetToPrincipals(t *testing.T) {
 }
 
 func TestSSHCheckParams(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{Name: "user1", ID: 1},
 		{Name: "user2", ID: 2},
@@ -2921,6 +2979,8 @@ func TestSSHCheckParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pm, err := NewPolicyManager(tt.policy, users, nodes.ViewSlice())
 			require.NoError(t, err)
 
@@ -2935,6 +2995,8 @@ func TestSSHCheckParams(t *testing.T) {
 }
 
 func TestResolveLocalparts(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		entries []SSHUser
@@ -3004,6 +3066,8 @@ func TestResolveLocalparts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := resolveLocalparts(tt.entries, tt.users)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("resolveLocalparts() mismatch (-want +got):\n%s", diff)
@@ -3013,6 +3077,8 @@ func TestResolveLocalparts(t *testing.T) {
 }
 
 func TestGroupSourcesByUser(t *testing.T) {
+	t.Parallel()
+
 	alice := types.User{
 		Name: "alice", Email: "alice@example.com",
 		ID: 1,
@@ -3121,6 +3187,8 @@ func TestGroupSourcesByUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			sortedUIDs, byUser, tagged := groupSourcesByUser(
 				tt.nodes.ViewSlice(), tt.srcIPs,
 			)

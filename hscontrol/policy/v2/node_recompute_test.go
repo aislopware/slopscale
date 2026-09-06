@@ -17,6 +17,8 @@ import (
 // node in a tailnet that uses relay or via elsewhere must still be classified
 // as not needing a recompute.
 func TestNodeNeedsPeerRecompute(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
 	}
@@ -126,6 +128,8 @@ func TestNodeNeedsPeerRecompute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pm, err := NewPolicyManager([]byte(tt.pol), users, tt.nodes.ViewSlice())
 			require.NoError(t, err)
 

@@ -10,6 +10,8 @@ import (
 )
 
 func TestSecurityHeaders(t *testing.T) {
+	t.Parallel()
+
 	handler := securityHeaders(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))

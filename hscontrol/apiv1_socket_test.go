@@ -16,6 +16,8 @@ import (
 // a unix socket reached by an http.Client that dials it, the same wiring as the
 // server's socket listener and the CLI's newSocketClient, on local trust.
 func TestAPIV1SocketClient(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	socketPath := filepath.Join(t.TempDir(), "headscale.sock")

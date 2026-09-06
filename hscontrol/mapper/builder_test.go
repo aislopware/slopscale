@@ -12,6 +12,8 @@ import (
 )
 
 func TestMapResponseBuilder_Basic(t *testing.T) {
+	t.Parallel()
+
 	cfg := &types.Config{
 		BaseDomain: "example.com",
 		LogTail: types.LogTailConfig{
@@ -39,6 +41,8 @@ func TestMapResponseBuilder_Basic(t *testing.T) {
 }
 
 func TestMapResponseBuilder_WithCapabilityVersion(t *testing.T) {
+	t.Parallel()
+
 	cfg := &types.Config{}
 	mockState := &state.State{}
 	m := &mapper{
@@ -57,6 +61,8 @@ func TestMapResponseBuilder_WithCapabilityVersion(t *testing.T) {
 }
 
 func TestMapResponseBuilder_WithDomain(t *testing.T) {
+	t.Parallel()
+
 	domain := "test.example.com"
 	cfg := &types.Config{
 		ServerURL:  "https://test.example.com",
@@ -79,6 +85,8 @@ func TestMapResponseBuilder_WithDomain(t *testing.T) {
 }
 
 func TestMapResponseBuilder_WithCollectServicesDisabled(t *testing.T) {
+	t.Parallel()
+
 	cfg := &types.Config{}
 	mockState := &state.State{}
 	m := &mapper{
@@ -98,6 +106,8 @@ func TestMapResponseBuilder_WithCollectServicesDisabled(t *testing.T) {
 }
 
 func TestMapResponseBuilder_WithDebugConfig(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		logTailEnabled bool
@@ -117,6 +127,8 @@ func TestMapResponseBuilder_WithDebugConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			cfg := &types.Config{
 				LogTail: types.LogTailConfig{
 					Enabled: tt.logTailEnabled,
@@ -141,6 +153,8 @@ func TestMapResponseBuilder_WithDebugConfig(t *testing.T) {
 }
 
 func TestMapResponseBuilder_WithPeerChangedPatch(t *testing.T) {
+	t.Parallel()
+
 	cfg := &types.Config{}
 	mockState := &state.State{}
 	m := &mapper{
@@ -168,6 +182,8 @@ func TestMapResponseBuilder_WithPeerChangedPatch(t *testing.T) {
 }
 
 func TestMapResponseBuilder_WithPeersRemoved(t *testing.T) {
+	t.Parallel()
+
 	cfg := &types.Config{}
 	mockState := &state.State{}
 	m := &mapper{
@@ -191,6 +207,8 @@ func TestMapResponseBuilder_WithPeersRemoved(t *testing.T) {
 }
 
 func TestMapResponseBuilder_ErrorHandling(t *testing.T) {
+	t.Parallel()
+
 	cfg := &types.Config{}
 	mockState := &state.State{}
 	m := &mapper{
@@ -221,6 +239,8 @@ func TestMapResponseBuilder_ErrorHandling(t *testing.T) {
 }
 
 func TestMapResponseBuilder_ChainedCalls(t *testing.T) {
+	t.Parallel()
+
 	domain := "chained.example.com"
 	cfg := &types.Config{
 		ServerURL:  "https://chained.example.com",
@@ -257,6 +277,8 @@ func TestMapResponseBuilder_ChainedCalls(t *testing.T) {
 }
 
 func TestMapResponseBuilder_MultipleWithPeersRemoved(t *testing.T) {
+	t.Parallel()
+
 	cfg := &types.Config{}
 	mockState := &state.State{}
 	m := &mapper{
@@ -280,6 +302,8 @@ func TestMapResponseBuilder_MultipleWithPeersRemoved(t *testing.T) {
 }
 
 func TestMapResponseBuilder_EmptyPeerChangedPatch(t *testing.T) {
+	t.Parallel()
+
 	cfg := &types.Config{}
 	mockState := &state.State{}
 	m := &mapper{
@@ -297,6 +321,8 @@ func TestMapResponseBuilder_EmptyPeerChangedPatch(t *testing.T) {
 }
 
 func TestMapResponseBuilder_NilPeerChangedPatch(t *testing.T) {
+	t.Parallel()
+
 	cfg := &types.Config{}
 	mockState := &state.State{}
 	m := &mapper{
@@ -314,6 +340,8 @@ func TestMapResponseBuilder_NilPeerChangedPatch(t *testing.T) {
 }
 
 func TestMapResponseBuilder_MultipleErrors(t *testing.T) {
+	t.Parallel()
+
 	cfg := &types.Config{}
 	mockState := &state.State{}
 	m := &mapper{

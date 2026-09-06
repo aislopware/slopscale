@@ -58,6 +58,8 @@ func policyTestNodes(users types.Users) types.Nodes {
 // checks the resulting RunTests behaviour. SetPolicy gating is exercised
 // separately in TestSetPolicyRejectsFailingTests.
 func TestRunTests(t *testing.T) {
+	t.Parallel()
+
 	users := policyTestUsers()
 	nodes := policyTestNodes(users)
 
@@ -237,6 +239,8 @@ func TestRunTests(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pm, err := NewPolicyManager([]byte(tt.policy), users, nodes.ViewSlice())
 			require.NoError(t, err, "policy must parse and compile")
 
@@ -261,6 +265,8 @@ func TestRunTests(t *testing.T) {
 // boundary: a policy whose tests fail must be rejected without mutating the
 // live PolicyManager. NewPolicyManager (boot path) does not run tests.
 func TestSetPolicyRejectsFailingTests(t *testing.T) {
+	t.Parallel()
+
 	users := policyTestUsers()
 	nodes := policyTestNodes(users)
 
@@ -309,6 +315,8 @@ func TestSetPolicyRejectsFailingTests(t *testing.T) {
 // tests, so a stale stored policy referencing a now-deleted user does not
 // stop the server from booting.
 func TestNewPolicyManagerSkipsTests(t *testing.T) {
+	t.Parallel()
+
 	users := policyTestUsers()
 	nodes := policyTestNodes(users)
 
@@ -349,6 +357,8 @@ func TestNewPolicyManagerSkipsTests(t *testing.T) {
 // passing tests including `tag:client → webserver:80` with no proto over
 // a `ip: tcp:80` grant).
 func TestRunTestsEmptyProtoMatchesDefaultProtocols(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "odin", Email: "odin@example.com"},
 	}
@@ -395,6 +405,8 @@ func TestRunTestsEmptyProtoMatchesDefaultProtocols(t *testing.T) {
 // TestPolicyTestResultsErrorsRendering checks the multi-line render layout
 // since the body becomes the user-facing error.
 func TestPolicyTestResultsErrorsRendering(t *testing.T) {
+	t.Parallel()
+
 	results := PolicyTestResults{
 		AllPassed: false,
 		Results: []PolicyTestResult{

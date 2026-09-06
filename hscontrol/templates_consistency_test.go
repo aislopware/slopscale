@@ -9,6 +9,8 @@ import (
 )
 
 func TestTemplateHTMLConsistency(t *testing.T) {
+	t.Parallel()
+
 	// Test all templates produce consistent modern HTML
 	testCases := []struct {
 		name string
@@ -60,6 +62,8 @@ func TestTemplateHTMLConsistency(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Check DOCTYPE
 			assert.True(t, strings.HasPrefix(tc.html, "<!DOCTYPE html>"),
 				"%s should start with <!DOCTYPE html>", tc.name)
@@ -92,6 +96,8 @@ func TestTemplateHTMLConsistency(t *testing.T) {
 }
 
 func TestTemplateModernHTMLFeatures(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name string
 		html string
@@ -142,6 +148,8 @@ func TestTemplateModernHTMLFeatures(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Check no deprecated tags
 			assert.NotContains(t, tc.html, "<font",
 				"%s should not use deprecated <font> tag", tc.name)
@@ -160,6 +168,8 @@ func TestTemplateModernHTMLFeatures(t *testing.T) {
 }
 
 func TestTemplateExternalLinkSecurity(t *testing.T) {
+	t.Parallel()
+
 	// Test that all external links (http/https) have proper security attributes
 	testCases := []struct {
 		name         string
@@ -225,6 +235,8 @@ func TestTemplateExternalLinkSecurity(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			for _, url := range tc.externalURLs {
 				// Find the link tag containing this URL
 				if !strings.Contains(tc.html, url) {
@@ -258,6 +270,8 @@ func TestTemplateExternalLinkSecurity(t *testing.T) {
 }
 
 func TestTemplateAccessibilityAttributes(t *testing.T) {
+	t.Parallel()
+
 	// Test that all templates have proper accessibility attributes
 	testCases := []struct {
 		name string
@@ -309,6 +323,8 @@ func TestTemplateAccessibilityAttributes(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Check for translate="no" on body tag to prevent browser translation
 			// This is important for technical documentation with commands
 			assert.Contains(t, tc.html, `translate="no"`,

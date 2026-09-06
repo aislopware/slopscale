@@ -37,6 +37,8 @@ type interactiveStep struct {
 
 //nolint:gocyclo // comprehensive test function with many scenarios
 func TestAuthenticationFlows(t *testing.T) {
+	t.Parallel()
+
 	// Shared test keys for consistent behavior across test cases
 	machineKey1 := key.NewMachine()
 	machineKey2 := key.NewMachine()
@@ -2492,6 +2494,8 @@ func TestAuthenticationFlows(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Create test app
 			app := createTestApp(t)
 
@@ -2735,6 +2739,8 @@ func validateCompleteRegistrationResponse(t *testing.T, resp *tailcfg.RegisterRe
 
 // Simple test to validate basic node creation and lookup.
 func TestNodeStoreLookup(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	machineKey := key.NewMachine()
@@ -2785,6 +2791,8 @@ func TestNodeStoreLookup(t *testing.T) {
 // EXPECTED BEHAVIOR: Should create NEW nodes for the new user, leaving old nodes with the old user.
 // This matches the integration test expectation and web flow behavior.
 func TestPreAuthKeyLogoutAndReloginDifferentUser(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	// Create two users
@@ -2959,6 +2967,8 @@ func TestPreAuthKeyLogoutAndReloginDifferentUser(t *testing.T) {
 // - User2 should get a NEW node created (NOT transfer)
 // - Both nodes share the same machine key (same physical device).
 func TestWebFlowReauthDifferentUser(t *testing.T) {
+	t.Parallel()
+
 	machineKey := key.NewMachine()
 	nodeKey1 := key.NewNode()
 	nodeKey2 := key.NewNode() // Node key rotates on re-auth
@@ -3042,6 +3052,8 @@ func TestWebFlowReauthDifferentUser(t *testing.T) {
 	t.Logf("✓ Admin registered node to user2 via CLI (node ID: %d)", node.ID())
 
 	t.Run("user1_original_node_still_exists", func(t *testing.T) {
+		t.Parallel()
+
 		// User1's original node should STILL exist (not transferred to user2)
 		user1NodeAfter, found1 := app.state.GetNodesByMachineKeyAllUsers(machineKey.Public())[types.UserID(user1.ID)]
 		assert.True(t, found1, "User1's original node should still exist (not transferred)")
@@ -3057,6 +3069,8 @@ func TestWebFlowReauthDifferentUser(t *testing.T) {
 	})
 
 	t.Run("user2_has_new_node_created", func(t *testing.T) {
+		t.Parallel()
+
 		// User2 should have a NEW node created (not transfer from user1)
 		user2Node, found2 := app.state.GetNodesByMachineKeyAllUsers(machineKey.Public())[types.UserID(user2.ID)]
 		assert.True(t, found2, "User2 should have a new node created")
@@ -3074,6 +3088,8 @@ func TestWebFlowReauthDifferentUser(t *testing.T) {
 	})
 
 	t.Run("returned_node_is_user2_new_node", func(t *testing.T) {
+		t.Parallel()
+
 		// The node returned from [state.State.HandleNodeFromAuthPath] should be user2's NEW node
 		assert.Equal(t, user2.ID, node.UserID().Get(), "Returned node should belong to user2")
 		assert.NotEqual(t, user1NodeID, node.ID(), "Returned node should be NEW, not transferred from user1")
@@ -3081,6 +3097,8 @@ func TestWebFlowReauthDifferentUser(t *testing.T) {
 	})
 
 	t.Run("both_nodes_share_machine_key", func(t *testing.T) {
+		t.Parallel()
+
 		// Both nodes should have the same machine key (same physical device)
 		user1NodeFinal, found1 := app.state.GetNodesByMachineKeyAllUsers(machineKey.Public())[types.UserID(user1.ID)]
 		user2NodeFinal, found2 := app.state.GetNodesByMachineKeyAllUsers(machineKey.Public())[types.UserID(user2.ID)]
@@ -3094,6 +3112,8 @@ func TestWebFlowReauthDifferentUser(t *testing.T) {
 	})
 
 	t.Run("total_node_count", func(t *testing.T) {
+		t.Parallel()
+
 		// We should have exactly 2 nodes total: one for user1 (expired), one for user2 (active)
 		allNodesSlice := app.state.ListNodes()
 		assert.Equal(t, 2, allNodesSlice.Len(), "Should have exactly 2 nodes total")
@@ -3459,6 +3479,8 @@ func TestIssue2830_ExistingNodeReregistersWithExpiredKey(t *testing.T) {
 // marked as Used=true from the initial registration. The fix allows re-registration of
 // existing nodes with their own used keys.
 func TestGitHubIssue2830_ExistingNodeCanReregisterWithUsedPreAuthKey(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	// Create a user
@@ -3999,6 +4021,8 @@ func TestTaggedNodeWithoutUserToDifferentUser(t *testing.T) {
 // enters the "different user" branch and would otherwise crash at
 // oldUser.Name() in UserView.Name when the backing pointer is nil.
 func TestHandleNodeFromPreAuthKey_OldUserNil_NoPanic(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	userA := app.state.CreateUserForTest("preauth-orphan-old")
@@ -4059,6 +4083,8 @@ func TestHandleNodeFromPreAuthKey_OldUserNil_NoPanic(t *testing.T) {
 // has its own oldUser.Name() log line in the existingNodeOwnedByOtherUser
 // branch and panics independently of the noise registration path.
 func TestHandleNodeFromAuthPath_OldUserNil_NoPanic(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	userA := app.state.CreateUserForTest("authpath-orphan-old")
@@ -4119,6 +4145,8 @@ func TestHandleNodeFromAuthPath_OldUserNil_NoPanic(t *testing.T) {
 // from the machine key cached in [types.RegistrationData] when the
 // registration was opened.
 func TestWaitForFollowupMachineKeyMismatch(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	victimMachineKey := key.NewMachine()
@@ -4157,6 +4185,8 @@ func TestWaitForFollowupMachineKeyMismatch(t *testing.T) {
 	}
 
 	t.Run("mismatched machine key is rejected", func(t *testing.T) {
+		t.Parallel()
+
 		resp, err := followup(newPendingFollowup("followup-mismatch"), attackerMachineKey.Public())
 
 		require.Error(t, err, "followup with a foreign machine key must not succeed")
@@ -4171,6 +4201,8 @@ func TestWaitForFollowupMachineKeyMismatch(t *testing.T) {
 	// finding the cache entry at all would still pass the case above, because
 	// waitForFollowup falls back to handing out a fresh AuthURL.
 	t.Run("matching machine key still completes", func(t *testing.T) {
+		t.Parallel()
+
 		resp, err := followup(newPendingFollowup("followup-match"), victimMachineKey.Public())
 
 		require.NoError(t, err)
@@ -4200,6 +4232,8 @@ func TestWaitForFollowupMachineKeyMismatch(t *testing.T) {
 // cancellation. This test forces both cases ready on every iteration; it must
 // never report a timeout.
 func TestFollowupWaitPrefersCompletedAuthOverExpiredContext(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	machineKey := key.NewMachine().Public()

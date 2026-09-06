@@ -24,6 +24,8 @@ var iap = func(ipStr string) *netip.Addr {
 }
 
 func TestDNSConfigMapResponse(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		magicDNS bool
 		want     *tailcfg.DNSConfig
@@ -49,6 +51,8 @@ func TestDNSConfigMapResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("with-magicdns-%v", tt.magicDNS), func(t *testing.T) {
+			t.Parallel()
+
 			mach := func(hostname, username string, userid uint) *types.Node {
 				return &types.Node{
 					Hostname: hostname,
@@ -206,6 +210,8 @@ func TestNextDNSCapMapRendering(t *testing.T) {
 // full peer objects via policy.ReduceNodes. Without it, a node receives the
 // existence, presence, and addresses of peers its policy forbids accessing.
 func TestBuildFromChangeFiltersPeerPatchesByVisibility(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 
 	p4 := netip.MustParsePrefix("100.64.0.0/10")
@@ -292,6 +298,8 @@ func TestBuildFromChangeFiltersPeerPatchesByVisibility(t *testing.T) {
 // nodes leaks its owner's identity (login name, display name, avatar) to
 // recipients whose policy forbids accessing that node.
 func TestBuildFromChangeFiltersUserProfilesByVisibility(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 
 	p4 := netip.MustParsePrefix("100.64.0.0/10")
@@ -366,6 +374,8 @@ func TestBuildFromChangeFiltersUserProfilesByVisibility(t *testing.T) {
 // matchers => all visible", and per-node policies (autogroup:self) must agree
 // across paths.
 func TestBuildFromChangeVisibilityMatchesFullMap(t *testing.T) {
+	t.Parallel()
+
 	tmp := t.TempDir()
 	p4 := netip.MustParsePrefix("100.64.0.0/10")
 	p6 := netip.MustParsePrefix("fd7a:115c:a1e0::/48")
@@ -514,6 +524,8 @@ func TestBuildFromChangeVisibilityMatchesFullMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			_, err := s.SetPolicy([]byte(tt.policy))
 			require.NoError(t, err)
 
@@ -551,6 +563,8 @@ func TestBuildFromChangeVisibilityMatchesFullMap(t *testing.T) {
 // the bad peer persists across restart. The build for an unaffected viewer
 // must succeed: the bad peer is dropped, valid peers and self survive.
 func TestFullMapResponseSurvivesPeerWithInvalidName(t *testing.T) {
+	t.Parallel()
+
 	for _, tt := range []struct {
 		name    string
 		badName string
@@ -559,6 +573,8 @@ func TestFullMapResponseSurvivesPeerWithInvalidName(t *testing.T) {
 		{"over-long fqdn", strings.Repeat("a", types.MaxHostnameLength+1)},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			tmp := t.TempDir()
 			p4 := netip.MustParsePrefix("100.64.0.0/10")
 			p6 := netip.MustParsePrefix("fd7a:115c:a1e0::/48")
@@ -632,6 +648,8 @@ func TestFullMapResponseSurvivesPeerWithInvalidName(t *testing.T) {
 // building such a node's map crashed the server whenever a NextDNS resolver
 // was configured.
 func TestGenerateDNSConfigNilHostinfoNoPanic(t *testing.T) {
+	t.Parallel()
+
 	node := (&types.Node{
 		Hostname: "legacy-node",
 		IPv4:     iap("100.64.0.1"),

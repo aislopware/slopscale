@@ -31,7 +31,11 @@ func seedPreAuthKeys() func(t *testing.T, app *Headscale) {
 }
 
 func TestAPIV1CreatePreAuthKey(t *testing.T) {
+	t.Parallel()
+
 	t.Run("huma response shape", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		h.app.state.CreateUserForTest("alice")
 
@@ -61,6 +65,8 @@ func TestAPIV1CreatePreAuthKey(t *testing.T) {
 	})
 
 	t.Run("tagged key has null user", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		res := h.callHuma(http.MethodPost, "/api/v1/preauthkey",
@@ -77,6 +83,8 @@ func TestAPIV1CreatePreAuthKey(t *testing.T) {
 	})
 
 	t.Run("invalid tag parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		h.app.state.CreateUserForTest("alice")
 		res := h.assertParity(t, http.MethodPost, "/api/v1/preauthkey",
@@ -85,18 +93,24 @@ func TestAPIV1CreatePreAuthKey(t *testing.T) {
 	})
 
 	t.Run("nonexistent user parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/preauthkey", []byte(`{"user":"999"}`))
 		assertStatus(t, res, http.StatusNotFound)
 	})
 
 	t.Run("invalid user id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/preauthkey", []byte(`{"user":"abc"}`))
 		assertStatus(t, res, http.StatusBadRequest)
 	})
 
 	t.Run("neither tagged nor owned parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/preauthkey", []byte(`{"reusable":true}`))
 		assertStatus(t, res, http.StatusBadRequest)
@@ -104,18 +118,26 @@ func TestAPIV1CreatePreAuthKey(t *testing.T) {
 }
 
 func TestAPIV1ExpirePreAuthKey(t *testing.T) {
+	t.Parallel()
+
 	t.Run("parity", func(t *testing.T) {
+		t.Parallel()
+
 		assertParityIsolated(t, seedPreAuthKeys(), http.MethodPost,
 			"/api/v1/preauthkey/expire", []byte(`{"id":"1"}`))
 	})
 
 	t.Run("nonexistent parity", func(t *testing.T) {
+		t.Parallel()
+
 		res := assertParityIsolated(t, seedPreAuthKeys(), http.MethodPost,
 			"/api/v1/preauthkey/expire", []byte(`{"id":"99999"}`))
 		assertStatus(t, res, http.StatusNotFound)
 	})
 
 	t.Run("invalid id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/preauthkey/expire", []byte(`{"id":"abc"}`))
 		assertStatus(t, res, http.StatusBadRequest)
@@ -123,18 +145,26 @@ func TestAPIV1ExpirePreAuthKey(t *testing.T) {
 }
 
 func TestAPIV1DeletePreAuthKey(t *testing.T) {
+	t.Parallel()
+
 	t.Run("parity", func(t *testing.T) {
+		t.Parallel()
+
 		assertParityIsolated(t, seedPreAuthKeys(), http.MethodDelete,
 			"/api/v1/preauthkey?id=1", nil)
 	})
 
 	t.Run("nonexistent parity", func(t *testing.T) {
+		t.Parallel()
+
 		res := assertParityIsolated(t, seedPreAuthKeys(), http.MethodDelete,
 			"/api/v1/preauthkey?id=99999", nil)
 		assertStatus(t, res, http.StatusNotFound)
 	})
 
 	t.Run("invalid id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodDelete, "/api/v1/preauthkey?id=abc", nil)
 		assertStatus(t, res, http.StatusBadRequest)
@@ -142,7 +172,11 @@ func TestAPIV1DeletePreAuthKey(t *testing.T) {
 }
 
 func TestAPIV1ListPreAuthKeys(t *testing.T) {
+	t.Parallel()
+
 	t.Run("empty returns empty array", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		res := h.callHuma(http.MethodGet, "/api/v1/preauthkey", nil)
@@ -151,11 +185,15 @@ func TestAPIV1ListPreAuthKeys(t *testing.T) {
 	})
 
 	t.Run("empty parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		h.assertParity(t, http.MethodGet, "/api/v1/preauthkey", nil)
 	})
 
 	t.Run("all parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedPreAuthKeys()(t, h.app)
 		h.assertParity(t, http.MethodGet, "/api/v1/preauthkey", nil)

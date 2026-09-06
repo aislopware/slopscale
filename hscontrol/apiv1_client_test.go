@@ -15,6 +15,8 @@ import (
 // service over a real HTTP server, exercising the typed request/response path
 // end to end.
 func TestAPIV1GeneratedClient(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	srv := httptest.NewServer(newHumaTestHandler(app))
 	t.Cleanup(srv.Close)

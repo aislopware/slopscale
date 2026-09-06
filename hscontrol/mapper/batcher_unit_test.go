@@ -196,6 +196,8 @@ func makeConnectionEntry(id string, ch chan<- *tailcfg.MapResponse) *connectionE
 // ============================================================================
 
 func TestConnectionEntry_SendSuccess(t *testing.T) {
+	t.Parallel()
+
 	ch := make(chan *tailcfg.MapResponse, 1)
 	entry := makeConnectionEntry("test-conn", ch)
 	data := testMapResponse()
@@ -213,6 +215,8 @@ func TestConnectionEntry_SendSuccess(t *testing.T) {
 }
 
 func TestConnectionEntry_SendNilData(t *testing.T) {
+	t.Parallel()
+
 	ch := make(chan *tailcfg.MapResponse, 1)
 	entry := makeConnectionEntry("test-conn", ch)
 
@@ -223,6 +227,8 @@ func TestConnectionEntry_SendNilData(t *testing.T) {
 }
 
 func TestConnectionEntry_SendTimeout(t *testing.T) {
+	t.Parallel()
+
 	// Unbuffered channel with no reader = always blocks
 	ch := make(chan *tailcfg.MapResponse)
 	entry := makeConnectionEntry("test-conn", ch)
@@ -238,6 +244,8 @@ func TestConnectionEntry_SendTimeout(t *testing.T) {
 }
 
 func TestConnectionEntry_SendClosed(t *testing.T) {
+	t.Parallel()
+
 	ch := make(chan *tailcfg.MapResponse, 1)
 	entry := makeConnectionEntry("test-conn", ch)
 
@@ -252,6 +260,8 @@ func TestConnectionEntry_SendClosed(t *testing.T) {
 }
 
 func TestConnectionEntry_SendUpdatesLastUsed(t *testing.T) {
+	t.Parallel()
+
 	ch := make(chan *tailcfg.MapResponse, 1)
 	entry := makeConnectionEntry("test-conn", ch)
 
@@ -271,6 +281,8 @@ func TestConnectionEntry_SendUpdatesLastUsed(t *testing.T) {
 // ============================================================================
 
 func TestMultiChannelSend_AllSuccess(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 
 	// Create 3 buffered channels (all will succeed)
@@ -296,6 +308,8 @@ func TestMultiChannelSend_AllSuccess(t *testing.T) {
 }
 
 func TestMultiChannelSend_PartialFailure(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 
 	// 2 buffered channels (will succeed) + 1 unbuffered (will timeout)
@@ -319,6 +333,8 @@ func TestMultiChannelSend_PartialFailure(t *testing.T) {
 }
 
 func TestMultiChannelSend_AllFail(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 
 	// All unbuffered channels with no readers
@@ -335,6 +351,8 @@ func TestMultiChannelSend_AllFail(t *testing.T) {
 }
 
 func TestMultiChannelSend_ZeroConnections(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 
 	err := mc.send(testMapResponse())
@@ -345,6 +363,8 @@ func TestMultiChannelSend_ZeroConnections(t *testing.T) {
 }
 
 func TestMultiChannelSend_NilData(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 	ch := make(chan *tailcfg.MapResponse, 1)
 	mc.addConnection(makeConnectionEntry("conn", ch))
@@ -356,6 +376,8 @@ func TestMultiChannelSend_NilData(t *testing.T) {
 }
 
 func TestMultiChannelSend_FailedConnectionRemoved(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 
 	goodCh := make(chan *tailcfg.MapResponse, 10) // large buffer
@@ -378,6 +400,8 @@ func TestMultiChannelSend_FailedConnectionRemoved(t *testing.T) {
 }
 
 func TestMultiChannelSend_UpdateCount(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 	ch := make(chan *tailcfg.MapResponse, 10)
 	mc.addConnection(makeConnectionEntry("conn", ch))
@@ -396,6 +420,8 @@ func TestMultiChannelSend_UpdateCount(t *testing.T) {
 // ============================================================================
 
 func TestMultiChannelClose_MarksEntriesClosed(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 
 	entries := make([]*connectionEntry, 3)
@@ -414,6 +440,8 @@ func TestMultiChannelClose_MarksEntriesClosed(t *testing.T) {
 }
 
 func TestMultiChannelClose_PreventsSendPanic(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 	ch := make(chan *tailcfg.MapResponse, 1)
 	entry := makeConnectionEntry("conn", ch)
@@ -433,6 +461,8 @@ func TestMultiChannelClose_PreventsSendPanic(t *testing.T) {
 // ============================================================================
 
 func TestMultiChannelNodeConn_AddRemoveConnections(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 
 	ch1 := make(chan *tailcfg.MapResponse, 1)
@@ -465,6 +495,8 @@ func TestMultiChannelNodeConn_AddRemoveConnections(t *testing.T) {
 }
 
 func TestMultiChannelNodeConn_Version(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 
 	// No connections - version should be 0
@@ -484,6 +516,8 @@ func TestMultiChannelNodeConn_Version(t *testing.T) {
 // ============================================================================
 
 func TestComputePeerDiff(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		tracked     []tailcfg.NodeID // peers previously sent to client
@@ -542,6 +576,8 @@ func TestComputePeerDiff(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			mc := newMultiChannelNodeConn(1, nil)
 
 			// Populate tracked peers
@@ -562,7 +598,11 @@ func TestComputePeerDiff(t *testing.T) {
 // ============================================================================
 
 func TestUpdateSentPeers(t *testing.T) {
+	t.Parallel()
+
 	t.Run("full_peer_list_replaces_all", func(t *testing.T) {
+		t.Parallel()
+
 		mc := newMultiChannelNodeConn(1, nil)
 		// Pre-populate with old peers
 		mc.lastSentPeers.Store(tailcfg.NodeID(100), struct{}{})
@@ -583,6 +623,8 @@ func TestUpdateSentPeers(t *testing.T) {
 	})
 
 	t.Run("incremental_add_via_PeersChanged", func(t *testing.T) {
+		t.Parallel()
+
 		mc := newMultiChannelNodeConn(1, nil)
 		mc.lastSentPeers.Store(tailcfg.NodeID(1), struct{}{})
 
@@ -598,6 +640,8 @@ func TestUpdateSentPeers(t *testing.T) {
 	})
 
 	t.Run("incremental_remove_via_PeersRemoved", func(t *testing.T) {
+		t.Parallel()
+
 		mc := newMultiChannelNodeConn(1, nil)
 		mc.lastSentPeers.Store(tailcfg.NodeID(1), struct{}{})
 		mc.lastSentPeers.Store(tailcfg.NodeID(2), struct{}{})
@@ -617,6 +661,8 @@ func TestUpdateSentPeers(t *testing.T) {
 	})
 
 	t.Run("nil_response_is_noop", func(t *testing.T) {
+		t.Parallel()
+
 		mc := newMultiChannelNodeConn(1, nil)
 		mc.lastSentPeers.Store(tailcfg.NodeID(1), struct{}{})
 
@@ -627,6 +673,8 @@ func TestUpdateSentPeers(t *testing.T) {
 	})
 
 	t.Run("full_then_incremental_sequence", func(t *testing.T) {
+		t.Parallel()
+
 		mc := newMultiChannelNodeConn(1, nil)
 
 		// Step 1: Full peer list
@@ -653,6 +701,8 @@ func TestUpdateSentPeers(t *testing.T) {
 	})
 
 	t.Run("empty_full_peer_list_clears_all", func(t *testing.T) {
+		t.Parallel()
+
 		mc := newMultiChannelNodeConn(1, nil)
 		mc.lastSentPeers.Store(tailcfg.NodeID(1), struct{}{})
 		mc.lastSentPeers.Store(tailcfg.NodeID(2), struct{}{})
@@ -677,6 +727,8 @@ func TestUpdateSentPeers(t *testing.T) {
 // ============================================================================
 
 func TestGenerateMapResponse_EmptyChange(t *testing.T) {
+	t.Parallel()
+
 	mc := newMockNodeConnection(1)
 
 	resp, err := generateMapResponse(mc, nil, change.Change{})
@@ -686,6 +738,8 @@ func TestGenerateMapResponse_EmptyChange(t *testing.T) {
 }
 
 func TestGenerateMapResponse_InvalidNodeID(t *testing.T) {
+	t.Parallel()
+
 	mc := newMockNodeConnection(0) // Invalid ID
 
 	resp, err := generateMapResponse(mc, &mapper{}, change.DERPMap())
@@ -695,6 +749,8 @@ func TestGenerateMapResponse_InvalidNodeID(t *testing.T) {
 }
 
 func TestGenerateMapResponse_NilMapper(t *testing.T) {
+	t.Parallel()
+
 	mc := newMockNodeConnection(1)
 
 	resp, err := generateMapResponse(mc, nil, change.DERPMap())
@@ -704,6 +760,8 @@ func TestGenerateMapResponse_NilMapper(t *testing.T) {
 }
 
 func TestGenerateMapResponse_SelfOnlyOtherNode(t *testing.T) {
+	t.Parallel()
+
 	mc := newMockNodeConnection(1)
 
 	// SelfUpdate targeted at node 99 should be skipped for node 1
@@ -716,6 +774,8 @@ func TestGenerateMapResponse_SelfOnlyOtherNode(t *testing.T) {
 }
 
 func TestGenerateMapResponse_SelfOnlySameNode(t *testing.T) {
+	t.Parallel()
+
 	// SelfUpdate targeted at node 1: IsSelfOnly()=true and TargetNode==nodeID
 	// This should NOT be short-circuited - it should attempt to generate.
 	// We verify the routing logic by checking that the change is not empty
@@ -732,12 +792,16 @@ func TestGenerateMapResponse_SelfOnlySameNode(t *testing.T) {
 // ============================================================================
 
 func TestHandleNodeChange_NilConnection(t *testing.T) {
+	t.Parallel()
+
 	err := handleNodeChange(nil, nil, change.DERPMap())
 
 	assert.ErrorIs(t, err, ErrNodeConnectionNil)
 }
 
 func TestHandleNodeChange_EmptyChange(t *testing.T) {
+	t.Parallel()
+
 	mc := newMockNodeConnection(1)
 
 	err := handleNodeChange(mc, nil, change.Change{})
@@ -749,6 +813,8 @@ func TestHandleNodeChange_EmptyChange(t *testing.T) {
 var errConnectionBroken = errors.New("connection broken")
 
 func TestHandleNodeChange_SendError(t *testing.T) {
+	t.Parallel()
+
 	mc := newMockNodeConnection(1).withSendError(errConnectionBroken)
 
 	// Need a real mapper for this test - we can't easily mock it.
@@ -761,6 +827,8 @@ func TestHandleNodeChange_SendError(t *testing.T) {
 }
 
 func TestHandleNodeChange_NilDataNoSend(t *testing.T) {
+	t.Parallel()
+
 	mc := newMockNodeConnection(1)
 
 	// SelfUpdate targeted at different node produces nil data
@@ -776,6 +844,8 @@ func TestHandleNodeChange_NilDataNoSend(t *testing.T) {
 // ============================================================================
 
 func TestConnectionEntry_ConcurrentSends(t *testing.T) {
+	t.Parallel()
+
 	ch := make(chan *tailcfg.MapResponse, 100)
 	entry := makeConnectionEntry("concurrent", ch)
 
@@ -813,6 +883,8 @@ func TestConnectionEntry_ConcurrentSends(t *testing.T) {
 }
 
 func TestConnectionEntry_ConcurrentSendAndClose(t *testing.T) {
+	t.Parallel()
+
 	ch := make(chan *tailcfg.MapResponse, 100)
 	entry := makeConnectionEntry("race", ch)
 
@@ -855,6 +927,8 @@ func TestConnectionEntry_ConcurrentSendAndClose(t *testing.T) {
 // ============================================================================
 
 func TestMultiChannelSend_ConcurrentAddAndSend(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 
 	// Start with one connection
@@ -902,6 +976,8 @@ func TestMultiChannelSend_ConcurrentAddAndSend(t *testing.T) {
 }
 
 func TestMultiChannelSend_ConcurrentRemoveAndSend(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 
 	channels := make([]chan *tailcfg.MapResponse, 10)
@@ -1012,6 +1088,8 @@ func TestBatcher_CloseThenStartIsNoop(t *testing.T) {
 // TestBatcher_CloseStopsTicker verifies that Close() stops the internal
 // ticker, preventing resource leaks.
 func TestBatcher_CloseStopsTicker(t *testing.T) {
+	t.Parallel()
+
 	b := NewBatcher(10*time.Millisecond, 1, nil)
 
 	b.Start()
@@ -1037,6 +1115,8 @@ func TestBatcher_CloseStopsTicker(t *testing.T) {
 // forever when workCh was full. With done initialized in NewBatcher,
 // Close() can be called safely before Start().
 func TestBatcher_CloseBeforeStart_DoesNotHang(t *testing.T) {
+	t.Parallel()
+
 	b := NewBatcher(50*time.Millisecond, 2, nil)
 
 	// Close without Start must not panic or hang.
@@ -1059,6 +1139,8 @@ func TestBatcher_CloseBeforeStart_DoesNotHang(t *testing.T) {
 // returns immediately via the done channel when the batcher is closed,
 // even without Start() having been called.
 func TestBatcher_QueueWorkAfterClose_DoesNotHang(t *testing.T) {
+	t.Parallel()
+
 	b := NewBatcher(50*time.Millisecond, 1, nil)
 	b.Close()
 
@@ -1083,6 +1165,8 @@ func TestBatcher_QueueWorkAfterClose_DoesNotHang(t *testing.T) {
 // mark the node as disconnected. IsConnected would return true for a
 // node with zero active connections.
 func TestIsConnected_FalseAfterAddNodeFailure(t *testing.T) {
+	t.Parallel()
+
 	b := NewBatcher(50*time.Millisecond, 2, nil)
 	b.Start()
 
@@ -1112,6 +1196,8 @@ func TestIsConnected_FalseAfterAddNodeFailure(t *testing.T) {
 // which left a stale pointer in the backing array's last slot. The fix
 // uses copy + explicit nil of the trailing element.
 func TestRemoveConnectionAtIndex_NilsTrailingSlot(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 
 	// Manually add three entries under the lock.

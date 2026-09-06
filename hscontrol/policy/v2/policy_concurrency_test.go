@@ -20,6 +20,8 @@ import (
 // — the same path that made #3346's reconnect storm expensive — which is where
 // the lazy caches are written.
 func TestPolicyManagerConcurrentReads(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
 		{ID: 2, Name: "user2", Email: "user2@headscale.net"},

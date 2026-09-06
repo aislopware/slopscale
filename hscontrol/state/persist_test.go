@@ -89,6 +89,8 @@ func persistTestConfig(dbPath string) *types.Config {
 // slices, so the column would stay populated with the previously
 // approved routes and a restart would re-apply them.
 func TestPersistEmptyApprovedRoutes(t *testing.T) {
+	t.Parallel()
+
 	dbPath, s, nodeID := persistTestSetup(t)
 
 	route := netip.MustParsePrefix("10.0.0.0/8")
@@ -128,6 +130,8 @@ func TestPersistEmptyApprovedRoutes(t *testing.T) {
 // NodeStore + persistNodeToDB, which is the same code path the public
 // SetApprovedRoutes call exercises.
 func TestPersistEmptyTags(t *testing.T) {
+	t.Parallel()
+
 	dbPath, s, nodeID := persistTestSetup(t)
 
 	_, ok := s.nodeStore.UpdateNode(nodeID, func(n *types.Node) {
@@ -174,6 +178,8 @@ func TestPersistEmptyTags(t *testing.T) {
 // layer directly because the bug is in serialization, not in
 // upstream parsing.
 func TestPersistEmptyEndpoints(t *testing.T) {
+	t.Parallel()
+
 	dbPath, s, nodeID := persistTestSetup(t)
 
 	endpoint := netip.MustParseAddrPort("198.51.100.1:41641")
@@ -228,6 +234,8 @@ func TestPersistEmptyEndpoints(t *testing.T) {
 // a 1:1 NodeKey<->MachineKey binding at poll time; this enforces the same
 // invariant at registration time.
 func TestRegistrationRejectsNodeKeyClaimedByAnotherMachine(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -273,6 +281,8 @@ func TestRegistrationRejectsNodeKeyClaimedByAnotherMachine(t *testing.T) {
 // NodeKey to a victim's, poisoning the NodeStore NodeKey index so the victim's
 // MapRequest resolves to the attacker's node and is rejected — a DoS.
 func TestReauthRejectsNodeKeyClaimedByAnotherMachine(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -337,6 +347,8 @@ func TestReauthRejectsNodeKeyClaimedByAnotherMachine(t *testing.T) {
 // endpoints would advertise the re-keyed node to peers endpoint-less, which
 // drives head/unstable tailscale clients into one-way disco-deafness.
 func TestReauthPreservesEndpointsWhenClientOmitsThem(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -399,6 +411,8 @@ func TestReauthPreservesEndpointsWhenClientOmitsThem(t *testing.T) {
 // momentarily-endpoint-less peer disco-deaf); a policy change forces a full
 // recompute; a new node is a whole-node add.
 func TestReauthChange(t *testing.T) {
+	t.Parallel()
+
 	n := types.Node{
 		ID:       7,
 		NodeKey:  key.NewNode().Public(),
@@ -426,6 +440,8 @@ func TestReauthChange(t *testing.T) {
 // auth path and poll-time validation enforce, so a node cannot rotate its key
 // to a victim's and poison the NodeStore NodeKey index.
 func TestPreAuthKeyReauthRejectsNodeKeyClaimedByAnotherMachine(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -483,6 +499,8 @@ var errInjectedNodeUpdate = errors.New("injected node update failure")
 // holding a node key that was never persisted: a restart would reload the old
 // row and the client's current key would no longer resolve, locking it out.
 func TestPreAuthKeyReauthRevertsNodeStoreOnDBFailure(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -534,6 +552,8 @@ func TestPreAuthKeyReauthRevertsNodeStoreOnDBFailure(t *testing.T) {
 // node" and creates its own, leaving duplicate nodes and IP allocations for
 // one machine.
 func TestConcurrentPreAuthKeyRegistrationSameMachineKey(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 

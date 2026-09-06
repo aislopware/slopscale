@@ -15,6 +15,8 @@ import (
 )
 
 func TestCreatePreAuthKey(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		test func(*testing.T, *HSDatabase)
@@ -53,6 +55,8 @@ func TestCreatePreAuthKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			db, err := newSQLiteTestDB()
 			require.NoError(t, err)
 
@@ -62,6 +66,8 @@ func TestCreatePreAuthKey(t *testing.T) {
 }
 
 func TestPreAuthKeyACLTags(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		test func(*testing.T, *HSDatabase)
@@ -105,6 +111,8 @@ func TestPreAuthKeyACLTags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			db, err := newSQLiteTestDB()
 			require.NoError(t, err)
 
@@ -114,6 +122,8 @@ func TestPreAuthKeyACLTags(t *testing.T) {
 }
 
 func TestCannotDeleteAssignedPreAuthKey(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 	user, err := db.CreateUser(types.User{Name: "test8"})
@@ -136,6 +146,8 @@ func TestCannotDeleteAssignedPreAuthKey(t *testing.T) {
 }
 
 func TestPreAuthKeyAuthentication(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -349,6 +361,8 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			keyStr := tt.setupKey()
 
 			pak, err := db.GetPreAuthKey(keyStr)
@@ -377,6 +391,8 @@ func TestPreAuthKeyAuthentication(t *testing.T) {
 }
 
 func TestMultipleLegacyKeysAllowed(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -450,6 +466,8 @@ func TestMultipleLegacyKeysAllowed(t *testing.T) {
 // compare-and-set: a second call against an already-used key reports
 // PAKError("authkey already used") rather than silently succeeding.
 func TestUsePreAuthKeyAtomicCAS(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -492,6 +510,8 @@ func TestUsePreAuthKeyAtomicCAS(t *testing.T) {
 // pre-auth key resolves to a record-not-found error, which the registration
 // handler maps to a 401 rather than a raw server error.
 func TestGetPreAuthKeyUnknownMapsToRecordNotFound(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 

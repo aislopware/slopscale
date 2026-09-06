@@ -15,6 +15,8 @@ import (
 // the NodeStore writer goroutine detects GivenName collisions inside
 // applyBatch and appends -1, -2, … to make the label unique.
 func TestPutNodeGivenNameCollisionBumps(t *testing.T) {
+	t.Parallel()
+
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 	store.Start()
@@ -37,6 +39,8 @@ func TestPutNodeGivenNameCollisionBumps(t *testing.T) {
 // an empty sanitised label becomes the literal "node". Subsequent
 // empty-label registrations bump as usual.
 func TestPutNodeEmptyGivenNameFallsBackToNode(t *testing.T) {
+	t.Parallel()
+
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 	store.Start()
@@ -57,6 +61,8 @@ func TestPutNodeEmptyGivenNameFallsBackToNode(t *testing.T) {
 // TestPutNodeIdempotentKeepsLabel asserts that re-putting the same
 // node (same ID, same GivenName) does not bump its own label.
 func TestPutNodeIdempotentKeepsLabel(t *testing.T) {
+	t.Parallel()
+
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 	store.Start()
@@ -74,6 +80,8 @@ func TestPutNodeIdempotentKeepsLabel(t *testing.T) {
 // the collision-bump branch when a callback rewrites GivenName to a
 // label held by another node.
 func TestUpdateNodeBumpsOnCollision(t *testing.T) {
+	t.Parallel()
+
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 	store.Start()
@@ -94,6 +102,8 @@ func TestUpdateNodeBumpsOnCollision(t *testing.T) {
 // with the same GivenName and distinct IDs. All N stored labels must
 // be unique (no two nodes holding the same GivenName).
 func TestConcurrentPutNodeSameGivenNameAllUnique(t *testing.T) {
+	t.Parallel()
+
 	const N = 20
 
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
@@ -142,6 +152,8 @@ func TestConcurrentPutNodeSameGivenNameAllUnique(t *testing.T) {
 // TestSetGivenNameSuccess renames a node to a free label and asserts
 // the NodeView reflects the new label.
 func TestSetGivenNameSuccess(t *testing.T) {
+	t.Parallel()
+
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 	store.Start()
@@ -157,6 +169,8 @@ func TestSetGivenNameSuccess(t *testing.T) {
 // TestSetGivenNameRejectsTaken refuses to rename a node to a label
 // held by a different node, leaving both labels unchanged.
 func TestSetGivenNameRejectsTaken(t *testing.T) {
+	t.Parallel()
+
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 	store.Start()
@@ -175,6 +189,8 @@ func TestSetGivenNameRejectsTaken(t *testing.T) {
 // TestSetGivenNameRejectsInvalid returns ErrGivenNameInvalid for
 // labels that are not valid DNS labels.
 func TestSetGivenNameRejectsInvalid(t *testing.T) {
+	t.Parallel()
+
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 	store.Start()
@@ -190,6 +206,8 @@ func TestSetGivenNameRejectsInvalid(t *testing.T) {
 
 // TestSetGivenNameRejectsMissingNode returns ErrNodeNotFound.
 func TestSetGivenNameRejectsMissingNode(t *testing.T) {
+	t.Parallel()
+
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 	store.Start()
@@ -202,6 +220,8 @@ func TestSetGivenNameRejectsMissingNode(t *testing.T) {
 // TestSetGivenNameIdempotent renaming a node to its own current label
 // succeeds (not a collision against itself).
 func TestSetGivenNameIdempotent(t *testing.T) {
+	t.Parallel()
+
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 	store.Start()

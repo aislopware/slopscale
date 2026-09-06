@@ -119,6 +119,8 @@ func (f *primariesFixture) requireNodeRoutes(id types.NodeID, want ...netip.Pref
 }
 
 func TestPrimaries_SingleNodeSingleRoute(t *testing.T) {
+	t.Parallel()
+
 	f := newPrimariesFixture(t, 1)
 	f.advertise(1, mp("192.168.1.0/24"))
 
@@ -127,6 +129,8 @@ func TestPrimaries_SingleNodeSingleRoute(t *testing.T) {
 }
 
 func TestPrimaries_TwoNodesDifferentRoutes(t *testing.T) {
+	t.Parallel()
+
 	f := newPrimariesFixture(t, 1, 2)
 	f.advertise(1, mp("192.168.1.0/24"))
 	f.advertise(2, mp("192.168.2.0/24"))
@@ -136,6 +140,8 @@ func TestPrimaries_TwoNodesDifferentRoutes(t *testing.T) {
 }
 
 func TestPrimaries_OverlappingRoutesLowerIDWins(t *testing.T) {
+	t.Parallel()
+
 	f := newPrimariesFixture(t, 1, 2)
 	f.advertise(1, mp("192.168.1.0/24"))
 	f.advertise(2, mp("192.168.1.0/24"))
@@ -146,6 +152,8 @@ func TestPrimaries_OverlappingRoutesLowerIDWins(t *testing.T) {
 }
 
 func TestPrimaries_AntiFlapPreservesCurrentPrimary(t *testing.T) {
+	t.Parallel()
+
 	// A primary that disappears (advertiser leaves the set) should
 	// trigger failover. When the original primary returns, the new
 	// primary keeps the assignment — anti-flap.
@@ -162,6 +170,8 @@ func TestPrimaries_AntiFlapPreservesCurrentPrimary(t *testing.T) {
 }
 
 func TestPrimaries_ClearRoutesDropsPrimary(t *testing.T) {
+	t.Parallel()
+
 	f := newPrimariesFixture(t, 1)
 	f.advertise(1, mp("192.168.1.0/24"))
 	f.requirePrimary(mp("192.168.1.0/24"), 1)
@@ -171,6 +181,8 @@ func TestPrimaries_ClearRoutesDropsPrimary(t *testing.T) {
 }
 
 func TestPrimaries_DisconnectDropsLastAdvertiserPrimary(t *testing.T) {
+	t.Parallel()
+
 	f := newPrimariesFixture(t, 1)
 	f.advertise(1, mp("192.168.1.0/24"))
 	f.requirePrimary(mp("192.168.1.0/24"), 1)
@@ -180,6 +192,8 @@ func TestPrimaries_DisconnectDropsLastAdvertiserPrimary(t *testing.T) {
 }
 
 func TestPrimaries_UnhealthyTriggersFailover(t *testing.T) {
+	t.Parallel()
+
 	f := newPrimariesFixture(t, 1, 2)
 	f.advertise(1, mp("192.168.1.0/24"))
 	f.advertise(2, mp("192.168.1.0/24"))
@@ -190,6 +204,8 @@ func TestPrimaries_UnhealthyTriggersFailover(t *testing.T) {
 }
 
 func TestPrimaries_RecoveryFromUnhealthyNoFlap(t *testing.T) {
+	t.Parallel()
+
 	f := newPrimariesFixture(t, 1, 2)
 	f.advertise(1, mp("192.168.1.0/24"))
 	f.advertise(2, mp("192.168.1.0/24"))
@@ -201,6 +217,8 @@ func TestPrimaries_RecoveryFromUnhealthyNoFlap(t *testing.T) {
 }
 
 func TestPrimaries_AllUnhealthyKeepsAPrimary(t *testing.T) {
+	t.Parallel()
+
 	// Anti-blackhole: when every advertiser is unhealthy the
 	// algorithm keeps *some* primary so peers can recover once one
 	// flips healthy. The specific node is the prev primary when
@@ -218,6 +236,8 @@ func TestPrimaries_AllUnhealthyKeepsAPrimary(t *testing.T) {
 }
 
 func TestPrimaries_AllUnhealthyPreservesPrevious(t *testing.T) {
+	t.Parallel()
+
 	// Once a failover has moved primary to a higher-ID node, a
 	// subsequent all-unhealthy state must NOT churn primary back to
 	// the lowest-ID candidate. Under cable-pull semantics both nodes
@@ -238,6 +258,8 @@ func TestPrimaries_AllUnhealthyPreservesPrevious(t *testing.T) {
 }
 
 func TestPrimaries_ExitRouteNotElected(t *testing.T) {
+	t.Parallel()
+
 	// Exit routes (0.0.0.0/0, ::/0) are not subject to HA primary
 	// election — every approved exit-route advertiser keeps it.
 	f := newPrimariesFixture(t, 1)
@@ -248,6 +270,8 @@ func TestPrimaries_ExitRouteNotElected(t *testing.T) {
 }
 
 func TestPrimaries_BothOfflineThenOneReturns(t *testing.T) {
+	t.Parallel()
+
 	// With two HA advertisers, dropping both then bringing one back
 	// used to leave the prefix without any primary. The snapshot
 	// recomputes primaries on every NodeStore write, so the
@@ -269,6 +293,8 @@ func TestPrimaries_BothOfflineThenOneReturns(t *testing.T) {
 }
 
 func TestPrimaries_HANodes(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		setup func(*primariesFixture)
@@ -331,6 +357,8 @@ func TestPrimaries_HANodes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			f := newPrimariesFixture(t, 1, 2, 3)
 			tt.setup(f)
 

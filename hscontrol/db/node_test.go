@@ -24,6 +24,8 @@ import (
 )
 
 func TestGetNode(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -40,6 +42,8 @@ func TestGetNode(t *testing.T) {
 }
 
 func TestGetNodeByID(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -56,6 +60,8 @@ func TestGetNodeByID(t *testing.T) {
 }
 
 func TestHardDeleteNode(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -70,6 +76,8 @@ func TestHardDeleteNode(t *testing.T) {
 }
 
 func TestListPeersManyNodes(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -91,6 +99,8 @@ func TestListPeersManyNodes(t *testing.T) {
 }
 
 func TestExpireNode(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -137,6 +147,8 @@ func TestExpireNode(t *testing.T) {
 }
 
 func TestDisableNodeExpiry(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -179,6 +191,8 @@ func TestDisableNodeExpiry(t *testing.T) {
 }
 
 func TestAutoApproveRoutes(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		acl          string
@@ -303,6 +317,8 @@ func TestAutoApproveRoutes(t *testing.T) {
 		pmfs := policy.PolicyManagerFuncsForTest([]byte(tt.acl))
 		for i, pmf := range pmfs {
 			t.Run(fmt.Sprintf("%s-policy-index%d", tt.name, i), func(t *testing.T) {
+				t.Parallel()
+
 				adb, err := newSQLiteTestDB()
 				require.NoError(t, err)
 
@@ -402,6 +418,8 @@ func TestAutoApproveRoutes(t *testing.T) {
 }
 
 func TestEphemeralGarbageCollectorOrder(t *testing.T) {
+	t.Parallel()
+
 	want := []types.NodeID{1, 3}
 	got := []types.NodeID{}
 
@@ -462,6 +480,8 @@ func TestEphemeralGarbageCollectorOrder(t *testing.T) {
 }
 
 func TestEphemeralGarbageCollectorLoads(t *testing.T) {
+	t.Parallel()
+
 	var (
 		got []types.NodeID
 		mu  sync.Mutex
@@ -520,6 +540,8 @@ func generateRandomNumber(t *testing.T, maxVal int64) int64 {
 }
 
 func TestListEphemeralNodes(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	if err != nil {
 		t.Fatalf("creating db: %s", err)
@@ -579,6 +601,8 @@ func TestListEphemeralNodes(t *testing.T) {
 }
 
 func TestListPeers(t *testing.T) {
+	t.Parallel()
+
 	// Setup test database
 	db, err := newSQLiteTestDB()
 	if err != nil {
@@ -665,6 +689,8 @@ func TestListPeers(t *testing.T) {
 }
 
 func TestListNodes(t *testing.T) {
+	t.Parallel()
+
 	// Setup test database
 	db, err := newSQLiteTestDB()
 	if err != nil {

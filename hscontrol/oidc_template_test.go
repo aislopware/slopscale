@@ -8,6 +8,8 @@ import (
 )
 
 func TestAuthErrorTemplate(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		result templates.AuthErrorResult
@@ -48,6 +50,8 @@ func TestAuthErrorTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			html := templates.AuthError(tt.result).Render()
 
 			// Verify the HTML contains expected structural elements
@@ -73,6 +77,8 @@ func TestAuthErrorTemplate(t *testing.T) {
 }
 
 func TestAuthSuccessTemplate(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		result templates.AuthSuccessResult
@@ -111,6 +117,8 @@ func TestAuthSuccessTemplate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			html := templates.AuthSuccess(tt.result).Render()
 
 			// Verify the HTML contains expected structural elements

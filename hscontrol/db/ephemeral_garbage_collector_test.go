@@ -127,6 +127,8 @@ func TestEphemeralGarbageCollectorCancelReapsGoroutine(t *testing.T) {
 // Cancel then runs before Start drains it. Start must drop the now-superseded
 // deletion rather than removing the freshly reconnected node.
 func TestEphemeralGarbageCollectorCancelBeatsQueuedDeletion(t *testing.T) {
+	t.Parallel()
+
 	const targetNode types.NodeID = 42
 
 	var (
@@ -171,6 +173,8 @@ func TestEphemeralGarbageCollectorCancelBeatsQueuedDeletion(t *testing.T) {
 // It creates a new [EphemeralGarbageCollector], schedules a node for deletion with a longer expiry,
 // and then reschedules it with a shorter expiry, and verifies that the node is deleted only once.
 func TestEphemeralGarbageCollectorReschedule(t *testing.T) {
+	t.Parallel()
+
 	// Deletion tracking mechanism
 	var (
 		deletedIDs  []types.NodeID
@@ -227,6 +231,8 @@ func TestEphemeralGarbageCollectorReschedule(t *testing.T) {
 // It creates a new [EphemeralGarbageCollector], schedules a node for deletion, cancels it, and then reschedules it,
 // and verifies that the node is deleted only once.
 func TestEphemeralGarbageCollectorCancelAndReschedule(t *testing.T) {
+	t.Parallel()
+
 	// Deletion tracking mechanism
 	var (
 		deletedIDs  []types.NodeID
@@ -295,6 +301,8 @@ func TestEphemeralGarbageCollectorCancelAndReschedule(t *testing.T) {
 // TestEphemeralGarbageCollectorCloseBeforeTimerFires is a test for the closing of the [EphemeralGarbageCollector] before the timer fires.
 // It creates a new [EphemeralGarbageCollector], schedules a node for deletion, closes the GC, and verifies that the node is not deleted.
 func TestEphemeralGarbageCollectorCloseBeforeTimerFires(t *testing.T) {
+	t.Parallel()
+
 	// Deletion tracking
 	var (
 		deletedIDs  []types.NodeID

@@ -15,6 +15,8 @@ import (
 // batching collapses the per-node SetApprovedRoutes calls into one NodeStore
 // update and one policy rebuild; this guards that correctness is preserved.
 func TestAutoApproveBatchApprovesRoutes(t *testing.T) {
+	t.Parallel()
+
 	_, s, nodeID := persistTestSetup(t)
 	t.Cleanup(func() { _ = s.Close() })
 

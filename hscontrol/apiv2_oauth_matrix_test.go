@@ -105,6 +105,8 @@ type matrixOp struct {
 // holding exactly that scope is allowed iff scope.Grants permits it (P3) and denied
 // otherwise (P2).
 func TestAPIv2OAuthMatrix_Enforcement(t *testing.T) {
+	t.Parallel()
+
 	app, baseURL, admin := newOAuthTestServer(t)
 
 	// Stable ids for the keyType-multiplexed get-by-id operations.
@@ -161,6 +163,8 @@ func TestAPIv2OAuthMatrix_Enforcement(t *testing.T) {
 // only mint a token for scopes within its own grant. For every held scope X and
 // requested scope Y, the mint succeeds iff scope.Grants([X], Y).
 func TestAPIv2OAuthMatrix_ScopeNarrowing(t *testing.T) {
+	t.Parallel()
+
 	_, baseURL, admin := newOAuthTestServer(t)
 
 	for _, held := range scope.Known() {
@@ -185,6 +189,8 @@ func TestAPIv2OAuthMatrix_ScopeNarrowing(t *testing.T) {
 // only mint a token for tags within its grant (closing the /oauth/token tags-param
 // path). A client with the "all" scope may request any tag.
 func TestAPIv2OAuthMatrix_TagNarrowing(t *testing.T) {
+	t.Parallel()
+
 	_, baseURL, admin := newOAuthTestServer(t)
 
 	_, secret := createClient(t, baseURL, admin, []string{"auth_keys"}, []string{"tag:a", "tag:b"})
@@ -211,6 +217,8 @@ func TestAPIv2OAuthMatrix_TagNarrowing(t *testing.T) {
 // TestAPIv2OAuthMatrix_Lifecycle proves expired and revoked credentials are denied
 // at the HTTP layer, and that an admin API key bypasses scope checks.
 func TestAPIv2OAuthMatrix_Lifecycle(t *testing.T) {
+	t.Parallel()
+
 	app, baseURL, admin := newOAuthTestServer(t)
 
 	devicesPath := baseURL + "/api/v2/tailnet/-/devices"

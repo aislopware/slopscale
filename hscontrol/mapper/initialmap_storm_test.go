@@ -133,6 +133,8 @@ func setupStormBatcher(tb testing.TB, nodeCount, workers int, policy string) (*T
 // this scale (lock-bound, and more workers do not help); with it, generation
 // parallelises across workers and stays well within a client's patience.
 func TestInitialMapNotStarvedByReconnectStorm(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("timing-sensitive storm regression; skipped in -short")
 	}

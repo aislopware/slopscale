@@ -69,13 +69,19 @@ func seedNodes(seeds ...nodeSeed) func(t *testing.T, app *Headscale) {
 }
 
 func TestAPIV1NodeGet(t *testing.T) {
+	t.Parallel()
+
 	t.Run("happy parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedNodes(newNodeSeed("alice", "node-a"))(t, h.app)
 		h.assertParity(t, http.MethodGet, "/api/v1/node/1", nil)
 	})
 
 	t.Run("tagged node parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		// No tagOwners means policy won't authorise a tag, so register via the
 		// pre-auth key path, which forces tags regardless of policy.
@@ -84,18 +90,24 @@ func TestAPIV1NodeGet(t *testing.T) {
 	})
 
 	t.Run("not found parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodGet, "/api/v1/node/99999", nil)
 		assertStatus(t, res, http.StatusNotFound)
 	})
 
 	t.Run("invalid id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodGet, "/api/v1/node/abc", nil)
 		assertStatus(t, res, http.StatusBadRequest)
 	})
 
 	t.Run("huma response shape", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedNodes(newNodeSeed("carol", "node-c"))(t, h.app)
 
@@ -121,7 +133,11 @@ func TestAPIV1NodeGet(t *testing.T) {
 }
 
 func TestAPIV1NodeList(t *testing.T) {
+	t.Parallel()
+
 	t.Run("empty returns empty array", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		res := h.callHuma(http.MethodGet, "/api/v1/node", nil)
@@ -130,11 +146,15 @@ func TestAPIV1NodeList(t *testing.T) {
 	})
 
 	t.Run("empty parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		h.assertParity(t, http.MethodGet, "/api/v1/node", nil)
 	})
 
 	t.Run("all parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedNodes(
 			newNodeSeed("alice", "node-a"),
@@ -144,6 +164,8 @@ func TestAPIV1NodeList(t *testing.T) {
 	})
 
 	t.Run("filter by user parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedNodes(
 			newNodeSeed("alice", "node-a"),
@@ -153,6 +175,8 @@ func TestAPIV1NodeList(t *testing.T) {
 	})
 
 	t.Run("unknown user parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedNodes(newNodeSeed("alice", "node-a"))(t, h.app)
 		res := h.assertParity(t, http.MethodGet, "/api/v1/node?user=nope", nil)
@@ -161,18 +185,26 @@ func TestAPIV1NodeList(t *testing.T) {
 }
 
 func TestAPIV1NodeDelete(t *testing.T) {
+	t.Parallel()
+
 	t.Run("happy parity", func(t *testing.T) {
+		t.Parallel()
+
 		assertParityIsolated(t, seedNodes(newNodeSeed("alice", "node-a")),
 			http.MethodDelete, "/api/v1/node/1", nil)
 	})
 
 	t.Run("not found parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodDelete, "/api/v1/node/99999", nil)
 		assertStatus(t, res, http.StatusNotFound)
 	})
 
 	t.Run("invalid id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodDelete, "/api/v1/node/abc", nil)
 		assertStatus(t, res, http.StatusBadRequest)
@@ -180,10 +212,14 @@ func TestAPIV1NodeDelete(t *testing.T) {
 }
 
 func TestAPIV1NodeExpire(t *testing.T) {
+	t.Parallel()
+
 	// The embedded pre-auth key's masked prefix is random per app, so isolated
 	// body comparison is impossible. GetNode/ListNodes prove full serialisation;
 	// here we just assert the mutation took effect.
 	t.Run("huma expires node", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedNodes(newNodeSeed("alice", "node-a"))(t, h.app)
 
@@ -201,12 +237,16 @@ func TestAPIV1NodeExpire(t *testing.T) {
 	})
 
 	t.Run("not found parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/node/99999/expire", nil)
 		assertStatus(t, res, http.StatusNotFound)
 	})
 
 	t.Run("invalid id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/node/abc/expire", nil)
 		assertStatus(t, res, http.StatusBadRequest)
@@ -214,7 +254,11 @@ func TestAPIV1NodeExpire(t *testing.T) {
 }
 
 func TestAPIV1NodeRename(t *testing.T) {
+	t.Parallel()
+
 	t.Run("huma renames node", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedNodes(newNodeSeed("alice", "node-a"))(t, h.app)
 
@@ -230,12 +274,16 @@ func TestAPIV1NodeRename(t *testing.T) {
 	})
 
 	t.Run("not found parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/node/99999/rename/whatever", nil)
 		assertStatus(t, res, http.StatusNotFound)
 	})
 
 	t.Run("invalid id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/node/abc/rename/whatever", nil)
 		assertStatus(t, res, http.StatusBadRequest)
@@ -243,7 +291,11 @@ func TestAPIV1NodeRename(t *testing.T) {
 }
 
 func TestAPIV1NodeSetTags(t *testing.T) {
+	t.Parallel()
+
 	t.Run("not found parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/node/99999/tags",
 			[]byte(`{"tags":["tag:foo"]}`))
@@ -251,6 +303,8 @@ func TestAPIV1NodeSetTags(t *testing.T) {
 	})
 
 	t.Run("empty tags parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedNodes(newNodeSeed("alice", "node-a"))(t, h.app)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/node/1/tags", []byte(`{"tags":[]}`))
@@ -258,6 +312,8 @@ func TestAPIV1NodeSetTags(t *testing.T) {
 	})
 
 	t.Run("unauthorized tag parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedNodes(newNodeSeed("alice", "node-a"))(t, h.app)
 		// No tagOwners in policy → SetNodeTags rejects with InvalidArgument (400).
@@ -267,6 +323,8 @@ func TestAPIV1NodeSetTags(t *testing.T) {
 	})
 
 	t.Run("invalid id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/node/abc/tags",
 			[]byte(`{"tags":["tag:foo"]}`))
@@ -275,7 +333,11 @@ func TestAPIV1NodeSetTags(t *testing.T) {
 }
 
 func TestAPIV1NodeSetApprovedRoutes(t *testing.T) {
+	t.Parallel()
+
 	t.Run("huma sets approved routes", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedNodes(newNodeSeed("alice", "node-a"))(t, h.app)
 
@@ -295,6 +357,8 @@ func TestAPIV1NodeSetApprovedRoutes(t *testing.T) {
 	})
 
 	t.Run("not found parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/node/99999/approve_routes",
 			[]byte(`{"routes":["10.0.0.0/24"]}`))
@@ -302,6 +366,8 @@ func TestAPIV1NodeSetApprovedRoutes(t *testing.T) {
 	})
 
 	t.Run("invalid id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/node/abc/approve_routes",
 			[]byte(`{"routes":[]}`))
@@ -310,7 +376,11 @@ func TestAPIV1NodeSetApprovedRoutes(t *testing.T) {
 }
 
 func TestAPIV1NodeRegister(t *testing.T) {
+	t.Parallel()
+
 	t.Run("happy parity", func(t *testing.T) {
+		t.Parallel()
+
 		authID := types.MustAuthID()
 		mk := key.NewMachine()
 		nk := key.NewNode()
@@ -333,6 +403,8 @@ func TestAPIV1NodeRegister(t *testing.T) {
 	})
 
 	t.Run("invalid key parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedNodes(newNodeSeed("alice", "node-a"))(t, h.app)
 		res := h.assertParity(t, http.MethodPost,
@@ -341,6 +413,8 @@ func TestAPIV1NodeRegister(t *testing.T) {
 	})
 
 	t.Run("unknown user parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost,
 			"/api/v1/node/register?user=nope&key="+types.MustAuthID().String(), nil)
@@ -349,12 +423,18 @@ func TestAPIV1NodeRegister(t *testing.T) {
 }
 
 func TestAPIV1NodeBackfillIPs(t *testing.T) {
+	t.Parallel()
+
 	t.Run("confirmed empty parity", func(t *testing.T) {
+		t.Parallel()
+
 		assertParityIsolated(t, nil, http.MethodPost,
 			"/api/v1/node/backfillips?confirmed=true", nil)
 	})
 
 	t.Run("confirmed returns empty array", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		res := h.callHuma(http.MethodPost, "/api/v1/node/backfillips?confirmed=true", nil)
@@ -363,6 +443,8 @@ func TestAPIV1NodeBackfillIPs(t *testing.T) {
 	})
 
 	t.Run("unconfirmed parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/node/backfillips", nil)
 		assertStatus(t, res, http.StatusBadRequest)
@@ -370,7 +452,11 @@ func TestAPIV1NodeBackfillIPs(t *testing.T) {
 }
 
 func TestAPIV1NodeDebugCreate(t *testing.T) {
+	t.Parallel()
+
 	t.Run("unknown user parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		body := []byte(`{"user":"nope","key":"` + types.MustAuthID().String() +
 			`","name":"dbg","routes":[]}`)
@@ -379,6 +465,8 @@ func TestAPIV1NodeDebugCreate(t *testing.T) {
 	})
 
 	t.Run("invalid key parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedNodes(newNodeSeed("alice", "node-a"))(t, h.app)
 
@@ -390,6 +478,8 @@ func TestAPIV1NodeDebugCreate(t *testing.T) {
 	// The handler mints fresh key material per call, so isolated apps can't
 	// produce byte-identical bodies; assert the shape directly instead.
 	t.Run("huma response shape", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		h.app.state.CreateUserForTest("alice")
 

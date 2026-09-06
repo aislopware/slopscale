@@ -485,6 +485,8 @@ func validateUpdateContent(resp *tailcfg.MapResponse) (bool, string) {
 
 // TestEnhancedNodeTracking verifies that the enhanced node tracking works correctly.
 func TestEnhancedNodeTracking(t *testing.T) {
+	t.Parallel()
+
 	// Create a simple test node
 	testNode := node{
 		n:  &types.Node{ID: 1},
@@ -523,8 +525,12 @@ func TestEnhancedNodeTracking(t *testing.T) {
 
 // TestEnhancedTrackingWithBatcher verifies enhanced tracking works with a real batcher.
 func TestEnhancedTrackingWithBatcher(t *testing.T) {
+	t.Parallel()
+
 	for _, batcherFunc := range allBatcherFunctions {
 		t.Run(batcherFunc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Create test environment with 1 node
 			testData, cleanup := setupBatcherWithTestData(t, batcherFunc.fn, 1, 1, 10)
 			defer cleanup()
@@ -573,6 +579,8 @@ func TestEnhancedTrackingWithBatcher(t *testing.T) {
 // and ensure all nodes can see all other nodes. This is a critical test for mesh network
 // functionality where every node must be able to communicate with every other node.
 func TestBatcherScalabilityAllToAll(t *testing.T) {
+	t.Parallel()
+
 	// Test cases: different node counts to stress test the all-to-all connectivity
 	testCases := []struct {
 		name      string
@@ -588,8 +596,12 @@ func TestBatcherScalabilityAllToAll(t *testing.T) {
 
 	for _, batcherFunc := range allBatcherFunctions {
 		t.Run(batcherFunc.name, func(t *testing.T) {
+			t.Parallel()
+
 			for _, tc := range testCases {
 				t.Run(tc.name, func(t *testing.T) {
+					t.Parallel()
+
 					t.Logf(
 						"ALL-TO-ALL TEST: %d nodes with %s batcher",
 						tc.nodeCount,
@@ -799,8 +811,12 @@ func TestBatcherScalabilityAllToAll(t *testing.T) {
 // add/remove operations and basic work processing pipeline with actual update
 // content validation instead of just byte count checks.
 func TestBatcherBasicOperations(t *testing.T) {
+	t.Parallel()
+
 	for _, batcherFunc := range allBatcherFunctions {
 		t.Run(batcherFunc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Create test environment with real database and nodes
 			testData, cleanup := setupBatcherWithTestData(t, batcherFunc.fn, 1, 2, 8)
 			defer cleanup()
@@ -1022,8 +1038,12 @@ func drainChannelTimeout(ch <-chan *tailcfg.MapResponse, timeout time.Duration) 
 // should be combined into fewer updates. This validates that the batching
 // system works correctly with real node data and mixed change types.
 func TestBatcherWorkQueueBatching(t *testing.T) {
+	t.Parallel()
+
 	for _, batcherFunc := range allBatcherFunctions {
 		t.Run(batcherFunc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Create test environment with real database and nodes
 			testData, cleanup := setupBatcherWithTestData(t, batcherFunc.fn, 1, 2, 8)
 			defer cleanup()
@@ -1110,8 +1130,12 @@ func TestBatcherWorkQueueBatching(t *testing.T) {
 // a separate full netmap rebuild for every connected node (the reconnect-storm
 // fan-out); with it, a node sees at most one recompute per tick.
 func TestBatcherCoalescesPolicyRecomputesPerTick(t *testing.T) {
+	t.Parallel()
+
 	for _, bf := range allBatcherFunctions {
 		t.Run(bf.name, func(t *testing.T) {
+			t.Parallel()
+
 			const (
 				nodesPerUser         = 4
 				policyChangesPerTick = 8
@@ -1179,8 +1203,12 @@ func TestBatcherCoalescesPolicyRecomputesPerTick(t *testing.T) {
 // closed by node removal. The test validates that the safeSend() method properly
 // handles closed channels with real update workloads.
 func TestBatcherWorkerChannelSafety(t *testing.T) {
+	t.Parallel()
+
 	for _, batcherFunc := range allBatcherFunctions {
 		t.Run(batcherFunc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Create test environment with real database and nodes
 			testData, cleanup := setupBatcherWithTestData(t, batcherFunc.fn, 1, 1, 8)
 			defer cleanup()
@@ -1309,12 +1337,16 @@ func TestBatcherWorkerChannelSafety(t *testing.T) {
 //
 //nolint:gocyclo // complex concurrent test scenario
 func TestBatcherConcurrentClients(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("Skipping concurrent client test in short mode")
 	}
 
 	for _, batcherFunc := range allBatcherFunctions {
 		t.Run(batcherFunc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Create comprehensive test environment with real data
 			testData, cleanup := setupBatcherWithTestData(
 				t,
@@ -1586,8 +1618,12 @@ func TestBatcherConcurrentClients(t *testing.T) {
 // TestBatcherFullPeerUpdates verifies that when multiple nodes are connected
 // and we send a FullSet update, nodes receive the complete peer list.
 func TestBatcherFullPeerUpdates(t *testing.T) {
+	t.Parallel()
+
 	for _, batcherFunc := range allBatcherFunctions {
 		t.Run(batcherFunc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Create test environment with 3 nodes from same user (so they can be peers)
 			testData, cleanup := setupBatcherWithTestData(t, batcherFunc.fn, 1, 3, 10)
 			defer cleanup()
@@ -1735,8 +1771,12 @@ func TestBatcherFullPeerUpdates(t *testing.T) {
 // at the same time cause /debug/batcher to show nodes as disconnected when they should be connected.
 // This specifically tests the multi-channel batcher implementation issue.
 func TestBatcherRapidReconnection(t *testing.T) {
+	t.Parallel()
+
 	for _, batcherFunc := range allBatcherFunctions {
 		t.Run(batcherFunc.name, func(t *testing.T) {
+			t.Parallel()
+
 			testData, cleanup := setupBatcherWithTestData(t, batcherFunc.fn, 1, 3, 10)
 			defer cleanup()
 
@@ -1864,8 +1904,12 @@ func TestBatcherRapidReconnection(t *testing.T) {
 
 //nolint:gocyclo // complex multi-connection test scenario
 func TestBatcherMultiConnection(t *testing.T) {
+	t.Parallel()
+
 	for _, batcherFunc := range allBatcherFunctions {
 		t.Run(batcherFunc.name, func(t *testing.T) {
+			t.Parallel()
+
 			testData, cleanup := setupBatcherWithTestData(t, batcherFunc.fn, 1, 2, 10)
 			defer cleanup()
 
@@ -2095,8 +2139,12 @@ func TestBatcherMultiConnection(t *testing.T) {
 // 3. Batcher worker tries to generate map response for deleted node
 // 4. Mapper fails to find node in state, causing repeated "node not found" errors.
 func TestNodeDeletedWhileChangesPending(t *testing.T) {
+	t.Parallel()
+
 	for _, batcherFunc := range allBatcherFunctions {
 		t.Run(batcherFunc.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Create test environment with 3 nodes
 			testData, cleanup := setupBatcherWithTestData(t, batcherFunc.fn, 1, 3, normalBufferSize)
 			defer cleanup()
@@ -2210,9 +2258,15 @@ func TestNodeDeletedWhileChangesPending(t *testing.T) {
 }
 
 func TestRemoveNodeChannelAlreadyRemoved(t *testing.T) {
+	t.Parallel()
+
 	for _, batcherFunc := range allBatcherFunctions {
 		t.Run(batcherFunc.name, func(t *testing.T) {
+			t.Parallel()
+
 			t.Run("marks disconnected when removed channel was last active connection", func(t *testing.T) {
+				t.Parallel()
+
 				testData, cleanup := setupBatcherWithTestData(t, batcherFunc.fn, 1, 1, normalBufferSize)
 				defer cleanup()
 
@@ -2241,6 +2295,8 @@ func TestRemoveNodeChannelAlreadyRemoved(t *testing.T) {
 			})
 
 			t.Run("keeps connected when another connection is still active", func(t *testing.T) {
+				t.Parallel()
+
 				testData, cleanup := setupBatcherWithTestData(t, batcherFunc.fn, 1, 1, normalBufferSize)
 				defer cleanup()
 

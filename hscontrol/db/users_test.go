@@ -11,6 +11,8 @@ import (
 )
 
 func TestCreateAndDestroyUser(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -29,6 +31,8 @@ func TestCreateAndDestroyUser(t *testing.T) {
 }
 
 func TestDestroyUserErrors(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		test func(*testing.T, *HSDatabase)
@@ -206,6 +210,8 @@ func TestDestroyUserErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			db, err := newSQLiteTestDB()
 			require.NoError(t, err)
 
@@ -215,6 +221,8 @@ func TestDestroyUserErrors(t *testing.T) {
 }
 
 func TestRenameUser(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		test func(*testing.T, *HSDatabase)
@@ -272,6 +280,8 @@ func TestRenameUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			db, err := newSQLiteTestDB()
 			require.NoError(t, err)
 

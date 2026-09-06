@@ -10,6 +10,8 @@ import (
 )
 
 func TestNetInfoFromMapRequest(t *testing.T) {
+	t.Parallel()
+
 	nodeID := types.NodeID(1)
 
 	tests := []struct {
@@ -59,6 +61,8 @@ func TestNetInfoFromMapRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := netInfoFromMapRequest(nodeID, tt.currentHostinfo, tt.reqHostinfo)
 
 			if tt.expectNetInfo == nil {
@@ -72,11 +76,15 @@ func TestNetInfoFromMapRequest(t *testing.T) {
 }
 
 func TestNetInfoPreservationInRegistrationFlow(t *testing.T) {
+	t.Parallel()
+
 	nodeID := types.NodeID(1)
 
 	// This test reproduces the bug in registration flows where NetInfo was lost
 	// because we used the wrong hostinfo reference when calling [netInfoFromMapRequest]
 	t.Run("registration_flow_bug_reproduction", func(t *testing.T) {
+		t.Parallel()
+
 		// Simulate existing node with NetInfo (before re-registration)
 		existingNodeHostinfo := &tailcfg.Hostinfo{
 			Hostname: "test-node",
@@ -108,6 +116,8 @@ func TestNetInfoPreservationInRegistrationFlow(t *testing.T) {
 	})
 
 	t.Run("new_node_creation_for_different_user_should_preserve_netinfo", func(t *testing.T) {
+		t.Parallel()
+
 		// This test covers the scenario where:
 		// 1. A node exists for user1 with NetInfo
 		// 2. The same machine logs in as user2 (different user)

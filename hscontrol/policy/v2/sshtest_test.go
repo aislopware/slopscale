@@ -88,6 +88,8 @@ func sshTestNodes(users types.Users) types.Nodes {
 // SetPolicy gating is exercised separately in
 // TestSetPolicyRejectsFailingSSHTests below.
 func TestRunSSHTests(t *testing.T) {
+	t.Parallel()
+
 	users := sshTestUsers()
 	nodes := sshTestNodes(users)
 
@@ -711,6 +713,8 @@ func TestRunSSHTests(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pm, err := NewPolicyManager([]byte(tt.policy), users, nodes.ViewSlice())
 			require.NoError(t, err, "policy must parse and compile")
 
@@ -738,6 +742,8 @@ func TestRunSSHTests(t *testing.T) {
 // errPolicyTestsFailed. The two sentinels share a literal message but
 // are distinct values.
 func TestRunSSHTestsBothTestsPassSSHTestsFail(t *testing.T) {
+	t.Parallel()
+
 	users := sshTestUsers()
 	nodes := sshTestNodes(users)
 
@@ -778,6 +784,8 @@ func TestRunSSHTestsBothTestsPassSSHTestsFail(t *testing.T) {
 // the live PolicyManager. SSHPolicy() output must remain the prior
 // rules.
 func TestSetPolicyRejectsFailingSSHTests(t *testing.T) {
+	t.Parallel()
+
 	users := sshTestUsers()
 	nodes := sshTestNodes(users)
 
@@ -849,6 +857,8 @@ func TestSetPolicyRejectsFailingSSHTests(t *testing.T) {
 // aggregation: when both layers fail, the returned error wraps both
 // sentinels so operators see every failure in a single round trip.
 func TestSetPolicyAggregatesACLAndSSHTestFailures(t *testing.T) {
+	t.Parallel()
+
 	users := sshTestUsers()
 	nodes := sshTestNodes(users)
 
@@ -929,6 +939,8 @@ func TestSetPolicyAggregatesACLAndSSHTestFailures(t *testing.T) {
 // not error on a failing sshTests block: warn-and-continue is the right
 // behaviour for stale stored policy, mirroring the ACL tests handling.
 func TestNewPolicyManagerWarnsOnSSHTestsFailure(t *testing.T) {
+	t.Parallel()
+
 	users := sshTestUsers()
 	nodes := sshTestNodes(users)
 
@@ -958,6 +970,8 @@ func TestNewPolicyManagerWarnsOnSSHTestsFailure(t *testing.T) {
 // layout. Because the body is the user-facing error, the format needs
 // to identify (src, user, dst) cleanly across accept, deny, and check.
 func TestSSHPolicyTestResultsErrorsRendering(t *testing.T) {
+	t.Parallel()
+
 	results := SSHPolicyTestResults{
 		AllPassed: false,
 		Results: []SSHPolicyTestResult{

@@ -17,6 +17,8 @@ import (
 // or runs first and AddNode recreates the entry — never leaving a live
 // connection orphaned outside b.nodes.
 func TestAddNodeReconnectNotOrphanedByCleanup(t *testing.T) {
+	t.Parallel()
+
 	testData, cleanup := setupBatcherWithTestData(t, NewBatcherAndMapper, 1, 1, normalBufferSize)
 	defer cleanup()
 

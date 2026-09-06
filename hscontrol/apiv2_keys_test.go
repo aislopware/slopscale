@@ -124,6 +124,8 @@ func keyCount(t *testing.T, app *Headscale) int {
 }
 
 func TestAPIv2Key_Create_Tagged(t *testing.T) {
+	t.Parallel()
+
 	app, api := newKeyTestAPI(t)
 
 	created := createKey(t, api, apiv2.CreateKeyRequest{
@@ -162,6 +164,8 @@ func TestAPIv2Key_Create_Tagged(t *testing.T) {
 }
 
 func TestAPIv2Key_Create_Permutations(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name          string
 		req           apiv2.CreateKeyRequest
@@ -211,6 +215,8 @@ func TestAPIv2Key_Create_Permutations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			app, api := newKeyTestAPI(t)
 
 			created := createKey(t, api, tt.req)
@@ -231,6 +237,8 @@ func TestAPIv2Key_Create_Permutations(t *testing.T) {
 }
 
 func TestAPIv2Key_Get(t *testing.T) {
+	t.Parallel()
+
 	_, api := newKeyTestAPI(t)
 
 	created := createKey(t, api, apiv2.CreateKeyRequest{
@@ -261,6 +269,8 @@ func TestAPIv2Key_Get(t *testing.T) {
 }
 
 func TestAPIv2Key_List(t *testing.T) {
+	t.Parallel()
+
 	app, api := newKeyTestAPI(t)
 
 	k1 := createKey(t, api, apiv2.CreateKeyRequest{Capabilities: taggedCaps("tag:test")})
@@ -279,6 +289,8 @@ func TestAPIv2Key_List(t *testing.T) {
 }
 
 func TestAPIv2Key_Delete(t *testing.T) {
+	t.Parallel()
+
 	app, api := newKeyTestAPI(t)
 
 	created := createKey(t, api, apiv2.CreateKeyRequest{Capabilities: taggedCaps("tag:test")})
@@ -309,6 +321,8 @@ func TestAPIv2Key_Delete(t *testing.T) {
 }
 
 func TestAPIv2Key_Create_NoTags_NoOwner_400(t *testing.T) {
+	t.Parallel()
+
 	app, api := newKeyTestAPI(t)
 
 	before := keyCount(t, app)

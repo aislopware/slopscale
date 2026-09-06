@@ -13,6 +13,8 @@ import (
 // after Stop has run; that write must be either applied or cleanly dropped,
 // never crash the process.
 func TestNodeStoreWriteDuringStopNoPanic(t *testing.T) {
+	t.Parallel()
+
 	const iterations = 200
 
 	for range iterations {

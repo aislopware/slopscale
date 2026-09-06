@@ -62,6 +62,8 @@ func createTestAppWithNodeExpiry(t *testing.T, nodeExpiry time.Duration) *Headsc
 // - Nil UserID (tagged nodes are owned by tags, not a user)
 // - [types.Node.IsTagged] returns true.
 func TestTaggedPreAuthKeyCreatesTaggedNode(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-creator")
@@ -115,6 +117,8 @@ func TestTaggedPreAuthKeyCreatesTaggedNode(t *testing.T) {
 // NOTE: This test verifies that re-authentication preserves the node's current tags
 // without testing tag modification via [state.State.SetNodeTags] (which requires ACL policy setup).
 func TestReAuthDoesNotReapplyTags(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-creator")
@@ -186,6 +190,8 @@ func TestReAuthDoesNotReapplyTags(t *testing.T) {
 // tagged node fails with ErrCannotRemoveAllTags. Once a node is tagged,
 // it must always have at least one tag (Tailscale requirement).
 func TestCannotRemoveAllTags(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-creator")
@@ -233,6 +239,8 @@ func TestCannotRemoveAllTags(t *testing.T) {
 // TestUserOwnedNodeCreatedWithUntaggedPreAuthKey tests that using a PreAuthKey
 // without tags creates a user-owned node (no tags, UserID is the owner).
 func TestUserOwnedNodeCreatedWithUntaggedPreAuthKey(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("node-owner")
@@ -278,6 +286,8 @@ func TestUserOwnedNodeCreatedWithUntaggedPreAuthKey(t *testing.T) {
 // PreAuthKey with tags can be used to register multiple nodes, and all nodes
 // receive the same tags from the key.
 func TestMultipleNodesWithSameReusableTaggedPreAuthKey(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-creator")
@@ -350,6 +360,8 @@ func TestMultipleNodesWithSameReusableTaggedPreAuthKey(t *testing.T) {
 // TestNonReusableTaggedPreAuthKey tests that a non-reusable PreAuthKey with tags
 // can only be used once. The second attempt should fail.
 func TestNonReusableTaggedPreAuthKey(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-creator")
@@ -411,6 +423,8 @@ func TestNonReusableTaggedPreAuthKey(t *testing.T) {
 // TestExpiredTaggedPreAuthKey tests that an expired PreAuthKey with tags
 // cannot be used to register a node.
 func TestExpiredTaggedPreAuthKey(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-creator")
@@ -448,6 +462,8 @@ func TestExpiredTaggedPreAuthKey(t *testing.T) {
 // TestSingleVsMultipleTags tests that PreAuthKeys work correctly with both
 // a single tag and multiple tags.
 func TestSingleVsMultipleTags(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-creator")
@@ -518,6 +534,8 @@ func TestSingleVsMultipleTags(t *testing.T) {
 // TestTaggedPreAuthKeyDisablesKeyExpiry tests that nodes registered with
 // a tagged PreAuthKey have key expiry disabled (expiry is nil).
 func TestTaggedPreAuthKeyDisablesKeyExpiry(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-creator")
@@ -562,6 +580,8 @@ func TestTaggedPreAuthKeyDisablesKeyExpiry(t *testing.T) {
 // TestUntaggedPreAuthKeyPreservesKeyExpiry tests that nodes registered with
 // an untagged PreAuthKey preserve the client's requested key expiry.
 func TestUntaggedPreAuthKeyPreservesKeyExpiry(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("node-owner")
@@ -608,6 +628,8 @@ func TestUntaggedPreAuthKeyPreservesKeyExpiry(t *testing.T) {
 // TestTaggedNodeReauthPreservesDisabledExpiry tests that when a tagged node
 // re-authenticates, the disabled expiry is preserved (not updated from client request).
 func TestTaggedNodeReauthPreservesDisabledExpiry(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-creator")
@@ -677,6 +699,8 @@ func TestTaggedNodeReauthPreservesDisabledExpiry(t *testing.T) {
 // handleLogout, which wrote &time.Time{} over the original nil and flipped
 // the API representation from null to "0001-01-01T00:00:00Z".
 func TestTaggedNodeRestartPreservesNilExpiry(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-restart")
@@ -748,6 +772,8 @@ func TestTaggedNodeRestartPreservesNilExpiry(t *testing.T) {
 // variant: the dropped node.Expiry().Valid() check covers any nil-expiry
 // node, regardless of ownership.
 func TestUntaggedNodeRestartPreservesNilExpiry(t *testing.T) {
+	t.Parallel()
+
 	app := createTestAppWithNodeExpiry(t, 0)
 
 	user := app.state.CreateUserForTest("untagged-restart")
@@ -815,6 +841,8 @@ func TestUntaggedNodeRestartPreservesNilExpiry(t *testing.T) {
 // Previously expiry was NOT cleared because expiry handling ran
 // BEFORE [state.State.processReauthTags].
 func TestExpiryDuringPersonalToTaggedConversion(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	user := app.state.CreateUserForTest("expiry-test-user")
 
@@ -888,6 +916,8 @@ func TestExpiryDuringPersonalToTaggedConversion(t *testing.T) {
 // Previously expiry was NOT set because expiry handling ran
 // BEFORE [state.State.processReauthTags] (node was still tagged at check time).
 func TestExpiryDuringTaggedToPersonalConversion(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	user := app.state.CreateUserForTest("expiry-test-user2")
 
@@ -960,6 +990,8 @@ func TestExpiryDuringTaggedToPersonalConversion(t *testing.T) {
 // to re-authenticate with the same NodeKey but a DIFFERENT MachineKey.
 // This scenario should be handled gracefully (currently creates a new node).
 func TestReAuthWithDifferentMachineKey(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-creator")
@@ -1370,6 +1402,8 @@ func tsLogoutSentinelExpiry() time.Time {
 // presented for the relogin (the trace shows tag:tag2 keys burned while the
 // node kept tag:tag1).
 func TestIssue3371_TaggedNodeLogoutReloginSingleUseKey(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-logout-user")
@@ -1460,6 +1494,8 @@ func TestIssue3371_TaggedNodeLogoutReloginSingleUseKey(t *testing.T) {
 // non-expired node and hangs. The observable failure here is the persisted
 // expired state after relogin.
 func TestIssue3371_TaggedNodeLogoutReloginReusableKey(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-logout-reusable")
@@ -1526,6 +1562,8 @@ func TestIssue3371_TaggedNodeLogoutReloginReusableKey(t *testing.T) {
 // regression that re-introduces logout-sets-expiry is caught even if the
 // re-registration cleanup masks it.
 func TestIssue3371_TaggedNodeLogoutDoesNotSetExpiry(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-logout-noexpiry")
@@ -1575,6 +1613,8 @@ func TestIssue3371_TaggedNodeLogoutDoesNotSetExpiry(t *testing.T) {
 // user-owned node that logs out MUST still be expired (that is what logout
 // means for it).
 func TestIssue3371_UserOwnedNodeLogoutStillExpires(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("user-logout")
@@ -1626,6 +1666,8 @@ func TestIssue3371_UserOwnedNodeLogoutStillExpires(t *testing.T) {
 // Passes before the fix (re-registration currently never touches a tagged
 // node's expiry) and must keep passing after.
 func TestIssue3371_TaggedNodeFutureExpirySurvivesRelogin(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-future-expiry")
@@ -1686,6 +1728,8 @@ func TestIssue3371_TaggedNodeFutureExpirySurvivesRelogin(t *testing.T) {
 //
 // Passes before the fix and must keep passing after.
 func TestIssue3371_EphemeralTaggedNodeLogoutDeletes(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 
 	user := app.state.CreateUserForTest("tag-ephemeral")

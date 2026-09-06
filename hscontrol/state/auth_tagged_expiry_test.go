@@ -20,6 +20,8 @@ import (
 // to a node that remains tagged just because the auth used the
 // convert-from-tag lookup path.
 func TestTaggedReauthKeepsNilExpiry(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -107,6 +109,8 @@ func TestTaggedReauthKeepsNilExpiry(t *testing.T) {
 //
 // https://github.com/juanfont/headscale/issues/3312
 func TestTaggedReauthWithReusedUserPAK(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -217,6 +221,8 @@ func reregisterExpiredUserNodeWithSpentKey(t *testing.T, sameNodeKey bool) (type
 // TestExpiredUserNodeReusedOneShotKey_RotatedNodeKey: a node rotating its node
 // key on re-auth is already a key rotation, so the key is re-validated.
 func TestExpiredUserNodeReusedOneShotKey_RotatedNodeKey(t *testing.T) {
+	t.Parallel()
+
 	_, err := reregisterExpiredUserNodeWithSpentKey(t, false)
 	require.Error(t, err,
 		"expired node re-authenticating with a rotated node key must present a valid key")
@@ -228,6 +234,8 @@ func TestExpiredUserNodeReusedOneShotKey_RotatedNodeKey(t *testing.T) {
 // node key must still re-validate the key, otherwise a spent one-shot key
 // silently re-authorises it.
 func TestExpiredUserNodeReusedOneShotKey_SameNodeKey(t *testing.T) {
+	t.Parallel()
+
 	_, err := reregisterExpiredUserNodeWithSpentKey(t, true)
 	require.Error(t, err,
 		"expired node re-registering with the same node key must re-validate its key")
@@ -238,6 +246,8 @@ func TestExpiredUserNodeReusedOneShotKey_SameNodeKey(t *testing.T) {
 // user pre-auth key creating a second node when it is re-presented for a node
 // that has since been converted to tagged. The node must be updated in place.
 func TestReusableUserPAKReauthOnTaggedNodeNoDuplicate(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -279,6 +289,8 @@ func TestReusableUserPAKReauthOnTaggedNodeNoDuplicate(t *testing.T) {
 // key for a machine that already has a user-owned node converts that node in
 // place (same machine, new ownership) rather than creating a duplicate.
 func TestTaggedPAKReauthConvertsUserOwnedNode(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -363,6 +375,8 @@ func registerTwoUsersOnOneMachine(t *testing.T) (*State, key.MachinePublic, type
 // so the registration is rejected rather than converting an arbitrary one and
 // orphaning the rest.
 func TestTaggedPAKReauthRejectsAmbiguousMultiUserNode(t *testing.T) {
+	t.Parallel()
+
 	s, mk, _ := registerTwoUsersOnOneMachine(t)
 
 	taggedPak, err := s.CreatePreAuthKey(nil, true, false, nil, []string{"tag:foo"})
@@ -384,6 +398,8 @@ func TestTaggedPAKReauthRejectsAmbiguousMultiUserNode(t *testing.T) {
 // an OIDC re-auth must reject rather than silently converting the tagged node
 // and orphaning the user-owned one.
 func TestAuthPathRejectsTaggedAndUserCoexistence(t *testing.T) {
+	t.Parallel()
+
 	s, mk, n1 := registerTwoUsersOnOneMachine(t)
 
 	// Tag one of the two user-owned nodes -> {0: tagged, u2: user-owned} coexist.
@@ -556,6 +572,8 @@ func (n seededTaggedNode) get(t *testing.T) types.NodeView {
 //
 // https://github.com/juanfont/headscale/issues/3374
 func TestTaggedReauthAddTagAsOwner(t *testing.T) {
+	t.Parallel()
+
 	n := seedTagOwnedNode(t, []string{"tag:tag1"}, "")
 
 	admin := n.s.CreateUserForTest("ci-admin")
@@ -594,6 +612,8 @@ func TestTaggedReauthAddTagAsOwner(t *testing.T) {
 // holds, which is also rejected today." Node is tag-owned (no user), tagger owns
 // the tag, re-auth re-advertises exactly the held tag.
 func TestTaggedReauthSameTagAsOwner(t *testing.T) {
+	t.Parallel()
+
 	n := seedTagOwnedNode(t, []string{"tag:foo"}, "")
 
 	tagger := n.s.CreateUserForTest("tagger")
@@ -615,6 +635,8 @@ func TestTaggedReauthSameTagAsOwner(t *testing.T) {
 // leaves processReauthTags rejecting every tag, so the node silently retains
 // both — a success return with the wrong tag set.
 func TestTaggedReauthRemoveTagAsOwner(t *testing.T) {
+	t.Parallel()
+
 	n := seedTagOwnedNode(t, []string{"tag:tag1", "tag:tag2"}, "")
 
 	owner := n.s.CreateUserForTest("owner")
@@ -639,6 +661,8 @@ func TestTaggedReauthRemoveTagAsOwner(t *testing.T) {
 // owned tag [tag:tag2]. The node must end up on tag:tag2 only, not silently keep
 // tag:tag1.
 func TestTaggedReauthReplaceTagSetAsOwner(t *testing.T) {
+	t.Parallel()
+
 	n := seedTagOwnedNode(t, []string{"tag:tag1"}, "")
 
 	owner := n.s.CreateUserForTest("owner")
@@ -662,6 +686,8 @@ func TestTaggedReauthReplaceTagSetAsOwner(t *testing.T) {
 // so this must be permitted. (Before the fix, NodeCanHaveTag consults the
 // created-by user and rejects.)
 func TestTaggedReauthAuthUserOwnsNotCreatedBy(t *testing.T) {
+	t.Parallel()
+
 	n := seedTagOwnedNode(t, []string{"tag:foo"}, "creator")
 
 	admin := n.s.CreateUserForTest("admin")
@@ -682,6 +708,8 @@ func TestTaggedReauthAuthUserOwnsNotCreatedBy(t *testing.T) {
 // with the client-requested expiry now applied (tagged nodes have no expiry;
 // user-owned nodes do). The untagging user need not own the tag.
 func TestTaggedReauthUntagReturnsToAuthUser(t *testing.T) {
+	t.Parallel()
+
 	n := seedTagOwnedNode(t, []string{"tag:foo"}, "")
 
 	alice := n.s.CreateUserForTest("alice")
@@ -708,6 +736,8 @@ func TestTaggedReauthUntagReturnsToAuthUser(t *testing.T) {
 // next disconnect, silently deleting the user's just-claimed device — and the
 // stale reference survives a control-plane restart via the reloaded AuthKeyID.
 func TestTaggedReauthUntagClearsEphemeralAuthKey(t *testing.T) {
+	t.Parallel()
+
 	n := seedTagOwnedNode(t, []string{"tag:foo"}, "")
 
 	alice := n.s.CreateUserForTest("alice")
@@ -754,6 +784,8 @@ func TestTaggedReauthUntagClearsEphemeralAuthKey(t *testing.T) {
 // byte-for-byte unchanged — same tags, same node key (NOT rotated), no user,
 // nil expiry — matching the issue's post-rejection DB/nodes-list state.
 func TestTaggedReauthRejectsUnownedTag(t *testing.T) {
+	t.Parallel()
+
 	n := seedTagOwnedNode(t, []string{"tag:foo"}, "")
 
 	tagger := n.s.CreateUserForTest("tagger")
@@ -793,6 +825,8 @@ func TestTaggedReauthRejectsUnownedTag(t *testing.T) {
 // owned by another user). The owned tag alone would pass; the undefined tag must
 // force rejection of the whole set.
 func TestTaggedReauthUndefinedTagRejected(t *testing.T) {
+	t.Parallel()
+
 	n := seedTagOwnedNode(t, []string{"tag:foo"}, "")
 
 	owner := n.s.CreateUserForTest("owner")
@@ -811,6 +845,8 @@ func TestTaggedReauthUndefinedTagRejected(t *testing.T) {
 // processReauthTags: an owner re-advertising the same tag twice must succeed and
 // the node must hold a single copy.
 func TestTaggedReauthDuplicateTagsDeduped(t *testing.T) {
+	t.Parallel()
+
 	n := seedTagOwnedNode(t, []string{"tag:foo"}, "")
 
 	owner := n.s.CreateUserForTest("owner")
@@ -827,6 +863,8 @@ func TestTaggedReauthDuplicateTagsDeduped(t *testing.T) {
 // invariants documented at applyAuthNodeUpdate: online status is owned by the
 // poll lifecycle and must not be reset here, and LastSeen is refreshed.
 func TestTaggedReauthPreservesOnlineAndLastSeen(t *testing.T) {
+	t.Parallel()
+
 	n := seedTagOwnedNode(t, []string{"tag:foo"}, "")
 
 	owner := n.s.CreateUserForTest("owner")
@@ -861,6 +899,8 @@ func TestTaggedReauthPreservesOnlineAndLastSeen(t *testing.T) {
 // past expiry on a node that remains tagged (scoped to IsExpired(), so a
 // deliberate future expiry is preserved).
 func TestIssue3371_TaggedNodeInteractiveReloginAfterLogout(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -935,6 +975,8 @@ func TestIssue3371_TaggedNodeInteractiveReloginAfterLogout(t *testing.T) {
 // comes back expired, and its next auth-key re-registration must self-heal it
 // by clearing the stale past expiry. This is the "part b" defensive clear.
 func TestIssue3371_TaggedNodePastExpirySelfHealsOnReregister(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -1002,6 +1044,8 @@ func TestIssue3371_TaggedNodePastExpirySelfHealsOnReregister(t *testing.T) {
 // all rotate the node key or use a reusable key, so validation runs regardless
 // and none probes this fast-path exclusion.
 func TestIssue3371_ExpiredTaggedNodeSameSpentKeyNotRevalidated(t *testing.T) {
+	t.Parallel()
+
 	s := newRetagTestState(t)
 
 	// Single-use tagged key.
@@ -1056,6 +1100,8 @@ func TestIssue3371_ExpiredTaggedNodeSameSpentKeyNotRevalidated(t *testing.T) {
 //
 // https://github.com/juanfont/headscale/issues/3370
 func TestTaggedPAKReauthRetagsExistingTaggedNode(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -1139,6 +1185,8 @@ func TestTaggedPAKReauthRetagsExistingTaggedNode(t *testing.T) {
 // (a --force-reauth with the same key also runs validation). This test passes
 // today and must keep passing after the #3370 fix.
 func TestTaggedPAKReauthSameKeyPreservesTags(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -1193,6 +1241,8 @@ func TestTaggedPAKReauthSameKeyPreservesTags(t *testing.T) {
 // existing isExpired comment already declares the boundary "must not depend on
 // the client rotating its key"; retag must honour the same rule.
 func TestTaggedPAKReauthSpentKeySameNodeKeyRejected(t *testing.T) {
+	t.Parallel()
+
 	s := newRetagTestState(t)
 
 	// KEY1: single-use tag:tag1, used to register.
@@ -1286,6 +1336,8 @@ func retagReauthCase(
 // must retag too. The retag must key on key identity, not on the single-use
 // `Used` flag, so it cannot be coupled to single-use semantics.
 func TestTaggedPAKReauthReusableKeyRetags(t *testing.T) {
+	t.Parallel()
+
 	s := newRetagTestState(t)
 	_, second := retagReauthCase(t, s,
 		[]string{"tag:tag1"}, []string{"tag:tag2"}, nil, nil, true /*reusable*/, true)
@@ -1296,6 +1348,8 @@ func TestTaggedPAKReauthReusableKeyRetags(t *testing.T) {
 // client reuses its node key (no rotation). The trigger is key identity,
 // decoupled from NodeKey rotation.
 func TestTaggedPAKReauthDifferentKeySameNodeKey(t *testing.T) {
+	t.Parallel()
+
 	s := newRetagTestState(t)
 	_, second := retagReauthCase(t, s,
 		[]string{"tag:tag1"}, []string{"tag:tag2"}, nil, nil, false, false /*same node key*/)
@@ -1311,6 +1365,8 @@ func TestTaggedPAKReauthDifferentKeySameNodeKey(t *testing.T) {
 // property #2830/#3312 depend on. (The existing #3312 test uses a user-owned
 // one-shot key; this covers the tags-only single-use key.)
 func TestTaggedPAKReauthSameSingleUseKeySameNodeKeyPreservesTags(t *testing.T) {
+	t.Parallel()
+
 	s := newRetagTestState(t)
 
 	pak, err := s.CreatePreAuthKey(nil, false /*single-use*/, false, nil, []string{"tag:tag1"})
@@ -1343,6 +1399,8 @@ func TestTaggedPAKReauthSameSingleUseKeySameNodeKeyPreservesTags(t *testing.T) {
 // exercises the pak.User != nil branch of findExistingNodeForPAK, a different
 // lookup path from tags-only keys. It must still retag.
 func TestTaggedPAKReauthUserScopedKeyRetags(t *testing.T) {
+	t.Parallel()
+
 	s := newRetagTestState(t)
 	user := s.CreateUserForTest("owner")
 	uid := user.TypedID()
@@ -1356,6 +1414,8 @@ func TestTaggedPAKReauthUserScopedKeyRetags(t *testing.T) {
 // re-keying *replaces* the tag set (it does not union). Re-keying a
 // {tag1,tag2} node with a {tag1} key must drop tag2.
 func TestTaggedPAKReauthReplacesNotMerges(t *testing.T) {
+	t.Parallel()
+
 	s := newRetagTestState(t)
 	_, second := retagReauthCase(t, s,
 		[]string{"tag:tag1", "tag:tag2"}, []string{"tag:tag1"}, nil, nil, false, true)
@@ -1367,6 +1427,8 @@ func TestTaggedPAKReauthReplacesNotMerges(t *testing.T) {
 // logout stamp — see #3371) re-authenticating with a fresh differently-tagged
 // key must still retag. Combines the isExpired validation path with the retag.
 func TestExpiredTaggedNodeReauthRetags(t *testing.T) {
+	t.Parallel()
+
 	s := newRetagTestState(t)
 
 	key1, err := s.CreatePreAuthKey(nil, false, false, nil, []string{"tag:tag1"})
@@ -1413,6 +1475,8 @@ func TestExpiredTaggedNodeReauthRetags(t *testing.T) {
 // Only a stale PAST expiry is cleared (see TestExpiredTaggedNodeReauthRetags).
 // Symmetric with the same-key relogin path.
 func TestTaggedPAKReauthRetagPreservesFutureAdminExpiry(t *testing.T) {
+	t.Parallel()
+
 	s := newRetagTestState(t)
 
 	key1, err := s.CreatePreAuthKey(nil, false, false, nil, []string{"tag:tag1"})
@@ -1478,6 +1542,8 @@ func newRetagTestState(t *testing.T) *State {
 // Drives the real handler twice, then reopens the DB to prove the association
 // survives the reload.
 func TestPreAuthKeyReauthPersistsAuthKeyID(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -1548,6 +1614,8 @@ func TestPreAuthKeyReauthPersistsAuthKeyID(t *testing.T) {
 // expiry disabled by default, but it can still be set explicitly (e.g. via
 // `headscale nodes expire`).
 func TestTaggedNodeCanHaveKeyExpiry(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 
@@ -1582,6 +1650,8 @@ func TestTaggedNodeCanHaveKeyExpiry(t *testing.T) {
 // TestTaggingPreservesNodeExpiry matches Tailscale: changing a node's tags does
 // not alter its key expiry (expiry only changes on re-authentication).
 func TestTaggingPreservesNodeExpiry(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 

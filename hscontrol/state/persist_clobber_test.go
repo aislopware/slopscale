@@ -14,6 +14,8 @@ import (
 // landed in between. NodeStore is the source of truth; the database row must
 // converge on it rather than reverting to the stale snapshot.
 func TestPersistNodeDoesNotClobberConcurrentAdminWrite(t *testing.T) {
+	t.Parallel()
+
 	dbPath, s, nodeID := persistTestSetup(t)
 
 	pol := `{

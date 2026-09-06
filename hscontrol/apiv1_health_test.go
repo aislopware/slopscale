@@ -9,9 +9,13 @@ import (
 )
 
 func TestAPIV1Health(t *testing.T) {
+	t.Parallel()
+
 	h := newAPIV1Harness(t)
 
 	t.Run("huma returns healthy with database connectivity", func(t *testing.T) {
+		t.Parallel()
+
 		res := h.callHuma(http.MethodGet, "/api/v1/health", nil)
 
 		assert.Equal(t, http.StatusOK, res.status)
@@ -19,6 +23,8 @@ func TestAPIV1Health(t *testing.T) {
 	})
 
 	t.Run("parity with gateway", func(t *testing.T) {
+		t.Parallel()
+
 		h.assertParity(t, http.MethodGet, "/api/v1/health", nil)
 	})
 }

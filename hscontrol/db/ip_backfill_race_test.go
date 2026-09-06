@@ -15,6 +15,8 @@ import (
 // without the lock, racing Next's writes; both must now take i.mu. Run with
 // -race.
 func TestAllocatorConcurrentNextAndBackfillNoRace(t *testing.T) {
+	t.Parallel()
+
 	p4 := netip.MustParsePrefix("100.64.0.0/10")
 	p6 := netip.MustParsePrefix("fd7a:115c:a1e0::/48")
 

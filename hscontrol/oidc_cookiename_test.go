@@ -11,6 +11,8 @@ import (
 // (e.g. a malformed nonce from a misbehaving IdP) does not panic with
 // slice-out-of-range; it uses the available bytes instead.
 func TestGetCookieNameShortValue(t *testing.T) {
+	t.Parallel()
+
 	require.NotPanics(t, func() {
 		assert.Equal(t, "nonce_ab", getCookieName("nonce", "ab"))
 	})

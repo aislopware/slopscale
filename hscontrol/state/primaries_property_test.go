@@ -414,6 +414,8 @@ func snapshotPrimariesCopy(ns *NodeStore) map[netip.Prefix]types.NodeID {
 //     (matches the Disconnect path's actual semantics versus
 //     ConnectAdvertise's full reset)
 func TestPrimaryRoutesProperty(t *testing.T) {
+	t.Parallel()
+
 	rapid.Check(t, func(rt *rapid.T) {
 		const numNodes = 4
 

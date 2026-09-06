@@ -16,6 +16,8 @@ import (
 )
 
 func TestSnapshotFromNodes(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		setupFunc func() (map[types.NodeID]types.Node, PeersFunc)
@@ -149,6 +151,8 @@ func TestSnapshotFromNodes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			nodes, peersFunc := tt.setupFunc()
 			snapshot := snapshotFromNodes(nodes, peersFunc, nil)
 			tt.validate(t, nodes, snapshot)
@@ -233,6 +237,8 @@ func oddEvenPeersFunc(nodes []types.NodeView) map[types.NodeID][]types.NodeView 
 }
 
 func TestNodeStoreOperations(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		setupFunc func(t *testing.T) *NodeStore
@@ -851,6 +857,8 @@ func TestNodeStoreOperations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			store := tt.setupFunc(t)
 
 			store.Start()
@@ -891,6 +899,8 @@ func createConcurrentTestNode(id types.NodeID, hostname string) types.Node {
 
 // --- Concurrency: concurrent PutNode operations ---.
 func TestNodeStoreConcurrentPutNode(t *testing.T) {
+	t.Parallel()
+
 	const concurrentOps = 20
 
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
@@ -926,6 +936,8 @@ func TestNodeStoreConcurrentPutNode(t *testing.T) {
 
 // --- Batching: concurrent ops fit in one batch ---.
 func TestNodeStoreBatchingEfficiency(t *testing.T) {
+	t.Parallel()
+
 	const ops = 15 // more than batchSize
 
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
@@ -961,6 +973,8 @@ func TestNodeStoreBatchingEfficiency(t *testing.T) {
 
 // --- Race conditions: many goroutines on same node ---.
 func TestNodeStoreRaceConditions(t *testing.T) {
+	t.Parallel()
+
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 	store.Start()
@@ -1069,6 +1083,8 @@ func TestNodeStoreResourceCleanup(t *testing.T) {
 
 // --- Timeout/deadlock: operations complete within reasonable time ---.
 func TestNodeStoreOperationTimeout(t *testing.T) {
+	t.Parallel()
+
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 	store.Start()
@@ -1165,6 +1181,8 @@ func TestNodeStoreOperationTimeout(t *testing.T) {
 
 // --- Edge case: update non-existent node ---.
 func TestNodeStoreUpdateNonExistentNode(t *testing.T) {
+	t.Parallel()
+
 	for i := range 10 {
 		store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 		store.Start()
@@ -1208,6 +1226,8 @@ func BenchmarkNodeStoreAllocations(b *testing.B) {
 }
 
 func TestNodeStoreAllocationStats(t *testing.T) {
+	t.Parallel()
+
 	res := testing.Benchmark(BenchmarkNodeStoreAllocations)
 	allocs := res.AllocsPerOp()
 	t.Logf("NodeStore allocations per op: %.2f", float64(allocs))
@@ -1218,6 +1238,8 @@ func TestNodeStoreAllocationStats(t *testing.T) {
 // This simulates what happens when SetNodeTags changes node tags and the
 // PolicyManager's matchers are updated, requiring the peer map to be rebuilt.
 func TestRebuildPeerMapsWithChangedPeersFunc(t *testing.T) {
+	t.Parallel()
+
 	// Create a peersFunc that can be controlled via a channel
 	// Initially it returns all nodes as peers, then we change it to return no peers
 	allowPeers := true
@@ -1306,9 +1328,13 @@ func TestRebuildPeerMapsWithChangedPeersFunc(t *testing.T) {
 // a machine key keyed by owning UserID (tagged nodes under UserID(0)), so callers
 // see the full set instead of a single arbitrary pick.
 func TestGetNodesByMachineKeyAllUsers(t *testing.T) {
+	t.Parallel()
+
 	mk := key.NewMachine().Public()
 
 	t.Run("empty when absent", func(t *testing.T) {
+		t.Parallel()
+
 		store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 		store.Start()
@@ -1318,6 +1344,8 @@ func TestGetNodesByMachineKeyAllUsers(t *testing.T) {
 	})
 
 	t.Run("returns all user-owned nodes keyed by user", func(t *testing.T) {
+		t.Parallel()
+
 		store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 		store.Start()
@@ -1338,6 +1366,8 @@ func TestGetNodesByMachineKeyAllUsers(t *testing.T) {
 	})
 
 	t.Run("tagged node indexed under UserID(0)", func(t *testing.T) {
+		t.Parallel()
+
 		store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 
 		store.Start()

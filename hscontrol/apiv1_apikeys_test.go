@@ -23,7 +23,11 @@ func seedAPIKey(t *testing.T, app *Headscale) (uint64, string) {
 }
 
 func TestAPIV1ApiKeyCreate(t *testing.T) {
+	t.Parallel()
+
 	t.Run("huma response shape", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		res := h.callHuma(http.MethodPost, "/api/v1/apikey", []byte(`{}`))
@@ -40,6 +44,8 @@ func TestAPIV1ApiKeyCreate(t *testing.T) {
 	})
 
 	t.Run("creates secret", func(t *testing.T) {
+		t.Parallel()
+
 		// The secret is random, so it can't be captured in a golden; just assert
 		// success and that a secret is returned.
 		humaApp := createTestApp(t)
@@ -57,7 +63,11 @@ func TestAPIV1ApiKeyCreate(t *testing.T) {
 }
 
 func TestAPIV1ApiKeyList(t *testing.T) {
+	t.Parallel()
+
 	t.Run("empty returns empty array", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		res := h.callHuma(http.MethodGet, "/api/v1/apikey", nil)
@@ -66,11 +76,15 @@ func TestAPIV1ApiKeyList(t *testing.T) {
 	})
 
 	t.Run("empty parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		h.assertParity(t, http.MethodGet, "/api/v1/apikey", nil)
 	})
 
 	t.Run("populated parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedAPIKey(t, h.app)
 		seedAPIKey(t, h.app)
@@ -78,6 +92,8 @@ func TestAPIV1ApiKeyList(t *testing.T) {
 	})
 
 	t.Run("nil timestamps emitted as null parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedAPIKey(t, h.app)
 		// Nil expiration: lastSeen and expiration are unset and must emit as
@@ -96,6 +112,8 @@ func TestAPIV1ApiKeyList(t *testing.T) {
 	})
 
 	t.Run("zero expiration emitted as zero instant parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		// Non-nil zero expiration (as gRPC CreateApiKey does for a missing one)
 		// must render as the zero instant, not null.
@@ -116,7 +134,11 @@ func TestAPIV1ApiKeyList(t *testing.T) {
 }
 
 func TestAPIV1ApiKeyExpire(t *testing.T) {
+	t.Parallel()
+
 	t.Run("by id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		id, _ := seedAPIKey(t, h.app)
 		h.assertParity(t, http.MethodPost, "/api/v1/apikey/expire",
@@ -124,6 +146,8 @@ func TestAPIV1ApiKeyExpire(t *testing.T) {
 	})
 
 	t.Run("by prefix parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		_, prefix := seedAPIKey(t, h.app)
 		h.assertParity(t, http.MethodPost, "/api/v1/apikey/expire",
@@ -131,12 +155,16 @@ func TestAPIV1ApiKeyExpire(t *testing.T) {
 	})
 
 	t.Run("neither id nor prefix parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/apikey/expire", []byte(`{}`))
 		assertStatus(t, res, http.StatusBadRequest)
 	})
 
 	t.Run("both id and prefix parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/apikey/expire",
 			[]byte(`{"id":"1","prefix":"abc"}`))
@@ -144,12 +172,16 @@ func TestAPIV1ApiKeyExpire(t *testing.T) {
 	})
 
 	t.Run("not found by id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/apikey/expire", []byte(`{"id":"999"}`))
 		assertStatus(t, res, http.StatusNotFound)
 	})
 
 	t.Run("expires the key", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		id, _ := seedAPIKey(t, h.app)
 
@@ -172,7 +204,11 @@ func TestAPIV1ApiKeyExpire(t *testing.T) {
 }
 
 func TestAPIV1ApiKeyDelete(t *testing.T) {
+	t.Parallel()
+
 	t.Run("by prefix deletes the key", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		_, prefix := seedAPIKey(t, h.app)
 
@@ -185,6 +221,8 @@ func TestAPIV1ApiKeyDelete(t *testing.T) {
 	})
 
 	t.Run("path prefix with id query is both -> 400 parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		id, prefix := seedAPIKey(t, h.app)
 		res := h.assertParity(t, http.MethodDelete,
@@ -193,18 +231,24 @@ func TestAPIV1ApiKeyDelete(t *testing.T) {
 	})
 
 	t.Run("not found by prefix parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodDelete, "/api/v1/apikey/doesnotexist", nil)
 		assertStatus(t, res, http.StatusNotFound)
 	})
 
 	t.Run("both id and prefix parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodDelete, "/api/v1/apikey/abc?id=1", nil)
 		assertStatus(t, res, http.StatusBadRequest)
 	})
 
 	t.Run("invalid id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodDelete, "/api/v1/apikey/abc?id=notanumber", nil)
 		assertStatus(t, res, http.StatusBadRequest)

@@ -112,6 +112,8 @@ func approvedRouteStrings(nv types.NodeView) []string {
 }
 
 func TestAPIv2Device_Get(t *testing.T) {
+	t.Parallel()
+
 	e := newDeviceTestEnv(t)
 
 	resp := e.api.Get("/api/v2/device/" + e.deviceID + "?fields=all")
@@ -139,6 +141,8 @@ func TestAPIv2Device_Get(t *testing.T) {
 }
 
 func TestAPIv2Device_Get_UnknownID_404(t *testing.T) {
+	t.Parallel()
+
 	e := newDeviceTestEnv(t)
 
 	assert.Equal(t, http.StatusNotFound, e.api.Get("/api/v2/device/999999").Code)
@@ -146,6 +150,8 @@ func TestAPIv2Device_Get_UnknownID_404(t *testing.T) {
 }
 
 func TestAPIv2Device_List(t *testing.T) {
+	t.Parallel()
+
 	e := newDeviceTestEnv(t)
 
 	list := func() []apiv2.Device {
@@ -182,6 +188,8 @@ func TestAPIv2Device_List(t *testing.T) {
 }
 
 func TestAPIv2Device_SetName(t *testing.T) {
+	t.Parallel()
+
 	e := newDeviceTestEnv(t)
 
 	require.Equal(t, http.StatusOK,
@@ -203,6 +211,8 @@ func TestAPIv2Device_SetName(t *testing.T) {
 }
 
 func TestAPIv2Device_SetTags(t *testing.T) {
+	t.Parallel()
+
 	e := newDeviceTestEnv(t)
 
 	setTags := func(tags []string) int {
@@ -239,6 +249,8 @@ func TestAPIv2Device_SetTags(t *testing.T) {
 }
 
 func TestAPIv2Device_SetKey(t *testing.T) {
+	t.Parallel()
+
 	e := newDeviceTestEnv(t)
 	e.seedExpiry(t, time.Now().Add(24*time.Hour))
 
@@ -258,6 +270,8 @@ func TestAPIv2Device_SetKey(t *testing.T) {
 }
 
 func TestAPIv2Device_SetRoutes(t *testing.T) {
+	t.Parallel()
+
 	e := newDeviceTestEnv(t)
 
 	setRoutes := func(routes []string) apiv2.DeviceRoutes {
@@ -306,6 +320,8 @@ func TestAPIv2Device_SetRoutes(t *testing.T) {
 }
 
 func TestAPIv2Device_SetAuthorized(t *testing.T) {
+	t.Parallel()
+
 	e := newDeviceTestEnv(t)
 
 	require.Equal(t, http.StatusOK,
@@ -320,6 +336,8 @@ func TestAPIv2Device_SetAuthorized(t *testing.T) {
 }
 
 func TestAPIv2Device_Delete(t *testing.T) {
+	t.Parallel()
+
 	e := newDeviceTestEnv(t)
 
 	require.Equal(t, http.StatusOK, e.api.Delete("/api/v2/device/"+e.deviceID).Code)

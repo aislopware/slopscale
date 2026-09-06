@@ -19,6 +19,8 @@ import (
 // and validates data integrity after migration. All migrations that require data validation
 // should be added here.
 func TestSQLiteMigrationAndDataValidation(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		dbPath   string
 		wantFunc func(*testing.T, *HSDatabase)
@@ -357,6 +359,8 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.dbPath, func(t *testing.T) {
+			t.Parallel()
+
 			if !strings.HasSuffix(tt.dbPath, ".sql") {
 				t.Fatalf("TestSQLiteMigrationAndDataValidation only supports .sql files, got: %s", tt.dbPath)
 			}
@@ -398,6 +402,8 @@ func requireConstraintFailed(t *testing.T, err error) {
 }
 
 func TestConstraints(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		run  func(*testing.T, *gorm.DB)
@@ -489,10 +495,14 @@ func TestConstraints(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name+"-postgres", func(t *testing.T) {
+			t.Parallel()
+
 			db := newPostgresTestDB(t)
 			tt.run(t, db.DB.Debug())
 		})
 		t.Run(tt.name+"-sqlite", func(t *testing.T) {
+			t.Parallel()
+
 			db, err := newSQLiteTestDB()
 			if err != nil {
 				t.Fatalf("creating database: %s", err)
@@ -510,6 +520,8 @@ func TestConstraints(t *testing.T) {
 // TODO(kradalby): Convert to use plain text SQL dumps instead of binary .pssql dumps for consistency
 // with SQLite tests and easier version control.
 func TestPostgresMigrationAndDataValidation(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		dbPath   string
@@ -518,6 +530,8 @@ func TestPostgresMigrationAndDataValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			u := newPostgresDBForTest(t)
 
 			pgRestorePath, err := exec.LookPath("pg_restore")

@@ -20,7 +20,11 @@ func seedUsers(names ...string) func(t *testing.T, app *Headscale) {
 }
 
 func TestAPIV1CreateUser(t *testing.T) {
+	t.Parallel()
+
 	t.Run("huma response shape", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		res := h.callHuma(http.MethodPost, "/api/v1/user", []byte(`{"name":"test"}`))
@@ -40,11 +44,15 @@ func TestAPIV1CreateUser(t *testing.T) {
 	})
 
 	t.Run("parity", func(t *testing.T) {
+		t.Parallel()
+
 		assertParityIsolated(t, nil, http.MethodPost, "/api/v1/user",
 			[]byte(`{"name":"test","displayName":"Test","email":"t@example.com"}`))
 	})
 
 	t.Run("duplicate name parity", func(t *testing.T) {
+		t.Parallel()
+
 		res := assertParityIsolated(t, seedUsers("dup"), http.MethodPost, "/api/v1/user",
 			[]byte(`{"name":"dup"}`))
 		assertStatus(t, res, http.StatusConflict)
@@ -52,18 +60,26 @@ func TestAPIV1CreateUser(t *testing.T) {
 }
 
 func TestAPIV1RenameUser(t *testing.T) {
+	t.Parallel()
+
 	t.Run("parity", func(t *testing.T) {
+		t.Parallel()
+
 		assertParityIsolated(t, seedUsers("alice"), http.MethodPost,
 			"/api/v1/user/1/rename/bob", nil)
 	})
 
 	t.Run("nonexistent parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/user/999/rename/bob", nil)
 		assertStatus(t, res, http.StatusNotFound)
 	})
 
 	t.Run("invalid id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/user/abc/rename/bob", nil)
 		assertStatus(t, res, http.StatusBadRequest)
@@ -71,11 +87,17 @@ func TestAPIV1RenameUser(t *testing.T) {
 }
 
 func TestAPIV1DeleteUser(t *testing.T) {
+	t.Parallel()
+
 	t.Run("parity", func(t *testing.T) {
+		t.Parallel()
+
 		assertParityIsolated(t, seedUsers("alice"), http.MethodDelete, "/api/v1/user/1", nil)
 	})
 
 	t.Run("nonexistent parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodDelete, "/api/v1/user/999", nil)
 		assertStatus(t, res, http.StatusNotFound)
@@ -83,7 +105,11 @@ func TestAPIV1DeleteUser(t *testing.T) {
 }
 
 func TestAPIV1ListUsers(t *testing.T) {
+	t.Parallel()
+
 	t.Run("empty returns empty array", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		res := h.callHuma(http.MethodGet, "/api/v1/user", nil)
@@ -92,29 +118,39 @@ func TestAPIV1ListUsers(t *testing.T) {
 	})
 
 	t.Run("empty parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		h.assertParity(t, http.MethodGet, "/api/v1/user", nil)
 	})
 
 	t.Run("all parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedUsers("alice", "bob", "carol")(t, h.app)
 		h.assertParity(t, http.MethodGet, "/api/v1/user", nil)
 	})
 
 	t.Run("filter by name parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedUsers("alice", "bob")(t, h.app)
 		h.assertParity(t, http.MethodGet, "/api/v1/user?name=alice", nil)
 	})
 
 	t.Run("filter by id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedUsers("alice", "bob")(t, h.app)
 		h.assertParity(t, http.MethodGet, "/api/v1/user?id=2", nil)
 	})
 
 	t.Run("invalid id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedUsers("alice")(t, h.app)
 		res := h.assertParity(t, http.MethodGet, "/api/v1/user?id=abc", nil)

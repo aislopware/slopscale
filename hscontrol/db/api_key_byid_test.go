@@ -11,6 +11,8 @@ import (
 // rather than returning the lowest-ID key. GORM drops a zero-valued primary key
 // from a struct condition, which would otherwise make the lookup unconditional.
 func TestGetAPIKeyByIDZeroReturnsError(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 

@@ -61,6 +61,8 @@ func TestHandleVerifyRequest_OversizedBodyRejected(t *testing.T) {
 // WriteHeader on first Write locks in a sniffed content type and the
 // later Header().Set becomes a no-op.
 func TestVerifyHandler_SuccessSetsJSONContentType(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := t.TempDir()
 
 	prefixV4 := netip.MustParsePrefix("100.64.0.0/10")

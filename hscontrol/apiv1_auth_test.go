@@ -42,7 +42,11 @@ func seedAuthRequest(
 }
 
 func TestAPIV1AuthRegister(t *testing.T) {
+	t.Parallel()
+
 	t.Run("happy path parity", func(t *testing.T) {
+		t.Parallel()
+
 		// Capture keys/authID once so both isolated apps register the identical
 		// node and produce byte-equal bodies.
 		authID := types.MustAuthID()
@@ -57,6 +61,8 @@ func TestAPIV1AuthRegister(t *testing.T) {
 	})
 
 	t.Run("happy path response shape", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		authID := types.MustAuthID()
@@ -92,6 +98,8 @@ func TestAPIV1AuthRegister(t *testing.T) {
 
 	// A malformed auth_id is bad input (400), matching AuthApprove/AuthReject.
 	t.Run("invalid auth_id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedUsers("alice")(t, h.app)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/auth/register",
@@ -100,6 +108,8 @@ func TestAPIV1AuthRegister(t *testing.T) {
 	})
 
 	t.Run("unknown user parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		body := fmt.Appendf(nil, `{"user":"ghost","authId":%q}`, types.MustAuthID().String())
 		res := h.assertParity(t, http.MethodPost, "/api/v1/auth/register", body)
@@ -109,6 +119,8 @@ func TestAPIV1AuthRegister(t *testing.T) {
 	// Valid auth_id but no cached session: HandleNodeFromAuthPath returns
 	// ErrNodeNotFoundRegistrationCache, which maps to 404.
 	t.Run("no pending session parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedUsers("alice")(t, h.app)
 
@@ -119,7 +131,11 @@ func TestAPIV1AuthRegister(t *testing.T) {
 }
 
 func TestAPIV1AuthApprove(t *testing.T) {
+	t.Parallel()
+
 	t.Run("happy path", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		authID := types.MustAuthID()
@@ -138,6 +154,8 @@ func TestAPIV1AuthApprove(t *testing.T) {
 
 	// Malformed auth_id: AuthApprove returns codes.InvalidArgument → 400.
 	t.Run("invalid auth_id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/auth/approve",
 			[]byte(`{"authId":"not-a-valid-auth-id"}`))
@@ -146,6 +164,8 @@ func TestAPIV1AuthApprove(t *testing.T) {
 
 	// Well-formed auth_id with no pending session: codes.NotFound → 404.
 	t.Run("no pending session parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		body := fmt.Appendf(nil, `{"authId":%q}`, types.MustAuthID().String())
 		res := h.assertParity(t, http.MethodPost, "/api/v1/auth/approve", body)
@@ -154,7 +174,11 @@ func TestAPIV1AuthApprove(t *testing.T) {
 }
 
 func TestAPIV1AuthReject(t *testing.T) {
+	t.Parallel()
+
 	t.Run("happy path", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		authID := types.MustAuthID()
@@ -172,6 +196,8 @@ func TestAPIV1AuthReject(t *testing.T) {
 	})
 
 	t.Run("invalid auth_id parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodPost, "/api/v1/auth/reject",
 			[]byte(`{"authId":"not-a-valid-auth-id"}`))
@@ -179,6 +205,8 @@ func TestAPIV1AuthReject(t *testing.T) {
 	})
 
 	t.Run("no pending session parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		body := fmt.Appendf(nil, `{"authId":%q}`, types.MustAuthID().String())
 		res := h.assertParity(t, http.MethodPost, "/api/v1/auth/reject", body)

@@ -15,6 +15,8 @@ import (
 // concurrency semaphore admits, asserting the limiter releases correctly (no
 // deadlock) and stays correct under contention. Run with -race.
 func TestVerifySecretConcurrent(t *testing.T) {
+	t.Parallel()
+
 	hash, err := hashSecret("s3cr3t")
 	require.NoError(t, err)
 
@@ -50,6 +52,8 @@ func TestVerifySecretConcurrent(t *testing.T) {
 }
 
 func TestOAuthClientCreateAndAuthenticate(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -87,6 +91,8 @@ func TestOAuthClientCreateAndAuthenticate(t *testing.T) {
 }
 
 func TestHashSecretRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	const secret = "a-high-entropy-credential-secret"
 
 	encoded, err := hashSecret(secret)
@@ -105,6 +111,8 @@ func TestHashSecretRoundTrip(t *testing.T) {
 }
 
 func TestOAuthClientRevoke(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -124,6 +132,8 @@ func TestOAuthClientRevoke(t *testing.T) {
 }
 
 func TestOAuthAccessTokenMintAuthenticateExpire(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -168,6 +178,8 @@ func TestOAuthAccessTokenMintAuthenticateExpire(t *testing.T) {
 // longer exists (orphaned by a delete/revoke race) is rejected, even though the
 // token row itself is valid and unexpired.
 func TestAccessTokenRejectedWhenClientGone(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 

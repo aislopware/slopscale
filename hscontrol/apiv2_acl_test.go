@@ -59,6 +59,8 @@ func setACL(t *testing.T, api humatest.TestAPI, body, contentType string, header
 }
 
 func TestAPIv2ACLDefaultWhenUnset(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
@@ -75,6 +77,8 @@ func TestAPIv2ACLDefaultWhenUnset(t *testing.T) {
 }
 
 func TestAPIv2ACLContentNegotiation(t *testing.T) {
+	t.Parallel()
+
 	api := registerAPIV2(t, createTestApp(t))
 
 	jsonResp := api.Get("/api/v2/tailnet/-/acl")
@@ -88,6 +92,8 @@ func TestAPIv2ACLContentNegotiation(t *testing.T) {
 }
 
 func TestAPIv2ACLSetCanonicalJSON(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
@@ -109,6 +115,8 @@ func TestAPIv2ACLSetCanonicalJSON(t *testing.T) {
 }
 
 func TestAPIv2ACLSetHuJSONWithComments(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
@@ -131,6 +139,8 @@ func TestAPIv2ACLSetHuJSONWithComments(t *testing.T) {
 }
 
 func TestAPIv2ACLETagChangesOnChangeStableOnNoop(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
@@ -149,6 +159,8 @@ func TestAPIv2ACLETagChangesOnChangeStableOnNoop(t *testing.T) {
 }
 
 func TestAPIv2ACLIfMatchPreconditions(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
@@ -172,6 +184,8 @@ func TestAPIv2ACLIfMatchPreconditions(t *testing.T) {
 }
 
 func TestAPIv2ACLIfMatchTsDefault(t *testing.T) {
+	t.Parallel()
+
 	// No policy set: ts-default matches the allow-all default -> 200.
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
@@ -185,6 +199,8 @@ func TestAPIv2ACLIfMatchTsDefault(t *testing.T) {
 }
 
 func TestAPIv2ACLInvalidPolicyAtomicity(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
@@ -205,6 +221,8 @@ func TestAPIv2ACLInvalidPolicyAtomicity(t *testing.T) {
 }
 
 func TestAPIv2ACLNonDefaultTailnet404(t *testing.T) {
+	t.Parallel()
+
 	api := registerAPIV2(t, createTestApp(t))
 
 	assert.Equal(t, http.StatusNotFound, api.Get("/api/v2/tailnet/example.com/acl").Code)
@@ -213,6 +231,8 @@ func TestAPIv2ACLNonDefaultTailnet404(t *testing.T) {
 }
 
 func TestAPIv2ACLFileModeReadOnly(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	path := filepath.Join(dir, "acl.hujson")
 	fileBytes := "{\n  // file-managed\n  \"acls\": [{\"action\":\"accept\",\"src\":[\"*\"],\"dst\":[\"*:*\"]}],\n}"

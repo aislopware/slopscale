@@ -149,6 +149,8 @@ func (w *recordingResponseWriter) statusCode() int {
 // send an empty 200, which the Tailscale client reports as
 // "PollNetMap: ... unexpected EOF" and retries forever (issue #3346).
 func TestServeLongPollWritesErrorWhenInitialMapFails(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	user := app.state.CreateUserForTest("self-bad-name-user")
 	createdNode := app.state.CreateRegisteredNodeForTest(user, "self-bad-name-node")

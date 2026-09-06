@@ -7,6 +7,8 @@ import (
 )
 
 func TestNodeStoreDebugString(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		setupFn  func() *NodeStore
@@ -49,6 +51,8 @@ func TestNodeStoreDebugString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			store := tt.setupFn()
 			if store.writeQueue != nil {
 				defer store.Stop()
@@ -65,6 +69,8 @@ func TestNodeStoreDebugString(t *testing.T) {
 }
 
 func TestDebugRegistrationCache(t *testing.T) {
+	t.Parallel()
+
 	// Create a minimal NodeStore for testing debug methods
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
 

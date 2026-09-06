@@ -28,6 +28,8 @@ var nap = func(pref string) *netip.Addr {
 }
 
 func TestIPAllocatorSequential(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		dbFunc func() *HSDatabase
@@ -146,6 +148,8 @@ func TestIPAllocatorSequential(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			db := tt.dbFunc()
 
 			alloc, _ := NewIPAllocator(
@@ -187,6 +191,8 @@ func TestIPAllocatorSequential(t *testing.T) {
 }
 
 func TestIPAllocatorRandom(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		dbFunc func() *HSDatabase
@@ -256,6 +262,8 @@ func TestIPAllocatorRandom(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			db := tt.dbFunc()
 
 			alloc, _ := NewIPAllocator(db, tt.prefix4, tt.prefix6, types.IPAllocationStrategyRandom)
@@ -285,6 +293,8 @@ func TestIPAllocatorRandom(t *testing.T) {
 }
 
 func TestBackfillIPAddresses(t *testing.T) {
+	t.Parallel()
+
 	fullNodeP := func(i int) *types.Node {
 		v4 := fmt.Sprintf("100.64.0.%d", i)
 		v6 := fmt.Sprintf("fd7a:115c:a1e0::%d", i)
@@ -451,6 +461,8 @@ func TestBackfillIPAddresses(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			db := tt.dbFunc()
 
 			alloc, err := NewIPAllocator(
@@ -483,6 +495,8 @@ func TestBackfillIPAddresses(t *testing.T) {
 }
 
 func TestIPAllocatorNextNoReservedIPs(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 

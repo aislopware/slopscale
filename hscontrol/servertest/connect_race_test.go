@@ -86,7 +86,12 @@ func TestConnectDisconnectRace(t *testing.T) {
 	// The two goroutines synchronise on a barrier so they start
 	// approximately simultaneously, maximising the chance of hitting the
 	// TOCTOU window.
-	const iterations = 100
+	iterations := 100
+	if testing.Short() {
+		// Each iteration costs about a second; keep the everyday sweep fast
+		// and leave the full hundred to explicit runs.
+		iterations = 20
+	}
 
 	for i := range iterations {
 		// Establish a "current session" with a known gen for r2.

@@ -12,6 +12,8 @@ import (
 )
 
 func TestParseVersion(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		input   string
 		want    semver
@@ -41,6 +43,8 @@ func TestParseVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+
 			got, err := parseVersion(tt.input)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -53,11 +57,15 @@ func TestParseVersion(t *testing.T) {
 }
 
 func TestSemverString(t *testing.T) {
+	t.Parallel()
+
 	s := semver{0, 28, 3}
 	assert.Equal(t, "v0.28.3", s.String())
 }
 
 func TestPseudoVersionTime(t *testing.T) {
+	t.Parallel()
+
 	parseTS := func(s string) time.Time {
 		t.Helper()
 
@@ -133,6 +141,8 @@ func TestPseudoVersionTime(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got, ok := pseudoVersionTime(tt.input)
 			assert.Equal(t, tt.wantOK, ok)
 
@@ -145,6 +155,8 @@ func TestPseudoVersionTime(t *testing.T) {
 }
 
 func TestIsDev(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		input string
@@ -194,6 +206,8 @@ func TestIsDev(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			assert.Equal(t, tt.want, isDev(tt.input))
 		})
 	}
@@ -205,6 +219,8 @@ func TestIsDev(t *testing.T) {
 // stored pseudo-version parses as v0.0.0 and the next real release
 // trips the multi-minor guard.
 func TestCheckVersionUpgradePath_StoredPseudoVersion(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		stored         string
@@ -228,6 +244,8 @@ func TestCheckVersionUpgradePath_StoredPseudoVersion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			db := versionTestDB(t)
 			require.NoError(t, setDatabaseVersion(db, tt.stored))
 			err := checkVersionUpgradePathFromVersions(db, tt.currentVersion)
@@ -241,6 +259,8 @@ func TestCheckVersionUpgradePath_StoredPseudoVersion(t *testing.T) {
 // stored real release so the next real release can upgrade cleanly.
 // Mirrors the gating in db.go around setDatabaseVersion.
 func TestCheckVersionUpgradePath_CurrentPseudoDoesNotPoison(t *testing.T) {
+	t.Parallel()
+
 	db := versionTestDB(t)
 	require.NoError(t, setDatabaseVersion(db, "v0.28.0"))
 
@@ -274,6 +294,8 @@ func versionTestDB(t *testing.T) *gorm.DB {
 }
 
 func TestSetAndGetDatabaseVersion(t *testing.T) {
+	t.Parallel()
+
 	db := versionTestDB(t)
 
 	// Initially empty
@@ -299,6 +321,8 @@ func TestSetAndGetDatabaseVersion(t *testing.T) {
 }
 
 func TestEnsureDatabaseVersionTableIdempotent(t *testing.T) {
+	t.Parallel()
+
 	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
 	require.NoError(t, err)
 
@@ -314,6 +338,8 @@ func TestEnsureDatabaseVersionTableIdempotent(t *testing.T) {
 // by directly seeding the database, bypassing types.GetVersionInfo()
 // (which returns "dev" in test environments and cannot be overridden).
 func TestCheckVersionUpgradePathDirect(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		storedVersion  string // empty means no row stored
@@ -436,6 +462,8 @@ func TestCheckVersionUpgradePathDirect(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			db := versionTestDB(t)
 
 			// Seed the stored version if provided

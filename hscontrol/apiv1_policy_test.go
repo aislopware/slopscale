@@ -29,7 +29,11 @@ func seedPolicy(policy string) func(t *testing.T, app *Headscale) {
 }
 
 func TestAPIV1PolicyGet(t *testing.T) {
+	t.Parallel()
+
 	t.Run("empty parity", func(t *testing.T) {
+		t.Parallel()
+
 		// With no policy stored, the DB load fails; this is treated as a server
 		// fault (500), matching the legacy contract.
 		h := newAPIV1Harness(t)
@@ -38,12 +42,16 @@ func TestAPIV1PolicyGet(t *testing.T) {
 	})
 
 	t.Run("set parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedPolicy(validPolicy)(t, h.app)
 		h.assertParity(t, http.MethodGet, "/api/v1/policy", nil)
 	})
 
 	t.Run("huma response shape", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 		seedPolicy(validPolicy)(t, h.app)
 
@@ -63,7 +71,11 @@ func TestAPIV1PolicyGet(t *testing.T) {
 }
 
 func TestAPIV1PolicySet(t *testing.T) {
+	t.Parallel()
+
 	t.Run("valid parity", func(t *testing.T) {
+		t.Parallel()
+
 		body, err := json.Marshal(map[string]string{"policy": validPolicy})
 		require.NoError(t, err)
 
@@ -71,6 +83,8 @@ func TestAPIV1PolicySet(t *testing.T) {
 	})
 
 	t.Run("invalid parity", func(t *testing.T) {
+		t.Parallel()
+
 		body, err := json.Marshal(map[string]string{"policy": invalidPolicy})
 		require.NoError(t, err)
 
@@ -79,6 +93,8 @@ func TestAPIV1PolicySet(t *testing.T) {
 	})
 
 	t.Run("huma response shape", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		body, err := json.Marshal(map[string]string{"policy": validPolicy})
@@ -98,6 +114,8 @@ func TestAPIV1PolicySet(t *testing.T) {
 	})
 
 	t.Run("not-db mode rejected", func(t *testing.T) {
+		t.Parallel()
+
 		// Policy updates are only valid in DB mode; file mode rejects with 400.
 		// createTestApp is DB mode, so build a file-mode app here.
 		humaApp := createFilePolicyApp(t)
@@ -113,7 +131,11 @@ func TestAPIV1PolicySet(t *testing.T) {
 }
 
 func TestAPIV1PolicyCheck(t *testing.T) {
+	t.Parallel()
+
 	t.Run("valid parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		body, err := json.Marshal(map[string]string{"policy": validPolicy})
@@ -123,6 +145,8 @@ func TestAPIV1PolicyCheck(t *testing.T) {
 	})
 
 	t.Run("invalid parity", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		body, err := json.Marshal(map[string]string{"policy": invalidPolicy})
@@ -133,6 +157,8 @@ func TestAPIV1PolicyCheck(t *testing.T) {
 	})
 
 	t.Run("valid returns empty object", func(t *testing.T) {
+		t.Parallel()
+
 		h := newAPIV1Harness(t)
 
 		body, err := json.Marshal(map[string]string{"policy": validPolicy})

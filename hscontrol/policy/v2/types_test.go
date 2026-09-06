@@ -35,6 +35,8 @@ import (
 // This test ensures our custom MarshalJSON methods properly encode
 // the various data structures used in the Policy.
 func TestMarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	// Create a complex test policy
 	policy := &Policy{
 		Groups: Groups{
@@ -99,6 +101,8 @@ func TestMarshalJSON(t *testing.T) {
 }
 
 func TestUnmarshalPolicy(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		input   string
@@ -2297,6 +2301,8 @@ func TestUnmarshalPolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Test unmarshalling
 			policy, err := unmarshalPolicy([]byte(tt.input))
 			if tt.wantErr == "" {
@@ -2357,6 +2363,8 @@ func pp(pref string) *Prefix      { return new(Prefix(mp(pref))) }
 func p(pref string) Prefix        { return Prefix(mp(pref)) }
 
 func TestResolvePolicy(t *testing.T) {
+	t.Parallel()
+
 	users := map[string]types.User{
 		"testuser":   {ID: 1, Name: "testuser"},
 		"groupuser":  {ID: 2, Name: "groupuser"},
@@ -2775,6 +2783,8 @@ func TestResolvePolicy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			ips, err := tt.toResolve.Resolve(tt.pol,
 				xmaps.Values(users),
 				tt.nodes.ViewSlice())
@@ -2806,6 +2816,8 @@ func TestResolvePolicy(t *testing.T) {
 }
 
 func TestResolveAutoApprovers(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -2958,6 +2970,8 @@ func TestResolveAutoApprovers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got, gotAllIPRoutes, err := resolveAutoApprovers(tt.policy, users, nodes.ViewSlice())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("resolveAutoApprovers() error = %v, wantErr %v", err, tt.wantErr)
@@ -2982,6 +2996,8 @@ func TestResolveAutoApprovers(t *testing.T) {
 }
 
 func TestSSHUsers_NormalUsers(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		users SSHUsers
@@ -3036,6 +3052,8 @@ func TestSSHUsers_NormalUsers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := tt.users.NormalUsers()
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("NormalUsers() unexpected result (-want +got):\n%s", diff)
@@ -3045,6 +3063,8 @@ func TestSSHUsers_NormalUsers(t *testing.T) {
 }
 
 func TestSSHUsers_ContainsRoot(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		users    SSHUsers
@@ -3074,6 +3094,8 @@ func TestSSHUsers_ContainsRoot(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := tt.users.ContainsRoot()
 			assert.Equal(t, tt.expected, result, "ContainsRoot() should return expected result")
 		})
@@ -3081,6 +3103,8 @@ func TestSSHUsers_ContainsRoot(t *testing.T) {
 }
 
 func TestSSHUsers_ContainsNonRoot(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		users    SSHUsers
@@ -3110,6 +3134,8 @@ func TestSSHUsers_ContainsNonRoot(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := tt.users.ContainsNonRoot()
 			assert.Equal(t, tt.expected, result, "ContainsNonRoot() should return expected result")
 		})
@@ -3117,6 +3143,8 @@ func TestSSHUsers_ContainsNonRoot(t *testing.T) {
 }
 
 func TestSSHUsers_ContainsLocalpart(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		users    SSHUsers
@@ -3151,6 +3179,8 @@ func TestSSHUsers_ContainsLocalpart(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			result := tt.users.ContainsLocalpart()
 			assert.Equal(t, tt.expected, result, "ContainsLocalpart() should return expected result")
 		})
@@ -3158,6 +3188,8 @@ func TestSSHUsers_ContainsLocalpart(t *testing.T) {
 }
 
 func TestSSHUsers_LocalpartEntries(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		users SSHUsers
@@ -3187,6 +3219,8 @@ func TestSSHUsers_LocalpartEntries(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := tt.users.LocalpartEntries()
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("LocalpartEntries() unexpected result (-want +got):\n%s", diff)
@@ -3196,6 +3230,8 @@ func TestSSHUsers_LocalpartEntries(t *testing.T) {
 }
 
 func TestSSHUser_ParseLocalpart(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		user           SSHUser
@@ -3241,6 +3277,8 @@ func TestSSHUser_ParseLocalpart(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			domain, err := tt.user.ParseLocalpart()
 			if tt.expectErr {
 				require.Error(t, err)
@@ -3272,6 +3310,8 @@ func ipSetComparer(x, y *netipx.IPSet) bool {
 }
 
 func TestNodeCanApproveRoute(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -3390,6 +3430,8 @@ func TestNodeCanApproveRoute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			b, err := json.Marshal(tt.policy)
 			require.NoError(t, err)
 
@@ -3405,6 +3447,8 @@ func TestNodeCanApproveRoute(t *testing.T) {
 }
 
 func TestResolveTagOwners(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -3491,6 +3535,8 @@ func TestResolveTagOwners(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got, err := resolveTagOwners(tt.policy, users, nodes.ViewSlice())
 			if (err != nil) != tt.wantErr {
 				t.Errorf("resolveTagOwners() error = %v, wantErr %v", err, tt.wantErr)
@@ -3505,6 +3551,8 @@ func TestResolveTagOwners(t *testing.T) {
 }
 
 func TestNodeCanHaveTag(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -3764,6 +3812,8 @@ func TestNodeCanHaveTag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			b, err := json.Marshal(tt.policy)
 			require.NoError(t, err)
 
@@ -3784,6 +3834,8 @@ func TestNodeCanHaveTag(t *testing.T) {
 }
 
 func TestUserMatchesOwner(t *testing.T) {
+	t.Parallel()
+
 	users := types.Users{
 		{ID: 1, Name: "user1"},
 		{ID: 2, Name: "user2"},
@@ -3860,6 +3912,8 @@ func TestUserMatchesOwner(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Create a minimal PolicyManager for testing
 			// We need nodes with IPs to initialize the tagOwnerMap
 			nodes := types.Nodes{
@@ -3884,6 +3938,8 @@ func TestUserMatchesOwner(t *testing.T) {
 }
 
 func TestACL_UnmarshalJSON_WithCommentFields(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		input    string
@@ -4032,6 +4088,8 @@ func TestACL_UnmarshalJSON_WithCommentFields(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var acl ACL
 
 			err := json.Unmarshal([]byte(tt.input), &acl)
@@ -4066,6 +4124,8 @@ func TestACL_UnmarshalJSON_WithCommentFields(t *testing.T) {
 }
 
 func TestACL_UnmarshalJSON_Roundtrip(t *testing.T) {
+	t.Parallel()
+
 	// Test that marshaling and unmarshaling preserves data (excluding comments)
 	original := ACL{
 		Action:   "accept",
@@ -4097,6 +4157,8 @@ func TestACL_UnmarshalJSON_Roundtrip(t *testing.T) {
 }
 
 func TestACL_UnmarshalJSON_PolicyIntegration(t *testing.T) {
+	t.Parallel()
+
 	// Test that ACL unmarshaling works within a Policy context
 	policyJSON := `{
 		"groups": {
@@ -4147,6 +4209,8 @@ func TestACL_UnmarshalJSON_PolicyIntegration(t *testing.T) {
 }
 
 func TestACL_UnmarshalJSON_InvalidAction(t *testing.T) {
+	t.Parallel()
+
 	// Test that invalid actions are rejected
 	policyJSON := `{
 		"acls": [
@@ -4175,6 +4239,8 @@ func mustParseAlias(s string) Alias {
 }
 
 func TestFlattenTagOwners(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		input   TagOwners
@@ -4337,6 +4403,8 @@ func TestFlattenTagOwners(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got, err := flattenTagOwners(tt.input)
 			if tt.wantErr != "" {
 				if err == nil {
@@ -4362,6 +4430,8 @@ func TestFlattenTagOwners(t *testing.T) {
 }
 
 func TestSSHCheckPeriodUnmarshal(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		input   string
@@ -4397,6 +4467,8 @@ func TestSSHCheckPeriodUnmarshal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var got SSHCheckPeriod
 
 			err := json.Unmarshal([]byte(tt.input), &got)
@@ -4413,6 +4485,8 @@ func TestSSHCheckPeriodUnmarshal(t *testing.T) {
 }
 
 func TestSSHCheckPeriodRoundTrip(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		input SSHCheckPeriod
@@ -4429,6 +4503,8 @@ func TestSSHCheckPeriodRoundTrip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			data, err := json.Marshal(tt.input)
 			require.NoError(t, err)
 
@@ -4443,6 +4519,8 @@ func TestSSHCheckPeriodRoundTrip(t *testing.T) {
 }
 
 func TestSSHCheckPeriodNilInSSH(t *testing.T) {
+	t.Parallel()
+
 	input := `{
 		"action": "check",
 		"src": ["user@"],
@@ -4458,6 +4536,8 @@ func TestSSHCheckPeriodNilInSSH(t *testing.T) {
 }
 
 func TestSSHCheckPeriodValidate(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		period  SSHCheckPeriod
@@ -4502,6 +4582,8 @@ func TestSSHCheckPeriodValidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := tt.period.Validate()
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
@@ -4515,6 +4597,8 @@ func TestSSHCheckPeriodValidate(t *testing.T) {
 }
 
 func TestSSHCheckPeriodPolicyValidation(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		ssh     SSH
@@ -4617,6 +4701,8 @@ func TestSSHCheckPeriodPolicyValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pol := &Policy{SSHs: []SSH{tt.ssh}}
 			err := pol.validate()
 
@@ -4634,6 +4720,8 @@ func TestSSHCheckPeriodPolicyValidation(t *testing.T) {
 // TestSSHRuleSaaSValidation exercises the SaaS-aligned rejections
 // added to match the API body strings exactly.
 func TestSSHRuleSaaSValidation(t *testing.T) {
+	t.Parallel()
+
 	baseSSH := func(modify func(*SSH)) SSH {
 		ssh := SSH{
 			Action:       SSHActionAccept,
@@ -4716,6 +4804,8 @@ func TestSSHRuleSaaSValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			pol := &Policy{
 				Hosts: Hosts{Host("srv"): Prefix(mp("100.64.0.16/32"))},
 				SSHs:  []SSH{tt.ssh},
@@ -4736,6 +4826,8 @@ func TestSSHRuleSaaSValidation(t *testing.T) {
 // TestSSHActionInvalidUnmarshal verifies the SaaS-aligned wording for
 // non-empty unknown actions surfaces at JSON parse time.
 func TestSSHActionInvalidUnmarshal(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name      string
 		input     string
@@ -4786,6 +4878,8 @@ func TestSSHActionInvalidUnmarshal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var a SSHAction
 
 			err := json.Unmarshal([]byte(tt.input), &a)
@@ -4808,6 +4902,8 @@ func TestSSHActionInvalidUnmarshal(t *testing.T) {
 // whitespace-only entry collapses to "" and is left for the per-rule
 // validate() pass to reject via ErrSSHUserInvalid.
 func TestSSHUserUnmarshalTrim(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		input string
@@ -4837,6 +4933,8 @@ func TestSSHUserUnmarshalTrim(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var u SSHUser
 
 			err := json.Unmarshal([]byte(tt.input), &u)
@@ -4850,7 +4948,11 @@ func TestSSHUserUnmarshalTrim(t *testing.T) {
 // parses cleanly and that the policy validate() pass treats `[" "]`
 // as the empty-user case (per-element trim happens at unmarshal time).
 func TestSSHUserTrimEndToEnd(t *testing.T) {
+	t.Parallel()
+
 	t.Run("leading whitespace user accepted and trimmed", func(t *testing.T) {
+		t.Parallel()
+
 		policy := `
 {
 	"tagOwners": {"tag:server": ["odin@example.com"]},
@@ -4868,6 +4970,8 @@ func TestSSHUserTrimEndToEnd(t *testing.T) {
 	})
 
 	t.Run("whitespace-only user rejected as empty", func(t *testing.T) {
+		t.Parallel()
+
 		policy := `
 {
 	"tagOwners": {"tag:server": ["odin@example.com"]},
@@ -4891,6 +4995,8 @@ func TestSSHUserTrimEndToEnd(t *testing.T) {
 // same Username alias. Covers tag, group, user, and autogroup entries
 // on both the leading- and trailing-whitespace edges.
 func TestAliasEncUnmarshalTrim(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		input string
@@ -4925,6 +5031,8 @@ func TestAliasEncUnmarshalTrim(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var a AliasEnc
 
 			err := json.Unmarshal([]byte(tt.input), &a)
@@ -4939,6 +5047,8 @@ func TestAliasEncUnmarshalTrim(t *testing.T) {
 // punctuation, and non-ASCII Unicode letters are rejected with the
 // same body SaaS produces. Subsequent characters are unconstrained.
 func TestTagValidateFirstCharLetter(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		tag     Tag
@@ -4985,6 +5095,8 @@ func TestTagValidateFirstCharLetter(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := tt.tag.Validate()
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
@@ -5001,6 +5113,8 @@ func TestTagValidateFirstCharLetter(t *testing.T) {
 // (`tagOwners["tag:сервер"]: …`) surfaces when a non-ASCII tag
 // appears as a tagOwners key.
 func TestUnmarshalPolicyCyrillicTagOwner(t *testing.T) {
+	t.Parallel()
+
 	policy := []byte(`{"tagOwners": {"tag:сервер": ["odin@example.com"]}}`)
 
 	_, err := unmarshalPolicy(policy)
@@ -5013,6 +5127,8 @@ func TestUnmarshalPolicyCyrillicTagOwner(t *testing.T) {
 // TestSSHCheckPeriodInvalidDuration verifies the SaaS body for the
 // malformed-duration case (`time: invalid duration "abc"`).
 func TestSSHCheckPeriodInvalidDuration(t *testing.T) {
+	t.Parallel()
+
 	var p SSHCheckPeriod
 
 	err := json.Unmarshal([]byte(`"abc"`), &p)
@@ -5023,6 +5139,8 @@ func TestSSHCheckPeriodInvalidDuration(t *testing.T) {
 // TestSSHCheckPeriodNegativeMessage verifies the SaaS body for the
 // negative-duration case (`checkPeriod -1m0s must be a positive duration`).
 func TestSSHCheckPeriodNegativeMessage(t *testing.T) {
+	t.Parallel()
+
 	p := SSHCheckPeriod{Duration: -time.Minute}
 
 	err := p.Validate()
@@ -5032,6 +5150,8 @@ func TestSSHCheckPeriodNegativeMessage(t *testing.T) {
 }
 
 func TestUnmarshalGrants(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		input   string
@@ -5498,6 +5618,8 @@ func TestUnmarshalGrants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			policy, err := unmarshalPolicy([]byte(tt.input))
 			if tt.wantErr != "" {
 				// Unmarshal succeeded, try validate
@@ -5534,6 +5656,8 @@ func TestUnmarshalGrants(t *testing.T) {
 }
 
 func TestACLToGrants(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		acl  ACL
@@ -5687,6 +5811,8 @@ func TestACLToGrants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := aclToGrants(tt.acl)
 
 			if diff := cmp.Diff(tt.want, got); diff != "" {
@@ -5697,6 +5823,8 @@ func TestACLToGrants(t *testing.T) {
 }
 
 func TestGrantMarshalJSON(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		grant    Grant
@@ -5910,6 +6038,8 @@ func TestGrantMarshalJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			// Marshal the Grant to JSON
 			gotJSON, err := json.Marshal(tt.grant)
 			if err != nil {
@@ -5951,6 +6081,8 @@ func TestGrantMarshalJSON(t *testing.T) {
 // these to differentiate "no policy → allow all" from "explicit
 // empty rule set → deny all" (matching Tailscale SaaS).
 func TestUnmarshalPolicyEmptyArrays(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name        string
 		input       string
@@ -5964,6 +6096,8 @@ func TestUnmarshalPolicyEmptyArrays(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			pol, err := unmarshalPolicy([]byte(tc.input))
 			require.NoError(t, err)
 			require.NotNil(t, pol)
@@ -5981,6 +6115,8 @@ func TestUnmarshalPolicyEmptyArrays(t *testing.T) {
 // parse — they share the "test(s) failed" body with true failures and
 // land with the engine.
 func TestUnmarshalPolicySSHTests(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		name           string
 		input          string
@@ -6203,6 +6339,8 @@ func TestUnmarshalPolicySSHTests(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			pol, err := unmarshalPolicy([]byte(tc.input))
 
 			if tc.wantErr == nil {
@@ -6245,6 +6383,8 @@ func TestUnmarshalPolicySSHTests(t *testing.T) {
 }
 
 func TestValidateCapabilityName(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		cap     string
@@ -6258,6 +6398,8 @@ func TestValidateCapabilityName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			err := validateCapabilityName(tt.cap)
 			if tt.wantErr == nil {
 				require.NoError(t, err)

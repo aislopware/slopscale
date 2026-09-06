@@ -12,6 +12,8 @@ import (
 )
 
 func TestCreateAPIKey(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -33,6 +35,8 @@ func TestCreateAPIKey(t *testing.T) {
 }
 
 func TestAPIKeyDoesNotExist(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -42,6 +46,8 @@ func TestAPIKeyDoesNotExist(t *testing.T) {
 }
 
 func TestValidateAPIKeyOk(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -56,6 +62,8 @@ func TestValidateAPIKeyOk(t *testing.T) {
 }
 
 func TestValidateAPIKeyNotOk(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -87,6 +95,8 @@ func TestValidateAPIKeyNotOk(t *testing.T) {
 }
 
 func TestExpireAPIKey(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -109,6 +119,8 @@ func TestExpireAPIKey(t *testing.T) {
 }
 
 func TestAPIKeyWithPrefix(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		test func(*testing.T, *HSDatabase)
@@ -239,6 +251,8 @@ func TestAPIKeyWithPrefix(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			db, err := newSQLiteTestDB()
 			require.NoError(t, err)
 
@@ -248,6 +262,8 @@ func TestAPIKeyWithPrefix(t *testing.T) {
 }
 
 func TestGetAPIKeyByID(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -265,6 +281,8 @@ func TestGetAPIKeyByID(t *testing.T) {
 }
 
 func TestGetAPIKeyByIDNotFound(t *testing.T) {
+	t.Parallel()
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 

@@ -59,6 +59,8 @@ func containsUserID(users []apiv2.User, id string) bool {
 }
 
 func TestAPIv2User_Get(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
@@ -83,6 +85,8 @@ func TestAPIv2User_Get(t *testing.T) {
 }
 
 func TestAPIv2User_Get_DeviceCount(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
@@ -99,6 +103,8 @@ func TestAPIv2User_Get_DeviceCount(t *testing.T) {
 }
 
 func TestAPIv2User_Get_NotFound(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
@@ -114,6 +120,8 @@ func TestAPIv2User_Get_NotFound(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			resp := api.Get("/api/v2/users/" + tt.id)
 			assert.Equal(t, http.StatusNotFound, resp.Code)
 			assert.Contains(t, resp.Body.String(), `"message"`, "Tailscale error shape")
@@ -122,6 +130,8 @@ func TestAPIv2User_Get_NotFound(t *testing.T) {
 }
 
 func TestAPIv2User_List(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
@@ -144,6 +154,8 @@ func TestAPIv2User_List(t *testing.T) {
 }
 
 func TestAPIv2User_List_Filters(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
@@ -165,6 +177,8 @@ func TestAPIv2User_List_Filters(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			users, body := listUsers(t, api, tt.query)
 			assert.Contains(t, body, `"users"`)
 			assert.NotContains(t, body, "null", "empty list marshals as [] not null")
@@ -179,6 +193,8 @@ func TestAPIv2User_List_Filters(t *testing.T) {
 }
 
 func TestAPIv2User_List_BadTailnet(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 

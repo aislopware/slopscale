@@ -18,6 +18,8 @@ import (
 // per-endpoint harness bypasses auth via WithLocalTrust, so this is the one
 // place the middleware itself is exercised.
 func TestAPIV1AuthMiddleware(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	handler := app.HTTPHandler()
 
@@ -38,6 +40,8 @@ func TestAPIV1AuthMiddleware(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			req := httptest.NewRequestWithContext(
 				context.Background(), http.MethodGet, "/api/v1/node", nil,
 			)
@@ -58,6 +62,8 @@ func TestAPIV1AuthMiddleware(t *testing.T) {
 // stay key-gated. The docs page points at the versioned spec so a future
 // /api/v2 can carry its own.
 func TestAPIV1DocsArePublic(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	handler := app.HTTPHandler()
 
@@ -71,6 +77,8 @@ func TestAPIV1DocsArePublic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
+			t.Parallel()
+
 			// No Authorization header: these must be public.
 			req := httptest.NewRequestWithContext(
 				context.Background(), http.MethodGet, tt.path, nil,
@@ -89,6 +97,8 @@ func TestAPIV1DocsArePublic(t *testing.T) {
 // "Unauthorized", under 100 bytes and leaking no data, as the integration
 // auth-bypass tests require.
 func TestAPIV1Unauthorized401(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	handler := app.HTTPHandler()
 

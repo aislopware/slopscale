@@ -450,6 +450,8 @@ func TestTailNodeDisableIPv4(t *testing.T) {
 }
 
 func TestNodeExpiry(t *testing.T) {
+	t.Parallel()
+
 	tp := func(t time.Time) *time.Time {
 		return &t
 	}
@@ -478,6 +480,8 @@ func TestNodeExpiry(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			node := &types.Node{
 				ID:        0,
 				GivenName: "test",

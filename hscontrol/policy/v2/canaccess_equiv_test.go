@@ -15,6 +15,8 @@ import (
 // must produce identical results. BuildPeerMap relies on this to precompute
 // each node's routes once instead of per pair.
 func TestCanAccessWithRoutesMatchesCanAccess(t *testing.T) {
+	t.Parallel()
+
 	user := types.User{Name: "u"}
 
 	subnetRouter := node("subnet", "100.64.0.1", "fd7a:115c:a1e0::1", user)

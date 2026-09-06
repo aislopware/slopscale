@@ -14,6 +14,8 @@ import (
 // and then breaks map generation for the node and its peers (issue #3346):
 // admin-facing writes must not be able to introduce an unmappable name.
 func TestRenameNodeRejectsNameExceedingFQDNLimit(t *testing.T) {
+	t.Parallel()
+
 	dbPath := t.TempDir() + "/headscale.db"
 	cfg := persistTestConfig(dbPath)
 	// A long base domain so a 63-char label overflows the 255-char FQDN bound.

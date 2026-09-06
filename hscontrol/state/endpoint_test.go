@@ -14,6 +14,8 @@ import (
 // are correctly stored in the NodeStore and can be retrieved for sending to peers.
 // This test reproduces the issue reported in https://github.com/juanfont/headscale/issues/2846
 func TestEndpointStorageInNodeStore(t *testing.T) {
+	t.Parallel()
+
 	// Create two test nodes
 	node1 := createTestNode(1, 1, "test-user", "node1")
 	node2 := createTestNode(2, 1, "test-user", "node2")
@@ -119,6 +121,8 @@ func TestEndpointStorageInNodeStore(t *testing.T) {
 // and disco's callMeMaybe re-derives STUN paths anyway. Only deltas that
 // introduce a genuinely useful (non-STUN) endpoint are broadcast-worthy.
 func TestEndpointBroadcastWorthy(t *testing.T) {
+	t.Parallel()
+
 	local := netip.MustParseAddrPort("192.168.1.5:41641")
 	local2 := netip.MustParseAddrPort("192.168.1.6:41641")
 	stun := netip.MustParseAddrPort("203.0.113.7:41641")
@@ -191,6 +195,8 @@ func TestEndpointBroadcastWorthy(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := endpointBroadcastWorthy(tt.stored, tt.newEPs, tt.newType)
 			assert.Equal(t, tt.want, got)
 		})

@@ -19,6 +19,8 @@ import (
 // reserved, leaving .1 and .2. After two allocations the pool is exhausted and
 // the third Next() must return ErrCouldNotAllocateIP promptly.
 func TestIPAllocatorRandomExhaustionReturnsError(t *testing.T) {
+	t.Parallel()
+
 	prefix4 := netip.MustParsePrefix("100.64.0.0/30")
 
 	alloc, err := NewIPAllocator(nil, &prefix4, nil, types.IPAllocationStrategyRandom)

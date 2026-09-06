@@ -15,6 +15,8 @@ import (
 // are not properly deleted during logout because UpdateNodeFromMapRequest returns a stale node view
 // after the node has been deleted from the NodeStore.
 func TestEphemeralNodeDeleteWithConcurrentUpdate(t *testing.T) {
+	t.Parallel()
+
 	// Create a simple test node
 	node := createTestNode(1, 1, "test-user", "test-node")
 
@@ -93,6 +95,8 @@ func TestEphemeralNodeDeleteWithConcurrentUpdate(t *testing.T) {
 // UpdateNode and DeleteNode are in the same batch with DELETE after UPDATE,
 // the UpdateNode should return an invalid node view.
 func TestUpdateNodeReturnsInvalidWhenDeletedInSameBatch(t *testing.T) {
+	t.Parallel()
+
 	node := createTestNode(2, 1, "test-user", "test-node-2")
 
 	// Use batch size of 2 to guarantee UpdateNode and DeleteNode batch together
@@ -152,6 +156,8 @@ func TestUpdateNodeReturnsInvalidWhenDeletedInSameBatch(t *testing.T) {
 // the race condition where a node is deleted after UpdateNode returns but before
 // persistNodeToDB is called. This reproduces the ephemeral node deletion bug.
 func TestPersistNodeToDBPreventsRaceCondition(t *testing.T) {
+	t.Parallel()
+
 	node := createTestNode(3, 1, "test-user", "test-node-3")
 
 	store := NewNodeStore(nil, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
@@ -203,6 +209,8 @@ func TestPersistNodeToDBPreventsRaceCondition(t *testing.T) {
 //  4. If UpdateNode's result is used to call persistNodeToDB after the deletion,
 //     the node could be re-inserted into the database even though it was deleted
 func TestEphemeralNodeLogoutRaceCondition(t *testing.T) {
+	t.Parallel()
+
 	ephemeralNode := createTestNode(4, 1, "test-user", "ephemeral-node")
 	ephemeralNode.AuthKey = &types.PreAuthKey{
 		ID:        1,
@@ -283,6 +291,8 @@ func TestEphemeralNodeLogoutRaceCondition(t *testing.T) {
 // 7. persistNodeToDB is called with the stale valid node
 // 8. Node gets re-inserted into database instead of staying deleted.
 func TestUpdateNodeFromMapRequestEphemeralLogoutSequence(t *testing.T) {
+	t.Parallel()
+
 	ephemeralNode := createTestNode(5, 1, "test-user", "ephemeral-node-5")
 	ephemeralNode.AuthKey = &types.PreAuthKey{
 		ID:        2,
@@ -360,6 +370,8 @@ func TestUpdateNodeFromMapRequestEphemeralLogoutSequence(t *testing.T) {
 // UpdateNode and DeleteNode are batched together with DELETE after UPDATE,
 // UpdateNode returns ok=false to indicate the node was deleted.
 func TestUpdateNodeDeletedInSameBatchReturnsInvalid(t *testing.T) {
+	t.Parallel()
+
 	node := createTestNode(6, 1, "test-user", "test-node-6")
 
 	// Use batch size of 2 to guarantee UpdateNode and DeleteNode batch together
@@ -417,6 +429,8 @@ func TestUpdateNodeDeletedInSameBatchReturnsInvalid(t *testing.T) {
 // 5. UpdateNodeFromMapRequest calls persistNodeToDB with the stale node
 // 6. persistNodeToDB must detect the node is deleted and refuse to persist.
 func TestPersistNodeToDBChecksNodeStoreBeforePersist(t *testing.T) {
+	t.Parallel()
+
 	ephemeralNode := createTestNode(7, 1, "test-user", "ephemeral-node-7")
 	ephemeralNode.AuthKey = &types.PreAuthKey{
 		ID:        3,

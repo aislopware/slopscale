@@ -12,6 +12,8 @@ import (
 
 //nolint:goconst // repeated test fixtures (addresses, headers), not refactor candidates
 func TestPeerTrusted(t *testing.T) {
+	t.Parallel()
+
 	trusted := []netip.Prefix{
 		netip.MustParsePrefix("10.0.0.0/16"),
 		netip.MustParsePrefix("127.0.0.1/32"),
@@ -38,6 +40,8 @@ func TestPeerTrusted(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := peerTrusted(tt.remoteAddr, trusted)
 			assert.Equal(t, tt.want, got)
 		})
@@ -45,6 +49,8 @@ func TestPeerTrusted(t *testing.T) {
 }
 
 func TestPrefixToIPNet(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		in   netip.Prefix
@@ -58,6 +64,8 @@ func TestPrefixToIPNet(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			got := prefixToIPNet(tt.in)
 			assert.Equal(t, tt.want, got.String())
 		})
@@ -66,6 +74,8 @@ func TestPrefixToIPNet(t *testing.T) {
 
 //nolint:goconst // repeated test fixtures (addresses, headers), not refactor candidates
 func TestTrustedProxyRealIP(t *testing.T) {
+	t.Parallel()
+
 	trusted := []netip.Prefix{
 		netip.MustParsePrefix("10.0.0.0/16"),
 		netip.MustParsePrefix("fd00::/8"),
@@ -186,6 +196,8 @@ func TestTrustedProxyRealIP(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			var observed *http.Request
 
 			handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -216,6 +228,8 @@ func TestTrustedProxyRealIP(t *testing.T) {
 }
 
 func TestTrustedProxyRealIPEmptyTrusted(t *testing.T) {
+	t.Parallel()
+
 	// Sanity: factory accepts an empty slice without error. Wiring code is
 	// responsible for skipping the mount entirely, but the factory itself
 	// must remain safe for tests that compose it manually.

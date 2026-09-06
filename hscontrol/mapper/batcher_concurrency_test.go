@@ -192,6 +192,8 @@ func runConcurrentlyWithTimeout(t *testing.T, n int, timeout time.Duration, fn f
 // FIX: pendingChanges moved into multiChannelNodeConn with mutex protection,
 // eliminating the race entirely.
 func TestAddToBatch_ConcurrentTargeted_NoDataLoss(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 10, 10)
 	defer lb.cleanup()
 
@@ -227,6 +229,8 @@ func TestAddToBatch_ConcurrentTargeted_NoDataLoss(t *testing.T) {
 // TestAddToBatch_ConcurrentBroadcast verifies that concurrent broadcasts
 // distribute changes to all nodes.
 func TestAddToBatch_ConcurrentBroadcast(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 50, 10)
 	defer lb.cleanup()
 
@@ -248,6 +252,8 @@ func TestAddToBatch_ConcurrentBroadcast(t *testing.T) {
 // TestAddToBatch_FullUpdateOverrides verifies that a FullUpdate replaces
 // all pending changes for every node.
 func TestAddToBatch_FullUpdateOverrides(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 10, 10)
 	defer lb.cleanup()
 
@@ -278,6 +284,8 @@ func TestAddToBatch_FullUpdateOverrides(t *testing.T) {
 // TestAddToBatch_NodeRemovalCleanup verifies that PeersRemoved in a change
 // cleans up the node from the batcher's internal state.
 func TestAddToBatch_NodeRemovalCleanup(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 5, 10)
 	defer lb.cleanup()
 
@@ -310,6 +318,8 @@ func TestAddToBatch_NodeRemovalCleanup(t *testing.T) {
 // TestProcessBatchedChanges_QueuesWork verifies that processBatchedChanges
 // moves pending changes to the work queue and clears them.
 func TestProcessBatchedChanges_QueuesWork(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 3, 10)
 	defer lb.cleanup()
 
@@ -340,6 +350,8 @@ func TestProcessBatchedChanges_QueuesWork(t *testing.T) {
 // FIX: pendingChanges moved into multiChannelNodeConn with atomic drainPending(),
 // eliminating the race entirely.
 func TestProcessBatchedChanges_ConcurrentAdd_NoDataLoss(t *testing.T) {
+	t.Parallel()
+
 	// Use a single node to maximize contention on one key.
 	lb := setupLightweightBatcher(t, 1, 10)
 	defer lb.cleanup()
@@ -410,6 +422,8 @@ func TestProcessBatchedChanges_ConcurrentAdd_NoDataLoss(t *testing.T) {
 // TestProcessBatchedChanges_EmptyPending verifies processBatchedChanges
 // is a no-op when there are no pending changes.
 func TestProcessBatchedChanges_EmptyPending(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 5, 10)
 	defer lb.cleanup()
 
@@ -424,6 +438,8 @@ func TestProcessBatchedChanges_EmptyPending(t *testing.T) {
 // This prevents out-of-order delivery when different workers pick up
 // separate changes for the same node.
 func TestProcessBatchedChanges_BundlesChangesPerNode(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 3, 10)
 	defer lb.cleanup()
 
@@ -469,6 +485,8 @@ func TestProcessBatchedChanges_BundlesChangesPerNode(t *testing.T) {
 // could process bundles from tick N and tick N+1 concurrently for the same
 // node, causing out-of-order delivery and races on lastSentPeers.
 func TestWorkMu_PreventsInterTickRace(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 	ch := make(chan *tailcfg.MapResponse, 100)
 	entry := &connectionEntry{
@@ -531,6 +549,8 @@ func TestWorkMu_PreventsInterTickRace(t *testing.T) {
 // TestCleanupOfflineNodes_RemovesOld verifies that nodes offline longer
 // than the 15-minute threshold are removed.
 func TestCleanupOfflineNodes_RemovesOld(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 5, 10)
 	defer lb.cleanup()
 
@@ -556,6 +576,8 @@ func TestCleanupOfflineNodes_RemovesOld(t *testing.T) {
 // TestCleanupOfflineNodes_KeepsRecent verifies that recently disconnected
 // nodes are not cleaned up.
 func TestCleanupOfflineNodes_KeepsRecent(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 5, 10)
 	defer lb.cleanup()
 
@@ -577,6 +599,8 @@ func TestCleanupOfflineNodes_KeepsRecent(t *testing.T) {
 // TestCleanupOfflineNodes_KeepsActive verifies that nodes with active
 // connections are never cleaned up, even if disconnect time is set.
 func TestCleanupOfflineNodes_KeepsActive(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 5, 10)
 	defer lb.cleanup()
 
@@ -601,6 +625,8 @@ func TestCleanupOfflineNodes_KeepsActive(t *testing.T) {
 // TestBatcher_CloseStopsWorkers verifies that Close() signals workers to stop
 // and doesn't deadlock.
 func TestBatcher_CloseStopsWorkers(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 3, 10)
 
 	// Start workers
@@ -637,6 +663,8 @@ func TestBatcher_CloseStopsWorkers(t *testing.T) {
 // BUG: batcher_lockfree.go:555-565 - close() calls close(conn.c) with no guard
 // FIX: Add sync.Once or atomic.Bool to multiChannelNodeConn.close().
 func TestBatcher_CloseMultipleTimes_DoubleClosePanic(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 3, 10)
 	lb.b.Start()
 
@@ -656,6 +684,8 @@ func TestBatcher_CloseMultipleTimes_DoubleClosePanic(t *testing.T) {
 // TestBatcher_MapResponseDuringShutdown verifies that MapResponseFromChange
 // returns ErrBatcherShuttingDown when the batcher is closed.
 func TestBatcher_MapResponseDuringShutdown(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 3, 10)
 
 	// Close the done channel
@@ -668,6 +698,8 @@ func TestBatcher_MapResponseDuringShutdown(t *testing.T) {
 // TestBatcher_IsConnectedReflectsState verifies IsConnected accurately
 // reflects the connection state of nodes.
 func TestBatcher_IsConnectedReflectsState(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 5, 10)
 	defer lb.cleanup()
 
@@ -697,6 +729,8 @@ func TestBatcher_IsConnectedReflectsState(t *testing.T) {
 // TestBatcher_ConnectedMapConsistency verifies ConnectedMap returns accurate
 // state for all nodes.
 func TestBatcher_ConnectedMapConsistency(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 5, 10)
 	defer lb.cleanup()
 
@@ -743,6 +777,8 @@ func TestBatcher_ConnectedMapConsistency(t *testing.T) {
 // calls addConnection() on the same entry makes hasActiveConnections()
 // return true, causing Compute to cancel the delete.
 func TestBug3_CleanupOfflineNodes_TOCTOU(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 5, 10)
 	defer lb.cleanup()
 
@@ -842,6 +878,8 @@ func TestBug3_CleanupOfflineNodes_TOCTOU(t *testing.T) {
 // BUG: batcher_lockfree.go worker() - no nil check after b.nodes.Load()
 // FIX: Add nil guard: `exists && nc != nil` in both sync and async paths.
 func TestBug5_WorkerPanicKillsWorkerPermanently(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 3, 10)
 	defer lb.cleanup()
 
@@ -977,6 +1015,8 @@ func TestBug6_StartCalledMultipleTimes_GoroutineLeak(t *testing.T) {
 // FIX: pendingChanges moved into multiChannelNodeConn — deleting the node
 // from b.nodes automatically drops its pending changes.
 func TestBug7_CleanupOfflineNodes_PendingChangesCleanedStructurally(t *testing.T) {
+	t.Parallel()
+
 	lb := setupLightweightBatcher(t, 5, 10)
 	defer lb.cleanup()
 
@@ -1029,6 +1069,8 @@ func TestBug7_CleanupOfflineNodes_PendingChangesCleanedStructurally(t *testing.T
 //	(timeouts happen here), then write-lock only to remove failed connections.
 //	The lock is now held only for O(N) pointer copies, not for N*50ms I/O.
 func TestBug8_SerialTimeoutUnderWriteLock(t *testing.T) {
+	t.Parallel()
+
 	mc := newMultiChannelNodeConn(1, nil)
 
 	// Add 5 stale connections (unbuffered, no reader = will timeout at 50ms each)
@@ -1083,6 +1125,8 @@ func TestBug8_SerialTimeoutUnderWriteLock(t *testing.T) {
 // changes, but on the broadcast code path within the Range callback.
 // FIX: pendingChanges moved into multiChannelNodeConn with mutex protection.
 func TestBug1_BroadcastNoDataLoss(t *testing.T) {
+	t.Parallel()
+
 	// Use many nodes so the Range iteration takes longer, widening the race window
 	lb := setupLightweightBatcher(t, 100, 10)
 	defer lb.cleanup()
@@ -1128,6 +1172,8 @@ func TestBug1_BroadcastNoDataLoss(t *testing.T) {
 // TestScale1000_AddToBatch_Broadcast verifies that broadcasting to 1000 nodes
 // works correctly under concurrent access.
 func TestScale1000_AddToBatch_Broadcast(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping 1000-node test in short mode")
 	}
@@ -1158,6 +1204,8 @@ func TestScale1000_AddToBatch_Broadcast(t *testing.T) {
 // TestScale1000_ProcessBatchedWithConcurrentAdd tests processBatchedChanges
 // running concurrently with addToBatch at 1000 nodes.
 func TestScale1000_ProcessBatchedWithConcurrentAdd(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping 1000-node test in short mode")
 	}
@@ -1210,6 +1258,8 @@ func TestScale1000_ProcessBatchedWithConcurrentAdd(t *testing.T) {
 // TestScale1000_MultiChannelBroadcast tests broadcasting a MapResponse
 // to 1000 nodes, each with 1-3 connections.
 func TestScale1000_MultiChannelBroadcast(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping 1000-node test in short mode")
 	}
@@ -1310,6 +1360,8 @@ func TestScale1000_MultiChannelBroadcast(t *testing.T) {
 // TestScale1000_ConnectionChurn tests 1000 nodes with 10% churning connections
 // while broadcasts are happening. Stable nodes should not lose data.
 func TestScale1000_ConnectionChurn(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping 1000-node test in short mode")
 	}
@@ -1409,6 +1461,8 @@ func TestScale1000_ConnectionChurn(t *testing.T) {
 // TestScale1000_ConcurrentAddRemove tests concurrent AddNode-like and
 // RemoveNode-like operations at 1000-node scale.
 func TestScale1000_ConcurrentAddRemove(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping 1000-node test in short mode")
 	}
@@ -1450,6 +1504,8 @@ func TestScale1000_ConcurrentAddRemove(t *testing.T) {
 // TestScale1000_IsConnectedConsistency verifies IsConnected returns consistent
 // results during rapid connection state changes at 1000-node scale.
 func TestScale1000_IsConnectedConsistency(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping 1000-node test in short mode")
 	}
@@ -1516,6 +1572,8 @@ func TestScale1000_IsConnectedConsistency(t *testing.T) {
 // TestScale1000_BroadcastDuringNodeChurn tests that broadcast addToBatch
 // calls work correctly while 20% of nodes are joining and leaving.
 func TestScale1000_BroadcastDuringNodeChurn(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping 1000-node test in short mode")
 	}
@@ -1600,6 +1658,8 @@ func TestScale1000_BroadcastDuringNodeChurn(t *testing.T) {
 // TestScale1000_WorkChannelSaturation tests that the work channel doesn't
 // deadlock when it fills up (queueWork selects on done channel as escape).
 func TestScale1000_WorkChannelSaturation(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping 1000-node test in short mode")
 	}
@@ -1675,6 +1735,8 @@ func TestScale1000_WorkChannelSaturation(t *testing.T) {
 // TestScale1000_FullUpdate_AllNodesGetPending verifies that a FullUpdate
 // creates pending entries for all 1000 nodes.
 func TestScale1000_FullUpdate_AllNodesGetPending(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping 1000-node test in short mode")
 	}
@@ -1706,6 +1768,8 @@ func TestScale1000_FullUpdate_AllNodesGetPending(t *testing.T) {
 // create 1000 nodes in DB, add them to batcher, send FullUpdate,
 // verify all nodes see 999 peers.
 func TestScale1000_AllToAll_FullPipeline(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		t.Skip("skipping 1000-node full pipeline test in short mode")
 	}

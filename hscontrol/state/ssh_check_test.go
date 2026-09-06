@@ -17,6 +17,8 @@ func newTestStateForSSHCheck() *State {
 }
 
 func TestSSHCheckAuth(t *testing.T) {
+	t.Parallel()
+
 	s := newTestStateForSSHCheck()
 
 	src := types.NodeID(1)
@@ -46,6 +48,8 @@ func TestSSHCheckAuth(t *testing.T) {
 }
 
 func TestSSHCheckAuthClear(t *testing.T) {
+	t.Parallel()
+
 	s := newTestStateForSSHCheck()
 
 	s.SetLastSSHAuth(types.NodeID(1), types.NodeID(2))
@@ -68,6 +72,8 @@ func TestSSHCheckAuthClear(t *testing.T) {
 }
 
 func TestSSHCheckAuthConcurrent(t *testing.T) {
+	t.Parallel()
+
 	s := newTestStateForSSHCheck()
 
 	var wg sync.WaitGroup

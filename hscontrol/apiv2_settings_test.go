@@ -42,6 +42,8 @@ func getSettings(t *testing.T, api humatest.TestAPI) apiv2.TailnetSettings {
 // is computed from config — the branches the default-config roundtrip never
 // exercises. Expectations live in struct fields, not name branches.
 func TestAPIv2SettingsComputedFields(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name                string
 		cfg                 types.Config
@@ -93,6 +95,8 @@ func TestAPIv2SettingsComputedFields(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			s := getSettings(t, settingsAPIWithConfig(t, &tt.cfg))
 
 			assert.Equal(t, tt.wantHTTPS, s.HTTPSEnabled)
@@ -106,6 +110,8 @@ func TestAPIv2SettingsComputedFields(t *testing.T) {
 // TestAPIv2SettingsConstantOffFields pins the hardcoded-off fields:
 // even with every config knob set, they must not pick up signal.
 func TestAPIv2SettingsConstantOffFields(t *testing.T) {
+	t.Parallel()
+
 	cfg := types.Config{
 		TLS:    types.TLSConfig{CertPath: "/x/cert.pem"},
 		Node:   types.NodeConfig{Expiry: 90 * 24 * time.Hour},
@@ -128,6 +134,8 @@ func TestAPIv2SettingsConstantOffFields(t *testing.T) {
 
 // TestAPIv2SettingsPatchUnsupported confirms writes are rejected and inert.
 func TestAPIv2SettingsPatchUnsupported(t *testing.T) {
+	t.Parallel()
+
 	app := createTestApp(t)
 	api := registerAPIV2(t, app)
 
@@ -142,6 +150,8 @@ func TestAPIv2SettingsPatchUnsupported(t *testing.T) {
 // TestAPIv2SettingsNonDefaultTailnet404 — the tailnet check runs before the
 // 501, so a bad tailnet is 404 on both verbs.
 func TestAPIv2SettingsNonDefaultTailnet404(t *testing.T) {
+	t.Parallel()
+
 	api := settingsAPIWithConfig(t, &types.Config{})
 
 	assert.Equal(t, http.StatusNotFound, api.Get("/api/v2/tailnet/example.com/settings").Code)

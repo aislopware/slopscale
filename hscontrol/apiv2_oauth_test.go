@@ -181,6 +181,8 @@ func createTaggedKey(t *testing.T, baseURL, bearer string, tags []string) int {
 }
 
 func TestAPIv2OAuth_TokenEndpoint(t *testing.T) {
+	t.Parallel()
+
 	_, baseURL, admin := newOAuthTestServer(t)
 
 	clientID, secret := createClient(t, baseURL, admin, []string{"auth_keys"}, []string{"tag:ci"})
@@ -220,6 +222,8 @@ func TestAPIv2OAuth_TokenEndpoint(t *testing.T) {
 }
 
 func TestAPIv2OAuth_ScopeEnforcement(t *testing.T) {
+	t.Parallel()
+
 	_, baseURL, admin := newOAuthTestServer(t)
 
 	// A write-scoped token may create an auth key within its tag grant...
@@ -260,6 +264,8 @@ func TestAPIv2OAuth_ScopeEnforcement(t *testing.T) {
 }
 
 func TestAPIv2OAuth_ClientManagementScopes(t *testing.T) {
+	t.Parallel()
+
 	_, baseURL, admin := newOAuthTestServer(t)
 
 	// An oauth_keys token may create a client within its own grant...
@@ -286,6 +292,8 @@ func TestAPIv2OAuth_ClientManagementScopes(t *testing.T) {
 }
 
 func TestAPIv2OAuth_TagOwnedBy(t *testing.T) {
+	t.Parallel()
+
 	app, baseURL, admin := newOAuthTestServer(t)
 
 	// tag:k8s is owned by tag:k8s-operator: the operator's tag delegation.
@@ -320,6 +328,8 @@ func TestAPIv2OAuth_TagOwnedBy(t *testing.T) {
 // clients gets the same response for a real client id as for a missing key, so
 // it cannot enumerate which ids are OAuth clients.
 func TestAPIv2OAuth_NoClientExistenceOracle(t *testing.T) {
+	t.Parallel()
+
 	_, baseURL, admin := newOAuthTestServer(t)
 
 	clientID, _ := createClient(t, baseURL, admin, []string{"oauth_keys"}, []string{"tag:ci"})
@@ -347,6 +357,8 @@ func TestAPIv2OAuth_NoClientExistenceOracle(t *testing.T) {
 // tags within its grant on a device. Without the grant check, the scope alone
 // would let a token stamp any existing policy tag (e.g. tag:other) onto any node.
 func TestAPIv2OAuth_SetDeviceTagsGrant(t *testing.T) {
+	t.Parallel()
+
 	app, baseURL, admin := newOAuthTestServer(t)
 
 	// A registered, user-owned node to retag.
@@ -377,6 +389,8 @@ func TestAPIv2OAuth_SetDeviceTagsGrant(t *testing.T) {
 // client or auth key carrying a tag absent from policy (matching SetNodeTags),
 // while an admin key retains the historical syntax-only validation.
 func TestAPIv2OAuth_UndefinedTagRejected(t *testing.T) {
+	t.Parallel()
+
 	_, baseURL, admin := newOAuthTestServer(t)
 
 	// A token that may create clients and auth keys, holding tag:ci (in policy).
@@ -402,6 +416,8 @@ func TestAPIv2OAuth_UndefinedTagRejected(t *testing.T) {
 // TestAPIv2OAuth_DenialBranches covers the token-endpoint and bearer-dispatch
 // failure paths: each must fail closed with the right status and no session.
 func TestAPIv2OAuth_DenialBranches(t *testing.T) {
+	t.Parallel()
+
 	_, baseURL, _ := newOAuthTestServer(t)
 	tokenURL := baseURL + "/api/v2/oauth/token"
 	keysURL := baseURL + "/api/v2/tailnet/-/keys"
@@ -456,6 +472,8 @@ func TestAPIv2OAuth_DenialBranches(t *testing.T) {
 // keeps the two kinds isolated by scope: a token cannot list or delete a kind it
 // lacks the scope for, and an admin key sees both.
 func TestAPIv2OAuth_KeysMultiplexIsolation(t *testing.T) {
+	t.Parallel()
+
 	_, baseURL, admin := newOAuthTestServer(t)
 	keysURL := baseURL + "/api/v2/tailnet/-/keys"
 

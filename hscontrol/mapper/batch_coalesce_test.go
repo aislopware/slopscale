@@ -16,6 +16,8 @@ import (
 // being queued as a second bundle that a non-FIFO worker could deliver out of
 // order.
 func TestProcessBatchedChangesCoalescesWhenInFlight(t *testing.T) {
+	t.Parallel()
+
 	b := NewBatcher(50*time.Millisecond, 2, nil) // not started: no ticker, no workers
 
 	id := types.NodeID(1)

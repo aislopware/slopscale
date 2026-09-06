@@ -67,10 +67,14 @@ func forcesPeerRecompute(cs []change.Change) bool {
 // netmap rebuilds (and a reconnect storm into O(N^2)), which saturated CPU
 // after the v0.28 -> v0.29 upgrade.
 func TestConnectDisconnectOrdinaryNodeNoRuntimeRecompute(t *testing.T) {
+	t.Parallel()
+
 	_, s, nodeID := persistTestSetup(t)
 	t.Cleanup(func() { _ = s.Close() })
 
 	t.Run("connect", func(t *testing.T) {
+		t.Parallel()
+
 		cs, epoch := s.Connect(nodeID)
 		require.NotZero(t, epoch, "Connect should return a session epoch")
 
@@ -84,6 +88,8 @@ func TestConnectDisconnectOrdinaryNodeNoRuntimeRecompute(t *testing.T) {
 	})
 
 	t.Run("disconnect", func(t *testing.T) {
+		t.Parallel()
+
 		// Connect acquired a session in the connect subtest too; drain to the
 		// last release, which is the one that marks the node offline.
 		_, epoch := s.Connect(nodeID)
@@ -105,6 +111,8 @@ func TestConnectDisconnectOrdinaryNodeNoRuntimeRecompute(t *testing.T) {
 // NodeNeedsPeerRecompute gate. Peers must still receive that recompute so they
 // drop a stale PeerRelay allocation when the relay goes offline.
 func TestConnectDisconnectRelayTargetTriggersRecompute(t *testing.T) {
+	t.Parallel()
+
 	_, s, nodeID := persistTestSetup(t)
 	t.Cleanup(func() { _ = s.Close() })
 
@@ -115,6 +123,8 @@ func TestConnectDisconnectRelayTargetTriggersRecompute(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("connect", func(t *testing.T) {
+		t.Parallel()
+
 		cs, epoch := s.Connect(nodeID)
 		require.NotZero(t, epoch)
 
@@ -123,6 +133,8 @@ func TestConnectDisconnectRelayTargetTriggersRecompute(t *testing.T) {
 	})
 
 	t.Run("disconnect", func(t *testing.T) {
+		t.Parallel()
+
 		_, epoch := s.Connect(nodeID)
 		cs := drainSessions(t, s, nodeID, epoch)
 
@@ -135,6 +147,8 @@ func TestConnectDisconnectRelayTargetTriggersRecompute(t *testing.T) {
 // still forces peers to recompute on connect/disconnect (primary-route
 // failover changes their AllowedIPs), so the gate does not over-suppress.
 func TestConnectDisconnectSubnetRouterForcesRecompute(t *testing.T) {
+	t.Parallel()
+
 	_, s, nodeID := persistTestSetup(t)
 	t.Cleanup(func() { _ = s.Close() })
 
@@ -146,6 +160,8 @@ func TestConnectDisconnectSubnetRouterForcesRecompute(t *testing.T) {
 	require.True(t, ok)
 
 	t.Run("connect", func(t *testing.T) {
+		t.Parallel()
+
 		cs, epoch := s.Connect(nodeID)
 		require.NotZero(t, epoch)
 
@@ -154,6 +170,8 @@ func TestConnectDisconnectSubnetRouterForcesRecompute(t *testing.T) {
 	})
 
 	t.Run("disconnect", func(t *testing.T) {
+		t.Parallel()
+
 		_, epoch := s.Connect(nodeID)
 		cs := drainSessions(t, s, nodeID, epoch)
 
@@ -169,6 +187,8 @@ func TestConnectDisconnectSubnetRouterForcesRecompute(t *testing.T) {
 // still carries primary-route failover, so the heavier FullUpdate that the
 // online/offline change once emitted for subnet routers is unnecessary.
 func TestConnectDisconnectSubnetRouterEmitsPolicyChangeNotFull(t *testing.T) {
+	t.Parallel()
+
 	_, s, nodeID := persistTestSetup(t)
 	t.Cleanup(func() { _ = s.Close() })
 
@@ -194,6 +214,8 @@ func TestConnectDisconnectSubnetRouterEmitsPolicyChangeNotFull(t *testing.T) {
 	}
 
 	t.Run("connect", func(t *testing.T) {
+		t.Parallel()
+
 		cs, epoch := s.Connect(nodeID)
 		require.NotZero(t, epoch)
 
@@ -201,6 +223,8 @@ func TestConnectDisconnectSubnetRouterEmitsPolicyChangeNotFull(t *testing.T) {
 	})
 
 	t.Run("disconnect", func(t *testing.T) {
+		t.Parallel()
+
 		_, epoch := s.Connect(nodeID)
 		cs := drainSessions(t, s, nodeID, epoch)
 
@@ -244,6 +268,8 @@ func drainSessions(t *testing.T, s *State, nodeID types.NodeID, epoch uint64) []
 // node offline. Under the old epoch-equality gate it was rejected as
 // stale and the node stayed online forever.
 func TestDisconnectOutOfOrderSessionsCannotStrandNodeOnline(t *testing.T) {
+	t.Parallel()
+
 	_, s, nodeID := persistTestSetup(t)
 	t.Cleanup(func() { _ = s.Close() })
 
