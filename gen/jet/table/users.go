@@ -24,6 +24,7 @@ type usersTable struct {
 	ProviderIdentifier sqlite.ColumnString
 	Provider           sqlite.ColumnString
 	ProfilePicURL      sqlite.ColumnString
+	Role               sqlite.ColumnString
 	CreatedAt          sqlite.ColumnTimestamp
 	UpdatedAt          sqlite.ColumnTimestamp
 	DeletedAt          sqlite.ColumnTimestamp
@@ -75,11 +76,12 @@ func newUsersTableImpl(schemaName, tableName, alias string) usersTable {
 		ProviderIdentifierColumn = sqlite.StringColumn("provider_identifier")
 		ProviderColumn           = sqlite.StringColumn("provider")
 		ProfilePicURLColumn      = sqlite.StringColumn("profile_pic_url")
+		RoleColumn               = sqlite.StringColumn("role")
 		CreatedAtColumn          = sqlite.TimestampColumn("created_at")
 		UpdatedAtColumn          = sqlite.TimestampColumn("updated_at")
 		DeletedAtColumn          = sqlite.TimestampColumn("deleted_at")
-		allColumns               = sqlite.ColumnList{IDColumn, NameColumn, DisplayNameColumn, EmailColumn, ProviderIdentifierColumn, ProviderColumn, ProfilePicURLColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
-		mutableColumns           = sqlite.ColumnList{NameColumn, DisplayNameColumn, EmailColumn, ProviderIdentifierColumn, ProviderColumn, ProfilePicURLColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
+		allColumns               = sqlite.ColumnList{IDColumn, NameColumn, DisplayNameColumn, EmailColumn, ProviderIdentifierColumn, ProviderColumn, ProfilePicURLColumn, RoleColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
+		mutableColumns           = sqlite.ColumnList{NameColumn, DisplayNameColumn, EmailColumn, ProviderIdentifierColumn, ProviderColumn, ProfilePicURLColumn, RoleColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
 		defaultColumns           = sqlite.ColumnList{}
 	)
 
@@ -94,6 +96,7 @@ func newUsersTableImpl(schemaName, tableName, alias string) usersTable {
 		ProviderIdentifier: ProviderIdentifierColumn,
 		Provider:           ProviderColumn,
 		ProfilePicURL:      ProfilePicURLColumn,
+		Role:               RoleColumn,
 		CreatedAt:          CreatedAtColumn,
 		UpdatedAt:          UpdatedAtColumn,
 		DeletedAt:          DeletedAtColumn,
