@@ -41,8 +41,11 @@ WIP commits on feature branches only.
 - `hscontrol/policy/v2/` is the policy engine; `policy/policy.go` is thin
   wrappers. There is no v1.
 - `hscontrol/servertest/` is an in-memory server harness. Prefer it over
-  `integration/` when Docker isn't needed. Its OAuth cases shell out to `tofu`,
-  which only the nix shell provides. `make test` passes `-short`, which skips
+  `integration/` when Docker isn't needed. It runs the NodeStore with a 5ms
+  write batch, so one change reaches clients as several map responses; check
+  netmaps with `WaitForCondition` or the `Assert*` helpers rather than reading
+  `Netmap()` right after a change. Its OAuth cases shell out to `tofu`, which
+  only the nix shell provides. `make test` passes `-short`, which skips
   `TestHAProberProperty`; that one runs 100 real handshake rounds and takes
   over half an hour, so run it explicitly when touching HA election.
 
