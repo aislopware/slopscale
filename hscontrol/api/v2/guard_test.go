@@ -5,7 +5,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/juanfont/headscale/hscontrol/scope"
+	"github.com/juanfont/headscale/hscontrol/api/principal"
 )
 
 // selfEnforcedKeyOps are the authenticated operations that intentionally declare
@@ -38,9 +38,9 @@ func TestEveryAuthenticatedOperationDeclaresScope(t *testing.T) {
 				continue
 			}
 
-			if _, ok := op.Metadata[scopeMetaKey].(scope.Scope); !ok {
+			if _, ok := principal.RequiredScope(op); !ok {
 				t.Errorf("operation %q is authenticated but declares no required scope; "+
-					"wrap it in requireScope, or add it to selfEnforcedKeyOps if it "+
+					"wrap it in principal.RequireScope, or add it to selfEnforcedKeyOps if it "+
 					"authorizes inside the handler", key)
 			}
 		}

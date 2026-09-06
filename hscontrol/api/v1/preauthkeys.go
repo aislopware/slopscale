@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
 
@@ -82,14 +83,14 @@ type listPreAuthKeysOutput struct {
 }
 
 func registerPreAuthKeys(api huma.API, b Backend) {
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "createPreAuthKey",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/preauthkey",
 		Summary:     "Create pre-auth key",
 		Tags:        []string{"PreAuthKeys"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *createPreAuthKeyInput) (*preAuthKeyOutput, error) {
+	}, scope.AuthKeys), func(_ context.Context, in *createPreAuthKeyInput) (*preAuthKeyOutput, error) {
 		user, err := parsePreAuthKeyUser(in.Body.User)
 		if err != nil {
 			return nil, err
@@ -137,14 +138,14 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "expirePreAuthKey",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/preauthkey/expire",
 		Summary:     "Expire pre-auth key",
 		Tags:        []string{"PreAuthKeys"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *expirePreAuthKeyInput) (*expirePreAuthKeyOutput, error) {
+	}, scope.AuthKeys), func(_ context.Context, in *expirePreAuthKeyInput) (*expirePreAuthKeyOutput, error) {
 		id, err := parsePreAuthKeyID(in.Body.ID)
 		if err != nil {
 			return nil, err
@@ -159,14 +160,14 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 		return &expirePreAuthKeyOutput{}, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "deletePreAuthKey",
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/preauthkey",
 		Summary:     "Delete pre-auth key",
 		Tags:        []string{"PreAuthKeys"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *deletePreAuthKeyInput) (*deletePreAuthKeyOutput, error) {
+	}, scope.AuthKeys), func(_ context.Context, in *deletePreAuthKeyInput) (*deletePreAuthKeyOutput, error) {
 		// DELETE has no body: id is bound from the query string.
 		id, err := parsePreAuthKeyID(in.ID)
 		if err != nil {
@@ -182,14 +183,14 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 		return &deletePreAuthKeyOutput{}, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "listPreAuthKeys",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/preauthkey",
 		Summary:     "List pre-auth keys",
 		Tags:        []string{"PreAuthKeys"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, _ *struct{}) (*listPreAuthKeysOutput, error) {
+	}, scope.AuthKeysRead), func(_ context.Context, _ *struct{}) (*listPreAuthKeysOutput, error) {
 		preAuthKeys, err := b.State.ListPreAuthKeys()
 		if err != nil {
 			return nil, huma.Error500InternalServerError("listing pre-auth keys", err)

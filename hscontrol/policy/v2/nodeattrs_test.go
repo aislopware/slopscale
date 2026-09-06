@@ -226,16 +226,6 @@ func TestNodeAttrsValidate(t *testing.T) {
 			wantErr: ErrNodeAttrsAutogroupNotAllowed,
 		},
 		{
-			name:    "autogroup:admin target rejected with user-role hint",
-			extra:   `"nodeAttrs": [{"target": ["autogroup:admin"], "attr": ["randomize-client-port"]}]`,
-			wantErr: ErrNodeAttrsAutogroupNotAllowed,
-		},
-		{
-			name:    "autogroup:owner target rejected with user-role hint",
-			extra:   `"nodeAttrs": [{"target": ["autogroup:owner"], "attr": ["randomize-client-port"]}]`,
-			wantErr: ErrNodeAttrsAutogroupNotAllowed,
-		},
-		{
 			name:    "funnel attr rejected as unsupported",
 			extra:   `"nodeAttrs": [{"target": ["*"], "attr": ["funnel"]}]`,
 			wantErr: ErrNodeAttrUnsupported,

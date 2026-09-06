@@ -218,13 +218,13 @@ func handleListKeys(ctx context.Context, b Backend, in *listKeysInput) (*listKey
 		return nil, err
 	}
 
-	scopes, isOAuth := principalScopes(ctx)
+	p := caller(ctx)
 
 	out := &listKeysOutput{}
 	out.Body.Keys = []Key{}
 
-	// A token sees the key kinds it has read scope for; an admin key sees all.
-	if !isOAuth || scope.Grants(scope.Parse(scopes), scope.AuthKeysRead) {
+	// A caller sees the key kinds it has read scope for.
+	if p.Allows(scope.AuthKeysRead) {
 		keys, keysErr := b.State.ListPreAuthKeys()
 		if keysErr != nil {
 			return nil, huma.Error500InternalServerError("listing auth keys", keysErr)
@@ -235,7 +235,7 @@ func handleListKeys(ctx context.Context, b Backend, in *listKeysInput) (*listKey
 		}
 	}
 
-	if !isOAuth || scope.Grants(scope.Parse(scopes), scope.OAuthKeysRead) {
+	if p.Allows(scope.OAuthKeysRead) {
 		clients, clientsErr := b.State.ListOAuthClients()
 		if clientsErr != nil {
 			return nil, huma.Error500InternalServerError("listing oauth clients", clientsErr)
@@ -322,16 +322,12 @@ func handleDeleteKey(ctx context.Context, b Backend, in *keyByIDInput) (*deleteK
 	return &deleteKeyOutput{}, nil
 }
 
-// requireKeyScope authorizes a keys operation for an OAuth access token. An admin
-// API key carries no OAuth scopes and is all-access, so it always passes.
+// requireKeyScope authorizes a keys operation. The keys handlers multiplex on
+// keyType, so their scope is known only once the body is parsed and the
+// static middleware cannot check it.
 func requireKeyScope(ctx context.Context, need scope.Scope) error {
-	scopes, isOAuth := principalScopes(ctx)
-	if !isOAuth {
-		return nil
-	}
-
-	if !scope.Grants(scope.Parse(scopes), need) {
-		return huma.Error403Forbidden("token is missing the required scope " + string(need))
+	if !caller(ctx).Allows(need) {
+		return huma.Error403Forbidden("credential is missing the required scope " + string(need))
 	}
 
 	return nil
@@ -434,23 +430,24 @@ func createOAuthClient(ctx context.Context, b Backend, body CreateKeyRequest) (*
 		)
 	}
 
-	// A client created by an OAuth token may not be granted authority the token
-	// lacks: its scopes must each be within the token's grant, and its tags within
-	// the token's tags and defined in policy (matching SetNodeTags). Otherwise an
-	// oauth_keys token could mint an all-access client and escalate. An admin API
-	// key (not an OAuth token) is unrestricted and keeps the historical tag
-	// behaviour (syntax-only validation).
-	if tokenScopes, isOAuth := principalScopes(ctx); isOAuth {
-		for _, s := range body.Scopes {
-			if !scope.Grants(scope.Parse(tokenScopes), scope.Scope(s)) {
-				return nil, huma.Error403Forbidden(
-					"client may not be granted scope " + s + " beyond the creating token",
-				)
-			}
+	// A client may not be granted authority its creator lacks: its scopes must
+	// each be within the creator's grant (an OAuth token's scopes or an API
+	// key owner's role), otherwise an oauth_keys credential could mint an
+	// all-access client and escalate. Tags are additionally bounded for an
+	// OAuth token, which must stay within its own tags, each defined in policy
+	// (matching SetNodeTags); an API key keeps the historical syntax-only tag
+	// validation.
+	p := caller(ctx)
+
+	for _, s := range body.Scopes {
+		if !p.Allows(scope.Scope(s)) {
+			return nil, huma.Error403Forbidden(
+				"client may not be granted scope " + s + " beyond the creating credential",
+			)
 		}
+	}
 
-		tokenTags, _ := principalTags(ctx)
-
+	if tokenTags, isOAuth := principalTags(ctx); isOAuth {
 		for _, tag := range body.Tags {
 			if !b.State.TagExists(tag) {
 				return nil, huma.Error400BadRequest("tag " + tag + " is not defined in policy")

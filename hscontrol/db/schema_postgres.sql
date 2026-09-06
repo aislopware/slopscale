@@ -15,7 +15,8 @@ CREATE TABLE users(
   email text,
   provider_identifier text,
   provider text,
-  profile_pic_url text
+  profile_pic_url text,
+  role text
 );
 CREATE INDEX idx_users_deleted_at ON users(deleted_at);
 CREATE UNIQUE INDEX idx_provider_identifier ON users(provider_identifier) WHERE provider_identifier IS NOT NULL;

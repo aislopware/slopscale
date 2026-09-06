@@ -343,9 +343,18 @@ func (s *State) ReloadPolicy() ([]change.Change, error) {
 // CreateUser creates a new user and updates the policy manager.
 // Returns the created user, change set, and any error.
 func (s *State) CreateUser(user types.User) (*types.User, change.Change, error) {
-	saveErr := hsdb.SaveUser(s.db, &user)
-	if saveErr != nil {
-		return nil, change.Change{}, fmt.Errorf("creating user: %w", saveErr)
+	// Role assignment and the insert share a transaction so two first users
+	// created at once cannot both become owner.
+	err := s.db.Write(func(tx *hsdb.Tx) error {
+		err := assignInitialRole(tx, &user)
+		if err != nil {
+			return err
+		}
+
+		return hsdb.SaveUser(tx, &user)
+	})
+	if err != nil {
+		return nil, change.Change{}, fmt.Errorf("creating user: %w", err)
 	}
 
 	// Check if policy manager needs updating
@@ -1290,6 +1299,24 @@ func (s *State) SetAPIKeyUser(keyID uint64, userID types.UserID) error {
 // CreateAPIKey generates a new API key with optional expiration.
 func (s *State) CreateAPIKey(expiration *time.Time) (string, *types.APIKey, error) {
 	return s.db.CreateAPIKey(expiration)
+}
+
+// CreateAPIKeyForUser generates an API key owned by userID, so the key is
+// bounded by the user's role. A nil userID mints a legacy all-access key.
+func (s *State) CreateAPIKeyForUser(expiration *time.Time, userID *types.UserID) (string, *types.APIKey, error) {
+	keyStr, apiKey, err := s.db.CreateAPIKey(expiration)
+	if err != nil || userID == nil {
+		return keyStr, apiKey, err
+	}
+
+	err = s.db.SetAPIKeyUser(apiKey.ID, *userID)
+	if err != nil {
+		return "", nil, fmt.Errorf("assigning api key owner: %w", err)
+	}
+
+	apiKey.UserID = new(uint(*userID))
+
+	return keyStr, apiKey, nil
 }
 
 // GetAPIKey retrieves an API key by its prefix.

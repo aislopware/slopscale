@@ -9,11 +9,12 @@ import (
 	"strconv"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 func init() {
-	registrations = append(registrations, registerUsers)
+	registrations = append(registrations, registerUsers, registerUserRole)
 }
 
 // CreateUserRequestBody mirrors v1.CreateUserRequest.
@@ -35,7 +36,17 @@ type (
 	}
 )
 
+// SetUserRoleRequestBody is the body of setUserRole.
+type SetUserRoleRequestBody struct {
+	Role string `doc:"One of owner, admin, network-admin, it-admin, auditor, member." json:"role"`
+}
+
 type (
+	setUserRoleInput struct {
+		ID   string `format:"uint64" path:"id"`
+		Body SetUserRoleRequestBody
+	}
+
 	renameUserInput struct {
 		OldID   string `format:"uint64" path:"oldId"`
 		NewName string `path:"newName"`
@@ -63,14 +74,14 @@ type (
 )
 
 func registerUsers(api huma.API, b Backend) {
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "createUser",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/user",
 		Summary:     "Create user",
 		Tags:        []string{"Users"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *createUserInput) (*userOutput, error) {
+	}, scope.Users), func(_ context.Context, in *createUserInput) (*userOutput, error) {
 		// Pre-check yields a 409 for the common case; the DB unique constraint
 		// is the real guard.
 		if in.Body.Name != "" {
@@ -98,14 +109,14 @@ func registerUsers(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "renameUser",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/user/{oldId}/rename/{newName}",
 		Summary:     "Rename user",
 		Tags:        []string{"Users"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *renameUserInput) (*userOutput, error) {
+	}, scope.Users), func(_ context.Context, in *renameUserInput) (*userOutput, error) {
 		oldID, err := parseUserID(in.OldID)
 		if err != nil {
 			return nil, err
@@ -134,14 +145,14 @@ func registerUsers(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "deleteUser",
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/user/{id}",
 		Summary:     "Delete user",
 		Tags:        []string{"Users"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *deleteUserInput) (*deleteUserOutput, error) {
+	}, scope.Users), func(_ context.Context, in *deleteUserInput) (*deleteUserOutput, error) {
 		id, err := parseUserID(in.ID)
 		if err != nil {
 			return nil, err
@@ -162,14 +173,14 @@ func registerUsers(api huma.API, b Backend) {
 		return &deleteUserOutput{}, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "listUsers",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/user",
 		Summary:     "List users",
 		Tags:        []string{"Users"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *listUsersInput) (*listUsersOutput, error) {
+	}, scope.UsersRead), func(_ context.Context, in *listUsersInput) (*listUsersOutput, error) {
 		// Gateway parity: a non-numeric id is a 400 even when other filters win.
 		if in.ID != "" {
 			_, err := strconv.ParseUint(in.ID, 10, 64)
@@ -230,4 +241,40 @@ func parseUserID(s string) (types.UserID, error) {
 	}
 
 	return types.UserID(id), nil
+}
+
+func registerUserRole(api huma.API, b Backend) {
+	huma.Register(api, withScope(huma.Operation{
+		OperationID: "setUserRole",
+		Method:      http.MethodPost,
+		Path:        "/api/v1/user/{id}/role",
+		Summary:     "Set user role",
+		Description: "Assigns an admin role. Only the owner or an admin may assign roles, nobody " +
+			"may change their own, and assigning owner transfers ownership: the previous owner " +
+			"becomes an admin. The owner's role changes only by such a transfer.",
+		Tags:     []string{"Users"},
+		Security: bearerAuth,
+	}, scope.Users), func(ctx context.Context, in *setUserRoleInput) (*userOutput, error) {
+		id, err := parseUserID(in.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		role, err := types.ParseRole(in.Body.Role)
+		if err != nil {
+			return nil, huma.Error400BadRequest("invalid role", err)
+		}
+
+		user, policyChanged, err := b.State.SetUserRole(roleActor(ctx), id, role)
+		if err != nil {
+			return nil, mapError("setting user role", err)
+		}
+
+		b.Change(policyChanged)
+
+		out := &userOutput{}
+		out.Body.User = userFromView(user.View())
+
+		return out, nil
+	})
 }

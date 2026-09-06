@@ -1907,10 +1907,13 @@ func (pm *PolicyManager) refreshNodeAttrsLocked() error {
 	// nodeAttrs entries and never had any. Skip the compile + per-node
 	// hash walk entirely. As soon as the operator adds a nodeAttrs
 	// entry pm.nodeAttrsHashes becomes non-empty and the gate opens.
+	// Role caps (is-admin, is-owner) ride on the same map, so the gate
+	// also stays shut only while no user holds a role that stamps them.
 	if pm.pol != nil &&
 		len(pm.pol.NodeAttrs) == 0 &&
 		!pm.pol.RandomizeClientPort &&
-		len(pm.nodeAttrsHashes) == 0 {
+		len(pm.nodeAttrsHashes) == 0 &&
+		!usersHaveAdmin(pm.users) {
 		return nil
 	}
 
@@ -1918,6 +1921,8 @@ func (pm *PolicyManager) refreshNodeAttrsLocked() error {
 	if err != nil {
 		return fmt.Errorf("compiling nodeAttrs: %w", err)
 	}
+
+	stampRoleCaps(pm.users, pm.nodes, newMap)
 
 	newHashes := make(map[types.NodeID]deephash.Sum, len(newMap))
 	for id, capMap := range newMap {

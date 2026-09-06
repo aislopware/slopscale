@@ -224,6 +224,63 @@ func (pol *Policy) compileNodeAttrs(
 	return result, nil
 }
 
+// stampRoleCaps adds to capMaps the capabilities a node inherits from its
+// user's role, as the hosted control plane does: is-admin for the owner and
+// admins, is-owner for the owner. Tagged nodes carry neither. Clients use
+// them for the admin-console affordances in their UI only; access is still
+// the filter's job.
+func stampRoleCaps(
+	users types.Users,
+	nodes views.Slice[types.NodeView],
+	capMaps map[types.NodeID]tailcfg.NodeCapMap,
+) {
+	roles := make(map[types.UserID]types.Role, len(users))
+
+	for i := range users {
+		if users[i].Role.IsAdmin() {
+			roles[types.UserID(users[i].ID)] = users[i].Role
+		}
+	}
+
+	if len(roles) == 0 {
+		return
+	}
+
+	for _, node := range nodes.All() {
+		if node.IsTagged() || !node.UserID().Valid() {
+			continue
+		}
+
+		role, ok := roles[types.UserID(node.UserID().Get())]
+		if !ok {
+			continue
+		}
+
+		capMap, ok := capMaps[node.ID()]
+		if !ok {
+			capMap = tailcfg.NodeCapMap{}
+			capMaps[node.ID()] = capMap
+		}
+
+		capMap[nodecap.Admin] = nil
+
+		if role == types.RoleOwner {
+			capMap[nodecap.Owner] = nil
+		}
+	}
+}
+
+// usersHaveAdmin reports whether any user holds a role that stamps caps.
+func usersHaveAdmin(users types.Users) bool {
+	for i := range users {
+		if users[i].Role.IsAdmin() {
+			return true
+		}
+	}
+
+	return false
+}
+
 // compileGrants resolves all policy grants into [compiledGrant] structs.
 // Source resolution and non-self destination resolution happens once
 // here. This is the single resolution path that replaces the

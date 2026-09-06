@@ -34,7 +34,8 @@
           "name": "bob",
           "profilePicUrl": "",
           "provider": "",
-          "providerId": ""
+          "providerId": "",
+          "role": "member"
         }
       },
       "registerMethod": "REGISTER_METHOD_AUTH_KEY",

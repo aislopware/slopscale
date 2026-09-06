@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
 )
@@ -64,14 +65,14 @@ type (
 )
 
 func registerAuth(api huma.API, b Backend) {
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "authRegister",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/auth/register",
 		Summary:     "Register node via auth flow",
 		Tags:        []string{"Auth"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *authRegisterInput) (*authRegisterOutput, error) {
+	}, scope.DevicesCore), func(_ context.Context, in *authRegisterInput) (*authRegisterOutput, error) {
 		// Malformed auth_id is 400; unknown user and missing pending session are
 		// 404 via mapError, matching the Approve/Reject handlers.
 		registrationID, err := types.AuthIDFromString(in.Body.AuthID)
@@ -107,14 +108,14 @@ func registerAuth(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "authApprove",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/auth/approve",
 		Summary:     "Approve a pending auth session",
 		Tags:        []string{"Auth"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *authApproveInput) (*authApproveOutput, error) {
+	}, scope.DevicesCore), func(_ context.Context, in *authApproveInput) (*authApproveOutput, error) {
 		authReq, err := pendingAuthRequest(b, in.Body.AuthID)
 		if err != nil {
 			return nil, err
@@ -125,14 +126,14 @@ func registerAuth(api huma.API, b Backend) {
 		return &authApproveOutput{}, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "authReject",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/auth/reject",
 		Summary:     "Reject a pending auth session",
 		Tags:        []string{"Auth"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *authRejectInput) (*authRejectOutput, error) {
+	}, scope.DevicesCore), func(_ context.Context, in *authRejectInput) (*authRejectOutput, error) {
 		authReq, err := pendingAuthRequest(b, in.Body.AuthID)
 		if err != nil {
 			return nil, err

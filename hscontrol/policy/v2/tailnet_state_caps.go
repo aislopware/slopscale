@@ -72,17 +72,16 @@ var unmodelledTailnetStateCaps = []nodecap.Cap{
 
 	// [tailcfg.CapabilityAdmin]: the hosted control plane stamps this
 	// on nodes whose owning user has the admin role; tagged nodes
-	// inherit from a tagOwner with the role. Headscale has no
-	// user-role model — [types.Node.TailNode] emits it as part of
-	// the always-on baseline. Stripping on both sides keeps the diff
-	// from failing on every user-owned non-admin node in a capture.
-	// Long-term fix is autogroup:admin support.
+	// inherit from a tagOwner with the role. Headscale stamps it from
+	// the user's role too (see stampRoleCaps), but the anonymised
+	// captures carry no roles, so the replayed tailnet cannot
+	// reproduce which users held one. Stripping on both sides keeps
+	// the diff from failing on that missing input.
 	nodecap.Admin,
 
 	// [tailcfg.CapabilityOwner]: same shape as is-admin, conditional
-	// on the "owner" role rather than admin. Headscale does not emit
-	// this cap at all. autogroup:owner support is tracked under
-	// NO_USER_ROLES — see the compat skip list.
+	// on the "owner" role rather than admin; stripped for the same
+	// reason.
 	nodecap.Owner,
 
 	// --- 2. Feature not implemented ---

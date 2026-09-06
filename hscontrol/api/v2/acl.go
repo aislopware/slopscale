@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/api/principal"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
@@ -53,7 +54,7 @@ type setACLInput struct {
 func registerACL(api huma.API, b Backend) {
 	aclTags := []string{"Policy", "Tailscale compat"}
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID: "getACL",
 		Method:      http.MethodGet,
 		Path:        "/api/v2/tailnet/{tailnet}/acl",
@@ -80,7 +81,7 @@ func registerACL(api huma.API, b Backend) {
 		return streamPolicy(data, aclContentType(in.Accept)), nil
 	})
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID:   "setACL",
 		Method:        http.MethodPost,
 		Path:          "/api/v2/tailnet/{tailnet}/acl",

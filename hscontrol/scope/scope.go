@@ -8,7 +8,11 @@
 // hscontrol/api/v2, so it can be tested exhaustively on its own.
 package scope
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/juanfont/headscale/hscontrol/types"
+)
 
 // Scope is an OAuth capability an operation requires and a token grants. The names
 // mirror Tailscale's API scopes; a "...:read" scope is the read-only subset of its
@@ -120,4 +124,49 @@ func RequiresTags(scopes []Scope) bool {
 	}
 
 	return false
+}
+
+// ForRole returns the scopes a user role holds. A credential that acts as a
+// user (an API key with an owner, an OAuth client created by one) can never
+// do more than this, whatever scopes it was minted with. The table follows
+// Tailscale's role matrix: owner and admin do everything; a network admin
+// manages the policy and routes and reads the rest; an IT admin manages
+// users, devices and keys and reads the policy; an auditor reads
+// everything; a member has no admin access.
+func ForRole(role types.Role) []Scope {
+	switch role {
+	case types.RoleOwner, types.RoleAdmin:
+		return []Scope{All}
+	case types.RoleNetworkAdmin:
+		return []Scope{
+			PolicyFile, DevicesRoutes,
+			UsersRead, DevicesCoreRead, AuthKeysRead, OAuthKeysRead, FeatureSettingsRead,
+		}
+	case types.RoleITAdmin:
+		return []Scope{
+			Users, DevicesCore, AuthKeys, OAuthKeys, FeatureSettings,
+			PolicyFileRead, DevicesRoutesRead,
+		}
+	case types.RoleAuditor:
+		return []Scope{AllRead}
+	case types.RoleMember:
+		return nil
+	}
+
+	return nil
+}
+
+// Narrow returns the subset of wanted that granted allows, in wanted's order.
+// It bounds a credential minted by another (an OAuth client created through
+// a role-limited API key) to the creator's authority.
+func Narrow(granted, wanted []Scope) []Scope {
+	var out []Scope
+
+	for _, w := range wanted {
+		if Grants(granted, w) {
+			out = append(out, w)
+		}
+	}
+
+	return out
 }

@@ -18,6 +18,7 @@ var (
 	ErrUserNotFound      = errors.New("user not found")
 	ErrUserStillHasNodes = errors.New("user not empty: node(s) found")
 	ErrUserNotUnique     = errors.New("expected exactly one user")
+	ErrCannotDeleteOwner = errors.New("the owner cannot be deleted; transfer ownership first")
 )
 
 // selectUsers is the base query for users that have not been soft-deleted,
@@ -27,6 +28,31 @@ func selectUsers() jet.SelectStatement {
 		FROM(table.Users).
 		WHERE(table.Users.DeletedAt.IS_NULL()).
 		ORDER_BY(table.Users.ID.ASC())
+}
+
+// listUsersBeforeRoles loads users with the columns that existed before
+// 202609062100-user-role added `role`. Migrations that predate it read
+// users through it; selecting every column would fail on a database that
+// has not reached that migration yet.
+func listUsersBeforeRoles(q Querier) ([]types.User, error) {
+	return queryUsers(q, jet.SELECT(userColumnsBeforeRoles).FROM(table.Users).
+		WHERE(table.Users.DeletedAt.IS_NULL()).
+		ORDER_BY(table.Users.ID.ASC()))
+}
+
+// userColumnsBeforeRoles is the users table as it was before
+// 202609062100-user-role.
+var userColumnsBeforeRoles = jet.ColumnList{
+	table.Users.ID,
+	table.Users.Name,
+	table.Users.DisplayName,
+	table.Users.Email,
+	table.Users.ProviderIdentifier,
+	table.Users.Provider,
+	table.Users.ProfilePicURL,
+	table.Users.CreatedAt,
+	table.Users.UpdatedAt,
+	table.Users.DeletedAt,
 }
 
 func queryUsers(q Querier, stmt jet.SelectStatement) ([]types.User, error) {
@@ -104,6 +130,12 @@ func CreateUser(q Querier, user types.User) (*types.User, error) {
 // exists and inserts it otherwise, keeping an explicit ID. The timestamps
 // are stamped when unset.
 func SaveUser(q Querier, user *types.User) error {
+	// The role column is never empty: rows from before roles were backfilled
+	// to member by migration, and every write since normalises the same way.
+	if user.Role == "" {
+		user.Role = types.RoleMember
+	}
+
 	if user.ID != 0 {
 		affected, err := updateUser(q, user)
 		if err != nil || affected > 0 {
@@ -150,6 +182,10 @@ func UpdateUser(q Querier, user *types.User) error {
 func updateUser(q Querier, user *types.User) (int64, error) {
 	user.UpdatedAt = time.Now()
 
+	if user.Role == "" {
+		user.Role = types.RoleMember
+	}
+
 	return q.executor().exec(
 		table.Users.UPDATE(table.Users.MutableColumns).MODEL(user).
 			WHERE(table.Users.ID.EQ(jet.Uint64(uint64(user.ID)))),
@@ -169,6 +205,12 @@ func DestroyUser(q Querier, uid types.UserID) error {
 	user, err := GetUserByID(q, uid)
 	if err != nil {
 		return err
+	}
+
+	// The tailnet always keeps its owner: ownership moves with SetUserRole,
+	// never by deleting the account that holds it.
+	if user.Role == types.RoleOwner {
+		return ErrCannotDeleteOwner
 	}
 
 	nodes, err := ListNodesByUser(q, uid)
@@ -294,6 +336,10 @@ func userFilter(filter *types.User) jet.BoolExpression {
 
 	if filter.ProfilePicURL != "" {
 		conds = append(conds, table.Users.ProfilePicURL.EQ(jet.String(filter.ProfilePicURL)))
+	}
+
+	if filter.Role != "" {
+		conds = append(conds, table.Users.Role.EQ(jet.String(string(filter.Role))))
 	}
 
 	if len(conds) == 0 {

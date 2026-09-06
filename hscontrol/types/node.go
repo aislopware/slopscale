@@ -1273,12 +1273,13 @@ func (nv NodeView) tailNode(
 }
 
 // selfCapMap is the CapMap of a node's own entry: the baseline caps every
-// node receives, regardless of policy, overlaid with its policy nodeAttrs.
-// Mirrors what Tailscale SaaS emits for a default tailnet.
+// node receives, regardless of policy, overlaid with its policy caps, which
+// carry the nodeAttrs and the role caps (is-admin, is-owner) the policy
+// manager stamps from the owning user's role. Mirrors what Tailscale SaaS
+// emits for a default tailnet.
 func selfCapMap(cfg *Config, policyCaps tailcfg.NodeCapMap) tailcfg.NodeCapMap {
 	capMap := tailcfg.NodeCapMap{
-		nodecap.Admin: []tailcfg.RawMessage{},
-		nodecap.SSH:   []tailcfg.RawMessage{},
+		nodecap.SSH: []tailcfg.RawMessage{},
 	}
 
 	// cfg.Taildrop.Enabled gates CapabilityFileSharing.

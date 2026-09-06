@@ -803,6 +803,19 @@ const (
 	AutoGroupTagged    AutoGroup = "autogroup:tagged"
 	AutoGroupSelf      AutoGroup = "autogroup:self"
 	AutoGroupDangerAll AutoGroup = "autogroup:danger-all"
+
+	// AutoGroupOwner is the personal (untagged) devices of the owner. The
+	// role autogroups behave like autogroup:member wherever the policy
+	// reasons about user groups, as on Tailscale.
+	AutoGroupOwner AutoGroup = "autogroup:owner"
+	// AutoGroupAdmin is the personal devices of every admin.
+	AutoGroupAdmin AutoGroup = "autogroup:admin"
+	// AutoGroupNetworkAdmin is the personal devices of every network admin.
+	AutoGroupNetworkAdmin AutoGroup = "autogroup:network-admin"
+	// AutoGroupITAdmin is the personal devices of every IT admin.
+	AutoGroupITAdmin AutoGroup = "autogroup:it-admin"
+	// AutoGroupAuditor is the personal devices of every auditor.
+	AutoGroupAuditor AutoGroup = "autogroup:auditor"
 )
 
 var autogroups = []AutoGroup{
@@ -812,6 +825,33 @@ var autogroups = []AutoGroup{
 	AutoGroupTagged,
 	AutoGroupSelf,
 	AutoGroupDangerAll,
+	AutoGroupOwner,
+	AutoGroupAdmin,
+	AutoGroupNetworkAdmin,
+	AutoGroupITAdmin,
+	AutoGroupAuditor,
+}
+
+// roleAutogroups maps each role autogroup to the role it selects.
+var roleAutogroups = map[AutoGroup]types.Role{
+	AutoGroupOwner:        types.RoleOwner,
+	AutoGroupAdmin:        types.RoleAdmin,
+	AutoGroupNetworkAdmin: types.RoleNetworkAdmin,
+	AutoGroupITAdmin:      types.RoleITAdmin,
+	AutoGroupAuditor:      types.RoleAuditor,
+}
+
+// IsUserGroup reports whether the autogroup selects users' personal
+// devices: autogroup:member or one of the role autogroups. The policy
+// treats these alike when a rule needs a user source or destination.
+func (ag *AutoGroup) IsUserGroup() bool {
+	if ag.Is(AutoGroupMember) {
+		return true
+	}
+
+	_, ok := roleAutogroups[*ag]
+
+	return ok
 }
 
 func (ag *AutoGroup) Validate() error {
@@ -863,10 +903,13 @@ func (ag *AutoGroup) Is(c AutoGroup) bool {
 	return *ag == c
 }
 
-func (ag *AutoGroup) resolve(_ *Policy, _ types.Users, nodes views.Slice[types.NodeView]) (*netipx.IPSet, error) {
+func (ag *AutoGroup) resolve(_ *Policy, users types.Users, nodes views.Slice[types.NodeView]) (*netipx.IPSet, error) {
 	var build netipx.IPSetBuilder
 
 	switch *ag {
+	case AutoGroupOwner, AutoGroupAdmin, AutoGroupNetworkAdmin, AutoGroupITAdmin, AutoGroupAuditor:
+		return resolveRoleAutogroup(roleAutogroups[*ag], users, nodes)
+
 	case AutoGroupInternet:
 		return util.TheInternet(), nil
 
@@ -933,6 +976,42 @@ func (ag *AutoGroup) resolve(_ *Policy, _ types.Users, nodes views.Slice[types.N
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrUnknownAutogroup, *ag)
 	}
+}
+
+// resolveRoleAutogroup selects the personal devices of every user with
+// role. Users are read from the manager's list, refreshed on every role
+// change, rather than from the copy a node carries, which is loaded once.
+func resolveRoleAutogroup(
+	role types.Role,
+	users types.Users,
+	nodes views.Slice[types.NodeView],
+) (*netipx.IPSet, error) {
+	holders := make(map[types.UserID]struct{})
+
+	for i := range users {
+		if users[i].Role == role {
+			holders[types.UserID(users[i].ID)] = struct{}{}
+		}
+	}
+
+	var build netipx.IPSetBuilder
+
+	for _, node := range nodes.All() {
+		if node.IsTagged() || !node.UserID().Valid() {
+			continue
+		}
+
+		if _, ok := holders[types.UserID(node.UserID().Get())]; ok {
+			node.AppendToIPSet(&build)
+		}
+	}
+
+	ipset, err := build.IPSet()
+	if err != nil {
+		return nil, fmt.Errorf("building autogroup %s IP set: %w", role, err)
+	}
+
+	return ipset, nil
 }
 
 type Alias interface {
@@ -2163,11 +2242,20 @@ type Policy struct {
 
 var (
 	// TODO(kradalby): Add these checks for tagOwners and autoApprovers.
-	autogroupForSrc       = []AutoGroup{AutoGroupMember, AutoGroupTagged, AutoGroupDangerAll}
-	autogroupForDst       = []AutoGroup{AutoGroupInternet, AutoGroupMember, AutoGroupTagged, AutoGroupSelf}
-	autogroupForSSHSrc    = []AutoGroup{AutoGroupMember, AutoGroupTagged}
-	autogroupForSSHDst    = []AutoGroup{AutoGroupMember, AutoGroupTagged, AutoGroupSelf}
-	autogroupForNodeAttrs = []AutoGroup{AutoGroupMember, AutoGroupTagged}
+	roleGroups = []AutoGroup{
+		AutoGroupOwner, AutoGroupAdmin, AutoGroupNetworkAdmin, AutoGroupITAdmin, AutoGroupAuditor,
+	}
+	autogroupForSrc = slices.Concat(
+		[]AutoGroup{AutoGroupMember, AutoGroupTagged, AutoGroupDangerAll}, roleGroups,
+	)
+	autogroupForDst = slices.Concat(
+		[]AutoGroup{AutoGroupInternet, AutoGroupMember, AutoGroupTagged, AutoGroupSelf}, roleGroups,
+	)
+	autogroupForSSHSrc = slices.Concat([]AutoGroup{AutoGroupMember, AutoGroupTagged}, roleGroups)
+	autogroupForSSHDst = slices.Concat(
+		[]AutoGroup{AutoGroupMember, AutoGroupTagged, AutoGroupSelf}, roleGroups,
+	)
+	autogroupForNodeAttrs = slices.Concat([]AutoGroup{AutoGroupMember, AutoGroupTagged}, roleGroups)
 	autogroupNotSupported = []AutoGroup{}
 
 	errUnknownProtocolWildcard = errors.New(
@@ -2326,8 +2414,8 @@ func validateSSHSrcDstCombination(sources SSHSrcAliases, destinations SSHDstAlia
 		case *AutoGroup:
 			if v.Is(AutoGroupTagged) {
 				srcHasTaggedEntities = true
-			} else if v.Is(AutoGroupMember) {
-				srcHasGroups = true // autogroup:member is like a group of users
+			} else if v.IsUserGroup() {
+				srcHasGroups = true // autogroup:member and the role groups are groups of users
 			}
 		case *Group:
 			srcHasGroups = true
@@ -2355,8 +2443,8 @@ func validateSSHSrcDstCombination(sources SSHSrcAliases, destinations SSHDstAlia
 			if v.Is(AutoGroupSelf) && srcHasTaggedEntities {
 				return ErrSSHAutogroupSelfRequiresUserSource
 			}
-			// Rule: autogroup:member (user-owned devices) cannot be accessed by tagged entities
-			if v.Is(AutoGroupMember) && srcHasTaggedEntities {
+			// Rule: autogroup:member and the role groups (user-owned devices) cannot be accessed by tagged entities
+			if v.IsUserGroup() && srcHasTaggedEntities {
 				return ErrSSHTagSourceToAutogroupMember
 			}
 		}
@@ -2393,8 +2481,8 @@ func validateACLSrcDstCombination(sources Aliases, destinations []AliasWithPorts
 			// Wildcard is allowed because autogroup:self evaluation narrows it per-node
 			continue
 		case *AutoGroup:
-			if v.Is(AutoGroupMember) {
-				continue // autogroup:member is valid
+			if v.IsUserGroup() {
+				continue // autogroup:member and the role groups are valid
 			}
 			// autogroup:tagged and others are NOT valid
 			return ErrACLAutogroupSelfInvalidSource
@@ -2473,7 +2561,7 @@ func validateGrantSrcDstCombination(sources, destinations Aliases) error {
 		case *Username, *Group:
 			continue
 		case *AutoGroup:
-			if v.Is(AutoGroupMember) {
+			if v.IsUserGroup() {
 				continue
 			}
 

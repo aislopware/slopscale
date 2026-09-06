@@ -7,7 +7,8 @@
         "expiration": "\u003ctimestamp\u003e",
         "id": "1",
         "lastSeen": null,
-        "prefix": "\u003csecret\u003e"
+        "prefix": "\u003csecret\u003e",
+        "userId": null
       }
     ]
   }

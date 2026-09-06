@@ -6,6 +6,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/state"
+	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 // mapError translates a state/db-layer error into a Huma HTTP error
@@ -35,12 +36,21 @@ func mapError(msg string, err error) error {
 		errors.Is(err, db.ErrUserStillHasNodes),
 		errors.Is(err, db.ErrCannotChangeOIDCUser),
 		errors.Is(err, db.ErrPreAuthKeyNotTaggedOrOwned),
-		errors.Is(err, db.ErrSingleUseAuthKeyHasBeenUsed):
+		errors.Is(err, db.ErrSingleUseAuthKeyHasBeenUsed),
+		errors.Is(err, types.ErrInvalidRole):
 		return huma.Error400BadRequest(msg, err)
 
 	case errors.Is(err, state.ErrNodeKeyInUse),
-		errors.Is(err, state.ErrAmbiguousNodeOwnership):
+		errors.Is(err, state.ErrAmbiguousNodeOwnership),
+		errors.Is(err, state.ErrOwnerExists):
 		return huma.Error409Conflict(msg, err)
+
+	case errors.Is(err, state.ErrCannotChangeOwnRole),
+		errors.Is(err, state.ErrRoleChangeForbidden),
+		errors.Is(err, state.ErrOnlyOwnerTransfers),
+		errors.Is(err, state.ErrOwnerRoleImmutable),
+		errors.Is(err, db.ErrCannotDeleteOwner):
+		return huma.Error403Forbidden(msg, err)
 
 	default:
 		return huma.Error500InternalServerError(msg, err)

@@ -417,6 +417,26 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 				return nil
 			},
 		},
+		{
+			// Users gain an administrative role (see types.Role). Every
+			// existing user is a member; the operator promotes the first
+			// owner with `headscale users set-role`, and a database that
+			// has no users yet makes the first user created its owner.
+			id: "202609062100-user-role",
+			run: func(tx *Tx) error {
+				err := tx.ex.addColumnIfMissing("users", "role", typeText)
+				if err != nil {
+					return err
+				}
+
+				_, err = tx.ex.execRaw(`UPDATE users SET role = 'member' WHERE role IS NULL OR role = ''`)
+				if err != nil {
+					return fmt.Errorf("defaulting user roles: %w", err)
+				}
+
+				return nil
+			},
+		},
 	}
 }
 
@@ -502,7 +522,7 @@ func enabledRoutesByNode(tx *Tx) (map[uint64][]netip.Prefix, error) {
 // cleanUserProviderIdentifiers (202505141324) normalises provider
 // identifiers that carried a double slash.
 func cleanUserProviderIdentifiers(tx *Tx) error {
-	users, err := ListUsers(tx, nil)
+	users, err := listUsersBeforeRoles(tx)
 	if err != nil {
 		return fmt.Errorf("listing users: %w", err)
 	}
@@ -755,7 +775,7 @@ func migrateHostinfoRequestTags(tx *Tx, cfg *types.Config) error {
 	// 2. Load users and nodes to create PolicyManager. The pre-auth key
 	// table lacks columns added by later migrations, so nodes are loaded
 	// without their keys, which the tag check does not need.
-	users, err := ListUsers(tx, nil)
+	users, err := listUsersBeforeRoles(tx)
 	if err != nil {
 		return fmt.Errorf("loading users for RequestTags migration: %w", err)
 	}

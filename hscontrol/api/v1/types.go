@@ -19,7 +19,7 @@ func formatID[T ~uint64 | ~uint](id T) string {
 
 // User mirrors the v1 User message.
 type User struct {
-	ID            string    `format:"uint64"      json:"id"`
+	ID            string    `format:"uint64"                                                json:"id"`
 	Name          string    `json:"name"`
 	CreatedAt     time.Time `json:"createdAt"`
 	DisplayName   string    `json:"displayName"`
@@ -27,6 +27,7 @@ type User struct {
 	ProviderID    string    `json:"providerId"`
 	Provider      string    `json:"provider"`
 	ProfilePicURL string    `json:"profilePicUrl"`
+	Role          string    `doc:"owner, admin, network-admin, it-admin, auditor or member" json:"role"`
 }
 
 // userFromView converts a domain user into the v1 response shape, reading
@@ -48,5 +49,6 @@ func userFromView(u types.UserView) User {
 		ProviderID:    u.ProviderIdentifier().String,
 		Provider:      u.Provider(),
 		ProfilePicURL: u.ProfilePicURL(),
+		Role:          u.Role().String(),
 	}
 }

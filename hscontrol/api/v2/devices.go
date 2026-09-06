@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/api/principal"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
@@ -118,7 +119,7 @@ type (
 func registerDevices(api huma.API, b Backend) {
 	deviceTags := []string{"Devices", "Tailscale compat"}
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID: "getDevice",
 		Method:      http.MethodGet,
 		Path:        "/api/v2/device/{id}",
@@ -130,7 +131,7 @@ func registerDevices(api huma.API, b Backend) {
 		return handleGetDevice(b, in)
 	})
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID: "listDevices",
 		Method:      http.MethodGet,
 		Path:        "/api/v2/tailnet/{tailnet}/devices",
@@ -142,7 +143,7 @@ func registerDevices(api huma.API, b Backend) {
 		return handleListDevices(b, in)
 	})
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID:   "deleteDevice",
 		Method:        http.MethodDelete,
 		Path:          "/api/v2/device/{id}",
@@ -155,7 +156,7 @@ func registerDevices(api huma.API, b Backend) {
 		return handleDeleteDevice(b, in)
 	})
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID:   "authorizeDevice",
 		Method:        http.MethodPost,
 		Path:          "/api/v2/device/{id}/authorized",
@@ -168,7 +169,7 @@ func registerDevices(api huma.API, b Backend) {
 		return handleAuthorizeDevice(b, in)
 	})
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID:   "setDeviceName",
 		Method:        http.MethodPost,
 		Path:          "/api/v2/device/{id}/name",
@@ -181,7 +182,7 @@ func registerDevices(api huma.API, b Backend) {
 		return handleSetDeviceName(b, in)
 	})
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID:   "setDeviceTags",
 		Method:        http.MethodPost,
 		Path:          "/api/v2/device/{id}/tags",
@@ -194,7 +195,7 @@ func registerDevices(api huma.API, b Backend) {
 		return handleSetDeviceTags(ctx, b, in)
 	})
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID:   "setDeviceKey",
 		Method:        http.MethodPost,
 		Path:          "/api/v2/device/{id}/key",
@@ -207,7 +208,7 @@ func registerDevices(api huma.API, b Backend) {
 		return handleSetDeviceKey(b, in)
 	})
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID:   "setDeviceRoutes",
 		Method:        http.MethodPost,
 		Path:          "/api/v2/device/{id}/routes",
@@ -220,7 +221,7 @@ func registerDevices(api huma.API, b Backend) {
 		return handleSetDeviceRoutes(b, in)
 	})
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID: "getDeviceRoutes",
 		Method:      http.MethodGet,
 		Path:        "/api/v2/device/{id}/routes",

@@ -123,6 +123,10 @@ func (v UserView) Provider() string { return v.ж.Provider }
 // TODO(kradalby): See if we can fill in Gravatar here.
 func (v UserView) ProfilePicURL() string { return v.ж.ProfilePicURL }
 
+// Role is the user's administrative role; see [Role]. Rows from before
+// roles existed hold "member".
+func (v UserView) Role() Role { return v.ж.Role }
+
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _UserViewNeedsRegeneration = User(struct {
 	ID                 uint
@@ -135,6 +139,7 @@ var _UserViewNeedsRegeneration = User(struct {
 	ProviderIdentifier sql.NullString
 	Provider           string
 	ProfilePicURL      string
+	Role               Role
 }{})
 
 // View returns a read-only view of Node.

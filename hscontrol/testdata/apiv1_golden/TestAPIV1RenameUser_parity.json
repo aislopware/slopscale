@@ -9,7 +9,8 @@
       "name": "bob",
       "profilePicUrl": "",
       "provider": "",
-      "providerId": ""
+      "providerId": "",
+      "role": "member"
     }
   }
 }

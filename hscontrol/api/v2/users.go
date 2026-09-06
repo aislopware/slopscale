@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/api/principal"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
@@ -15,11 +16,11 @@ func init() {
 	registrations = append(registrations, registerUsers)
 }
 
-// Headscale models none of type/role/status and has a single tailnet, so these
-// fields are fixed strings. Every account is an active member.
+// Headscale models neither user type nor status and has a single tailnet,
+// so these fields are fixed strings: every account is an active member. The
+// role is the user's real admin role.
 const (
 	userTypeMember   = "member"
-	userRoleMember   = "member"
 	userStatusActive = "active"
 	singleTailnetID  = "1"
 
@@ -28,8 +29,8 @@ const (
 )
 
 // User is the Tailscale user response. Identity fields map from the Headscale
-// user; type/role/status/tailnetId are constants (see above); the device fields
-// are aggregated from the user's nodes.
+// user; type/status/tailnetId are constants (see above); role is the user's
+// admin role; the device fields are aggregated from the user's nodes.
 type User struct {
 	ID                 string    `json:"id"`
 	DisplayName        string    `json:"displayName"`
@@ -50,9 +51,9 @@ type (
 		UserID string `doc:"User id (the decimal user id)." path:"id"`
 	}
 	listUsersInput struct {
-		Tailnet string `doc:"Tailnet; must be \"-\" (the single Headscale tailnet)."   path:"tailnet"`
-		Type    string `doc:"Filter by user type; Headscale users are all \"member\"." query:"type"`
-		Role    string `doc:"Filter by user role; Headscale users are all \"member\"." query:"role"`
+		Tailnet string `doc:"Tailnet; must be \"-\" (the single Headscale tailnet)."                  path:"tailnet"`
+		Type    string `doc:"Filter by user type; Headscale users are all \"member\"."                query:"type"`
+		Role    string `doc:"Filter by role: owner, admin, network-admin, it-admin, auditor, member." query:"role"`
 	}
 
 	userOutput      struct{ Body User }
@@ -66,7 +67,7 @@ type (
 func registerUsers(api huma.API, b Backend) {
 	usersTags := []string{"Users", tagTailscaleCompat}
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID: "getUser",
 		Method:      http.MethodGet,
 		Path:        "/api/v2/users/{id}",
@@ -83,7 +84,7 @@ func registerUsers(api huma.API, b Backend) {
 		return &userOutput{Body: userFromView(b, view)}, nil
 	})
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID: "listUsers",
 		Method:      http.MethodGet,
 		Path:        "/api/v2/tailnet/{tailnet}/users",
@@ -100,13 +101,14 @@ func registerUsers(api huma.API, b Backend) {
 		out := &listUsersOutput{}
 		out.Body.Users = []User{}
 
-		// Headscale has only "member" users. A filter for any other type/role
-		// matches nothing, so return the empty envelope.
-		if !matchesMember(in.Type) || !matchesMember(in.Role) {
+		// Headscale has only "member"-type users. A filter for any other type,
+		// or for a role that is not one, matches nothing, so return the empty
+		// envelope.
+		if !matchesMember(in.Type) || (in.Role != "" && !types.Role(in.Role).Valid()) {
 			return out, nil
 		}
 
-		users, err := b.State.ListAllUsers()
+		users, err := b.State.ListUsersWithFilter(&types.User{Role: types.Role(in.Role)})
 		if err != nil {
 			return nil, huma.Error500InternalServerError("listing users", err)
 		}
@@ -137,8 +139,8 @@ func lookupUser(b Backend, rawID string) (types.UserView, error) {
 	return user.View(), nil
 }
 
-// matchesMember reports whether an optional type/role filter selects Headscale's
-// only user kind. An empty value means "no filter".
+// matchesMember reports whether an optional type filter selects Headscale's
+// only user type. An empty value means "no filter".
 func matchesMember(filter string) bool {
 	return filter == "" || filter == userTypeMember
 }
@@ -155,7 +157,7 @@ func userFromView(b Backend, view types.UserView) User {
 		TailnetID:     singleTailnetID,
 		Created:       view.CreatedAt(),
 		Type:          userTypeMember,
-		Role:          userRoleMember,
+		Role:          view.Role().String(),
 		Status:        userStatusActive,
 	}
 

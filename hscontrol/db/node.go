@@ -63,10 +63,11 @@ func selectNodes() jet.SelectStatement {
 	).ORDER_BY(table.Nodes.ID.ASC())
 }
 
-// listNodesWithoutAuthKeys loads nodes with their users only. Migrations
-// that predate columns of the pre_auth_keys table use it.
+// listNodesWithoutAuthKeys loads nodes with their users only, with the
+// user columns of before 202609062100-user-role. Migrations that predate
+// columns of the pre_auth_keys or users tables use it.
 func listNodesWithoutAuthKeys(q Querier) (types.Nodes, error) {
-	stmt := jet.SELECT(table.Nodes.AllColumns, table.Users.AllColumns).
+	stmt := jet.SELECT(table.Nodes.AllColumns, userColumnsBeforeRoles).
 		FROM(table.Nodes.LEFT_JOIN(table.Users, table.Nodes.UserID.EQ(table.Users.ID))).
 		ORDER_BY(table.Nodes.ID.ASC())
 

@@ -98,6 +98,10 @@ type User struct {
 
 	// TODO(kradalby): See if we can fill in Gravatar here.
 	ProfilePicURL string
+
+	// Role is the user's administrative role; see [Role]. Rows from before
+	// roles existed hold "member".
+	Role Role
 }
 
 func (u *User) StringID() string {

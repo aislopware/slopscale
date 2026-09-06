@@ -11,11 +11,12 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
+	"github.com/juanfont/headscale/hscontrol/api/principal"
+	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
@@ -32,8 +33,8 @@ type Backend struct {
 
 // NewAPI builds the v1 Huma API on the given chi router and registers every
 // operation. Auth is enforced by a Huma middleware driven by each operation's
-// declared bearer security (see authMiddleware); locally-trusted requests
-// bypass it via WithLocalTrust.
+// declared bearer security and required scope (see authMiddleware);
+// locally-trusted requests bypass it via WithLocalTrust.
 func NewAPI(router chi.Router, backend Backend) huma.API {
 	config := huma.DefaultConfig("Headscale API", "v1")
 	config.Info.Description = "Headscale control server API."
@@ -120,54 +121,46 @@ func Handler(backend Backend) (*chi.Mux, huma.API) {
 	return mux, api
 }
 
-// localTrustKey marks a request as arriving over a locally-trusted transport;
-// the auth middleware skips authentication for such requests.
-type localTrustKey struct{}
-
 // WithLocalTrust wraps a handler so its requests bypass API-key authentication.
 // The unix socket uses this — access to the socket is the trust boundary — as
 // do in-process tests that exercise the mux directly.
 func WithLocalTrust(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		next.ServeHTTP(w, req.WithContext(
-			context.WithValue(req.Context(), localTrustKey{}, struct{}{}),
-		))
-	})
+	return principal.WithLocalTrust(next)
 }
 
-// authMiddleware is a pure gate enforcing the bearer API key for any operation
-// that declares security; the v1 handlers do not read caller identity.
-// Locally-trusted requests and operations without declared security pass
-// through. b.State is nil only during spec emission, where no request is
-// served, so it is never dereferenced there.
+// authMiddleware authenticates the caller of any operation that declares
+// security and enforces the scope the operation declared, so a role-limited
+// API key or an OAuth token is held to the same matrix as on v2. Locally
+// trusted requests and operations without declared security pass through.
+// b.State is nil only during spec emission, where no request is served.
 func authMiddleware(api huma.API, b Backend) func(huma.Context, func(huma.Context)) {
-	return func(ctx huma.Context, next func(huma.Context)) {
-		if ctx.Context().Value(localTrustKey{}) != nil {
-			next(ctx)
+	return principal.Middleware(api, b.State)
+}
 
-			return
-		}
-
-		if len(ctx.Operation().Security) == 0 {
-			next(ctx)
-
-			return
-		}
-
-		token, ok := strings.CutPrefix(ctx.Header("Authorization"), "Bearer ")
-		if !ok {
-			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
-
-			return
-		}
-
-		valid, err := b.State.ValidateAPIKey(token)
-		if err != nil || !valid {
-			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
-
-			return
-		}
-
-		next(ctx)
+// caller returns the request's principal; a locally trusted request carries
+// [principal.Local].
+func caller(ctx context.Context) principal.Principal {
+	p, ok := principal.From(ctx)
+	if !ok {
+		return principal.Local()
 	}
+
+	return p
+}
+
+// roleActor is the caller as the state layer's role rules see it: nil for an
+// all-access credential without a user, which is bound only by the
+// structural rules.
+func roleActor(ctx context.Context) *state.RoleActor {
+	p := caller(ctx)
+	if !p.HasUser() {
+		return nil
+	}
+
+	return &state.RoleActor{UserID: p.UserID, Role: p.Role}
+}
+
+// withScope declares the scope op requires; see [principal.RequireScope].
+func withScope(op huma.Operation, s scope.Scope) huma.Operation {
+	return principal.RequireScope(op, s)
 }

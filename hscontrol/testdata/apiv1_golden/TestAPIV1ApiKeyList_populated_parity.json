@@ -7,14 +7,16 @@
         "expiration": null,
         "id": "1",
         "lastSeen": null,
-        "prefix": "\u003csecret\u003e"
+        "prefix": "\u003csecret\u003e",
+        "userId": null
       },
       {
         "createdAt": "\u003ctimestamp\u003e",
         "expiration": null,
         "id": "2",
         "lastSeen": null,
-        "prefix": "\u003csecret\u003e"
+        "prefix": "\u003csecret\u003e",
+        "userId": null
       }
     ]
   }

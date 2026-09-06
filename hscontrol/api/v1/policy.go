@@ -10,6 +10,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
+	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
 )
@@ -53,29 +54,29 @@ type (
 )
 
 func registerPolicy(api huma.API, b Backend) {
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "getPolicy",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/policy",
 		Summary:     "Get policy",
 		Tags:        []string{"Policy"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, _ *getPolicyInput) (*getPolicyOutput, error) {
+	}, scope.PolicyFileRead), func(_ context.Context, _ *getPolicyInput) (*getPolicyOutput, error) {
 		return handleGetPolicy(b)
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "setPolicy",
 		Method:      http.MethodPut,
 		Path:        "/api/v1/policy",
 		Summary:     "Set policy",
 		Tags:        []string{"Policy"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *setPolicyInput) (*setPolicyOutput, error) {
+	}, scope.PolicyFile), func(_ context.Context, in *setPolicyInput) (*setPolicyOutput, error) {
 		return handleSetPolicy(b, in)
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "checkPolicy",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/policy/check",
@@ -83,7 +84,7 @@ func registerPolicy(api huma.API, b Backend) {
 		Description: "Validates the given policy against the server's live users and nodes without persisting it.",
 		Tags:        []string{"Policy"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *checkPolicyInput) (*checkPolicyOutput, error) {
+	}, scope.PolicyFileRead), func(_ context.Context, in *checkPolicyInput) (*checkPolicyOutput, error) {
 		return handleCheckPolicy(b, in)
 	})
 }

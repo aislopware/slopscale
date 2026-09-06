@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/api/principal"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
@@ -56,7 +57,7 @@ type (
 func registerSettings(api huma.API, b Backend) {
 	settingsTags := []string{"TailnetSettings", "Tailscale compat"}
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID: "getTailnetSettings",
 		Method:      http.MethodGet,
 		Path:        "/api/v2/tailnet/{tailnet}/settings",
@@ -81,7 +82,7 @@ func registerSettings(api huma.API, b Backend) {
 		}}, nil
 	})
 
-	huma.Register(api, requireScope(huma.Operation{
+	huma.Register(api, principal.RequireScope(huma.Operation{
 		OperationID: "updateTailnetSettings",
 		Method:      http.MethodPatch,
 		Path:        "/api/v2/tailnet/{tailnet}/settings",

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
 	"tailscale.com/net/tsaddr"
@@ -175,14 +176,14 @@ func registerNodes(api huma.API, b Backend) {
 }
 
 func registerNodeReadOps(api huma.API, b Backend) {
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "getNode",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/node/{nodeId}",
 		Summary:     "Get node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *getNodeInput) (*nodeOutput, error) {
+	}, scope.DevicesCoreRead), func(_ context.Context, in *getNodeInput) (*nodeOutput, error) {
 		nodeID, err := parseNodeID(in.NodeID)
 		if err != nil {
 			return nil, err
@@ -199,14 +200,14 @@ func registerNodeReadOps(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "listNodes",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/node",
 		Summary:     "List nodes",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *listNodesInput) (*listNodesOutput, error) {
+	}, scope.DevicesCoreRead), func(_ context.Context, in *listNodesInput) (*listNodesOutput, error) {
 		nodes := b.State.ListNodes()
 		if in.User != "" {
 			user, err := b.State.GetUserByName(in.User)
@@ -248,14 +249,14 @@ func registerNodeReadOps(api huma.API, b Backend) {
 }
 
 func registerNodeWriteOps(api huma.API, b Backend) {
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "deleteNode",
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/node/{nodeId}",
 		Summary:     "Delete node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *deleteNodeInput) (*deleteNodeOutput, error) {
+	}, scope.DevicesCore), func(_ context.Context, in *deleteNodeInput) (*deleteNodeOutput, error) {
 		nodeID, err := parseNodeID(in.NodeID)
 		if err != nil {
 			return nil, err
@@ -276,25 +277,25 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		return &deleteNodeOutput{}, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "expireNode",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/{nodeId}/expire",
 		Summary:     "Expire node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *expireNodeInput) (*nodeOutput, error) {
+	}, scope.DevicesCore), func(_ context.Context, in *expireNodeInput) (*nodeOutput, error) {
 		return handleExpireNode(b, in)
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "renameNode",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/{nodeId}/rename/{newName}",
 		Summary:     "Rename node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *renameNodeInput) (*nodeOutput, error) {
+	}, scope.DevicesCore), func(_ context.Context, in *renameNodeInput) (*nodeOutput, error) {
 		nodeID, err := parseNodeID(in.NodeID)
 		if err != nil {
 			return nil, err
@@ -313,14 +314,14 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "setTags",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/{nodeId}/tags",
 		Summary:     "Set tags",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *setTagsInput) (*nodeOutput, error) {
+	}, scope.DevicesCore), func(_ context.Context, in *setTagsInput) (*nodeOutput, error) {
 		return handleSetTags(b, in)
 	})
 }
@@ -420,25 +421,25 @@ func handleSetTags(b Backend, in *setTagsInput) (*nodeOutput, error) {
 }
 
 func registerNodeAdminOps(api huma.API, b Backend) {
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "setApprovedRoutes",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/{nodeId}/approve_routes",
 		Summary:     "Set approved routes",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *setApprovedRoutesInput) (*nodeOutput, error) {
+	}, scope.DevicesRoutes), func(_ context.Context, in *setApprovedRoutesInput) (*nodeOutput, error) {
 		return handleSetApprovedRoutes(b, in)
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "registerNode",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/register",
 		Summary:     "Register node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *registerNodeInput) (*nodeOutput, error) {
+	}, scope.DevicesCore), func(_ context.Context, in *registerNodeInput) (*nodeOutput, error) {
 		registrationID, err := types.AuthIDFromString(in.Key)
 		if err != nil {
 			return nil, huma.Error400BadRequest("registering node", err)
@@ -473,14 +474,14 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "backfillNodeIPs",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/backfillips",
 		Summary:     "Backfill node IPs",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *backfillNodeIPsInput) (*backfillNodeIPsOutput, error) {
+	}, scope.DevicesCore), func(_ context.Context, in *backfillNodeIPsInput) (*backfillNodeIPsOutput, error) {
 		if !in.Confirmed {
 			return nil, huma.Error400BadRequest("backfilling node IPs", errBackfillNotConfirmed)
 		}
@@ -500,14 +501,14 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, withScope(huma.Operation{
 		OperationID: "debugCreateNode",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/debug/node",
 		Summary:     "Debug create node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *debugCreateNodeInput) (*nodeOutput, error) {
+	}, scope.DevicesCore), func(_ context.Context, in *debugCreateNodeInput) (*nodeOutput, error) {
 		return handleDebugCreateNode(b, in)
 	})
 }

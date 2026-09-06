@@ -74,6 +74,7 @@ COL users.email text null=YES
 COL users.provider_identifier text null=YES
 COL users.provider text null=YES
 COL users.profile_pic_url text null=YES
+COL users.role text null=YES
 IDX CREATE INDEX idx_policies_deleted_at ON public.policies USING btree (deleted_at)
 IDX CREATE INDEX idx_users_deleted_at ON public.users USING btree (deleted_at)
 IDX CREATE UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)

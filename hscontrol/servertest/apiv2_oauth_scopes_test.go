@@ -197,7 +197,7 @@ resource "tailscale_tailnet_key" "k" {
 			scopes:       []string{"oauth_keys"},
 			config:       oauthClientEscalateConfig,
 			deny:         true,
-			denyContains: []string{"403", "Forbidden", "beyond the creating token"},
+			denyContains: []string{"403", "Forbidden", "beyond the creating credential"},
 		},
 
 		// policy_file: write scope sets the ACL; read does not.

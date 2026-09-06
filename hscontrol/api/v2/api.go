@@ -16,16 +16,14 @@ package apiv2
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"maps"
 	"net/http"
-	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
-	"github.com/juanfont/headscale/hscontrol/scope"
+	"github.com/juanfont/headscale/hscontrol/api/principal"
 	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
@@ -142,142 +140,46 @@ func Spec30() ([]byte, error) {
 	return yaml, nil
 }
 
-type contextKey int
-
-const (
-	localTrustKey contextKey = iota
-	ownerUserKey
-	principalScopesKey
-	principalTagsKey
-)
-
 // WithLocalTrust marks a request as arriving over a locally-trusted transport
 // (the unix socket), bypassing API-key authentication. Reserved for a future
 // v2 socket mount; the network listener always authenticates.
 func WithLocalTrust(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		next.ServeHTTP(w, req.WithContext(
-			context.WithValue(req.Context(), localTrustKey, struct{}{}),
-		))
-	})
+	return principal.WithLocalTrust(next)
 }
 
-// authMiddleware authenticates the API key (HTTP Basic with the key as the
-// username, what the Tailscale SDK sends, or Bearer), records the key's owning
-// user for handlers, and enforces the operation's required scope.
+// authMiddleware authenticates the caller (HTTP Basic with the key as the
+// username, what the Tailscale SDK sends, or Bearer), attaches the principal
+// for handlers, and enforces the operation's required scope.
 func authMiddleware(api huma.API, b Backend) func(huma.Context, func(huma.Context)) {
-	return func(ctx huma.Context, next func(huma.Context)) {
-		if ctx.Context().Value(localTrustKey) != nil {
-			next(ctx)
-
-			return
-		}
-
-		if len(ctx.Operation().Security) == 0 {
-			next(ctx)
-
-			return
-		}
-
-		token, ok := bearerOrBasicToken(ctx.Header("Authorization"))
-		if !ok {
-			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "unauthorized")
-
-			return
-		}
-
-		// An OAuth access token is scope-limited; an admin API key is all-access.
-		// They are told apart by prefix so a scoped token can never be mistaken
-		// for an all-access key.
-		if strings.HasPrefix(token, types.AccessTokenPrefix) {
-			at, err := b.State.AuthenticateAccessToken(token)
-			if err != nil {
-				_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "unauthorized")
-
-				return
-			}
-
-			if want, ok := requiredScope(ctx.Operation()); ok && !scope.Grants(scope.Parse(at.Scopes), want) {
-				_ = huma.WriteErr(api, ctx, http.StatusForbidden,
-					"token is missing the required scope "+string(want))
-
-				return
-			}
-
-			// The keys handler multiplexes on keyType, so its required scope and
-			// permitted tags depend on the body; carry the token's scopes and tags
-			// for it to finish the check the static middleware cannot.
-			ctx = huma.WithValue(ctx, principalScopesKey, at.Scopes)
-			ctx = huma.WithValue(ctx, principalTagsKey, at.Tags)
-
-			next(ctx)
-
-			return
-		}
-
-		key, err := b.State.AuthenticateAPIKey(token)
-		if err != nil {
-			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "unauthorized")
-
-			return
-		}
-
-		// An admin API key is all-access: its operations are not scope-checked.
-		// Record its owning user (may be unset) so handlers can create user-owned
-		// keys on its behalf.
-		if key.UserID != nil {
-			ctx = huma.WithValue(ctx, ownerUserKey, types.UserID(*key.UserID))
-		}
-
-		next(ctx)
-	}
+	return principal.Middleware(api, b.State)
 }
 
-// bearerOrBasicToken extracts the API key from an Authorization header. The
-// Tailscale SDK sends the key as the Basic-auth username with an empty
-// password; curl and humans may use Bearer.
-func bearerOrBasicToken(header string) (string, bool) {
-	if token, ok := strings.CutPrefix(header, "Bearer "); ok {
-		return token, token != ""
+// caller returns the request's principal. The middleware attaches one to
+// every authenticated request; a locally trusted request carries
+// [principal.Local].
+func caller(ctx context.Context) principal.Principal {
+	p, ok := principal.From(ctx)
+	if !ok {
+		return principal.Local()
 	}
 
-	if encoded, ok := strings.CutPrefix(header, "Basic "); ok {
-		raw, err := base64.StdEncoding.DecodeString(encoded)
-		if err != nil {
-			return "", false
-		}
-
-		username, _, _ := strings.Cut(string(raw), ":")
-
-		return username, username != ""
-	}
-
-	return "", false
+	return p
 }
 
-// ownerUser returns the user the request's API key belongs to, if any.
+// ownerUser returns the user the request's credential belongs to, if any.
 func ownerUser(ctx context.Context) (types.UserID, bool) {
-	uid, ok := ctx.Value(ownerUserKey).(types.UserID)
+	p := caller(ctx)
 
-	return uid, ok
-}
-
-// principalScopes returns the scopes granted to the request's OAuth access
-// token, and whether the request authenticated with one. ok is false for an
-// admin API key, which is all-access and not scope-checked.
-func principalScopes(ctx context.Context) ([]string, bool) {
-	scopes, ok := ctx.Value(principalScopesKey).([]string)
-
-	return scopes, ok
+	return p.UserID, p.HasUser()
 }
 
 // principalTags returns the tags granted to the request's OAuth access token,
-// and whether the request authenticated with one. An admin API key is not an
-// OAuth token, so ok is false and its key creation is unrestricted by tags.
+// and whether the request authenticated with one. Only a token is bounded by
+// tags; an API key keeps the historical syntax-only tag validation.
 func principalTags(ctx context.Context) ([]string, bool) {
-	tags, ok := ctx.Value(principalTagsKey).([]string)
+	p := caller(ctx)
 
-	return tags, ok
+	return p.Tags, p.IsOAuth()
 }
 
 // requireDefaultTailnet rejects any tailnet other than "-". Headscale is
@@ -289,49 +191,4 @@ func requireDefaultTailnet(tailnet string) error {
 	}
 
 	return nil
-}
-
-// The scope vocabulary and the grant predicate live in the hscontrol/scope
-// package; this file only wires a required scope onto each huma operation and
-// reads it back in the middleware.
-
-// scopeMetaKey keys the per-operation required scope in huma.Operation.Metadata.
-const scopeMetaKey = "headscale.scope"
-
-// requireScope records op's required scope, both in its Metadata (where the auth
-// middleware reads it back) and in the generated OpenAPI document: an
-// x-required-scope extension for machine consumers and a Description line so the
-// rendered docs state what each operation needs.
-func requireScope(op huma.Operation, s scope.Scope) huma.Operation {
-	if op.Metadata == nil {
-		op.Metadata = map[string]any{}
-	}
-
-	op.Metadata[scopeMetaKey] = s
-
-	if op.Extensions == nil {
-		op.Extensions = map[string]any{}
-	}
-
-	op.Extensions["x-required-scope"] = string(s)
-
-	note := "Requires the `" + string(s) + "` OAuth scope (an admin API key is all-access)."
-	if op.Description == "" {
-		op.Description = note
-	} else {
-		op.Description += "\n\n" + note
-	}
-
-	return op
-}
-
-// requiredScope returns the scope an operation declared via requireScope, if any.
-func requiredScope(op *huma.Operation) (scope.Scope, bool) {
-	if op == nil || op.Metadata == nil {
-		return "", false
-	}
-
-	s, ok := op.Metadata[scopeMetaKey].(scope.Scope)
-
-	return s, ok
 }

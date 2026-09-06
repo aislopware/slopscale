@@ -27,6 +27,9 @@ type ApiKey struct {
 	Expiration *time.Time `json:"expiration" nullable:"true"`
 	CreatedAt  *time.Time `json:"createdAt"  nullable:"true"`
 	LastSeen   *time.Time `json:"lastSeen"   nullable:"true"`
+	// UserID is the owning user, whose role bounds the key; null for a legacy
+	// all-access key.
+	UserID *string `doc:"Owning user id; null for a legacy key." format:"uint64" json:"userId" nullable:"true"`
 }
 
 // CreateApiKeyRequestBody is the v1.CreateApiKeyRequest body.
@@ -34,6 +37,11 @@ type ApiKey struct {
 //nolint:staticcheck,revive // ST1003: name is the OpenAPI schema name
 type CreateApiKeyRequestBody struct {
 	Expiration *time.Time `json:"expiration,omitempty"`
+	// UserID makes the key belong to a user, bounding it by the user's role.
+	// A caller that is itself a user may only mint keys for that user unless
+	// it is the owner or an admin; only those, or the socket, may mint a key
+	// without a user.
+	UserID string `doc:"Owning user id; empty for a legacy all-access key." format:"uint64" json:"userId,omitempty"`
 }
 
 // ExpireApiKeyRequestBody is the v1.ExpireApiKeyRequest body.
@@ -88,17 +96,21 @@ func registerAPIKeys(api huma.API, b Backend) {
 		Method:      http.MethodPost,
 		Path:        "/api/v1/apikey",
 		Summary:     "Create API key",
-		Tags:        []string{"ApiKeys"},
-		Security:    bearerAuth,
-	}, func(_ context.Context, in *createAPIKeyInput) (*createAPIKeyOutput, error) {
-		// CreateAPIKey requires a non-nil pointer; default a missing expiration
-		// to the zero time as the gRPC handler does.
-		var expiration time.Time
-		if in.Body.Expiration != nil {
-			expiration = *in.Body.Expiration
+		Description: "Any authenticated caller may mint a key for itself; a key for another user, or " +
+			"a legacy key without a user, needs the owner, an admin or the socket.",
+		Tags:     []string{"ApiKeys"},
+		Security: bearerAuth,
+	}, func(ctx context.Context, in *createAPIKeyInput) (*createAPIKeyOutput, error) {
+		// A missing expiration is a key that never expires. The gRPC handler
+		// defaulted it to the zero time, which minted a key that was expired
+		// before it was printed; the CLI always sends one, so nothing relied
+		// on that.
+		userID, err := apiKeyOwner(ctx, b, in.Body.UserID)
+		if err != nil {
+			return nil, err
 		}
 
-		keyStr, _, err := b.State.CreateAPIKey(&expiration)
+		keyStr, _, err := b.State.CreateAPIKeyForUser(in.Body.Expiration, userID)
 		if err != nil {
 			return nil, huma.Error500InternalServerError("creating api key", err)
 		}
@@ -116,8 +128,13 @@ func registerAPIKeys(api huma.API, b Backend) {
 		Summary:     "Expire API key",
 		Tags:        []string{"ApiKeys"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *expireAPIKeyInput) (*expireAPIKeyOutput, error) {
+	}, func(ctx context.Context, in *expireAPIKeyInput) (*expireAPIKeyOutput, error) {
 		key, err := lookupAPIKey(b, in.Body.ID, in.Body.Prefix)
+		if err != nil {
+			return nil, err
+		}
+
+		err = requireKeyAccess(ctx, key)
 		if err != nil {
 			return nil, err
 		}
@@ -137,10 +154,17 @@ func registerAPIKeys(api huma.API, b Backend) {
 		Summary:     "List API keys",
 		Tags:        []string{"ApiKeys"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, _ *struct{}) (*listAPIKeysOutput, error) {
+	}, func(ctx context.Context, _ *struct{}) (*listAPIKeysOutput, error) {
 		keys, err := b.State.ListAPIKeys()
 		if err != nil {
 			return nil, huma.Error500InternalServerError("listing api keys", err)
+		}
+
+		// A caller without admin authority sees only its own keys.
+		if p := caller(ctx); p.Bounded {
+			keys = slices.DeleteFunc(keys, func(k types.APIKey) bool {
+				return k.UserID == nil || types.UserID(*k.UserID) != p.UserID
+			})
 		}
 
 		// Match the gRPC handler's ascending-ID ordering.
@@ -165,8 +189,13 @@ func registerAPIKeys(api huma.API, b Backend) {
 		Summary:     "Delete API key",
 		Tags:        []string{"ApiKeys"},
 		Security:    bearerAuth,
-	}, func(_ context.Context, in *deleteAPIKeyInput) (*deleteAPIKeyOutput, error) {
+	}, func(ctx context.Context, in *deleteAPIKeyInput) (*deleteAPIKeyOutput, error) {
 		key, err := lookupAPIKey(b, in.ID, in.Prefix)
+		if err != nil {
+			return nil, err
+		}
+
+		err = requireKeyAccess(ctx, key)
 		if err != nil {
 			return nil, err
 		}
@@ -232,13 +261,68 @@ func parseAPIKeyID(s string) (uint64, error) {
 // apiKeyFromState converts a domain API key into the v1 response shape, masking
 // the prefix so the secret is never returned.
 func apiKeyFromState(k *types.APIKey) ApiKey {
-	return ApiKey{
+	out := ApiKey{
 		ID:         formatID(k.ID),
 		Prefix:     apiKeyMaskedPrefix(k.Prefix),
 		Expiration: k.Expiration,
 		CreatedAt:  k.CreatedAt,
 		LastSeen:   k.LastSeen,
 	}
+
+	if k.UserID != nil {
+		uid := formatID(uint64(*k.UserID))
+		out.UserID = &uid
+	}
+
+	return out
+}
+
+// apiKeyOwner resolves the user a new key should belong to and checks the
+// caller may mint it: an all-access caller (socket, legacy key, owner, admin)
+// may mint for anyone or for nobody; every other caller only for itself.
+func apiKeyOwner(ctx context.Context, b Backend, rawUserID string) (*types.UserID, error) {
+	p := caller(ctx)
+
+	if rawUserID == "" {
+		if !p.Bounded {
+			return nil, nil //nolint:nilnil // no owner is a legacy all-access key
+		}
+
+		uid := p.UserID
+
+		return &uid, nil
+	}
+
+	id, err := parseUserID(rawUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	if p.Bounded && id != p.UserID {
+		return nil, huma.Error403Forbidden("only the owner or an admin may create keys for other users")
+	}
+
+	_, err = b.State.GetUserByID(id)
+	if err != nil {
+		return nil, mapError("looking up key owner", err)
+	}
+
+	return &id, nil
+}
+
+// requireKeyAccess lets a bounded caller manage only its own keys. Not
+// found, rather than forbidden, so the key's existence is not revealed.
+func requireKeyAccess(ctx context.Context, key *types.APIKey) error {
+	p := caller(ctx)
+	if !p.Bounded {
+		return nil
+	}
+
+	if key.UserID == nil || types.UserID(*key.UserID) != p.UserID {
+		return huma.Error404NotFound("api key not found")
+	}
+
+	return nil
 }
 
 // apiKeyMaskedPrefix reproduces the unexported types.APIKey.maskedPrefix.
