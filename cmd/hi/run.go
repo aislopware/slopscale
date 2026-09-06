@@ -26,8 +26,8 @@ type RunConfig struct {
 	LogsDir       string        `flag:"logs-dir,default=control_logs,Control logs directory"`
 	Verbose       bool          `flag:"verbose,default=false,Verbose output"`
 	Stats         bool          `flag:"stats,default=false,Collect and display container resource usage statistics"`
-	HSMemoryLimit float64       `flag:"hs-memory-limit,default=0,Fail test if any Headscale container exceeds this memory limit in MB (0 = disabled)"`
-	TSMemoryLimit float64       `flag:"ts-memory-limit,default=0,Fail test if any Tailscale container exceeds this memory limit in MB (0 = disabled)"`
+	HSMemoryLimit float64       `flag:"hs-memory-limit,default=0,Fail if Headscale exceeds this MB (0=disabled)"`
+	TSMemoryLimit float64       `flag:"ts-memory-limit,default=0,Fail if Tailscale exceeds this MB (0=disabled)"`
 }
 
 // runIntegrationTest executes the integration test workflow.
@@ -71,7 +71,7 @@ func detectGoVersion() string {
 	if err != nil {
 		content, err = os.ReadFile(filepath.Join("..", "..", "go.mod"))
 		if err != nil {
-			return "1.27.0"
+			return "1.27.1"
 		}
 	}
 
@@ -83,5 +83,5 @@ func detectGoVersion() string {
 		}
 	}
 
-	return "1.27.0"
+	return "1.27.1"
 }

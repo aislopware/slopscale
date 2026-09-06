@@ -15,21 +15,60 @@ var (
 	errUnknownFormat = errors.New("unknown --format value (want space|newline|json)")
 )
 
+// VersionSet specifies which subset of Tailscale versions to list.
+type VersionSet string
+
+const (
+	VersionSetMust VersionSet = "must"
+	VersionSetAll  VersionSet = "all"
+)
+
+// OutputFormat specifies how listed versions are formatted.
+type OutputFormat string
+
+const (
+	OutputFormatSpace   OutputFormat = "space"
+	OutputFormatNewline OutputFormat = "newline"
+	OutputFormatJSON    OutputFormat = "json"
+)
+
 // ListVersionsConfig holds flags for the list-versions subcommand.
 type ListVersionsConfig struct {
-	Set     string `flag:"set,default=must,Version set: must|all"`
-	Exclude string `flag:"exclude,Comma-separated versions to exclude (e.g. head,unstable)"`
-	Format  string `flag:"format,default=space,Output format: space|newline|json"`
+	Set     VersionSet   `flag:"set,default=must,Version set: must|all"`
+	Exclude string       `flag:"exclude,Comma-separated versions to exclude (e.g. head,unstable)"`
+	Format  OutputFormat `flag:"format,default=space,Output format: space|newline|json"`
 }
 
 var listVersionsConfig ListVersionsConfig
+
+// Validate verifies that Set and Format are recognized values.
+func (c ListVersionsConfig) Validate() error {
+	switch c.Set {
+	case VersionSetMust, VersionSetAll:
+	default:
+		return fmt.Errorf("%w: %q", errUnknownSet, c.Set)
+	}
+
+	switch c.Format {
+	case OutputFormatSpace, OutputFormatNewline, OutputFormatJSON:
+	default:
+		return fmt.Errorf("%w: %q", errUnknownFormat, c.Format)
+	}
+
+	return nil
+}
 
 // listVersions prints the Tailscale versions used by integration tests
 // in a format CI can shell out to. Mirrors integration/scenario.go
 // AllVersions and MustTestVersions: "head" and "unstable" are bare
 // tags, releases get a "v" prefix so each entry can be appended to
 // "ghcr.io/tailscale/tailscale:" directly.
-func listVersions(env *command.Env) error {
+func listVersions(_ *command.Env) error {
+	err := listVersionsConfig.Validate()
+	if err != nil {
+		return err
+	}
+
 	release := capver.TailscaleLatestMajorMinor(capver.SupportedMajorMinorVersions, true)
 	all := append([]string{"head", "unstable"}, release...)
 	must := append(append([]string{}, all[0:4]...), all[len(all)-2:]...)
@@ -37,12 +76,10 @@ func listVersions(env *command.Env) error {
 	var versions []string
 
 	switch listVersionsConfig.Set {
-	case "must":
+	case VersionSetMust:
 		versions = must
-	case "all":
+	case VersionSetAll:
 		versions = all
-	default:
-		return fmt.Errorf("%w: %q", errUnknownSet, listVersionsConfig.Set)
 	}
 
 	excluded := make(map[string]bool)
@@ -68,21 +105,19 @@ func listVersions(env *command.Env) error {
 	}
 
 	switch listVersionsConfig.Format {
-	case "space":
+	case OutputFormatSpace:
 		fmt.Println(strings.Join(out, " "))
-	case "newline":
+	case OutputFormatNewline:
 		for _, v := range out {
 			fmt.Println(v)
 		}
-	case "json":
+	case OutputFormatJSON:
 		b, err := json.Marshal(out)
 		if err != nil {
-			return err
+			return fmt.Errorf("marshalling versions to JSON: %w", err)
 		}
 
 		fmt.Println(string(b))
-	default:
-		return fmt.Errorf("%w: %q", errUnknownFormat, listVersionsConfig.Format)
 	}
 
 	return nil

@@ -11,6 +11,7 @@ import (
 
 	"github.com/juanfont/headscale/integration/dockertestutil"
 	"github.com/juanfont/headscale/integration/k3sic"
+	"github.com/moby/moby/client"
 )
 
 const (
@@ -64,21 +65,23 @@ func runDoctorCheck(ctx context.Context) error {
 
 	// If Docker is available, run additional checks
 	if dockerResult.Status == statusPass {
-		results = append(results, checkDockerContext(ctx))
-		results = append(results, checkDockerSocket(ctx))
-		results = append(results, checkDockerHubCredentials())
-		results = append(results, checkGolangImage(ctx))
-		results = append(results, checkK3sImage(ctx))
+		results = append(
+			results,
+			checkDockerContext(ctx),
+			checkDockerSocket(ctx),
+			checkDockerHubCredentials(),
+			checkGolangImage(ctx),
+			checkK3sImage(ctx),
+		)
 	}
 
-	// Check 3: Go installation
-	results = append(results, checkGoInstallation(ctx))
-
-	// Check 4: Git repository
-	results = append(results, checkGitRepository(ctx))
-
-	// Check 5: Required files
-	results = append(results, checkRequiredFiles(ctx))
+	// Checks 3-5: Go installation, git repository, required files.
+	results = append(
+		results,
+		checkGoInstallation(ctx),
+		checkGitRepository(ctx),
+		checkRequiredFiles(ctx),
+	)
 
 	// Display results
 	displayDoctorResults(results)
@@ -126,7 +129,7 @@ func checkDockerDaemon(ctx context.Context) DoctorResult {
 	}
 	defer cli.Close()
 
-	_, err = cli.Ping(ctx)
+	_, err = cli.Ping(ctx, client.PingOptions{})
 	if err != nil {
 		return fail(
 			nameDockerDaemon,
@@ -173,7 +176,7 @@ func checkDockerSocket(ctx context.Context) DoctorResult {
 	}
 	defer cli.Close()
 
-	info, err := cli.Info(ctx)
+	infoResult, err := cli.Info(ctx, client.InfoOptions{})
 	if err != nil {
 		return fail(
 			nameDockerSocket,
@@ -183,7 +186,7 @@ func checkDockerSocket(ctx context.Context) DoctorResult {
 		)
 	}
 
-	return pass(nameDockerSocket, fmt.Sprintf("Docker socket accessible (Server: %s)", info.ServerVersion))
+	return pass(nameDockerSocket, fmt.Sprintf("Docker socket accessible (Server: %s)", infoResult.Info.ServerVersion))
 }
 
 // checkDockerHubCredentials warns when pulls would be anonymous and

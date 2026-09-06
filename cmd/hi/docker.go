@@ -15,15 +15,26 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v5"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/juanfont/headscale/integration/dockertestutil"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/client"
 )
 
 const defaultDirPerm = 0o755
+
+const (
+	// containerFinalizationMaxWait bounds how long waitForContainerFinalization
+	// polls before giving up and proceeding with artifact extraction anyway.
+	containerFinalizationMaxWait = 10 * time.Second
+	// containerFinalizationCheckInterval is the polling interval used by
+	// waitForContainerFinalization.
+	containerFinalizationCheckInterval = 500 * time.Millisecond
+	// imagePullMaxElapsedTime bounds the total retry time for pulling a Docker image.
+	imagePullMaxElapsedTime = 60 * time.Second
+)
 
 var (
 	ErrTestFailed              = errors.New("test failed")
@@ -34,7 +45,9 @@ var (
 
 // runTestContainer executes integration tests in a Docker container.
 //
-//nolint:gocyclo // complex test orchestration function
+// splitting further would scatter the sequential setup/run/cleanup steps
+//
+//nolint:gocyclo,gocognit,cyclop,funlen // legacy: orchestrates the full container lifecycle;
 func runTestContainer(ctx context.Context, config *RunConfig) error {
 	cli, err := createDockerClient(ctx)
 	if err != nil {
@@ -58,8 +71,10 @@ func runTestContainer(ctx context.Context, config *RunConfig) error {
 	}
 
 	const dirPerm = 0o755
-	if err := os.MkdirAll(absLogsDir, dirPerm); err != nil { //nolint:noinlineerr
-		return fmt.Errorf("creating logs directory: %w", err)
+
+	mkdirErr := os.MkdirAll(absLogsDir, dirPerm)
+	if mkdirErr != nil {
+		return fmt.Errorf("creating logs directory: %w", mkdirErr)
 	}
 
 	if config.CleanBefore {
@@ -67,9 +82,9 @@ func runTestContainer(ctx context.Context, config *RunConfig) error {
 			log.Printf("Running pre-test cleanup...")
 		}
 
-		err := cleanupBeforeTest(ctx)
-		if err != nil && config.Verbose {
-			log.Printf("Warning: pre-test cleanup failed: %v", err)
+		cleanupErr := cleanupBeforeTest(ctx)
+		if cleanupErr != nil && config.Verbose {
+			log.Printf("Warning: pre-test cleanup failed: %v", cleanupErr)
 		}
 	}
 
@@ -79,8 +94,10 @@ func runTestContainer(ctx context.Context, config *RunConfig) error {
 	}
 
 	imageName := "golang:" + config.GoVersion
-	if err := ensureImageAvailable(ctx, cli, imageName, config.Verbose); err != nil { //nolint:noinlineerr
-		return fmt.Errorf("ensuring image availability: %w", err)
+
+	imageErr := ensureImageAvailable(ctx, cli, imageName, config.Verbose)
+	if imageErr != nil {
+		return fmt.Errorf("ensuring image availability: %w", imageErr)
 	}
 
 	resp, err := createGoTestContainer(ctx, cli, config, containerName, absLogsDir, goTestCmd)
@@ -92,8 +109,13 @@ func runTestContainer(ctx context.Context, config *RunConfig) error {
 		log.Printf("Created container: %s", resp.ID)
 	}
 
-	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil { //nolint:noinlineerr
-		return fmt.Errorf("starting container: %w", err)
+	_, startErr := cli.ContainerStart(
+		ctx,
+		resp.ID,
+		client.ContainerStartOptions{},
+	)
+	if startErr != nil {
+		return fmt.Errorf("starting container: %w", startErr)
 	}
 
 	log.Printf("Starting test: %s", config.TestPattern)
@@ -102,33 +124,10 @@ func runTestContainer(ctx context.Context, config *RunConfig) error {
 	log.Printf("Logs directory: %s", logsDir)
 
 	// Start stats collection for container resource monitoring (if enabled)
-	var statsCollector *StatsCollector
-
-	if config.Stats {
-		var err error
-
-		statsCollector, err = NewStatsCollector(ctx)
-		if err != nil {
-			if config.Verbose {
-				log.Printf("Warning: failed to create stats collector: %v", err)
-			}
-
-			statsCollector = nil
-		}
-
-		if statsCollector != nil {
-			defer statsCollector.Close()
-
-			// Start stats collection immediately - no need for complex retry logic
-			// The new implementation monitors Docker events and will catch containers as they start
-			err := statsCollector.StartCollection(ctx, runID, config.Verbose)
-			if err != nil {
-				if config.Verbose {
-					log.Printf("Warning: failed to start stats collection: %v", err)
-				}
-			}
-			defer statsCollector.StopCollection()
-		}
+	statsCollector := startStatsCollector(ctx, config, runID)
+	if statsCollector != nil {
+		defer statsCollector.Close()
+		defer statsCollector.StopCollection()
 	}
 
 	exitCode, err := streamAndWait(ctx, cli, resp.ID)
@@ -140,8 +139,14 @@ func runTestContainer(ctx context.Context, config *RunConfig) error {
 	}
 
 	// Extract artifacts from test containers before cleanup
-	if err := extractArtifactsFromContainers(ctx, resp.ID, logsDir, config.Verbose); err != nil && config.Verbose { //nolint:noinlineerr
-		log.Printf("Warning: failed to extract artifacts from containers: %v", err)
+	extractErr := extractArtifactsFromContainers(
+		ctx,
+		resp.ID,
+		logsDir,
+		config.Verbose,
+	)
+	if extractErr != nil && config.Verbose {
+		log.Printf("Warning: failed to extract artifacts from containers: %v", extractErr)
 	}
 
 	// Always list control files regardless of test outcome
@@ -202,6 +207,36 @@ func runTestContainer(ctx context.Context, config *RunConfig) error {
 	return nil
 }
 
+// startStatsCollector creates and starts a [StatsCollector] for the given run
+// when config.Stats is enabled. It returns nil when stats collection is
+// disabled or fails to initialize or start; the caller must call Close and
+// StopCollection on a non-nil result.
+func startStatsCollector(ctx context.Context, config *RunConfig, runID string) *StatsCollector {
+	if !config.Stats {
+		return nil
+	}
+
+	statsCollector, err := NewStatsCollector(ctx)
+	if err != nil {
+		if config.Verbose {
+			log.Printf("Warning: failed to create stats collector: %v", err)
+		}
+
+		return nil
+	}
+
+	// Start stats collection immediately - no need for complex retry logic.
+	// The new implementation monitors Docker events and will catch containers as they start.
+	startErr := statsCollector.StartCollection(ctx, runID, config.Verbose)
+	if startErr != nil {
+		if config.Verbose {
+			log.Printf("Warning: failed to start stats collection: %v", startErr)
+		}
+	}
+
+	return statsCollector
+}
+
 // buildGoTestCommand constructs the go test command arguments.
 func buildGoTestCommand(config *RunConfig) []string {
 	cmd := []string{"go", "test", "./..."}
@@ -214,17 +249,22 @@ func buildGoTestCommand(config *RunConfig) []string {
 		cmd = append(cmd, "-failfast")
 	}
 
-	cmd = append(cmd, "-timeout", config.Timeout.String())
-	cmd = append(cmd, "-v")
+	cmd = append(cmd, "-timeout", config.Timeout.String(), "-v")
 
 	return cmd
 }
 
 // createGoTestContainer creates a Docker container configured for running integration tests.
-func createGoTestContainer(ctx context.Context, cli *client.Client, config *RunConfig, containerName, logsDir string, goTestCmd []string) (container.CreateResponse, error) {
+func createGoTestContainer(
+	ctx context.Context,
+	cli *client.Client,
+	config *RunConfig,
+	containerName, logsDir string,
+	goTestCmd []string,
+) (client.ContainerCreateResult, error) {
 	pwd, err := os.Getwd()
 	if err != nil {
-		return container.CreateResponse{}, fmt.Errorf("getting working directory: %w", err)
+		return client.ContainerCreateResult{}, fmt.Errorf("getting working directory: %w", err)
 	}
 
 	projectRoot := findProjectRoot(pwd)
@@ -315,12 +355,21 @@ func createGoTestContainer(ctx context.Context, cli *client.Client, config *RunC
 		Mounts:     mounts,
 	}
 
-	return cli.ContainerCreate(ctx, containerConfig, hostConfig, nil, nil, containerName)
+	resp, err := cli.ContainerCreate(ctx, client.ContainerCreateOptions{
+		Config:     containerConfig,
+		HostConfig: hostConfig,
+		Name:       containerName,
+	})
+	if err != nil {
+		return resp, fmt.Errorf("creating container %s: %w", containerName, err)
+	}
+
+	return resp, nil
 }
 
 // streamAndWait streams container output and waits for completion.
 func streamAndWait(ctx context.Context, cli *client.Client, containerID string) (int, error) {
-	out, err := cli.ContainerLogs(ctx, containerID, container.LogsOptions{
+	out, err := cli.ContainerLogs(ctx, containerID, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
@@ -334,13 +383,15 @@ func streamAndWait(ctx context.Context, cli *client.Client, containerID string) 
 		_, _ = io.Copy(os.Stdout, out)
 	}()
 
-	statusCh, errCh := cli.ContainerWait(ctx, containerID, container.WaitConditionNotRunning)
+	waitResult := cli.ContainerWait(ctx, containerID, client.ContainerWaitOptions{
+		Condition: container.WaitConditionNotRunning,
+	})
 	select {
-	case err := <-errCh:
+	case err := <-waitResult.Error:
 		if err != nil {
 			return -1, fmt.Errorf("waiting for container: %w", err)
 		}
-	case status := <-statusCh:
+	case status := <-waitResult.Result:
 		return int(status.StatusCode), nil
 	}
 
@@ -350,19 +401,17 @@ func streamAndWait(ctx context.Context, cli *client.Client, containerID string) 
 // waitForContainerFinalization ensures all test containers have properly finished and flushed their output.
 func waitForContainerFinalization(ctx context.Context, cli *client.Client, testContainerID string, verbose bool) error {
 	// First, get all related test containers
-	containers, err := cli.ContainerList(ctx, container.ListOptions{All: true})
+	listResult, err := cli.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
 		return fmt.Errorf("listing containers: %w", err)
 	}
 
-	testContainers := getCurrentTestContainers(containers, testContainerID, verbose)
+	testContainers := getCurrentTestContainers(listResult.Items, testContainerID, verbose)
 
 	// Wait for all test containers to reach a final state
-	maxWaitTime := 10 * time.Second
-	checkInterval := 500 * time.Millisecond
-	timeout := time.After(maxWaitTime)
+	timeout := time.After(containerFinalizationMaxWait)
 
-	ticker := time.NewTicker(checkInterval)
+	ticker := time.NewTicker(containerFinalizationCheckInterval)
 	defer ticker.Stop()
 
 	for {
@@ -374,31 +423,7 @@ func waitForContainerFinalization(ctx context.Context, cli *client.Client, testC
 
 			return nil
 		case <-ticker.C:
-			allFinalized := true
-
-			for _, testCont := range testContainers {
-				inspect, err := cli.ContainerInspect(ctx, testCont.ID)
-				if err != nil {
-					if verbose {
-						log.Printf("Warning: failed to inspect container %s: %v", testCont.name, err)
-					}
-
-					continue
-				}
-
-				// Check if container is in a final state
-				if !isContainerFinalized(inspect.State) {
-					allFinalized = false
-
-					if verbose {
-						log.Printf("Container %s still finalizing (state: %s)", testCont.name, inspect.State.Status)
-					}
-
-					break
-				}
-			}
-
-			if allFinalized {
+			if allTestContainersFinalized(ctx, cli, testContainers, verbose) {
 				if verbose {
 					log.Printf("All test containers finalized, ready for artifact extraction")
 				}
@@ -407,6 +432,36 @@ func waitForContainerFinalization(ctx context.Context, cli *client.Client, testC
 			}
 		}
 	}
+}
+
+// allTestContainersFinalized reports whether every container in testContainers
+// has reached a final state (not running, with a finish time).
+func allTestContainersFinalized(
+	ctx context.Context,
+	cli *client.Client,
+	testContainers []testContainer,
+	verbose bool,
+) bool {
+	for _, testCont := range testContainers {
+		inspect, err := cli.ContainerInspect(ctx, testCont.ID, client.ContainerInspectOptions{})
+		if err != nil {
+			if verbose {
+				log.Printf("Warning: failed to inspect container %s: %v", testCont.name, err)
+			}
+
+			continue
+		}
+
+		if !isContainerFinalized(inspect.Container.State) {
+			if verbose {
+				log.Printf("Container %s still finalizing (state: %s)", testCont.name, inspect.Container.State.Status)
+			}
+
+			return false
+		}
+	}
+
+	return true
 }
 
 // isContainerFinalized checks if a container has reached a final state where logs are flushed.
@@ -419,7 +474,8 @@ func isContainerFinalized(state *container.State) bool {
 func findProjectRoot(startPath string) string {
 	current := startPath
 	for {
-		if _, err := os.Stat(filepath.Join(current, "go.mod")); err == nil { //nolint:noinlineerr
+		_, err := os.Stat(filepath.Join(current, "go.mod"))
+		if err == nil {
 			return current
 		}
 
@@ -453,32 +509,61 @@ type DockerContext struct {
 func createDockerClient(ctx context.Context) (*client.Client, error) {
 	contextInfo, err := getCurrentDockerContext(ctx)
 	if err != nil {
-		return client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		cli, clientErr := client.New(client.FromEnv, client.WithUserAgent("headscale-hi"))
+		if clientErr != nil {
+			return nil, fmt.Errorf("creating Docker client from environment: %w", clientErr)
+		}
+
+		return cli, nil
 	}
 
 	var clientOpts []client.Opt
 
-	clientOpts = append(clientOpts, client.WithAPIVersionNegotiation())
-
-	if contextInfo != nil {
-		if endpoints, ok := contextInfo.Endpoints["docker"]; ok {
-			if endpointMap, ok := endpoints.(map[string]any); ok {
-				if host, ok := endpointMap["Host"].(string); ok {
-					if runConfig.Verbose {
-						log.Printf("Using Docker host from context '%s': %s", contextInfo.Name, host)
-					}
-
-					clientOpts = append(clientOpts, client.WithHost(host))
-				}
-			}
+	if host, ok := dockerHostFromContext(contextInfo); ok {
+		if runConfig.Verbose {
+			log.Printf("Using Docker host from context '%s': %s", contextInfo.Name, host)
 		}
+
+		clientOpts = append(clientOpts, client.WithHost(host))
 	}
 
-	if len(clientOpts) == 1 {
+	if len(clientOpts) == 0 {
 		clientOpts = append(clientOpts, client.FromEnv)
 	}
 
-	return client.NewClientWithOpts(clientOpts...)
+	clientOpts = append(clientOpts, client.WithUserAgent("headscale-hi"))
+
+	cli, err := client.New(clientOpts...)
+	if err != nil {
+		return nil, fmt.Errorf("creating Docker client: %w", err)
+	}
+
+	return cli, nil
+}
+
+// dockerHostFromContext extracts the Docker host endpoint from context
+// metadata, if present.
+func dockerHostFromContext(contextInfo *DockerContext) (string, bool) {
+	if contextInfo == nil {
+		return "", false
+	}
+
+	endpoints, ok := contextInfo.Endpoints["docker"]
+	if !ok {
+		return "", false
+	}
+
+	endpointMap, ok := endpoints.(map[string]any)
+	if !ok {
+		return "", false
+	}
+
+	host, ok := endpointMap["Host"].(string)
+	if !ok {
+		return "", false
+	}
+
+	return host, true
 }
 
 // getCurrentDockerContext retrieves the current Docker context information.
@@ -491,7 +576,9 @@ func getCurrentDockerContext(ctx context.Context) (*DockerContext, error) {
 	}
 
 	var contexts []DockerContext
-	if err := json.Unmarshal(output, &contexts); err != nil { //nolint:noinlineerr
+
+	err = json.Unmarshal(output, &contexts)
+	if err != nil {
 		return nil, fmt.Errorf("parsing docker context: %w", err)
 	}
 
@@ -511,9 +598,9 @@ func getDockerSocketPath() string {
 
 // checkImageAvailableLocally checks if the specified Docker image is available locally.
 func checkImageAvailableLocally(ctx context.Context, cli *client.Client, imageName string) (bool, error) {
-	_, _, err := cli.ImageInspectWithRaw(ctx, imageName) //nolint:staticcheck // SA1019: deprecated but functional
+	_, err := cli.ImageInspect(ctx, imageName)
 	if err != nil {
-		if client.IsErrNotFound(err) { //nolint:staticcheck // SA1019: deprecated but functional
+		if cerrdefs.IsNotFound(err) {
 			return false, nil
 		}
 
@@ -551,7 +638,7 @@ func ensureImageAvailable(ctx context.Context, cli *client.Client, imageName str
 	_, err = backoff.Retry(
 		ctx,
 		func() (struct{}, error) {
-			reader, pullErr := cli.ImagePull(ctx, imageName, image.PullOptions{RegistryAuth: registryAuth})
+			reader, pullErr := cli.ImagePull(ctx, imageName, client.ImagePullOptions{RegistryAuth: registryAuth})
 			if pullErr != nil {
 				if isPermanentDockerPullError(pullErr) {
 					return struct{}{}, backoff.Permanent(pullErr)
@@ -574,10 +661,10 @@ func ensureImageAvailable(ctx context.Context, cli *client.Client, imageName str
 			return struct{}{}, nil
 		},
 		backoff.WithBackOff(backoff.NewExponentialBackOff()),
-		backoff.WithMaxElapsedTime(60*time.Second),
+		backoff.WithMaxElapsedTime(imagePullMaxElapsedTime),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("pulling image %s: %w", imageName, err)
 	}
 
 	if !verbose {
@@ -666,13 +753,13 @@ func extractArtifactsFromContainers(ctx context.Context, testContainerID, logsDi
 	defer cli.Close()
 
 	// List all containers
-	containers, err := cli.ContainerList(ctx, container.ListOptions{All: true})
+	listResult, err := cli.ContainerList(ctx, client.ContainerListOptions{All: true})
 	if err != nil {
 		return fmt.Errorf("listing containers: %w", err)
 	}
 
 	// Get containers from the specific test run
-	currentTestContainers := getCurrentTestContainers(containers, testContainerID, verbose)
+	currentTestContainers := getCurrentTestContainers(listResult.Items, testContainerID, verbose)
 
 	extractedCount := 0
 
@@ -681,7 +768,12 @@ func extractArtifactsFromContainers(ctx context.Context, testContainerID, logsDi
 		err := extractContainerArtifacts(ctx, cli, cont.ID, cont.name, logsDir, verbose)
 		if err != nil {
 			if verbose {
-				log.Printf("Warning: failed to extract artifacts from container %s (%s): %v", cont.name, cont.ID[:12], err)
+				log.Printf(
+					"Warning: failed to extract artifacts from container %s (%s): %v",
+					cont.name,
+					cont.ID[:12],
+					err,
+				)
 			}
 		} else {
 			if verbose {
@@ -756,7 +848,12 @@ func getCurrentTestContainers(containers []container.Summary, testContainerID st
 }
 
 // extractContainerArtifacts saves logs and tar files from a container.
-func extractContainerArtifacts(ctx context.Context, cli *client.Client, containerID, containerName, logsDir string, verbose bool) error {
+func extractContainerArtifacts(
+	ctx context.Context,
+	cli *client.Client,
+	containerID, containerName, logsDir string,
+	verbose bool,
+) error {
 	// Ensure the logs directory exists
 	err := os.MkdirAll(logsDir, defaultDirPerm)
 	if err != nil {
@@ -773,9 +870,14 @@ func extractContainerArtifacts(ctx context.Context, cli *client.Client, containe
 }
 
 // extractContainerLogs saves the stdout and stderr logs from a container to files.
-func extractContainerLogs(ctx context.Context, cli *client.Client, containerID, containerName, logsDir string, verbose bool) error {
+func extractContainerLogs(
+	ctx context.Context,
+	cli *client.Client,
+	containerID, containerName, logsDir string,
+	verbose bool,
+) error {
 	// Get container logs
-	logReader, err := cli.ContainerLogs(ctx, containerID, container.LogsOptions{
+	logReader, err := cli.ContainerLogs(ctx, containerID, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Timestamps: false,
@@ -801,13 +903,23 @@ func extractContainerLogs(ctx context.Context, cli *client.Client, containerID, 
 	}
 
 	// Write stdout logs
-	if err := os.WriteFile(stdoutPath, stdoutBuf.Bytes(), 0o644); err != nil { //nolint:gosec,noinlineerr // log files should be readable
-		return fmt.Errorf("writing stdout log: %w", err)
+	stdoutErr := os.WriteFile(
+		stdoutPath,
+		stdoutBuf.Bytes(),
+		0o600,
+	)
+	if stdoutErr != nil {
+		return fmt.Errorf("writing stdout log: %w", stdoutErr)
 	}
 
 	// Write stderr logs
-	if err := os.WriteFile(stderrPath, stderrBuf.Bytes(), 0o644); err != nil { //nolint:gosec,noinlineerr // log files should be readable
-		return fmt.Errorf("writing stderr log: %w", err)
+	stderrErr := os.WriteFile(
+		stderrPath,
+		stderrBuf.Bytes(),
+		0o600,
+	)
+	if stderrErr != nil {
+		return fmt.Errorf("writing stderr log: %w", stderrErr)
 	}
 
 	if verbose {

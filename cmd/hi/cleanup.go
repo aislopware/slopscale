@@ -10,11 +10,9 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v5"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/errdefs"
+	cerrdefs "github.com/containerd/errdefs"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
 )
 
 // cleanupBeforeTest performs cleanup operations before running tests.
@@ -25,7 +23,8 @@ func cleanupBeforeTest(ctx context.Context) error {
 		return fmt.Errorf("cleaning stale test containers: %w", err)
 	}
 
-	if err := pruneDockerNetworks(ctx); err != nil { //nolint:noinlineerr
+	err = pruneDockerNetworks(ctx)
+	if err != nil {
 		return fmt.Errorf("pruning networks: %w", err)
 	}
 
@@ -35,7 +34,7 @@ func cleanupBeforeTest(ctx context.Context) error {
 // cleanupAfterTest removes the test container and all associated integration test containers for the run.
 func cleanupAfterTest(ctx context.Context, cli *client.Client, containerID, runID string) error {
 	// Remove the main test container
-	err := cli.ContainerRemove(ctx, containerID, container.RemoveOptions{
+	_, err := cli.ContainerRemove(ctx, containerID, client.ContainerRemoveOptions{
 		Force: true,
 	})
 	if err != nil {
@@ -61,7 +60,7 @@ func killTestContainers(ctx context.Context) error {
 	}
 	defer cli.Close()
 
-	containers, err := cli.ContainerList(ctx, container.ListOptions{
+	listResult, err := cli.ContainerList(ctx, client.ContainerListOptions{
 		All: true,
 	})
 	if err != nil {
@@ -70,7 +69,7 @@ func killTestContainers(ctx context.Context) error {
 
 	removed := 0
 
-	for _, cont := range containers {
+	for _, cont := range listResult.Items {
 		if isTestContainerName(cont.Names) {
 			if killAndRemove(ctx, cli, cont) {
 				removed++
@@ -98,11 +97,9 @@ func killTestContainersByRunID(ctx context.Context, runID string) error {
 	defer cli.Close()
 
 	// Filter containers by hi.run-id label
-	containers, err := cli.ContainerList(ctx, container.ListOptions{
-		All: true,
-		Filters: filters.NewArgs(
-			filters.Arg("label", "hi.run-id="+runID),
-		),
+	listResult, err := cli.ContainerList(ctx, client.ContainerListOptions{
+		All:     true,
+		Filters: make(client.Filters).Add("label", "hi.run-id="+runID),
 	})
 	if err != nil {
 		return fmt.Errorf("listing containers for run %s: %w", runID, err)
@@ -110,7 +107,7 @@ func killTestContainersByRunID(ctx context.Context, runID string) error {
 
 	removed := 0
 
-	for _, cont := range containers {
+	for _, cont := range listResult.Items {
 		if killAndRemove(ctx, cli, cont) {
 			removed++
 		}
@@ -134,12 +131,9 @@ func cleanupStaleTestContainers(ctx context.Context) error {
 	defer cli.Close()
 
 	// Only get stopped/exited containers
-	containers, err := cli.ContainerList(ctx, container.ListOptions{
-		All: true,
-		Filters: filters.NewArgs(
-			filters.Arg("status", "exited"),
-			filters.Arg("status", "dead"),
-		),
+	listResult, err := cli.ContainerList(ctx, client.ContainerListOptions{
+		All:     true,
+		Filters: make(client.Filters).Add("status", "exited", "dead"),
 	})
 	if err != nil {
 		return fmt.Errorf("listing stopped containers: %w", err)
@@ -147,7 +141,7 @@ func cleanupStaleTestContainers(ctx context.Context) error {
 
 	removed := 0
 
-	for _, cont := range containers {
+	for _, cont := range listResult.Items {
 		// Only remove containers that look like test containers
 		if isTestContainerName(cont.Names) {
 			if killAndRemove(ctx, cli, cont) {
@@ -174,11 +168,11 @@ func removeContainerWithRetry(ctx context.Context, cli *client.Client, container
 	expBackoff.InitialInterval = containerRemoveInitialInterval
 
 	_, err := backoff.Retry(ctx, func() (struct{}, error) {
-		err := cli.ContainerRemove(ctx, containerID, container.RemoveOptions{
+		_, err := cli.ContainerRemove(ctx, containerID, client.ContainerRemoveOptions{
 			Force: true,
 		})
 		if err != nil {
-			return struct{}{}, err
+			return struct{}{}, fmt.Errorf("removing container %s: %w", containerID, err)
 		}
 
 		return struct{}{}, nil
@@ -221,7 +215,7 @@ func isTestContainerName(names []string) bool {
 // reporting whether the removal succeeded.
 func killAndRemove(ctx context.Context, cli *client.Client, cont container.Summary) bool {
 	if cont.State == "running" {
-		_ = cli.ContainerKill(ctx, cont.ID, "KILL")
+		_, _ = cli.ContainerKill(ctx, cont.ID, client.ContainerKillOptions{Signal: "KILL"})
 	}
 
 	return removeContainerWithRetry(ctx, cli, cont.ID)
@@ -235,13 +229,13 @@ func pruneDockerNetworks(ctx context.Context) error {
 	}
 	defer cli.Close()
 
-	report, err := cli.NetworksPrune(ctx, filters.Args{})
+	pruneResult, err := cli.NetworkPrune(ctx, client.NetworkPruneOptions{})
 	if err != nil {
 		return fmt.Errorf("pruning networks: %w", err)
 	}
 
-	if len(report.NetworksDeleted) > 0 {
-		fmt.Printf("Removed %d unused networks\n", len(report.NetworksDeleted))
+	if len(pruneResult.Report.NetworksDeleted) > 0 {
+		fmt.Printf("Removed %d unused networks\n", len(pruneResult.Report.NetworksDeleted))
 	} else {
 		fmt.Println("No unused networks found to remove")
 	}
@@ -257,7 +251,7 @@ func cleanOldImages(ctx context.Context) error {
 	}
 	defer cli.Close()
 
-	images, err := cli.ImageList(ctx, image.ListOptions{
+	listResult, err := cli.ImageList(ctx, client.ImageListOptions{
 		All: true,
 	})
 	if err != nil {
@@ -266,7 +260,7 @@ func cleanOldImages(ctx context.Context) error {
 
 	removed := 0
 
-	for _, img := range images {
+	for _, img := range listResult.Items {
 		shouldRemove := false
 
 		for _, tag := range img.RepoTags {
@@ -283,7 +277,7 @@ func cleanOldImages(ctx context.Context) error {
 		}
 
 		if shouldRemove {
-			_, err := cli.ImageRemove(ctx, img.ID, image.RemoveOptions{
+			_, err := cli.ImageRemove(ctx, img.ID, client.ImageRemoveOptions{
 				Force: true,
 			})
 			if err == nil {
@@ -311,13 +305,14 @@ func cleanCacheVolume(ctx context.Context) error {
 
 	volumeName := "hs-integration-go-cache"
 
-	err = cli.VolumeRemove(ctx, volumeName, true)
+	_, err = cli.VolumeRemove(ctx, volumeName, client.VolumeRemoveOptions{Force: true})
 	if err != nil {
-		if errdefs.IsNotFound(err) { //nolint:staticcheck // SA1019: deprecated but functional
+		switch {
+		case cerrdefs.IsNotFound(err):
 			fmt.Printf("Go module cache volume not found: %s\n", volumeName)
-		} else if errdefs.IsConflict(err) { //nolint:staticcheck // SA1019: deprecated but functional
+		case cerrdefs.IsConflict(err):
 			fmt.Printf("Go module cache volume is in use and cannot be removed: %s\n", volumeName)
-		} else {
+		default:
 			fmt.Printf("Failed to remove Go module cache volume %s: %v\n", volumeName, err)
 		}
 	} else {
@@ -352,57 +347,19 @@ func cleanupSuccessfulTestArtifacts(logsDir string, verbose bool) error {
 		fullPath := filepath.Join(logsDir, name)
 
 		if entry.IsDir() {
-			// Remove pprof and mapresponses directories (typically large)
-			// These directories contain artifacts from all containers in the test run
-			if name == "pprof" || name == "mapresponses" {
-				size, sizeErr := getDirSize(fullPath)
-				if sizeErr == nil {
-					totalSize += size
-				}
-
-				err := os.RemoveAll(fullPath)
-				if err != nil {
-					if verbose {
-						log.Printf("Warning: failed to remove directory %s: %v", name, err)
-					}
-				} else {
-					removedDirs++
-
-					if verbose {
-						log.Printf("Removed directory: %s/", name)
-					}
-				}
-			}
-		} else {
-			// Only process test-related files (headscale and tailscale)
-			if !strings.HasPrefix(name, "hs-") && !strings.HasPrefix(name, "ts-") {
-				continue
+			removed, size := removeSuccessfulTestArtifactDir(fullPath, name, verbose)
+			if removed {
+				removedDirs++
+				totalSize += size
 			}
 
-			// Remove database, metrics, and status files, but keep logs
-			shouldRemove := strings.HasSuffix(name, ".db") ||
-				strings.HasSuffix(name, "_metrics.txt") ||
-				strings.HasSuffix(name, "_status.json")
+			continue
+		}
 
-			if shouldRemove {
-				info, infoErr := entry.Info()
-				if infoErr == nil {
-					totalSize += info.Size()
-				}
-
-				err := os.Remove(fullPath)
-				if err != nil {
-					if verbose {
-						log.Printf("Warning: failed to remove file %s: %v", name, err)
-					}
-				} else {
-					removedFiles++
-
-					if verbose {
-						log.Printf("Removed file: %s", name)
-					}
-				}
-			}
+		removed, size := removeSuccessfulTestArtifactFile(entry, fullPath, name, verbose)
+		if removed {
+			removedFiles++
+			totalSize += size
 		}
 	}
 
@@ -413,6 +370,77 @@ func cleanupSuccessfulTestArtifacts(logsDir string, verbose bool) error {
 	}
 
 	return nil
+}
+
+// removeSuccessfulTestArtifactDir removes fullPath if name is one of the
+// large per-run artifact directories (pprof, mapresponses), reporting
+// whether it was removed and its size before removal.
+func removeSuccessfulTestArtifactDir(fullPath, name string, verbose bool) (bool, int64) {
+	// Remove pprof and mapresponses directories (typically large).
+	// These directories contain artifacts from all containers in the test run.
+	if name != "pprof" && name != "mapresponses" {
+		return false, 0
+	}
+
+	size, sizeErr := getDirSize(fullPath)
+	if sizeErr != nil {
+		size = 0
+	}
+
+	err := os.RemoveAll(fullPath)
+	if err != nil {
+		if verbose {
+			log.Printf("Warning: failed to remove directory %s: %v", name, err)
+		}
+
+		return false, 0
+	}
+
+	if verbose {
+		log.Printf("Removed directory: %s/", name)
+	}
+
+	return true, size
+}
+
+// removeSuccessfulTestArtifactFile removes fullPath if name is a headscale
+// or tailscale database, metrics, or status file, reporting whether it was
+// removed and its size before removal. Log files are always kept.
+func removeSuccessfulTestArtifactFile(entry os.DirEntry, fullPath, name string, verbose bool) (bool, int64) {
+	// Only process test-related files (headscale and tailscale).
+	if !strings.HasPrefix(name, "hs-") && !strings.HasPrefix(name, "ts-") {
+		return false, 0
+	}
+
+	// Remove database, metrics, and status files, but keep logs.
+	shouldRemove := strings.HasSuffix(name, ".db") ||
+		strings.HasSuffix(name, "_metrics.txt") ||
+		strings.HasSuffix(name, "_status.json")
+	if !shouldRemove {
+		return false, 0
+	}
+
+	var size int64
+
+	info, infoErr := entry.Info()
+	if infoErr == nil {
+		size = info.Size()
+	}
+
+	err := os.Remove(fullPath)
+	if err != nil {
+		if verbose {
+			log.Printf("Warning: failed to remove file %s: %v", name, err)
+		}
+
+		return false, 0
+	}
+
+	if verbose {
+		log.Printf("Removed file: %s", name)
+	}
+
+	return true, size
 }
 
 // getDirSize calculates the total size of a directory.
@@ -430,6 +458,9 @@ func getDirSize(path string) (int64, error) {
 
 		return nil
 	})
+	if err != nil {
+		return size, fmt.Errorf("walking directory %s: %w", path, err)
+	}
 
-	return size, err
+	return size, nil
 }
