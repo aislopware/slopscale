@@ -96,6 +96,10 @@ func init() {
 	usernameAndIDFlag(renameUserCmd)
 	renameUserCmd.Flags().StringP("new-name", "r", "", "New username")
 	mustMarkRequired(renameUserCmd, "new-name")
+	userCmd.AddCommand(setUserRoleCmd)
+	usernameAndIDFlag(setUserRoleCmd)
+	setUserRoleCmd.Flags().StringP("role", "r", "", "Role: owner, admin, network-admin, it-admin, auditor or member")
+	mustMarkRequired(setUserRoleCmd, "role")
 }
 
 var userCmd = &cobra.Command{
@@ -230,12 +234,13 @@ var listUsersCmd = &cobra.Command{
 							user.DisplayName,
 							user.Name,
 							user.Email,
+							user.Role,
 							user.CreatedAt.Format(HeadscaleDateTimeFormat),
 						},
 					)
 				}
 
-				return renderTable([]string{"ID", "Name", "Username", "Email", colCreated}, rows)
+				return renderTable([]string{"ID", "Name", "Username", "Email", "Role", colCreated}, rows)
 			})
 		},
 	),
@@ -264,6 +269,37 @@ var renameUserCmd = &cobra.Command{
 			}
 
 			return printOutput(cmd, resp.JSON200.User, "User renamed")
+		},
+	),
+}
+
+var setUserRoleCmd = &cobra.Command{
+	Use:   "set-role --identifier ID or --name NAME --role ROLE",
+	Short: "Sets a user's admin role",
+	Long: `
+Sets the role that bounds what the user may do through the admin API and
+console. Assigning owner transfers ownership: the previous owner becomes an
+admin. The owner's role changes only by such a transfer.`,
+	Aliases: []string{"role"},
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			userID, _, err := resolveSingleUser(ctx, client, cmd)
+			if err != nil {
+				return err
+			}
+
+			role, _ := cmd.Flags().GetString("role")
+
+			resp, err := client.SetUserRoleWithResponse(ctx, userID, clientv1.SetUserRoleJSONRequestBody{Role: role})
+			if err != nil {
+				return fmt.Errorf("setting user role: %w", err)
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			return printOutput(cmd, resp.JSON200.User, "User role set to "+resp.JSON200.User.Role)
 		},
 	),
 }

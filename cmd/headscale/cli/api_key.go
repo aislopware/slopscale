@@ -22,6 +22,8 @@ func init() {
 
 	createAPIKeyCmd.Flags().
 		StringP("expiration", "e", DefaultAPIKeyExpiry, "Human-readable expiration of the key (e.g. 30m, 24h)")
+	createAPIKeyCmd.Flags().
+		Uint64P("user", "u", 0, "Owning user ID; the key is bounded by the user's role (0: all-access key)")
 
 	apiKeysCmd.AddCommand(createAPIKeyCmd)
 
@@ -70,15 +72,21 @@ var listAPIKeys = &cobra.Command{
 						created = key.CreatedAt.Format(HeadscaleDateTimeFormat)
 					}
 
+					user := "-"
+					if key.UserId != nil {
+						user = *key.UserId
+					}
+
 					rows = append(rows, []string{
 						key.Id,
 						key.Prefix,
+						user,
 						expiration,
 						created,
 					})
 				}
 
-				return renderTable([]string{"ID", "Prefix", colExpiration, colCreated}, rows)
+				return renderTable([]string{"ID", "Prefix", "User", colExpiration, colCreated}, rows)
 			})
 		},
 	),
@@ -99,9 +107,14 @@ If you lose a key, create a new one and revoke (expire) the old one.`,
 				return err
 			}
 
-			resp, err := client.CreateApiKeyWithResponse(ctx, clientv1.CreateApiKeyJSONRequestBody{
-				Expiration: &expiryTime,
-			})
+			body := clientv1.CreateApiKeyJSONRequestBody{Expiration: &expiryTime}
+
+			if user, _ := cmd.Flags().GetUint64("user"); user != 0 {
+				userID := strconv.FormatUint(user, util.Base10)
+				body.UserId = &userID
+			}
+
+			resp, err := client.CreateApiKeyWithResponse(ctx, body)
 			if err != nil {
 				return fmt.Errorf("creating api key: %w", err)
 			}

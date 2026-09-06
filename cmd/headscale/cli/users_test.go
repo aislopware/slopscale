@@ -169,6 +169,7 @@ func userFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("display-name", "d", "", "")
 	cmd.Flags().StringP("picture-url", "p", "", "")
 	cmd.Flags().StringP("new-name", "r", "", "")
+	cmd.Flags().String("role", "", "")
 }
 
 func TestUserCommands(t *testing.T) {
@@ -177,9 +178,10 @@ func TestUserCommands(t *testing.T) {
 		Name:        "alice",
 		DisplayName: "Alice",
 		Email:       "alice@example.com",
+		Role:        "owner",
 		CreatedAt:   time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
 	}
-	bob := clientv1.User{Id: "2", Name: "bob", CreatedAt: time.Date(2026, 3, 2, 12, 0, 0, 0, time.UTC)}
+	bob := clientv1.User{Id: "2", Name: "bob", Role: "member", CreatedAt: time.Date(2026, 3, 2, 12, 0, 0, 0, time.UTC)}
 
 	listFiltered := func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 		t.Helper()
@@ -280,7 +282,45 @@ func TestUserCommands(t *testing.T) {
 			name:   "list renders a table",
 			src:    listUsersCmd,
 			routes: map[string]apiHandler{"GET /api/v1/user": listFiltered},
-			wantIn: []string{"Username", "alice", "Alice", "alice@example.com", "bob", "2026-03-01 12:00:00"},
+			wantIn: []string{
+				"Username", "Role", "alice", "Alice", "alice@example.com", "owner", "bob", "member",
+				"2026-03-01 12:00:00",
+			},
+		},
+		{
+			name:  "set-role resolves by name and posts the role",
+			src:   setUserRoleCmd,
+			flags: map[string]string{"name": "bob", "role": "auditor"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/user": listFiltered,
+				"POST /api/v1/user/{id}/role": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+					assert.Equal(t, "2", r.PathValue("id"))
+
+					var body clientv1.SetUserRoleRequestBody
+
+					decodeBody(t, r, &body)
+					assert.Equal(t, "auditor", body.Role)
+
+					promoted := bob
+					promoted.Role = "auditor"
+					writeJSON(t, w, clientv1.UserOutputBody{User: promoted})
+				},
+			},
+			want: "User role set to auditor\n",
+		},
+		{
+			name:  "set-role surfaces the api error",
+			src:   setUserRoleCmd,
+			flags: map[string]string{"identifier": "1", "role": "member"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/user": listFiltered,
+				"POST /api/v1/user/{id}/role": func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+					t.Helper()
+					writeProblem(t, w, http.StatusForbidden, "the owner's role only changes by transferring ownership")
+				},
+			},
+			wantErr: "transferring ownership",
 		},
 		{
 			name:   "list filters by identifier",

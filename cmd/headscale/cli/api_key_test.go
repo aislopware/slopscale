@@ -17,14 +17,17 @@ func apiKeyFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("expiration", "e", DefaultAPIKeyExpiry, "")
 	cmd.Flags().StringP("prefix", "p", "", "")
 	cmd.Flags().Uint64P("id", "i", 0, "")
+	cmd.Flags().Uint64P("user", "u", 0, "")
 }
 
 func apiKeys() []clientv1.ApiKey {
 	created := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
 	expiration := time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC)
 
+	owner := "7"
+
 	return []clientv1.ApiKey{
-		{Id: "2", Prefix: "abcd1234", Expiration: &expiration, CreatedAt: &created},
+		{Id: "2", Prefix: "abcd1234", Expiration: &expiration, CreatedAt: &created, UserId: &owner},
 		{Id: "3", Prefix: "wxyz9876"},
 	}
 }
@@ -52,7 +55,8 @@ func TestAPIKeyCommands(t *testing.T) {
 			src:    listAPIKeys,
 			routes: map[string]apiHandler{"GET /api/v1/apikey": listAll},
 			wantIn: []string{
-				"Prefix", "abcd1234", "wxyz9876", "2026-03-01 12:00:00", ColourTime(*keys[0].Expiration), "-",
+				"Prefix", "User", "abcd1234", "wxyz9876", "7", "2026-03-01 12:00:00",
+				ColourTime(*keys[0].Expiration), "-",
 			},
 		},
 		{
@@ -113,6 +117,24 @@ func TestAPIKeyCommands(t *testing.T) {
 				},
 			},
 			want: "\"abcd1234.supersecret\"\n",
+		},
+		{
+			name:  "create sends the owning user",
+			src:   createAPIKeyCmd,
+			flags: map[string]string{"user": "7"},
+			routes: map[string]apiHandler{
+				"POST /api/v1/apikey": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+
+					var body clientv1.CreateApiKeyRequestBody
+
+					decodeBody(t, r, &body)
+					assert.Equal(t, "7", ptrStr(body.UserId))
+
+					writeJSON(t, w, clientv1.CreateAPIKeyOutputBody{ApiKey: "abcd1234.supersecret"})
+				},
+			},
+			want: "abcd1234.supersecret\n",
 		},
 		{
 			name:    "create rejects an unparsable expiration before calling the api",
