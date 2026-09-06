@@ -110,7 +110,11 @@ func ExecuteCommand(
 	select {
 	case res := <-resultChan:
 		if res.err != nil {
-			return stdout.String(), stderr.String(), fmt.Errorf("command failed, stderr: %s: %w", stderr.String(), res.err)
+			return stdout.String(), stderr.String(), fmt.Errorf(
+				"command failed, stderr: %s: %w",
+				stderr.String(),
+				res.err,
+			)
 		}
 
 		if res.exitCode != 0 {
@@ -118,11 +122,19 @@ func ExecuteCommand(
 			// log.Println("Command: ", cmd)
 			// log.Println("stdout: ", stdout.String())
 			// log.Println("stderr: ", stderr.String())
-			return stdout.String(), stderr.String(), fmt.Errorf("command failed, stderr: %s: %w", stderr.String(), ErrDockertestCommandFailed)
+			return stdout.String(), stderr.String(), fmt.Errorf(
+				"command failed, stderr: %s: %w",
+				stderr.String(),
+				ErrDockertestCommandFailed,
+			)
 		}
 
 		return stdout.String(), stderr.String(), nil
 	case <-time.After(execConfig.timeout):
-		return stdout.String(), stderr.String(), fmt.Errorf("command failed, stderr: %s: %w", stderr.String(), ErrDockertestCommandTimeout)
+		return stdout.String(), stderr.String(), fmt.Errorf(
+			"command failed, stderr: %s: %w",
+			stderr.String(),
+			ErrDockertestCommandTimeout,
+		)
 	}
 }

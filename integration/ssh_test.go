@@ -145,7 +145,10 @@ func TestSSHMultipleUsersAllToAll(t *testing.T) {
 	scenario := sshScenario(t,
 		&policyv2.Policy{
 			Groups: policyv2.Groups{
-				policyv2.Group("group:integration-test"): []policyv2.Username{policyv2.Username("user1@"), policyv2.Username("user2@")},
+				policyv2.Group("group:integration-test"): []policyv2.Username{
+					policyv2.Username("user1@"),
+					policyv2.Username("user2@"),
+				},
 			},
 			ACLs: []policyv2.ACL{
 				{
@@ -417,17 +420,17 @@ func TestSSHUserOnlyIsolation(t *testing.T) {
 	}
 }
 
-func doSSH(t *testing.T, client TailscaleClient, peer TailscaleClient) (string, string, error) {
+func doSSH(t *testing.T, client, peer TailscaleClient) (string, string, error) {
 	t.Helper()
 	return doSSHWithRetry(t, client, peer, true)
 }
 
-func doSSHWithoutRetry(t *testing.T, client TailscaleClient, peer TailscaleClient) (string, string, error) {
+func doSSHWithoutRetry(t *testing.T, client, peer TailscaleClient) (string, string, error) {
 	t.Helper()
 	return doSSHWithRetry(t, client, peer, false)
 }
 
-func doSSHWithRetry(t *testing.T, client TailscaleClient, peer TailscaleClient, retry bool) (string, string, error) {
+func doSSHWithRetry(t *testing.T, client, peer TailscaleClient, retry bool) (string, string, error) {
 	t.Helper()
 
 	return doSSHWithRetryAsUser(t, client, peer, "ssh-it-user", retry)
@@ -480,7 +483,7 @@ func doSSHWithRetryAsUser(
 	return result, stderr, err
 }
 
-func assertSSHHostname(t *testing.T, client TailscaleClient, peer TailscaleClient) {
+func assertSSHHostname(t *testing.T, client, peer TailscaleClient) {
 	t.Helper()
 
 	result, _, err := doSSH(t, client, peer)
@@ -489,7 +492,7 @@ func assertSSHHostname(t *testing.T, client TailscaleClient, peer TailscaleClien
 	require.Contains(t, peer.ContainerID(), strings.ReplaceAll(result, "\n", ""))
 }
 
-func assertSSHPermissionDenied(t *testing.T, client TailscaleClient, peer TailscaleClient) {
+func assertSSHPermissionDenied(t *testing.T, client, peer TailscaleClient) {
 	t.Helper()
 
 	result, stderr, err := doSSHWithoutRetry(t, client, peer)
@@ -499,7 +502,7 @@ func assertSSHPermissionDenied(t *testing.T, client TailscaleClient, peer Tailsc
 	assertSSHNoAccessStdError(t, err, stderr)
 }
 
-func assertSSHTimeout(t *testing.T, client TailscaleClient, peer TailscaleClient) {
+func assertSSHTimeout(t *testing.T, client, peer TailscaleClient) {
 	t.Helper()
 
 	result, stderr, _ := doSSHWithoutRetry(t, client, peer)
@@ -521,13 +524,13 @@ func assertSSHNoAccessStdError(t *testing.T, err error, stderr string) {
 	}
 }
 
-func doSSHAsUser(t *testing.T, client TailscaleClient, peer TailscaleClient, sshUser string) (string, string, error) {
+func doSSHAsUser(t *testing.T, client, peer TailscaleClient, sshUser string) (string, string, error) {
 	t.Helper()
 
 	return doSSHWithRetryAsUser(t, client, peer, sshUser, true)
 }
 
-func assertSSHHostnameAsUser(t *testing.T, client TailscaleClient, peer TailscaleClient, sshUser string) {
+func assertSSHHostnameAsUser(t *testing.T, client, peer TailscaleClient, sshUser string) {
 	t.Helper()
 
 	result, _, err := doSSHAsUser(t, client, peer, sshUser)
@@ -536,7 +539,7 @@ func assertSSHHostnameAsUser(t *testing.T, client TailscaleClient, peer Tailscal
 	require.Contains(t, peer.ContainerID(), strings.ReplaceAll(result, "\n", ""))
 }
 
-func assertSSHPermissionDeniedAsUser(t *testing.T, client TailscaleClient, peer TailscaleClient, sshUser string) {
+func assertSSHPermissionDeniedAsUser(t *testing.T, client, peer TailscaleClient, sshUser string) {
 	t.Helper()
 
 	result, stderr, err := doSSHWithRetryAsUser(t, client, peer, sshUser, false)
@@ -715,7 +718,8 @@ func findSSHCheckAuthID(t *testing.T, headscale ControlServer) string {
 		}
 
 		assert.NotEmpty(c, authID, "auth-id not found in headscale logs")
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.SlowPoll, "waiting for SSH check auth-id in headscale logs")
+	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.SlowPoll,
+		"waiting for SSH check auth-id in headscale logs")
 
 	return authID
 }
@@ -833,7 +837,6 @@ func TestSSHOneUserToOneCheckModeCLI(t *testing.T) {
 	IntegrationSkip(t)
 
 	scenario := sshScenario(t, sshCheckPolicy(), "ssh-checkcli", 1)
-	// defer scenario.ShutdownAssertNoPanics(t)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -921,7 +924,6 @@ func TestSSHOneUserToOneCheckModeOIDC(t *testing.T) {
 
 	scenario, err := NewScenario(spec)
 	require.NoError(t, err)
-	// defer scenario.ShutdownAssertNoPanics(t)
 
 	oidcMap := map[string]string{
 		"HEADSCALE_OIDC_ISSUER":             scenario.mockOIDC.Issuer(),

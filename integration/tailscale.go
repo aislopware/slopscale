@@ -18,7 +18,7 @@ import (
 	"tailscale.com/wgengine/filter"
 )
 
-// nolint
+//nolint:interfacebloat // the test client mirrors the whole tailscale CLI surface
 type TailscaleClient interface {
 	Hostname() string
 	Shutdown() (string, string, error)
@@ -40,7 +40,7 @@ type TailscaleClient interface {
 	MustIPv6() netip.Addr
 	FQDN() (string, error)
 	MustFQDN() string
-	Status(...bool) (*ipnstate.Status, error)
+	Status(_ ...bool) (*ipnstate.Status, error)
 	MustStatus() *ipnstate.Status
 	Netmap() (*netmap.NetworkMap, error)
 	DebugDERPRegion(region string) (*ipnstate.DebugDERPRegionReport, error)
@@ -52,7 +52,7 @@ type TailscaleClient interface {
 	Ping(hostnameOrIP string, opts ...tsic.PingOption) error
 	Curl(url string, opts ...tsic.CurlOption) (string, error)
 	CurlFailFast(url string) (string, error)
-	Traceroute(netip.Addr) (util.Traceroute, error)
+	Traceroute(ip netip.Addr) (util.Traceroute, error)
 	ContainerID() string
 	MustID() types.NodeID
 	ReadFile(path string) ([]byte, error)

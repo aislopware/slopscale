@@ -24,7 +24,7 @@ func TestRetryDockerOp_RecoversFromTransient(t *testing.T) {
 		return nil
 	}
 
-	err := retryDockerOp(context.Background(), op)
+	err := retryDockerOp(t.Context(), op)
 	if err != nil {
 		t.Fatalf("retryDockerOp should recover from 2 transient errors, got: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestRetryDockerOp_RespectsContextCancellation(t *testing.T) {
 		return errPermanent
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 	defer cancel()
 
 	start := time.Now()

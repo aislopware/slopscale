@@ -146,7 +146,7 @@ func TestTS2021WASMClientUnderNode(t *testing.T) {
 	// Fetch the server's Noise key here and pass it to the WASM client: Go's
 	// net/http DNS resolver is unavailable under GOOS=js, so the client can only
 	// use the JS WebSocket transport, not an HTTP GET to /key.
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 
 	controlKey, err := fetchServerNoiseKey(ctx, &http.Client{Timeout: 15 * time.Second}, controlURL)
@@ -180,7 +180,7 @@ func wasmClientService(s *Scenario, networkName string) (*dockertest.Resource, e
 
 	network, ok := s.networks[s.prefixedNetworkName(networkName)]
 	if !ok {
-		return nil, fmt.Errorf("network does not exist: %s", networkName) //nolint:err113
+		return nil, fmt.Errorf("network does not exist: %s", networkName)
 	}
 
 	runOpts := &dockertest.RunOptions{
@@ -215,7 +215,7 @@ func wasmClientService(s *Scenario, networkName string) (*dockertest.Resource, e
 func dialTS2021WebSocket(t *testing.T, endpoint string, caCert []byte) (*controlbase.Conn, error) {
 	t.Helper()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	t.Cleanup(cancel)
 
 	u, err := url.Parse(endpoint)
@@ -289,7 +289,7 @@ func fetchServerNoiseKey(
 
 	keyURL := fmt.Sprintf("%s/key?v=%d", endpoint, tailcfg.CurrentCapabilityVersion)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, keyURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, keyURL, http.NoBody)
 	if err != nil {
 		return zero, err
 	}
@@ -308,7 +308,7 @@ func fetchServerNoiseKey(
 	}
 
 	if k.PublicKey.IsZero() {
-		return zero, errors.New("server returned zero Noise public key") //nolint:err113
+		return zero, errors.New("server returned zero Noise public key")
 	}
 
 	return k.PublicKey, nil

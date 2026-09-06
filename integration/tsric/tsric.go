@@ -33,6 +33,8 @@ const (
 	buildArgRef  = "TAILSCALE_RS_REF"
 )
 
+var errInvalidImageFormat = errors.New("tsric: invalid image format, expected repository:tag")
+
 // getPrebuiltImage returns the pre-built tailscale-rs Docker image name if set.
 func getPrebuiltImage() string {
 	return os.Getenv("HEADSCALE_INTEGRATION_TAILSCALE_RS_IMAGE")
@@ -109,44 +111,6 @@ func WithRef(ref string) Option {
 	}
 }
 
-// buildEntrypoint constructs the container entrypoint command.
-//
-// The axum example reads the control URL from TS_CONTROL_URL, the
-// hostname from -H, and the auth key from -k. The key file (-c) is
-// created on first run.
-func (t *TailscaleRustInContainer) buildEntrypoint() []string {
-	var commands []string
-
-	commands = append(commands,
-		"while ! ip route show default >/dev/null 2>&1; do sleep 0.1; done")
-
-	// CA certs are written by New after the container starts, so the
-	// entrypoint races with that write. Block until the first cert lands.
-	if len(t.caCerts) > 0 {
-		commands = append(commands,
-			fmt.Sprintf("while [ ! -f %s/user-0.crt ]; do sleep 0.1; done", caCertRoot))
-	}
-
-	commands = append(commands, "update-ca-certificates 2>/dev/null || true")
-
-	commands = append(
-		commands,
-		fmt.Sprintf(`export TS_CONTROL_URL=%q`, t.headscaleURL),
-		// The tailscale crate refuses to run without this env gate;
-		// see lib.rs in tailscale-rs.
-		"export TS_RS_EXPERIMENT=this_is_unstable_software",
-	)
-
-	axumCmd := "/usr/local/bin/axum -c /tmp/tsrs-keys.json -H " + t.hostname
-	if t.authKey != "" {
-		axumCmd += " -k " + t.authKey
-	}
-
-	commands = append(commands, "exec "+axumCmd)
-
-	return []string{"/bin/sh", "-c", strings.Join(commands, " ; ")}
-}
-
 // New creates and starts a new [TailscaleRustInContainer] instance.
 func New(
 	pool *dockertest.Pool,
@@ -177,15 +141,15 @@ func New(
 	}
 
 	if t.network == nil {
-		return nil, errors.New("tsric: no network set") //nolint:err113
+		return nil, errors.New("tsric: no network set")
 	}
 
 	if t.headscaleURL == "" {
-		return nil, errors.New("tsric: no headscale URL set") //nolint:err113
+		return nil, errors.New("tsric: no headscale URL set")
 	}
 
 	if t.authKey == "" {
-		return nil, errors.New("tsric: no auth key set") //nolint:err113
+		return nil, errors.New("tsric: no auth key set")
 	}
 
 	entrypoint := t.buildEntrypoint()
@@ -212,7 +176,7 @@ func New(
 
 		repo, tag, ok := strings.Cut(prebuiltImage, ":")
 		if !ok {
-			return nil, fmt.Errorf("tsric: invalid image format %q, expected repository:tag", prebuiltImage) //nolint:err113
+			return nil, fmt.Errorf("%w: %q", errInvalidImageFormat, prebuiltImage)
 		}
 
 		runOptions.Repository = repo
@@ -249,7 +213,10 @@ func New(
 			BuildArgs:  buildArgs,
 		}
 
-		log.Printf("Building tailscale-rs container %s from upstream (this may take a while for the first build)...", hostname)
+		log.Printf(
+			"Building tailscale-rs container %s from upstream (this may take a while for the first build)...",
+			hostname,
+		)
 
 		container, err = pool.BuildAndRunWithBuildOptions(
 			buildOptions,
@@ -331,4 +298,41 @@ func (t *TailscaleRustInContainer) Execute(
 // WriteFile writes a file into the container.
 func (t *TailscaleRustInContainer) WriteFile(path string, data []byte) error {
 	return integrationutil.WriteFileToContainer(t.pool, t.container, path, data)
+}
+
+// buildEntrypoint constructs the container entrypoint command.
+//
+// The axum example reads the control URL from TS_CONTROL_URL, the
+// hostname from -H, and the auth key from -k. The key file (-c) is
+// created on first run.
+func (t *TailscaleRustInContainer) buildEntrypoint() []string {
+	var commands []string
+
+	commands = append(commands,
+		"while ! ip route show default >/dev/null 2>&1; do sleep 0.1; done")
+
+	// CA certs are written by New after the container starts, so the
+	// entrypoint races with that write. Block until the first cert lands.
+	if len(t.caCerts) > 0 {
+		commands = append(commands,
+			fmt.Sprintf("while [ ! -f %s/user-0.crt ]; do sleep 0.1; done", caCertRoot))
+	}
+
+	commands = append(
+		commands,
+		"update-ca-certificates 2>/dev/null || true",
+		fmt.Sprintf(`export TS_CONTROL_URL=%q`, t.headscaleURL),
+		// The tailscale crate refuses to run without this env gate;
+		// see lib.rs in tailscale-rs.
+		"export TS_RS_EXPERIMENT=this_is_unstable_software",
+	)
+
+	axumCmd := "/usr/local/bin/axum -c /tmp/tsrs-keys.json -H " + t.hostname
+	if t.authKey != "" {
+		axumCmd += " -k " + t.authKey
+	}
+
+	commands = append(commands, "exec "+axumCmd)
+
+	return []string{"/bin/sh", "-c", strings.Join(commands, " ; ")}
 }

@@ -45,7 +45,7 @@ func TestPolicyCheckCommand(t *testing.T) {
 		ACLs: []policyv2.ACL{
 			{
 				Action:   policyv2.ActionAccept,
-				Protocol: "tcp", //nolint:goconst // protocol literal, used inline once
+				Protocol: "tcp",
 				Sources:  []policyv2.Alias{usernamep(user1)},
 				Destinations: []policyv2.AliasWithPorts{
 					aliasWithPorts(usernamep(user2), tailcfg.PortRange{First: 22, Last: 22}),
@@ -87,7 +87,7 @@ func TestPolicyCheckCommand(t *testing.T) {
 		wantStdout string
 	}
 
-	modes := []string{"file", "database"} //nolint:goconst // axis labels match HEADSCALE_POLICY_MODE values
+	modes := []string{"file", "database"}
 	bypasses := []bool{false, true}
 	rows := make([]row, 0, len(modes)*len(fixtures)*len(bypasses))
 
@@ -120,7 +120,10 @@ func TestPolicyCheckCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			spec := ScenarioSpec{
 				NodesPerUser: 1,
-				Users:        []string{"user1", "user2"}, //nolint:goconst // matches usernamep("user1@")/("user2@") above
+				Users: []string{
+					"user1",
+					"user2",
+				},
 			}
 
 			scenario, err := NewScenario(spec)
@@ -132,7 +135,7 @@ func TestPolicyCheckCommand(t *testing.T) {
 				[]tsic.Option{},
 				hsic.WithTestName("cli-policycheck"),
 				hsic.WithConfigEnv(map[string]string{
-					"HEADSCALE_POLICY_MODE": tt.policyMode, //nolint:goconst // env var name from hscontrol/types/config.go
+					"HEADSCALE_POLICY_MODE": tt.policyMode,
 				}),
 			)
 			require.NoError(t, err)
@@ -143,11 +146,11 @@ func TestPolicyCheckCommand(t *testing.T) {
 			pBytes, err := json.Marshal(tt.fixture.policy)
 			require.NoError(t, err)
 
-			policyFilePath := "/etc/headscale/policy.json" //nolint:goconst // standard headscale policy path
+			policyFilePath := "/etc/headscale/policy.json"
 			err = headscale.WriteFile(policyFilePath, pBytes)
 			require.NoError(t, err)
 
-			cmd := []string{"headscale", "policy", "check", "-f", policyFilePath} //nolint:goconst // CLI invocation
+			cmd := []string{"headscale", "policy", "check", "-f", policyFilePath}
 			if tt.bypass {
 				// --force suppresses the "is the server running?"
 				// confirmation prompt so the command can run
@@ -322,7 +325,7 @@ func TestPolicyCommand(t *testing.T) {
 		},
 	}
 
-	pBytes, _ := json.Marshal(p) //nolint:errchkjson
+	pBytes, _ := json.Marshal(p)
 
 	policyFilePath := "/etc/headscale/policy.json"
 
@@ -409,7 +412,7 @@ func TestPolicyBrokenConfigCommand(t *testing.T) {
 		},
 	}
 
-	pBytes, _ := json.Marshal(p) //nolint:errchkjson
+	pBytes, _ := json.Marshal(p)
 
 	policyFilePath := "/etc/headscale/policy.json"
 

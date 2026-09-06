@@ -157,7 +157,7 @@ func New(
 
 	repo, tag, ok := strings.Cut(K3sImage, ":")
 	if !ok {
-		return nil, fmt.Errorf("invalid k3s image reference %q", K3sImage) //nolint:err113
+		return nil, fmt.Errorf("invalid k3s image reference %q", K3sImage)
 	}
 
 	runOptions := &dockertest.RunOptions{
@@ -248,27 +248,6 @@ func withK3sHostConfig(config *docker.HostConfig) {
 	config.Binds = append(config.Binds, "/lib/modules:/lib/modules:ro")
 }
 
-// ensureBridgeNetfilter loads br_netfilter and enables the sysctls that make
-// kube-proxy's ClusterIP DNAT apply to bridged pod-to-pod traffic. On a host
-// where the module is already loaded (e.g. the amd64 dev box, where Docker
-// loads it for bridge networks) these are no-ops; on the arm64 CI runner the
-// module is absent and pods cannot reach any Service IP — kube-dns included —
-// so in-cluster DNS times out. Best-effort: k3s also loads the module, and a
-// genuinely missing module surfaces in DumpDiagnostics rather than here.
-func (k *K3sInContainer) ensureBridgeNetfilter() {
-	for _, cmd := range []string{
-		"modprobe br_netfilter || true",
-		"sysctl -w net.bridge.bridge-nf-call-iptables=1 || true",
-		"sysctl -w net.bridge.bridge-nf-call-ip6tables=1 || true",
-		"sysctl -w net.ipv4.ip_forward=1 || true",
-	} {
-		out, stderr, err := k.Execute([]string{shellBin, "-c", cmd})
-		if err != nil {
-			log.Printf("[k3s] %q failed: %v (stdout: %s, stderr: %s)", cmd, err, out, stderr)
-		}
-	}
-}
-
 // Hostname returns the hostname of the [K3sInContainer].
 func (k *K3sInContainer) Hostname() string {
 	return k.hostname
@@ -321,7 +300,7 @@ func (k *K3sInContainer) WaitForRunning() error {
 		}
 
 		if !strings.Contains(out, "ok") {
-			return fmt.Errorf("k3s apiserver readyz returned %q", strings.TrimSpace(out)) //nolint:err113
+			return fmt.Errorf("k3s apiserver readyz returned %q", strings.TrimSpace(out))
 		}
 
 		// Wait for the node object to exist and be Ready before returning so
@@ -334,7 +313,7 @@ func (k *K3sInContainer) WaitForRunning() error {
 		}
 
 		if !strings.Contains(nodeOut, " Ready") {
-			return fmt.Errorf("k3s node not Ready yet: %q", strings.TrimSpace(nodeOut)) //nolint:err113
+			return fmt.Errorf("k3s node not Ready yet: %q", strings.TrimSpace(nodeOut))
 		}
 
 		return nil
@@ -369,54 +348,6 @@ func (k *K3sInContainer) InstallHelm() error {
 	}
 
 	return nil
-}
-
-// waitForClusterDNS blocks until CoreDNS is rolled out and the kube-dns Service
-// has at least one ready endpoint — i.e. in-cluster name resolution is actually
-// servable, which every workload (starting with the operator) depends on. k3s
-// deploys CoreDNS via its addon manager shortly after the node reports Ready, so
-// the deployment may not exist yet; retry until it does before checking rollout.
-func (k *K3sInContainer) waitForClusterDNS() error {
-	err := k.pool.Retry(func() error {
-		_, stderr, err := k.Execute([]string{
-			kubectlBin, "-n", kubeSystemNamespace, "get", "deployment", "coredns",
-		})
-		if err != nil {
-			return fmt.Errorf("coredns deployment not present yet (stderr: %s): %w", stderr, err)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("waiting for coredns deployment to appear: %w", err)
-	}
-
-	_, stderr, err := k.Execute([]string{
-		kubectlBin, "-n", kubeSystemNamespace, "rollout", "status",
-		"deployment/coredns", "--timeout=150s",
-	})
-	if err != nil {
-		return fmt.Errorf("coredns did not become available (stderr: %s): %w", stderr, err)
-	}
-
-	return k.pool.Retry(func() error {
-		// A populated endpoint set means a CoreDNS pod is serving :53 and
-		// kube-proxy has a backend to DNAT the kube-dns ClusterIP to; empty means
-		// in-cluster lookups will time out no matter how long a client waits.
-		out, stderr, err := k.Execute([]string{
-			kubectlBin, "-n", kubeSystemNamespace, "get", "endpoints", "kube-dns",
-			"-o", "jsonpath={.subsets[*].addresses[*].ip}",
-		})
-		if err != nil {
-			return fmt.Errorf("reading kube-dns endpoints (stderr: %s): %w", stderr, err)
-		}
-
-		if strings.TrimSpace(out) == "" {
-			return errNoKubeDNSEndpoints
-		}
-
-		return nil
-	})
 }
 
 // ConfigureCoreDNSHost makes in-cluster pods resolve hostname to ip via CoreDNS.
@@ -480,7 +411,11 @@ func (k *K3sInContainer) DumpDiagnostics() {
 		// path, not DNS.
 		{shellBin, "-c", "lsmod | grep -E 'br_netfilter|nf_conntrack' || echo 'br_netfilter NOT loaded'"},
 		{shellBin, "-c", "sysctl net.bridge.bridge-nf-call-iptables net.ipv4.ip_forward 2>&1 || true"},
-		{shellBin, "-c", "iptables-save -t nat 2>/dev/null | grep -iE 'KUBE-SERVICES|kube-dns|10.43.0.10' | head -40 || echo 'no kube-dns nat rules'"},
+		{
+			shellBin, "-c",
+			"iptables-save -t nat 2>/dev/null | grep -iE 'KUBE-SERVICES|kube-dns|10.43.0.10' | head -40" +
+				" || echo 'no kube-dns nat rules'",
+		},
 	} {
 		out, stderr, err := k.Execute(c)
 		label := strings.Join(c, " ")
@@ -500,7 +435,7 @@ func (k *K3sInContainer) DumpDiagnostics() {
 // latest is cheap; the fallback keeps a broken release from breaking CI.
 func resolveHelmVersion() string {
 	req, err := http.NewRequestWithContext(
-		context.Background(), http.MethodGet, "https://get.helm.sh/helm-latest-version", nil)
+		context.Background(), http.MethodGet, "https://get.helm.sh/helm-latest-version", http.NoBody)
 	if err != nil {
 		return helmVersionFallback
 	}
@@ -533,7 +468,7 @@ func resolveHelmVersion() string {
 func fetchHelmBinary(version, goarch string) ([]byte, error) {
 	url := fmt.Sprintf("https://get.helm.sh/helm-%s-linux-%s.tar.gz", version, goarch)
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
@@ -600,4 +535,73 @@ func (k *K3sInContainer) SaveLog(path string) error {
 	_, _, err := dockertestutil.SaveLog(k.pool, k.container, path)
 
 	return err
+}
+
+// ensureBridgeNetfilter loads br_netfilter and enables the sysctls that make
+// kube-proxy's ClusterIP DNAT apply to bridged pod-to-pod traffic. On a host
+// where the module is already loaded (e.g. the amd64 dev box, where Docker
+// loads it for bridge networks) these are no-ops; on the arm64 CI runner the
+// module is absent and pods cannot reach any Service IP — kube-dns included —
+// so in-cluster DNS times out. Best-effort: k3s also loads the module, and a
+// genuinely missing module surfaces in DumpDiagnostics rather than here.
+func (k *K3sInContainer) ensureBridgeNetfilter() {
+	for _, cmd := range []string{
+		"modprobe br_netfilter || true",
+		"sysctl -w net.bridge.bridge-nf-call-iptables=1 || true",
+		"sysctl -w net.bridge.bridge-nf-call-ip6tables=1 || true",
+		"sysctl -w net.ipv4.ip_forward=1 || true",
+	} {
+		out, stderr, err := k.Execute([]string{shellBin, "-c", cmd})
+		if err != nil {
+			log.Printf("[k3s] %q failed: %v (stdout: %s, stderr: %s)", cmd, err, out, stderr)
+		}
+	}
+}
+
+// waitForClusterDNS blocks until CoreDNS is rolled out and the kube-dns Service
+// has at least one ready endpoint — i.e. in-cluster name resolution is actually
+// servable, which every workload (starting with the operator) depends on. k3s
+// deploys CoreDNS via its addon manager shortly after the node reports Ready, so
+// the deployment may not exist yet; retry until it does before checking rollout.
+func (k *K3sInContainer) waitForClusterDNS() error {
+	err := k.pool.Retry(func() error {
+		_, stderr, err := k.Execute([]string{
+			kubectlBin, "-n", kubeSystemNamespace, "get", "deployment", "coredns",
+		})
+		if err != nil {
+			return fmt.Errorf("coredns deployment not present yet (stderr: %s): %w", stderr, err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("waiting for coredns deployment to appear: %w", err)
+	}
+
+	_, stderr, err := k.Execute([]string{
+		kubectlBin, "-n", kubeSystemNamespace, "rollout", "status",
+		"deployment/coredns", "--timeout=150s",
+	})
+	if err != nil {
+		return fmt.Errorf("coredns did not become available (stderr: %s): %w", stderr, err)
+	}
+
+	return k.pool.Retry(func() error {
+		// A populated endpoint set means a CoreDNS pod is serving :53 and
+		// kube-proxy has a backend to DNAT the kube-dns ClusterIP to; empty means
+		// in-cluster lookups will time out no matter how long a client waits.
+		out, stderr, err := k.Execute([]string{
+			kubectlBin, "-n", kubeSystemNamespace, "get", "endpoints", "kube-dns",
+			"-o", "jsonpath={.subsets[*].addresses[*].ip}",
+		})
+		if err != nil {
+			return fmt.Errorf("reading kube-dns endpoints (stderr: %s): %w", stderr, err)
+		}
+
+		if strings.TrimSpace(out) == "" {
+			return errNoKubeDNSEndpoints
+		}
+
+		return nil
+	})
 }

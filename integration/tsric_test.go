@@ -33,7 +33,7 @@ func TestTailscaleRustAxum(t *testing.T) {
 	// is reachable on the tailnet.
 	spec := ScenarioSpec{
 		NodesPerUser: 1,
-		Users:        []string{"user1"}, //nolint:goconst // consistent with other integration tests
+		Users:        []string{"user1"},
 	}
 
 	scenario, err := NewScenario(spec)
@@ -73,7 +73,7 @@ func TestTailscaleRustAxum(t *testing.T) {
 	var userID uint64
 
 	for _, u := range users {
-		if u.Name == "user1" { //nolint:goconst
+		if u.Name == "user1" {
 			userID = mustParseID(u.Id)
 
 			break
@@ -116,9 +116,9 @@ func TestTailscaleRustAxum(t *testing.T) {
 	require.NoError(t, err, "failed to create tailscale-rs container")
 
 	defer func() {
-		_, _, err := tsrs.Shutdown()
-		if err != nil {
-			t.Logf("error shutting down tailscale-rs container: %s", err)
+		_, _, shutdownErr := tsrs.Shutdown()
+		if shutdownErr != nil {
+			t.Logf("error shutting down tailscale-rs container: %s", shutdownErr)
 		}
 	}()
 
@@ -133,8 +133,8 @@ func TestTailscaleRustAxum(t *testing.T) {
 	t.Log("Waiting for tailscale-rs node to register with headscale...")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		nodes, err := headscale.ListNodes()
-		assert.NoError(c, err)
+		nodes, listErr := headscale.ListNodes()
+		assert.NoError(c, listErr)
 
 		// Expect 2 nodes: 1 tsic probe + 1 tsric
 		assert.GreaterOrEqual(c, len(nodes), 2,
@@ -177,8 +177,8 @@ func TestTailscaleRustAxum(t *testing.T) {
 	t.Log("Verifying probe client sees tailscale-rs as a peer...")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		status, err := probeClient.Status()
-		assert.NoError(c, err)
+		status, statusErr := probeClient.Status()
+		assert.NoError(c, statusErr)
 
 		found := false
 
@@ -198,8 +198,8 @@ func TestTailscaleRustAxum(t *testing.T) {
 	t.Logf("Verifying axum web server is reachable at %s via probe client...", axumURL)
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		result, err := probeClient.Curl(axumURL)
-		assert.NoError(c, err, "curl to axum server failed")
+		result, curlErr := probeClient.Curl(axumURL)
+		assert.NoError(c, curlErr, "curl to axum server failed")
 		assert.Contains(c, result, "tailscale-rs",
 			"expected index.html to contain 'tailscale-rs'")
 	}, 120*time.Second, 2*time.Second, "axum /index.html should be reachable from probe client")
@@ -212,8 +212,8 @@ func TestTailscaleRustAxum(t *testing.T) {
 	t.Logf("Verifying static asset at %s...", cssURL)
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		result, err := probeClient.Curl(cssURL)
-		assert.NoError(c, err, "curl to CSS asset failed")
+		result, curlErr := probeClient.Curl(cssURL)
+		assert.NoError(c, curlErr, "curl to CSS asset failed")
 		assert.Contains(c, result, "font-family",
 			"expected CSS file to contain 'font-family'")
 	}, 10*time.Second, 1*time.Second, "axum should serve static CSS assets")
@@ -227,14 +227,14 @@ func TestTailscaleRustAxum(t *testing.T) {
 
 	// First POST establishes connectivity and gets the initial counter value
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		stdout, _, err := probeClient.Execute([]string{
+		stdout, _, execErr := probeClient.Execute([]string{
 			"curl", "--silent",
 			"--connect-timeout", "3",
 			"--max-time", "5",
 			"-X", "POST",
 			countURL,
 		})
-		assert.NoError(c, err, "curl POST to /count failed")
+		assert.NoError(c, execErr, "curl POST to /count failed")
 		assert.Contains(c, stdout, `"count"`,
 			"expected /count response to contain 'count'")
 	}, 30*time.Second, 2*time.Second, "axum /count POST should work")

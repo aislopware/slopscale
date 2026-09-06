@@ -102,7 +102,7 @@ func (k *K3sInContainer) InstallOperator(loginServer, clientID, clientSecret str
 // operator proxies reach the embedded (non-TLS) DERP over websocket. Proxy
 // resources reference it via spec.proxyClass / the tailscale.com/proxy-class
 // annotation.
-const DERPWebsocketProxyClass = "headscale-derp-ws" //nolint:gosec // G101 false positive: a ProxyClass name, not a credential
+const DERPWebsocketProxyClass = "headscale-derp-ws"
 
 func (k *K3sInContainer) applyDERPWebsocketProxyClass() error {
 	manifest := fmt.Sprintf(`apiVersion: tailscale.com/v1alpha1

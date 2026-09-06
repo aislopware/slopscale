@@ -99,8 +99,6 @@ func TestDERPServerWebsocketScenario(t *testing.T) {
 // This function implements the common parts of a DERP scenario,
 // we *want* it to show up in stacktraces,
 // so marking it as a test helper would be counterproductive.
-//
-//nolint:thelper
 func derpServerScenario(
 	t *testing.T,
 	spec ScenarioSpec,

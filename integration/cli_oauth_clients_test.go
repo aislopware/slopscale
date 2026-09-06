@@ -65,9 +65,9 @@ func TestOAuthClientCommand(t *testing.T) {
 	var listed []cliOAuthClient
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		err := executeAndUnmarshal(headscale,
+		executeAndUnmarshalErr := executeAndUnmarshal(headscale,
 			[]string{"headscale", "oauth-clients", "list", "--output", "json"}, &listed)
-		assert.NoError(c, err)
+		assert.NoError(c, executeAndUnmarshalErr)
 		assert.Len(c, listed, 1)
 	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "waiting for oauth client list")
 
@@ -87,7 +87,11 @@ func TestOAuthClientCommand(t *testing.T) {
 			[]string{"headscale", "oauth-clients", "list", "--output", "json"}, &afterDelete)
 		assert.NoError(c, err)
 		assert.Empty(c, afterDelete)
-	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "waiting for oauth client list after delete")
+	},
+		integrationutil.ScaledTimeout(10*time.Second),
+		integrationutil.FastPoll,
+		"waiting for oauth client list after delete",
+	)
 }
 
 // TestOAuthClientCommandValidation covers the CLI's input validation and the
@@ -112,9 +116,17 @@ func TestOAuthClientCommandValidation(t *testing.T) {
 		wantErr string
 	}{
 		{name: "no scope", args: []string{"oauth-clients", "create"}, wantErr: "at least one --scope is required"},
-		{name: "devices:core needs tag", args: []string{"oauth-clients", "create", "--scope", "devices:core"}, wantErr: "tags are required"},
+		{
+			name:    "devices:core needs tag",
+			args:    []string{"oauth-clients", "create", "--scope", "devices:core"},
+			wantErr: "tags are required",
+		},
 		{name: "delete no id", args: []string{"oauth-clients", "delete"}, wantErr: "--id is required"},
-		{name: "delete nonexistent id", args: []string{"oauth-clients", "delete", "--id", "doesnotexist"}, wantErr: "404"},
+		{
+			name:    "delete nonexistent id",
+			args:    []string{"oauth-clients", "delete", "--id", "doesnotexist"},
+			wantErr: "404",
+		},
 	}
 
 	for _, tt := range tests {

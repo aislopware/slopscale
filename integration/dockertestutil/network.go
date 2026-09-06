@@ -225,14 +225,14 @@ func waitNetworkContainer(
 	match func(docker.Endpoint) bool,
 ) error {
 	return pollUntil(timeout, func() (bool, error) {
-		net, err := pool.Client.NetworkInfo(network.Network.ID)
+		info, err := pool.Client.NetworkInfo(network.Network.ID)
 		if err != nil {
 			return false, fmt.Errorf("inspecting network %s: %w", network.Network.Name, err)
 		}
 
 		found := false
 
-		for _, c := range net.Containers {
+		for _, c := range info.Containers {
 			if (c.Name == testContainer || c.Name == "/"+testContainer) && match(c) {
 				found = true
 				break
@@ -249,7 +249,14 @@ func waitNetworkContainerAbsent(
 	testContainer string,
 	timeout time.Duration,
 ) error {
-	return waitNetworkContainer(pool, network, testContainer, timeout, false, func(docker.Endpoint) bool { return true })
+	return waitNetworkContainer(
+		pool,
+		network,
+		testContainer,
+		timeout,
+		false,
+		func(docker.Endpoint) bool { return true },
+	)
 }
 
 func waitNetworkContainerPresent(
@@ -258,7 +265,14 @@ func waitNetworkContainerPresent(
 	testContainer string,
 	timeout time.Duration,
 ) error {
-	return waitNetworkContainer(pool, network, testContainer, timeout, true, func(c docker.Endpoint) bool { return c.IPv4Address != "" })
+	return waitNetworkContainer(
+		pool,
+		network,
+		testContainer,
+		timeout,
+		true,
+		func(c docker.Endpoint) bool { return c.IPv4Address != "" },
+	)
 }
 
 // waitContainerRouteAbsent polls the container's routing table until no
@@ -266,7 +280,12 @@ func waitNetworkContainerPresent(
 // endpoint teardown is asynchronous from the kernel netns flush, and a
 // surviving route blocks a subsequent reconnect at sticky-IP assignment
 // with "conflicts with existing route".
-func waitContainerRouteAbsent(pool *dockertest.Pool, containerID string, network *dockertest.Network, timeout time.Duration) error {
+func waitContainerRouteAbsent(
+	pool *dockertest.Pool,
+	containerID string,
+	network *dockertest.Network,
+	timeout time.Duration,
+) error {
 	subnets := networkSubnets(network)
 	if len(subnets) == 0 {
 		return nil
@@ -387,8 +406,13 @@ func RandomFreeHostPort() (int, error) {
 		return 0, err
 	}
 	defer listener.Close()
-	//nolint:forcetypeassert
-	return listener.Addr().(*net.TCPAddr).Port, nil
+
+	tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+	if !ok {
+		return 0, fmt.Errorf("unexpected listener address type %T", listener.Addr())
+	}
+
+	return tcpAddr.Port, nil
 }
 
 // CleanUnreferencedNetworks removes networks that are not referenced by any containers.

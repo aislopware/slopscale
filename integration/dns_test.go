@@ -37,8 +37,6 @@ func TestResolveMagicDNS(t *testing.T) {
 	err = scenario.WaitForTailscaleSync()
 	requireNoErrSync(t, err)
 
-	// assertClientsState(t, allClients)
-
 	// Poor mans cache
 	_, err = scenario.ListTailscaleClientsFQDNs()
 	requireNoErrListFQDN(t, err)
@@ -65,7 +63,15 @@ func TestResolveMagicDNS(t *testing.T) {
 				assert.NoError(ct, err, "Failed to get IPs for %s", peer.Hostname())
 
 				for _, ip := range ips {
-					assert.Contains(ct, result, ip.String(), "IP %s should be found in DNS resolution result from %s to %s", ip.String(), client.Hostname(), peer.Hostname())
+					assert.Contains(
+						ct,
+						result,
+						ip.String(),
+						"IP %s should be found in DNS resolution result from %s to %s",
+						ip.String(),
+						client.Hostname(),
+						peer.Hostname(),
+					)
 				}
 			}, integrationutil.StatusReadyTimeout, 2*time.Second)
 		}
@@ -93,7 +99,7 @@ func TestResolveMagicDNSExtraRecordsPath(t *testing.T) {
 		Type:  "A",
 		Value: "6.6.6.6",
 	})
-	b, _ := json.Marshal(extraRecords) //nolint:errchkjson
+	b, _ := json.Marshal(extraRecords)
 
 	err = scenario.CreateHeadscaleEnv([]tsic.Option{
 		tsic.WithPackages("python3", "curl", "bind-tools"),
@@ -114,8 +120,6 @@ func TestResolveMagicDNSExtraRecordsPath(t *testing.T) {
 	err = scenario.WaitForTailscaleSync()
 	requireNoErrSync(t, err)
 
-	// assertClientsState(t, allClients)
-
 	// Poor mans cache
 	_, err = scenario.ListTailscaleClientsFQDNs()
 	requireNoErrListFQDN(t, err)
@@ -131,7 +135,7 @@ func TestResolveMagicDNSExtraRecordsPath(t *testing.T) {
 	require.NoError(t, err)
 
 	// Write the file directly into place from the docker API.
-	b0, _ := json.Marshal([]tailcfg.DNSRecord{ //nolint:errchkjson
+	b0, _ := json.Marshal([]tailcfg.DNSRecord{
 		{
 			Name:  "docker.myvpn.example.com",
 			Type:  "A",
@@ -153,7 +157,7 @@ func TestResolveMagicDNSExtraRecordsPath(t *testing.T) {
 		Type:  "A",
 		Value: "7.7.7.7",
 	})
-	b2, _ := json.Marshal(extraRecords) //nolint:errchkjson
+	b2, _ := json.Marshal(extraRecords)
 
 	err = hs.WriteFile(erPath+"2", b2)
 	require.NoError(t, err)
@@ -167,7 +171,7 @@ func TestResolveMagicDNSExtraRecordsPath(t *testing.T) {
 
 	// Write a new file and copy it to the path to ensure the reload
 	// works when a file is copied into place.
-	b3, _ := json.Marshal([]tailcfg.DNSRecord{ //nolint:errchkjson
+	b3, _ := json.Marshal([]tailcfg.DNSRecord{
 		{
 			Name:  "copy.myvpn.example.com",
 			Type:  "A",
@@ -185,7 +189,7 @@ func TestResolveMagicDNSExtraRecordsPath(t *testing.T) {
 	}
 
 	// Write in place to ensure pipe like behaviour works
-	b4, _ := json.Marshal([]tailcfg.DNSRecord{ //nolint:errchkjson
+	b4, _ := json.Marshal([]tailcfg.DNSRecord{
 		{
 			Name:  "docker.myvpn.example.com",
 			Type:  "A",
@@ -207,8 +211,8 @@ func TestResolveMagicDNSExtraRecordsPath(t *testing.T) {
 	// The same paths should still be available as it is not cleared on delete.
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		for _, client := range allClients {
-			result, _, err := client.Execute([]string{"dig", "docker.myvpn.example.com"})
-			assert.NoError(ct, err)
+			result, _, executeErr := client.Execute([]string{"dig", "docker.myvpn.example.com"})
+			assert.NoError(ct, executeErr)
 			assert.Contains(ct, result, "9.9.9.9")
 		}
 	}, integrationutil.ScaledTimeout(10*time.Second), 1*time.Second)

@@ -25,9 +25,8 @@ func IntegrationSkip(t *testing.T) {
 }
 
 // If subtests are parallel, then they will start before setup is run.
-// This might mean we approach setup slightly wrong, but for now, ignore
-// the linter
-// nolint:tparallel
+// This might mean we approach setup slightly wrong, but for now, keep
+// the subtests sequential.
 func TestHeadscale(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -72,9 +71,8 @@ func TestHeadscale(t *testing.T) {
 }
 
 // If subtests are parallel, then they will start before setup is run.
-// This might mean we approach setup slightly wrong, but for now, ignore
-// the linter
-// nolint:tparallel
+// This might mean we approach setup slightly wrong, but for now, keep
+// the subtests sequential.
 func TestTailscaleNodesJoiningHeadcale(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -113,7 +111,12 @@ func TestTailscaleNodesJoiningHeadcale(t *testing.T) {
 	})
 
 	t.Run("create-tailscale", func(t *testing.T) {
-		err := scenario.CreateTailscaleNodesInUser(user, "unstable", count, tsic.WithNetwork(scenario.networks[scenario.testDefaultNetwork]))
+		err := scenario.CreateTailscaleNodesInUser(
+			user,
+			"unstable",
+			count,
+			tsic.WithNetwork(scenario.networks[scenario.testDefaultNetwork]),
+		)
 		if err != nil {
 			t.Fatalf("failed to add tailscale nodes: %s", err)
 		}

@@ -65,7 +65,7 @@ func RegistryAuth() (string, error) {
 		Password string `json:"password"`
 	}{Username: u, Password: p}
 
-	b, err := json.Marshal(auth) //nolint:gosec // G117: password field holds the Docker Hub token, intentional
+	b, err := json.Marshal(auth)
 	if err != nil {
 		return "", fmt.Errorf("marshalling docker auth: %w", err)
 	}

@@ -250,8 +250,8 @@ func TestGrantCapRelay(t *testing.T) {
 
 	// Verify no direct path between A and B.
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		status, err := clientA.Status()
-		assert.NoError(c, err)
+		status, statusErr := clientA.Status()
+		assert.NoError(c, statusErr)
 
 		peerB := status.Peer[clientBKey]
 		assert.NotNil(c, peerB, "A should see B as a peer")
@@ -262,8 +262,8 @@ func TestGrantCapRelay(t *testing.T) {
 	}, assertTimeout, 500*time.Millisecond, "A should have no direct path to B")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		status, err := clientB.Status()
-		assert.NoError(c, err)
+		status, statusErr := clientB.Status()
+		assert.NoError(c, statusErr)
 
 		peerA := status.Peer[clientAKey]
 		assert.NotNil(c, peerA, "B should see A as a peer")
@@ -280,24 +280,24 @@ func TestGrantCapRelay(t *testing.T) {
 
 	// Relay R should have cap/relay targeting the relay's own IP.
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		pf, err := relayR.PacketFilter()
-		assert.NoError(c, err)
+		pf, packetFilterErr := relayR.PacketFilter()
+		assert.NoError(c, packetFilterErr)
 		assert.True(c, hasCapMatchForIP(pf, peercap.Relay, relayIPv4),
 			"Relay R should have cap/relay with Dst matching relay's IP %s", relayIPv4)
 	}, assertTimeout, 500*time.Millisecond, "R should have cap/relay targeting its own IP")
 
 	// Client A should have cap/relay-target targeting client A's IP.
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		pf, err := clientA.PacketFilter()
-		assert.NoError(c, err)
+		pf, packetFilterErr := clientA.PacketFilter()
+		assert.NoError(c, packetFilterErr)
 		assert.True(c, hasCapMatchForIP(pf, peercap.RelayTarget, clientAIPv4),
 			"Client A should have cap/relay-target with Dst matching A's IP %s", clientAIPv4)
 	}, assertTimeout, 500*time.Millisecond, "A should have cap/relay-target targeting its own IP")
 
 	// Client B should have cap/relay-target targeting client B's IP.
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		pf, err := clientB.PacketFilter()
-		assert.NoError(c, err)
+		pf, packetFilterErr := clientB.PacketFilter()
+		assert.NoError(c, packetFilterErr)
 		assert.True(c, hasCapMatchForIP(pf, peercap.RelayTarget, clientBIPv4),
 			"Client B should have cap/relay-target with Dst matching B's IP %s", clientBIPv4)
 	}, assertTimeout, 500*time.Millisecond, "B should have cap/relay-target targeting its own IP")
@@ -306,24 +306,24 @@ func TestGrantCapRelay(t *testing.T) {
 
 	// Relay R should NOT have cap/relay-target (it's a relay server, not a target).
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		pf, err := relayR.PacketFilter()
-		assert.NoError(c, err)
+		pf, packetFilterErr := relayR.PacketFilter()
+		assert.NoError(c, packetFilterErr)
 		assert.False(c, hasCapMatchInPacketFilter(pf, peercap.RelayTarget),
 			"Relay R should NOT have cap/relay-target")
 	}, 10*time.Second, 500*time.Millisecond, "R should not have cap/relay-target")
 
 	// Client A should NOT have cap/relay (it's a client, not a relay server).
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		pf, err := clientA.PacketFilter()
-		assert.NoError(c, err)
+		pf, packetFilterErr := clientA.PacketFilter()
+		assert.NoError(c, packetFilterErr)
 		assert.False(c, hasCapMatchInPacketFilter(pf, peercap.Relay),
 			"Client A should NOT have cap/relay")
 	}, 10*time.Second, 500*time.Millisecond, "A should not have cap/relay")
 
 	// Client B should NOT have cap/relay (it's a client, not a relay server).
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		pf, err := clientB.PacketFilter()
-		assert.NoError(c, err)
+		pf, packetFilterErr := clientB.PacketFilter()
+		assert.NoError(c, packetFilterErr)
 		assert.False(c, hasCapMatchInPacketFilter(pf, peercap.Relay),
 			"Client B should NOT have cap/relay")
 	}, 10*time.Second, 500*time.Millisecond, "B should not have cap/relay")
@@ -338,10 +338,11 @@ func TestGrantCapRelay(t *testing.T) {
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		// Fire a ping to trigger relay path discovery (ignore output).
-		clientA.Execute([]string{"tailscale", "ping", "--c=1", "--timeout=1s", clientBIPv4.String()}) //nolint:errcheck
+		//nolint:errcheck // best-effort ping to trigger relay path discovery; errors expected before relay forms
+		clientA.Execute([]string{"tailscale", "ping", "--c=1", "--timeout=1s", clientBIPv4.String()})
 
-		status, err := clientA.Status()
-		assert.NoError(c, err)
+		status, statusErr := clientA.Status()
+		assert.NoError(c, statusErr)
 
 		peerB := status.Peer[clientBKey]
 		assert.NotNil(c, peerB, "A should see B as a peer")
@@ -374,10 +375,11 @@ func TestGrantCapRelay(t *testing.T) {
 	}, assertTimeout, 2*time.Second, "A should show peer relay to B")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		clientB.Execute([]string{"tailscale", "ping", "--c=1", "--timeout=1s", clientAIPv4.String()}) //nolint:errcheck
+		//nolint:errcheck // best-effort ping to trigger relay path discovery; errors expected before relay forms
+		clientB.Execute([]string{"tailscale", "ping", "--c=1", "--timeout=1s", clientAIPv4.String()})
 
-		status, err := clientB.Status()
-		assert.NoError(c, err)
+		status, statusErr := clientB.Status()
+		assert.NoError(c, statusErr)
 
 		peerA := status.Peer[clientAKey]
 		assert.NotNil(c, peerA, "B should see A as a peer")
@@ -429,8 +431,8 @@ func TestGrantCapRelay(t *testing.T) {
 
 	// Verify PeerRelay is gone and DERP is used.
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		status, err := clientA.Status()
-		assert.NoError(c, err)
+		status, statusErr := clientA.Status()
+		assert.NoError(c, statusErr)
 
 		peerB := status.Peer[clientBKey]
 		assert.NotNil(c, peerB, "A should still see B as a peer")
@@ -446,8 +448,8 @@ func TestGrantCapRelay(t *testing.T) {
 	}, assertTimeout, 500*time.Millisecond, "A should fall back to DERP for B")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		status, err := clientB.Status()
-		assert.NoError(c, err)
+		status, statusErr := clientB.Status()
+		assert.NoError(c, statusErr)
 
 		peerA := status.Peer[clientAKey]
 		assert.NotNil(c, peerA, "B should still see A as a peer")
@@ -462,13 +464,13 @@ func TestGrantCapRelay(t *testing.T) {
 
 	// Verify data plane works via DERP after relay is down.
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		err := clientA.Ping(
+		pingErr := clientA.Ping(
 			clientBIPv4.String(),
 			tsic.WithPingUntilDirect(false),
 			tsic.WithPingTimeout(2*time.Second),
 			tsic.WithPingCount(1),
 		)
-		assert.NoError(c, err)
+		assert.NoError(c, pingErr)
 	}, assertTimeout, 1*time.Second, "A should reach B via DERP after relay down")
 
 	// ===== Phase 5: Bring relay back up -> peer relay resumes =====
@@ -481,7 +483,8 @@ func TestGrantCapRelay(t *testing.T) {
 
 	// Verify peer relay resumes. Ping to trigger relay re-discovery.
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		clientA.Execute([]string{"tailscale", "ping", "--c=1", "--timeout=1s", clientBIPv4.String()}) //nolint:errcheck
+		//nolint:errcheck // best-effort ping to trigger relay path discovery; errors expected before relay forms
+		clientA.Execute([]string{"tailscale", "ping", "--c=1", "--timeout=1s", clientBIPv4.String()})
 
 		status, err := clientA.Status()
 		assert.NoError(c, err)
@@ -498,7 +501,8 @@ func TestGrantCapRelay(t *testing.T) {
 	}, assertTimeout, 2*time.Second, "A should resume peer relay to B")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		clientB.Execute([]string{"tailscale", "ping", "--c=1", "--timeout=1s", clientAIPv4.String()}) //nolint:errcheck
+		//nolint:errcheck // best-effort ping to trigger relay path discovery; errors expected before relay forms
+		clientB.Execute([]string{"tailscale", "ping", "--c=1", "--timeout=1s", clientAIPv4.String()})
 
 		status, err := clientB.Status()
 		assert.NoError(c, err)
@@ -714,8 +718,8 @@ func TestGrantCapDrive(t *testing.T) {
 
 	for _, node := range allNodes {
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
-			nm, err := node.Netmap()
-			assert.NoError(c, err)
+			nm, netmapErr := node.Netmap()
+			assert.NoError(c, netmapErr)
 
 			if nm == nil {
 				return
@@ -741,8 +745,8 @@ func TestGrantCapDrive(t *testing.T) {
 
 	// Sharer should have cap/drive targeting its own IP (it's the drive destination).
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		pf, err := sharer.PacketFilter()
-		assert.NoError(c, err)
+		pf, packetFilterErr := sharer.PacketFilter()
+		assert.NoError(c, packetFilterErr)
 		assert.True(c, hasCapMatchForIP(pf, peercap.Taildrive, sharerIPv4),
 			"Sharer should have cap/drive with Dst matching sharer's IP %s", sharerIPv4)
 	}, assertTimeout, 500*time.Millisecond, "sharer should have cap/drive targeting its own IP")
@@ -751,8 +755,8 @@ func TestGrantCapDrive(t *testing.T) {
 	rwClientIPv4 := rwClient.MustIPv4()
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		pf, err := rwClient.PacketFilter()
-		assert.NoError(c, err)
+		pf, packetFilterErr := rwClient.PacketFilter()
+		assert.NoError(c, packetFilterErr)
 		assert.True(c, hasCapMatchForIP(pf, peercap.TaildriveSharer, rwClientIPv4),
 			"RW client should have cap/drive-sharer with Dst matching rw-client's IP %s", rwClientIPv4)
 	}, assertTimeout, 500*time.Millisecond, "rw-client should have cap/drive-sharer")
@@ -761,8 +765,8 @@ func TestGrantCapDrive(t *testing.T) {
 	roClientIPv4 := roClient.MustIPv4()
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		pf, err := roClient.PacketFilter()
-		assert.NoError(c, err)
+		pf, packetFilterErr := roClient.PacketFilter()
+		assert.NoError(c, packetFilterErr)
 		assert.True(c, hasCapMatchForIP(pf, peercap.TaildriveSharer, roClientIPv4),
 			"RO client should have cap/drive-sharer with Dst matching ro-client's IP %s", roClientIPv4)
 	}, assertTimeout, 500*time.Millisecond, "ro-client should have cap/drive-sharer")
@@ -771,8 +775,8 @@ func TestGrantCapDrive(t *testing.T) {
 
 	// No-access node should NOT have cap/drive or cap/drive-sharer.
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		pf, err := noAccess.PacketFilter()
-		assert.NoError(c, err)
+		pf, packetFilterErr := noAccess.PacketFilter()
+		assert.NoError(c, packetFilterErr)
 		assert.False(c, hasCapMatchInPacketFilter(pf, peercap.Taildrive),
 			"no-access should NOT have cap/drive")
 		assert.False(c, hasCapMatchInPacketFilter(pf, peercap.TaildriveSharer),
@@ -781,24 +785,24 @@ func TestGrantCapDrive(t *testing.T) {
 
 	// Sharer should NOT have cap/drive-sharer (it's a destination, not a source).
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		pf, err := sharer.PacketFilter()
-		assert.NoError(c, err)
+		pf, packetFilterErr := sharer.PacketFilter()
+		assert.NoError(c, packetFilterErr)
 		assert.False(c, hasCapMatchInPacketFilter(pf, peercap.TaildriveSharer),
 			"sharer should NOT have cap/drive-sharer")
 	}, 10*time.Second, 500*time.Millisecond, "sharer should not have cap/drive-sharer")
 
 	// RW client should NOT have cap/drive (it's a source, not a destination).
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		pf, err := rwClient.PacketFilter()
-		assert.NoError(c, err)
+		pf, packetFilterErr := rwClient.PacketFilter()
+		assert.NoError(c, packetFilterErr)
 		assert.False(c, hasCapMatchInPacketFilter(pf, peercap.Taildrive),
 			"rw-client should NOT have cap/drive")
 	}, 10*time.Second, 500*time.Millisecond, "rw-client should not have cap/drive")
 
 	// RO client should NOT have cap/drive (it's a source, not a destination).
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		pf, err := roClient.PacketFilter()
-		assert.NoError(c, err)
+		pf, packetFilterErr := roClient.PacketFilter()
+		assert.NoError(c, packetFilterErr)
 		assert.False(c, hasCapMatchInPacketFilter(pf, peercap.Taildrive),
 			"ro-client should NOT have cap/drive")
 	}, 10*time.Second, 500*time.Millisecond, "ro-client should not have cap/drive")
@@ -819,8 +823,8 @@ func TestGrantCapDrive(t *testing.T) {
 
 	// Verify share is listed.
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		result, _, err := sharer.Execute([]string{"tailscale", "drive", "list"})
-		assert.NoError(c, err)
+		result, _, executeErr := sharer.Execute([]string{"tailscale", "drive", "list"})
+		assert.NoError(c, executeErr)
 		assert.Contains(c, result, "testshare",
 			"sharer should list 'testshare' in drive list")
 	}, 10*time.Second, 500*time.Millisecond, "sharer should have testshare listed")
@@ -835,11 +839,11 @@ func TestGrantCapDrive(t *testing.T) {
 	t.Log("Phase 5: RW client reads file from sharer")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		result, _, err := rwClient.Execute([]string{
+		result, _, executeErr := rwClient.Execute([]string{
 			"curl", "-s", "--max-time", "5",
 			driveURL(domain, sharerName, "testshare/testfile.txt"),
 		})
-		assert.NoError(c, err)
+		assert.NoError(c, executeErr)
 		assert.Equal(c, "hello-taildrive", strings.TrimSpace(result),
 			"rw-client should read testfile.txt content")
 	}, 60*time.Second, 2*time.Second, "rw-client should read file from sharer")
@@ -848,21 +852,21 @@ func TestGrantCapDrive(t *testing.T) {
 	t.Log("Phase 6: RW client writes file to sharer")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		result, _, err := rwClient.Execute([]string{
+		result, _, executeErr := rwClient.Execute([]string{
 			"curl", "-s", "--max-time", "5",
 			"-o", "/dev/null", "-w", "%{http_code}",
 			"-X", "PUT", "--data-binary", "written-by-rw",
 			driveURL(domain, sharerName, "testshare/rw-wrote.txt"),
 		})
-		assert.NoError(c, err)
+		assert.NoError(c, executeErr)
 		assert.Contains(c, result, "20",
 			"rw-client PUT should return 2xx status")
 	}, 30*time.Second, 2*time.Second, "rw-client should write file to sharer")
 
 	// Verify the file exists on sharer.
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		content, err := sharer.ReadFile("/tmp/testshare/rw-wrote.txt")
-		assert.NoError(c, err)
+		content, readFileErr := sharer.ReadFile("/tmp/testshare/rw-wrote.txt")
+		assert.NoError(c, readFileErr)
 		assert.Equal(c, "written-by-rw", strings.TrimSpace(string(content)))
 	}, 10*time.Second, 500*time.Millisecond, "rw-wrote.txt should exist on sharer")
 
@@ -870,11 +874,11 @@ func TestGrantCapDrive(t *testing.T) {
 	t.Log("Phase 7: RO client reads file from sharer")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		result, _, err := roClient.Execute([]string{
+		result, _, executeErr := roClient.Execute([]string{
 			"curl", "-s", "--max-time", "5",
 			driveURL(domain, sharerName, "testshare/testfile.txt"),
 		})
-		assert.NoError(c, err)
+		assert.NoError(c, executeErr)
 		assert.Equal(c, "hello-taildrive", strings.TrimSpace(result),
 			"ro-client should read testfile.txt content")
 	}, 60*time.Second, 2*time.Second, "ro-client should read file from sharer")
@@ -883,13 +887,13 @@ func TestGrantCapDrive(t *testing.T) {
 	t.Log("Phase 8: RO client write attempt (should be denied)")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		result, _, err := roClient.Execute([]string{
+		result, _, executeErr := roClient.Execute([]string{
 			"curl", "-s", "--max-time", "5",
 			"-o", "/dev/null", "-w", "%{http_code}",
 			"-X", "PUT", "--data-binary", "should-not-work",
 			driveURL(domain, sharerName, "testshare/ro-wrote.txt"),
 		})
-		assert.NoError(c, err)
+		assert.NoError(c, executeErr)
 		assert.Equal(c, "403", strings.TrimSpace(result),
 			"ro-client PUT should return 403 Forbidden")
 	}, 30*time.Second, 2*time.Second, "ro-client write should be 403 Forbidden")
@@ -902,13 +906,13 @@ func TestGrantCapDrive(t *testing.T) {
 	t.Log("Phase 9: No-access node read attempt (should fail)")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		result, _, err := noAccess.Execute([]string{
+		result, _, executeErr := noAccess.Execute([]string{
 			"curl", "-s", "--max-time", "5",
 			"-o", "/dev/null", "-w", "%{http_code}",
 			driveURL(domain, sharerName, "testshare/testfile.txt"),
 		})
 		// Either error (connection refused) or non-200 status.
-		if err == nil {
+		if executeErr == nil {
 			assert.NotEqual(c, "200", strings.TrimSpace(result),
 				"no-access node should NOT get 200 from sharer's drive")
 		}
@@ -918,13 +922,13 @@ func TestGrantCapDrive(t *testing.T) {
 	t.Log("Phase 10: No-access node write attempt (should fail)")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		result, _, err := noAccess.Execute([]string{
+		result, _, executeErr := noAccess.Execute([]string{
 			"curl", "-s", "--max-time", "5",
 			"-o", "/dev/null", "-w", "%{http_code}",
 			"-X", "PUT", "--data-binary", "should-not-work",
 			driveURL(domain, sharerName, "testshare/no-access-wrote.txt"),
 		})
-		if err == nil {
+		if executeErr == nil {
 			assert.NotEqual(c, "200", strings.TrimSpace(result),
 				"no-access node should not get 200 on PUT")
 			assert.NotEqual(c, "201", strings.TrimSpace(result),
@@ -940,12 +944,12 @@ func TestGrantCapDrive(t *testing.T) {
 	t.Log("Phase 11: RW client lists directory via PROPFIND")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		result, _, err := rwClient.Execute([]string{
+		result, _, executeErr := rwClient.Execute([]string{
 			"curl", "-s", "--max-time", "5",
 			"-X", "PROPFIND", "-H", "Depth: 1",
 			driveURL(domain, sharerName, "testshare/"),
 		})
-		assert.NoError(c, err)
+		assert.NoError(c, executeErr)
 		assert.Contains(c, result, "testfile.txt",
 			"PROPFIND should list testfile.txt")
 		assert.Contains(c, result, "rw-wrote.txt",
@@ -956,34 +960,34 @@ func TestGrantCapDrive(t *testing.T) {
 	t.Log("Phase 12: RW client deletes file from sharer")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		result, _, err := rwClient.Execute([]string{
+		result, _, executeErr := rwClient.Execute([]string{
 			"curl", "-s", "--max-time", "5",
 			"-o", "/dev/null", "-w", "%{http_code}",
 			"-X", "DELETE",
 			driveURL(domain, sharerName, "testshare/rw-wrote.txt"),
 		})
-		assert.NoError(c, err)
+		assert.NoError(c, executeErr)
 		assert.Contains(c, result, "20",
 			"rw-client DELETE should return 2xx status")
 	}, 30*time.Second, 2*time.Second, "rw-client should delete file from sharer")
 
 	// Verify deleted on sharer.
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		_, err := sharer.ReadFile("/tmp/testshare/rw-wrote.txt")
-		assert.Error(c, err, "rw-wrote.txt should be deleted from sharer")
+		_, readFileErr := sharer.ReadFile("/tmp/testshare/rw-wrote.txt")
+		assert.Error(c, readFileErr, "rw-wrote.txt should be deleted from sharer")
 	}, 10*time.Second, 500*time.Millisecond, "rw-wrote.txt should be gone")
 
 	// ===== Phase 13: RO client - delete file (NEGATIVE - expect 403) =====
 	t.Log("Phase 13: RO client delete attempt (should be denied)")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		result, _, err := roClient.Execute([]string{
+		result, _, executeErr := roClient.Execute([]string{
 			"curl", "-s", "--max-time", "5",
 			"-o", "/dev/null", "-w", "%{http_code}",
 			"-X", "DELETE",
 			driveURL(domain, sharerName, "testshare/testfile.txt"),
 		})
-		assert.NoError(c, err)
+		assert.NoError(c, executeErr)
 		assert.Equal(c, "403", strings.TrimSpace(result),
 			"ro-client DELETE should return 403 Forbidden")
 	}, 30*time.Second, 2*time.Second, "ro-client delete should be 403 Forbidden")

@@ -32,12 +32,36 @@ func TestAuthCommandValidation(t *testing.T) {
 		args    []string
 		wantErr string
 	}{
-		{name: "register malformed auth-id", args: []string{"auth", "register", "--user", "user1", "--auth-id", "not-valid"}, wantErr: "invalid"},
-		{name: "register nonexistent user", args: []string{"auth", "register", "--user", "ghost", "--auth-id", unknown}, wantErr: "looking up user"},
-		{name: "approve malformed auth-id", args: []string{"auth", "approve", "--auth-id", "not-valid"}, wantErr: "invalid auth_id"},
-		{name: "approve unknown auth-id", args: []string{"auth", "approve", "--auth-id", unknown}, wantErr: "no pending auth session"},
-		{name: "reject malformed auth-id", args: []string{"auth", "reject", "--auth-id", "not-valid"}, wantErr: "invalid auth_id"},
-		{name: "reject unknown auth-id", args: []string{"auth", "reject", "--auth-id", unknown}, wantErr: "no pending auth session"},
+		{
+			name:    "register malformed auth-id",
+			args:    []string{"auth", "register", "--user", "user1", "--auth-id", "not-valid"},
+			wantErr: "invalid",
+		},
+		{
+			name:    "register nonexistent user",
+			args:    []string{"auth", "register", "--user", "ghost", "--auth-id", unknown},
+			wantErr: "looking up user",
+		},
+		{
+			name:    "approve malformed auth-id",
+			args:    []string{"auth", "approve", "--auth-id", "not-valid"},
+			wantErr: "invalid auth_id",
+		},
+		{
+			name:    "approve unknown auth-id",
+			args:    []string{"auth", "approve", "--auth-id", unknown},
+			wantErr: "no pending auth session",
+		},
+		{
+			name:    "reject malformed auth-id",
+			args:    []string{"auth", "reject", "--auth-id", "not-valid"},
+			wantErr: "invalid auth_id",
+		},
+		{
+			name:    "reject unknown auth-id",
+			args:    []string{"auth", "reject", "--auth-id", unknown},
+			wantErr: "no pending auth session",
+		},
 	}
 
 	for _, tt := range tests {
