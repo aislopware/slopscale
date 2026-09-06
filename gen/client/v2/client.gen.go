@@ -274,7 +274,7 @@ type ListUsersParams struct {
 	// Type Filter by user type; Headscale users are all "member".
 	Type *string `form:"type,omitempty" json:"type,omitempty"`
 
-	// Role Filter by user role; Headscale users are all "member".
+	// Role Filter by user role: owner, admin, network-admin, it-admin, auditor or member.
 	Role *string `form:"role,omitempty" json:"role,omitempty"`
 }
 
@@ -378,21 +378,21 @@ type ClientInterface interface {
 
 	// DeleteDevice Delete a device
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with DELETE /api/v2/device/{id} (the `DeleteDevice` operationId).
 	DeleteDevice(ctx context.Context, id string, params *DeleteDeviceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetDevice Get a device
 	//
-	// Requires the `devices:core:read` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with GET /api/v2/device/{id} (the `GetDevice` operationId).
 	GetDevice(ctx context.Context, id string, params *GetDeviceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AuthorizeDeviceWithBody Authorize a device
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -401,7 +401,7 @@ type ClientInterface interface {
 
 	// AuthorizeDevice Authorize a device
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -410,7 +410,7 @@ type ClientInterface interface {
 
 	// SetDeviceKeyWithBody Set a device's key settings
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -419,7 +419,7 @@ type ClientInterface interface {
 
 	// SetDeviceKey Set a device's key settings
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -428,7 +428,7 @@ type ClientInterface interface {
 
 	// SetDeviceNameWithBody Set a device's name
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -437,7 +437,7 @@ type ClientInterface interface {
 
 	// SetDeviceName Set a device's name
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -446,14 +446,14 @@ type ClientInterface interface {
 
 	// GetDeviceRoutes Get a device's subnet routes
 	//
-	// Requires the `devices:routes:read` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with GET /api/v2/device/{id}/routes (the `GetDeviceRoutes` operationId).
 	GetDeviceRoutes(ctx context.Context, id string, params *GetDeviceRoutesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetDeviceRoutesWithBody Set a device's enabled subnet routes
 	//
-	// Requires the `devices:routes` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -462,7 +462,7 @@ type ClientInterface interface {
 
 	// SetDeviceRoutes Set a device's enabled subnet routes
 	//
-	// Requires the `devices:routes` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -471,7 +471,7 @@ type ClientInterface interface {
 
 	// SetDeviceTagsWithBody Set a device's tags
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -480,7 +480,7 @@ type ClientInterface interface {
 
 	// SetDeviceTags Set a device's tags
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -489,14 +489,14 @@ type ClientInterface interface {
 
 	// GetACL Get the policy file
 	//
-	// Requires the `policy_file:read` OAuth scope (an admin API key is all-access).
+	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with GET /api/v2/tailnet/{tailnet}/acl (the `GetACL` operationId).
 	GetACL(ctx context.Context, tailnet string, params *GetACLParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetACLWithBody Set the policy file
 	//
-	// Requires the `policy_file` OAuth scope (an admin API key is all-access).
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -505,7 +505,7 @@ type ClientInterface interface {
 
 	// SetACL Set the policy file
 	//
-	// Requires the `policy_file` OAuth scope (an admin API key is all-access).
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -514,7 +514,7 @@ type ClientInterface interface {
 
 	// ListDevices List devices
 	//
-	// Requires the `devices:core:read` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with GET /api/v2/tailnet/{tailnet}/devices (the `ListDevices` operationId).
 	ListDevices(ctx context.Context, tailnet string, params *ListDevicesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -560,14 +560,14 @@ type ClientInterface interface {
 
 	// GetTailnetSettings Get tailnet settings
 	//
-	// Requires the `feature_settings:read` OAuth scope (an admin API key is all-access).
+	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with GET /api/v2/tailnet/{tailnet}/settings (the `GetTailnetSettings` operationId).
 	GetTailnetSettings(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateTailnetSettingsWithBody Update tailnet settings
 	//
-	// Requires the `feature_settings` OAuth scope (an admin API key is all-access).
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -576,7 +576,7 @@ type ClientInterface interface {
 
 	// UpdateTailnetSettings Update tailnet settings
 	//
-	// Requires the `feature_settings` OAuth scope (an admin API key is all-access).
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -585,14 +585,14 @@ type ClientInterface interface {
 
 	// ListUsers List users
 	//
-	// Requires the `users:read` OAuth scope (an admin API key is all-access).
+	// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with GET /api/v2/tailnet/{tailnet}/users (the `ListUsers` operationId).
 	ListUsers(ctx context.Context, tailnet string, params *ListUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetUser Get a user
 	//
-	// Requires the `users:read` OAuth scope (an admin API key is all-access).
+	// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with GET /api/v2/users/{id} (the `GetUser` operationId).
 	GetUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -600,7 +600,7 @@ type ClientInterface interface {
 
 // DeleteDevice Delete a device
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with DELETE /api/v2/device/{id} (the `DeleteDevice` operationId).
 func (c *Client) DeleteDevice(ctx context.Context, id string, params *DeleteDeviceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -617,7 +617,7 @@ func (c *Client) DeleteDevice(ctx context.Context, id string, params *DeleteDevi
 
 // GetDevice Get a device
 //
-// Requires the `devices:core:read` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with GET /api/v2/device/{id} (the `GetDevice` operationId).
 func (c *Client) GetDevice(ctx context.Context, id string, params *GetDeviceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -634,7 +634,7 @@ func (c *Client) GetDevice(ctx context.Context, id string, params *GetDevicePara
 
 // AuthorizeDeviceWithBody Authorize a device
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -653,7 +653,7 @@ func (c *Client) AuthorizeDeviceWithBody(ctx context.Context, id string, content
 
 // AuthorizeDevice Authorize a device
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -672,7 +672,7 @@ func (c *Client) AuthorizeDevice(ctx context.Context, id string, body AuthorizeD
 
 // SetDeviceKeyWithBody Set a device's key settings
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -691,7 +691,7 @@ func (c *Client) SetDeviceKeyWithBody(ctx context.Context, id string, contentTyp
 
 // SetDeviceKey Set a device's key settings
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -710,7 +710,7 @@ func (c *Client) SetDeviceKey(ctx context.Context, id string, body SetDeviceKeyJ
 
 // SetDeviceNameWithBody Set a device's name
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -729,7 +729,7 @@ func (c *Client) SetDeviceNameWithBody(ctx context.Context, id string, contentTy
 
 // SetDeviceName Set a device's name
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -748,7 +748,7 @@ func (c *Client) SetDeviceName(ctx context.Context, id string, body SetDeviceNam
 
 // GetDeviceRoutes Get a device's subnet routes
 //
-// Requires the `devices:routes:read` OAuth scope (an admin API key is all-access).
+// Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with GET /api/v2/device/{id}/routes (the `GetDeviceRoutes` operationId).
 func (c *Client) GetDeviceRoutes(ctx context.Context, id string, params *GetDeviceRoutesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -765,7 +765,7 @@ func (c *Client) GetDeviceRoutes(ctx context.Context, id string, params *GetDevi
 
 // SetDeviceRoutesWithBody Set a device's enabled subnet routes
 //
-// Requires the `devices:routes` OAuth scope (an admin API key is all-access).
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -784,7 +784,7 @@ func (c *Client) SetDeviceRoutesWithBody(ctx context.Context, id string, content
 
 // SetDeviceRoutes Set a device's enabled subnet routes
 //
-// Requires the `devices:routes` OAuth scope (an admin API key is all-access).
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -803,7 +803,7 @@ func (c *Client) SetDeviceRoutes(ctx context.Context, id string, body SetDeviceR
 
 // SetDeviceTagsWithBody Set a device's tags
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -822,7 +822,7 @@ func (c *Client) SetDeviceTagsWithBody(ctx context.Context, id string, contentTy
 
 // SetDeviceTags Set a device's tags
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -841,7 +841,7 @@ func (c *Client) SetDeviceTags(ctx context.Context, id string, body SetDeviceTag
 
 // GetACL Get the policy file
 //
-// Requires the `policy_file:read` OAuth scope (an admin API key is all-access).
+// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with GET /api/v2/tailnet/{tailnet}/acl (the `GetACL` operationId).
 func (c *Client) GetACL(ctx context.Context, tailnet string, params *GetACLParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -858,7 +858,7 @@ func (c *Client) GetACL(ctx context.Context, tailnet string, params *GetACLParam
 
 // SetACLWithBody Set the policy file
 //
-// Requires the `policy_file` OAuth scope (an admin API key is all-access).
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -877,7 +877,7 @@ func (c *Client) SetACLWithBody(ctx context.Context, tailnet string, params *Set
 
 // SetACL Set the policy file
 //
-// Requires the `policy_file` OAuth scope (an admin API key is all-access).
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -896,7 +896,7 @@ func (c *Client) SetACL(ctx context.Context, tailnet string, params *SetACLParam
 
 // ListDevices List devices
 //
-// Requires the `devices:core:read` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with GET /api/v2/tailnet/{tailnet}/devices (the `ListDevices` operationId).
 func (c *Client) ListDevices(ctx context.Context, tailnet string, params *ListDevicesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1002,7 +1002,7 @@ func (c *Client) GetKey(ctx context.Context, tailnet string, keyId string, reqEd
 
 // GetTailnetSettings Get tailnet settings
 //
-// Requires the `feature_settings:read` OAuth scope (an admin API key is all-access).
+// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with GET /api/v2/tailnet/{tailnet}/settings (the `GetTailnetSettings` operationId).
 func (c *Client) GetTailnetSettings(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1019,7 +1019,7 @@ func (c *Client) GetTailnetSettings(ctx context.Context, tailnet string, reqEdit
 
 // UpdateTailnetSettingsWithBody Update tailnet settings
 //
-// Requires the `feature_settings` OAuth scope (an admin API key is all-access).
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -1038,7 +1038,7 @@ func (c *Client) UpdateTailnetSettingsWithBody(ctx context.Context, tailnet stri
 
 // UpdateTailnetSettings Update tailnet settings
 //
-// Requires the `feature_settings` OAuth scope (an admin API key is all-access).
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1057,7 +1057,7 @@ func (c *Client) UpdateTailnetSettings(ctx context.Context, tailnet string, body
 
 // ListUsers List users
 //
-// Requires the `users:read` OAuth scope (an admin API key is all-access).
+// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with GET /api/v2/tailnet/{tailnet}/users (the `ListUsers` operationId).
 func (c *Client) ListUsers(ctx context.Context, tailnet string, params *ListUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1074,7 +1074,7 @@ func (c *Client) ListUsers(ctx context.Context, tailnet string, params *ListUser
 
 // GetUser Get a user
 //
-// Requires the `users:read` OAuth scope (an admin API key is all-access).
+// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with GET /api/v2/users/{id} (the `GetUser` operationId).
 func (c *Client) GetUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2141,7 +2141,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteDeviceWithResponse Delete a device
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2150,7 +2150,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetDeviceWithResponse Get a device
 	//
-	// Requires the `devices:core:read` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2159,7 +2159,7 @@ type ClientWithResponsesInterface interface {
 
 	// AuthorizeDeviceWithBodyWithResponse Authorize a device
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2168,7 +2168,7 @@ type ClientWithResponsesInterface interface {
 
 	// AuthorizeDeviceWithResponse Authorize a device
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2177,7 +2177,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetDeviceKeyWithBodyWithResponse Set a device's key settings
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2186,7 +2186,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetDeviceKeyWithResponse Set a device's key settings
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2195,7 +2195,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetDeviceNameWithBodyWithResponse Set a device's name
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2204,7 +2204,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetDeviceNameWithResponse Set a device's name
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2213,7 +2213,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetDeviceRoutesWithResponse Get a device's subnet routes
 	//
-	// Requires the `devices:routes:read` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2222,7 +2222,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetDeviceRoutesWithBodyWithResponse Set a device's enabled subnet routes
 	//
-	// Requires the `devices:routes` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2231,7 +2231,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetDeviceRoutesWithResponse Set a device's enabled subnet routes
 	//
-	// Requires the `devices:routes` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2240,7 +2240,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetDeviceTagsWithBodyWithResponse Set a device's tags
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2249,7 +2249,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetDeviceTagsWithResponse Set a device's tags
 	//
-	// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2258,7 +2258,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetACLWithResponse Get the policy file
 	//
-	// Requires the `policy_file:read` OAuth scope (an admin API key is all-access).
+	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2267,7 +2267,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetACLWithBodyWithResponse Set the policy file
 	//
-	// Requires the `policy_file` OAuth scope (an admin API key is all-access).
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2276,7 +2276,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetACLWithResponse Set the policy file
 	//
-	// Requires the `policy_file` OAuth scope (an admin API key is all-access).
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2285,7 +2285,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListDevicesWithResponse List devices
 	//
-	// Requires the `devices:core:read` OAuth scope (an admin API key is all-access).
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2339,7 +2339,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetTailnetSettingsWithResponse Get tailnet settings
 	//
-	// Requires the `feature_settings:read` OAuth scope (an admin API key is all-access).
+	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2348,7 +2348,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateTailnetSettingsWithBodyWithResponse Update tailnet settings
 	//
-	// Requires the `feature_settings` OAuth scope (an admin API key is all-access).
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2357,7 +2357,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateTailnetSettingsWithResponse Update tailnet settings
 	//
-	// Requires the `feature_settings` OAuth scope (an admin API key is all-access).
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2366,7 +2366,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListUsersWithResponse List users
 	//
-	// Requires the `users:read` OAuth scope (an admin API key is all-access).
+	// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2375,7 +2375,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetUserWithResponse Get a user
 	//
-	// Requires the `users:read` OAuth scope (an admin API key is all-access).
+	// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -3878,7 +3878,7 @@ func (r GetUserResponse) ContentType() string {
 
 // DeleteDeviceWithResponse Delete a device
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -3893,7 +3893,7 @@ func (c *ClientWithResponses) DeleteDeviceWithResponse(ctx context.Context, id s
 
 // GetDeviceWithResponse Get a device
 //
-// Requires the `devices:core:read` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -3908,7 +3908,7 @@ func (c *ClientWithResponses) GetDeviceWithResponse(ctx context.Context, id stri
 
 // AuthorizeDeviceWithBodyWithResponse Authorize a device
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3923,7 +3923,7 @@ func (c *ClientWithResponses) AuthorizeDeviceWithBodyWithResponse(ctx context.Co
 
 // AuthorizeDeviceWithResponse Authorize a device
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3938,7 +3938,7 @@ func (c *ClientWithResponses) AuthorizeDeviceWithResponse(ctx context.Context, i
 
 // SetDeviceKeyWithBodyWithResponse Set a device's key settings
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3953,7 +3953,7 @@ func (c *ClientWithResponses) SetDeviceKeyWithBodyWithResponse(ctx context.Conte
 
 // SetDeviceKeyWithResponse Set a device's key settings
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3968,7 +3968,7 @@ func (c *ClientWithResponses) SetDeviceKeyWithResponse(ctx context.Context, id s
 
 // SetDeviceNameWithBodyWithResponse Set a device's name
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3983,7 +3983,7 @@ func (c *ClientWithResponses) SetDeviceNameWithBodyWithResponse(ctx context.Cont
 
 // SetDeviceNameWithResponse Set a device's name
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3998,7 +3998,7 @@ func (c *ClientWithResponses) SetDeviceNameWithResponse(ctx context.Context, id 
 
 // GetDeviceRoutesWithResponse Get a device's subnet routes
 //
-// Requires the `devices:routes:read` OAuth scope (an admin API key is all-access).
+// Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -4013,7 +4013,7 @@ func (c *ClientWithResponses) GetDeviceRoutesWithResponse(ctx context.Context, i
 
 // SetDeviceRoutesWithBodyWithResponse Set a device's enabled subnet routes
 //
-// Requires the `devices:routes` OAuth scope (an admin API key is all-access).
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4028,7 +4028,7 @@ func (c *ClientWithResponses) SetDeviceRoutesWithBodyWithResponse(ctx context.Co
 
 // SetDeviceRoutesWithResponse Set a device's enabled subnet routes
 //
-// Requires the `devices:routes` OAuth scope (an admin API key is all-access).
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4043,7 +4043,7 @@ func (c *ClientWithResponses) SetDeviceRoutesWithResponse(ctx context.Context, i
 
 // SetDeviceTagsWithBodyWithResponse Set a device's tags
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4058,7 +4058,7 @@ func (c *ClientWithResponses) SetDeviceTagsWithBodyWithResponse(ctx context.Cont
 
 // SetDeviceTagsWithResponse Set a device's tags
 //
-// Requires the `devices:core` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4073,7 +4073,7 @@ func (c *ClientWithResponses) SetDeviceTagsWithResponse(ctx context.Context, id 
 
 // GetACLWithResponse Get the policy file
 //
-// Requires the `policy_file:read` OAuth scope (an admin API key is all-access).
+// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -4088,7 +4088,7 @@ func (c *ClientWithResponses) GetACLWithResponse(ctx context.Context, tailnet st
 
 // SetACLWithBodyWithResponse Set the policy file
 //
-// Requires the `policy_file` OAuth scope (an admin API key is all-access).
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4103,7 +4103,7 @@ func (c *ClientWithResponses) SetACLWithBodyWithResponse(ctx context.Context, ta
 
 // SetACLWithResponse Set the policy file
 //
-// Requires the `policy_file` OAuth scope (an admin API key is all-access).
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4118,7 +4118,7 @@ func (c *ClientWithResponses) SetACLWithResponse(ctx context.Context, tailnet st
 
 // ListDevicesWithResponse List devices
 //
-// Requires the `devices:core:read` OAuth scope (an admin API key is all-access).
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -4208,7 +4208,7 @@ func (c *ClientWithResponses) GetKeyWithResponse(ctx context.Context, tailnet st
 
 // GetTailnetSettingsWithResponse Get tailnet settings
 //
-// Requires the `feature_settings:read` OAuth scope (an admin API key is all-access).
+// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -4223,7 +4223,7 @@ func (c *ClientWithResponses) GetTailnetSettingsWithResponse(ctx context.Context
 
 // UpdateTailnetSettingsWithBodyWithResponse Update tailnet settings
 //
-// Requires the `feature_settings` OAuth scope (an admin API key is all-access).
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4238,7 +4238,7 @@ func (c *ClientWithResponses) UpdateTailnetSettingsWithBodyWithResponse(ctx cont
 
 // UpdateTailnetSettingsWithResponse Update tailnet settings
 //
-// Requires the `feature_settings` OAuth scope (an admin API key is all-access).
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4253,7 +4253,7 @@ func (c *ClientWithResponses) UpdateTailnetSettingsWithResponse(ctx context.Cont
 
 // ListUsersWithResponse List users
 //
-// Requires the `users:read` OAuth scope (an admin API key is all-access).
+// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -4268,7 +4268,7 @@ func (c *ClientWithResponses) ListUsersWithResponse(ctx context.Context, tailnet
 
 // GetUserWithResponse Get a user
 //
-// Requires the `users:read` OAuth scope (an admin API key is all-access).
+// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //

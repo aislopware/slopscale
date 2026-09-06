@@ -48,6 +48,9 @@ type ApiKey struct {
 	Id         string     `json:"id"`
 	LastSeen   *time.Time `json:"lastSeen"`
 	Prefix     string     `json:"prefix"`
+
+	// UserId Owning user id; null for a legacy all-access key.
+	UserId *string `json:"userId"`
 }
 
 // AuthApproveOutputBody defines model for AuthApproveOutputBody.
@@ -93,6 +96,9 @@ type CreateAPIKeyOutputBody struct {
 // CreateApiKeyRequestBody defines model for CreateApiKeyRequestBody.
 type CreateApiKeyRequestBody struct {
 	Expiration *time.Time `json:"expiration,omitempty"`
+
+	// UserId Owning user id; empty for a legacy all-access key.
+	UserId *string `json:"userId,omitempty"`
 }
 
 // CreatePreAuthKeyRequestBody defines model for CreatePreAuthKeyRequestBody.
@@ -305,6 +311,12 @@ type SetTagsRequestBody struct {
 	Tags *[]string `json:"tags,omitempty"`
 }
 
+// SetUserRoleRequestBody defines model for SetUserRoleRequestBody.
+type SetUserRoleRequestBody struct {
+	// Role One of owner, admin, network-admin, it-admin, auditor, member.
+	Role string `json:"role"`
+}
+
 // User defines model for User.
 type User struct {
 	CreatedAt     time.Time `json:"createdAt"`
@@ -315,11 +327,26 @@ type User struct {
 	ProfilePicUrl string    `json:"profilePicUrl"`
 	Provider      string    `json:"provider"`
 	ProviderId    string    `json:"providerId"`
+
+	// Role Admin role: owner, admin, network-admin, it-admin, auditor or member.
+	Role string `json:"role"`
 }
 
 // UserOutputBody defines model for UserOutputBody.
 type UserOutputBody struct {
 	User User `json:"user"`
+}
+
+// Whoami defines model for Whoami.
+type Whoami struct {
+	AllAccess bool `json:"allAccess"`
+
+	// Kind How the caller authenticated: local (socket), api_key or oauth.
+	Kind        string          `json:"kind"`
+	Permissions map[string]bool `json:"permissions"`
+	Role        string          `json:"role"`
+	Scopes      []string        `json:"scopes"`
+	User        *User           `json:"user,omitempty"`
 }
 
 // DeleteApiKeyParams defines parameters for DeleteApiKey.
@@ -396,6 +423,9 @@ type ExpirePreAuthKeyJSONRequestBody = ExpirePreAuthKeyRequestBody
 
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = CreateUserRequestBody
+
+// SetUserRoleJSONRequestBody defines body for SetUserRole for application/json ContentType.
+type SetUserRoleJSONRequestBody = SetUserRoleRequestBody
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -478,12 +508,16 @@ type ClientInterface interface {
 
 	// CreateApiKeyWithBody Create API key
 	//
+	// Any authenticated caller may mint a key for itself; a key for another user, or a legacy key without a user, needs the owner, an admin or the socket.
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /api/v1/apikey (the `CreateApiKey` operationId).
 	CreateApiKeyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateApiKey Create API key
+	//
+	// Any authenticated caller may mint a key for itself; a key for another user, or a legacy key without a user, needs the owner, an admin or the socket.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -511,12 +545,16 @@ type ClientInterface interface {
 
 	// AuthApproveWithBody Approve a pending auth session
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /api/v1/auth/approve (the `AuthApprove` operationId).
 	AuthApproveWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AuthApprove Approve a pending auth session
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -525,12 +563,16 @@ type ClientInterface interface {
 
 	// AuthRegisterWithBody Register node via auth flow
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /api/v1/auth/register (the `AuthRegister` operationId).
 	AuthRegisterWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AuthRegister Register node via auth flow
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -539,12 +581,16 @@ type ClientInterface interface {
 
 	// AuthRejectWithBody Reject a pending auth session
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /api/v1/auth/reject (the `AuthReject` operationId).
 	AuthRejectWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AuthReject Reject a pending auth session
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -553,12 +599,16 @@ type ClientInterface interface {
 
 	// DebugCreateNodeWithBody Debug create node
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /api/v1/debug/node (the `DebugCreateNode` operationId).
 	DebugCreateNodeWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DebugCreateNode Debug create node
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -574,30 +624,42 @@ type ClientInterface interface {
 
 	// ListNodes List nodes
 	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Corresponds with GET /api/v1/node (the `ListNodes` operationId).
 	ListNodes(ctx context.Context, params *ListNodesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// BackfillNodeIPs Backfill node IPs
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with POST /api/v1/node/backfillips (the `BackfillNodeIPs` operationId).
 	BackfillNodeIPs(ctx context.Context, params *BackfillNodeIPsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RegisterNode Register node
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Corresponds with POST /api/v1/node/register (the `RegisterNode` operationId).
 	RegisterNode(ctx context.Context, params *RegisterNodeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteNode Delete node
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with DELETE /api/v1/node/{nodeId} (the `DeleteNode` operationId).
 	DeleteNode(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetNode Get node
 	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Corresponds with GET /api/v1/node/{nodeId} (the `GetNode` operationId).
 	GetNode(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetApprovedRoutesWithBody Set approved routes
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -606,12 +668,16 @@ type ClientInterface interface {
 
 	// SetApprovedRoutes Set approved routes
 	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/approve_routes (the `SetApprovedRoutes` operationId).
 	SetApprovedRoutes(ctx context.Context, nodeId string, body SetApprovedRoutesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ExpireNodeWithBody Expire node
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -620,6 +686,8 @@ type ClientInterface interface {
 
 	// ExpireNode Expire node
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
@@ -627,10 +695,14 @@ type ClientInterface interface {
 
 	// RenameNode Rename node
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Corresponds with POST /api/v1/node/{nodeId}/rename/{newName} (the `RenameNode` operationId).
 	RenameNode(ctx context.Context, nodeId string, newName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetTagsWithBody Set tags
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -639,6 +711,8 @@ type ClientInterface interface {
 
 	// SetTags Set tags
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/tags (the `SetTags` operationId).
@@ -646,10 +720,14 @@ type ClientInterface interface {
 
 	// GetPolicy Get policy
 	//
+	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Corresponds with GET /api/v1/policy (the `GetPolicy` operationId).
 	GetPolicy(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetPolicyWithBody Set policy
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -657,6 +735,8 @@ type ClientInterface interface {
 	SetPolicyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetPolicy Set policy
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -667,6 +747,8 @@ type ClientInterface interface {
 	//
 	// Validates the given policy against the server's live users and nodes without persisting it.
 	//
+	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /api/v1/policy/check (the `CheckPolicy` operationId).
@@ -676,6 +758,8 @@ type ClientInterface interface {
 	//
 	// Validates the given policy against the server's live users and nodes without persisting it.
 	//
+	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /api/v1/policy/check (the `CheckPolicy` operationId).
@@ -683,15 +767,21 @@ type ClientInterface interface {
 
 	// DeletePreAuthKey Delete pre-auth key
 	//
+	// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Corresponds with DELETE /api/v1/preauthkey (the `DeletePreAuthKey` operationId).
 	DeletePreAuthKey(ctx context.Context, params *DeletePreAuthKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListPreAuthKeys List pre-auth keys
 	//
+	// Requires the `auth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Corresponds with GET /api/v1/preauthkey (the `ListPreAuthKeys` operationId).
 	ListPreAuthKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreatePreAuthKeyWithBody Create pre-auth key
+	//
+	// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -700,12 +790,16 @@ type ClientInterface interface {
 
 	// CreatePreAuthKey Create pre-auth key
 	//
+	// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /api/v1/preauthkey (the `CreatePreAuthKey` operationId).
 	CreatePreAuthKey(ctx context.Context, body CreatePreAuthKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ExpirePreAuthKeyWithBody Expire pre-auth key
+	//
+	// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -714,6 +808,8 @@ type ClientInterface interface {
 
 	// ExpirePreAuthKey Expire pre-auth key
 	//
+	// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
@@ -721,10 +817,14 @@ type ClientInterface interface {
 
 	// ListUsers List users
 	//
+	// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Corresponds with GET /api/v1/user (the `ListUsers` operationId).
 	ListUsers(ctx context.Context, params *ListUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateUserWithBody Create user
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -733,6 +833,8 @@ type ClientInterface interface {
 
 	// CreateUser Create user
 	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /api/v1/user (the `CreateUser` operationId).
@@ -740,13 +842,46 @@ type ClientInterface interface {
 
 	// DeleteUser Delete user
 	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Corresponds with DELETE /api/v1/user/{id} (the `DeleteUser` operationId).
 	DeleteUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// SetUserRoleWithBody Set user role
+	//
+	// Assigns an admin role. Only the owner or an admin may assign roles, nobody may change their own, and assigning owner transfers ownership: the previous owner becomes an admin. The owner's role changes only by such a transfer.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/user/{id}/role (the `SetUserRole` operationId).
+	SetUserRoleWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetUserRole Set user role
+	//
+	// Assigns an admin role. Only the owner or an admin may assign roles, nobody may change their own, and assigning owner transfers ownership: the previous owner becomes an admin. The owner's role changes only by such a transfer.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/user/{id}/role (the `SetUserRole` operationId).
+	SetUserRole(ctx context.Context, id string, body SetUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// RenameUser Rename user
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with POST /api/v1/user/{oldId}/rename/{newName} (the `RenameUser` operationId).
 	RenameUser(ctx context.Context, oldId string, newName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// Whoami Describe the caller
+	//
+	// Any authenticated caller may ask who it is; no scope is required.
+	//
+	// Corresponds with GET /api/v1/whoami (the `Whoami` operationId).
+	Whoami(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // ListApiKeys List API keys
@@ -766,6 +901,8 @@ func (c *Client) ListApiKeys(ctx context.Context, reqEditors ...RequestEditorFn)
 
 // CreateApiKeyWithBody Create API key
 //
+// Any authenticated caller may mint a key for itself; a key for another user, or a legacy key without a user, needs the owner, an admin or the socket.
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /api/v1/apikey (the `CreateApiKey` operationId).
@@ -782,6 +919,8 @@ func (c *Client) CreateApiKeyWithBody(ctx context.Context, contentType string, b
 }
 
 // CreateApiKey Create API key
+//
+// Any authenticated caller may mint a key for itself; a key for another user, or a legacy key without a user, needs the owner, an admin or the socket.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -849,6 +988,8 @@ func (c *Client) DeleteApiKey(ctx context.Context, prefix string, params *Delete
 
 // AuthApproveWithBody Approve a pending auth session
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /api/v1/auth/approve (the `AuthApprove` operationId).
@@ -865,6 +1006,8 @@ func (c *Client) AuthApproveWithBody(ctx context.Context, contentType string, bo
 }
 
 // AuthApprove Approve a pending auth session
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -883,6 +1026,8 @@ func (c *Client) AuthApprove(ctx context.Context, body AuthApproveJSONRequestBod
 
 // AuthRegisterWithBody Register node via auth flow
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /api/v1/auth/register (the `AuthRegister` operationId).
@@ -899,6 +1044,8 @@ func (c *Client) AuthRegisterWithBody(ctx context.Context, contentType string, b
 }
 
 // AuthRegister Register node via auth flow
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -917,6 +1064,8 @@ func (c *Client) AuthRegister(ctx context.Context, body AuthRegisterJSONRequestB
 
 // AuthRejectWithBody Reject a pending auth session
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /api/v1/auth/reject (the `AuthReject` operationId).
@@ -933,6 +1082,8 @@ func (c *Client) AuthRejectWithBody(ctx context.Context, contentType string, bod
 }
 
 // AuthReject Reject a pending auth session
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -951,6 +1102,8 @@ func (c *Client) AuthReject(ctx context.Context, body AuthRejectJSONRequestBody,
 
 // DebugCreateNodeWithBody Debug create node
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /api/v1/debug/node (the `DebugCreateNode` operationId).
@@ -967,6 +1120,8 @@ func (c *Client) DebugCreateNodeWithBody(ctx context.Context, contentType string
 }
 
 // DebugCreateNode Debug create node
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1002,6 +1157,8 @@ func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*ht
 
 // ListNodes List nodes
 //
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Corresponds with GET /api/v1/node (the `ListNodes` operationId).
 func (c *Client) ListNodes(ctx context.Context, params *ListNodesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListNodesRequest(c.Server, params)
@@ -1016,6 +1173,8 @@ func (c *Client) ListNodes(ctx context.Context, params *ListNodesParams, reqEdit
 }
 
 // BackfillNodeIPs Backfill node IPs
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with POST /api/v1/node/backfillips (the `BackfillNodeIPs` operationId).
 func (c *Client) BackfillNodeIPs(ctx context.Context, params *BackfillNodeIPsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1032,6 +1191,8 @@ func (c *Client) BackfillNodeIPs(ctx context.Context, params *BackfillNodeIPsPar
 
 // RegisterNode Register node
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Corresponds with POST /api/v1/node/register (the `RegisterNode` operationId).
 func (c *Client) RegisterNode(ctx context.Context, params *RegisterNodeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRegisterNodeRequest(c.Server, params)
@@ -1046,6 +1207,8 @@ func (c *Client) RegisterNode(ctx context.Context, params *RegisterNodeParams, r
 }
 
 // DeleteNode Delete node
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with DELETE /api/v1/node/{nodeId} (the `DeleteNode` operationId).
 func (c *Client) DeleteNode(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1062,6 +1225,8 @@ func (c *Client) DeleteNode(ctx context.Context, nodeId string, reqEditors ...Re
 
 // GetNode Get node
 //
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Corresponds with GET /api/v1/node/{nodeId} (the `GetNode` operationId).
 func (c *Client) GetNode(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetNodeRequest(c.Server, nodeId)
@@ -1076,6 +1241,8 @@ func (c *Client) GetNode(ctx context.Context, nodeId string, reqEditors ...Reque
 }
 
 // SetApprovedRoutesWithBody Set approved routes
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -1094,6 +1261,8 @@ func (c *Client) SetApprovedRoutesWithBody(ctx context.Context, nodeId string, c
 
 // SetApprovedRoutes Set approved routes
 //
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /api/v1/node/{nodeId}/approve_routes (the `SetApprovedRoutes` operationId).
@@ -1110,6 +1279,8 @@ func (c *Client) SetApprovedRoutes(ctx context.Context, nodeId string, body SetA
 }
 
 // ExpireNodeWithBody Expire node
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -1128,6 +1299,8 @@ func (c *Client) ExpireNodeWithBody(ctx context.Context, nodeId string, contentT
 
 // ExpireNode Expire node
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
@@ -1145,6 +1318,8 @@ func (c *Client) ExpireNode(ctx context.Context, nodeId string, body ExpireNodeJ
 
 // RenameNode Rename node
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Corresponds with POST /api/v1/node/{nodeId}/rename/{newName} (the `RenameNode` operationId).
 func (c *Client) RenameNode(ctx context.Context, nodeId string, newName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRenameNodeRequest(c.Server, nodeId, newName)
@@ -1159,6 +1334,8 @@ func (c *Client) RenameNode(ctx context.Context, nodeId string, newName string, 
 }
 
 // SetTagsWithBody Set tags
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -1177,6 +1354,8 @@ func (c *Client) SetTagsWithBody(ctx context.Context, nodeId string, contentType
 
 // SetTags Set tags
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /api/v1/node/{nodeId}/tags (the `SetTags` operationId).
@@ -1194,6 +1373,8 @@ func (c *Client) SetTags(ctx context.Context, nodeId string, body SetTagsJSONReq
 
 // GetPolicy Get policy
 //
+// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Corresponds with GET /api/v1/policy (the `GetPolicy` operationId).
 func (c *Client) GetPolicy(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPolicyRequest(c.Server)
@@ -1208,6 +1389,8 @@ func (c *Client) GetPolicy(ctx context.Context, reqEditors ...RequestEditorFn) (
 }
 
 // SetPolicyWithBody Set policy
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -1225,6 +1408,8 @@ func (c *Client) SetPolicyWithBody(ctx context.Context, contentType string, body
 }
 
 // SetPolicy Set policy
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1245,6 +1430,8 @@ func (c *Client) SetPolicy(ctx context.Context, body SetPolicyJSONRequestBody, r
 //
 // Validates the given policy against the server's live users and nodes without persisting it.
 //
+// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes any type of body and a specified content type.
 //
 // Corresponds with POST /api/v1/policy/check (the `CheckPolicy` operationId).
@@ -1264,6 +1451,8 @@ func (c *Client) CheckPolicyWithBody(ctx context.Context, contentType string, bo
 //
 // Validates the given policy against the server's live users and nodes without persisting it.
 //
+// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /api/v1/policy/check (the `CheckPolicy` operationId).
@@ -1281,6 +1470,8 @@ func (c *Client) CheckPolicy(ctx context.Context, body CheckPolicyJSONRequestBod
 
 // DeletePreAuthKey Delete pre-auth key
 //
+// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Corresponds with DELETE /api/v1/preauthkey (the `DeletePreAuthKey` operationId).
 func (c *Client) DeletePreAuthKey(ctx context.Context, params *DeletePreAuthKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeletePreAuthKeyRequest(c.Server, params)
@@ -1296,6 +1487,8 @@ func (c *Client) DeletePreAuthKey(ctx context.Context, params *DeletePreAuthKeyP
 
 // ListPreAuthKeys List pre-auth keys
 //
+// Requires the `auth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Corresponds with GET /api/v1/preauthkey (the `ListPreAuthKeys` operationId).
 func (c *Client) ListPreAuthKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListPreAuthKeysRequest(c.Server)
@@ -1310,6 +1503,8 @@ func (c *Client) ListPreAuthKeys(ctx context.Context, reqEditors ...RequestEdito
 }
 
 // CreatePreAuthKeyWithBody Create pre-auth key
+//
+// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -1328,6 +1523,8 @@ func (c *Client) CreatePreAuthKeyWithBody(ctx context.Context, contentType strin
 
 // CreatePreAuthKey Create pre-auth key
 //
+// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /api/v1/preauthkey (the `CreatePreAuthKey` operationId).
@@ -1344,6 +1541,8 @@ func (c *Client) CreatePreAuthKey(ctx context.Context, body CreatePreAuthKeyJSON
 }
 
 // ExpirePreAuthKeyWithBody Expire pre-auth key
+//
+// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -1362,6 +1561,8 @@ func (c *Client) ExpirePreAuthKeyWithBody(ctx context.Context, contentType strin
 
 // ExpirePreAuthKey Expire pre-auth key
 //
+// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
@@ -1379,6 +1580,8 @@ func (c *Client) ExpirePreAuthKey(ctx context.Context, body ExpirePreAuthKeyJSON
 
 // ListUsers List users
 //
+// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Corresponds with GET /api/v1/user (the `ListUsers` operationId).
 func (c *Client) ListUsers(ctx context.Context, params *ListUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListUsersRequest(c.Server, params)
@@ -1393,6 +1596,8 @@ func (c *Client) ListUsers(ctx context.Context, params *ListUsersParams, reqEdit
 }
 
 // CreateUserWithBody Create user
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -1411,6 +1616,8 @@ func (c *Client) CreateUserWithBody(ctx context.Context, contentType string, bod
 
 // CreateUser Create user
 //
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with POST /api/v1/user (the `CreateUser` operationId).
@@ -1428,6 +1635,8 @@ func (c *Client) CreateUser(ctx context.Context, body CreateUserJSONRequestBody,
 
 // DeleteUser Delete user
 //
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Corresponds with DELETE /api/v1/user/{id} (the `DeleteUser` operationId).
 func (c *Client) DeleteUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteUserRequest(c.Server, id)
@@ -1441,11 +1650,72 @@ func (c *Client) DeleteUser(ctx context.Context, id string, reqEditors ...Reques
 	return c.Client.Do(req)
 }
 
+// SetUserRoleWithBody Set user role
+//
+// Assigns an admin role. Only the owner or an admin may assign roles, nobody may change their own, and assigning owner transfers ownership: the previous owner becomes an admin. The owner's role changes only by such a transfer.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/user/{id}/role (the `SetUserRole` operationId).
+func (c *Client) SetUserRoleWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetUserRoleRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetUserRole Set user role
+//
+// Assigns an admin role. Only the owner or an admin may assign roles, nobody may change their own, and assigning owner transfers ownership: the previous owner becomes an admin. The owner's role changes only by such a transfer.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/user/{id}/role (the `SetUserRole` operationId).
+func (c *Client) SetUserRole(ctx context.Context, id string, body SetUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetUserRoleRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // RenameUser Rename user
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with POST /api/v1/user/{oldId}/rename/{newName} (the `RenameUser` operationId).
 func (c *Client) RenameUser(ctx context.Context, oldId string, newName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRenameUserRequest(c.Server, oldId, newName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// Whoami Describe the caller
+//
+// Any authenticated caller may ask who it is; no scope is required.
+//
+// Corresponds with GET /api/v1/whoami (the `Whoami` operationId).
+func (c *Client) Whoami(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewWhoamiRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -2655,6 +2925,53 @@ func NewDeleteUserRequest(server string, id string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewSetUserRoleRequest calls the generic SetUserRole builder with application/json body
+func NewSetUserRoleRequest(server string, id string, body SetUserRoleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetUserRoleRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewSetUserRoleRequestWithBody constructs an http.Request for the SetUserRole method, with any body, and a specified content type
+func NewSetUserRoleRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/user/%s/role", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewRenameUserRequest constructs an http.Request for the RenameUser method
 func NewRenameUserRequest(server string, oldId string, newName string) (*http.Request, error) {
 	var err error
@@ -2689,6 +3006,33 @@ func NewRenameUserRequest(server string, oldId string, newName string) (*http.Re
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewWhoamiRequest constructs an http.Request for the Whoami method
+func NewWhoamiRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/whoami")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -2749,12 +3093,16 @@ type ClientWithResponsesInterface interface {
 
 	// CreateApiKeyWithBodyWithResponse Create API key
 	//
+	// Any authenticated caller may mint a key for itself; a key for another user, or a legacy key without a user, needs the owner, an admin or the socket.
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/apikey (the `CreateApiKey` operationId).
 	CreateApiKeyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateApiKeyResponse, error)
 
 	// CreateApiKeyWithResponse Create API key
+	//
+	// Any authenticated caller may mint a key for itself; a key for another user, or a legacy key without a user, needs the owner, an admin or the socket.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2784,12 +3132,16 @@ type ClientWithResponsesInterface interface {
 
 	// AuthApproveWithBodyWithResponse Approve a pending auth session
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/auth/approve (the `AuthApprove` operationId).
 	AuthApproveWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AuthApproveResponse, error)
 
 	// AuthApproveWithResponse Approve a pending auth session
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2798,12 +3150,16 @@ type ClientWithResponsesInterface interface {
 
 	// AuthRegisterWithBodyWithResponse Register node via auth flow
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/auth/register (the `AuthRegister` operationId).
 	AuthRegisterWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AuthRegisterResponse, error)
 
 	// AuthRegisterWithResponse Register node via auth flow
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2812,12 +3168,16 @@ type ClientWithResponsesInterface interface {
 
 	// AuthRejectWithBodyWithResponse Reject a pending auth session
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/auth/reject (the `AuthReject` operationId).
 	AuthRejectWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AuthRejectResponse, error)
 
 	// AuthRejectWithResponse Reject a pending auth session
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2826,12 +3186,16 @@ type ClientWithResponsesInterface interface {
 
 	// DebugCreateNodeWithBodyWithResponse Debug create node
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/debug/node (the `DebugCreateNode` operationId).
 	DebugCreateNodeWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DebugCreateNodeResponse, error)
 
 	// DebugCreateNodeWithResponse Debug create node
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2849,12 +3213,16 @@ type ClientWithResponsesInterface interface {
 
 	// ListNodesWithResponse List nodes
 	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/node (the `ListNodes` operationId).
 	ListNodesWithResponse(ctx context.Context, params *ListNodesParams, reqEditors ...RequestEditorFn) (*ListNodesResponse, error)
 
 	// BackfillNodeIPsWithResponse Backfill node IPs
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2863,12 +3231,16 @@ type ClientWithResponsesInterface interface {
 
 	// RegisterNodeWithResponse Register node
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/node/register (the `RegisterNode` operationId).
 	RegisterNodeWithResponse(ctx context.Context, params *RegisterNodeParams, reqEditors ...RequestEditorFn) (*RegisterNodeResponse, error)
 
 	// DeleteNodeWithResponse Delete node
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2877,12 +3249,16 @@ type ClientWithResponsesInterface interface {
 
 	// GetNodeWithResponse Get node
 	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/node/{nodeId} (the `GetNode` operationId).
 	GetNodeWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodeResponse, error)
 
 	// SetApprovedRoutesWithBodyWithResponse Set approved routes
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2891,12 +3267,16 @@ type ClientWithResponsesInterface interface {
 
 	// SetApprovedRoutesWithResponse Set approved routes
 	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/approve_routes (the `SetApprovedRoutes` operationId).
 	SetApprovedRoutesWithResponse(ctx context.Context, nodeId string, body SetApprovedRoutesJSONRequestBody, reqEditors ...RequestEditorFn) (*SetApprovedRoutesResponse, error)
 
 	// ExpireNodeWithBodyWithResponse Expire node
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2905,12 +3285,16 @@ type ClientWithResponsesInterface interface {
 
 	// ExpireNodeWithResponse Expire node
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
 	ExpireNodeWithResponse(ctx context.Context, nodeId string, body ExpireNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*ExpireNodeResponse, error)
 
 	// RenameNodeWithResponse Rename node
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2919,12 +3303,16 @@ type ClientWithResponsesInterface interface {
 
 	// SetTagsWithBodyWithResponse Set tags
 	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/tags (the `SetTags` operationId).
 	SetTagsWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetTagsResponse, error)
 
 	// SetTagsWithResponse Set tags
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2933,6 +3321,8 @@ type ClientWithResponsesInterface interface {
 
 	// GetPolicyWithResponse Get policy
 	//
+	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/policy (the `GetPolicy` operationId).
@@ -2940,12 +3330,16 @@ type ClientWithResponsesInterface interface {
 
 	// SetPolicyWithBodyWithResponse Set policy
 	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/v1/policy (the `SetPolicy` operationId).
 	SetPolicyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetPolicyResponse, error)
 
 	// SetPolicyWithResponse Set policy
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2956,6 +3350,8 @@ type ClientWithResponsesInterface interface {
 	//
 	// Validates the given policy against the server's live users and nodes without persisting it.
 	//
+	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/policy/check (the `CheckPolicy` operationId).
@@ -2965,12 +3361,16 @@ type ClientWithResponsesInterface interface {
 	//
 	// Validates the given policy against the server's live users and nodes without persisting it.
 	//
+	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/policy/check (the `CheckPolicy` operationId).
 	CheckPolicyWithResponse(ctx context.Context, body CheckPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*CheckPolicyResponse, error)
 
 	// DeletePreAuthKeyWithResponse Delete pre-auth key
+	//
+	// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2979,12 +3379,16 @@ type ClientWithResponsesInterface interface {
 
 	// ListPreAuthKeysWithResponse List pre-auth keys
 	//
+	// Requires the `auth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/preauthkey (the `ListPreAuthKeys` operationId).
 	ListPreAuthKeysWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPreAuthKeysResponse, error)
 
 	// CreatePreAuthKeyWithBodyWithResponse Create pre-auth key
+	//
+	// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2993,12 +3397,16 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePreAuthKeyWithResponse Create pre-auth key
 	//
+	// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/preauthkey (the `CreatePreAuthKey` operationId).
 	CreatePreAuthKeyWithResponse(ctx context.Context, body CreatePreAuthKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePreAuthKeyResponse, error)
 
 	// ExpirePreAuthKeyWithBodyWithResponse Expire pre-auth key
+	//
+	// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -3007,12 +3415,16 @@ type ClientWithResponsesInterface interface {
 
 	// ExpirePreAuthKeyWithResponse Expire pre-auth key
 	//
+	// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
 	ExpirePreAuthKeyWithResponse(ctx context.Context, body ExpirePreAuthKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*ExpirePreAuthKeyResponse, error)
 
 	// ListUsersWithResponse List users
+	//
+	// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -3021,12 +3433,16 @@ type ClientWithResponsesInterface interface {
 
 	// CreateUserWithBodyWithResponse Create user
 	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/user (the `CreateUser` operationId).
 	CreateUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateUserResponse, error)
 
 	// CreateUserWithResponse Create user
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -3035,17 +3451,52 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteUserWithResponse Delete user
 	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /api/v1/user/{id} (the `DeleteUser` operationId).
 	DeleteUserWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteUserResponse, error)
 
+	// SetUserRoleWithBodyWithResponse Set user role
+	//
+	// Assigns an admin role. Only the owner or an admin may assign roles, nobody may change their own, and assigning owner transfers ownership: the previous owner becomes an admin. The owner's role changes only by such a transfer.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/user/{id}/role (the `SetUserRole` operationId).
+	SetUserRoleWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetUserRoleResponse, error)
+
+	// SetUserRoleWithResponse Set user role
+	//
+	// Assigns an admin role. Only the owner or an admin may assign roles, nobody may change their own, and assigning owner transfers ownership: the previous owner becomes an admin. The owner's role changes only by such a transfer.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/user/{id}/role (the `SetUserRole` operationId).
+	SetUserRoleWithResponse(ctx context.Context, id string, body SetUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*SetUserRoleResponse, error)
+
 	// RenameUserWithResponse Rename user
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/user/{oldId}/rename/{newName} (the `RenameUser` operationId).
 	RenameUserWithResponse(ctx context.Context, oldId string, newName string, reqEditors ...RequestEditorFn) (*RenameUserResponse, error)
+
+	// WhoamiWithResponse Describe the caller
+	//
+	// Any authenticated caller may ask who it is; no scope is required.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/whoami (the `Whoami` operationId).
+	WhoamiWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*WhoamiResponse, error)
 }
 
 type ListApiKeysResponse struct {
@@ -4392,6 +4843,54 @@ func (r DeleteUserResponse) ContentType() string {
 	return ""
 }
 
+type SetUserRoleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UserOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetUserRoleResponse) GetJSON200() *UserOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r SetUserRoleResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetUserRoleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetUserRoleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetUserRoleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetUserRoleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type RenameUserResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4440,6 +4939,54 @@ func (r RenameUserResponse) ContentType() string {
 	return ""
 }
 
+type WhoamiResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Whoami
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r WhoamiResponse) GetJSON200() *Whoami {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r WhoamiResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r WhoamiResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r WhoamiResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r WhoamiResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r WhoamiResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // ListApiKeysWithResponse List API keys
 //
 // Returns a wrapper object for the known response body format(s).
@@ -4455,6 +5002,8 @@ func (c *ClientWithResponses) ListApiKeysWithResponse(ctx context.Context, reqEd
 
 // CreateApiKeyWithBodyWithResponse Create API key
 //
+// Any authenticated caller may mint a key for itself; a key for another user, or a legacy key without a user, needs the owner, an admin or the socket.
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/apikey (the `CreateApiKey` operationId).
@@ -4467,6 +5016,8 @@ func (c *ClientWithResponses) CreateApiKeyWithBodyWithResponse(ctx context.Conte
 }
 
 // CreateApiKeyWithResponse Create API key
+//
+// Any authenticated caller may mint a key for itself; a key for another user, or a legacy key without a user, needs the owner, an admin or the socket.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4520,6 +5071,8 @@ func (c *ClientWithResponses) DeleteApiKeyWithResponse(ctx context.Context, pref
 
 // AuthApproveWithBodyWithResponse Approve a pending auth session
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/auth/approve (the `AuthApprove` operationId).
@@ -4532,6 +5085,8 @@ func (c *ClientWithResponses) AuthApproveWithBodyWithResponse(ctx context.Contex
 }
 
 // AuthApproveWithResponse Approve a pending auth session
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4546,6 +5101,8 @@ func (c *ClientWithResponses) AuthApproveWithResponse(ctx context.Context, body 
 
 // AuthRegisterWithBodyWithResponse Register node via auth flow
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/auth/register (the `AuthRegister` operationId).
@@ -4558,6 +5115,8 @@ func (c *ClientWithResponses) AuthRegisterWithBodyWithResponse(ctx context.Conte
 }
 
 // AuthRegisterWithResponse Register node via auth flow
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4572,6 +5131,8 @@ func (c *ClientWithResponses) AuthRegisterWithResponse(ctx context.Context, body
 
 // AuthRejectWithBodyWithResponse Reject a pending auth session
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/auth/reject (the `AuthReject` operationId).
@@ -4584,6 +5145,8 @@ func (c *ClientWithResponses) AuthRejectWithBodyWithResponse(ctx context.Context
 }
 
 // AuthRejectWithResponse Reject a pending auth session
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4598,6 +5161,8 @@ func (c *ClientWithResponses) AuthRejectWithResponse(ctx context.Context, body A
 
 // DebugCreateNodeWithBodyWithResponse Debug create node
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/debug/node (the `DebugCreateNode` operationId).
@@ -4610,6 +5175,8 @@ func (c *ClientWithResponses) DebugCreateNodeWithBodyWithResponse(ctx context.Co
 }
 
 // DebugCreateNodeWithResponse Debug create node
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4639,6 +5206,8 @@ func (c *ClientWithResponses) HealthWithResponse(ctx context.Context, reqEditors
 
 // ListNodesWithResponse List nodes
 //
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/v1/node (the `ListNodes` operationId).
@@ -4651,6 +5220,8 @@ func (c *ClientWithResponses) ListNodesWithResponse(ctx context.Context, params 
 }
 
 // BackfillNodeIPsWithResponse Backfill node IPs
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -4665,6 +5236,8 @@ func (c *ClientWithResponses) BackfillNodeIPsWithResponse(ctx context.Context, p
 
 // RegisterNodeWithResponse Register node
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/node/register (the `RegisterNode` operationId).
@@ -4677,6 +5250,8 @@ func (c *ClientWithResponses) RegisterNodeWithResponse(ctx context.Context, para
 }
 
 // DeleteNodeWithResponse Delete node
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -4691,6 +5266,8 @@ func (c *ClientWithResponses) DeleteNodeWithResponse(ctx context.Context, nodeId
 
 // GetNodeWithResponse Get node
 //
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/v1/node/{nodeId} (the `GetNode` operationId).
@@ -4703,6 +5280,8 @@ func (c *ClientWithResponses) GetNodeWithResponse(ctx context.Context, nodeId st
 }
 
 // SetApprovedRoutesWithBodyWithResponse Set approved routes
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4717,6 +5296,8 @@ func (c *ClientWithResponses) SetApprovedRoutesWithBodyWithResponse(ctx context.
 
 // SetApprovedRoutesWithResponse Set approved routes
 //
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/node/{nodeId}/approve_routes (the `SetApprovedRoutes` operationId).
@@ -4729,6 +5310,8 @@ func (c *ClientWithResponses) SetApprovedRoutesWithResponse(ctx context.Context,
 }
 
 // ExpireNodeWithBodyWithResponse Expire node
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4743,6 +5326,8 @@ func (c *ClientWithResponses) ExpireNodeWithBodyWithResponse(ctx context.Context
 
 // ExpireNodeWithResponse Expire node
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
@@ -4755,6 +5340,8 @@ func (c *ClientWithResponses) ExpireNodeWithResponse(ctx context.Context, nodeId
 }
 
 // RenameNodeWithResponse Rename node
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -4769,6 +5356,8 @@ func (c *ClientWithResponses) RenameNodeWithResponse(ctx context.Context, nodeId
 
 // SetTagsWithBodyWithResponse Set tags
 //
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/node/{nodeId}/tags (the `SetTags` operationId).
@@ -4781,6 +5370,8 @@ func (c *ClientWithResponses) SetTagsWithBodyWithResponse(ctx context.Context, n
 }
 
 // SetTagsWithResponse Set tags
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4795,6 +5386,8 @@ func (c *ClientWithResponses) SetTagsWithResponse(ctx context.Context, nodeId st
 
 // GetPolicyWithResponse Get policy
 //
+// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/v1/policy (the `GetPolicy` operationId).
@@ -4808,6 +5401,8 @@ func (c *ClientWithResponses) GetPolicyWithResponse(ctx context.Context, reqEdit
 
 // SetPolicyWithBodyWithResponse Set policy
 //
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /api/v1/policy (the `SetPolicy` operationId).
@@ -4820,6 +5415,8 @@ func (c *ClientWithResponses) SetPolicyWithBodyWithResponse(ctx context.Context,
 }
 
 // SetPolicyWithResponse Set policy
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4836,6 +5433,8 @@ func (c *ClientWithResponses) SetPolicyWithResponse(ctx context.Context, body Se
 //
 // Validates the given policy against the server's live users and nodes without persisting it.
 //
+// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/policy/check (the `CheckPolicy` operationId).
@@ -4851,6 +5450,8 @@ func (c *ClientWithResponses) CheckPolicyWithBodyWithResponse(ctx context.Contex
 //
 // Validates the given policy against the server's live users and nodes without persisting it.
 //
+// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/policy/check (the `CheckPolicy` operationId).
@@ -4863,6 +5464,8 @@ func (c *ClientWithResponses) CheckPolicyWithResponse(ctx context.Context, body 
 }
 
 // DeletePreAuthKeyWithResponse Delete pre-auth key
+//
+// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -4877,6 +5480,8 @@ func (c *ClientWithResponses) DeletePreAuthKeyWithResponse(ctx context.Context, 
 
 // ListPreAuthKeysWithResponse List pre-auth keys
 //
+// Requires the `auth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/v1/preauthkey (the `ListPreAuthKeys` operationId).
@@ -4889,6 +5494,8 @@ func (c *ClientWithResponses) ListPreAuthKeysWithResponse(ctx context.Context, r
 }
 
 // CreatePreAuthKeyWithBodyWithResponse Create pre-auth key
+//
+// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4903,6 +5510,8 @@ func (c *ClientWithResponses) CreatePreAuthKeyWithBodyWithResponse(ctx context.C
 
 // CreatePreAuthKeyWithResponse Create pre-auth key
 //
+// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/preauthkey (the `CreatePreAuthKey` operationId).
@@ -4915,6 +5524,8 @@ func (c *ClientWithResponses) CreatePreAuthKeyWithResponse(ctx context.Context, 
 }
 
 // ExpirePreAuthKeyWithBodyWithResponse Expire pre-auth key
+//
+// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4929,6 +5540,8 @@ func (c *ClientWithResponses) ExpirePreAuthKeyWithBodyWithResponse(ctx context.C
 
 // ExpirePreAuthKeyWithResponse Expire pre-auth key
 //
+// Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
@@ -4941,6 +5554,8 @@ func (c *ClientWithResponses) ExpirePreAuthKeyWithResponse(ctx context.Context, 
 }
 
 // ListUsersWithResponse List users
+//
+// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -4955,6 +5570,8 @@ func (c *ClientWithResponses) ListUsersWithResponse(ctx context.Context, params 
 
 // CreateUserWithBodyWithResponse Create user
 //
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with POST /api/v1/user (the `CreateUser` operationId).
@@ -4967,6 +5584,8 @@ func (c *ClientWithResponses) CreateUserWithBodyWithResponse(ctx context.Context
 }
 
 // CreateUserWithResponse Create user
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -4981,6 +5600,8 @@ func (c *ClientWithResponses) CreateUserWithResponse(ctx context.Context, body C
 
 // DeleteUserWithResponse Delete user
 //
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with DELETE /api/v1/user/{id} (the `DeleteUser` operationId).
@@ -4992,7 +5613,43 @@ func (c *ClientWithResponses) DeleteUserWithResponse(ctx context.Context, id str
 	return ParseDeleteUserResponse(rsp)
 }
 
+// SetUserRoleWithBodyWithResponse Set user role
+//
+// Assigns an admin role. Only the owner or an admin may assign roles, nobody may change their own, and assigning owner transfers ownership: the previous owner becomes an admin. The owner's role changes only by such a transfer.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/user/{id}/role (the `SetUserRole` operationId).
+func (c *ClientWithResponses) SetUserRoleWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetUserRoleResponse, error) {
+	rsp, err := c.SetUserRoleWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetUserRoleResponse(rsp)
+}
+
+// SetUserRoleWithResponse Set user role
+//
+// Assigns an admin role. Only the owner or an admin may assign roles, nobody may change their own, and assigning owner transfers ownership: the previous owner becomes an admin. The owner's role changes only by such a transfer.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/user/{id}/role (the `SetUserRole` operationId).
+func (c *ClientWithResponses) SetUserRoleWithResponse(ctx context.Context, id string, body SetUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*SetUserRoleResponse, error) {
+	rsp, err := c.SetUserRole(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetUserRoleResponse(rsp)
+}
+
 // RenameUserWithResponse Rename user
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -5003,6 +5660,21 @@ func (c *ClientWithResponses) RenameUserWithResponse(ctx context.Context, oldId 
 		return nil, err
 	}
 	return ParseRenameUserResponse(rsp)
+}
+
+// WhoamiWithResponse Describe the caller
+//
+// Any authenticated caller may ask who it is; no scope is required.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/whoami (the `Whoami` operationId).
+func (c *ClientWithResponses) WhoamiWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*WhoamiResponse, error) {
+	rsp, err := c.Whoami(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseWhoamiResponse(rsp)
 }
 
 // ParseListApiKeysResponse parses an HTTP response from a ListApiKeysWithResponse call
@@ -5929,6 +6601,39 @@ func ParseDeleteUserResponse(rsp *http.Response) (*DeleteUserResponse, error) {
 	return response, nil
 }
 
+// ParseSetUserRoleResponse parses an HTTP response from a SetUserRoleWithResponse call
+func ParseSetUserRoleResponse(rsp *http.Response) (*SetUserRoleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetUserRoleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UserOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseRenameUserResponse parses an HTTP response from a RenameUserWithResponse call
 func ParseRenameUserResponse(rsp *http.Response) (*RenameUserResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5945,6 +6650,39 @@ func ParseRenameUserResponse(rsp *http.Response) (*RenameUserResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest UserOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseWhoamiResponse parses an HTTP response from a WhoamiWithResponse call
+func ParseWhoamiResponse(rsp *http.Response) (*WhoamiResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &WhoamiResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Whoami
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
