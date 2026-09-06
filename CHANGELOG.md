@@ -46,6 +46,7 @@ keys remain all-access.
 - Improve systemd service file hardening [#3341](https://github.com/juanfont/headscale/pull/3341)
 - Headscale now requires Go 1.27 to build
 - Fix `headscale policy set --bypass-server-and-access-database-directly` storing the policy with its comments blanked out; the file is now saved as written
+- Fix the OIDC success page always saying "Node registered"; a node logging in again now sees "Node reauthenticated"
 
 ## 0.29.4 (unreleased)
 

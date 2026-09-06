@@ -863,6 +863,17 @@ func (a *AuthProviderOIDC) handleRegistration(
 	registrationID types.AuthID,
 	expiry *time.Time,
 ) (bool, error) {
+	// Decide "registered" versus "reauthenticated" before the registration
+	// runs: it always produces a non-empty change, so the change cannot
+	// tell the two apart afterwards.
+	newNode := true
+	if entry, ok := a.h.state.GetAuthCacheEntry(registrationID); ok {
+		all := a.h.state.GetNodesByMachineKeyAllUsers(entry.RegistrationData().MachineKey)
+		_, sameUser := all[types.UserID(user.ID)]
+		tagged, hasTagged := all[0]
+		newNode = !sameUser && !(hasTagged && tagged.IsTagged())
+	}
+
 	node, nodeChange, err := a.h.state.HandleNodeFromAuthPath(
 		registrationID,
 		types.UserID(user.ID),
@@ -892,7 +903,7 @@ func (a *AuthProviderOIDC) handleRegistration(
 	// Send both changes. Empty changes are ignored by Change().
 	a.h.Change(nodeChange, routesChange)
 
-	return !nodeChange.IsEmpty(), nil
+	return newNode, nil
 }
 
 func renderRegistrationSuccessTemplate(

@@ -344,7 +344,9 @@ func TestOIDCReloginSameNodeReauthenticates(t *testing.T) {
 	require.NoError(t, client.LogoutAndDisconnect(ctx))
 
 	relogin := client.StartInteractiveRelogin(t)
-	completeOIDCLogin(t, srv, srv.HTTPClient(t), relogin)
+	body := completeOIDCLogin(t, srv, srv.HTTPClient(t), relogin)
+	assert.Contains(t, body, "Node reauthenticated",
+		"an existing node logging in again must not be reported as newly registered")
 	relogin.Wait(t, oidcLoginTimeout)
 	client.WaitForUpdate(t, oidcLoginTimeout)
 
