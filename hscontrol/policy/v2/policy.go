@@ -67,6 +67,13 @@ type PolicyManager struct {
 	compiledGrants []compiledGrant
 	userNodeIdx    userNodeIndex
 
+	// viaGrants is every grant with its addresses resolved for
+	// [PolicyManager.ViaRoutesForPeer]; hasViaGrants is false when none
+	// of them steers through a via tag, which lets that call return
+	// before touching the viewer.
+	viaGrants    []resolvedViaGrant
+	hasViaGrants bool
+
 	// Lazy map of per-node filter rules (reduced, for packet filters)
 	filterRulesMap *xsync.Map[types.NodeID, []tailcfg.FilterRule]
 
@@ -893,7 +900,7 @@ func (pm *PolicyManager) NodeCanApproveRoute(node types.NodeView, route netip.Pr
 // legacy: three-pass via-grant resolution (match, primary election,
 // regular-overlap); splitting risks diverging the passes.
 //
-//nolint:gocyclo,gocognit,nestif,cyclop,funlen,maintidx // see above
+//nolint:gocyclo,gocognit,nestif,cyclop,maintidx // see above
 func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.ViaRouteResult {
 	var result types.ViaRouteResult
 
@@ -915,40 +922,23 @@ func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.Via
 		return result
 	}
 
-	grants := pm.pol.Grants
-	for _, acl := range pm.pol.ACLs {
-		grants = append(grants, aclToGrants(acl)...)
+	if !pm.hasViaGrants {
+		return result
 	}
 
-	// Resolve each grant's sources against the viewer once, and each
-	// grant's destinations into a flat prefix list. The three passes
-	// below reuse both results instead of re-resolving per pass.
+	// Sources and destinations were resolved when the policy, users or
+	// nodes last changed (see [resolveViaGrants]); only the viewer match
+	// is per call. The three passes below share it.
+	grants := pm.viaGrants
 	viewerIPs := viewer.IPs()
 	viewerMatchesGrant := make([]bool, len(grants))
-	resolvedDstPrefixes := make([][]netip.Prefix, len(grants))
-	grantHasAutoGroupInternet := make([]bool, len(grants))
 
-	for i, grant := range grants {
-		for _, src := range grant.Sources {
-			ips, err := src.Resolve(pm.pol, pm.users, pm.nodes)
-			if err != nil {
-				continue
-			}
-
-			if ips != nil && slices.ContainsFunc(viewerIPs, ips.Contains) {
-				viewerMatchesGrant[i] = true
-
-				break
-			}
-		}
-
-		resolvedDstPrefixes[i], grantHasAutoGroupInternet[i] = resolveViaDestinations(
-			pm.pol, pm.users, pm.nodes, grant.Destinations,
-		)
+	for i := range grants {
+		viewerMatchesGrant[i] = grants[i].matches(viewerIPs)
 	}
 
 	for i, grant := range grants {
-		if len(grant.Via) == 0 {
+		if len(grant.via) == 0 {
 			continue
 		}
 
@@ -966,7 +956,7 @@ func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.Via
 
 		var matchedPrefixes []netip.Prefix
 
-		for _, dstPrefix := range resolvedDstPrefixes[i] {
+		for _, dstPrefix := range grant.dsts {
 			for _, route := range peerSubnetRoutes {
 				if dstPrefix.Overlaps(route) {
 					matchedPrefixes = append(matchedPrefixes, route)
@@ -979,7 +969,7 @@ func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.Via
 		// "advertises the destination". The downstream Include/Exclude
 		// split below restricts the viewer to exit nodes carrying the
 		// via tag.
-		if grantHasAutoGroupInternet[i] && peer.IsExitNode() {
+		if grant.internet && peer.IsExitNode() {
 			matchedPrefixes = append(matchedPrefixes, peer.ExitRoutes()...)
 		}
 
@@ -990,7 +980,7 @@ func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.Via
 		// Check if peer has any of the via tags.
 		peerHasVia := false
 
-		for _, viaTag := range grant.Via {
+		for _, viaTag := range grant.via {
 			if peer.HasTag(string(viaTag)) {
 				peerHasVia = true
 
@@ -1031,7 +1021,7 @@ func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.Via
 		// otherwise grants for other viewer groups would incorrectly
 		// demote the peer.
 		for i, grant := range grants {
-			if len(grant.Via) == 0 {
+			if len(grant.via) == 0 {
 				continue
 			}
 
@@ -1042,7 +1032,7 @@ func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.Via
 			// Elect per matched route, not per dst — a peer can only
 			// be primary for a prefix it actually advertises, and one
 			// dst may cover multiple distinct routes.
-			for _, dstPrefix := range resolvedDstPrefixes[i] {
+			for _, dstPrefix := range grant.dsts {
 				for _, included := range slices.Clone(result.Include) {
 					if !dstPrefix.Overlaps(included) {
 						continue
@@ -1050,7 +1040,7 @@ func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.Via
 
 					var viaPrimaryID types.NodeID
 
-					for _, viaTag := range grant.Via {
+					for _, viaTag := range grant.via {
 						for _, node := range pm.nodes.All() {
 							if node.HasTag(string(viaTag)) &&
 								slices.Contains(node.SubnetRoutes(), included) {
@@ -1081,7 +1071,7 @@ func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.Via
 		// [state.State.RoutesForPeer] can apply normal
 		// [policy.ReduceRoutes] + primary logic.
 		for i, grant := range grants {
-			if len(grant.Via) > 0 {
+			if len(grant.via) > 0 {
 				continue
 			}
 
@@ -1093,7 +1083,7 @@ func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.Via
 			// defers to global HA primary election. Match by overlap so
 			// a broader or narrower regular dst still catches the
 			// routes the via grant added to Include.
-			for _, dstPrefix := range resolvedDstPrefixes[i] {
+			for _, dstPrefix := range grant.dsts {
 				for _, p := range result.Include {
 					if dstPrefix.Overlaps(p) &&
 						!slices.Contains(result.UsePrimary, p) {
@@ -1107,6 +1097,69 @@ func (pm *PolicyManager) ViaRoutesForPeer(viewer, peer types.NodeView) types.Via
 	}
 
 	return result
+}
+
+// resolvedViaGrant is one grant of the policy, ACLs included, with its
+// sources and destinations resolved to addresses. It is what
+// [PolicyManager.ViaRoutesForPeer] reads; resolving there instead cost
+// every viewer-peer pair a full pass of alias resolution, which dominated
+// full map builds.
+type resolvedViaGrant struct {
+	via      []Tag
+	srcs     []ResolvedAddresses
+	dsts     []netip.Prefix
+	internet bool
+}
+
+// matches reports whether any of ips is a source of the grant.
+func (g *resolvedViaGrant) matches(ips []netip.Addr) bool {
+	for _, src := range g.srcs {
+		if slices.ContainsFunc(ips, src.Contains) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// resolveViaGrants resolves every grant of pol for
+// [PolicyManager.ViaRoutesForPeer] and reports whether any of them has a
+// via tag. Sources that fail to resolve are skipped, as they were when the
+// resolution happened per call.
+func resolveViaGrants(
+	pol *Policy,
+	users types.Users,
+	nodes views.Slice[types.NodeView],
+) ([]resolvedViaGrant, bool) {
+	if pol == nil {
+		return nil, false
+	}
+
+	grants := slices.Clone(pol.Grants)
+	for _, acl := range pol.ACLs {
+		grants = append(grants, aclToGrants(acl)...)
+	}
+
+	resolved := make([]resolvedViaGrant, len(grants))
+	hasVia := false
+
+	for i, grant := range grants {
+		resolved[i].via = grant.Via
+		hasVia = hasVia || len(grant.Via) > 0
+
+		for _, src := range grant.Sources {
+			ips, err := src.Resolve(pol, users, nodes)
+			if err != nil || ips == nil {
+				continue
+			}
+
+			resolved[i].srcs = append(resolved[i].srcs, ips)
+		}
+
+		resolved[i].dsts, resolved[i].internet = resolveViaDestinations(pol, users, nodes, grant.Destinations)
+	}
+
+	return resolved, hasVia
 }
 
 func (pm *PolicyManager) Version() int {
@@ -1378,6 +1431,7 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 	// rules are derived from these compiled grants.
 	pm.compiledGrants = pm.pol.compileGrants(pm.users, pm.nodes)
 	pm.userNodeIdx = buildUserNodeIndex(pm.nodes)
+	pm.viaGrants, pm.hasViaGrants = resolveViaGrants(pm.pol, pm.users, pm.nodes)
 	pm.needsPerNodeFilter = hasPerNodeGrants(pm.compiledGrants)
 	pm.viaTargetTags = collectViaTargetTags(pm.compiledGrants)
 
