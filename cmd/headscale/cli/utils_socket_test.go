@@ -15,7 +15,7 @@ import (
 // tolerates a not-yet-created socket (the server-still-starting race) by
 // retrying until it appears, rather than failing immediately like a bare dial.
 func TestDialHeadscaleSocketRetriesUntilPresent(t *testing.T) {
-	sock := filepath.Join(t.TempDir(), "headscale.sock")
+	sock := shortSocketPath(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -58,7 +58,7 @@ func TestDialHeadscaleSocketRetriesUntilPresent(t *testing.T) {
 // context: when the socket never appears, the dialer returns an error around the
 // deadline instead of hanging.
 func TestDialHeadscaleSocketRespectsDeadline(t *testing.T) {
-	sock := filepath.Join(t.TempDir(), "absent.sock")
+	sock := filepath.Join(filepath.Dir(shortSocketPath(t)), "absent.sock")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()

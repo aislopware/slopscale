@@ -74,7 +74,7 @@ func serveAPIOnSocket(t *testing.T, routes map[string]apiHandler) {
 		})
 	}
 
-	socketPath := filepath.Join(t.TempDir(), "headscale.sock")
+	socketPath := shortSocketPath(t)
 
 	var lc net.ListenConfig
 
@@ -302,4 +302,17 @@ func indentJSON(t *testing.T, v any) string {
 	require.NoError(t, err)
 
 	return string(b) + "\n"
+}
+
+// shortSocketPath returns a unix socket path in a fresh temp directory that
+// stays under the 104-byte macOS limit. t.TempDir embeds the full test name,
+// which overflows it for long subtest names.
+func shortSocketPath(t *testing.T) string {
+	t.Helper()
+
+	dir, err := os.MkdirTemp("", "hs") //nolint:usetesting // t.TempDir embeds the test name and overflows the socket path limit
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+
+	return filepath.Join(dir, "hs.sock")
 }
