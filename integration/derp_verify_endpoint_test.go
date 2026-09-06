@@ -31,7 +31,7 @@ func TestDERPVerifyEndpoint(t *testing.T) {
 	headscalePort := 8080
 
 	// Create cert for headscale
-	caHeadscale, certHeadscale, keyHeadscale, err := integrationutil.CreateCertificate(hostname)
+	certsHeadscale, err := integrationutil.CreateCertificate(hostname)
 	require.NoError(t, err)
 
 	spec := ScenarioSpec{
@@ -46,8 +46,10 @@ func TestDERPVerifyEndpoint(t *testing.T) {
 
 	derper, err := scenario.CreateDERPServer(
 		"head",
-		dsic.WithCACert(caHeadscale),
-		dsic.WithVerifyClientURL(fmt.Sprintf("https://%s/verify", net.JoinHostPort(hostname, strconv.Itoa(headscalePort)))),
+		dsic.WithCACert(certsHeadscale.CACertPEM),
+		dsic.WithVerifyClientURL(
+			fmt.Sprintf("https://%s/verify", net.JoinHostPort(hostname, strconv.Itoa(headscalePort))),
+		),
 	)
 	require.NoError(t, err)
 
@@ -83,7 +85,7 @@ func TestDERPVerifyEndpoint(t *testing.T) {
 	err = scenario.CreateHeadscaleEnv([]tsic.Option{tsic.WithCACert(derper.GetCert())},
 		hsic.WithHostname(hostname),
 		hsic.WithPort(headscalePort),
-		hsic.WithCustomTLS(caHeadscale, certHeadscale, keyHeadscale),
+		hsic.WithCustomTLS(certsHeadscale.CACertPEM, certsHeadscale.CertPEM, certsHeadscale.KeyPEM),
 		hsic.WithDERPConfig(derpMap))
 	requireNoErrHeadscaleEnv(t, err)
 
@@ -120,15 +122,23 @@ func DERPVerify(
 		result = fmt.Errorf("client Connect: %w", err)
 	}
 
-	if m, err := c.Recv(); err != nil { //nolint:noinlineerr
-		result = fmt.Errorf("client first Recv: %w", err)
+	m, recvErr := c.Recv()
+	if recvErr != nil {
+		result = fmt.Errorf("client first Recv: %w", recvErr)
 	} else if v, ok := m.(derp.ServerInfoMessage); !ok {
-		result = fmt.Errorf("client first Recv was unexpected type %T", v) //nolint:err113
+		result = fmt.Errorf("client first Recv was unexpected type %T", v)
 	}
 
 	if expectSuccess && result != nil {
-		t.Fatalf("DERP verify failed unexpectedly for client %s. Expected success but got error: %v", nodeKey.Public(), result)
+		t.Fatalf(
+			"DERP verify failed unexpectedly for client %s. Expected success but got error: %v",
+			nodeKey.Public(),
+			result,
+		)
 	} else if !expectSuccess && result == nil {
-		t.Fatalf("DERP verify succeeded unexpectedly for client %s. Expected failure but it succeeded.", nodeKey.Public())
+		t.Fatalf(
+			"DERP verify succeeded unexpectedly for client %s. Expected failure but it succeeded.",
+			nodeKey.Public(),
+		)
 	}
 }

@@ -1,6 +1,7 @@
 package dsic
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -26,7 +27,10 @@ const (
 	dockerExecuteTimeout = 60 * time.Second
 )
 
-var errDERPerStatusCodeNotOk = errors.New("DERPer status code not OK")
+var (
+	errDERPerStatusCodeNotOk   = errors.New("DERPer status code not OK")
+	errDefaultTransportNotHTTP = errors.New("http.DefaultTransport is not an *http.Transport")
+)
 
 // DERPServerInContainer represents DERP Server in Container (DSIC).
 type DERPServerInContainer struct {
@@ -104,38 +108,6 @@ func WithExtraHosts(hosts []string) Option {
 	}
 }
 
-// buildEntrypoint builds the container entrypoint command based on configuration.
-// It constructs proper wait conditions instead of fixed sleeps:
-// 1. Wait for network to be ready
-// 2. Wait for TLS cert to be written (always written after container start)
-// 3. Wait for CA certs if configured
-// 4. Update CA certificates
-// 5. Run derper with provided arguments.
-func (dsic *DERPServerInContainer) buildEntrypoint(derperArgs string) []string {
-	var commands []string
-
-	// Wait for network to be ready
-	commands = append(commands, "while ! ip route show default >/dev/null 2>&1; do sleep 0.1; done")
-
-	// Wait for TLS cert to be written (always written after container start)
-	commands = append(commands,
-		fmt.Sprintf("while [ ! -f %s/%s.crt ]; do sleep 0.1; done", DERPerCertRoot, dsic.hostname))
-
-	// If CA certs are configured, wait for them to be written
-	if len(dsic.caCerts) > 0 {
-		commands = append(commands,
-			fmt.Sprintf("while [ ! -f %s/user-0.crt ]; do sleep 0.1; done", caCertRoot))
-	}
-
-	// Update CA certificates
-	commands = append(commands, "update-ca-certificates")
-
-	// Run derper
-	commands = append(commands, "derper "+derperArgs)
-
-	return []string{"/bin/sh", "-c", strings.Join(commands, " ; ")}
-}
-
 // New returns a new [tsic.TailscaleInContainer] instance.
 func New(
 	pool *dockertest.Pool,
@@ -158,7 +130,7 @@ func New(
 		hostname = fmt.Sprintf("derp-%s-%s", strings.ReplaceAll(version, ".", "-"), hash)
 	}
 
-	tlsCACert, tlsCert, tlsKey, err := integrationutil.CreateCertificate(hostname)
+	certs, err := integrationutil.CreateCertificate(hostname)
 	if err != nil {
 		return nil, fmt.Errorf("creating certificates for derp test: %w", err)
 	}
@@ -168,16 +140,16 @@ func New(
 		hostname:  hostname,
 		pool:      pool,
 		networks:  networks,
-		tlsCACert: tlsCACert,
-		tlsCert:   tlsCert,
-		tlsKey:    tlsKey,
-		stunPort:  3478, //nolint
-		derpPort:  443,  //nolint
+		tlsCACert: certs.CACertPEM,
+		tlsCert:   certs.CertPEM,
+		tlsKey:    certs.KeyPEM,
+		stunPort:  3478,
+		derpPort:  443,
 	}
 
 	// Install the CA cert so the DERP server trusts its own certificate
 	// and any headscale CA certs passed via [WithCACert].
-	dsic.caCerts = append(dsic.caCerts, tlsCACert)
+	dsic.caCerts = append(dsic.caCerts, certs.CACertPEM)
 
 	for _, opt := range opts {
 		opt(dsic)
@@ -341,15 +313,26 @@ func (t *DERPServerInContainer) WaitForRunning() error {
 	url := "https://" + net.JoinHostPort(t.GetHostname(), strconv.Itoa(t.GetDERPPort())) + "/"
 	log.Printf("waiting for DERPer to be ready at %s", url)
 
-	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()      //nolint
-	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint
+	defaultTransport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return errDefaultTransportNotHTTP
+	}
+
+	insecureTransport := defaultTransport.Clone()
+	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	client := &http.Client{Transport: insecureTransport}
 
 	return t.pool.Retry(func() error {
-		resp, err := client.Get(url) //nolint
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
+		if err != nil {
+			return fmt.Errorf("building DERPer readiness request: %w", err)
+		}
+
+		resp, err := client.Do(req)
 		if err != nil {
 			return fmt.Errorf("DERPer is not ready: %w", err)
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			return errDERPerStatusCodeNotOk
@@ -375,4 +358,32 @@ func (t *DERPServerInContainer) SaveLog(path string) error {
 	_, _, err := dockertestutil.SaveLog(t.pool, t.container, path)
 
 	return err
+}
+
+// buildEntrypoint builds the container entrypoint command based on configuration.
+// It constructs proper wait conditions instead of fixed sleeps:
+// 1. Wait for network to be ready
+// 2. Wait for TLS cert to be written (always written after container start)
+// 3. Wait for CA certs if configured
+// 4. Update CA certificates
+// 5. Run derper with provided arguments.
+func (t *DERPServerInContainer) buildEntrypoint(derperArgs string) []string {
+	var commands []string
+
+	// Wait for network to be ready, then for the TLS cert to be written
+	// (always written after container start).
+	commands = append(commands,
+		"while ! ip route show default >/dev/null 2>&1; do sleep 0.1; done",
+		fmt.Sprintf("while [ ! -f %s/%s.crt ]; do sleep 0.1; done", DERPerCertRoot, t.hostname))
+
+	// If CA certs are configured, wait for them to be written
+	if len(t.caCerts) > 0 {
+		commands = append(commands,
+			fmt.Sprintf("while [ ! -f %s/user-0.crt ]; do sleep 0.1; done", caCertRoot))
+	}
+
+	// Update CA certificates, then run derper
+	commands = append(commands, "update-ca-certificates", "derper "+derperArgs)
+
+	return []string{"/bin/sh", "-c", strings.Join(commands, " ; ")}
 }

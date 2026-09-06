@@ -35,7 +35,7 @@ import (
 	"github.com/juanfont/headscale/integration/integrationutil"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 	"tailscale.com/tailcfg"
 	"tailscale.com/util/mak"
 	"tailscale.com/util/rands"
@@ -58,9 +58,14 @@ const (
 
 var (
 	errHeadscaleStatusCodeNotOk    = errors.New("headscale status code not ok")
-	errInvalidHeadscaleImageFormat = errors.New("invalid HEADSCALE_INTEGRATION_HEADSCALE_IMAGE format, expected repository:tag")
-	errHeadscaleImageRequiredInCI  = errors.New("HEADSCALE_INTEGRATION_HEADSCALE_IMAGE must be set in CI")
-	errInvalidPostgresImageFormat  = errors.New("invalid HEADSCALE_INTEGRATION_POSTGRES_IMAGE format, expected repository:tag")
+	errInvalidHeadscaleImageFormat = errors.New(
+		"invalid HEADSCALE_INTEGRATION_HEADSCALE_IMAGE format, expected repository:tag",
+	)
+	errHeadscaleImageRequiredInCI = errors.New("HEADSCALE_INTEGRATION_HEADSCALE_IMAGE must be set in CI")
+	errDefaultTransportNotHTTP    = errors.New("http.DefaultTransport is not an *http.Transport")
+	errInvalidPostgresImageFormat = errors.New(
+		"invalid HEADSCALE_INTEGRATION_POSTGRES_IMAGE format, expected repository:tag",
+	)
 )
 
 type fileInContainer struct {
@@ -190,11 +195,11 @@ func WithHostname(hostname string) Option {
 }
 
 // WithFileInContainer adds a file to the container at the given path.
-func WithFileInContainer(path string, contents []byte) Option {
+func WithFileInContainer(containerPath string, contents []byte) Option {
 	return func(hsic *HeadscaleInContainer) {
 		hsic.filesInContainer = append(hsic.filesInContainer,
 			fileInContainer{
-				path:     path,
+				path:     containerPath,
 				contents: contents,
 			})
 	}
@@ -291,44 +296,7 @@ func WithTimezone(timezone string) Option {
 	}
 }
 
-// buildEntrypoint builds the container entrypoint command based on configuration.
-// It constructs proper wait conditions instead of fixed sleeps:
-// 1. Wait for network to be ready
-// 2. Wait for config.yaml (always written after container start)
-// 3. Wait for CA certs if configured
-// 4. Update CA certificates
-// 5. Run headscale serve
-// 6. Sleep at end to keep container alive for log collection on shutdown.
-func (hsic *HeadscaleInContainer) buildEntrypoint() []string {
-	var commands []string
-
-	// Wait for network to be ready
-	commands = append(commands, "while ! ip route show default >/dev/null 2>&1; do sleep 0.1; done")
-
-	// Wait for config.yaml to be written (always written after container start)
-	commands = append(commands, "while [ ! -f /etc/headscale/config.yaml ]; do sleep 0.1; done")
-
-	// If CA certs are configured, wait for them to be written
-	if len(hsic.caCerts) > 0 {
-		commands = append(commands,
-			fmt.Sprintf("while [ ! -f %s/user-0.crt ]; do sleep 0.1; done", caCertRoot))
-	}
-
-	// Update CA certificates
-	commands = append(commands, "update-ca-certificates")
-
-	// Run headscale serve
-	commands = append(commands, "/usr/local/bin/headscale serve")
-
-	// Keep container alive after headscale exits for log collection
-	commands = append(commands, "/bin/sleep 30")
-
-	return []string{"/bin/bash", "-c", strings.Join(commands, " ; ")}
-}
-
 // New returns a new [HeadscaleInContainer] instance.
-//
-//nolint:gocyclo // complex container setup with many options
 func New(
 	pool *dockertest.Pool,
 	networks []*dockertest.Network,
@@ -370,19 +338,19 @@ func New(
 	// disabled via [WithoutTLS] and no custom cert was provided
 	// via [WithCustomTLS].
 	if !hsic.noTLS && len(hsic.tlsCert) == 0 {
-		caCert, cert, key, err := integrationutil.CreateCertificate(hsic.hostname)
+		certs, err := integrationutil.CreateCertificate(hsic.hostname)
 		if err != nil {
 			return nil, fmt.Errorf("creating default TLS certificates: %w", err)
 		}
 
-		hsic.tlsCACert = caCert
-		hsic.tlsCert = cert
-		hsic.tlsKey = key
+		hsic.tlsCACert = certs.CACertPEM
+		hsic.tlsCert = certs.CertPEM
+		hsic.tlsKey = certs.KeyPEM
 
 		// Install the CA cert into the headscale container's trust
 		// store so that tools like curl trust the server's own
 		// certificate.
-		hsic.caCerts = append(hsic.caCerts, caCert)
+		hsic.caCerts = append(hsic.caCerts, certs.CACertPEM)
 	}
 
 	log.Println("NAME: ", hsic.hostname)
@@ -443,8 +411,6 @@ func New(
 		"HEADSCALE_DEBUG_PROFILING_ENABLED=1",
 		"HEADSCALE_DEBUG_PROFILING_PATH=/tmp/profile",
 		"HEADSCALE_DEBUG_DUMP_MAPRESPONSE_PATH=/tmp/mapresponses",
-		"HEADSCALE_DEBUG_DEADLOCK=1",
-		"HEADSCALE_DEBUG_DEADLOCK_TIMEOUT=5s",
 		"HEADSCALE_DEBUG_HIGH_CARDINALITY_METRICS=1",
 		"HEADSCALE_DEBUG_DUMP_CONFIG=1",
 	}
@@ -512,8 +478,9 @@ func New(
 	// Check if a pre-built image is available via environment variable
 	prebuiltImage := os.Getenv("HEADSCALE_INTEGRATION_HEADSCALE_IMAGE")
 
-	if prebuiltImage != "" {
-		log.Printf("Using pre-built headscale image: %s", prebuiltImage) //nolint:gosec // G706: integration-only log of trusted env value
+	switch {
+	case prebuiltImage != "":
+		log.Printf("Using pre-built headscale image: %s", prebuiltImage)
 		// Parse image into repository and tag
 		repo, tag, ok := strings.Cut(prebuiltImage, ":")
 		if !ok {
@@ -532,9 +499,9 @@ func New(
 		if err != nil {
 			return nil, fmt.Errorf("running pre-built headscale container %q: %w", prebuiltImage, err)
 		}
-	} else if util.IsCI() {
+	case util.IsCI():
 		return nil, errHeadscaleImageRequiredInCI
-	} else {
+	default:
 		container, err = pool.BuildAndRunWithBuildOptions(
 			headscaleBuildOptions,
 			runOptions,
@@ -546,7 +513,10 @@ func New(
 			// Try to get more detailed build output
 			log.Printf("Docker build/run failed, attempting to get detailed output...")
 
-			buildOutput, buildErr := dockertestutil.RunDockerBuildForDiagnostics(dockerContextPath, IntegrationTestDockerFileName)
+			buildOutput, buildErr := dockertestutil.RunDockerBuildForDiagnostics(
+				dockerContextPath,
+				IntegrationTestDockerFileName,
+			)
 
 			// Show the last 100 lines of build output to avoid overwhelming the logs
 			lines := strings.Split(buildOutput, "\n")
@@ -562,16 +532,32 @@ func New(
 
 			if buildErr != nil {
 				// The diagnostic build also failed - this is the real error
-				return nil, fmt.Errorf("starting headscale container: %w\n\nDocker build failed. Last %d lines of output:\n%s", err, maxLines, relevantOutput)
+				return nil, fmt.Errorf(
+					"starting headscale container: %w\n\nDocker build failed. Last %d lines of output:\n%s",
+					err,
+					maxLines,
+					relevantOutput,
+				)
 			}
 
 			if buildOutput != "" {
 				// Build succeeded on retry but container creation still failed
-				return nil, fmt.Errorf("starting headscale container: %w\n\nDocker build succeeded on retry, but container creation failed. Last %d lines of build output:\n%s", err, maxLines, relevantOutput)
+				return nil, fmt.Errorf(
+					"starting headscale container: %w\n\n"+
+						"Docker build succeeded on retry, but container creation failed. "+
+						"Last %d lines of build output:\n%s",
+					err,
+					maxLines,
+					relevantOutput,
+				)
 			}
 
 			// No output at all - diagnostic build command may have failed
-			return nil, fmt.Errorf("starting headscale container: %w\n\nUnable to get diagnostic build output (command may have failed silently)", err)
+			return nil, fmt.Errorf(
+				"starting headscale container: %w\n\n"+
+					"Unable to get diagnostic build output (command may have failed silently)",
+				err,
+			)
 		}
 	}
 
@@ -642,10 +628,6 @@ func New(
 
 func (t *HeadscaleInContainer) ConnectToNetwork(network *dockertest.Network) error {
 	return t.container.ConnectToNetwork(network)
-}
-
-func (t *HeadscaleInContainer) hasTLS() bool {
-	return len(t.tlsCert) != 0 && len(t.tlsKey) != 0
 }
 
 // Shutdown stops and cleans up the Headscale container.
@@ -732,12 +714,17 @@ func (t *HeadscaleInContainer) ReadLog() (string, string, error) {
 
 // SaveLog saves the current stdout log of the container to a path
 // on the host system.
-func (t *HeadscaleInContainer) SaveLog(path string) (string, string, error) {
-	return dockertestutil.SaveLog(t.pool, t.container, path)
+func (t *HeadscaleInContainer) SaveLog(savePath string) (string, string, error) {
+	return dockertestutil.SaveLog(t.pool, t.container, savePath)
 }
 
 func (t *HeadscaleInContainer) SaveMetrics(savePath string) error {
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+net.JoinHostPort(t.hostname, "9090")+"/metrics", nil)
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		"http://"+net.JoinHostPort(t.hostname, "9090")+"/metrics",
+		http.NoBody,
+	)
 	if err != nil {
 		return fmt.Errorf("creating metrics request: %w", err)
 	}
@@ -824,7 +811,6 @@ func extractTarToDirectory(tarData []byte, targetDir string) error {
 		switch header.Typeflag {
 		case tar.TypeDir:
 			// Create directory
-			//nolint:gosec // G115: header.Mode is trusted from tar archive
 			err := os.MkdirAll(targetPath, os.FileMode(header.Mode))
 			if err != nil {
 				return fmt.Errorf("creating directory %s: %w", targetPath, err)
@@ -842,7 +828,8 @@ func extractTarToDirectory(tarData []byte, targetDir string) error {
 				return fmt.Errorf("creating file %s: %w", targetPath, err)
 			}
 
-			if _, err := io.Copy(outFile, tarReader); err != nil { //nolint:gosec,noinlineerr // trusted tar from test container
+			_, err = io.Copy(outFile, tarReader)
+			if err != nil {
 				outFile.Close()
 				return fmt.Errorf("copying file contents: %w", err)
 			}
@@ -850,7 +837,8 @@ func extractTarToDirectory(tarData []byte, targetDir string) error {
 			outFile.Close()
 
 			// Set file permissions
-			if err := os.Chmod(targetPath, os.FileMode(header.Mode)); err != nil { //nolint:gosec,noinlineerr // safe mode from tar header
+			err = os.Chmod(targetPath, os.FileMode(header.Mode))
+			if err != nil {
 				return fmt.Errorf("setting file permissions: %w", err)
 			}
 		}
@@ -912,7 +900,7 @@ func (t *HeadscaleInContainer) SaveDatabase(savePath string) error {
 	}
 
 	if strings.TrimSpace(schemaCheck) == "" {
-		return errors.New("database file exists but has no schema (empty database)") //nolint:err113
+		return errors.New("database file exists but has no schema (empty database)")
 	}
 
 	tarFile, err := t.FetchPath("/tmp/integration_test_db.sqlite3")
@@ -948,7 +936,7 @@ func (t *HeadscaleInContainer) SaveDatabase(savePath string) error {
 				return fmt.Errorf("creating database file: %w", err)
 			}
 
-			written, err := io.Copy(outFile, tarReader) //nolint:gosec // trusted tar from test container
+			written, err := io.Copy(outFile, tarReader)
 			outFile.Close()
 
 			if err != nil {
@@ -964,7 +952,7 @@ func (t *HeadscaleInContainer) SaveDatabase(savePath string) error {
 
 			// Check if we actually wrote something
 			if written == 0 {
-				return fmt.Errorf( //nolint:err113
+				return fmt.Errorf(
 					"database file is empty (size: %d, header size: %d)",
 					written,
 					header.Size,
@@ -975,7 +963,7 @@ func (t *HeadscaleInContainer) SaveDatabase(savePath string) error {
 		}
 	}
 
-	return errors.New("no regular file found in database tar archive") //nolint:err113
+	return errors.New("no regular file found in database tar archive")
 }
 
 // Execute runs a command inside the Headscale container and returns the
@@ -1068,7 +1056,7 @@ func (t *HeadscaleInContainer) CreateOAuthClient(
 	}
 
 	if resp.JSON200 == nil {
-		return "", "", fmt.Errorf( //nolint:err113
+		return "", "", fmt.Errorf(
 			"creating OAuth client: status %s: %s", resp.Status(), strings.TrimSpace(string(resp.Body)))
 	}
 
@@ -1091,46 +1079,9 @@ func (t *HeadscaleInContainer) CreateOAuthClient(
 	return clientID, clientSecret, nil
 }
 
-// httpClient returns an HTTP client that trusts this Headscale's TLS CA when TLS
-// is enabled, or a default client when it serves plain HTTP.
-func (t *HeadscaleInContainer) httpClient() *http.Client {
-	if !t.hasTLS() {
-		return &http.Client{Timeout: 30 * time.Second}
-	}
-
-	pool := x509.NewCertPool()
-	pool.AppendCertsFromPEM(t.tlsCACert)
-
-	return &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12},
-		},
-	}
-}
-
 // GetIPEndpoint returns the Headscale endpoint using IP address instead of hostname.
 func (t *HeadscaleInContainer) GetIPEndpoint() string {
 	return t.getEndpoint(true)
-}
-
-// getEndpoint returns the Headscale endpoint, optionally using IP address instead of hostname.
-func (t *HeadscaleInContainer) getEndpoint(useIP bool) string {
-	var host string
-	if useIP && len(t.networks) > 0 {
-		// Use IP address from the first network
-		host = t.GetIPInNetwork(t.networks[0])
-	} else {
-		host = t.GetHostname()
-	}
-
-	hostEndpoint := fmt.Sprintf("%s:%d", host, t.port)
-
-	if t.hasTLS() {
-		return "https://" + hostEndpoint
-	}
-
-	return "http://" + hostEndpoint
 }
 
 // GetCert returns the CA certificate that clients should trust to
@@ -1159,16 +1110,27 @@ func (t *HeadscaleInContainer) WaitForRunning() error {
 	client := &http.Client{}
 
 	if t.hasTLS() {
-		insecureTransport := http.DefaultTransport.(*http.Transport).Clone()      //nolint
-		insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint
+		defaultTransport, ok := http.DefaultTransport.(*http.Transport)
+		if !ok {
+			return errDefaultTransportNotHTTP
+		}
+
+		insecureTransport := defaultTransport.Clone()
+		insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 		client = &http.Client{Transport: insecureTransport}
 	}
 
 	return t.pool.Retry(func() error {
-		resp, err := client.Get(url) //nolint
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
+		if err != nil {
+			return fmt.Errorf("building headscale readiness request: %w", err)
+		}
+
+		resp, err := client.Do(req)
 		if err != nil {
 			return fmt.Errorf("headscale is not ready: %w", err)
 		}
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			return errHeadscaleStatusCodeNotOk
@@ -1507,66 +1469,35 @@ func (t *HeadscaleInContainer) DeleteUser(userID uint64) error {
 	return nil
 }
 
-func (h *HeadscaleInContainer) SetPolicy(pol *policyv2.Policy) error {
-	err := h.writePolicy(pol)
+func (t *HeadscaleInContainer) SetPolicy(pol *policyv2.Policy) error {
+	err := t.writePolicy(pol)
 	if err != nil {
 		return fmt.Errorf("writing policy file: %w", err)
 	}
 
-	switch h.policyMode {
+	switch t.policyMode {
 	case types.PolicyModeDB:
-		err := h.reloadDatabasePolicy()
+		err := t.reloadDatabasePolicy()
 		if err != nil {
 			return fmt.Errorf("reloading database policy: %w", err)
 		}
 	case types.PolicyModeFile:
-		err := h.Reload()
+		err := t.Reload()
 		if err != nil {
 			return fmt.Errorf("reloading policy file: %w", err)
 		}
 	default:
-		panic("policy mode is not valid: " + h.policyMode)
+		panic("policy mode is not valid: " + t.policyMode)
 	}
 
 	return nil
 }
 
-func (h *HeadscaleInContainer) reloadDatabasePolicy() error {
-	_, err := h.Execute(
-		[]string{
-			binHeadscale,
-			"policy",
-			"set",
-			"-f",
-			aclPolicyPath,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("setting policy with db command: %w", err)
-	}
-
-	return nil
-}
-
-func (h *HeadscaleInContainer) writePolicy(pol *policyv2.Policy) error {
-	pBytes, err := json.Marshal(pol)
-	if err != nil {
-		return fmt.Errorf("marshalling policy: %w", err)
-	}
-
-	err = h.WriteFile(aclPolicyPath, pBytes)
-	if err != nil {
-		return fmt.Errorf("writing policy to headscale container: %w", err)
-	}
-
-	return nil
-}
-
-func (h *HeadscaleInContainer) PID() (int, error) {
+func (t *HeadscaleInContainer) PID() (int, error) {
 	// Use pidof to find the headscale process, which is more reliable than grep
 	// as it only looks for the actual binary name, not processes that contain
 	// "headscale" in their command line (like the dlv debugger).
-	output, err := h.Execute([]string{"pidof", binHeadscale})
+	output, err := t.Execute([]string{"pidof", binHeadscale})
 	if err != nil {
 		// pidof returns exit code 1 when no process is found
 		return 0, os.ErrNotExist
@@ -1606,13 +1537,13 @@ func (h *HeadscaleInContainer) PID() (int, error) {
 
 // Reload sends a SIGHUP to the headscale process to reload internals,
 // for example Policy from file.
-func (h *HeadscaleInContainer) Reload() error {
-	pid, err := h.PID()
+func (t *HeadscaleInContainer) Reload() error {
+	pid, err := t.PID()
 	if err != nil {
 		return fmt.Errorf("getting headscale PID: %w", err)
 	}
 
-	_, err = h.Execute([]string{"kill", "-HUP", strconv.Itoa(pid)})
+	_, err = t.Execute([]string{"kill", "-HUP", strconv.Itoa(pid)})
 	if err != nil {
 		return fmt.Errorf("reloading headscale with HUP: %w", err)
 	}
@@ -1625,13 +1556,13 @@ func (h *HeadscaleInContainer) Reload() error {
 // the bounded cache of pending authentication sessions. This reproduces a
 // control-plane restart, one of the real-world cases where a pending SSH-check
 // auth session is lost.
-func (h *HeadscaleInContainer) Restart() error {
-	err := h.pool.Client.RestartContainer(h.container.Container.ID, 30)
+func (t *HeadscaleInContainer) Restart() error {
+	err := t.pool.Client.RestartContainer(t.container.Container.ID, 30)
 	if err != nil {
-		return fmt.Errorf("restarting headscale container %s: %w", h.hostname, err)
+		return fmt.Errorf("restarting headscale container %s: %w", t.hostname, err)
 	}
 
-	return h.WaitForRunning()
+	return t.WaitForRunning()
 }
 
 // ApproveRoutes approves routes for a node.
@@ -1698,14 +1629,14 @@ func (t *HeadscaleInContainer) SetNodeTags(nodeID uint64, tags []string) error {
 }
 
 // WriteFile save file inside the Headscale container.
-func (t *HeadscaleInContainer) WriteFile(path string, data []byte) error {
-	return integrationutil.WriteFileToContainer(t.pool, t.container, path, data)
+func (t *HeadscaleInContainer) WriteFile(containerPath string, data []byte) error {
+	return integrationutil.WriteFileToContainer(t.pool, t.container, containerPath, data)
 }
 
 // FetchPath gets a path from inside the Headscale container and returns a tar
 // file as byte array.
-func (t *HeadscaleInContainer) FetchPath(path string) ([]byte, error) {
-	return integrationutil.FetchPathFromContainer(t.pool, t.container, path)
+func (t *HeadscaleInContainer) FetchPath(containerPath string) ([]byte, error) {
+	return integrationutil.FetchPathFromContainer(t.pool, t.container, containerPath)
 }
 
 func (t *HeadscaleInContainer) SendInterrupt() error {
@@ -1746,6 +1677,97 @@ func (t *HeadscaleInContainer) DebugFilter() ([]tailcfg.FilterRule, error) {
 	return t.debugJSON[[]tailcfg.FilterRule]("filter")
 }
 
+// DebugPolicy fetches the current policy from the debug endpoint.
+func (t *HeadscaleInContainer) DebugPolicy() (string, error) {
+	// Execute curl inside the container to access the debug endpoint locally
+	command := []string{
+		"curl", "-s", "http://localhost:9090/debug/policy",
+	}
+
+	result, err := t.Execute(command)
+	if err != nil {
+		return "", fmt.Errorf("fetching policy from debug endpoint: %w", err)
+	}
+
+	return result, nil
+}
+
+// hasTLS reports whether the container was configured with a TLS certificate
+// and key.
+func (t *HeadscaleInContainer) hasTLS() bool {
+	return len(t.tlsCert) != 0 && len(t.tlsKey) != 0
+}
+
+// httpClient returns an HTTP client that trusts this Headscale's TLS CA when TLS
+// is enabled, or a default client when it serves plain HTTP.
+func (t *HeadscaleInContainer) httpClient() *http.Client {
+	if !t.hasTLS() {
+		return &http.Client{Timeout: 30 * time.Second}
+	}
+
+	pool := x509.NewCertPool()
+	pool.AppendCertsFromPEM(t.tlsCACert)
+
+	return &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12},
+		},
+	}
+}
+
+// getEndpoint returns the Headscale endpoint, optionally using IP address instead of hostname.
+func (t *HeadscaleInContainer) getEndpoint(useIP bool) string {
+	var host string
+	if useIP && len(t.networks) > 0 {
+		// Use IP address from the first network
+		host = t.GetIPInNetwork(t.networks[0])
+	} else {
+		host = t.GetHostname()
+	}
+
+	hostEndpoint := net.JoinHostPort(host, strconv.Itoa(t.port))
+
+	if t.hasTLS() {
+		return "https://" + hostEndpoint
+	}
+
+	return "http://" + hostEndpoint
+}
+
+// reloadDatabasePolicy tells headscale to reload the policy from the database.
+func (t *HeadscaleInContainer) reloadDatabasePolicy() error {
+	_, err := t.Execute(
+		[]string{
+			binHeadscale,
+			"policy",
+			"set",
+			"-f",
+			aclPolicyPath,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("setting policy with db command: %w", err)
+	}
+
+	return nil
+}
+
+// writePolicy marshals pol and writes it to the policy file inside the container.
+func (t *HeadscaleInContainer) writePolicy(pol *policyv2.Policy) error {
+	pBytes, err := json.Marshal(pol)
+	if err != nil {
+		return fmt.Errorf("marshalling policy: %w", err)
+	}
+
+	err = t.WriteFile(aclPolicyPath, pBytes)
+	if err != nil {
+		return fmt.Errorf("writing policy to headscale container: %w", err)
+	}
+
+	return nil
+}
+
 // debugJSON fetches and decodes a JSON-returning debug endpoint by name.
 func (t *HeadscaleInContainer) debugJSON[T any](endpoint string) (T, error) {
 	var res T
@@ -1760,24 +1782,43 @@ func (t *HeadscaleInContainer) debugJSON[T any](endpoint string) (T, error) {
 		return res, fmt.Errorf("fetching %s from debug endpoint: %w", endpoint, err)
 	}
 
-	if err := json.Unmarshal([]byte(result), &res); err != nil { //nolint:noinlineerr
+	err = json.Unmarshal([]byte(result), &res)
+	if err != nil {
 		return res, fmt.Errorf("decoding %s response: %w", endpoint, err)
 	}
 
 	return res, nil
 }
 
-// DebugPolicy fetches the current policy from the debug endpoint.
-func (t *HeadscaleInContainer) DebugPolicy() (string, error) {
-	// Execute curl inside the container to access the debug endpoint locally
-	command := []string{
-		"curl", "-s", "http://localhost:9090/debug/policy",
+// buildEntrypoint builds the container entrypoint command based on configuration.
+// It constructs proper wait conditions instead of fixed sleeps:
+// 1. Wait for network to be ready
+// 2. Wait for config.yaml (always written after container start)
+// 3. Wait for CA certs if configured
+// 4. Update CA certificates
+// 5. Run headscale serve
+// 6. Sleep at end to keep container alive for log collection on shutdown.
+func (t *HeadscaleInContainer) buildEntrypoint() []string {
+	var commands []string
+
+	// Wait for network to be ready, then for config.yaml to be written
+	// (always written after container start).
+	commands = append(commands,
+		"while ! ip route show default >/dev/null 2>&1; do sleep 0.1; done",
+		"while [ ! -f /etc/headscale/config.yaml ]; do sleep 0.1; done")
+
+	// If CA certs are configured, wait for them to be written
+	if len(t.caCerts) > 0 {
+		commands = append(commands,
+			fmt.Sprintf("while [ ! -f %s/user-0.crt ]; do sleep 0.1; done", caCertRoot))
 	}
 
-	result, err := t.Execute(command)
-	if err != nil {
-		return "", fmt.Errorf("fetching policy from debug endpoint: %w", err)
-	}
+	// Update CA certificates, run headscale serve, then keep the container
+	// alive after headscale exits for log collection.
+	commands = append(commands,
+		"update-ca-certificates",
+		"/usr/local/bin/headscale serve",
+		"/bin/sleep 30")
 
-	return result, nil
+	return []string{"/bin/bash", "-c", strings.Join(commands, " ; ")}
 }
