@@ -1,19 +1,15 @@
 package sqliteconfig
 
 import (
-	"database/sql"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	_ "modernc.org/sqlite"
 )
 
 const memoryDBPath = ":memory:"
 
-// TestSQLiteDriverPragmaIntegration verifies that the modernc.org/sqlite driver
-// correctly applies all pragma settings from URL parameters, ensuring they work
-// the same as the old SQL PRAGMA statements approach.
+// TestSQLiteDriverPragmaIntegration verifies that a pool from [Open] applies
+// every pragma of the configuration to its connections.
 func TestSQLiteDriverPragmaIntegration(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -85,15 +81,7 @@ func TestSQLiteDriverPragmaIntegration(t *testing.T) {
 				tt.config = &configCopy
 			}
 
-			// Generate URL and open database
-			url, err := tt.config.ToURL()
-			if err != nil {
-				t.Fatalf("Failed to generate URL: %v", err)
-			}
-
-			t.Logf("Opening database with URL: %s", url)
-
-			db, err := sql.Open("sqlite", url)
+			db, err := Open(tt.config)
 			if err != nil {
 				t.Fatalf("Failed to open database: %v", err)
 			}
@@ -156,12 +144,7 @@ func TestForeignKeyConstraintEnforcement(t *testing.T) {
 	dbPath := filepath.Join(tempDir, "fk_test.db")
 	config := Default(dbPath)
 
-	url, err := config.ToURL()
-	if err != nil {
-		t.Fatalf("Failed to generate URL: %v", err)
-	}
-
-	db, err := sql.Open("sqlite", url)
+	db, err := Open(config)
 	if err != nil {
 		t.Fatalf("Failed to open database: %v", err)
 	}
@@ -247,12 +230,7 @@ func TestJournalModeValidation(t *testing.T) {
 				ForeignKeys: true,
 			}
 
-			url, err := config.ToURL()
-			if err != nil {
-				t.Fatalf("Failed to generate URL: %v", err)
-			}
-
-			db, err := sql.Open("sqlite", url)
+			db, err := Open(config)
 			if err != nil {
 				t.Fatalf("Failed to open database: %v", err)
 			}

@@ -21,7 +21,7 @@ import (
 	sqlitegen "github.com/go-jet/jet/v2/generator/sqlite"
 	"github.com/go-jet/jet/v2/generator/template"
 	"github.com/go-jet/jet/v2/sqlite"
-	_ "modernc.org/sqlite" // registers the "sqlite" database/sql driver
+	"github.com/juanfont/headscale/hscontrol/db/sqliteconfig"
 )
 
 var errEmptySchema = errors.New("schema file is empty")
@@ -54,7 +54,7 @@ func run(schemaPath, outDir string) error {
 
 	defer func() { _ = os.RemoveAll(dir) }()
 
-	db, err := sql.Open("sqlite", "file:"+filepath.Join(dir, "schema.sqlite"))
+	db, err := sql.Open(sqliteconfig.DriverName, filepath.Join(dir, "schema.sqlite"))
 	if err != nil {
 		return fmt.Errorf("opening scratch database: %w", err)
 	}

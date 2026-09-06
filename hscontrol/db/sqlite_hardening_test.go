@@ -1,17 +1,24 @@
 package db
 
 import (
+	"os"
+	"strings"
 	"testing"
 
+	"github.com/juanfont/headscale/hscontrol/db/sqliteconfig"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestSQLiteHardeningReachesProduction opens the database exactly as the
-// server does and checks that the connection-level hardening from
-// sqliteconfig is in force: the DSN is only honoured because hscontrol/db
-// opens SQLite through the modernc driver directly.
+// server does and checks that the compile-time hardening from sqlite.cflags
+// is in force. The flags reach the compiler through CGO_CFLAGS, which make
+// and the Nix flake export; a bare `go test` cannot see them and skips.
 func TestSQLiteHardeningReachesProduction(t *testing.T) {
+	if !strings.Contains(os.Getenv("CGO_CFLAGS"), "SQLITE_DQS=0") {
+		t.Skip("CGO_CFLAGS does not carry sqlite.cflags; run through make test")
+	}
+
 	db, err := newSQLiteTestDB()
 	require.NoError(t, err)
 
@@ -21,23 +28,14 @@ func TestSQLiteHardeningReachesProduction(t *testing.T) {
 
 	ctx := t.Context()
 
-	// Defensive mode: the request to make the schema writable is refused
-	// silently, so the pragma reads back as off.
-	_, err = db.DB.ExecContext(ctx, "PRAGMA writable_schema = ON")
+	hardening, err := sqliteconfig.ProbeHardening(ctx, db.DB)
 	require.NoError(t, err)
+	assert.True(t, hardening.Defensive, "defensive mode must keep writable_schema off")
+	assert.True(t, hardening.StrictDoubleQuotes, "double-quoted string literals must be rejected")
 
-	var writable int
-	require.NoError(t, db.DB.QueryRowContext(ctx, "PRAGMA writable_schema").Scan(&writable))
-	assert.Equal(t, 0, writable, "defensive mode must keep writable_schema off")
-
-	// Strict double quotes: an unknown double-quoted identifier is an error
-	// rather than a silently substituted string literal.
+	// The probe leaves the connection usable and ordinary literals work.
 	var out string
 
-	err = db.DB.QueryRowContext(ctx, `SELECT "no_such_column"`).Scan(&out)
-	require.ErrorContains(t, err, "no such column")
-
-	// Ordinary single-quoted literals keep working through the same path.
 	require.NoError(t, db.DB.QueryRowContext(ctx, `SELECT 'literal'`).Scan(&out))
 	assert.Equal(t, "literal", out)
 }

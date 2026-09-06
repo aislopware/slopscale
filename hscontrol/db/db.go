@@ -17,7 +17,6 @@ import (
 	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/rs/zerolog/log"
 	"github.com/tailscale/squibble"
-	_ "modernc.org/sqlite" // registers the "sqlite" database/sql driver
 )
 
 //go:generate go run ../../cmd/gen-jet -schema schema.sql -out ../../gen/jet
@@ -124,19 +123,14 @@ func openSQLite(cfg types.SqliteConfig) (*sql.DB, error) {
 		Str("path", cfg.Path).
 		Msg("Opening database")
 
-	// Connection-level hardening and pragmas are applied through the URL.
 	sqliteConfig := sqliteconfig.Default(cfg.Path)
 	if cfg.WriteAheadLog {
 		sqliteConfig.JournalMode = sqliteconfig.JournalModeWAL
 		sqliteConfig.WALAutocheckpoint = cfg.WALAutoCheckPoint
 	}
 
-	connectionURL, err := sqliteConfig.ToURL()
-	if err != nil {
-		return nil, fmt.Errorf("building sqlite connection URL: %w", err)
-	}
-
-	pool, err := sql.Open(sqliteconfig.DriverName, connectionURL)
+	// The connector applies the pragmas to every connection the pool opens.
+	pool, err := sqliteconfig.Open(sqliteConfig)
 	if err != nil {
 		return nil, fmt.Errorf("opening sqlite database: %w", err)
 	}
@@ -147,6 +141,23 @@ func openSQLite(cfg types.SqliteConfig) (*sql.DB, error) {
 	pool.SetMaxIdleConns(1)
 	pool.SetMaxOpenConns(1)
 	pool.SetConnMaxIdleTime(time.Hour)
+
+	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
+	defer cancel()
+
+	hardening, err := sqliteconfig.ProbeHardening(ctx, pool)
+	if err != nil {
+		_ = pool.Close()
+
+		return nil, fmt.Errorf("probing sqlite hardening: %w", err)
+	}
+
+	if !hardening.Complete() {
+		log.Warn().
+			Bool("defensive", hardening.Defensive).
+			Bool("strict_double_quotes", hardening.StrictDoubleQuotes).
+			Msg("SQLite was compiled without the hardening flags from sqlite.cflags; build with make or nix")
+	}
 
 	return pool, nil
 }

@@ -20,6 +20,11 @@
     let
       headscaleVersion = self.shortRev or self.dirtyShortRev;
       commitHash = self.rev or self.dirtyRev;
+      # C flags for the SQLite bundled in mattn/go-sqlite3 (see
+      # sqlite.cflags); exported as CGO_CFLAGS wherever Go compiles it.
+      sqliteCFlags = nixpkgs.lib.concatStringsSep " "
+        (nixpkgs.lib.filter (l: l != "" && !nixpkgs.lib.hasPrefix "#" l)
+          (nixpkgs.lib.splitString "\n" (builtins.readFile ./sqlite.cflags)));
     in
     {
       # NixOS module
@@ -49,6 +54,10 @@
             #   go run ./cmd/vendorhash update
             inherit vendorHash;
 
+            # The SQLite driver is C compiled by cgo (buildGoModule enables
+            # cgo whenever a C compiler is present).
+            env.CGO_CFLAGS = sqliteCFlags;
+
             subPackages = [ "cmd/headscale" ];
 
             meta = {
@@ -63,6 +72,8 @@
 
             checkFlags = [ "-short" ];
             inherit vendorHash;
+
+            env.CGO_CFLAGS = sqliteCFlags;
 
             subPackages = [ "cmd/hi" ];
           };
@@ -104,8 +115,12 @@
           inherit system;
         };
         buildDeps = with pkgs; [ git go_latest gnumake ];
+        # zig is the C cross compiler behind zigcc for the Linux release
+        # binaries and container images (cgo needs a compiler per target).
+        crossDeps = with pkgs; [ zig ];
         devDeps = with pkgs;
           buildDeps
+          ++ crossDeps
           ++ [
             golangci-lint
             golangci-lint-langserver
@@ -177,18 +192,21 @@
           ];
         };
         goChecks = {
-          build = fc.goBuild (common // { subPackages = [ "cmd/headscale" ]; });
+          build = fc.goBuild (common // {
+            subPackages = [ "cmd/headscale" ];
+            env = { CGO_CFLAGS = sqliteCFlags; };
+          });
 
           # The pure unit subset. ./integration (Docker) and
           # ./hscontrol/servertest (slow: 10s+ convergence plus race/stress/HA
           # property tests — run by the servertest workflow instead) are dropped
           # from the test set but kept in source so cmd/hi and friends still
           # compile; TestPostgres* needs a server (the SQLite equivalents still
-          # run). CGO off matches the build.
+          # run). The SQLite C flags match the build.
           gotest = fc.goTest (common // {
             testExclude = [ "/integration" "/hscontrol/servertest" ];
             goSkip = [ "TestPostgres" ];
-            testEnv = "export CGO_ENABLED=0";
+            testEnv = "export CGO_CFLAGS=\"${sqliteCFlags}\"";
           });
 
           # Full-tree golangci-lint (golines, gofumpt, etc.); uses the overlay's
@@ -221,6 +239,28 @@
                   exec go run ./cmd/vendorhash update "$@"
                 '')
 
+              # cgo cross compiler for go build, goreleaser and ko: maps the
+              # GOOS/GOARCH they set to a zig target so the SQLite C sources
+              # compile for every Linux release target and link statically
+              # against musl. Native builds use the platform compiler.
+              (pkgs.writeShellScriptBin
+                "zigcc"
+                ''
+                  set -eu
+                  case "''${GOOS:-}/''${GOARCH:-}''${GOARM:+v$GOARM}" in
+                    linux/amd64) target=x86_64-linux-musl ;;
+                    linux/arm64) target=aarch64-linux-musl ;;
+                    linux/arm | linux/armv7) target=arm-linux-musleabihf ;;
+                    *)
+                      echo "zigcc: no zig target for GOOS=''${GOOS:-} GOARCH=''${GOARCH:-}" >&2
+                      exit 1
+                      ;;
+                  esac
+                  # zig cc turns on UBSan for C by default and Go's linker has
+                  # no runtime for it; the SQLite amalgamation is built without.
+                  exec ${pkgs.zig}/bin/zig cc -target "$target" -fno-sanitize=undefined "$@"
+                '')
+
               (pkgs.writeShellScriptBin
                 "go-mod-update-all"
                 ''
@@ -231,7 +271,8 @@
 
           shellHook = ''
             export PATH="$PWD/result/bin:$PATH"
-            export CGO_ENABLED=0
+            export CGO_ENABLED=1
+            export CGO_CFLAGS="${sqliteCFlags}"
           '';
         };
 

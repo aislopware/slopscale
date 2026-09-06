@@ -141,7 +141,7 @@ func TestCannotDeleteAssignedPreAuthKey(t *testing.T) {
 	require.NoError(t, CreateNode(db, &node))
 
 	_, err = db.DB.ExecContext(t.Context(), "DELETE FROM pre_auth_keys WHERE id = $1", key.ID)
-	require.ErrorContains(t, err, "constraint failed: FOREIGN KEY constraint failed")
+	require.ErrorContains(t, err, "FOREIGN KEY constraint failed")
 }
 
 func TestPreAuthKeyAuthentication(t *testing.T) {

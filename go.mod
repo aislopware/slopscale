@@ -22,6 +22,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/jagottsicher/termcolor v1.0.2
+	github.com/mattn/go-sqlite3 v1.14.52
 	github.com/moby/moby/api v1.56.0
 	github.com/moby/moby/client v0.6.0
 	github.com/oapi-codegen/runtime v1.7.0
@@ -48,25 +49,6 @@ require (
 	golang.org/x/net v0.58.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.22.0
-
-	// NOTE: modernc sqlite has a fragile dependency
-	// chain and it is important that they are updated
-	// in lockstep to ensure that they do not break
-	// some architectures and similar at runtime:
-	// https://github.com/juanfont/headscale/issues/2188
-	//
-	// Fragile libc dependency:
-	// https://pkg.go.dev/modernc.org/sqlite#hdr-Fragile_modernc_org_libc_dependency
-	// https://gitlab.com/cznic/sqlite/-/issues/177
-	//
-	// To upgrade, determine the new SQLite version to
-	// be used, and consult the `go.mod` file:
-	// https://gitlab.com/cznic/sqlite/-/blob/master/go.mod
-	// to find
-	// the appropriate `libc` version, then upgrade them
-	// together, e.g:
-	// go get modernc.org/libc@v1.55.3 modernc.org/sqlite@v1.33.1
-	modernc.org/sqlite v1.58.0
 	pgregory.net/rapid v1.3.0
 	tailscale.com v1.103.0-pre.0.20260904191346-5201273aec73
 	tailscale.com/client/tailscale/v2 v2.10.1
@@ -121,7 +103,6 @@ require (
 	github.com/docker/cli v29.5.3+incompatible // indirect
 	github.com/docker/go-connections v0.7.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
@@ -166,7 +147,6 @@ require (
 	github.com/moby/sys/user v0.4.0 // indirect
 	github.com/moby/term v0.5.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/opencontainers/runc v1.3.6 // indirect
@@ -175,7 +155,6 @@ require (
 	github.com/pires/go-proxyproto v0.9.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
-	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/safchain/ethtool v0.7.0 // indirect
 	github.com/sagikazarmark/locafero v0.12.0 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
@@ -225,12 +204,7 @@ require (
 	// https://github.com/tailscale/tailscale/blob/main/go.mod
 	gvisor.dev/gvisor v0.0.0-20260224225140-573d5e7127a8 // indirect
 	k8s.io/client-go v0.35.3 // indirect
-
-	// NOTE: keep in lockstep with modernc.org/sqlite; see the
-	// upgrade note in the direct require block above.
-	modernc.org/libc v1.75.6 // indirect
-	modernc.org/mathutil v1.7.1 // indirect
-	modernc.org/memory v1.12.1 // indirect
+	modernc.org/sqlite v1.58.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 	software.sslmate.com/src/go-pkcs12 v0.4.0 // indirect
 )

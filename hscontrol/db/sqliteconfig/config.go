@@ -1,21 +1,32 @@
-// Package sqliteconfig provides type-safe configuration for SQLite databases
-// with proper enum validation and URL generation for the modernc.org/sqlite
-// driver, which hscontrol/db opens through database/sql. Besides pragmas it
-// carries two connection-level hardening switches: defensive mode, which
-// refuses SQL that can deliberately corrupt the file (writable_schema and
-// friends), and strict double quotes, which stops SQLite from silently
-// treating an unknown double-quoted identifier as a string literal.
+// Package sqliteconfig owns how hscontrol/db reaches SQLite. It registers
+// mattn/go-sqlite3 under [DriverName] for callers that open by name, and
+// [Open] builds a pool whose every connection gets the pragmas from
+// [Config] applied through a [driver.Connector], so the settings survive
+// pool reconnects. Connection hardening (defensive mode and strict double
+// quotes) is compiled into the library by the flags in sqlite.cflags;
+// [ProbeHardening] reports whether a binary carries them.
 package sqliteconfig
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
+	"strconv"
+
+	"github.com/mattn/go-sqlite3"
 )
 
-// DriverName is the database/sql driver name modernc.org/sqlite registers.
+// DriverName is the database/sql driver name this package registers for
+// mattn/go-sqlite3. It carries no pragmas; production pools come from
+// [Open], the name is for read-only consumers such as tailsql and the jet
+// generator.
 const DriverName = "sqlite"
+
+//nolint:gochecknoinits // database/sql drivers register at init; mattn does the same for "sqlite3"
+func init() {
+	sql.Register(DriverName, &sqlite3.SQLiteDriver{})
+}
 
 // Errors returned by config validation.
 var (
@@ -296,14 +307,6 @@ type Config struct {
 	// CacheSize is the page cache size per connection in KiB; 0 leaves
 	// SQLite's default (2 MiB).
 	CacheSize int
-	// Defensive enables SQLITE_DBCONFIG_DEFENSIVE (_defensive=1): PRAGMA
-	// writable_schema, journal_mode=OFF, schema_version writes and direct
-	// shadow-table writes are refused, closing the SQL-level corruption vectors.
-	Defensive bool
-	// StrictDoubleQuotes disables the double-quoted string literal
-	// misfeature (_dqs=0), so a mistyped "identifier" is an error instead of
-	// a string.
-	StrictDoubleQuotes bool
 }
 
 // Default returns the production configuration optimized for Headscale's usage patterns.
@@ -314,31 +317,26 @@ type Config struct {
 //   - Data integrity (foreign key constraints enabled)
 //   - Safe concurrent writes (IMMEDIATE transaction lock)
 //   - Reasonable timeout for busy database scenarios (10s)
-//   - Corruption-resistant connections (defensive mode, strict double quotes)
 func Default(path string) *Config {
 	return &Config{
-		Path:               path,
-		BusyTimeout:        DefaultBusyTimeout,
-		JournalMode:        JournalModeWAL,
-		AutoVacuum:         AutoVacuumIncremental,
-		WALAutocheckpoint:  DefaultWALAutocheckpoint,
-		Synchronous:        SynchronousNormal,
-		ForeignKeys:        true,
-		TxLock:             TxLockImmediate,
-		CacheSize:          DefaultCacheSize,
-		Defensive:          true,
-		StrictDoubleQuotes: true,
+		Path:              path,
+		BusyTimeout:       DefaultBusyTimeout,
+		JournalMode:       JournalModeWAL,
+		AutoVacuum:        AutoVacuumIncremental,
+		WALAutocheckpoint: DefaultWALAutocheckpoint,
+		Synchronous:       SynchronousNormal,
+		ForeignKeys:       true,
+		TxLock:            TxLockImmediate,
+		CacheSize:         DefaultCacheSize,
 	}
 }
 
 // Memory returns a configuration for in-memory databases.
 func Memory() *Config {
 	return &Config{
-		Path:               ":memory:",
-		WALAutocheckpoint:  -1, // not set, use driver default
-		ForeignKeys:        true,
-		Defensive:          true,
-		StrictDoubleQuotes: true,
+		Path:              ":memory:",
+		WALAutocheckpoint: -1, // not set, use driver default
+		ForeignKeys:       true,
 	}
 }
 
@@ -379,72 +377,55 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// ToURL builds a properly encoded SQLite connection string using _pragma parameters
-// compatible with modernc.org/sqlite driver.
-func (c *Config) ToURL() (string, error) {
-	err := c.Validate()
-	if err != nil {
-		return "", fmt.Errorf("invalid config: %w", err)
+// DSN returns the mattn/go-sqlite3 data source name for the configuration:
+// the path plus the transaction lock mode, which is the one setting the
+// driver must know at BEGIN time and cannot be a pragma. Everything else is
+// applied per connection from [Config.Pragmas].
+func (c *Config) DSN() string {
+	if c.TxLock == "" {
+		return c.Path
 	}
 
-	// Handle different database types
-	var baseURL string
-	if c.Path == ":memory:" {
-		baseURL = ":memory:"
-	} else {
-		baseURL = "file:" + c.Path
-	}
+	return c.Path + "?_txlock=" + string(c.TxLock)
+}
 
-	// Build query parameters
-	var queryParts []string
+// Pragmas returns the PRAGMA statements that realise the configuration,
+// in the order they must run: busy_timeout first so the ones after it wait
+// on a locked file instead of failing; auto_vacuum before journal_mode,
+// because switching to WAL writes the database header of a new file and
+// after that auto_vacuum can only change through VACUUM; foreign_keys
+// last.
+func (c *Config) Pragmas() []string {
+	var pragmas []string
 
-	// Connection parameters come first, then pragmas. _txlock leads because
-	// it changes how every transaction below is opened.
-	if c.TxLock != "" {
-		queryParts = append(queryParts, "_txlock="+string(c.TxLock))
-	}
-
-	if c.Defensive {
-		queryParts = append(queryParts, "_defensive=1")
-	}
-
-	if c.StrictDoubleQuotes {
-		queryParts = append(queryParts, "_dqs=0")
-	}
-
-	// Add pragma parameters only if they're set (non-zero/non-empty)
 	if c.BusyTimeout > 0 {
-		queryParts = append(queryParts, fmt.Sprintf("_pragma=busy_timeout=%d", c.BusyTimeout))
-	}
-
-	if c.JournalMode != "" {
-		queryParts = append(queryParts, fmt.Sprintf("_pragma=journal_mode=%s", c.JournalMode))
+		pragmas = append(pragmas, "PRAGMA busy_timeout = "+strconv.Itoa(c.BusyTimeout))
 	}
 
 	if c.AutoVacuum != "" {
-		queryParts = append(queryParts, fmt.Sprintf("_pragma=auto_vacuum=%s", c.AutoVacuum))
+		pragmas = append(pragmas, "PRAGMA auto_vacuum = "+string(c.AutoVacuum))
+	}
+
+	if c.JournalMode != "" {
+		pragmas = append(pragmas, "PRAGMA journal_mode = "+string(c.JournalMode))
 	}
 
 	if c.WALAutocheckpoint >= 0 {
-		queryParts = append(queryParts, fmt.Sprintf("_pragma=wal_autocheckpoint=%d", c.WALAutocheckpoint))
+		pragmas = append(pragmas, "PRAGMA wal_autocheckpoint = "+strconv.Itoa(c.WALAutocheckpoint))
 	}
 
 	if c.Synchronous != "" {
-		queryParts = append(queryParts, fmt.Sprintf("_pragma=synchronous=%s", c.Synchronous))
+		pragmas = append(pragmas, "PRAGMA synchronous = "+string(c.Synchronous))
 	}
 
 	// A negative cache_size is a size in KiB rather than a page count.
 	if c.CacheSize > 0 {
-		queryParts = append(queryParts, fmt.Sprintf("_pragma=cache_size=-%d", c.CacheSize))
+		pragmas = append(pragmas, "PRAGMA cache_size = -"+strconv.Itoa(c.CacheSize))
 	}
 
 	if c.ForeignKeys {
-		queryParts = append(queryParts, "_pragma=foreign_keys=ON")
+		pragmas = append(pragmas, "PRAGMA foreign_keys = ON")
 	}
 
-	if len(queryParts) > 0 {
-		baseURL += "?" + strings.Join(queryParts, "&")
-	}
-
-	return baseURL, nil
+	return pragmas
 }

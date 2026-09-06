@@ -6,6 +6,12 @@ VERSION ?= $(shell git describe --always --tags --dirty)
 
 # Build configuration
 GOOS ?= $(shell uname | tr '[:upper:]' '[:lower:]')
+
+# SQLite is mattn/go-sqlite3, compiled from C by cgo with the flags in
+# sqlite.cflags (hardening and performance defines). Every go invocation
+# below inherits them; a build without them logs a warning at startup.
+export CGO_ENABLED := 1
+export CGO_CFLAGS := $(shell grep -v '^\#' sqlite.cflags | tr '\n' ' ')
 ifeq ($(filter $(GOOS), openbsd netbsd solaris plan9), )
 	PIE_FLAGS = -buildmode=pie
 endif
@@ -44,7 +50,7 @@ build: check-deps $(GO_SOURCES) go.mod go.sum
 .PHONY: test
 test: check-deps $(GO_SOURCES) go.mod go.sum
 	@echo "Running Go tests..."
-	CGO_ENABLED=1 go test -race -short -timeout 30m ./...
+	go test -race -short -timeout 30m ./...
 
 
 # Formatting targets

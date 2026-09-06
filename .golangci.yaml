@@ -39,6 +39,13 @@ linters:
       max-complexity: 30
     depguard:
       rules:
+        sqlite-driver:
+          list-mode: lax
+          files:
+            - "!**/hscontrol/db/sqliteconfig/*.go"
+          deny:
+            - pkg: github.com/mattn/go-sqlite3
+              desc: import hscontrol/db/sqliteconfig, which registers the driver and applies the pragmas
         main:
           list-mode: lax
           deny:
@@ -52,14 +59,14 @@ linters:
               desc: use slices from the standard library
             - pkg: golang.org/x/exp/constraints
               desc: use cmp.Ordered
+            - pkg: modernc.org/sqlite
+              desc: SQLite is mattn/go-sqlite3 (cgo), registered as "sqlite" by hscontrol/db/sqliteconfig; a second driver with that name panics at init
             - pkg: github.com/glebarez/sqlite
-              desc: SQLite is modernc.org/sqlite through database/sql; a second driver registering "sqlite" panics at init
+              desc: SQLite is mattn/go-sqlite3 (cgo), registered as "sqlite" by hscontrol/db/sqliteconfig; a second driver with that name panics at init
             - pkg: github.com/glebarez/go-sqlite
-              desc: SQLite is modernc.org/sqlite through database/sql; a second driver registering "sqlite" panics at init
+              desc: SQLite is mattn/go-sqlite3 (cgo), registered as "sqlite" by hscontrol/db/sqliteconfig; a second driver with that name panics at init
             - pkg: gorm.io/driver/sqlite
-              desc: needs cgo via mattn/go-sqlite3; SQLite is modernc.org/sqlite through database/sql
-            - pkg: github.com/mattn/go-sqlite3
-              desc: needs cgo; SQLite is modernc.org/sqlite through database/sql
+              desc: queries are built with go-jet/jet in hscontrol/db; GORM was removed
             - pkg: gorm.io/gorm
               desc: queries are built with go-jet/jet in hscontrol/db; GORM was removed
             - pkg: github.com/go-gormigrate/gormigrate/v2

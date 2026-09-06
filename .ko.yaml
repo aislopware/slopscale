@@ -1,0 +1,17 @@
+# ko build settings for the development images built by
+# .github/workflows/container-main.yml. Mirrors the kos section of
+# .goreleaser.yml: the SQLite driver is C compiled by cgo, zigcc picks the
+# zig target from GOOS/GOARCH and the result links statically against musl.
+builds:
+  - id: headscale
+    main: ./cmd/headscale
+    env:
+      - CGO_ENABLED=1
+      - CC=zigcc
+    flags:
+      - -trimpath
+      - -tags=netgo,osusergo
+    ldflags:
+      - -s -w
+      - -linkmode=external
+      - -extldflags=-static

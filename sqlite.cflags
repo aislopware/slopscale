@@ -1,0 +1,19 @@
+# C compiler flags for the bundled SQLite in mattn/go-sqlite3. Exported as
+# CGO_CFLAGS by the Makefile, the Nix flake and the Dockerfiles; a build
+# without them works but logs a warning at startup because the two
+# hardening switches below are compile-time only.
+#
+# Hardening: an unknown double-quoted identifier is an error rather than a
+# string, and PRAGMA writable_schema and friends are refused.
+-DSQLITE_DQS=0
+-DSQLITE_DEFAULT_DEFENSIVE=1
+# Performance: skip the memory-statistics bookkeeping on every allocation,
+# the expression depth accounting, the progress callback and the shared
+# cache, none of which headscale uses; stack-allocate VDBE cursors.
+-DSQLITE_DEFAULT_MEMSTATUS=0
+-DSQLITE_MAX_EXPR_DEPTH=0
+-DSQLITE_OMIT_PROGRESS_CALLBACK
+-DSQLITE_OMIT_SHARED_CACHE
+-DSQLITE_USE_ALLOCA
+-DSQLITE_LIKE_DOESNT_MATCH_BLOBS
+-DSQLITE_STRICT_SUBTYPE=1
