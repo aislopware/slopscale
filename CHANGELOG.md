@@ -40,6 +40,23 @@ gains `autogroup:owner`, `autogroup:admin`, `autogroup:network-admin`,
 admins carry Tailscale's `is-admin` capability. See
 [User roles](https://headscale.net/development/ref/roles/).
 
+### Device and user approval
+
+Two tailnet-wide settings put an administrator between a node or user and the
+tailnet, following Tailscale's device approval and user approval. With
+`devicesApprovalOn`, a newly registered node waits — it has no peers, no peer
+sees it and the client shows it as needing machine authorization — until
+`headscale nodes approve` admits it, unless it registered with a preauthorized
+pre-auth key (the default for keys, `--preauthorized=false` opts out). With
+`usersApprovalOn`, a user created by an OpenID Connect login cannot register
+nodes until `headscale users approve` admits them. Both switches are off after
+an upgrade and everything that exists counts as approved; switching one off
+approves everything that was waiting. `headscale settings` manages the
+switches, and the v2 API's `authorized` device flag, `needs-approval` user
+status, `preauthorized` key capability and tailnet settings `PATCH` now carry
+real meaning, so Tailscale tooling can drive approval. See
+[Device and user approval](https://headscale.net/development/ref/approval/).
+
 ### BREAKING
 
 #### API
@@ -71,6 +88,7 @@ admins carry Tailscale's `is-admin` capability. See
 - User roles: `headscale users set-role`, a `Role` column in `headscale users list`, `POST /api/v1/user/{id}/role`, `GET /api/v1/whoami`, a `userId` on API keys and `headscale apikeys create --user`; the v2 user object's `role` field and `?role=` filter now reflect the real role
 - The `is-admin` node capability, previously stamped on every node, is now stamped only on devices of the owner and admins; `is-owner` on the owner's. Clients use these for admin-console affordances in their UI only
 - `POST /api/v1/apikey` without an `expiration` now mints a key that never expires instead of one that was already expired
+- Device and user approval: `headscale settings get|set`, `headscale nodes approve`, `headscale users approve`, `headscale preauthkeys create --preauthorized`, an `Approved` column in `headscale nodes list` and `headscale users list`, `GET|POST /api/v1/settings`, `POST /api/v1/node/{id}/approve`, `POST /api/v1/user/{id}/approve`, `approved`/`approvedAt` on nodes and users and `preauthorized` on pre-auth keys; the v2 API's `PATCH /api/v2/tailnet/{tailnet}/settings` now updates `devicesApprovalOn` and `usersApprovalOn` instead of returning 501, `POST /api/v2/device/{id}/authorized` accepts `false`, and `POST /api/v2/users/{id}/approve|suspend|restore` exist
 
 ## 0.29.4 (unreleased)
 

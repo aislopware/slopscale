@@ -106,6 +106,25 @@ each API package fails on an authenticated operation without one. Role rules
 role autogroups and the `is-admin`/`is-owner` caps because the node's user
 copy is loaded once and goes stale.
 
+Approval is a node property (`nodes.approved_at`; users have their own) and
+is enforced in exactly two places: the NodeStore's peer function drops
+unapproved nodes before the policy builds the peer map, and
+`State.ListPeers`'s explicit-ID branch, `FilterForNode` and `SSHPolicy`
+apply the same rule for the incremental paths. Nothing in the mapper or the
+policy engine knows about approval. `persistNodeToDB` never writes
+`approved_at` (like expiry); `NodeSetApproval` does. An approval change is a
+`PolicyChange` with `IncludeSelf`, not `OriginNode`: one change can carry a
+single origin, but switching a setting off admits many nodes at once and
+each client needs its self node to see `MachineAuthorized` flip. The
+tailnet-wide switches live in the `settings` key/value table and are cached
+on `State`; a fresh or upgraded server has them off, and the migration
+backfills everything that exists as approved. Test helpers (`CreateUser`,
+`CreateNodeForTest`, the servertest keys) create approved rows, so a test
+that wants a pending node must ask for it (`PreAuthKeySpec` with
+`Preauthorized: false`, `CreateUserFromLogin`). A servertest client is torn
+down with the `testing.TB` it was created for, so create clients on the
+parent test, not inside a subtest that later subtests depend on.
+
 API responses read through `NodeView`, `UserView`, and `PreAuthKeyView`.
 `AsStruct()` clones the whole record and is only for write/merge copies.
 
