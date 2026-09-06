@@ -51,15 +51,24 @@ WIP commits on feature branches only.
   the table name. `SaveNode`/`SaveUser` keep GORM's update-or-insert
   meaning; `UpdateNode` takes a `NodeUpdate` selecting expiry and auth key,
   because the map request path must never write a stale `auth_key_id`.
+  Statements on the map request and registration paths are `fixedSQL`:
+  rendered once, arguments bound per call; `fixed_test.go` pins each one
+  to the jet statement it replaces, so add a case there for every new one.
 - `schema.sql` is the schema's source of truth: squibble validates every
   SQLite database against it, and `TestPostgresSchemaMatchesGolden` pins
   `schema_postgres.sql` to the schema GORM used to create, so a change to
   one must be mirrored in the other and in the golden file. SQLite is
-  `modernc.org/sqlite` over `database/sql`; only one driver may register
-  the name `sqlite`, so never import another SQLite driver, even in tests
-  (depguard rejects the known ones). Connection hardening lives in
-  `hscontrol/db/sqliteconfig` and is verified through the production
-  opener, not with a bare `sql.Open`.
+  `mattn/go-sqlite3`, C compiled by cgo, imported only by
+  `hscontrol/db/sqliteconfig`, which registers it as `sqlite` and applies
+  the pragmas per connection through a `driver.Connector` (depguard
+  rejects the driver elsewhere and every other SQLite driver anywhere).
+  Hardening (`SQLITE_DQS=0`, defensive mode) is compile-time: the flags
+  live in `sqlite.cflags` and reach the compiler as `CGO_CFLAGS` through
+  the Makefile, the flake, the Dockerfiles and the goreleaser env; a
+  binary built without them logs a warning at startup and the hardening
+  test skips. Cross builds need a C compiler per target: `zigcc` in the
+  devShell maps `GOOS`/`GOARCH` to a zig target and links statically
+  against musl.
 - `hscontrol/servertest/` is an in-memory server harness. Prefer it over
   `integration/` when Docker isn't needed. It runs the NodeStore with a 5ms
   write batch, so one change reaches clients as several map responses; check

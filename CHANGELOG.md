@@ -42,12 +42,13 @@ keys remain all-access.
 
 ### Changes
 
-- Bundled SQLite is now 3.53.4 (modernc.org/sqlite v1.58.0); Go module, Nix flake and container base images are refreshed to their current releases
+- SQLite is now driven by mattn/go-sqlite3, the C library compiled through cgo (SQLite 3.53.4), instead of the transpiled-to-Go modernc.org/sqlite, which cuts CPU time per query on small machines such as a Raspberry Pi. Release binaries and container images are statically linked against musl for linux amd64, arm64 and armv7; macOS and FreeBSD binaries are no longer published, build them from source with a C compiler or through the Nix flake. Go module, Nix flake and container base images are refreshed to their current releases
 - GORM is gone: the database layer now builds its queries with go-jet/jet and hand-written migrations, and PostgreSQL connects through pgx's own pool. The on-disk schema and every migration are unchanged; existing databases upgrade in place
 - `database.gorm` is replaced by `database.query_log` (`slow_threshold`, `log_not_found`, `parameterized`); the old keys are still read with a deprecation warning and `prepare_stmt` is dropped because statements are always prepared and cached
 - SQLite runs with a 64 MiB page cache per connection instead of SQLite's 2 MiB default
+- Map responses cost less CPU and memory to build and send: the control protocol is encoded with Go's `encoding/json/v2` into pooled buffers, via grants are resolved once per policy change instead of once per viewer-peer pair, and the hot database statements are rendered once and only bound per call. A full map for a 100-node tailnet takes about 40% less CPU and 60% fewer allocations than before
 - `HEADSCALE_DEBUG_DEADLOCK` and `HEADSCALE_DEBUG_DEADLOCK_TIMEOUT` are removed; they configured a lock detector no lock used
-- SQLite connections now run in defensive mode with double-quoted string literals disabled, so SQL that could corrupt the database file is refused and a mistyped `"identifier"` is an error rather than a silent string
+- SQLite is compiled in defensive mode with double-quoted string literals disabled (the flags in `sqlite.cflags`), so SQL that could corrupt the database file is refused and a mistyped `"identifier"` is an error rather than a silent string; a binary built without those flags still runs but logs a warning at startup
 - Expiring or deleting a non-existent pre-auth key now returns an error instead of silently succeeding [#3324](https://github.com/juanfont/headscale/pull/3324)
 - Improve systemd service file hardening [#3341](https://github.com/juanfont/headscale/pull/3341)
 - Headscale now requires Go 1.27 to build
