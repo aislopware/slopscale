@@ -42,7 +42,7 @@ func (hsdb *HSDatabase) CreateAPIKey(
 	keyStr := apiKeyPrefix + prefix + "-" + secret
 
 	// bcrypt hash of secret
-	hash, err := bcrypt.GenerateFromPassword([]byte(secret), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(secret), bcryptCost)
 	if err != nil {
 		return "", nil, err
 	}

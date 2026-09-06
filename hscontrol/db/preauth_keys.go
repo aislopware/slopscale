@@ -109,7 +109,7 @@ func CreatePreAuthKey(
 
 	keyStr := authKeyPrefix + prefix + "-" + toBeHashed
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(toBeHashed), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(toBeHashed), bcryptCost)
 	if err != nil {
 		return nil, err
 	}

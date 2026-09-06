@@ -47,12 +47,8 @@ var (
 	errSecretMismatch      = errors.New("secret does not match hash")
 )
 
-// Argon2id parameters, OWASP's minimum recommendation (19 MiB, 2 iterations, 1
-// lane). They are encoded into every stored hash, so raising them later still
-// verifies credentials stored under the old cost.
+// Argon2id shape parameters; the time and memory costs live in hashcost.go.
 const (
-	argon2Time    = 2
-	argon2Memory  = 19 * 1024
 	argon2Threads = 1
 	argon2KeyLen  = 32
 	argon2SaltLen = 16
