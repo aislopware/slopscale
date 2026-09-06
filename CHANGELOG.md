@@ -42,6 +42,12 @@ keys remain all-access.
 
 ### Changes
 
+- Bundled SQLite is now 3.53.4 (modernc.org/sqlite v1.58.0); Go module, Nix flake and container base images are refreshed to their current releases
+- GORM is gone: the database layer now builds its queries with go-jet/jet and hand-written migrations, and PostgreSQL connects through pgx's own pool. The on-disk schema and every migration are unchanged; existing databases upgrade in place
+- `database.gorm` is replaced by `database.query_log` (`slow_threshold`, `log_not_found`, `parameterized`); the old keys are still read with a deprecation warning and `prepare_stmt` is dropped because statements are always prepared and cached
+- SQLite runs with a 64 MiB page cache per connection instead of SQLite's 2 MiB default
+- `HEADSCALE_DEBUG_DEADLOCK` and `HEADSCALE_DEBUG_DEADLOCK_TIMEOUT` are removed; they configured a lock detector no lock used
+- SQLite connections now run in defensive mode with double-quoted string literals disabled, so SQL that could corrupt the database file is refused and a mistyped `"identifier"` is an error rather than a silent string
 - Expiring or deleting a non-existent pre-auth key now returns an error instead of silently succeeding [#3324](https://github.com/juanfont/headscale/pull/3324)
 - Improve systemd service file hardening [#3341](https://github.com/juanfont/headscale/pull/3341)
 - Headscale now requires Go 1.27 to build

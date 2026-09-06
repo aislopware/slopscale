@@ -40,6 +40,26 @@ WIP commits on feature branches only.
   changing it. Same for `hscontrol/mapper/`.
 - `hscontrol/policy/v2/` is the policy engine; `policy/policy.go` is thin
   wrappers. There is no v1.
+- `hscontrol/db/` has no ORM. Queries are built once with go-jet's SQLite
+  builder against `gen/jet/table` (generated from `schema.sql` by
+  `cmd/gen-jet`, never edited by hand) and run through `executor`, which
+  rewrites placeholders and quoting for PostgreSQL, so there is one source
+  per query and no dialect branches in query code. Raw SQL is for
+  migrations and schema introspection only, with `$n` placeholders. Row
+  types live in `model.go`; jet maps results by table alias, so a
+  destination struct needs an `alias:"table"` tag when its type name is not
+  the table name. `SaveNode`/`SaveUser` keep GORM's update-or-insert
+  meaning; `UpdateNode` takes a `NodeUpdate` selecting expiry and auth key,
+  because the map request path must never write a stale `auth_key_id`.
+- `schema.sql` is the schema's source of truth: squibble validates every
+  SQLite database against it, and `TestPostgresSchemaMatchesGolden` pins
+  `schema_postgres.sql` to the schema GORM used to create, so a change to
+  one must be mirrored in the other and in the golden file. SQLite is
+  `modernc.org/sqlite` over `database/sql`; only one driver may register
+  the name `sqlite`, so never import another SQLite driver, even in tests
+  (depguard rejects the known ones). Connection hardening lives in
+  `hscontrol/db/sqliteconfig` and is verified through the production
+  opener, not with a bare `sql.Open`.
 - `hscontrol/servertest/` is an in-memory server harness. Prefer it over
   `integration/` when Docker isn't needed. It runs the NodeStore with a 5ms
   write batch, so one change reaches clients as several map responses; check
@@ -53,9 +73,13 @@ WIP commits on feature branches only.
 
 Migrations run in place on users' production databases, so their rules are
 strict. Order is immutable and new migrations go at the end. IDs are
-`YYYYMMDDHHMM-short-description`. `migrationsRequiringFKDisabled` in
-`hscontrol/db/db.go` has been frozen since 2025-07-02. Never rename a column a
-later migration references; let AutoMigrate add a new one.
+`YYYYMMDDHHMM-short-description`, written by hand in
+`hscontrol/db/migrations.go` and run by `migrate.go`, one transaction each.
+On SQLite everything up to `lastMigrationRequiringFKDisabled` runs with
+foreign keys off; that boundary has been frozen since 2025-07-02. A fresh
+database gets `schema.sql` directly and every ID marked applied; an existing
+database without a `migrations` table is refused rather than guessed at.
+Never rename a column a later migration references; add a new one.
 
 Tags XOR users. A node is tagged or user-owned, never both. `node.IsTagged()`
 is authoritative; a tagged node may still carry a `UserID` as "created by", so
@@ -64,6 +88,20 @@ in `hscontrol/state/tags.go` enforces this.
 
 API responses read through `NodeView`, `UserView`, and `PreAuthKeyView`.
 `AsStruct()` clones the whole record and is only for write/merge copies.
+
+## Quality gate
+
+All code here is machine-written, so the gate is deliberately strict.
+`.golangci.yaml` enables every linter and formatter (golines wraps at 120,
+gofumpt, gci); the few disabled ones carry a reason next to them. Complexity
+limits (gocognit, cyclop, funlen, maintidx, nestif) apply to production
+code, not tests. `make lint` is the full gate: golangci-lint, `go vet` with
+the integration tag, `go mod tidy -diff`, and `go tool govulncheck`.
+`make fmt-go` runs `go fix` first, so new code lands in current idioms.
+Suppress a linter only with `//nolint:<name> // <why>` on the line above
+the statement; nolintlint rejects bare or unused directives. Large legacy
+functions carry a `// legacy:` suppression; split them when you next touch
+them rather than adding to them.
 
 ## Conventions
 
