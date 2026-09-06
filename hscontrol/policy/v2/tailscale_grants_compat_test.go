@@ -132,7 +132,7 @@ func convertPolicyUserEmails(policyJSON string) []byte {
 func loadGrantTestFile(t *testing.T, path string) *testcapture.Capture {
 	t.Helper()
 
-	c, err := testcapture.Read(path)
+	c, err := readCapture(path)
 	require.NoError(t, err, "failed to read test file %s", path)
 
 	return c

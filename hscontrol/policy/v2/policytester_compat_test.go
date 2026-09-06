@@ -26,7 +26,6 @@ import (
 	"testing"
 
 	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 )
@@ -115,7 +114,7 @@ func TestPolicyTesterCompat(t *testing.T) {
 	nodes := policyTesterCompatNodes(users)
 
 	for _, file := range files {
-		c, err := testcapture.Read(file)
+		c, err := readCapture(file)
 		require.NoError(t, err, "reading %s", file)
 
 		t.Run(c.TestID, func(t *testing.T) {

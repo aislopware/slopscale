@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/require"
 )
 
@@ -34,7 +33,7 @@ func TestSSHTesterCompat(t *testing.T) {
 	users := setupSSHDataCompatUsers()
 
 	for _, file := range files {
-		c, err := testcapture.Read(file)
+		c, err := readCapture(file)
 		require.NoError(t, err, "reading %s", file)
 
 		t.Run(c.TestID, func(t *testing.T) {
