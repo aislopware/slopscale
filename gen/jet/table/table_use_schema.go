@@ -13,6 +13,7 @@ func UseSchema(schema string) {
 	APIKeys = APIKeys.FromSchema(schema)
 	DatabaseVersions = DatabaseVersions.FromSchema(schema)
 	Migrations = Migrations.FromSchema(schema)
+	NodeShares = NodeShares.FromSchema(schema)
 	Nodes = Nodes.FromSchema(schema)
 	OAuthAccessTokens = OAuthAccessTokens.FromSchema(schema)
 	OAuthClients = OAuthClients.FromSchema(schema)
