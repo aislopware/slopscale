@@ -16,7 +16,7 @@ func init() {
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Launches the headscale server",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		app, err := newHeadscaleServerWithConfig()
 		if err != nil {
 			if squibbleErr, ok := errors.AsType[squibble.ValidationError](err); ok {

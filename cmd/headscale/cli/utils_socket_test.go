@@ -17,7 +17,7 @@ import (
 func TestDialHeadscaleSocketRetriesUntilPresent(t *testing.T) {
 	sock := shortSocketPath(t)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Second)
 	defer cancel()
 
 	type result struct {
@@ -60,7 +60,7 @@ func TestDialHeadscaleSocketRetriesUntilPresent(t *testing.T) {
 func TestDialHeadscaleSocketRespectsDeadline(t *testing.T) {
 	sock := filepath.Join(filepath.Dir(shortSocketPath(t)), "absent.sock")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
 	defer cancel()
 
 	start := time.Now()

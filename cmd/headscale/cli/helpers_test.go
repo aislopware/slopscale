@@ -238,7 +238,7 @@ func answerPrompt(t *testing.T, answer string) {
 	reader, writer, err := os.Pipe()
 	require.NoError(t, err)
 
-	_, err = io.WriteString(writer, answer+"\n")
+	_, err = writer.WriteString(answer + "\n")
 	require.NoError(t, err)
 	require.NoError(t, writer.Close())
 
@@ -310,7 +310,8 @@ func indentJSON(t *testing.T, v any) string {
 func shortSocketPath(t *testing.T) string {
 	t.Helper()
 
-	dir, err := os.MkdirTemp("", "hs") //nolint:usetesting // t.TempDir embeds the test name and overflows the socket path limit
+	//nolint:usetesting // t.TempDir embeds the test name and overflows the socket path limit
+	dir, err := os.MkdirTemp("", "hs")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 

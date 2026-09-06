@@ -42,7 +42,7 @@ func main() {
 }
 
 // runIntegrationTest executes the integration test workflow.
-func runOnline(env *command.Env) error {
+func runOnline(_ *command.Env) error {
 	if mapConfig.Directory == "" {
 		return errDirectoryRequired
 	}
@@ -60,7 +60,7 @@ func runOnline(env *command.Env) error {
 	}
 
 	os.Stderr.Write(out)
-	os.Stderr.Write([]byte("\n"))
+	os.Stderr.WriteString("\n")
 
 	return nil
 }

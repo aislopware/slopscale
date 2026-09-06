@@ -36,7 +36,7 @@ var mockOidcCmd = &cobra.Command{
 	Use:   "mockoidc",
 	Short: "Runs a mock OIDC server for testing",
 	Long:  "This internal command runs a OpenID Connect for testing purposes",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(_ *cobra.Command, _ []string) error {
 		err := mockOIDC()
 		if err != nil {
 			return fmt.Errorf("running mock OIDC server: %w", err)
@@ -71,7 +71,7 @@ func mockOIDC() error {
 	if accessTTLOverride != "" {
 		newTTL, err := time.ParseDuration(accessTTLOverride)
 		if err != nil {
-			return err
+			return fmt.Errorf("parsing mock OIDC access TTL %q: %w", accessTTLOverride, err)
 		}
 
 		accessTTL = newTTL
@@ -93,9 +93,9 @@ func mockOIDC() error {
 
 	log.Info().Msgf("access token TTL: %s", accessTTL)
 
-	port, err := strconv.Atoi(portStr)
+	_, err = strconv.Atoi(portStr)
 	if err != nil {
-		return err
+		return fmt.Errorf("parsing mock OIDC port %q: %w", portStr, err)
 	}
 
 	mock, err := getMockOIDC(clientID, clientSecret, users)
@@ -103,14 +103,14 @@ func mockOIDC() error {
 		return err
 	}
 
-	listener, err := new(net.ListenConfig).Listen(context.Background(), "tcp", fmt.Sprintf("%s:%d", addrStr, port))
+	listener, err := new(net.ListenConfig).Listen(context.Background(), "tcp", net.JoinHostPort(addrStr, portStr))
 	if err != nil {
-		return err
+		return fmt.Errorf("listening on mock OIDC address: %w", err)
 	}
 
 	err = mock.Start(listener, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("starting mock OIDC server: %w", err)
 	}
 
 	log.Info().Msgf("mock OIDC server listening on %s", listener.Addr().String())
@@ -122,10 +122,10 @@ func mockOIDC() error {
 	return nil
 }
 
-func getMockOIDC(clientID string, clientSecret string, users []mockoidc.MockUser) (*mockoidc.MockOIDC, error) {
+func getMockOIDC(clientID, clientSecret string, users []mockoidc.MockUser) (*mockoidc.MockOIDC, error) {
 	keypair, err := mockoidc.NewKeypair(nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("creating mock OIDC keypair: %w", err)
 	}
 
 	userQueue := mockoidc.UserQueue{}

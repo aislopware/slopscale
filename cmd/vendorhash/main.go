@@ -153,7 +153,7 @@ func goModFingerprint() (string, error) {
 	for _, f := range []string{goModFile, goSumFile} {
 		b, err := os.ReadFile(f)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("reading file %s: %w", f, err)
 		}
 
 		fmt.Fprintf(h, "%s %d\n", f, len(b))
@@ -168,12 +168,12 @@ func goModFingerprint() (string, error) {
 func hashVendor(ctx context.Context) (string, error) {
 	out, err := os.MkdirTemp("", "nar-vendor-")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("creating temporary directory: %w", err)
 	}
 	// `go mod vendor -o` requires the destination to not already exist.
 	err = os.Remove(out)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("removing initial temp directory %s: %w", out, err)
 	}
 
 	defer os.RemoveAll(out)
@@ -188,7 +188,12 @@ func hashVendor(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("go mod vendor: %w", err)
 	}
 
-	return nardump.SRI(os.DirFS(out))
+	sri, err := nardump.SRI(os.DirFS(out))
+	if err != nil {
+		return "", fmt.Errorf("computing SRI hash for vendor directory: %w", err)
+	}
+
+	return sri, nil
 }
 
 func loadHashes() (FlakeHashes, error) {
@@ -196,7 +201,7 @@ func loadHashes() (FlakeHashes, error) {
 
 	b, err := os.ReadFile(hashesFile)
 	if err != nil {
-		return h, err
+		return h, fmt.Errorf("reading hashes file %s: %w", hashesFile, err)
 	}
 
 	err = json.Unmarshal(b, &h)
@@ -210,12 +215,18 @@ func loadHashes() (FlakeHashes, error) {
 func writeHashes(h FlakeHashes) error {
 	b, err := json.MarshalIndent(h, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("marshalling hashes to JSON: %w", err)
 	}
 
 	b = append(b, '\n')
 
 	// flakehashes.json is committed source read by Nix during evaluation;
 	// world-readable matches every other tracked file in the repo.
-	return os.WriteFile(hashesFile, b, 0o644) //nolint:gosec
+	//nolint:gosec // G306: flakehashes.json is committed repo source read by Nix
+	err = os.WriteFile(hashesFile, b, 0o644)
+	if err != nil {
+		return fmt.Errorf("writing hashes file %s: %w", hashesFile, err)
+	}
+
+	return nil
 }

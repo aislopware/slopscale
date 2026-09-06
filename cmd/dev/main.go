@@ -19,8 +19,18 @@ import (
 	"time"
 )
 
+const (
+	// defaultPort is the headscale listen port when --port is not given.
+	defaultPort = 8080
+	// metricsPortOffset is added to --port to derive the metrics listen
+	// port, so the default lands on 9090.
+	metricsPortOffset = 1010
+	// healthTimeout bounds how long we wait for the server to come up.
+	healthTimeout = 30 * time.Second
+)
+
 var (
-	port = flag.Int("port", 8080, "headscale listen port")
+	port = flag.Int("port", defaultPort, "headscale listen port")
 	keep = flag.Bool("keep", false, "keep state directory on exit")
 )
 
@@ -29,8 +39,8 @@ var errHealthTimeout = errors.New("health check timed out")
 var errEmptyAuthKey = errors.New("empty auth key in response")
 
 // maxDevPort is the highest --port value that keeps the derived metrics
-// port (port+1010) inside the valid 1..65535 TCP range.
-const maxDevPort = 64525
+// port (port+metricsPortOffset) inside the valid 1..65535 TCP range.
+const maxDevPort = 65535 - metricsPortOffset
 
 const devConfig = `---
 server_url: http://127.0.0.1:%d
@@ -97,7 +107,7 @@ func main() {
 }
 
 func run() error {
-	metricsPort := *port + 1010 // default 9090
+	metricsPort := *port + metricsPortOffset
 
 	tmpDir, err := os.MkdirTemp("", "headscale-dev-")
 	if err != nil {
@@ -153,7 +163,7 @@ func run() error {
 	// Wait for server to be ready.
 	healthURL := fmt.Sprintf("http://127.0.0.1:%d/health", *port)
 
-	err = waitForHealth(ctx, healthURL, 30*time.Second)
+	err = waitForHealth(ctx, healthURL, healthTimeout)
 	if err != nil {
 		return fmt.Errorf("waiting for headscale: %w", err)
 	}
@@ -247,7 +257,7 @@ func waitForHealth(ctx context.Context, url string, timeout time.Duration) error
 			return ctx.Err()
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 		if err != nil {
 			return fmt.Errorf("creating request: %w", err)
 		}
@@ -262,7 +272,8 @@ func waitForHealth(ctx context.Context, url string, timeout time.Duration) error
 		}
 
 		// Busy-wait is acceptable for a dev tool polling a local server.
-		time.Sleep(200 * time.Millisecond) //nolint:forbidigo
+		//nolint:forbidigo // busy-wait polling local server health endpoint
+		time.Sleep(200 * time.Millisecond)
 	}
 
 	return errHealthTimeout
@@ -274,7 +285,12 @@ func runHS(ctx context.Context, bin, config string, args ...string) ([]byte, err
 	cmd := exec.CommandContext(ctx, bin, fullArgs...)
 	cmd.Stderr = os.Stderr
 
-	return cmd.Output()
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("running headscale CLI %s: %w", bin, err)
+	}
+
+	return out, nil
 }
 
 // extractUserID parses the JSON output of "users create" and returns the

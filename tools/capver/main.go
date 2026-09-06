@@ -23,7 +23,8 @@ import (
 )
 
 const (
-	ghcrTokenURL                = "https://ghcr.io/token?service=ghcr.io&scope=repository:tailscale/tailscale:pull" //nolint:gosec
+	//nolint:gosec // G101: public anonymous token endpoint, not a credential
+	ghcrTokenURL                = "https://ghcr.io/token?service=ghcr.io&scope=repository:tailscale/tailscale:pull"
 	ghcrTagsURL                 = "https://ghcr.io/v2/tailscale/tailscale/tags/list?n=10000"
 	rawFileURL                  = "https://github.com/tailscale/tailscale/raw/refs/tags/%s/tailcfg/tailcfg.go"
 	outputFile                  = "../../hscontrol/capver/capver_generated.go"
@@ -54,7 +55,7 @@ type GHCRTagsResponse struct {
 func getGHCRToken(ctx context.Context) (string, error) {
 	client := &http.Client{}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ghcrTokenURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ghcrTokenURL, http.NoBody)
 	if err != nil {
 		return "", fmt.Errorf("error creating token request: %w", err)
 	}
@@ -93,7 +94,7 @@ func getGHCRTags(ctx context.Context) ([]string, error) {
 
 	client := &http.Client{}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ghcrTagsURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, ghcrTagsURL, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("error creating tags request: %w", err)
 	}
@@ -204,44 +205,63 @@ func getCapabilityVersions(ctx context.Context) (map[string]tailcfg.CapabilityVe
 	client := &http.Client{}
 
 	for minorVer, patchVer := range minorVersions {
-		// Fetch the raw Go file for the patch version
-		rawURL := fmt.Sprintf(rawFileURL, patchVer)
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil) //nolint:gosec
-		if err != nil {
-			log.Printf("Warning: failed to create request for %s: %v", patchVer, err)
+		capabilityVersion, ok := fetchCapabilityVersion(ctx, client, re, patchVer)
+		if !ok {
 			continue
 		}
 
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Printf("Warning: failed to fetch %s: %v", patchVer, err)
-			continue
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("Warning: got status %d for %s", resp.StatusCode, patchVer)
-			continue
-		}
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Printf("Warning: failed to read response for %s: %v", patchVer, err)
-			continue
-		}
-
-		// Find the [tailcfg.CurrentCapabilityVersion]
-		matches := re.FindStringSubmatch(string(body))
-		if len(matches) > 1 {
-			capabilityVersionStr := matches[1]
-			capabilityVersion, _ := strconv.Atoi(capabilityVersionStr)
-			versions[minorVer] = tailcfg.CapabilityVersion(capabilityVersion)
-			log.Printf("  %s (from %s): capVer %d", minorVer, patchVer, capabilityVersion)
-		}
+		versions[minorVer] = capabilityVersion
+		log.Printf("  %s (from %s): capVer %d", minorVer, patchVer, capabilityVersion)
 	}
 
 	return versions, nil
+}
+
+// fetchCapabilityVersion downloads tailcfg.go for the given tag and extracts
+// [tailcfg.CurrentCapabilityVersion] from it. Failures are logged as warnings
+// and reported through the boolean so the caller can skip the version.
+func fetchCapabilityVersion(
+	ctx context.Context,
+	client *http.Client,
+	re *regexp.Regexp,
+	patchVer string,
+) (tailcfg.CapabilityVersion, bool) {
+	// Fetch the raw Go file for the patch version
+	rawURL := fmt.Sprintf(rawFileURL, patchVer)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, http.NoBody)
+	if err != nil {
+		log.Printf("Warning: failed to create request for %s: %v", patchVer, err)
+		return 0, false
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Warning: failed to fetch %s: %v", patchVer, err)
+		return 0, false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Warning: got status %d for %s", resp.StatusCode, patchVer)
+		return 0, false
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Warning: failed to read response for %s: %v", patchVer, err)
+		return 0, false
+	}
+
+	// Find the [tailcfg.CurrentCapabilityVersion]
+	matches := re.FindStringSubmatch(string(body))
+	if len(matches) <= 1 {
+		return 0, false
+	}
+
+	capabilityVersion, _ := strconv.Atoi(matches[1])
+
+	return tailcfg.CapabilityVersion(capabilityVersion), true
 }
 
 // sortedMinorVersions returns the minor versions ordered numerically. cmpver
@@ -283,7 +303,10 @@ func firstTailscaleVerPerCapVer(versions map[string]tailcfg.CapabilityVersion) m
 	return capVerToTailscaleVer
 }
 
-func writeCapabilityVersionsToFile(versions map[string]tailcfg.CapabilityVersion, minSupportedCapVer tailcfg.CapabilityVersion) error {
+func writeCapabilityVersionsToFile(
+	versions map[string]tailcfg.CapabilityVersion,
+	minSupportedCapVer tailcfg.CapabilityVersion,
+) error {
 	// Generate the Go code as a string
 	var content strings.Builder
 	content.WriteString("package capver\n\n")
@@ -337,7 +360,10 @@ func writeCapabilityVersionsToFile(versions map[string]tailcfg.CapabilityVersion
 	return nil
 }
 
-func writeTestDataFile(versions map[string]tailcfg.CapabilityVersion, minSupportedCapVer tailcfg.CapabilityVersion) error {
+func writeTestDataFile(
+	versions map[string]tailcfg.CapabilityVersion,
+	minSupportedCapVer tailcfg.CapabilityVersion,
+) error {
 	// Sort minor versions
 	minorVersions := sortedMinorVersions(versions)
 
