@@ -170,9 +170,10 @@ func TestLogoutReloginAllClientsConverge(t *testing.T) {
 
 		for _, c := range clients {
 			go func() {
-				time.Sleep(rand.N(reloginStagger)) //nolint:forbidigo,gosec // intentional jitter so relogins interleave; weak random is fine
+				//nolint:forbidigo // intentional jitter so relogins interleave; weak random is fine
+				time.Sleep(rand.N(reloginStagger))
 
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 				defer cancel()
 
 				errs <- c.ReloginAndPoll(ctx)
@@ -229,9 +230,10 @@ func TestLogoutReloginWithPollChurn(t *testing.T) {
 
 		for _, c := range clients {
 			go func() {
-				time.Sleep(rand.N(reloginStagger)) //nolint:forbidigo,gosec // intentional jitter so relogins interleave; weak random is fine
+				//nolint:forbidigo // intentional jitter so relogins interleave; weak random is fine
+				time.Sleep(rand.N(reloginStagger))
 
-				ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 				defer cancel()
 
 				err := c.ReloginAndPoll(ctx)
@@ -243,8 +245,9 @@ func TestLogoutReloginWithPollChurn(t *testing.T) {
 				// Churn the map session like a freshly logged-in
 				// tailscaled: restart the poll once or twice with
 				// small random gaps.
-				for range 1 + rand.IntN(2) { //nolint:gosec // weak random is fine for test jitter
-					time.Sleep(rand.N(400 * time.Millisecond)) //nolint:forbidigo,gosec // intentional jitter between poll restarts; weak random is fine
+				for range 1 + rand.IntN(2) {
+					//nolint:forbidigo // intentional jitter between poll restarts; weak random is fine
+					time.Sleep(rand.N(400 * time.Millisecond))
 
 					err = c.RestartPoll(ctx)
 					if err != nil {
@@ -279,7 +282,7 @@ func logoutAllAndWaitOffline(t *testing.T, h *servertest.TestHarness) {
 
 	for _, c := range clients {
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
 
 			errs <- c.LogoutAndDisconnect(ctx)
@@ -304,7 +307,13 @@ func logoutAllAndWaitOffline(t *testing.T, h *servertest.TestHarness) {
 // waitForMeshOrDump waits until client c reports at least wantPeers peers.
 // On timeout it dumps every client's view of the mesh before failing, so a
 // reproduced flake shows exactly which clients are stuck and what they see.
-func waitForMeshOrDump(t *testing.T, all []*servertest.TestClient, c *servertest.TestClient, wantPeers int, timeout time.Duration) {
+func waitForMeshOrDump(
+	t *testing.T,
+	all []*servertest.TestClient,
+	c *servertest.TestClient,
+	wantPeers int,
+	timeout time.Duration,
+) {
 	t.Helper()
 
 	deadline := time.After(timeout)
@@ -354,7 +363,14 @@ func describeNetmap(c *servertest.TestClient) string {
 			hostname = hi.Hostname()
 		}
 
-		fmt.Fprintf(&out, " %s(id=%d expired=%t online=%v)", hostname, p.ID(), p.KeyExpiry().Before(time.Now()), p.Online())
+		fmt.Fprintf(
+			&out,
+			" %s(id=%d expired=%t online=%v)",
+			hostname,
+			p.ID(),
+			p.KeyExpiry().Before(time.Now()),
+			p.Online(),
+		)
 	}
 
 	return out.String()

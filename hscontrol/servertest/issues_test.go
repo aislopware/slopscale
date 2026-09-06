@@ -248,7 +248,7 @@ func TestIssuesRoutes(t *testing.T) {
 
 		c1.WaitForCondition(t, "self-update after route approval",
 			10*time.Second,
-			func(nm *netmap.NetworkMap) bool {
+			func(_ *netmap.NetworkMap) bool {
 				return c1.UpdateCount() > countBefore
 			})
 	})
@@ -275,7 +275,7 @@ func TestIssuesRoutes(t *testing.T) {
 			RoutableIPs:  []netip.Prefix{route},
 		})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
 		_ = c1.Direct().SendUpdate(ctx)
@@ -511,7 +511,7 @@ func TestIssuesServerMutations(t *testing.T) {
 			OS:           "TestOS",
 		})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
 		_ = c1.Direct().SendUpdate(ctx)

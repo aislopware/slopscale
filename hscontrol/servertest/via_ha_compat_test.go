@@ -136,7 +136,7 @@ func runViaHACompat(t *testing.T, c *testcapture.Capture) {
 			RoutableIPs:  routes,
 		})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		require.NoError(t, cl.Direct().SendUpdate(ctx),
 			"route advertisement for %s should succeed", name)
 

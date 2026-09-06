@@ -417,7 +417,12 @@ output "enabled_routes" { value = tailscale_device_subnet_routes.dut.routes }
 // outputs (read path) against the server truth, and the resulting server state
 // (write path). parallelism=1 avoids racing concurrent mutations on the one
 // shared node.
-func apiv2DevicesACLTerraform(t *testing.T, srv *servertest.TestServer, baseURL, apiKey, hostname string, id types.NodeID) {
+func apiv2DevicesACLTerraform(
+	t *testing.T,
+	srv *servertest.TestServer,
+	baseURL, apiKey, hostname string,
+	id types.NodeID,
+) {
 	t.Helper()
 
 	tf := newTofu(t, baseURL, apiKey, fmt.Sprintf(devicesACLTFConfig, hostname))

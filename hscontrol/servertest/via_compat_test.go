@@ -167,7 +167,7 @@ func runViaMapCompat(t *testing.T, c *testcapture.Capture) {
 			RoutableIPs:  routes,
 		})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		require.NoError(t, cl.Direct().SendUpdate(ctx),
 			"route advertisement for %s should succeed", name)
 
@@ -600,7 +600,8 @@ func prefixInTailscaleRange(p netip.Prefix) bool {
 	if addr.Is6() {
 		b := addr.As16()
 
-		return b[0] == 0xfd && b[1] == 0x7a && b[2] == 0x11 && b[3] == 0x5c //nolint:gosec // As16 returns [16]byte, indexing [0..3] is safe
+		return b[0] == 0xfd && b[1] == 0x7a && b[2] == 0x11 &&
+			b[3] == 0x5c
 	}
 
 	return false
@@ -655,7 +656,8 @@ func isTailscaleIP(prefix netip.Prefix) bool {
 		// Tailscale ULA fd7a:115c:a1e0::/48
 		b := addr.As16()
 
-		return b[0] == 0xfd && b[1] == 0x7a && b[2] == 0x11 && b[3] == 0x5c //nolint:gosec // As16 returns [16]byte, indexing [0..3] is safe
+		return b[0] == 0xfd && b[1] == 0x7a && b[2] == 0x11 &&
+			b[3] == 0x5c
 	}
 
 	return false

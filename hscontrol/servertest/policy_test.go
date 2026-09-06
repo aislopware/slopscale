@@ -42,7 +42,7 @@ func TestPolicyChanges(t *testing.T) {
 		// Both clients should receive an update after the policy change.
 		h.Client(0).WaitForCondition(t, "update after policy",
 			10*time.Second,
-			func(nm *netmap.NetworkMap) bool {
+			func(_ *netmap.NetworkMap) bool {
 				return h.Client(0).UpdateCount() > countBefore
 			})
 	})
@@ -99,7 +99,7 @@ func TestPolicyChanges(t *testing.T) {
 		for i, c := range h.Clients() {
 			c.WaitForCondition(t, "update after policy change",
 				10*time.Second,
-				func(nm *netmap.NetworkMap) bool {
+				func(_ *netmap.NetworkMap) bool {
 					return c.UpdateCount() > counts[i]
 				})
 		}
@@ -121,7 +121,7 @@ func TestPolicyChanges(t *testing.T) {
 
 			h.Client(0).WaitForCondition(t, "update after policy change",
 				10*time.Second,
-				func(nm *netmap.NetworkMap) bool {
+				func(_ *netmap.NetworkMap) bool {
 					return h.Client(0).UpdateCount() > countBefore
 				})
 

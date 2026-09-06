@@ -6,6 +6,7 @@ package servertest
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -33,6 +34,8 @@ type TestServer struct {
 	ln         net.Listener
 	httpServer *http.Server
 	st         *state.State
+	tb         testing.TB
+	serveErr   chan error
 }
 
 // ServerOption configures a [TestServer].
@@ -208,7 +211,7 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 	if sc.realListener {
 		var lc net.ListenConfig
 
-		ln, err = lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+		ln, err = lc.Listen(tb.Context(), "tcp", "127.0.0.1:0")
 	} else {
 		ln, err = memNetwork.Listen("tcp", "127.0.0.1:443")
 	}
@@ -222,7 +225,11 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	go httpServer.Serve(ln) //nolint:errcheck // will return on Close
+	serveErr := make(chan error, 1)
+
+	go func() {
+		serveErr <- httpServer.Serve(ln)
+	}()
 
 	serverURL := "http://" + ln.Addr().String()
 
@@ -233,6 +240,8 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 		ln:         ln,
 		httpServer: httpServer,
 		st:         app.GetState(),
+		tb:         tb,
+		serveErr:   serveErr,
 	}
 
 	tb.Cleanup(ts.Close)
@@ -257,6 +266,15 @@ func (s *TestServer) State() *state.State {
 func (s *TestServer) Close() {
 	s.httpServer.Close()
 	s.ln.Close()
+
+	select {
+	case err := <-s.serveErr:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			s.tb.Errorf("servertest: http.Server.Serve: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		s.tb.Errorf("servertest: http.Server.Serve did not return after Close")
+	}
 }
 
 // MemNet returns the in-memory network used by this server,

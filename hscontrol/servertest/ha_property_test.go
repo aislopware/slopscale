@@ -93,7 +93,7 @@ func haReadvertise(
 		RoutableIPs:  []netip.Prefix{c.route},
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(tb.Context(), 5*time.Second)
 	defer cancel()
 
 	_ = c.tc.Direct().SendUpdate(ctx)
@@ -139,8 +139,6 @@ func readPrimaries(
 // snapshot and asserts the six properties documented in the test
 // header. prevPrimaries is the snapshot taken before the just-applied
 // op so anti-flap can compare moves.
-//
-//nolint:gocyclo // invariant checker over several independent properties
 func checkHAInvariants(
 	rt *rapid.T,
 	srv *servertest.TestServer,
@@ -582,7 +580,7 @@ func TestHAProberProperty(t *testing.T) {
 				}
 
 				ctx, cancel := context.WithTimeout(
-					context.Background(),
+					t.Context(),
 					5*time.Second,
 				)
 

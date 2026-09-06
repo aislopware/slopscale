@@ -2,6 +2,7 @@ package servertest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -18,6 +19,12 @@ import (
 	"tailscale.com/types/netmap"
 	"tailscale.com/types/persist"
 	"tailscale.com/util/eventbus"
+)
+
+// errUnexpectedAuthURL is returned when a pre-auth-key login is answered
+// with an interactive AuthURL instead of a registered node.
+var errUnexpectedAuthURL = errors.New(
+	"servertest: unexpected auth URL (expected auto-auth with preauth key)",
 )
 
 // TestClient wraps a Tailscale [controlclient.Direct] connected to a
@@ -230,47 +237,6 @@ func (c *TestClient) StartInteractiveRelogin(tb testing.TB) *PendingLogin {
 	return c.startPendingLogin(tb)
 }
 
-// startPendingLogin performs the first register request of an interactive
-// login and starts the follow-up long-poll in the background. The follow-up
-// is cancelled when the test ends if nothing completes it before.
-func (c *TestClient) startPendingLogin(tb testing.TB) *PendingLogin {
-	tb.Helper()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	authURL, err := c.direct.TryLogin(ctx, controlclient.LoginDefault)
-	if err != nil {
-		tb.Fatalf("servertest: TryLogin(%s): %v", c.Name, err)
-	}
-
-	if authURL == "" {
-		tb.Fatalf("servertest: TryLogin(%s): expected an auth URL for an interactive login", c.Name)
-	}
-
-	authID, err := types.AuthIDFromString(strings.TrimPrefix(authURL, c.server.URL+"/register/"))
-	if err != nil {
-		tb.Fatalf("servertest: TryLogin(%s): auth URL %q does not carry an auth id: %v", c.Name, authURL, err)
-	}
-
-	followupCtx, followupCancel := context.WithCancel(context.Background())
-	tb.Cleanup(followupCancel)
-
-	pl := &PendingLogin{
-		AuthURL: authURL,
-		AuthID:  authID,
-		client:  c,
-		done:    make(chan loginResult, 1),
-	}
-
-	go func() {
-		newURL, err := c.direct.WaitLoginURL(followupCtx, authURL)
-		pl.done <- loginResult{url: newURL, err: err}
-	}()
-
-	return pl
-}
-
 // Wait blocks until the server has answered the follow-up request with a
 // registered node, then starts the map poll and returns the connected
 // client. It fails the test if the follow-up errors, if the server hands out
@@ -299,61 +265,6 @@ func (p *PendingLogin) Wait(tb testing.TB, timeout time.Duration) *TestClient {
 	return p.client
 }
 
-// register performs the initial [controlclient.Direct.TryLogin] to register the client.
-func (c *TestClient) register(tb testing.TB) {
-	tb.Helper()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	url, err := c.direct.TryLogin(ctx, controlclient.LoginDefault)
-	if err != nil {
-		tb.Fatalf("servertest: TryLogin(%s): %v", c.Name, err)
-	}
-
-	if url != "" {
-		tb.Fatalf("servertest: TryLogin(%s): unexpected auth URL: %s (expected auto-auth with preauth key)", c.Name, url)
-	}
-}
-
-// startPoll begins the long-poll [tailcfg.MapRequest] loop.
-func (c *TestClient) startPoll(tb testing.TB) {
-	tb.Helper()
-
-	c.startPollLoop()
-}
-
-// startPollLoop creates a fresh poll context and launches the background
-// [controlclient.Direct.PollNetMap] goroutine, which blocks until the
-// context is cancelled or the server closes the connection.
-func (c *TestClient) startPollLoop() {
-	c.pollCtx, c.pollCancel = context.WithCancel(context.Background())
-	c.pollDone = make(chan struct{})
-
-	go func() {
-		defer close(c.pollDone)
-
-		_ = c.direct.PollNetMap(c.pollCtx, c)
-	}()
-}
-
-// resetNetmapState clears the cached netmap and drains any pending
-// updates from a previous session so that convergence waits observe
-// only the new session's maps.
-func (c *TestClient) resetNetmapState() {
-	c.mu.Lock()
-	c.netmap = nil
-	c.mu.Unlock()
-
-	for {
-		select {
-		case <-c.updates:
-		default:
-			return
-		}
-	}
-}
-
 // UpdateFullNetmap implements [controlclient.NetmapUpdater].
 // Called by [controlclient.Direct] when a new [netmap.NetworkMap] is received.
 func (c *TestClient) UpdateFullNetmap(nm *netmap.NetworkMap) {
@@ -366,33 +277,6 @@ func (c *TestClient) UpdateFullNetmap(nm *netmap.NetworkMap) {
 	select {
 	case c.updates <- nm:
 	default:
-	}
-}
-
-// cleanup releases all resources.
-func (c *TestClient) cleanup() {
-	if c.pollCancel != nil {
-		c.pollCancel()
-	}
-
-	if c.pollDone != nil {
-		// Wait for PollNetMap to exit, but don't hang.
-		select {
-		case <-c.pollDone:
-		case <-time.After(5 * time.Second):
-		}
-	}
-
-	if c.direct != nil {
-		c.direct.Close()
-	}
-
-	if c.dialer != nil {
-		c.dialer.Close()
-	}
-
-	if c.bus != nil {
-		c.bus.Close()
 	}
 }
 
@@ -478,7 +362,7 @@ func (c *TestClient) ReloginAndPoll(ctx context.Context) error {
 	}
 
 	if url != "" {
-		return fmt.Errorf("servertest: TryLogin(%s): unexpected auth URL %q (expected auto-auth with preauth key)", c.Name, url) //nolint:err113
+		return fmt.Errorf("%w: TryLogin(%s): %q", errUnexpectedAuthURL, c.Name, url)
 	}
 
 	c.resetNetmapState()
@@ -540,41 +424,6 @@ func (c *TestClient) WaitForPeers(tb testing.TB, n int, timeout time.Duration) {
 	tb.Helper()
 
 	c.waitForPeers(tb, n, timeout, "WaitForPeers", func(got int) bool { return got >= n })
-}
-
-// waitForPeers blocks until match reports the current peer count
-// satisfies the caller's predicate, or until timeout expires. op
-// names the caller for the timeout failure message.
-func (c *TestClient) waitForPeers(
-	tb testing.TB,
-	n int,
-	timeout time.Duration,
-	op string,
-	match func(got int) bool,
-) {
-	tb.Helper()
-
-	deadline := time.After(timeout)
-
-	for {
-		if nm := c.Netmap(); nm != nil && match(len(nm.Peers)) {
-			return
-		}
-
-		select {
-		case <-c.updates:
-			// Check again.
-		case <-deadline:
-			nm := c.Netmap()
-
-			got := 0
-			if nm != nil {
-				got = len(nm.Peers)
-			}
-
-			tb.Fatalf("servertest: %s(%s, %d): timeout after %v (got %d peers)", op, c.Name, n, timeout, got)
-		}
-	}
 }
 
 // WaitForUpdate blocks until the next netmap update arrives or timeout.
@@ -682,7 +531,12 @@ func (c *TestClient) WaitForPeerCount(tb testing.TB, n int, timeout time.Duratio
 // WaitForCondition blocks until condFn returns true on the latest
 // netmap, or until timeout expires. This is useful for waiting for
 // specific state changes (e.g., peer going offline).
-func (c *TestClient) WaitForCondition(tb testing.TB, desc string, timeout time.Duration, condFn func(*netmap.NetworkMap) bool) {
+func (c *TestClient) WaitForCondition(
+	tb testing.TB,
+	desc string,
+	timeout time.Duration,
+	condFn func(*netmap.NetworkMap) bool,
+) {
 	tb.Helper()
 
 	deadline := time.After(timeout)
@@ -715,4 +569,166 @@ func (c *TestClient) String() string {
 	}
 
 	return fmt.Sprintf("TestClient(%s, %d peers)", c.Name, len(nm.Peers))
+}
+
+// startPendingLogin performs the first register request of an interactive
+// login and starts the follow-up long-poll in the background. The follow-up
+// is cancelled when the test ends if nothing completes it before.
+func (c *TestClient) startPendingLogin(tb testing.TB) *PendingLogin {
+	tb.Helper()
+
+	ctx, cancel := context.WithTimeout(tb.Context(), 10*time.Second)
+	defer cancel()
+
+	authURL, err := c.direct.TryLogin(ctx, controlclient.LoginDefault)
+	if err != nil {
+		tb.Fatalf("servertest: TryLogin(%s): %v", c.Name, err)
+	}
+
+	if authURL == "" {
+		tb.Fatalf("servertest: TryLogin(%s): expected an auth URL for an interactive login", c.Name)
+	}
+
+	authID, err := types.AuthIDFromString(strings.TrimPrefix(authURL, c.server.URL+"/register/"))
+	if err != nil {
+		tb.Fatalf("servertest: TryLogin(%s): auth URL %q does not carry an auth id: %v", c.Name, authURL, err)
+	}
+
+	followupCtx, followupCancel := context.WithCancel(tb.Context())
+	tb.Cleanup(followupCancel)
+
+	pl := &PendingLogin{
+		AuthURL: authURL,
+		AuthID:  authID,
+		client:  c,
+		done:    make(chan loginResult, 1),
+	}
+
+	go func() {
+		newURL, err := c.direct.WaitLoginURL(followupCtx, authURL)
+		pl.done <- loginResult{url: newURL, err: err}
+	}()
+
+	return pl
+}
+
+// register performs the initial [controlclient.Direct.TryLogin] to register the client.
+func (c *TestClient) register(tb testing.TB) {
+	tb.Helper()
+
+	ctx, cancel := context.WithTimeout(tb.Context(), 10*time.Second)
+	defer cancel()
+
+	url, err := c.direct.TryLogin(ctx, controlclient.LoginDefault)
+	if err != nil {
+		tb.Fatalf("servertest: TryLogin(%s): %v", c.Name, err)
+	}
+
+	if url != "" {
+		tb.Fatalf(
+			"servertest: TryLogin(%s): unexpected auth URL: %s (expected auto-auth with preauth key)",
+			c.Name,
+			url,
+		)
+	}
+}
+
+// startPoll begins the long-poll [tailcfg.MapRequest] loop.
+func (c *TestClient) startPoll(tb testing.TB) {
+	tb.Helper()
+
+	c.startPollLoop()
+}
+
+// startPollLoop creates a fresh poll context and launches the background
+// [controlclient.Direct.PollNetMap] goroutine, which blocks until the
+// context is cancelled or the server closes the connection.
+func (c *TestClient) startPollLoop() {
+	c.pollCtx, c.pollCancel = context.WithCancel(context.Background())
+	c.pollDone = make(chan struct{})
+
+	go func() {
+		defer close(c.pollDone)
+
+		_ = c.direct.PollNetMap(c.pollCtx, c)
+	}()
+}
+
+// resetNetmapState clears the cached netmap and drains any pending
+// updates from a previous session so that convergence waits observe
+// only the new session's maps.
+func (c *TestClient) resetNetmapState() {
+	c.mu.Lock()
+	c.netmap = nil
+	c.mu.Unlock()
+
+	for {
+		select {
+		case <-c.updates:
+		default:
+			return
+		}
+	}
+}
+
+// cleanup releases all resources.
+func (c *TestClient) cleanup() {
+	if c.pollCancel != nil {
+		c.pollCancel()
+	}
+
+	if c.pollDone != nil {
+		// Wait for PollNetMap to exit, but don't hang.
+		select {
+		case <-c.pollDone:
+		case <-time.After(5 * time.Second):
+		}
+	}
+
+	if c.direct != nil {
+		c.direct.Close()
+	}
+
+	if c.dialer != nil {
+		c.dialer.Close()
+	}
+
+	if c.bus != nil {
+		c.bus.Close()
+	}
+}
+
+// waitForPeers blocks until match reports the current peer count
+// satisfies the caller's predicate, or until timeout expires. op
+// names the caller for the timeout failure message.
+func (c *TestClient) waitForPeers(
+	tb testing.TB,
+	n int,
+	timeout time.Duration,
+	op string,
+	match func(got int) bool,
+) {
+	tb.Helper()
+
+	deadline := time.After(timeout)
+
+	for {
+		if nm := c.Netmap(); nm != nil && match(len(nm.Peers)) {
+			return
+		}
+
+		select {
+		case <-c.updates:
+			// Check again.
+		case <-deadline:
+			nm := c.Netmap()
+
+			got := 0
+			if nm != nil {
+				got = len(nm.Peers)
+			}
+
+			tb.Fatalf("servertest: %s(%s, %d): timeout after %v (got %d peers)", op, c.Name, n, timeout, got)
+		}
+	}
 }

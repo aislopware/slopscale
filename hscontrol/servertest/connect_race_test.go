@@ -53,7 +53,7 @@ func TestConnectDisconnectRace(t *testing.T) {
 		RoutableIPs:  []netip.Prefix{route},
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	_ = c2.Direct().SendUpdate(ctx)
 
 	cancel()

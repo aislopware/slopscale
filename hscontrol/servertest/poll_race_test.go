@@ -131,8 +131,12 @@ func TestPollRace(t *testing.T) {
 		isOnline, known := nv.IsOnline().GetOk()
 		assert.True(t, known,
 			"server should know online status after grace period expires")
-		assert.True(t, isOnline,
-			"server should show node as online after grace period -- the reconnect should have prevented the Disconnect() call")
+		assert.True(
+			t,
+			isOnline,
+			"server should show node as online after grace period -- "+
+				"the reconnect should have prevented the Disconnect() call",
+		)
 	})
 
 	// Peer's view: after rapid reconnect, the peer should see

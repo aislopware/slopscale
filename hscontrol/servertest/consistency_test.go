@@ -108,7 +108,7 @@ func TestConsistency(t *testing.T) {
 
 				a.WaitForCondition(t, "new client "+a.Name+" sees "+b.Name,
 					15*time.Second,
-					func(nm *netmap.NetworkMap) bool {
+					func(_ *netmap.NetworkMap) bool {
 						_, found := a.PeerByName(b.Name)
 
 						return found

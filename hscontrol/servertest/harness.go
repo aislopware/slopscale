@@ -129,16 +129,6 @@ func (h *TestHarness) AddClient(tb testing.TB, opts ...ClientOption) *TestClient
 	return c
 }
 
-// newClient creates a [TestClient] on the harness server, prepending the
-// shared default user so caller options can override it.
-func (h *TestHarness) newClient(tb testing.TB, name string, opts ...ClientOption) *TestClient {
-	tb.Helper()
-
-	copts := append([]ClientOption{WithUser(h.defaultUser)}, opts...)
-
-	return NewClient(tb, h.Server, name, copts...)
-}
-
 // WaitForMeshComplete blocks until every connected client sees
 // (connectedCount - 1) peers.
 func (h *TestHarness) WaitForMeshComplete(tb testing.TB, timeout time.Duration) {
@@ -176,6 +166,16 @@ func (h *TestHarness) ChangePolicy(tb testing.TB, policy []byte) {
 // DefaultUser returns the shared user for adding more clients.
 func (h *TestHarness) DefaultUser() *types.User {
 	return h.defaultUser
+}
+
+// newClient creates a [TestClient] on the harness server, prepending the
+// shared default user so caller options can override it.
+func (h *TestHarness) newClient(tb testing.TB, name string, opts ...ClientOption) *TestClient {
+	tb.Helper()
+
+	copts := append([]ClientOption{WithUser(h.defaultUser)}, opts...)
+
+	return NewClient(tb, h.Server, name, copts...)
 }
 
 func clientName(index int) string {

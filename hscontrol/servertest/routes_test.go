@@ -17,8 +17,6 @@ import (
 
 // TestRoutes verifies that route advertisements and approvals
 // propagate correctly through the control plane to all peers.
-//
-//nolint:gocyclo // table-driven test driver with many independent subtests
 func TestRoutes(t *testing.T) {
 	t.Parallel()
 
@@ -74,7 +72,7 @@ func TestRoutes(t *testing.T) {
 		})
 
 		// Send a non-streaming update to push the new [tailcfg.Hostinfo].
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
 		_ = c1.Direct().SendUpdate(ctx)
@@ -122,7 +120,7 @@ func TestRoutes(t *testing.T) {
 			RoutableIPs:  []netip.Prefix{route},
 		})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
 		_ = c1.Direct().SendUpdate(ctx)
@@ -258,7 +256,7 @@ func TestRoutes(t *testing.T) {
 				RoutableIPs:  []netip.Prefix{route},
 			})
 
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
 
 			_ = c.Direct().SendUpdate(ctx)

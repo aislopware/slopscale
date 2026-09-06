@@ -237,7 +237,7 @@ func TestStressStateMutations(t *testing.T) {
 		// c2 should eventually see the update.
 		c2.WaitForCondition(t, "final route update received",
 			10*time.Second,
-			func(nm *netmap.NetworkMap) bool {
+			func(_ *netmap.NetworkMap) bool {
 				return c2.UpdateCount() > 2
 			})
 	})
@@ -321,7 +321,7 @@ func TestStressStateMutations(t *testing.T) {
 		// Client should have received at least some updates.
 		c1.WaitForCondition(t, "updates after policy changes",
 			10*time.Second,
-			func(nm *netmap.NetworkMap) bool {
+			func(_ *netmap.NetworkMap) bool {
 				return c1.UpdateCount() > countBefore
 			})
 	})
@@ -471,16 +471,13 @@ func TestStressDataIntegrity(t *testing.T) {
 		clientID1 := nm1.SelfNode.ID()
 		clientID2 := nm2.SelfNode.ID()
 
-		//nolint:gosec // G115: test-only, IDs won't overflow
 		assert.Equal(t, int64(serverID1), int64(clientID1),
 			"node 1: server ID should match client self ID")
-		//nolint:gosec // G115: test-only, IDs won't overflow
 		assert.Equal(t, int64(serverID2), int64(clientID2),
 			"node 2: server ID should match client self ID")
 
 		// c1's view of c2's ID should also match.
 		require.Len(t, nm1.Peers, 1)
-		//nolint:gosec // G115: test-only, IDs won't overflow
 		assert.Equal(t, int64(serverID2), int64(nm1.Peers[0].ID()),
 			"c1's view of c2's ID should match server")
 	})
@@ -513,7 +510,7 @@ func TestStressDataIntegrity(t *testing.T) {
 			OS:           "StressTestOS",
 		})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancel()
 
 		_ = clients[0].Direct().SendUpdate(ctx)

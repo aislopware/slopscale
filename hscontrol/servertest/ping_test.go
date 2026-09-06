@@ -27,7 +27,7 @@ func TestPingNode(t *testing.T) {
 	require.NotNil(t, nm)
 	require.True(t, nm.SelfNode.Valid())
 
-	nodeID := types.NodeID(nm.SelfNode.ID()) //nolint:gosec
+	nodeID := types.NodeID(nm.SelfNode.ID())
 
 	st := h.Server.State()
 	pingID, responseCh := st.RegisterPing(nodeID)
@@ -59,7 +59,7 @@ func TestPingDisconnectedNode(t *testing.T) {
 	nm := h.Client(0).Netmap()
 	require.NotNil(t, nm)
 
-	nodeID := types.NodeID(nm.SelfNode.ID()) //nolint:gosec
+	nodeID := types.NodeID(nm.SelfNode.ID())
 
 	// Disconnect the client.
 	h.Client(0).Disconnect(t)
@@ -93,7 +93,7 @@ func TestPingTwoSameNode(t *testing.T) {
 	nm := h.Client(0).Netmap()
 	require.NotNil(t, nm)
 
-	nodeID := types.NodeID(nm.SelfNode.ID()) //nolint:gosec
+	nodeID := types.NodeID(nm.SelfNode.ID())
 
 	st := h.Server.State()
 
@@ -182,10 +182,10 @@ func TestPingResponseHandlerRejectsNonHEAD(t *testing.T) {
 		t.Run(method, func(t *testing.T) {
 			t.Parallel()
 
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
 
-			req, err := http.NewRequestWithContext(ctx, method, h.Server.URL+"/machine/ping-response?id=x", nil)
+			req, err := http.NewRequestWithContext(ctx, method, h.Server.URL+"/machine/ping-response?id=x", http.NoBody)
 			require.NoError(t, err)
 
 			resp, err := http.DefaultClient.Do(req)

@@ -18,7 +18,7 @@ import (
 // TestGrantPolicies verifies that grant-based policies propagate
 // correctly through the full control plane (policy -> state -> mapper)
 // and produce the expected packet filter rules in client [netmap.NetworkMap]s.
-func TestGrantPolicies(t *testing.T) { //nolint:gocyclo
+func TestGrantPolicies(t *testing.T) {
 	t.Parallel()
 
 	t.Run("grant_only_policy", func(t *testing.T) {
@@ -58,12 +58,12 @@ func TestGrantPolicies(t *testing.T) { //nolint:gocyclo
 		// Wait for both clients to receive an update after the policy change.
 		c1.WaitForCondition(t, "update after grant-only policy",
 			10*time.Second,
-			func(nm *netmap.NetworkMap) bool {
+			func(_ *netmap.NetworkMap) bool {
 				return c1.UpdateCount() > countC1
 			})
 		c2.WaitForCondition(t, "update after grant-only policy",
 			10*time.Second,
-			func(nm *netmap.NetworkMap) bool {
+			func(_ *netmap.NetworkMap) bool {
 				return c2.UpdateCount() > countC2
 			})
 
@@ -217,19 +217,19 @@ func TestGrantPolicies(t *testing.T) { //nolint:gocyclo
 		require.NoError(t, err)
 
 		if changed {
-			changes, err := srv.State().ReloadPolicy()
-			require.NoError(t, err)
+			changes, reloadErr := srv.State().ReloadPolicy()
+			require.NoError(t, reloadErr)
 			srv.App.Change(changes...)
 		}
 
 		c1.WaitForCondition(t, "first grant policy update",
 			10*time.Second,
-			func(nm *netmap.NetworkMap) bool {
+			func(_ *netmap.NetworkMap) bool {
 				return c1.UpdateCount() > countC1
 			})
 		c2.WaitForCondition(t, "first grant policy update",
 			10*time.Second,
-			func(nm *netmap.NetworkMap) bool {
+			func(_ *netmap.NetworkMap) bool {
 				return c2.UpdateCount() > countC2
 			})
 
@@ -276,7 +276,7 @@ func TestGrantPolicies(t *testing.T) { //nolint:gocyclo
 			})
 		c2.WaitForCondition(t, "second grant policy update",
 			10*time.Second,
-			func(nm *netmap.NetworkMap) bool {
+			func(_ *netmap.NetworkMap) bool {
 				return c2.UpdateCount() > countC2
 			})
 	})
@@ -516,8 +516,8 @@ func TestGrantPolicies(t *testing.T) { //nolint:gocyclo
 		require.NoError(t, err)
 
 		if changed {
-			changes, err := srv.State().ReloadPolicy()
-			require.NoError(t, err)
+			changes, reloadErr := srv.State().ReloadPolicy()
+			require.NoError(t, reloadErr)
 			srv.App.Change(changes...)
 		}
 
@@ -548,7 +548,7 @@ func TestGrantPolicies(t *testing.T) { //nolint:gocyclo
 			RoutableIPs:  []netip.Prefix{route},
 		})
 
-		ctxA, cancelA := context.WithTimeout(context.Background(), 5*time.Second)
+		ctxA, cancelA := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancelA()
 
 		_ = routerA.Direct().SendUpdate(ctxA)
@@ -559,7 +559,7 @@ func TestGrantPolicies(t *testing.T) { //nolint:gocyclo
 			RoutableIPs:  []netip.Prefix{route},
 		})
 
-		ctxB, cancelB := context.WithTimeout(context.Background(), 5*time.Second)
+		ctxB, cancelB := context.WithTimeout(t.Context(), 5*time.Second)
 		defer cancelB()
 
 		_ = routerB.Direct().SendUpdate(ctxB)
@@ -583,7 +583,7 @@ func TestGrantPolicies(t *testing.T) { //nolint:gocyclo
 			func(nm *netmap.NetworkMap) bool {
 				for _, p := range nm.Peers {
 					hi := p.Hostinfo()
-					if hi.Valid() && hi.Hostname() == "router-a" { //nolint:goconst
+					if hi.Valid() && hi.Hostname() == "router-a" {
 						for i := range p.AllowedIPs().Len() {
 							if p.AllowedIPs().At(i) == route {
 								return true
@@ -684,8 +684,8 @@ func TestGrantViaSubnetFilterRules(t *testing.T) {
 	require.NoError(t, err)
 
 	if changed {
-		changes, err := srv.State().ReloadPolicy()
-		require.NoError(t, err)
+		changes, reloadErr := srv.State().ReloadPolicy()
+		require.NoError(t, reloadErr)
 		srv.App.Change(changes...)
 	}
 
@@ -706,7 +706,7 @@ func TestGrantViaSubnetFilterRules(t *testing.T) {
 		RoutableIPs:  []netip.Prefix{route},
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	_ = routerA.Direct().SendUpdate(ctx)
@@ -802,8 +802,8 @@ func TestGrantViaSubnetBroaderDstFilterRules(t *testing.T) {
 	require.NoError(t, err)
 
 	if changed {
-		changes, err := srv.State().ReloadPolicy()
-		require.NoError(t, err)
+		changes, reloadErr := srv.State().ReloadPolicy()
+		require.NoError(t, reloadErr)
 		srv.App.Change(changes...)
 	}
 
@@ -823,7 +823,7 @@ func TestGrantViaSubnetBroaderDstFilterRules(t *testing.T) {
 		RoutableIPs:  []netip.Prefix{advertised},
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	_ = routerA.Direct().SendUpdate(ctx)
@@ -914,8 +914,8 @@ func TestGrantViaExitNodeNoFilterRules(t *testing.T) {
 	require.NoError(t, err)
 
 	if changed {
-		changes, err := srv.State().ReloadPolicy()
-		require.NoError(t, err)
+		changes, reloadErr := srv.State().ReloadPolicy()
+		require.NoError(t, reloadErr)
 		srv.App.Change(changes...)
 	}
 
@@ -936,7 +936,7 @@ func TestGrantViaExitNodeNoFilterRules(t *testing.T) {
 		RoutableIPs:  []netip.Prefix{exitRouteV4, exitRouteV6},
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	_ = exitA.Direct().SendUpdate(ctx)
@@ -1012,8 +1012,8 @@ func TestGrantViaExitNodeInternetVisibility(t *testing.T) {
 	require.NoError(t, err)
 
 	if changed {
-		changes, err := srv.State().ReloadPolicy()
-		require.NoError(t, err)
+		changes, reloadErr := srv.State().ReloadPolicy()
+		require.NoError(t, reloadErr)
 		srv.App.Change(changes...)
 	}
 
@@ -1033,7 +1033,7 @@ func TestGrantViaExitNodeInternetVisibility(t *testing.T) {
 		RoutableIPs:  []netip.Prefix{exitRouteV4, exitRouteV6},
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	_ = exitA.Direct().SendUpdate(ctx)

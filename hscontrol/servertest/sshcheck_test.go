@@ -29,8 +29,8 @@ func TestSSHCheckReDelegatesWhenSessionMissing(t *testing.T) {
 
 	h := servertest.NewHarness(t, 2)
 
-	srcID := types.NodeID(h.Client(0).Netmap().SelfNode.ID()) //nolint:gosec
-	dstID := types.NodeID(h.Client(1).Netmap().SelfNode.ID()) //nolint:gosec
+	srcID := types.NodeID(h.Client(0).Netmap().SelfNode.ID())
+	dstID := types.NodeID(h.Client(1).Netmap().SelfNode.ID())
 
 	// Subject the same-user (src, dst) pair to an SSH check.
 	h.ChangePolicy(t, []byte(`{
@@ -93,10 +93,10 @@ func pollSSHAction(
 	// controlclient issues its own register/map calls).
 	actionURL = strings.Replace(actionURL, "http://", "https://", 1)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, actionURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, actionURL, http.NoBody)
 	require.NoError(t, err)
 
 	resp, err := node.Direct().DoNoiseRequest(req)

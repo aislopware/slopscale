@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -118,14 +120,21 @@ func TestRaceConcurrentServerMutations(t *testing.T) {
 
 		nodeID1 := findNodeID(t, srv, "conmut-node1")
 
-		var wg sync.WaitGroup
+		var (
+			wg              sync.WaitGroup
+			renameSuccesses atomic.Int32
+		)
 
 		// Concurrent renames.
 
 		wg.Go(func() {
 			for i := range 5 {
 				name := fmt.Sprintf("conmut-renamed-%d", i)
-				srv.State().RenameNode(nodeID1, name) //nolint:errcheck
+
+				_, _, err := srv.State().RenameNode(nodeID1, name)
+				if err == nil {
+					renameSuccesses.Add(1)
+				}
 			}
 		})
 
@@ -160,6 +169,11 @@ func TestRaceConcurrentServerMutations(t *testing.T) {
 		})
 
 		wg.Wait()
+
+		// At least one rename must have gone through, so the mutation
+		// path under test actually ran despite the concurrent stress.
+		assert.Positive(t, renameSuccesses.Load(),
+			"expected at least one concurrent rename to succeed")
 
 		// Server should not have panicked, and clients should still
 		// be getting updates.
@@ -275,7 +289,7 @@ func TestRaceConcurrentServerMutations(t *testing.T) {
 				})
 
 				ctx, cancel := context.WithTimeout(
-					context.Background(), 5*time.Second)
+					t.Context(), 5*time.Second)
 				defer cancel()
 
 				_ = c.Direct().SendUpdate(ctx)
@@ -340,7 +354,7 @@ func TestRaceConnectDuringGracePeriod(t *testing.T) {
 
 		// c2 should see c3.
 		c2.WaitForCondition(t, "c2 sees c3", 10*time.Second,
-			func(nm *netmap.NetworkMap) bool {
+			func(_ *netmap.NetworkMap) bool {
 				_, found := c2.PeerByName("grace-node3")
 
 				return found
@@ -383,7 +397,7 @@ func TestRaceConnectDuringGracePeriod(t *testing.T) {
 
 		// The surviving originals + new nodes should form a mesh.
 		surviving := originals[n/2:]
-		allActive := append(surviving, replacements...)
+		allActive := slices.Concat(surviving, replacements)
 
 		for _, c := range allActive {
 			c.WaitForPeers(t, len(allActive)-1, 30*time.Second)
@@ -455,7 +469,7 @@ func TestRaceBatcherContention(t *testing.T) {
 		// Observer should see at least the final node.
 		observer.WaitForCondition(t, "sees final node",
 			15*time.Second,
-			func(nm *netmap.NetworkMap) bool {
+			func(_ *netmap.NetworkMap) bool {
 				_, found := observer.PeerByName("intleave-final")
 
 				return found
@@ -464,7 +478,7 @@ func TestRaceBatcherContention(t *testing.T) {
 		// Final should see observer.
 		final.WaitForCondition(t, "sees observer",
 			15*time.Second,
-			func(nm *netmap.NetworkMap) bool {
+			func(_ *netmap.NetworkMap) bool {
 				_, found := final.PeerByName("intleave-obs")
 
 				return found
@@ -566,7 +580,7 @@ func TestRaceMapResponseDuringDisconnect(t *testing.T) {
 		})
 
 		ctx, cancel := context.WithTimeout(
-			context.Background(), 5*time.Second)
+			t.Context(), 5*time.Second)
 		defer cancel()
 
 		_ = c1.Direct().SendUpdate(ctx)

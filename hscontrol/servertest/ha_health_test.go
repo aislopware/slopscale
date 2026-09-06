@@ -31,7 +31,7 @@ func advertiseAndApproveRoute(
 		RoutableIPs:  []netip.Prefix{route},
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	_ = c.Direct().SendUpdate(ctx)
@@ -74,7 +74,7 @@ func TestHAHealthProbe_HealthyNodes(t *testing.T) {
 		srv.App.MapBatcher().IsConnected,
 	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 
 	prober.ProbeOnce(ctx, srv.App.Change)
@@ -325,7 +325,7 @@ func TestHAHealthProbe_ReconnectDuringProbeKeepsHealthy(t *testing.T) {
 		srv.App.MapBatcher().IsConnected,
 	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
 	defer cancel()
 
 	// TestClient does not implement ping responses, so every probe
@@ -382,7 +382,7 @@ func TestHAHealthProbe_NoHARoutes(t *testing.T) {
 		srv.App.MapBatcher().IsConnected,
 	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
 
 	var dispatched bool

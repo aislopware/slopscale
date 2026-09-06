@@ -302,7 +302,15 @@ func setScopeMatrixPolicy(t *testing.T, srv *servertest.TestServer) {
 
 	// tag:other exists but is owned by no one, so the owned-by denial row tests a
 	// grant denial (403) rather than a tag-not-in-policy rejection (400).
-	const policy = `{"tagOwners":{"tag:ci":["apiv2-oauth@"],"tag:k8s-operator":[],"tag:k8s":["tag:k8s-operator"],"tag:other":[]},"acls":[{"action":"accept","src":["*"],"dst":["*:*"]}]}`
+	const policy = `{
+		"tagOwners": {
+			"tag:ci": ["apiv2-oauth@"],
+			"tag:k8s-operator": [],
+			"tag:k8s": ["tag:k8s-operator"],
+			"tag:other": []
+		},
+		"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}]
+	}`
 
 	st := srv.State()
 

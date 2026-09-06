@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/juanfont/headscale/hscontrol/servertest"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
@@ -91,7 +92,7 @@ func newOIDCServer(
 		Issuer:       provider.Issuer(),
 		ClientID:     provider.ClientID,
 		ClientSecret: provider.ClientSecret,
-		Scope:        []string{"openid", "profile", "email", "groups"},
+		Scope:        []string{oidc.ScopeOpenID, oidc.ScopeProfile, oidc.ScopeEmail, "groups"},
 	}
 	if mutate != nil {
 		mutate(&cfg)
@@ -105,7 +106,7 @@ func newOIDCServer(
 func browse(t *testing.T, client *http.Client, target string) (int, string) {
 	t.Helper()
 
-	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, target, http.NoBody)
 	require.NoError(t, err)
 
 	resp, err := client.Do(req)
@@ -590,11 +591,10 @@ func TestOIDCCallbackRejectsBadState(t *testing.T) {
 				target += "?" + tt.query.Encode()
 			}
 
-			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, target, nil)
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, target, http.NoBody)
 			require.NoError(t, err)
 
 			for name, value := range tt.cookies {
-				//nolint:gosec // G124: a request cookie; security attributes only apply to Set-Cookie
 				req.AddCookie(&http.Cookie{Name: name, Value: value})
 			}
 
@@ -719,7 +719,6 @@ func TestOIDCRegisterConfirmCSRF(t *testing.T) {
 	otherLogin := servertest.NewPendingLogin(t, srv, "pat-phone")
 	status, body = submitConfirm(t, srv.HTTPClient(t), srv, otherLogin.AuthID,
 		url.Values{registerConfirmCSRFField: {token}},
-		//nolint:gosec // G124: a request cookie; security attributes only apply to Set-Cookie
 		&http.Cookie{Name: registerConfirmCSRFField, Value: token})
 	assert.Equal(t, http.StatusForbidden, status, "unauthorised registration; body:\n%s", body)
 
