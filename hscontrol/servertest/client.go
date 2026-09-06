@@ -3,6 +3,7 @@ package servertest
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -115,7 +116,25 @@ func NewClient(tb testing.TB, server *TestServer, name string, opts ...ClientOpt
 		authKey = server.CreatePreAuthKey(tb, uid)
 	}
 
-	// Set up Tailscale client infrastructure.
+	tc := newTestClient(tb, server, name, cc.hostname, authKey)
+	tc.user = user
+
+	// Register with the server.
+	tc.register(tb)
+
+	// Start long-polling in the background.
+	tc.startPoll(tb)
+
+	return tc
+}
+
+// newTestClient builds the Tailscale client infrastructure for a
+// [TestClient] wired to the server's in-memory network. An empty authKey
+// leaves the client to log in interactively. The client is not registered
+// and not polling yet; cleanup is registered on tb.
+func newTestClient(tb testing.TB, server *TestServer, name, hostname, authKey string) *TestClient {
+	tb.Helper()
+
 	bus := eventbus.New()
 	tracker := health.NewTracker(bus)
 	dialer := tsdial.NewDialer(netmon.NewStatic())
@@ -134,7 +153,7 @@ func NewClient(tb testing.TB, server *TestServer, name string, opts ...ClientOpt
 		AuthKey:              authKey,
 		Hostinfo: &tailcfg.Hostinfo{
 			BackendLogID: "servertest-" + name,
-			Hostname:     cc.hostname,
+			Hostname:     hostname,
 		},
 		DiscoPublicKey: key.NewDisco().Public(),
 		Logf:           tb.Logf,
@@ -151,7 +170,6 @@ func NewClient(tb testing.TB, server *TestServer, name string, opts ...ClientOpt
 		server:  server,
 		direct:  direct,
 		authKey: authKey,
-		user:    user,
 		updates: make(chan *netmap.NetworkMap, 64),
 		bus:     bus,
 		dialer:  dialer,
@@ -162,13 +180,123 @@ func NewClient(tb testing.TB, server *TestServer, name string, opts ...ClientOpt
 		tc.cleanup()
 	})
 
-	// Register with the server.
-	tc.register(tb)
-
-	// Start long-polling in the background.
-	tc.startPoll(tb)
-
 	return tc
+}
+
+// PendingLogin is a Tailscale client that has started an interactive
+// registration and is waiting for it to be completed out of band. The server
+// answered the first register request with AuthURL and is now holding the
+// client's follow-up request open until an operator, or an identity provider
+// callback, finishes the registration for AuthID.
+type PendingLogin struct {
+	// AuthURL is the URL the server asked the user to visit, as a browser
+	// would receive it from `tailscale up`.
+	AuthURL string
+
+	// AuthID is the registration id embedded in AuthURL. It keys the
+	// server's auth cache entry for this registration.
+	AuthID types.AuthID
+
+	client *TestClient
+	done   chan loginResult
+}
+
+type loginResult struct {
+	url string
+	err error
+}
+
+// NewPendingLogin creates a client with no pre-auth key and sends its first
+// register request, which the server answers with an AuthURL. The client then
+// long-polls the follow-up request in the background, the way tailscaled
+// does while `tailscale up` prints the login URL. Complete the registration
+// (for example by driving the OIDC flow with [TestServer.HTTPClient]) and
+// call [PendingLogin.Wait] to obtain the connected client.
+func NewPendingLogin(tb testing.TB, server *TestServer, name string) *PendingLogin {
+	tb.Helper()
+
+	tc := newTestClient(tb, server, name, name, "")
+
+	return tc.startPendingLogin(tb)
+}
+
+// StartInteractiveRelogin sends a fresh register request for a client that
+// has logged out with [TestClient.LogoutAndDisconnect]. Without a pre-auth
+// key the server answers with an AuthURL, and the returned [PendingLogin]
+// long-polls the follow-up until the registration is completed out of band.
+func (c *TestClient) StartInteractiveRelogin(tb testing.TB) *PendingLogin {
+	tb.Helper()
+
+	return c.startPendingLogin(tb)
+}
+
+// startPendingLogin performs the first register request of an interactive
+// login and starts the follow-up long-poll in the background. The follow-up
+// is cancelled when the test ends if nothing completes it before.
+func (c *TestClient) startPendingLogin(tb testing.TB) *PendingLogin {
+	tb.Helper()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	authURL, err := c.direct.TryLogin(ctx, controlclient.LoginDefault)
+	if err != nil {
+		tb.Fatalf("servertest: TryLogin(%s): %v", c.Name, err)
+	}
+
+	if authURL == "" {
+		tb.Fatalf("servertest: TryLogin(%s): expected an auth URL for an interactive login", c.Name)
+	}
+
+	authID, err := types.AuthIDFromString(strings.TrimPrefix(authURL, c.server.URL+"/register/"))
+	if err != nil {
+		tb.Fatalf("servertest: TryLogin(%s): auth URL %q does not carry an auth id: %v", c.Name, authURL, err)
+	}
+
+	followupCtx, followupCancel := context.WithCancel(context.Background())
+	tb.Cleanup(followupCancel)
+
+	pl := &PendingLogin{
+		AuthURL: authURL,
+		AuthID:  authID,
+		client:  c,
+		done:    make(chan loginResult, 1),
+	}
+
+	go func() {
+		newURL, err := c.direct.WaitLoginURL(followupCtx, authURL)
+		pl.done <- loginResult{url: newURL, err: err}
+	}()
+
+	return pl
+}
+
+// Wait blocks until the server has answered the follow-up request with a
+// registered node, then starts the map poll and returns the connected
+// client. It fails the test if the follow-up errors, if the server hands out
+// a fresh AuthURL instead (the registration was lost), or if timeout passes.
+func (p *PendingLogin) Wait(tb testing.TB, timeout time.Duration) *TestClient {
+	tb.Helper()
+
+	select {
+	case res := <-p.done:
+		if res.err != nil {
+			tb.Fatalf("servertest: WaitLoginURL(%s): %v", p.client.Name, res.err)
+		}
+
+		if res.url != "" {
+			tb.Fatalf("servertest: WaitLoginURL(%s): server restarted the login with %s", p.client.Name, res.url)
+		}
+	case <-time.After(timeout):
+		tb.Fatalf("servertest: PendingLogin(%s): registration not completed after %v", p.client.Name, timeout)
+	}
+
+	// A relogin after [TestClient.LogoutAndDisconnect] still holds the old
+	// session's netmap; drop it so waits observe only the new session.
+	p.client.resetNetmapState()
+	p.client.startPollLoop()
+
+	return p.client
 }
 
 // register performs the initial [controlclient.Direct.TryLogin] to register the client.

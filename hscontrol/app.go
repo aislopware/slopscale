@@ -1046,6 +1046,14 @@ func (h *Headscale) SetServerURLForTest(tb testing.TB, url string) {
 	tb.Helper()
 
 	h.cfg.ServerURL = url
+
+	// The OIDC provider captured the placeholder URL at construction, both
+	// as the base of its auth URLs and as the OAuth redirect URL, so the
+	// interactive login only works if it follows the update.
+	if provider, ok := h.authProvider.(*AuthProviderOIDC); ok {
+		provider.serverURL = url
+		provider.oauth2Config.RedirectURL = strings.TrimSuffix(url, "/") + "/oidc/callback"
+	}
 }
 
 // StartBatcherForTest initialises and starts the map response batcher.

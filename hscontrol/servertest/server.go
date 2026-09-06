@@ -8,6 +8,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"net/netip"
 	"testing"
 	"time"
@@ -46,6 +47,7 @@ type serverConfig struct {
 	taildropEnabled  bool
 	realListener     bool
 	nodeStoreBatch   time.Duration
+	oidc             *types.OIDCConfig
 }
 
 func defaultServerConfig() *serverConfig {
@@ -106,6 +108,16 @@ func WithTaildropEnabled(enabled bool) ServerOption {
 	return func(c *serverConfig) { c.taildropEnabled = enabled }
 }
 
+// WithOIDC makes the server authenticate interactive logins against the
+// given OpenID Connect provider instead of the CLI/web flow. The issuer must
+// already serve its discovery document when [NewServer] runs, because
+// [hscontrol.NewHeadscale] discovers the provider at construction time; a
+// failed discovery fails the test rather than falling back to web auth.
+// Scope is passed through unchanged, so include at least "openid".
+func WithOIDC(cfg types.OIDCConfig) ServerOption {
+	return func(c *serverConfig) { c.oidc = &cfg }
+}
+
 // NewServer creates and starts a Headscale test server.
 // The server is fully functional and accepts real Tailscale control
 // protocol connections over Noise.
@@ -151,6 +163,11 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 			NodeMapSessionBufferedChanSize: sc.bufferedChanSize,
 			NodeStoreBatchTimeout:          sc.nodeStoreBatch,
 		},
+	}
+
+	if sc.oidc != nil {
+		cfg.OIDC = *sc.oidc
+		cfg.OIDC.OnlyStartIfOIDCIsAvailable = true
 	}
 
 	app, err := hscontrol.NewHeadscale(&cfg)
@@ -246,6 +263,44 @@ func (s *TestServer) Close() {
 // so that [TestClient] dialers can be wired to it.
 func (s *TestServer) MemNet() *memnet.Network {
 	return s.memNet
+}
+
+// HTTPClient returns an [http.Client] that reaches the server's HTTP API. On
+// the default in-memory network it dials the server address through memnet
+// and every other address through the real network, so one client can follow
+// a browser-style redirect chain that leaves the server for an identity
+// provider on a loopback port and comes back. The client carries a cookie
+// jar, which the OIDC state and CSRF cookies need, and follows redirects the
+// way a browser does.
+func (s *TestServer) HTTPClient(tb testing.TB) *http.Client {
+	tb.Helper()
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		tb.Fatalf("servertest: cookiejar.New: %v", err)
+	}
+
+	serverAddr := s.ln.Addr().String()
+
+	var realDialer net.Dialer
+
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			if addr == serverAddr {
+				return s.memNet.Dial(ctx, network, addr)
+			}
+
+			return realDialer.DialContext(ctx, network, addr)
+		},
+	}
+
+	tb.Cleanup(transport.CloseIdleConnections)
+
+	return &http.Client{
+		Transport: transport,
+		Jar:       jar,
+		Timeout:   30 * time.Second,
+	}
 }
 
 // CreateUser creates a test user and returns it.
