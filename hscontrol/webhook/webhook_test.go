@@ -17,23 +17,27 @@ import (
 
 type memStore struct {
 	mu      sync.Mutex
-	records map[types.WebhookID]string
+	records map[types.WebhookID]types.WebhookDelivery
 }
 
-func (m *memStore) RecordWebhookDelivery(id types.WebhookID, _ time.Time, status string) error {
+func (m *memStore) RecordWebhookDelivery(d types.WebhookDelivery) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.records == nil {
-		m.records = map[types.WebhookID]string{}
+		m.records = map[types.WebhookID]types.WebhookDelivery{}
 	}
 
-	m.records[id] = status
+	m.records[d.WebhookID] = d
 
 	return nil
 }
 
 func (m *memStore) status(id types.WebhookID) string {
+	return m.record(id).Status
+}
+
+func (m *memStore) record(id types.WebhookID) types.WebhookDelivery {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -132,6 +136,9 @@ func TestEmitDeliversToSubscribedWithRetry(t *testing.T) {
 	assert.Equal(t, int32(2), hits.Load(), "one retry after the 503")
 	assert.Equal(t, int32(0), other.Load(), "the unsubscribed endpoint is left alone")
 	assert.Equal(t, "200", store.status(1))
+	assert.Equal(t, 2, store.record(1).Attempts)
+	assert.True(t, store.record(1).OK)
+	assert.Equal(t, types.EventNodeCreated, store.record(1).EventType)
 
 	require.NotNil(t, body.Load())
 	require.NotNil(t, sig.Load())
@@ -159,6 +166,8 @@ func TestTestRecordsRejection(t *testing.T) {
 	err := d.Test(t.Context(), types.Webhook{ID: 3, URL: srv.URL, Secret: "s"})
 	require.ErrorIs(t, err, ErrDeliveryRejected)
 	assert.Equal(t, "400", store.status(3))
+	assert.False(t, store.record(3).OK)
+	assert.Equal(t, 1, store.record(3).Attempts)
 
 	err = d.Test(t.Context(), types.Webhook{ID: 4, URL: "http://127.0.0.1:1", Secret: "s"})
 	require.Error(t, err)

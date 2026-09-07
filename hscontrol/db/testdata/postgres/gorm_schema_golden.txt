@@ -148,6 +148,14 @@ COL users.provider text null=YES
 COL users.profile_pic_url text null=YES
 COL users.role text null=YES
 COL users.approved_at timestamp with time zone null=YES
+COL webhook_deliveries.id bigint null=NO default=nextval('webhook_deliveries_id_seq'::regclass)
+COL webhook_deliveries.webhook_id bigint null=NO
+COL webhook_deliveries.event_type text null=NO
+COL webhook_deliveries.status text null=NO
+COL webhook_deliveries.ok boolean null=NO
+COL webhook_deliveries.attempts bigint null=NO
+COL webhook_deliveries.duration_ms bigint null=NO
+COL webhook_deliveries.created_at timestamp with time zone null=NO
 COL webhooks.id bigint null=NO default=nextval('webhooks_id_seq'::regclass)
 COL webhooks.url text null=NO
 COL webhooks.description text null=YES
@@ -163,6 +171,7 @@ IDX CREATE INDEX idx_audit_events_actor_user_id ON public.audit_events USING btr
 IDX CREATE INDEX idx_audit_events_created_at ON public.audit_events USING btree (created_at)
 IDX CREATE INDEX idx_policies_deleted_at ON public.policies USING btree (deleted_at)
 IDX CREATE INDEX idx_users_deleted_at ON public.users USING btree (deleted_at)
+IDX CREATE INDEX idx_webhook_deliveries_webhook ON public.webhook_deliveries USING btree (webhook_id, id)
 IDX CREATE UNIQUE INDEX access_rule_groups_pkey ON public.access_rule_groups USING btree (id)
 IDX CREATE UNIQUE INDEX access_rules_pkey ON public.access_rules USING btree (id)
 IDX CREATE UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)
@@ -202,6 +211,7 @@ IDX CREATE UNIQUE INDEX pre_auth_keys_pkey ON public.pre_auth_keys USING btree (
 IDX CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (id)
 IDX CREATE UNIQUE INDEX settings_pkey ON public.settings USING btree (key)
 IDX CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)
+IDX CREATE UNIQUE INDEX webhook_deliveries_pkey ON public.webhook_deliveries USING btree (id)
 IDX CREATE UNIQUE INDEX webhooks_pkey ON public.webhooks USING btree (id)
 CON access_rule_groups access_rule_groups_group_id_not_null NOT NULL group_id
 CON access_rule_groups access_rule_groups_id_not_null NOT NULL id
@@ -290,6 +300,16 @@ CON settings settings_key_not_null NOT NULL key
 CON settings settings_pkey PRIMARY KEY (key)
 CON users users_id_not_null NOT NULL id
 CON users users_pkey PRIMARY KEY (id)
+CON webhook_deliveries fk_webhook_deliveries_webhook FOREIGN KEY (webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE
+CON webhook_deliveries webhook_deliveries_attempts_not_null NOT NULL attempts
+CON webhook_deliveries webhook_deliveries_created_at_not_null NOT NULL created_at
+CON webhook_deliveries webhook_deliveries_duration_ms_not_null NOT NULL duration_ms
+CON webhook_deliveries webhook_deliveries_event_type_not_null NOT NULL event_type
+CON webhook_deliveries webhook_deliveries_id_not_null NOT NULL id
+CON webhook_deliveries webhook_deliveries_ok_not_null NOT NULL ok
+CON webhook_deliveries webhook_deliveries_pkey PRIMARY KEY (id)
+CON webhook_deliveries webhook_deliveries_status_not_null NOT NULL status
+CON webhook_deliveries webhook_deliveries_webhook_id_not_null NOT NULL webhook_id
 CON webhooks webhooks_id_not_null NOT NULL id
 CON webhooks webhooks_pkey PRIMARY KEY (id)
 CON webhooks webhooks_secret_not_null NOT NULL secret

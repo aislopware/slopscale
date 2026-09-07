@@ -42,6 +42,28 @@ type Webhook struct {
 	LastDeliveryStatus string
 }
 
+// WebhookDeliveryID is the identifier of one delivery record.
+type WebhookDeliveryID uint64
+
+// WebhookDelivery is how one event's delivery to one endpoint went, after
+// every retry.
+type WebhookDelivery struct {
+	ID        WebhookDeliveryID
+	WebhookID WebhookID
+	EventType WebhookEventType
+	// Status is the HTTP status, or the error text when no response came.
+	Status string
+	// OK is whether the receiver answered 2xx in the end.
+	OK bool
+	// Attempts counts the requests made, retries included.
+	Attempts int
+	Duration time.Duration
+	At       time.Time
+}
+
+// WebhookDeliveryHistory is how many deliveries are kept per endpoint.
+const WebhookDeliveryHistory = 100
+
 // Subscribed reports whether the endpoint wants the event type.
 func (w Webhook) Subscribed(t WebhookEventType) bool {
 	return slices.Contains(w.Subscriptions, t)

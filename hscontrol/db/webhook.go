@@ -187,21 +187,118 @@ func (hsdb *HSDatabase) UpdateWebhook(w types.Webhook) (types.Webhook, error) {
 	})
 }
 
-// RecordWebhookDelivery stores how the newest delivery went. It is
-// called from the delivery goroutines, so it never fails loudly.
-func (hsdb *HSDatabase) RecordWebhookDelivery(id types.WebhookID, at time.Time, status string) error {
+// webhookDeliveryRow is a row of the webhook_deliveries table; see
+// schema.sql.
+type webhookDeliveryRow struct {
+	ID         uint64 `sql:"primary_key"`
+	WebhookID  uint64
+	EventType  string
+	Status     string
+	Ok         bool
+	Attempts   int64
+	DurationMs int64
+	CreatedAt  time.Time
+}
+
+type webhookDeliveryRecord struct {
+	Delivery webhookDeliveryRow `alias:"webhook_deliveries"`
+}
+
+func (r webhookDeliveryRow) delivery() types.WebhookDelivery {
+	return types.WebhookDelivery{
+		ID:        types.WebhookDeliveryID(r.ID),
+		WebhookID: types.WebhookID(r.WebhookID),
+		EventType: types.WebhookEventType(r.EventType),
+		Status:    r.Status,
+		OK:        r.Ok,
+		Attempts:  int(r.Attempts),
+		Duration:  time.Duration(r.DurationMs) * time.Millisecond,
+		At:        r.CreatedAt,
+	}
+}
+
+// RecordWebhookDelivery stores how a delivery went: on the endpoint as the
+// newest status, and in the history, which is trimmed to
+// [types.WebhookDeliveryHistory] rows. It is called from the delivery
+// goroutines, so it never fails loudly.
+func (hsdb *HSDatabase) RecordWebhookDelivery(d types.WebhookDelivery) error {
 	return hsdb.Write(func(tx *Tx) error {
+		at := d.At.UTC()
+
 		_, err := tx.executor().exec(
 			table.Webhooks.UPDATE(table.Webhooks.LastDeliveryAt, table.Webhooks.LastDeliveryStatus).
-				SET(at.UTC(), status).
-				WHERE(table.Webhooks.ID.EQ(jet.Uint64(uint64(id)))),
+				SET(at, d.Status).
+				WHERE(table.Webhooks.ID.EQ(jet.Uint64(uint64(d.WebhookID)))),
 		)
 		if err != nil {
-			return fmt.Errorf("recording webhook %d delivery: %w", id, err)
+			return fmt.Errorf("recording webhook %d delivery: %w", d.WebhookID, err)
 		}
 
-		return nil
+		row := webhookDeliveryRow{
+			WebhookID:  uint64(d.WebhookID),
+			EventType:  string(d.EventType),
+			Status:     d.Status,
+			Ok:         d.OK,
+			Attempts:   int64(d.Attempts),
+			DurationMs: d.Duration.Milliseconds(),
+			CreatedAt:  at,
+		}
+
+		_, err = tx.executor().exec(
+			table.WebhookDeliveries.INSERT(table.WebhookDeliveries.MutableColumns).MODEL(&row),
+		)
+		if err != nil {
+			return fmt.Errorf("recording webhook %d delivery history: %w", d.WebhookID, err)
+		}
+
+		return trimWebhookDeliveries(tx, d.WebhookID)
 	})
+}
+
+// trimWebhookDeliveries drops everything older than the newest
+// [types.WebhookDeliveryHistory] rows of the endpoint.
+func trimWebhookDeliveries(tx *Tx, id types.WebhookID) error {
+	keep := table.WebhookDeliveries.
+		SELECT(table.WebhookDeliveries.ID).
+		WHERE(table.WebhookDeliveries.WebhookID.EQ(jet.Uint64(uint64(id)))).
+		ORDER_BY(table.WebhookDeliveries.ID.DESC()).
+		LIMIT(types.WebhookDeliveryHistory)
+
+	_, err := tx.executor().exec(
+		table.WebhookDeliveries.DELETE().
+			WHERE(
+				table.WebhookDeliveries.WebhookID.EQ(jet.Uint64(uint64(id))).
+					AND(table.WebhookDeliveries.ID.NOT_IN(keep)),
+			),
+	)
+	if err != nil {
+		return fmt.Errorf("trimming webhook %d delivery history: %w", id, err)
+	}
+
+	return nil
+}
+
+// ListWebhookDeliveries returns the endpoint's kept deliveries, newest
+// first.
+func (hsdb *HSDatabase) ListWebhookDeliveries(id types.WebhookID) ([]types.WebhookDelivery, error) {
+	var rows []webhookDeliveryRecord
+
+	err := hsdb.executor().query(
+		table.WebhookDeliveries.SELECT(table.WebhookDeliveries.AllColumns).
+			WHERE(table.WebhookDeliveries.WebhookID.EQ(jet.Uint64(uint64(id)))).
+			ORDER_BY(table.WebhookDeliveries.ID.DESC()),
+		&rows,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listing webhook %d deliveries: %w", id, err)
+	}
+
+	out := make([]types.WebhookDelivery, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, r.Delivery.delivery())
+	}
+
+	return out, nil
 }
 
 // DeleteWebhook removes the webhook.

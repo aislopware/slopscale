@@ -504,6 +504,11 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609091100-webhooks",
 			run: migrateWebhooks,
 		},
+		{
+			// Webhook delivery history, the newest attempts per endpoint.
+			id:  "202609091200-webhook-deliveries",
+			run: migrateWebhookDeliveries,
+		},
 	}
 }
 
@@ -1464,5 +1469,40 @@ func createOAuthTables(tx *Tx) error {
 	return tx.ex.execAll("creating oauth_access_tokens table", []string{
 		ddl,
 		`CREATE UNIQUE INDEX idx_oauth_access_tokens_prefix ON oauth_access_tokens(prefix)`,
+	})
+}
+
+// migrateWebhookDeliveries (202609091200) creates the webhook_deliveries
+// table.
+func migrateWebhookDeliveries(tx *Tx) error {
+	return createTables(tx, []tableDefinition{
+		{
+			name: "webhook_deliveries",
+			sqlite: `CREATE TABLE webhook_deliveries(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  webhook_id integer NOT NULL,
+  event_type text NOT NULL,
+  status text NOT NULL,
+  ok boolean NOT NULL,
+  attempts integer NOT NULL,
+  duration_ms integer NOT NULL,
+  created_at datetime NOT NULL,
+  CONSTRAINT fk_webhook_deliveries_webhook FOREIGN KEY(webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE
+)`,
+			postgres: `CREATE TABLE webhook_deliveries(
+  id bigserial PRIMARY KEY,
+  webhook_id bigint NOT NULL,
+  event_type text NOT NULL,
+  status text NOT NULL,
+  ok boolean NOT NULL,
+  attempts bigint NOT NULL,
+  duration_ms bigint NOT NULL,
+  created_at timestamptz NOT NULL,
+  CONSTRAINT fk_webhook_deliveries_webhook FOREIGN KEY(webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE
+)`,
+			indexes: []string{
+				`CREATE INDEX idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, id)`,
+			},
+		},
 	})
 }

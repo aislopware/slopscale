@@ -177,6 +177,21 @@ func TestWebhookDeliveries(t *testing.T) {
 	assert.Equal(t, "204", hook(t, body)["lastDeliveryStatus"])
 	assert.NotEmpty(t, hook(t, body)["lastDeliveryAt"])
 
+	status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/webhook/"+id+"/deliveries", nil)
+	require.Equal(t, http.StatusOK, status, body)
+
+	deliveries, _ := body["deliveries"].([]any)
+	require.Len(t, deliveries, 2, "the node event and the test event")
+
+	newest, _ := deliveries[0].(map[string]any)
+	assert.Equal(t, "test", newest["eventType"], "newest first")
+	assert.Equal(t, true, newest["ok"])
+	assert.Equal(t, "204", newest["status"])
+	assert.InDelta(t, 1, newest["attempts"], 0)
+
+	oldest, _ := deliveries[1].(map[string]any)
+	assert.Equal(t, "nodeCreated", oldest["eventType"])
+
 	// User events.
 	status, body = apiCall(t, client, ownerKey, http.MethodPost, v1+"/user", map[string]any{"name": "hook-member"})
 	require.Equal(t, http.StatusOK, status, body)
@@ -230,6 +245,9 @@ func TestWebhookDeliveries(t *testing.T) {
 
 	status, _ = apiCall(t, client, ownerKey, http.MethodGet, v1+"/webhook/"+id, nil)
 	assert.Equal(t, http.StatusNotFound, status)
+
+	status, _ = apiCall(t, client, ownerKey, http.MethodGet, v1+"/webhook/"+id+"/deliveries", nil)
+	assert.Equal(t, http.StatusNotFound, status, "history goes with the webhook")
 
 	status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/webhook", nil)
 	require.Equal(t, http.StatusOK, status, body)

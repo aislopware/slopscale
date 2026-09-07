@@ -29,9 +29,9 @@ import (
 // SignatureHeader carries the timestamp and HMAC of a delivery.
 const SignatureHeader = "Tailscale-Webhook-Signature"
 
-// Store records how the newest delivery to an endpoint went.
+// Store records how a delivery to an endpoint went.
 type Store interface {
-	RecordWebhookDelivery(id types.WebhookID, at time.Time, status string) error
+	RecordWebhookDelivery(d types.WebhookDelivery) error
 }
 
 // Dispatcher holds the current endpoints and delivers events to the
@@ -155,8 +155,9 @@ func (d *Dispatcher) Emit(t types.WebhookEventType, message string, data any) {
 func (d *Dispatcher) Test(ctx context.Context, endpoint types.Webhook) error {
 	event := d.event(types.EventTest, "This is a test event from headscale.", nil)
 
+	started := time.Now()
 	status, err := d.deliver(ctx, endpoint, event)
-	d.record(endpoint.ID, status, err)
+	d.record(endpoint.ID, event.Type, status, err, 1, time.Since(started))
 
 	return err
 }
@@ -174,9 +175,12 @@ func (d *Dispatcher) event(t types.WebhookEventType, message string, data any) t
 
 func (d *Dispatcher) deliverWithRetry(ctx context.Context, endpoint types.Webhook, event types.WebhookEvent) {
 	var (
-		status int
-		err    error
+		status   int
+		err      error
+		attempts int
 	)
+
+	started := time.Now()
 
 	for attempt := 0; attempt <= len(d.backoff); attempt++ {
 		if attempt > 0 {
@@ -187,13 +191,15 @@ func (d *Dispatcher) deliverWithRetry(ctx context.Context, endpoint types.Webhoo
 			}
 		}
 
+		attempts++
+
 		status, err = d.deliver(ctx, endpoint, event)
 		if err == nil || !retryable(status, err) {
 			break
 		}
 	}
 
-	d.record(endpoint.ID, status, err)
+	d.record(endpoint.ID, event.Type, status, err, attempts, time.Since(started))
 
 	if err != nil {
 		log.Warn().Err(err).
@@ -249,7 +255,9 @@ func (d *Dispatcher) deliver(ctx context.Context, endpoint types.Webhook, event 
 	return resp.StatusCode, nil
 }
 
-func (d *Dispatcher) record(id types.WebhookID, status int, err error) {
+func (d *Dispatcher) record(
+	id types.WebhookID, eventType types.WebhookEventType, status int, err error, attempts int, took time.Duration,
+) {
 	if d.store == nil {
 		return
 	}
@@ -259,7 +267,15 @@ func (d *Dispatcher) record(id types.WebhookID, status int, err error) {
 		text = err.Error()
 	}
 
-	recordErr := d.store.RecordWebhookDelivery(id, time.Now().UTC(), text)
+	recordErr := d.store.RecordWebhookDelivery(types.WebhookDelivery{
+		WebhookID: id,
+		EventType: eventType,
+		Status:    text,
+		OK:        err == nil,
+		Attempts:  attempts,
+		Duration:  took,
+		At:        time.Now().UTC(),
+	})
 	if recordErr != nil {
 		log.Error().Err(recordErr).Uint64("webhook", uint64(id)).Msg("recording webhook delivery")
 	}

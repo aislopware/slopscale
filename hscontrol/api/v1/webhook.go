@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	registrations = append(registrations, registerWebhooks, registerWebhookActions)
+	registrations = append(registrations, registerWebhooks, registerWebhookActions, registerWebhookDeliveries)
 }
 
 const tagWebhooks = "Webhooks"
@@ -49,6 +49,20 @@ type WebhookRequestBody struct {
 	Subscriptions []string `json:"subscriptions"`
 }
 
+// WebhookDelivery is one attempt at delivering an event, after retries.
+type WebhookDelivery struct {
+	ID        string `format:"uint64"  json:"id"`
+	EventType string `json:"eventType"`
+	// Status is the HTTP status, or the error text when no response came.
+	Status string `json:"status"`
+	// Ok is whether the receiver answered 2xx in the end.
+	Ok bool `json:"ok"`
+	// Attempts counts the requests made, retries included.
+	Attempts   int       `json:"attempts"`
+	DurationMs int64     `json:"durationMs"`
+	At         time.Time `json:"at"`
+}
+
 // WebhookEventTypes lists what a webhook may subscribe to.
 type WebhookEventTypes struct {
 	Types []string `json:"types" nullable:"false"`
@@ -57,6 +71,11 @@ type WebhookEventTypes struct {
 type (
 	webhookIDInput struct {
 		ID string `format:"uint64" path:"id"`
+	}
+	webhookDeliveriesOutput struct {
+		Body struct {
+			Deliveries []WebhookDelivery `json:"deliveries" nullable:"false"`
+		}
 	}
 	webhookBodyInput struct {
 		Body WebhookRequestBody
@@ -365,6 +384,46 @@ func registerWebhookActions(api huma.API, b Backend) {
 		out := &webhookTestOutput{}
 		out.Body.Delivered = err == nil
 		out.Body.Status = w.LastDeliveryStatus
+
+		return out, nil
+	})
+}
+
+func registerWebhookDeliveries(api huma.API, b Backend) {
+	huma.Register(api, withScope(huma.Operation{
+		OperationID: "listWebhookDeliveries",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/webhook/{id}/deliveries",
+		Summary:     "List webhook deliveries",
+		Description: "The newest deliveries to the webhook, most recent first; the server keeps the last " +
+			strconv.Itoa(types.WebhookDeliveryHistory) + " per webhook.",
+		Tags:     []string{tagWebhooks},
+		Security: bearerAuth,
+	}, scope.FeatureSettingsRead), func(_ context.Context, in *webhookIDInput) (*webhookDeliveriesOutput, error) {
+		id, err := parseWebhookID(in.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		deliveries, err := b.State.ListWebhookDeliveries(id)
+		if err != nil {
+			return nil, mapError("listing webhook deliveries", err)
+		}
+
+		out := &webhookDeliveriesOutput{}
+		out.Body.Deliveries = make([]WebhookDelivery, 0, len(deliveries))
+
+		for _, d := range deliveries {
+			out.Body.Deliveries = append(out.Body.Deliveries, WebhookDelivery{
+				ID:         formatID(uint64(d.ID)),
+				EventType:  string(d.EventType),
+				Status:     d.Status,
+				Ok:         d.OK,
+				Attempts:   d.Attempts,
+				DurationMs: d.Duration.Milliseconds(),
+				At:         d.At,
+			})
+		}
 
 		return out, nil
 	})

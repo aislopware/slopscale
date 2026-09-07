@@ -343,3 +343,20 @@ CREATE TABLE webhooks(
   last_delivery_at datetime,
   last_delivery_status text
 );
+
+-- webhook_deliveries keeps the newest attempts per webhook (the dispatcher
+-- trims the rest) so an operator can see what was sent and how it went.
+-- status is the HTTP status, or the error text when no response came.
+CREATE TABLE webhook_deliveries(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  webhook_id integer NOT NULL,
+  event_type text NOT NULL,
+  status text NOT NULL,
+  ok boolean NOT NULL,
+  attempts integer NOT NULL,
+  duration_ms integer NOT NULL,
+  created_at datetime NOT NULL,
+
+  CONSTRAINT fk_webhook_deliveries_webhook FOREIGN KEY(webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, id);

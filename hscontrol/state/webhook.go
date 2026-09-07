@@ -122,6 +122,17 @@ func (s *State) RotateWebhookSecret(id types.WebhookID) (types.Webhook, error) {
 	return updated, s.loadWebhooks()
 }
 
+// ListWebhookDeliveries returns the endpoint's kept delivery history,
+// newest first.
+func (s *State) ListWebhookDeliveries(id types.WebhookID) ([]types.WebhookDelivery, error) {
+	_, err := s.db.GetWebhook(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.db.ListWebhookDeliveries(id)
+}
+
 // DeleteWebhook removes an endpoint and stops delivering to it.
 func (s *State) DeleteWebhook(id types.WebhookID) error {
 	err := s.db.DeleteWebhook(id)

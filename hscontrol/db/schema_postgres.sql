@@ -274,3 +274,16 @@ CREATE TABLE webhooks(
   last_delivery_at timestamptz,
   last_delivery_status text
 );
+
+CREATE TABLE webhook_deliveries(
+  id bigserial PRIMARY KEY,
+  webhook_id bigint NOT NULL,
+  event_type text NOT NULL,
+  status text NOT NULL,
+  ok boolean NOT NULL,
+  attempts bigint NOT NULL,
+  duration_ms bigint NOT NULL,
+  created_at timestamptz NOT NULL,
+  CONSTRAINT fk_webhook_deliveries_webhook FOREIGN KEY(webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, id);
