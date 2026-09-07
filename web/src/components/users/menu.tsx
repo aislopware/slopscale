@@ -7,20 +7,26 @@ import {
   PencilSimpleIcon,
   ShieldCheckIcon,
   TrashIcon,
+  UsersThreeIcon,
 } from "@phosphor-icons/react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
+import { groupsQuery } from "~/api/queries.ts";
 import type { User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
+import { MembershipDialog } from "~/components/access/membership-dialog.tsx";
+import { groupsOfUser } from "~/components/access/model.ts";
+import { useAccessMutations } from "~/components/access/mutations.ts";
 import { DeleteUserDialog, RenameUserDialog, RoleDialog } from "~/components/users/dialogs.tsx";
 import { useUserMutations } from "~/components/users/mutations.ts";
 
 const actionsIconSize = 18;
 
-type Dialog = "rename" | "role" | "delete";
+type Dialog = "rename" | "role" | "groups" | "delete";
 
 type Mutations = ReturnType<typeof useUserMutations>;
 
@@ -33,6 +39,9 @@ export interface UserMenuProps {
 export function UserMenu({ user, me }: UserMenuProps): ReactElement {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const mutations = useUserMutations();
+  const access = useAccessMutations();
+  const groups = useQuery({ ...groupsQuery, enabled: can(me, "policy_file") });
+  const groupList = groups.data?.groups ?? [];
   const close = (open: boolean): void => {
     if (!open) {
       setDialog(null);
@@ -54,7 +63,13 @@ export function UserMenu({ user, me }: UserMenuProps): ReactElement {
           }
         />
         <DropdownMenu.Content align="end">
-          <UserMenuItems user={user} me={me} mutations={mutations} onOpen={setDialog} />
+          <UserMenuItems
+            user={user}
+            me={me}
+            mutations={mutations}
+            canEditGroups={can(me, "policy_file") && groups.data !== undefined}
+            onOpen={setDialog}
+          />
         </DropdownMenu.Content>
       </DropdownMenu>
       <RenameUserDialog
@@ -64,6 +79,16 @@ export function UserMenu({ user, me }: UserMenuProps): ReactElement {
         onOpenChange={close}
       />
       <RoleDialog user={user} open={dialog === "role"} mutations={mutations} onOpenChange={close} />
+      <MembershipDialog
+        title="Edit groups"
+        description="Every machine this user owns is in these groups, including ones registered later."
+        member={{ userId: user.id }}
+        groups={groupList}
+        current={groupsOfUser(groupList, user).map((group) => group.id)}
+        open={dialog === "groups"}
+        onOpenChange={close}
+        mutations={access}
+      />
       <DeleteUserDialog
         user={user}
         open={dialog === "delete"}
@@ -78,11 +103,13 @@ function UserMenuItems({
   user,
   me,
   mutations,
+  canEditGroups,
   onOpen,
 }: {
   readonly user: User;
   readonly me: Me;
   readonly mutations: Mutations;
+  readonly canEditGroups: boolean;
   readonly onOpen: (dialog: Dialog) => void;
 }): ReactElement {
   const writable = can(me, "users");
@@ -123,6 +150,16 @@ function UserMenuItems({
       >
         Change role…
       </DropdownMenu.Item>
+      {canEditGroups ? (
+        <DropdownMenu.Item
+          icon={UsersThreeIcon}
+          onClick={() => {
+            onOpen("groups");
+          }}
+        >
+          Edit groups…
+        </DropdownMenu.Item>
+      ) : null}
       {can(me, "devices:core:read") ? (
         <DropdownMenu.Item
           // A rendered item drops the item's own icon and children, so the link carries both.

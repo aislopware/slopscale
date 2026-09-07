@@ -3,9 +3,10 @@ import type { BadgeVariant } from "@cloudflare/kumo/components/badge";
 import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
-import type { PreAuthKey } from "~/api/queries.ts";
+import type { Group, PreAuthKey } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
+import { groupName } from "~/components/access/model.ts";
 import { ExpiryCell, KeyPrefix } from "~/components/keys/cells.tsx";
 import { KeyActions } from "~/components/keys/key-actions.tsx";
 import { usePreAuthKeyMutations } from "~/components/keys/mutations.ts";
@@ -61,7 +62,9 @@ export const preAuthKeyColumns = helper.columns([
     id: "type",
     header: "Type",
     enableSorting: false,
-    cell: ({ row }) => <TypeCell authKey={row.original} />,
+    cell: ({ row, table }) => (
+      <TypeCell authKey={row.original} groups={table.options.meta?.groups ?? []} />
+    ),
     meta: { className: "min-w-44" },
   }),
   helper.accessor((authKey) => statusOrder[preAuthKeyStatus(authKey)], {
@@ -114,7 +117,13 @@ function UserCell({ name }: { readonly name: string }): ReactElement {
   );
 }
 
-function TypeCell({ authKey }: { readonly authKey: PreAuthKey }): ReactElement {
+function TypeCell({
+  authKey,
+  groups,
+}: {
+  readonly authKey: PreAuthKey;
+  readonly groups: readonly Group[];
+}): ReactElement {
   return (
     <div className="flex flex-wrap items-center gap-1">
       <Badge variant="secondary">{authKey.reusable ? "Reusable" : "Single use"}</Badge>
@@ -123,6 +132,11 @@ function TypeCell({ authKey }: { readonly authKey: PreAuthKey }): ReactElement {
       {authKey.aclTags.map((tag) => (
         <Badge key={tag} variant="outline" className="font-mono">
           {tag}
+        </Badge>
+      ))}
+      {authKey.groupIds.map((id) => (
+        <Badge key={id} variant="outline">
+          {groupName(groups, id)}
         </Badge>
       ))}
     </div>

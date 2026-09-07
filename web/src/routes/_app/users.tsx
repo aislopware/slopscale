@@ -3,13 +3,13 @@ import { Empty } from "@cloudflare/kumo/components/empty";
 import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import { UsersIcon } from "@phosphor-icons/react";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useDeferredValue, useState } from "react";
 import type { ReactElement } from "react";
 import { object, optional, pipe, transform, unknown } from "valibot";
 
-import { usersQuery } from "~/api/queries.ts";
+import { groupsQuery, usersQuery } from "~/api/queries.ts";
 import type { User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
@@ -72,7 +72,12 @@ function searchFor(query: string, filter: UserFilter): UsersSearch {
 export const Route = createFileRoute("/_app/users")({
   validateSearch: searchSchema,
   loader: async ({ context }) => {
-    await context.queryClient.query(usersQuery);
+    await Promise.all([
+      context.queryClient.query(usersQuery),
+      can(context.me, "policy_file:read")
+        ? context.queryClient.query(groupsQuery)
+        : Promise.resolve(),
+    ]);
   },
   component: UsersPage,
 });
@@ -90,6 +95,7 @@ function UsersPage(): ReactElement {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const users = useSuspenseQuery(usersQuery);
+  const groups = useQuery({ ...groupsQuery, enabled: can(me, "policy_file:read") });
   const text = search.q ?? "";
   const filter = search.filter ?? "all";
   const query = useDeferredValue(text);
@@ -101,7 +107,7 @@ function UsersPage(): ReactElement {
     getRowId: (user) => user.id,
     state: { globalFilter: query },
     initialState: { sorting: [{ id: "name", desc: false }] },
-    meta: { me },
+    meta: { me, ...(groups.data === undefined ? {} : { groups: groups.data.groups }) },
   });
 
   const total = users.data.users.length;

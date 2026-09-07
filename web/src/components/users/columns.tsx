@@ -2,6 +2,8 @@ import { Badge } from "@cloudflare/kumo/components/badge";
 import type { ReactElement } from "react";
 
 import type { User } from "~/api/queries.ts";
+import { GroupChips } from "~/components/access/group-chips.tsx";
+import { groupsOfUser } from "~/components/access/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
@@ -57,6 +59,21 @@ export const columns = helper.columns([
       </Badge>
     ),
     meta: { className: "whitespace-nowrap" },
+  }),
+  helper.display({
+    id: "groups",
+    header: "Groups",
+    cell: ({ row, table }) => {
+      const groups = table.options.meta?.groups;
+
+      return groups === undefined ? null : (
+        <GroupChips
+          ids={groupsOfUser(groups, row.original).map((group) => group.id)}
+          groups={groups}
+        />
+      );
+    },
+    meta: { className: "hidden lg:table-cell" },
   }),
   helper.accessor((user) => user.createdAt, {
     id: "joined",

@@ -6,11 +6,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import { api } from "~/api/client.ts";
-import { usersQuery } from "~/api/queries.ts";
+import { groupsQuery, usersQuery } from "~/api/queries.ts";
 import type { Node, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { DangerZone } from "~/components/machines/danger-zone.tsx";
+import { GroupsSection } from "~/components/machines/groups.tsx";
 import { MachineMenu } from "~/components/machines/menu.tsx";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
 import { AddressesSection, OverviewSection } from "~/components/machines/overview.tsx";
@@ -39,6 +40,9 @@ export const Route = createFileRoute("/_app/machines/$nodeId")({
         }),
       ),
       can(context.me, "users:read") ? context.queryClient.query(usersQuery) : Promise.resolve(),
+      can(context.me, "policy_file:read")
+        ? context.queryClient.query(groupsQuery)
+        : Promise.resolve(),
     ]);
   },
   component: MachinePage,
@@ -51,6 +55,7 @@ function MachinePage(): ReactElement {
     api.queryOptions("get", "/api/v1/node/{nodeId}", { params: { path: { nodeId } } }),
   );
   const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
+  const groups = useQuery({ ...groupsQuery, enabled: can(me, "policy_file:read") });
   const { node } = detail.data;
   const userList = users.data?.users ?? emptyUsers;
   const routes = can(me, "devices:routes");
@@ -64,6 +69,9 @@ function MachinePage(): ReactElement {
         <div className="flex flex-col gap-6">
           <OverviewSection node={node} />
           <RoutesSection node={node} canEdit={routes} />
+          {groups.data === undefined ? null : (
+            <GroupsSection node={node} groups={groups.data.groups} users={userList} me={me} />
+          )}
           <SharingSection node={node} users={userList} me={me} />
         </div>
         <div className="flex flex-col gap-6">

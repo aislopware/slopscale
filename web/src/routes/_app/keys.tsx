@@ -9,7 +9,7 @@ import { useDeferredValue, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { object, optional, pipe, transform, unknown } from "valibot";
 
-import { apiKeysQuery, preAuthKeysQuery, usersQuery } from "~/api/queries.ts";
+import { apiKeysQuery, groupsQuery, preAuthKeysQuery, usersQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { apiKeyColumns, emptyUsers } from "~/components/keys/api-columns.tsx";
@@ -161,6 +161,8 @@ function PreAuthPanel({
   readonly controls: PanelControls;
 }): ReactElement {
   const keys = useSuspenseQuery(preAuthKeysQuery);
+  // Group names for the type cell; without the scope the cell shows the ids.
+  const groups = useQuery({ ...groupsQuery, enabled: can(me, "policy_file:read") });
   const [creating, setCreating] = useState(false);
   const filter = useDeferredValue(controls.query);
   const rows = keys.data.preAuthKeys.filter(
@@ -172,7 +174,7 @@ function PreAuthPanel({
     getRowId: (authKey) => authKey.id,
     state: { globalFilter: filter },
     initialState: { sorting: [{ id: "created", desc: true }] },
-    meta: { me },
+    meta: { me, ...(groups.data === undefined ? {} : { groups: groups.data.groups }) },
   });
   const create = (): void => {
     setCreating(true);

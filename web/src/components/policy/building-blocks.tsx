@@ -90,7 +90,7 @@ export function BuildingBlocks({
         </Collapsible.Trigger>
         <Collapsible.Panel className="border-t border-kumo-hairline">
           <BlockRow
-            label="Groups"
+            label="User groups (group:)"
             names={blocks.groups}
             empty="No groups yet"
             onSelect={onSelect}

@@ -60,6 +60,7 @@ const secret = "hskey-auth-69968f8036d70dd6a1b2c3d4e5f6";
 
 const plain: PreAuthKey = {
   aclTags: [],
+  groupIds: [],
   createdAt: "2026-01-01T00:00:00Z",
   ephemeral: false,
   expiration: "2027-01-01T00:00:00Z",

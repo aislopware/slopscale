@@ -31,7 +31,15 @@ export function DialogContent({
   children,
 }: DialogContentProps): ReactElement {
   return (
-    <Dialog size={size} className={cn("flex flex-col p-0", className)}>
+    <Dialog
+      size={size}
+      // Kumo pins the dialog below the top edge with no height limit, so a long form on a short
+      // screen would lose its footer; the body scrolls instead.
+      className={cn(
+        "flex max-h-[calc(100svh-3rem)] flex-col p-0 sm:max-h-[calc(100svh-5rem)]",
+        className,
+      )}
+    >
       <div className="flex items-center justify-between gap-4 border-b border-kumo-line px-6 py-4">
         <Dialog.Title className="text-lg font-semibold text-kumo-default">{title}</Dialog.Title>
         <Dialog.Close
@@ -47,7 +55,7 @@ export function DialogContent({
           }
         />
       </div>
-      <div className="flex flex-col gap-4 p-6">
+      <div className="flex min-h-0 flex-col gap-4 overflow-y-auto p-6">
         {description === undefined ? null : (
           <Dialog.Description className="max-w-prose text-pretty text-kumo-subtle">
             {description}

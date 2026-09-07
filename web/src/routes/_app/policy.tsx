@@ -1,179 +1,153 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
-import { Banner } from "@cloudflare/kumo/components/banner";
-import { Button, LinkButton } from "@cloudflare/kumo/components/button";
-import { cn } from "@cloudflare/kumo/utils";
-import { ArrowSquareOutIcon, WarningCircleIcon, WarningIcon } from "@phosphor-icons/react";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useState } from "react";
-import type { ReactElement } from "react";
+import { Tabs } from "@cloudflare/kumo/components/tabs";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import type { ReactElement, ReactNode } from "react";
+import { object, optional, pipe, transform, unknown } from "valibot";
 
-import { policyQuery } from "~/api/queries.ts";
+import {
+  accessRulesQuery,
+  groupsQuery,
+  nodesQuery,
+  policyQuery,
+  usersQuery,
+} from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
-import { policyBlocks } from "~/components/policy/blocks.ts";
-import { BuildingBlocks } from "~/components/policy/building-blocks.tsx";
-import { LeaveGuard } from "~/components/policy/leave-guard.tsx";
-import { PolicyEditor } from "~/components/policy/policy-editor.tsx";
-import type { PolicyEditorHandle } from "~/components/policy/policy-editor.tsx";
-import { usePolicyDraft } from "~/components/policy/use-policy-draft.ts";
-import type { PolicyDraft } from "~/components/policy/use-policy-draft.ts";
+import { GroupsTab } from "~/components/access/groups-tab.tsx";
+import { RulesTab } from "~/components/access/rules-tab.tsx";
+import { PolicyFileTab } from "~/components/policy/policy-file-tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
-import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { parseTime } from "~/lib/time.ts";
 
-const referenceUrl = "https://headscale.net/stable/ref/policy/";
+const tabs = ["rules", "groups", "file"] as const;
+type Tab = (typeof tabs)[number];
+
+const tabItems: readonly { value: Tab; label: string }[] = [
+  { value: "rules", label: "Rules" },
+  { value: "groups", label: "Groups" },
+  { value: "file", label: "Policy file" },
+];
+
+function toText(value: unknown): string | undefined {
+  return typeof value === "string" && value !== "" ? value : undefined;
+}
+
+function toTab(value: unknown): Tab | undefined {
+  return tabs.find((known) => known === value);
+}
+
+const anyValue = unknown();
+const optionalTab = optional(pipe(anyValue, transform(toTab)));
+const optionalText = optional(pipe(anyValue, transform(toText)));
+
+/** Absent means the default, so the URL only carries a tab or search the operator chose. */
+const searchSchema = object({ tab: optionalTab, q: optionalText });
 
 export const Route = createFileRoute("/_app/policy")({
+  validateSearch: searchSchema,
   loader: async ({ context }) => {
-    await context.queryClient.query(policyQuery);
+    await Promise.all([
+      context.queryClient.query(policyQuery),
+      context.queryClient.query(groupsQuery),
+      context.queryClient.query(accessRulesQuery),
+    ]);
   },
   component: PolicyPage,
 });
 
-/** The one-line state of the draft: a dot and what it means, under the title. */
-function DraftState({
-  dirty,
-  updatedAt,
-}: {
-  readonly dirty: boolean;
-  readonly updatedAt: string;
-}): ReactElement {
-  if (dirty) {
-    return (
-      <Badge appearance="dot" variant="warning">
-        Unsaved changes
-      </Badge>
-    );
-  }
-
-  if (parseTime(updatedAt) === null) {
-    return (
-      <Badge appearance="dot" variant="neutral">
-        Never saved
-      </Badge>
-    );
-  }
-
-  return (
-    <Badge appearance="dot" variant="success">
-      Saved <RelativeTime value={updatedAt} />
-    </Badge>
-  );
-}
-
-function Actions({
-  draft,
-  canEdit,
-}: {
-  readonly draft: PolicyDraft;
-  readonly canEdit: boolean;
-}): ReactElement {
-  return (
-    <>
-      <LinkButton href={referenceUrl} external variant="ghost" icon={ArrowSquareOutIcon}>
-        Policy reference
-      </LinkButton>
-      <Button
-        variant="secondary"
-        loading={draft.checking}
-        onClick={() => {
-          draft.check();
-        }}
-      >
-        Check
-      </Button>
-      <Button
-        variant="primary"
-        disabled={!draft.dirty || !canEdit}
-        loading={draft.saving}
-        onClick={() => {
-          draft.save();
-        }}
-      >
-        Save
-      </Button>
-    </>
-  );
-}
-
 function PolicyPage(): ReactElement {
   const { me } = Route.useRouteContext();
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
   const policy = useSuspenseQuery(policyQuery).data;
+  const { groups } = useSuspenseQuery(groupsQuery).data;
+  const { rules, policyFileEnforces } = useSuspenseQuery(accessRulesQuery).data;
+  // Group membership names machines and users; a caller without those scopes still sees counts.
+  const nodes = useQuery({ ...nodesQuery, enabled: can(me, "devices:core:read") });
+  const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
+  const tab = search.tab ?? "rules";
+  const text = search.q ?? "";
   const canEdit = can(me, "policy_file");
-  const draft = usePolicyDraft({ policy, canEdit });
-  const unset = policy.policy === "";
-  const editor = useRef<PolicyEditorHandle>(null);
-  const [blocksOpen, setBlocksOpen] = useState(true);
+  const hasRules = rules.some((rule) => rule.enabled);
+
+  const setTab = (value: string): void => {
+    const next = toTab(value) ?? "rules";
+
+    void navigate({ search: () => ({ tab: next === "rules" ? undefined : next, q: undefined }) });
+  };
+  const setSearch = (value: string): void => {
+    void navigate({
+      search: (current) => ({ ...current, q: value === "" ? undefined : value }),
+      replace: true,
+    });
+  };
 
   return (
     <>
       <PageHeader
         title="Access controls"
-        description="The tailnet policy in HuJSON: grants, groups, tags, SSH rules and autogroups."
-        meta={<DraftState dirty={draft.dirty} updatedAt={policy.updatedAt} />}
-        actions={<Actions draft={draft} canEdit={canEdit} />}
+        description="Who may reach what: rules between groups of machines, and the policy file for everything else."
+        meta={describe(rules, groups.length)}
       />
-      {draft.issue === null ? null : (
-        <Banner
-          size="sm"
-          variant="error"
-          icon={<WarningCircleIcon />}
-          title={draft.issue.title}
-          description={draft.issue.message}
-        />
-      )}
-      {unset ? (
-        <Banner
-          size="sm"
-          variant="alert"
-          icon={<WarningIcon />}
-          title="No policy is set"
-          description="Every user can reach every device until a policy is saved."
-          {...(canEdit && draft.text === ""
-            ? {
-                action: (
-                  <Banner.Action
-                    variant="ghost"
-                    onClick={() => {
-                      draft.fillTemplate();
-                    }}
-                  >
-                    Start from a template
-                  </Banner.Action>
-                ),
-              }
-            : {})}
-        />
-      ) : null}
-      <div
-        className={cn(
-          "grid min-w-0 gap-4",
-          // Closed, the panel shrinks to its title so the editor takes the width back.
-          blocksOpen ? "xl:grid-cols-[minmax(0,1fr)_18rem]" : "xl:grid-cols-[minmax(0,1fr)_auto]",
-        )}
-      >
-        <PolicyEditor
-          ref={editor}
-          value={draft.text}
-          onChange={(next) => {
-            draft.setText(next);
-          }}
-          readOnly={!canEdit}
-          dirty={draft.dirty}
-          onDiscard={() => {
-            draft.discard();
-          }}
-        />
-        <BuildingBlocks
-          blocks={policyBlocks(draft.text)}
-          open={blocksOpen}
-          onOpenChange={setBlocksOpen}
-          onSelect={(name) => {
-            editor.current?.reveal(name);
-          }}
-        />
+      <div className="flex">
+        <Tabs variant="segmented" tabs={[...tabItems]} value={tab} onValueChange={setTab} />
       </div>
-      <LeaveGuard dirty={draft.dirty} />
+      {/* Kumo's Tabs renders the controls only, so each body names itself as the panel. */}
+      {tab === "rules" ? (
+        <TabPanel label="Rules">
+          <RulesTab
+            me={me}
+            rules={rules}
+            groups={groups}
+            policyFileEnforces={policyFileEnforces}
+            search={text}
+            onSearchChange={setSearch}
+          />
+        </TabPanel>
+      ) : null}
+      {tab === "groups" ? (
+        <TabPanel label="Groups">
+          <GroupsTab
+            me={me}
+            groups={groups}
+            rules={rules}
+            nodes={nodes.data?.nodes}
+            users={users.data?.users}
+            search={text}
+            onSearchChange={setSearch}
+          />
+        </TabPanel>
+      ) : null}
+      {tab === "file" ? (
+        <TabPanel label="Policy file">
+          <PolicyFileTab
+            policy={policy}
+            canEdit={canEdit}
+            hasRules={hasRules}
+            enforces={policyFileEnforces}
+          />
+        </TabPanel>
+      ) : null}
     </>
   );
+}
+
+function TabPanel({
+  label,
+  children,
+}: {
+  readonly label: string;
+  readonly children: ReactNode;
+}): ReactElement {
+  return (
+    <div role="tabpanel" aria-label={label} className="flex flex-col gap-6">
+      {children}
+    </div>
+  );
+}
+
+function describe(rules: readonly { enabled: boolean }[], groupCount: number): string {
+  const enabled = rules.filter((rule) => rule.enabled).length;
+  const ruleText = enabled === 1 ? "1 rule enabled" : `${enabled} rules enabled`;
+  const groupText = groupCount === 1 ? "1 group" : `${groupCount} groups`;
+
+  return `${ruleText} · ${groupText}`;
 }

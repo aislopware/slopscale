@@ -1,5 +1,5 @@
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
-import { FileTextIcon, PlusIcon, UserPlusIcon } from "@phosphor-icons/react";
+import { PlusIcon, ShieldCheckIcon, UserPlusIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -44,8 +44,8 @@ export function QuickActions({ me, onAddMachine }: QuickActionsProps): ReactElem
         </>
       ) : null}
       {can(me, "policy_file") ? (
-        <LinkButton href="/policy" variant="secondary" size="sm" icon={FileTextIcon}>
-          Edit policy
+        <LinkButton href="/policy" variant="secondary" size="sm" icon={ShieldCheckIcon}>
+          Access controls
         </LinkButton>
       ) : null}
     </>

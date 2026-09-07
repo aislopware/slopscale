@@ -7,10 +7,11 @@ import { useState } from "react";
 import type { ReactElement, ReactNode, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
-import { usersQuery } from "~/api/queries.ts";
-import type { User } from "~/api/queries.ts";
+import { groupsQuery, usersQuery } from "~/api/queries.ts";
+import type { Group, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
+import { groupItems } from "~/components/access/pickers.ts";
 import { CreatedKey, useCreatedKey } from "~/components/keys/created-key.tsx";
 import { expirationFor, expiryOptions } from "~/components/keys/expiration.ts";
 import type { ExpiryChoice } from "~/components/keys/expiration.ts";
@@ -23,6 +24,7 @@ import {
   DialogFooter,
   DialogRoot,
 } from "~/components/ui/dialog.tsx";
+import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { userLabel } from "~/lib/node.ts";
 
 interface Draft {
@@ -32,6 +34,7 @@ interface Draft {
   readonly ephemeral: boolean;
   readonly preauthorized: boolean;
   readonly tags: string;
+  readonly groupIds: readonly string[];
 }
 
 const emptyDraft: Draft = {
@@ -41,6 +44,7 @@ const emptyDraft: Draft = {
   ephemeral: false,
   preauthorized: true,
   tags: "",
+  groupIds: [],
 };
 
 const revealNote = "The full key is shown this once and cannot be read again.";
@@ -91,7 +95,7 @@ export function CreatePreAuthKeyDialog({
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        size="base"
+        size="lg"
         title={created === null ? titles[intent].form : titles[intent].created}
         description={created === null ? descriptions[intent] : undefined}
       >
@@ -119,6 +123,7 @@ function CreatePreAuthKeyForm({
 }): ReactElement {
   const mayListUsers = can(me, "users:read");
   const users = useQuery({ ...usersQuery, enabled: mayListUsers });
+  const groups = useQuery({ ...groupsQuery, enabled: can(me, "policy_file:read") });
   const { create } = usePreAuthKeyMutations();
   const [draft, setDraft] = useState<Draft>({ ...emptyDraft, userId: me.user?.id ?? "" });
   const userList = users.data?.users ?? [];
@@ -139,6 +144,7 @@ function CreatePreAuthKeyForm({
           preauthorized: draft.preauthorized,
           expiration: expirationFor(draft.expiry),
           aclTags: parseTags(draft.tags),
+          groupIds: [...draft.groupIds],
         },
       },
       {
@@ -154,6 +160,7 @@ function CreatePreAuthKeyForm({
       <PreAuthKeyFields
         draft={{ ...draft, userId }}
         users={mayListUsers ? userList : undefined}
+        groups={groups.data?.groups}
         onChange={update}
       />
       <DialogError message={create.isError ? errorMessage(create.error) : undefined} />
@@ -170,11 +177,14 @@ function CreatePreAuthKeyForm({
 function PreAuthKeyFields({
   draft,
   users,
+  groups,
   onChange,
 }: {
   readonly draft: Draft;
   /** The users to choose from, or undefined when the caller may not list them. */
   readonly users: readonly User[] | undefined;
+  /** The groups a registered machine may join, or undefined when the caller may not list them. */
+  readonly groups: readonly Group[] | undefined;
   readonly onChange: (patch: Partial<Draft>) => void;
 }): ReactElement {
   return (
@@ -248,6 +258,19 @@ function PreAuthKeyFields({
           onChange({ tags });
         }}
       />
+      {groups === undefined ? null : (
+        <MultiPicker
+          label="Groups"
+          description="Every machine registered with this key joins these groups."
+          placeholder="Add groups…"
+          items={groupItems(groups, { builtin: false })}
+          value={draft.groupIds}
+          onValueChange={(groupIds) => {
+            onChange({ groupIds });
+          }}
+          empty="No group matches. Create one under Access controls."
+        />
+      )}
     </>
   );
 }

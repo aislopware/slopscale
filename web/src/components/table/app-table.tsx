@@ -16,7 +16,7 @@ import {
 } from "@tanstack/react-table";
 import type { CellData, RowData, TableFeatures } from "@tanstack/react-table";
 
-import type { User } from "~/api/queries.ts";
+import type { AccessRule, Group, Node, User } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 
 /**
@@ -49,10 +49,16 @@ export const { createAppColumnHelper, useAppTable, useTableContext } = createTab
 });
 
 declare module "@tanstack/react-table" {
-  // Rows render actions, so the table carries the caller and the user list.
+  // Rows render actions and names of related records, so the table carries the caller and the
+  // collections a cell may need to look one up.
   interface TableMeta<in out TFeatures extends TableFeatures, in out TData extends RowData> {
     me?: Me;
     users?: readonly User[];
+    nodes?: readonly Node[];
+    groups?: readonly Group[];
+    rules?: readonly AccessRule[];
+    /** Whether the policy file restricts traffic on its own; false means the rules are all there is. */
+    policyFileEnforces?: boolean;
   }
 
   // The type parameters must mirror the package's declaration to merge.
