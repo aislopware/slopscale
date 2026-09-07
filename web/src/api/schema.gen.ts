@@ -1263,6 +1263,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ssh-recording": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List SSH session recordings
+         * @description Newest first; page with before=<last id>. See docs/ref/ssh-recording.md.
+         *
+         *     Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listSSHRecordings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ssh-recording/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get SSH session recording
+         * @description Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getSSHRecording"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete SSH session recording
+         * @description Removes the index entry and the file.
+         *
+         *     Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["deleteSSHRecording"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ssh-recording/{id}/cast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download SSH session recording
+         * @description The session as an asciinema v2 file, playable with asciinema or asciinema-player.
+         *
+         *     Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["downloadSSHRecording"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user": {
         parameters: {
             query?: never;
@@ -1927,6 +1997,10 @@ export interface components {
             policyFileEnforces: boolean;
             rules: components["schemas"]["AccessRule"][];
         };
+        ListSSHRecordingsOutputBody: {
+            nextBefore: string;
+            recordings: components["schemas"]["SSHRecording"][];
+        };
         ListUsersOutputBody: {
             users: components["schemas"]["User"][];
         };
@@ -2230,9 +2304,12 @@ export interface components {
             defaultKeyExpiryDays: number;
             /** @description New nodes wait for an administrator unless they register with a preauthorized key. */
             devicesApprovalOn: boolean;
+            embeddedRecorder: boolean;
             /** Format: int64 */
             keyExpiryDays: number;
             postureIdentityOn: boolean;
+            sshRecorders: string[];
+            sshRecordingEnforce: boolean;
             /** @description Users created by OIDC login wait for an administrator before registering nodes. */
             usersApprovalOn: boolean;
         };
@@ -2247,11 +2324,36 @@ export interface components {
              */
             userId: string;
         };
+        SSHRecording: {
+            command: string;
+            complete: boolean;
+            dstNode: string;
+            /** Format: uint64 */
+            dstNodeId: string;
+            /** Format: date-time */
+            endedAt: string | null;
+            /** Format: uint64 */
+            id: string;
+            localUser: string;
+            /** Format: int64 */
+            size: number;
+            srcNode: string;
+            srcNodeId: string;
+            srcUser: string;
+            sshUser: string;
+            /** Format: date-time */
+            startedAt: string;
+        };
+        SshRecordingOutputBody: {
+            recording: components["schemas"]["SSHRecording"];
+        };
         UpdateSettingsRequestBody: {
             devicesApprovalOn?: boolean;
             /** Format: int64 */
             keyExpiryDays?: number;
             postureIdentityOn?: boolean;
+            sshRecorders?: string[];
+            sshRecordingEnforce?: boolean;
             usersApprovalOn?: boolean;
         };
         User: {
@@ -2401,6 +2503,7 @@ export type ListPosturesOutputBody = components['schemas']['ListPosturesOutputBo
 export type ListPreAuthKeysOutputBody = components['schemas']['ListPreAuthKeysOutputBody'];
 export type ListRequestsOutputBody = components['schemas']['ListRequestsOutputBody'];
 export type ListRulesOutputBody = components['schemas']['ListRulesOutputBody'];
+export type ListSshRecordingsOutputBody = components['schemas']['ListSSHRecordingsOutputBody'];
 export type ListUsersOutputBody = components['schemas']['ListUsersOutputBody'];
 export type ListWebhooksOutputBody = components['schemas']['ListWebhooksOutputBody'];
 export type LogStream = components['schemas']['LogStream'];
@@ -2443,6 +2546,8 @@ export type SetTagsRequestBody = components['schemas']['SetTagsRequestBody'];
 export type Settings = components['schemas']['Settings'];
 export type SetUserRoleRequestBody = components['schemas']['SetUserRoleRequestBody'];
 export type ShareNodeRequestBody = components['schemas']['ShareNodeRequestBody'];
+export type SshRecording = components['schemas']['SSHRecording'];
+export type SshRecordingOutputBody = components['schemas']['SshRecordingOutputBody'];
 export type UpdateSettingsRequestBody = components['schemas']['UpdateSettingsRequestBody'];
 export type User = components['schemas']['User'];
 export type UserOutputBody = components['schemas']['UserOutputBody'];
@@ -5118,6 +5223,133 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Settings"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listSSHRecordings: {
+        parameters: {
+            query?: {
+                /** @description Page: recordings with an ID below this one. */
+                before?: string;
+                /** @description Page size, at most 500. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListSSHRecordingsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getSSHRecording: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SshRecordingOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteSSHRecording: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmptyOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    downloadSSHRecording: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The recording. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/x-asciicast": string;
                 };
             };
             /** @description Error */

@@ -597,6 +597,12 @@ type ListRulesOutputBody struct {
 	Rules              []AccessRule `json:"rules"`
 }
 
+// ListSSHRecordingsOutputBody defines model for ListSSHRecordingsOutputBody.
+type ListSSHRecordingsOutputBody struct {
+	NextBefore string         `json:"nextBefore"`
+	Recordings []SSHRecording `json:"recordings"`
+}
+
 // ListUsersOutputBody defines model for ListUsersOutputBody.
 type ListUsersOutputBody struct {
 	Users []User `json:"users"`
@@ -889,6 +895,23 @@ type RuleOutputBody struct {
 	Rule AccessRule `json:"rule"`
 }
 
+// SSHRecording defines model for SSHRecording.
+type SSHRecording struct {
+	Command   string     `json:"command"`
+	Complete  bool       `json:"complete"`
+	DstNode   string     `json:"dstNode"`
+	DstNodeId string     `json:"dstNodeId"`
+	EndedAt   *time.Time `json:"endedAt"`
+	Id        string     `json:"id"`
+	LocalUser string     `json:"localUser"`
+	Size      int64      `json:"size"`
+	SrcNode   string     `json:"srcNode"`
+	SrcNodeId string     `json:"srcNodeId"`
+	SrcUser   string     `json:"srcUser"`
+	SshUser   string     `json:"sshUser"`
+	StartedAt time.Time  `json:"startedAt"`
+}
+
 // ServerInfo defines model for ServerInfo.
 type ServerInfo struct {
 	BaseDomain                 string       `json:"baseDomain"`
@@ -970,9 +993,12 @@ type Settings struct {
 	DefaultKeyExpiryDays int64 `json:"defaultKeyExpiryDays"`
 
 	// DevicesApprovalOn New nodes wait for an administrator unless they register with a preauthorized key.
-	DevicesApprovalOn bool  `json:"devicesApprovalOn"`
-	KeyExpiryDays     int64 `json:"keyExpiryDays"`
-	PostureIdentityOn bool  `json:"postureIdentityOn"`
+	DevicesApprovalOn   bool     `json:"devicesApprovalOn"`
+	EmbeddedRecorder    bool     `json:"embeddedRecorder"`
+	KeyExpiryDays       int64    `json:"keyExpiryDays"`
+	PostureIdentityOn   bool     `json:"postureIdentityOn"`
+	SshRecorders        []string `json:"sshRecorders"`
+	SshRecordingEnforce bool     `json:"sshRecordingEnforce"`
 
 	// UsersApprovalOn Users created by OIDC login wait for an administrator before registering nodes.
 	UsersApprovalOn bool `json:"usersApprovalOn"`
@@ -984,12 +1010,19 @@ type ShareNodeRequestBody struct {
 	UserId string `json:"userId"`
 }
 
+// SshRecordingOutputBody defines model for SshRecordingOutputBody.
+type SshRecordingOutputBody struct {
+	Recording SSHRecording `json:"recording"`
+}
+
 // UpdateSettingsRequestBody defines model for UpdateSettingsRequestBody.
 type UpdateSettingsRequestBody struct {
-	DevicesApprovalOn *bool  `json:"devicesApprovalOn,omitempty"`
-	KeyExpiryDays     *int64 `json:"keyExpiryDays,omitempty"`
-	PostureIdentityOn *bool  `json:"postureIdentityOn,omitempty"`
-	UsersApprovalOn   *bool  `json:"usersApprovalOn,omitempty"`
+	DevicesApprovalOn   *bool     `json:"devicesApprovalOn,omitempty"`
+	KeyExpiryDays       *int64    `json:"keyExpiryDays,omitempty"`
+	PostureIdentityOn   *bool     `json:"postureIdentityOn,omitempty"`
+	SshRecorders        *[]string `json:"sshRecorders,omitempty"`
+	SshRecordingEnforce *bool     `json:"sshRecordingEnforce,omitempty"`
+	UsersApprovalOn     *bool     `json:"usersApprovalOn,omitempty"`
 }
 
 // User defines model for User.
@@ -1143,6 +1176,15 @@ type RegisterNodeParams struct {
 // DeletePreAuthKeyParams defines parameters for DeletePreAuthKey.
 type DeletePreAuthKeyParams struct {
 	Id *string `form:"id,omitempty" json:"id,omitempty"`
+}
+
+// ListSSHRecordingsParams defines parameters for ListSSHRecordings.
+type ListSSHRecordingsParams struct {
+	// Before Page: recordings with an ID below this one.
+	Before *string `form:"before,omitempty" json:"before,omitempty"`
+
+	// Limit Page size, at most 500.
+	Limit *int64 `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListUsersParams defines parameters for ListUsers.
@@ -2425,6 +2467,40 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/settings (the `UpdateSettings` operationId).
 	UpdateSettings(ctx context.Context, body UpdateSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSSHRecordings List SSH session recordings
+	//
+	// Newest first; page with before=<last id>. See docs/ref/ssh-recording.md.
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/ssh-recording (the `ListSSHRecordings` operationId).
+	ListSSHRecordings(ctx context.Context, params *ListSSHRecordingsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteSSHRecording Delete SSH session recording
+	//
+	// Removes the index entry and the file.
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v1/ssh-recording/{id} (the `DeleteSSHRecording` operationId).
+	DeleteSSHRecording(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSSHRecording Get SSH session recording
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/ssh-recording/{id} (the `GetSSHRecording` operationId).
+	GetSSHRecording(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DownloadSSHRecording Download SSH session recording
+	//
+	// The session as an asciinema v2 file, playable with asciinema or asciinema-player.
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/ssh-recording/{id}/cast (the `DownloadSSHRecording` operationId).
+	DownloadSSHRecording(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListUsers List users
 	//
@@ -4882,6 +4958,80 @@ func (c *Client) UpdateSettingsWithBody(ctx context.Context, contentType string,
 // Corresponds with POST /api/v1/settings (the `UpdateSettings` operationId).
 func (c *Client) UpdateSettings(ctx context.Context, body UpdateSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateSettingsRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSSHRecordings List SSH session recordings
+//
+// Newest first; page with before=<last id>. See docs/ref/ssh-recording.md.
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/ssh-recording (the `ListSSHRecordings` operationId).
+func (c *Client) ListSSHRecordings(ctx context.Context, params *ListSSHRecordingsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSSHRecordingsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteSSHRecording Delete SSH session recording
+//
+// Removes the index entry and the file.
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v1/ssh-recording/{id} (the `DeleteSSHRecording` operationId).
+func (c *Client) DeleteSSHRecording(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSSHRecordingRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSSHRecording Get SSH session recording
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/ssh-recording/{id} (the `GetSSHRecording` operationId).
+func (c *Client) GetSSHRecording(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSSHRecordingRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DownloadSSHRecording Download SSH session recording
+//
+// The session as an asciinema v2 file, playable with asciinema or asciinema-player.
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/ssh-recording/{id}/cast (the `DownloadSSHRecording` operationId).
+func (c *Client) DownloadSSHRecording(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadSSHRecordingRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -8648,6 +8798,174 @@ func NewUpdateSettingsRequestWithBody(server string, contentType string, body io
 	return req, nil
 }
 
+// NewListSSHRecordingsRequest constructs an http.Request for the ListSSHRecordings method
+func NewListSSHRecordingsRequest(server string, params *ListSSHRecordingsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ssh-recording")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Before != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "before", *params.Before, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uint64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteSSHRecordingRequest constructs an http.Request for the DeleteSSHRecording method
+func NewDeleteSSHRecordingRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ssh-recording/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetSSHRecordingRequest constructs an http.Request for the GetSSHRecording method
+func NewGetSSHRecordingRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ssh-recording/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDownloadSSHRecordingRequest constructs an http.Request for the DownloadSSHRecording method
+func NewDownloadSSHRecordingRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/ssh-recording/%s/cast", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListUsersRequest constructs an http.Request for the ListUsers method
 func NewListUsersRequest(server string, params *ListUsersParams) (*http.Request, error) {
 	var err error
@@ -10482,6 +10800,48 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/settings (the `UpdateSettings` operationId).
 	UpdateSettingsWithResponse(ctx context.Context, body UpdateSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSettingsResponse, error)
+
+	// ListSSHRecordingsWithResponse List SSH session recordings
+	//
+	// Newest first; page with before=<last id>. See docs/ref/ssh-recording.md.
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/ssh-recording (the `ListSSHRecordings` operationId).
+	ListSSHRecordingsWithResponse(ctx context.Context, params *ListSSHRecordingsParams, reqEditors ...RequestEditorFn) (*ListSSHRecordingsResponse, error)
+
+	// DeleteSSHRecordingWithResponse Delete SSH session recording
+	//
+	// Removes the index entry and the file.
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/ssh-recording/{id} (the `DeleteSSHRecording` operationId).
+	DeleteSSHRecordingWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteSSHRecordingResponse, error)
+
+	// GetSSHRecordingWithResponse Get SSH session recording
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/ssh-recording/{id} (the `GetSSHRecording` operationId).
+	GetSSHRecordingWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetSSHRecordingResponse, error)
+
+	// DownloadSSHRecordingWithResponse Download SSH session recording
+	//
+	// The session as an asciinema v2 file, playable with asciinema or asciinema-player.
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/ssh-recording/{id}/cast (the `DownloadSSHRecording` operationId).
+	DownloadSSHRecordingWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DownloadSSHRecordingResponse, error)
 
 	// ListUsersWithResponse List users
 	//
@@ -14681,6 +15041,191 @@ func (r UpdateSettingsResponse) ContentType() string {
 	return ""
 }
 
+type ListSSHRecordingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListSSHRecordingsOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSSHRecordingsResponse) GetJSON200() *ListSSHRecordingsOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListSSHRecordingsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSSHRecordingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSSHRecordingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSSHRecordingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSSHRecordingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteSSHRecordingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmptyOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteSSHRecordingResponse) GetJSON200() *EmptyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeleteSSHRecordingResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteSSHRecordingResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteSSHRecordingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteSSHRecordingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteSSHRecordingResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetSSHRecordingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SshRecordingOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSSHRecordingResponse) GetJSON200() *SshRecordingOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetSSHRecordingResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSSHRecordingResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSSHRecordingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSSHRecordingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSSHRecordingResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DownloadSSHRecordingResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DownloadSSHRecordingResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DownloadSSHRecordingResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DownloadSSHRecordingResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DownloadSSHRecordingResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DownloadSSHRecordingResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -17333,6 +17878,72 @@ func (c *ClientWithResponses) UpdateSettingsWithResponse(ctx context.Context, bo
 		return nil, err
 	}
 	return ParseUpdateSettingsResponse(rsp)
+}
+
+// ListSSHRecordingsWithResponse List SSH session recordings
+//
+// Newest first; page with before=<last id>. See docs/ref/ssh-recording.md.
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/ssh-recording (the `ListSSHRecordings` operationId).
+func (c *ClientWithResponses) ListSSHRecordingsWithResponse(ctx context.Context, params *ListSSHRecordingsParams, reqEditors ...RequestEditorFn) (*ListSSHRecordingsResponse, error) {
+	rsp, err := c.ListSSHRecordings(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSSHRecordingsResponse(rsp)
+}
+
+// DeleteSSHRecordingWithResponse Delete SSH session recording
+//
+// Removes the index entry and the file.
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/ssh-recording/{id} (the `DeleteSSHRecording` operationId).
+func (c *ClientWithResponses) DeleteSSHRecordingWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteSSHRecordingResponse, error) {
+	rsp, err := c.DeleteSSHRecording(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteSSHRecordingResponse(rsp)
+}
+
+// GetSSHRecordingWithResponse Get SSH session recording
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/ssh-recording/{id} (the `GetSSHRecording` operationId).
+func (c *ClientWithResponses) GetSSHRecordingWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetSSHRecordingResponse, error) {
+	rsp, err := c.GetSSHRecording(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSSHRecordingResponse(rsp)
+}
+
+// DownloadSSHRecordingWithResponse Download SSH session recording
+//
+// The session as an asciinema v2 file, playable with asciinema or asciinema-player.
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/ssh-recording/{id}/cast (the `DownloadSSHRecording` operationId).
+func (c *ClientWithResponses) DownloadSSHRecordingWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DownloadSSHRecordingResponse, error) {
+	rsp, err := c.DownloadSSHRecording(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDownloadSSHRecordingResponse(rsp)
 }
 
 // ListUsersWithResponse List users
@@ -20410,6 +21021,131 @@ func ParseUpdateSettingsResponse(rsp *http.Response) (*UpdateSettingsResponse, e
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListSSHRecordingsResponse parses an HTTP response from a ListSSHRecordingsWithResponse call
+func ParseListSSHRecordingsResponse(rsp *http.Response) (*ListSSHRecordingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSSHRecordingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListSSHRecordingsOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteSSHRecordingResponse parses an HTTP response from a DeleteSSHRecordingWithResponse call
+func ParseDeleteSSHRecordingResponse(rsp *http.Response) (*DeleteSSHRecordingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteSSHRecordingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmptyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSSHRecordingResponse parses an HTTP response from a GetSSHRecordingWithResponse call
+func ParseGetSSHRecordingResponse(rsp *http.Response) (*GetSSHRecordingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSSHRecordingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SshRecordingOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDownloadSSHRecordingResponse parses an HTTP response from a DownloadSSHRecordingWithResponse call
+func ParseDownloadSSHRecordingResponse(rsp *http.Response) (*DownloadSSHRecordingResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DownloadSSHRecordingResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest ErrorModel
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

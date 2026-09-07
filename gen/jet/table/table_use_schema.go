@@ -37,6 +37,7 @@ func UseSchema(schema string) {
 	PreAuthKeys = PreAuthKeys.FromSchema(schema)
 	Sessions = Sessions.FromSchema(schema)
 	Settings = Settings.FromSchema(schema)
+	SSHRecordings = SSHRecordings.FromSchema(schema)
 	Users = Users.FromSchema(schema)
 	WebhookDeliveries = WebhookDeliveries.FromSchema(schema)
 	Webhooks = Webhooks.FromSchema(schema)

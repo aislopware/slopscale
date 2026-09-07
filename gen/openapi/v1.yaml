@@ -871,6 +871,19 @@ components:
         - rules
         - policyFileEnforces
       type: object
+    ListSSHRecordingsOutputBody:
+      additionalProperties: false
+      properties:
+        nextBefore:
+          type: string
+        recordings:
+          items:
+            $ref: "#/components/schemas/SSHRecording"
+          type: array
+      required:
+        - recordings
+        - nextBefore
+      type: object
     ListUsersOutputBody:
       additionalProperties: false
       properties:
@@ -1545,6 +1558,57 @@ components:
       required:
         - rule
       type: object
+    SSHRecording:
+      additionalProperties: false
+      properties:
+        command:
+          type: string
+        complete:
+          type: boolean
+        dstNode:
+          type: string
+        dstNodeId:
+          format: uint64
+          type: string
+        endedAt:
+          format: date-time
+          type:
+            - string
+            - "null"
+        id:
+          format: uint64
+          type: string
+        localUser:
+          type: string
+        size:
+          format: int64
+          type: integer
+        srcNode:
+          type: string
+        srcNodeId:
+          type: string
+        srcUser:
+          type: string
+        sshUser:
+          type: string
+        startedAt:
+          format: date-time
+          type: string
+      required:
+        - id
+        - startedAt
+        - endedAt
+        - srcNode
+        - srcNodeId
+        - srcUser
+        - dstNodeId
+        - dstNode
+        - sshUser
+        - localUser
+        - command
+        - size
+        - complete
+      type: object
     ServerInfo:
       additionalProperties: false
       properties:
@@ -1725,10 +1789,18 @@ components:
         devicesApprovalOn:
           description: New nodes wait for an administrator unless they register with a preauthorized key.
           type: boolean
+        embeddedRecorder:
+          type: boolean
         keyExpiryDays:
           format: int64
           type: integer
         postureIdentityOn:
+          type: boolean
+        sshRecorders:
+          items:
+            type: string
+          type: array
+        sshRecordingEnforce:
           type: boolean
         usersApprovalOn:
           description: Users created by OIDC login wait for an administrator before registering nodes.
@@ -1739,6 +1811,9 @@ components:
         - postureIdentityOn
         - keyExpiryDays
         - defaultKeyExpiryDays
+        - sshRecorders
+        - sshRecordingEnforce
+        - embeddedRecorder
       type: object
     ShareNodeRequestBody:
       additionalProperties: false
@@ -1749,6 +1824,14 @@ components:
           type: string
       required:
         - userId
+      type: object
+    SshRecordingOutputBody:
+      additionalProperties: false
+      properties:
+        recording:
+          $ref: "#/components/schemas/SSHRecording"
+      required:
+        - recording
       type: object
     UpdateSettingsRequestBody:
       additionalProperties: false
@@ -1761,6 +1844,12 @@ components:
           minimum: 0
           type: integer
         postureIdentityOn:
+          type: boolean
+        sshRecorders:
+          items:
+            type: string
+          type: array
+        sshRecordingEnforce:
           type: boolean
         usersApprovalOn:
           type: boolean
@@ -4662,6 +4751,149 @@ paths:
         - Settings
       x-audit-action: settings.set
       x-required-scope: feature_settings
+  /api/v1/ssh-recording:
+    get:
+      description: |-
+        Newest first; page with before=<last id>. See docs/ref/ssh-recording.md.
+
+        Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listSSHRecordings
+      parameters:
+        - description: "Page: recordings with an ID below this one."
+          explode: false
+          in: query
+          name: before
+          schema:
+            description: "Page: recordings with an ID below this one."
+            format: uint64
+            type: string
+        - description: Page size, at most 500.
+          explode: false
+          in: query
+          name: limit
+          schema:
+            description: Page size, at most 500.
+            format: int64
+            maximum: 500
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSSHRecordingsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List SSH session recordings
+      tags:
+        - SSH recordings
+      x-required-scope: logs:configuration:read
+  /api/v1/ssh-recording/{id}:
+    delete:
+      description: |-
+        Removes the index entry and the file.
+
+        Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteSSHRecording
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmptyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete SSH session recording
+      tags:
+        - SSH recordings
+      x-audit-action: sshrecording.delete
+      x-required-scope: logs:configuration
+    get:
+      description: Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getSSHRecording
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SshRecordingOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get SSH session recording
+      tags:
+        - SSH recordings
+      x-required-scope: logs:configuration:read
+  /api/v1/ssh-recording/{id}/cast:
+    get:
+      description: |-
+        The session as an asciinema v2 file, playable with asciinema or asciinema-player.
+
+        Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: downloadSSHRecording
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/x-asciicast:
+              schema:
+                contentMediaType: application/octet-stream
+                format: binary
+                type: string
+          description: The recording.
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Download SSH session recording
+      tags:
+        - SSH recordings
+      x-required-scope: logs:configuration:read
   /api/v1/user:
     get:
       description: Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
