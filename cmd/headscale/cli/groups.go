@@ -21,6 +21,7 @@ func init() {
 	createGroupCmd.Flags().StringP("name", "n", "", "Group name")
 	mustMarkRequired(createGroupCmd, "name")
 	createGroupCmd.Flags().StringP("description", "d", "", "Group description")
+	createGroupCmd.Flags().Bool("requestable", false, "Let members request to join the group for a while")
 	groupsCmd.AddCommand(createGroupCmd)
 
 	renameGroupCmd.Flags().Uint64P("identifier", "i", 0, "Group identifier (ID)")
@@ -28,6 +29,7 @@ func init() {
 	renameGroupCmd.Flags().StringP("name", "n", "", "New group name")
 	mustMarkRequired(renameGroupCmd, "name")
 	renameGroupCmd.Flags().StringP("description", "d", "", "Group description")
+	renameGroupCmd.Flags().Bool("requestable", false, "Let members request to join the group for a while")
 	groupsCmd.AddCommand(renameGroupCmd)
 
 	deleteGroupCmd.Flags().Uint64P("identifier", "i", 0, "Group identifier (ID)")
@@ -37,6 +39,7 @@ func init() {
 	addGroupNodeCmd.Flags().Uint64P("identifier", "i", 0, "Group identifier (ID)")
 	mustMarkRequired(addGroupNodeCmd, "identifier")
 	addGroupNodeCmd.Flags().String("node", "", "Machine identifier (ID)")
+	addGroupNodeCmd.Flags().String("expires", "", "End the membership after a duration (4h) or at an RFC 3339 time")
 	mustMarkRequired(addGroupNodeCmd, "node")
 	groupsCmd.AddCommand(addGroupNodeCmd)
 
@@ -49,6 +52,7 @@ func init() {
 	addGroupUserCmd.Flags().Uint64P("identifier", "i", 0, "Group identifier (ID)")
 	mustMarkRequired(addGroupUserCmd, "identifier")
 	addGroupUserCmd.Flags().StringP("user", "u", "", "User identifier (ID)")
+	addGroupUserCmd.Flags().String("expires", "", "End the membership after a duration (4h) or at an RFC 3339 time")
 	mustMarkRequired(addGroupUserCmd, "user")
 	groupsCmd.AddCommand(addGroupUserCmd)
 
@@ -117,8 +121,11 @@ var createGroupCmd = &cobra.Command{
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
 			name, _ := cmd.Flags().GetString("name")
 
+			requestable, _ := cmd.Flags().GetBool("requestable")
+
 			req := clientv1.CreateGroupJSONRequestBody{
-				Name: name,
+				Name:        name,
+				Requestable: &requestable,
 			}
 
 			if cmd.Flags().Changed("description") {
@@ -151,8 +158,11 @@ var renameGroupCmd = &cobra.Command{
 
 			name, _ := cmd.Flags().GetString("name")
 
+			requestable, _ := cmd.Flags().GetBool("requestable")
+
 			req := clientv1.UpdateGroupJSONRequestBody{
-				Name: name,
+				Name:        name,
+				Requestable: &requestable,
 			}
 
 			if cmd.Flags().Changed("description") {
@@ -224,30 +234,46 @@ var addGroupNodeCmd = &cobra.Command{
 	Short: "Add a machine to a group",
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
-			identifier, _ := cmd.Flags().GetUint64("identifier")
-			groupID := strconv.FormatUint(identifier, util.Base10)
-
 			nodeID, err := groupNodeFlag(cmd)
 			if err != nil {
 				return err
 			}
 
-			resp, err := client.AddGroupMemberWithResponse(
-				ctx,
-				groupID,
-				clientv1.AddGroupMemberJSONRequestBody{NodeId: &nodeID},
-			)
-			if err != nil {
-				return fmt.Errorf("adding machine to group: %w", err)
-			}
-
-			if resp.StatusCode() != http.StatusOK {
-				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
-			}
-
-			return printOutput(cmd, resp.JSON200.Group, "Machine added to group")
+			return addGroupMember(ctx, client, cmd, clientv1.AddGroupMemberJSONRequestBody{NodeId: &nodeID},
+				"Machine added to group")
 		},
 	),
+}
+
+// addGroupMember sends one membership with the --expires flag applied and
+// prints the group.
+func addGroupMember(
+	ctx context.Context,
+	client *clientv1.ClientWithResponses,
+	cmd *cobra.Command,
+	body clientv1.AddGroupMemberJSONRequestBody,
+	done string,
+) error {
+	identifier, _ := cmd.Flags().GetUint64("identifier")
+	groupID := strconv.FormatUint(identifier, util.Base10)
+
+	expiresAt, err := ruleExpiryFlag(cmd)
+	if err != nil {
+		return err
+	}
+
+	body.ExpiresAt = expiresAt
+
+	resp, err := client.AddGroupMemberWithResponse(ctx, groupID, body)
+	if err != nil {
+		return fmt.Errorf("adding group member: %w", err)
+	}
+
+	if resp.StatusCode() != http.StatusOK {
+		return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+	}
+
+	return printOutput(cmd, resp.JSON200.Group, done)
 }
 
 var removeGroupNodeCmd = &cobra.Command{
@@ -282,28 +308,13 @@ var addGroupUserCmd = &cobra.Command{
 	Short: "Add a user to a group",
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
-			identifier, _ := cmd.Flags().GetUint64("identifier")
-			groupID := strconv.FormatUint(identifier, util.Base10)
-
 			userID, err := groupUserFlag(cmd)
 			if err != nil {
 				return err
 			}
 
-			resp, err := client.AddGroupMemberWithResponse(
-				ctx,
-				groupID,
-				clientv1.AddGroupMemberJSONRequestBody{UserId: &userID},
-			)
-			if err != nil {
-				return fmt.Errorf("adding user to group: %w", err)
-			}
-
-			if resp.StatusCode() != http.StatusOK {
-				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
-			}
-
-			return printOutput(cmd, resp.JSON200.Group, "User added to group")
+			return addGroupMember(ctx, client, cmd, clientv1.AddGroupMemberJSONRequestBody{UserId: &userID},
+				"User added to group")
 		},
 	),
 }

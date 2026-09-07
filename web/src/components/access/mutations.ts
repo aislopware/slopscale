@@ -19,6 +19,10 @@ export interface AccessMutations {
   readonly createPosture: Mutation<"post", "/api/v1/posture">;
   readonly updatePosture: Mutation<"put", "/api/v1/posture/{id}">;
   readonly deletePosture: Mutation<"delete", "/api/v1/posture/{id}">;
+  readonly createRequest: Mutation<"post", "/api/v1/access-request">;
+  readonly approveRequest: Mutation<"post", "/api/v1/access-request/{id}/approve">;
+  readonly denyRequest: Mutation<"post", "/api/v1/access-request/{id}/deny">;
+  readonly cancelRequest: Mutation<"delete", "/api/v1/access-request/{id}">;
 }
 
 /**
@@ -29,7 +33,13 @@ export interface AccessMutations {
 export function useAccessMutations(): AccessMutations {
   const queryClient = useQueryClient();
   const refresh = async (): Promise<void> => {
-    await invalidate(queryClient, "/api/v1/group", "/api/v1/access-rule", "/api/v1/posture");
+    await invalidate(
+      queryClient,
+      "/api/v1/group",
+      "/api/v1/access-rule",
+      "/api/v1/posture",
+      "/api/v1/access-request",
+    );
   };
 
   return {
@@ -62,6 +72,25 @@ export function useAccessMutations(): AccessMutations {
     deletePosture: api.useMutation("delete", "/api/v1/posture/{id}", {
       onSuccess: async () => {
         toast.success("Posture deleted");
+        await refresh();
+      },
+    }),
+    createRequest: api.useMutation("post", "/api/v1/access-request", { onSuccess: refresh }),
+    approveRequest: api.useMutation("post", "/api/v1/access-request/{id}/approve", {
+      onSuccess: async () => {
+        toast.success("Request approved");
+        await refresh();
+      },
+    }),
+    denyRequest: api.useMutation("post", "/api/v1/access-request/{id}/deny", {
+      onSuccess: async () => {
+        toast.success("Request denied");
+        await refresh();
+      },
+    }),
+    cancelRequest: api.useMutation("delete", "/api/v1/access-request/{id}", {
+      onSuccess: async () => {
+        toast.success("Request withdrawn");
         await refresh();
       },
     }),

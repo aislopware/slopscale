@@ -536,6 +536,13 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609101000-postures",
 			run: migratePostures,
 		},
+		{
+			// Temporary access: rules and memberships gain an expiry,
+			// groups can be requestable, and access_requests records
+			// the asks. See docs/ref/temporary-access.md.
+			id:  "202609111000-temporary-access",
+			run: migrateTemporaryAccess,
+		},
 	}
 }
 
@@ -1647,6 +1654,66 @@ func migrateNetworkRouteApprovals(tx *Tx) error {
 				`CREATE UNIQUE INDEX idx_network_route_approvals_node_prefix` +
 					` ON network_route_approvals(node_id, prefix)`,
 			},
+		},
+	})
+}
+
+// migrateTemporaryAccess (202609111000) adds the expiry columns, the
+// requestable flag and the access_requests table.
+func migrateTemporaryAccess(tx *Tx) error {
+	for _, col := range []struct {
+		table, column string
+		typ           columnType
+	}{
+		{"access_rules", "expires_at", typeTimestamp},
+		{"group_nodes", "expires_at", typeTimestamp},
+		{"group_users", "expires_at", typeTimestamp},
+		{"groups", "requestable", typeBoolFalse},
+	} {
+		err := tx.ex.addColumnIfMissing(col.table, col.column, col.typ)
+		if err != nil {
+			return err
+		}
+	}
+
+	return createTables(tx, []tableDefinition{
+		{
+			name: "access_requests",
+			sqlite: `CREATE TABLE access_requests(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  user_id integer NOT NULL,
+  node_id integer,
+  group_id integer NOT NULL,
+  reason text,
+  duration_seconds integer NOT NULL,
+  status text NOT NULL,
+  decided_by text,
+  note text,
+  created_at datetime,
+  decided_at datetime,
+  expires_at datetime,
+  CONSTRAINT fk_access_requests_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_requests_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_requests_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+)`,
+			postgres: `CREATE TABLE access_requests(
+  id bigserial PRIMARY KEY,
+  user_id bigint NOT NULL,
+  node_id bigint,
+  group_id bigint NOT NULL,
+  reason text,
+  duration_seconds bigint NOT NULL,
+  status text NOT NULL,
+  decided_by text,
+  note text,
+  created_at timestamptz,
+  decided_at timestamptz,
+  expires_at timestamptz,
+  CONSTRAINT fk_access_requests_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_requests_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_requests_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+)`,
+			indexes: []string{`CREATE INDEX idx_access_requests_status ON access_requests(status, id)`},
 		},
 	})
 }

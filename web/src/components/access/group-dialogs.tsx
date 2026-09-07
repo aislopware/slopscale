@@ -1,6 +1,7 @@
 import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
+import { Switch } from "@cloudflare/kumo/components/switch";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
@@ -61,8 +62,15 @@ function GroupForm({
   const [description, setDescription] = useState(group?.description ?? "");
   const [nodeIds, setNodeIds] = useState<string[]>(group?.nodeIds ?? []);
   const [userIds, setUserIds] = useState<string[]>(group?.userIds ?? []);
+  const [requestable, setRequestable] = useState(group?.requestable ?? false);
   const mutation = group === undefined ? mutations.createGroup : mutations.updateGroup;
-  const body = { name: name.trim(), description: description.trim(), nodeIds, userIds };
+  const body = {
+    name: name.trim(),
+    description: description.trim(),
+    nodeIds,
+    userIds,
+    requestable,
+  };
 
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -121,6 +129,22 @@ function GroupForm({
         onValueChange={setNodeIds}
         empty="No machine matches."
       />
+      <Switch.Group>
+        <Switch.Legend>Requests</Switch.Legend>
+        <Switch
+          checked={requestable}
+          onCheckedChange={setRequestable}
+          label={
+            <span className="flex flex-col gap-0.5">
+              <span className="font-medium text-kumo-default">Members may request access</span>
+              <span className="text-xs text-kumo-subtle">
+                A signed-in user can ask to join this group for a while; an approver decides under
+                Requests.
+              </span>
+            </span>
+          }
+        />
+      </Switch.Group>
       <DialogError message={mutation.isError ? errorMessage(mutation.error) : undefined} />
       <FormFooter
         label={group === undefined ? "Create group" : "Save"}

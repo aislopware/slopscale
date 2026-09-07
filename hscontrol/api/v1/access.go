@@ -30,14 +30,25 @@ func init() {
 // every machine owned by the users listed. The builtin "all" group holds
 // every machine and lists none.
 type Group struct {
-	ID          string    `format:"uint64"                                                      json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Builtin     string    `doc:"Empty for operator-made groups, \"all\" for the builtin group." json:"builtin"`
-	NodeIDs     []string  `json:"nodeIds"                                                       nullable:"false"`
-	UserIDs     []string  `json:"userIds"                                                       nullable:"false"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID          string   `format:"uint64"                                                      json:"id"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Builtin     string   `doc:"Empty for operator-made groups, \"all\" for the builtin group." json:"builtin"`
+	Requestable bool     `doc:"Whether members may request to join the group for a while."     json:"requestable"`
+	NodeIDs     []string `json:"nodeIds"                                                       nullable:"false"`
+	UserIDs     []string `json:"userIds"                                                       nullable:"false"`
+	// Expiries lists the temporary memberships; a member absent from it
+	// is permanent.
+	Expiries  []GroupMemberExpiry `json:"expiries"  nullable:"false"`
+	CreatedAt time.Time           `json:"createdAt"`
+	UpdatedAt time.Time           `json:"updatedAt"`
+}
+
+// GroupMemberExpiry is when a temporary membership ends.
+type GroupMemberExpiry struct {
+	NodeID    string    `format:"uint64"  json:"nodeId,omitempty"`
+	UserID    string    `format:"uint64"  json:"userId,omitempty"`
+	ExpiresAt time.Time `json:"expiresAt"`
 }
 
 // AccessRule lets the source groups reach the destination groups.
@@ -55,9 +66,11 @@ type AccessRule struct {
 	DestinationGroupIDs []string `json:"destinationGroupIds" nullable:"false"`
 	// PostureIDs are the postures a source must satisfy, any one of
 	// them; empty means the rule checks none.
-	PostureIDs []string  `json:"postureIds" nullable:"false"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
+	PostureIDs []string `json:"postureIds" nullable:"false"`
+	// ExpiresAt is when the rule stops applying; null never does.
+	ExpiresAt *time.Time `json:"expiresAt" nullable:"true"`
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
 }
 
 // GroupRequestBody creates or updates a group. Members are replaced when
@@ -65,14 +78,17 @@ type AccessRule struct {
 type GroupRequestBody struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
+	Requestable bool      `doc:"Whether members may ask to join for a while." json:"requestable,omitempty"`
 	NodeIDs     *[]string `json:"nodeIds,omitempty"`
 	UserIDs     *[]string `json:"userIds,omitempty"`
 }
 
-// GroupMemberRequestBody names a machine or user to add.
+// GroupMemberRequestBody names a machine or user to add, for good or
+// until an expiry.
 type GroupMemberRequestBody struct {
-	NodeID string `format:"uint64" json:"nodeId,omitempty"`
-	UserID string `format:"uint64" json:"userId,omitempty"`
+	NodeID    string     `format:"uint64"                                         json:"nodeId,omitempty"`
+	UserID    string     `format:"uint64"                                         json:"userId,omitempty"`
+	ExpiresAt *time.Time `doc:"When the membership ends; omitted means for good." json:"expiresAt,omitempty"`
 }
 
 // AccessRuleRequestBody creates or replaces a rule.
@@ -86,6 +102,9 @@ type AccessRuleRequestBody struct {
 	SourceGroupIDs      []string `json:"sourceGroupIds"`
 	DestinationGroupIDs []string `json:"destinationGroupIds"`
 	PostureIDs          []string `doc:"Postures a source must satisfy, any one of them." json:"postureIds,omitempty"`
+	// ExpiresAt is when the rule stops applying; omitted or null means
+	// never.
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
 }
 
 type (
@@ -163,18 +182,28 @@ func groupFrom(g types.AccessGroup) Group {
 		Name:        g.Name,
 		Description: g.Description,
 		Builtin:     g.Builtin,
+		Requestable: g.Requestable,
 		NodeIDs:     make([]string, 0, len(g.NodeIDs)),
 		UserIDs:     make([]string, 0, len(g.UserIDs)),
+		Expiries:    []GroupMemberExpiry{},
 		CreatedAt:   g.CreatedAt,
 		UpdatedAt:   g.UpdatedAt,
 	}
 
 	for _, id := range g.NodeIDs {
 		out.NodeIDs = append(out.NodeIDs, formatID(id.Uint64()))
+
+		if at := g.NodeExpiry(id); !at.IsZero() {
+			out.Expiries = append(out.Expiries, GroupMemberExpiry{NodeID: formatID(id.Uint64()), ExpiresAt: at})
+		}
 	}
 
 	for _, id := range g.UserIDs {
 		out.UserIDs = append(out.UserIDs, formatID(uint64(id)))
+
+		if at := g.UserExpiry(id); !at.IsZero() {
+			out.Expiries = append(out.Expiries, GroupMemberExpiry{UserID: formatID(uint64(id)), ExpiresAt: at})
+		}
 	}
 
 	return out
@@ -192,6 +221,7 @@ func ruleFrom(r types.AccessRule) AccessRule {
 		SourceGroupIDs:      make([]string, 0, len(r.SourceGroupIDs)),
 		DestinationGroupIDs: make([]string, 0, len(r.DestinationGroupIDs)),
 		PostureIDs:          make([]string, 0, len(r.PostureIDs)),
+		ExpiresAt:           r.ExpiresAt,
 		CreatedAt:           r.CreatedAt,
 		UpdatedAt:           r.UpdatedAt,
 	}
@@ -301,6 +331,7 @@ func ruleFromBody(body AccessRuleRequestBody) (types.AccessRule, error) {
 		SourceGroupIDs:      sources,
 		DestinationGroupIDs: destinations,
 		PostureIDs:          postures,
+		ExpiresAt:           body.ExpiresAt,
 	}, nil
 }
 
@@ -362,7 +393,7 @@ func registerGroups(api huma.API, b Backend) {
 	}, scope.PolicyFile), "group.create", "group", ""), func(
 		ctx context.Context, in *groupBodyInput,
 	) (*groupOutput, error) {
-		group, c, err := b.State.CreateGroup(in.Body.Name, in.Body.Description)
+		group, c, err := b.State.CreateGroup(in.Body.Name, in.Body.Description, in.Body.Requestable)
 		if err != nil {
 			return nil, mapError("creating group", err)
 		}
@@ -403,7 +434,7 @@ func registerGroups(api huma.API, b Backend) {
 			return nil, err
 		}
 
-		group, c, err := b.State.UpdateGroup(id, in.Body.Name, in.Body.Description)
+		group, c, err := b.State.UpdateGroup(id, in.Body.Name, in.Body.Description, in.Body.Requestable)
 		if err != nil {
 			return nil, mapError("updating group", err)
 		}
@@ -471,7 +502,7 @@ func registerGroupMembers(api huma.API, b Backend) {
 		Method:      http.MethodPost,
 		Path:        "/api/v1/group/{id}/member",
 		Summary:     "Add group member",
-		Description: "Adds a machine (nodeId) or a user (userId) to the group.",
+		Description: "Adds a machine (nodeId) or a user (userId) to the group, for good or until expiresAt.",
 		Tags:        []string{tagAccessControl},
 		Security:    bearerAuth,
 	}, scope.PolicyFile), "group.member.add", "group", "id"), func(
@@ -487,6 +518,10 @@ func registerGroupMembers(api huma.API, b Backend) {
 			c     change.Change
 		)
 
+		if in.Body.ExpiresAt != nil {
+			audit.Detail(ctx, "expiresAt", in.Body.ExpiresAt.Format(time.RFC3339))
+		}
+
 		switch {
 		case in.Body.NodeID != "" && in.Body.UserID != "":
 			return nil, huma.Error400BadRequest("give either nodeId or userId, not both")
@@ -498,7 +533,7 @@ func registerGroupMembers(api huma.API, b Backend) {
 
 			audit.Detail(ctx, "nodeId", in.Body.NodeID)
 
-			group, c, err = b.State.AddGroupNode(id, nodeID)
+			group, c, err = b.State.AddGroupNode(id, nodeID, in.Body.ExpiresAt)
 		case in.Body.UserID != "":
 			userID, parseErr := parseUserID(in.Body.UserID)
 			if parseErr != nil {
@@ -507,7 +542,7 @@ func registerGroupMembers(api huma.API, b Backend) {
 
 			audit.Detail(ctx, "userId", in.Body.UserID)
 
-			group, c, err = b.State.AddGroupUser(id, userID)
+			group, c, err = b.State.AddGroupUser(id, userID, in.Body.ExpiresAt)
 		default:
 			return nil, huma.Error400BadRequest("give nodeId or userId")
 		}
@@ -835,5 +870,9 @@ func auditRuleDetails(ctx context.Context, rule types.AccessRule) {
 
 	if len(rule.PostureIDs) > 0 {
 		audit.Detail(ctx, "postures", len(rule.PostureIDs))
+	}
+
+	if rule.ExpiresAt != nil {
+		audit.Detail(ctx, "expiresAt", rule.ExpiresAt.Format(time.RFC3339))
 	}
 }

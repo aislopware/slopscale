@@ -27,23 +27,23 @@ func TestAccessGroupsAndRules(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, all.ID, again.ID, "the builtin group is created once")
 
-	eng, err := db.CreateGroup("Engineering", "The engineers")
+	eng, err := db.CreateGroup("Engineering", "The engineers", false)
 	require.NoError(t, err)
 	assert.NotZero(t, eng.ID)
 
-	_, err = db.CreateGroup("Engineering", "")
+	_, err = db.CreateGroup("Engineering", "", false)
 	require.ErrorIs(t, err, types.ErrGroupNameTaken)
 
-	require.NoError(t, db.AddGroupNode(eng.ID, node.ID))
-	require.ErrorIs(t, db.AddGroupNode(eng.ID, node.ID), types.ErrGroupMemberExists)
-	require.NoError(t, db.AddGroupUser(eng.ID, types.UserID(alice.ID)))
+	require.NoError(t, db.AddGroupNode(eng.ID, node.ID, nil))
+	require.ErrorIs(t, db.AddGroupNode(eng.ID, node.ID, nil), types.ErrGroupMemberExists)
+	require.NoError(t, db.AddGroupUser(eng.ID, types.UserID(alice.ID), nil))
 
 	got, err := db.GetGroup(eng.ID)
 	require.NoError(t, err)
 	assert.Equal(t, []types.NodeID{node.ID}, got.NodeIDs)
 	assert.Equal(t, []types.UserID{types.UserID(alice.ID)}, got.UserIDs)
 
-	servers, err := db.CreateGroup("Servers", "")
+	servers, err := db.CreateGroup("Servers", "", false)
 	require.NoError(t, err)
 
 	rule, err := db.CreateAccessRule(types.AccessRule{
@@ -92,7 +92,7 @@ func TestAccessGroupsAndRules(t *testing.T) {
 	require.ErrorIs(t, err, types.ErrGroupNotFound)
 
 	// Deleting a node drops its memberships.
-	require.NoError(t, db.AddGroupNode(eng.ID, node.ID))
+	require.NoError(t, db.AddGroupNode(eng.ID, node.ID, nil))
 	require.NoError(t, db.DeleteNode(node))
 
 	got, err = db.GetGroup(eng.ID)

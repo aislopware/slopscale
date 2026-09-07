@@ -12,6 +12,7 @@ import type { CustomAttribute } from "~/api/schema.gen.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { toast } from "~/components/ui/toast.ts";
+import { toLocalInput } from "~/lib/time.ts";
 
 /** A value as the attribute map renders it: lists joined, booleans and numbers as text. */
 export function attributeText(value: unknown): string {
@@ -51,23 +52,6 @@ const kindLabels: Record<ValueKind, string> = {
   number: "Number",
   boolean: "True or false",
 };
-
-function pad(part: number): string {
-  return String(part).padStart(2, "0");
-}
-
-/** A local datetime for the input, from an ISO string. */
-function toLocalInput(value: string | undefined): string {
-  if (value === undefined) {
-    return "";
-  }
-
-  const date = new Date(value);
-  const day = [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join("-");
-  const clock = [pad(date.getHours()), pad(date.getMinutes())].join(":");
-
-  return `${day}T${clock}`;
-}
 
 export function AttributeDialog({
   node,

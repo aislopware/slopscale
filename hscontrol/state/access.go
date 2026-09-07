@@ -3,6 +3,7 @@ package state
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	hsdb "github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -69,7 +70,7 @@ func (s *State) GetGroup(id types.GroupID) (types.AccessGroup, error) {
 }
 
 // CreateGroup adds a group with no members.
-func (s *State) CreateGroup(name, description string) (types.AccessGroup, change.Change, error) {
+func (s *State) CreateGroup(name, description string, requestable bool) (types.AccessGroup, change.Change, error) {
 	name = strings.TrimSpace(name)
 
 	err := types.ValidateGroupName(name)
@@ -77,7 +78,7 @@ func (s *State) CreateGroup(name, description string) (types.AccessGroup, change
 		return types.AccessGroup{}, change.Change{}, err
 	}
 
-	group, err := s.db.CreateGroup(name, strings.TrimSpace(description))
+	group, err := s.db.CreateGroup(name, strings.TrimSpace(description), requestable)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
 	}
@@ -92,8 +93,11 @@ func (s *State) CreateGroup(name, description string) (types.AccessGroup, change
 	return group, c, nil
 }
 
-// UpdateGroup renames or re-describes a group. Builtin groups are fixed.
-func (s *State) UpdateGroup(id types.GroupID, name, description string) (types.AccessGroup, change.Change, error) {
+// UpdateGroup renames or re-describes a group and sets whether members
+// may request to join it. Builtin groups are fixed.
+func (s *State) UpdateGroup(
+	id types.GroupID, name, description string, requestable bool,
+) (types.AccessGroup, change.Change, error) {
 	existing, err := s.GetGroup(id)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
@@ -110,7 +114,7 @@ func (s *State) UpdateGroup(id types.GroupID, name, description string) (types.A
 		return types.AccessGroup{}, change.Change{}, err
 	}
 
-	group, err := s.db.UpdateGroup(id, name, strings.TrimSpace(description))
+	group, err := s.db.UpdateGroup(id, name, strings.TrimSpace(description), requestable)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
 	}
@@ -202,8 +206,11 @@ func (s *State) SetGroupMembers(
 	return group, c, nil
 }
 
-// AddGroupNode makes the node a direct member of the group.
-func (s *State) AddGroupNode(id types.GroupID, nodeID types.NodeID) (types.AccessGroup, change.Change, error) {
+// AddGroupNode makes the node a direct member of the group, until the
+// expiry when one is given.
+func (s *State) AddGroupNode(
+	id types.GroupID, nodeID types.NodeID, expiresAt *time.Time,
+) (types.AccessGroup, change.Change, error) {
 	err := s.requireEditableGroup(id)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
@@ -213,7 +220,12 @@ func (s *State) AddGroupNode(id types.GroupID, nodeID types.NodeID) (types.Acces
 		return types.AccessGroup{}, change.Change{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, nodeID)
 	}
 
-	err = s.db.AddGroupNode(id, nodeID)
+	err = validateMemberExpiry(expiresAt)
+	if err != nil {
+		return types.AccessGroup{}, change.Change{}, err
+	}
+
+	err = s.db.AddGroupNode(id, nodeID, expiresAt)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
 	}
@@ -236,8 +248,11 @@ func (s *State) RemoveGroupNode(id types.GroupID, nodeID types.NodeID) (types.Ac
 	return s.groupAfterChange(id)
 }
 
-// AddGroupUser makes every device the user owns a member of the group.
-func (s *State) AddGroupUser(id types.GroupID, userID types.UserID) (types.AccessGroup, change.Change, error) {
+// AddGroupUser makes every device the user owns a member of the group,
+// until the expiry when one is given.
+func (s *State) AddGroupUser(
+	id types.GroupID, userID types.UserID, expiresAt *time.Time,
+) (types.AccessGroup, change.Change, error) {
 	err := s.requireEditableGroup(id)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
@@ -248,7 +263,12 @@ func (s *State) AddGroupUser(id types.GroupID, userID types.UserID) (types.Acces
 		return types.AccessGroup{}, change.Change{}, fmt.Errorf("looking up user %d: %w", userID, err)
 	}
 
-	err = s.db.AddGroupUser(id, userID)
+	err = validateMemberExpiry(expiresAt)
+	if err != nil {
+		return types.AccessGroup{}, change.Change{}, err
+	}
+
+	err = s.db.AddGroupUser(id, userID, expiresAt)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
 	}
@@ -269,6 +289,16 @@ func (s *State) RemoveGroupUser(id types.GroupID, userID types.UserID) (types.Ac
 	}
 
 	return s.groupAfterChange(id)
+}
+
+// validateMemberExpiry refuses a temporary membership that would already
+// be over.
+func validateMemberExpiry(expiresAt *time.Time) error {
+	if expiresAt != nil && !expiresAt.After(time.Now()) {
+		return types.ErrMemberExpiryPast
+	}
+
+	return nil
 }
 
 func (s *State) requireEditableGroup(id types.GroupID) error {
@@ -364,6 +394,10 @@ func (s *State) CreateAccessRule(rule types.AccessRule) (types.AccessRule, chang
 		return types.AccessRule{}, change.Change{}, err
 	}
 
+	if rule.Expired(time.Now()) {
+		return types.AccessRule{}, change.Change{}, types.ErrRuleExpiryPast
+	}
+
 	created, err := s.db.CreateAccessRule(rule)
 	if err != nil {
 		return types.AccessRule{}, change.Change{}, err
@@ -379,9 +413,11 @@ func (s *State) CreateAccessRule(rule types.AccessRule) (types.AccessRule, chang
 	return created, c, nil
 }
 
-// UpdateAccessRule replaces every field of a rule.
+// UpdateAccessRule replaces every field of a rule. An expiry that has
+// passed is refused when it is new; an expired rule may be edited as
+// long as its expiry is kept, extended or cleared.
 func (s *State) UpdateAccessRule(rule types.AccessRule) (types.AccessRule, change.Change, error) {
-	_, err := s.GetAccessRule(rule.ID)
+	existing, err := s.GetAccessRule(rule.ID)
 	if err != nil {
 		return types.AccessRule{}, change.Change{}, err
 	}
@@ -389,6 +425,10 @@ func (s *State) UpdateAccessRule(rule types.AccessRule) (types.AccessRule, chang
 	rule, err = s.normalizeAccessRule(rule)
 	if err != nil {
 		return types.AccessRule{}, change.Change{}, err
+	}
+
+	if !sameExpiry(existing.ExpiresAt, rule.ExpiresAt) && rule.Expired(time.Now()) {
+		return types.AccessRule{}, change.Change{}, types.ErrRuleExpiryPast
 	}
 
 	updated, err := s.db.UpdateAccessRule(rule)
@@ -424,6 +464,35 @@ func (s *State) DeleteAccessRule(id types.AccessRuleID) (change.Change, error) {
 	log.Info().Uint64("rule.id", uint64(id)).Str("rule.name", rule.Name).Msg("Access rule deleted")
 
 	return c, nil
+}
+
+// sameExpiry reports whether two optional instants agree.
+func sameExpiry(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+
+	return a.Equal(*b)
+}
+
+// ExpireAccess ends what ran out between the two instants: temporary
+// memberships past their expiry are deleted and the policy is rebuilt
+// without them and without the rules that expired. It runs from the
+// minute ticker, so a grant ends within a minute of its time.
+func (s *State) ExpireAccess(since, now time.Time) (change.Change, error) {
+	next := s.AccessModel().NextExpiry(since)
+	if next.IsZero() || next.After(now) {
+		return change.Change{}, nil
+	}
+
+	gone, err := s.db.DeleteExpiredMemberships(now)
+	if err != nil {
+		return change.Change{}, err
+	}
+
+	log.Info().Int64("memberships", gone).Msg("Temporary access ran out")
+
+	return s.loadAccessModel()
 }
 
 // normalizeAccessRule trims, validates and checks that every group the

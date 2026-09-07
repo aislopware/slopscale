@@ -921,6 +921,7 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 
 		case now := <-attributeTicker.C:
 			h.expireNodeAttributes()
+			h.expireAccess(lastScheduleCheck, now)
 
 			if h.postureBoundaryPassed(lastScheduleCheck, now) {
 				h.recompilePostures()
@@ -945,6 +946,21 @@ func (h *Headscale) recompilePostures() {
 	c, err := h.state.RecompilePostures()
 	if err != nil {
 		log.Error().Err(err).Msg("recompiling postures at a schedule boundary")
+
+		return
+	}
+
+	if !c.IsEmpty() {
+		h.Change(c)
+	}
+}
+
+// expireAccess ends the temporary rules and memberships that ran out
+// between the two instants and publishes the rebuilt policy.
+func (h *Headscale) expireAccess(since, now time.Time) {
+	c, err := h.state.ExpireAccess(since, now)
+	if err != nil {
+		log.Error().Err(err).Msg("ending expired temporary access")
 
 		return
 	}

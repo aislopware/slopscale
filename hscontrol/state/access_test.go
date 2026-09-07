@@ -32,43 +32,43 @@ func TestAccessGroupsAndRules(t *testing.T) {
 	assert.Equal(t, types.GroupAllName, all.Name)
 	assert.True(t, all.IsBuiltin())
 
-	_, _, err = s.UpdateGroup(all.ID, "Everyone", "")
+	_, _, err = s.UpdateGroup(all.ID, "Everyone", "", false)
 	require.ErrorIs(t, err, types.ErrGroupBuiltin)
 
 	_, err = s.DeleteGroup(all.ID)
 	require.ErrorIs(t, err, types.ErrGroupBuiltin)
 
-	_, _, err = s.AddGroupNode(all.ID, aliceNode.ID)
+	_, _, err = s.AddGroupNode(all.ID, aliceNode.ID, nil)
 	require.ErrorIs(t, err, types.ErrGroupBuiltin)
 
 	// Names are validated and unique.
-	_, _, err = s.CreateGroup("  ", "")
+	_, _, err = s.CreateGroup("  ", "", false)
 	require.ErrorIs(t, err, types.ErrGroupNameEmpty)
 
-	_, _, err = s.CreateGroup("bad/name", "")
+	_, _, err = s.CreateGroup("bad/name", "", false)
 	require.ErrorIs(t, err, types.ErrGroupNameInvalid)
 
-	eng, _, err := s.CreateGroup("Engineering", "")
+	eng, _, err := s.CreateGroup("Engineering", "", false)
 	require.NoError(t, err)
 
-	_, _, err = s.CreateGroup("Engineering", "")
+	_, _, err = s.CreateGroup("Engineering", "", false)
 	require.ErrorIs(t, err, types.ErrGroupNameTaken)
 
-	servers, _, err := s.CreateGroup("Servers", "")
+	servers, _, err := s.CreateGroup("Servers", "", false)
 	require.NoError(t, err)
 
 	// Membership by user and by node; unknown members are refused.
-	_, _, err = s.AddGroupUser(eng.ID, types.UserID(999))
+	_, _, err = s.AddGroupUser(eng.ID, types.UserID(999), nil)
 	require.Error(t, err)
 
-	_, _, err = s.AddGroupNode(servers.ID, types.NodeID(999))
+	_, _, err = s.AddGroupNode(servers.ID, types.NodeID(999), nil)
 	require.ErrorIs(t, err, ErrNodeNotInNodeStore)
 
-	group, _, err := s.AddGroupUser(eng.ID, types.UserID(alice.ID))
+	group, _, err := s.AddGroupUser(eng.ID, types.UserID(alice.ID), nil)
 	require.NoError(t, err)
 	assert.Equal(t, []types.UserID{types.UserID(alice.ID)}, group.UserIDs)
 
-	group, _, err = s.AddGroupNode(servers.ID, bobNode.ID)
+	group, _, err = s.AddGroupNode(servers.ID, bobNode.ID, nil)
 	require.NoError(t, err)
 	assert.Equal(t, []types.NodeID{bobNode.ID}, group.NodeIDs)
 
@@ -125,7 +125,7 @@ func TestAccessGroupsAndRules(t *testing.T) {
 	require.NoError(t, err)
 
 	// Deleting a user drops it from every group.
-	group, _, err = s.AddGroupUser(eng.ID, types.UserID(bob.ID))
+	group, _, err = s.AddGroupUser(eng.ID, types.UserID(bob.ID), nil)
 	require.NoError(t, err)
 	assert.Len(t, group.UserIDs, 2)
 
@@ -146,7 +146,7 @@ func TestPreAuthKeyGroupsEnrolNode(t *testing.T) {
 	s := newRoleTestState(t)
 	alice := createUserWithRole(t, s, "alice", "")
 
-	servers, _, err := s.CreateGroup("Servers", "")
+	servers, _, err := s.CreateGroup("Servers", "", false)
 	require.NoError(t, err)
 
 	uid := types.UserID(alice.ID)

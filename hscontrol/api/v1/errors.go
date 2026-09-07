@@ -31,6 +31,7 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrGroupMemberMissing),
 		errors.Is(err, types.ErrNetworkNotFound),
 		errors.Is(err, types.ErrPostureNotFound),
+		errors.Is(err, types.ErrAccessRequestNotFound),
 		errors.Is(err, types.ErrWebhookNotFound):
 		return huma.Error404NotFound(msg, err)
 
@@ -77,6 +78,13 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrPostureEmpty),
 		errors.Is(err, types.ErrPostureTooMany),
 		errors.Is(err, types.ErrPostureCountryNoGeo),
+		errors.Is(err, types.ErrRuleExpiryPast),
+		errors.Is(err, types.ErrMemberExpiryPast),
+		errors.Is(err, types.ErrAccessRequestNoUser),
+		errors.Is(err, types.ErrAccessRequestNotRequestable),
+		errors.Is(err, types.ErrAccessRequestDuration),
+		errors.Is(err, types.ErrAccessRequestTextTooLong),
+		errors.Is(err, types.ErrAccessRequestNodeOwner),
 		errors.Is(err, posture.ErrEmpty),
 		errors.Is(err, posture.ErrAttribute),
 		errors.Is(err, posture.ErrOperator),
@@ -101,7 +109,9 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrGroupMemberExists),
 		errors.Is(err, types.ErrNetworkNameTaken),
 		errors.Is(err, types.ErrPostureNameTaken),
-		errors.Is(err, types.ErrPostureInUse):
+		errors.Is(err, types.ErrPostureInUse),
+		errors.Is(err, types.ErrAccessRequestDecided),
+		errors.Is(err, types.ErrAccessRequestPendingExists):
 		return huma.Error409Conflict(msg, err)
 
 	case errors.Is(err, state.ErrCannotChangeOwnRole),
@@ -109,6 +119,7 @@ func mapError(msg string, err error) error {
 		errors.Is(err, state.ErrOnlyOwnerTransfers),
 		errors.Is(err, state.ErrOwnerRoleImmutable),
 		errors.Is(err, state.ErrUserNotApproved),
+		errors.Is(err, types.ErrAccessRequestOwn),
 		errors.Is(err, db.ErrCannotDeleteOwner):
 		return huma.Error403Forbidden(msg, err)
 

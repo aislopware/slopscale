@@ -229,7 +229,7 @@ func TestPreAuthKeyGroupsEnrolNode(t *testing.T) {
 	owner := srv.CreateUser(t, "key-owner")
 	ownerKey := srv.CreateAPIKey(t, owner)
 
-	group, _, err := srv.State().CreateGroup("Servers", "")
+	group, _, err := srv.State().CreateGroup("Servers", "", false)
 	require.NoError(t, err)
 
 	authKey := srv.CreatePreAuthKeyFromSpec(t, types.PreAuthKeySpec{

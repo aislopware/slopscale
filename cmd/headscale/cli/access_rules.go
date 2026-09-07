@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	clientv1 "github.com/juanfont/headscale/gen/client/v1"
 	"github.com/juanfont/headscale/hscontrol/util"
@@ -54,6 +55,22 @@ func addAccessRuleFlags(cmd *cobra.Command) {
 	cmd.Flags().Bool("bidirectional", false, "Allow bidirectional traffic")
 	cmd.Flags().Bool("disabled", false, "Create rule in disabled state")
 	cmd.Flags().StringSlice("posture", []string{}, "Posture identifier a source must satisfy (repeatable; any one)")
+	cmd.Flags().String("expires", "", "When the rule stops applying: a duration from now (24h) or an RFC 3339 time")
+}
+
+// ruleExpiryFlag reads --expires; nil when it was not given.
+func ruleExpiryFlag(cmd *cobra.Command) (*time.Time, error) {
+	raw, _ := cmd.Flags().GetString("expires")
+	if raw == "" {
+		return nil, nil //nolint:nilnil // no flag means no expiry
+	}
+
+	at, err := parseExpiry(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	return &at, nil
 }
 
 var accessRulesCmd = &cobra.Command{
@@ -92,6 +109,10 @@ var listAccessRulesCmd = &cobra.Command{
 						enabled = "yes"
 					}
 
+					if rule.ExpiresAt != nil && !rule.ExpiresAt.After(time.Now()) {
+						enabled = "expired"
+					}
+
 					rows = append(
 						rows,
 						[]string{
@@ -103,12 +124,23 @@ var listAccessRulesCmd = &cobra.Command{
 							rule.Ports,
 							direction,
 							enabled,
+							optionalTime(rule.ExpiresAt),
 						},
 					)
 				}
 
 				return renderTable(
-					[]string{"ID", "Name", "Sources", "Destinations", "Protocol", "Ports", "Direction", "Enabled"},
+					[]string{
+						"ID",
+						"Name",
+						"Sources",
+						"Destinations",
+						"Protocol",
+						"Ports",
+						"Direction",
+						"Enabled",
+						"Expires",
+					},
 					rows,
 				)
 			})
@@ -131,6 +163,11 @@ var createAccessRuleCmd = &cobra.Command{
 			postures, _ := cmd.Flags().GetStringSlice("posture")
 			enabled := !disabled
 
+			expiresAt, err := ruleExpiryFlag(cmd)
+			if err != nil {
+				return err
+			}
+
 			body := clientv1.CreateAccessRuleJSONRequestBody{
 				Name:                name,
 				Enabled:             &enabled,
@@ -140,6 +177,7 @@ var createAccessRuleCmd = &cobra.Command{
 				SourceGroupIds:      &srcs,
 				DestinationGroupIds: &dsts,
 				PostureIds:          &postures,
+				ExpiresAt:           expiresAt,
 			}
 
 			if cmd.Flags().Changed("description") {
@@ -180,6 +218,11 @@ var updateAccessRuleCmd = &cobra.Command{
 			postures, _ := cmd.Flags().GetStringSlice("posture")
 			enabled := !disabled
 
+			expiresAt, err := ruleExpiryFlag(cmd)
+			if err != nil {
+				return err
+			}
+
 			body := clientv1.UpdateAccessRuleJSONRequestBody{
 				Name:                name,
 				Description:         &desc,
@@ -190,6 +233,7 @@ var updateAccessRuleCmd = &cobra.Command{
 				SourceGroupIds:      &srcs,
 				DestinationGroupIds: &dsts,
 				PostureIds:          &postures,
+				ExpiresAt:           expiresAt,
 			}
 
 			resp, err := client.UpdateAccessRuleWithResponse(ctx, ruleID, body)

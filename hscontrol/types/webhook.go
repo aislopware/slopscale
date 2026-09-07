@@ -122,6 +122,12 @@ const (
 	EventUserApproved      WebhookEventType = "userApproved"
 	EventUserRoleUpdated   WebhookEventType = "userRoleUpdated"
 	EventUserDeleted       WebhookEventType = "userDeleted"
+	// EventAccessRequestCreated, EventAccessRequestApproved and
+	// EventAccessRequestDenied have no Tailscale counterpart; see
+	// docs/ref/temporary-access.md.
+	EventAccessRequestCreated  WebhookEventType = "accessRequestCreated"
+	EventAccessRequestApproved WebhookEventType = "accessRequestApproved"
+	EventAccessRequestDenied   WebhookEventType = "accessRequestDenied"
 	// EventTest is what the test endpoint sends; every webhook gets it.
 	EventTest WebhookEventType = "test"
 )
@@ -141,6 +147,9 @@ var WebhookEventTypes = []WebhookEventType{
 	EventUserApproved,
 	EventUserRoleUpdated,
 	EventUserDeleted,
+	EventAccessRequestCreated,
+	EventAccessRequestApproved,
+	EventAccessRequestDenied,
 }
 
 // WebhookEvent is one delivery's payload, in Tailscale's shape.

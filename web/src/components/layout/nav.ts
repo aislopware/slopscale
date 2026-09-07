@@ -4,6 +4,7 @@ import {
   DesktopIcon,
   GearSixIcon,
   GlobeIcon,
+  HandWavingIcon,
   KeyIcon,
   WebhooksLogoIcon,
   PathIcon,
@@ -20,6 +21,7 @@ export type NavPath =
   | "/machines"
   | "/users"
   | "/keys"
+  | "/access"
   | "/policy"
   | "/dns"
   | "/networks"
@@ -57,6 +59,7 @@ export const navGroups: readonly NavGroup[] = [
       },
       { to: "/users", label: "Users", icon: UsersIcon, scope: "users:read", badge: "pendingUsers" },
       { to: "/keys", label: "Keys", icon: KeyIcon },
+      { to: "/access", label: "My access", icon: HandWavingIcon },
     ],
   },
   {

@@ -1,3 +1,4 @@
+import { Input } from "@cloudflare/kumo/components/input";
 import { useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
 
@@ -9,6 +10,7 @@ import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { toast } from "~/components/ui/toast.ts";
+import { fromLocalInput } from "~/lib/time.ts";
 
 /** Which record the dialog puts into groups; the API has one endpoint per kind. */
 export type Member = { readonly nodeId: string } | { readonly userId: string };
@@ -47,6 +49,7 @@ function MembershipForm({
   mutations,
 }: Omit<MembershipDialogProps, "open" | "title" | "description">): ReactElement {
   const [selected, setSelected] = useState<string[]>([...current]);
+  const [expires, setExpires] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const added = selected.filter((id) => !current.includes(id));
@@ -63,10 +66,10 @@ function MembershipForm({
     setPending(true);
     setError(undefined);
 
+    const expiresAt = fromLocalInput(expires);
+    const body = expiresAt === undefined ? member : { ...member, expiresAt };
     const calls = [
-      ...added.map((id) =>
-        mutations.addMember.mutateAsync({ params: { path: { id } }, body: member }),
-      ),
+      ...added.map((id) => mutations.addMember.mutateAsync({ params: { path: { id } }, body })),
       ...removed.map((id) => leave(id)),
     ];
     const outcome = await Promise.allSettled(calls);
@@ -98,6 +101,18 @@ function MembershipForm({
         onValueChange={setSelected}
         empty="No group matches. Create one under Access controls."
       />
+      {added.length === 0 ? null : (
+        <Input
+          label="Until"
+          required={false}
+          type="datetime-local"
+          description="The groups joined now are left again at this time. Empty means for good."
+          value={expires}
+          onChange={(event) => {
+            setExpires(event.target.value);
+          }}
+        />
+      )}
       <DialogError message={error} />
       <FormFooter label="Save" pending={pending} disabled={!dirty} />
     </form>

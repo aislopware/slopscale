@@ -26,6 +26,11 @@ export type AuditEvent = AuditPage["events"][number];
 export type Group = MethodResponse<typeof api, "get", "/api/v1/group">["groups"][number];
 export type AccessRule = MethodResponse<typeof api, "get", "/api/v1/access-rule">["rules"][number];
 export type Posture = MethodResponse<typeof api, "get", "/api/v1/posture">["postures"][number];
+export type AccessRequest = MethodResponse<
+  typeof api,
+  "get",
+  "/api/v1/access-request"
+>["requests"][number];
 export type Dns = MethodResponse<typeof api, "get", "/api/v1/dns">;
 export type Network = MethodResponse<typeof api, "get", "/api/v1/network">["networks"][number];
 export type Webhook = MethodResponse<typeof api, "get", "/api/v1/webhook">["webhooks"][number];
@@ -39,6 +44,16 @@ export const serverInfoQuery = api.queryOptions("get", "/api/v1/server");
 export const groupsQuery = api.queryOptions("get", "/api/v1/group");
 export const accessRulesQuery = api.queryOptions("get", "/api/v1/access-rule");
 export const posturesQuery = api.queryOptions("get", "/api/v1/posture");
+export const accessRequestsQuery = api.queryOptions("get", "/api/v1/access-request");
+export const myAccessRequestsQuery = api.queryOptions("get", "/api/v1/access-request", {
+  params: { query: { mine: true } },
+});
+export const accessRequestOptionsQuery = api.queryOptions("get", "/api/v1/access-request/options");
+export type AccessRequestOptions = MethodResponse<
+  typeof api,
+  "get",
+  "/api/v1/access-request/options"
+>;
 export const dnsQuery = api.queryOptions("get", "/api/v1/dns");
 export const networksQuery = api.queryOptions("get", "/api/v1/network");
 export const webhooksQuery = api.queryOptions("get", "/api/v1/webhook");
@@ -145,6 +160,7 @@ type Collection =
   | "/api/v1/group"
   | "/api/v1/access-rule"
   | "/api/v1/posture"
+  | "/api/v1/access-request"
   | "/api/v1/dns"
   | "/api/v1/network"
   | "/api/v1/webhook";

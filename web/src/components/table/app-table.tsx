@@ -64,6 +64,8 @@ declare module "@tanstack/react-table" {
     policyFileEnforces?: boolean;
     /** Whether the server can answer ip:country postures. */
     geoIpAvailable?: boolean;
+    /** Whether the caller may approve or deny access requests. */
+    canDecide?: boolean;
   }
 
   // The type parameters must mirror the package's declaration to merge.

@@ -78,3 +78,53 @@ export function hoursAgo(hours: number): string {
 export function daysFromNow(days: number): string {
   return new Date(Date.now() + days * day).toISOString();
 }
+
+function pad(part: number): string {
+  return String(part).padStart(2, "0");
+}
+
+/** The value a datetime-local input shows for an instant; empty for none. */
+export function toLocalInput(value: string | null | undefined): string {
+  const date = parseTime(value);
+
+  if (date === null) {
+    return "";
+  }
+
+  const calendar = [date.getFullYear(), pad(date.getMonth() + 1), pad(date.getDate())].join("-");
+  const clock = [pad(date.getHours()), pad(date.getMinutes())].join(":");
+
+  return `${calendar}T${clock}`;
+}
+
+/**
+ * The instant a datetime-local input holds, as the API's RFC 3339 string; undefined when empty or
+ * invalid.
+ */
+export function fromLocalInput(value: string): string | undefined {
+  if (value === "") {
+    return undefined;
+  }
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+/** Durations in seconds, the unit the API counts access requests in. */
+export const minuteSeconds = secondsPerMinute;
+export const hourSeconds = minutesPerHour * minuteSeconds;
+export const daySeconds = hoursPerDay * hourSeconds;
+
+/** "2 h", "3 d", "45 min": a duration in seconds for a table cell. */
+export function formatDuration(seconds: number): string {
+  if (seconds >= daySeconds && seconds % daySeconds === 0) {
+    return `${seconds / daySeconds} d`;
+  }
+
+  if (seconds >= hourSeconds && seconds % hourSeconds === 0) {
+    return `${seconds / hourSeconds} h`;
+  }
+
+  return `${Math.round(seconds / minuteSeconds)} min`;
+}

@@ -1,3 +1,4 @@
+import { Badge } from "@cloudflare/kumo/components/badge";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { ArrowRightIcon, ArrowsLeftRightIcon } from "@phosphor-icons/react";
 import { useState } from "react";
@@ -14,7 +15,9 @@ import { postureName } from "~/components/access/posture-model.ts";
 import { RuleMenu } from "~/components/access/rule-menu.tsx";
 import { createAppColumnHelper, useTableContext } from "~/components/table/app-table.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { toast } from "~/components/ui/toast.ts";
+import { isPast, parseTime } from "~/lib/time.ts";
 
 /** A rule with its group names spelled out, so the global filter can match them. */
 export interface RuleRow extends AccessRule {
@@ -128,6 +131,7 @@ function NameCell({ rule }: { readonly rule: AccessRule }): ReactElement {
       )}
       {/* The protocol column is hidden on small screens, so the name carries it there. */}
       <span className="truncate text-xs text-kumo-subtle md:hidden">{protocolSummary(rule)}</span>
+      <ExpiryLine rule={rule} />
     </div>
   );
 }
@@ -145,6 +149,25 @@ function SourcesCell({ rule }: { readonly rule: RuleRow }): ReactElement {
         </span>
       )}
     </div>
+  );
+}
+
+/** When the rule expires, or that it did; nothing for a rule without an expiry. */
+function ExpiryLine({ rule }: { readonly rule: AccessRule }): ReactElement | null {
+  const expires = parseTime(rule.expiresAt);
+
+  if (expires === null) {
+    return null;
+  }
+
+  return isPast(expires) ? (
+    <Badge variant="error" className="w-fit">
+      Expired <RelativeTime value={rule.expiresAt} />
+    </Badge>
+  ) : (
+    <span className="truncate text-xs text-kumo-subtle">
+      Expires <RelativeTime value={rule.expiresAt} />
+    </span>
   );
 }
 

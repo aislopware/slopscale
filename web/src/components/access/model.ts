@@ -52,7 +52,7 @@ export function rulesUsingGroup(rules: readonly AccessRule[], group: Group): Acc
   );
 }
 
-export function groupName(groups: readonly Group[], id: string): string {
+export function groupName(groups: readonly { id: string; name: string }[], id: string): string {
   return groups.find((group) => group.id === id)?.name ?? `Group ${id}`;
 }
 

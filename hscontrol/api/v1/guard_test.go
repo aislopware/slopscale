@@ -26,6 +26,14 @@ var selfEnforcedOps = map[string]bool{
 	// Sharing lets a member act on the nodes they own (requireShareAccess).
 	"POST /api/v1/node/{nodeId}/share":            true,
 	"DELETE /api/v1/node/{nodeId}/share/{userId}": true,
+
+	// Access requests let a member file and follow their own asks
+	// (requireRequestAccess); deciding declares the policy scope.
+	"GET /api/v1/access-request/options": true,
+	"GET /api/v1/access-request":         true,
+	"GET /api/v1/access-request/{id}":    true,
+	"POST /api/v1/access-request":        true,
+	"DELETE /api/v1/access-request/{id}": true,
 }
 
 // TestEveryAuthenticatedOperationDeclaresScope guarantees no v1 operation

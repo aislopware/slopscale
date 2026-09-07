@@ -43,11 +43,66 @@ type AccessGroup struct {
 	Description string
 	// Builtin is empty for groups an operator made and [GroupBuiltinAll]
 	// for the group that holds every node.
-	Builtin   string
-	NodeIDs   []NodeID
-	UserIDs   []UserID
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	Builtin string
+	// Requestable lets members ask to join the group for a while; see
+	// [AccessRequest].
+	Requestable bool
+	NodeIDs     []NodeID
+	UserIDs     []UserID
+	// NodeExpiries and UserExpiries hold the end of the temporary
+	// memberships; a member absent from them is permanent.
+	NodeExpiries map[NodeID]time.Time
+	UserExpiries map[UserID]time.Time
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+// NodeExpiry returns when the node's direct membership ends, or zero
+// for a permanent one.
+func (g AccessGroup) NodeExpiry(id NodeID) time.Time {
+	return g.NodeExpiries[id]
+}
+
+// UserExpiry returns when the user's membership ends, or zero for a
+// permanent one.
+func (g AccessGroup) UserExpiry(id UserID) time.Time {
+	return g.UserExpiries[id]
+}
+
+// NextExpiry returns the earliest membership expiry after the instant,
+// or zero when none is due.
+func (g AccessGroup) NextExpiry(after time.Time) time.Time {
+	var next time.Time
+
+	for _, t := range g.NodeExpiries {
+		next = earliestAfter(next, t, after)
+	}
+
+	for _, t := range g.UserExpiries {
+		next = earliestAfter(next, t, after)
+	}
+
+	return next
+}
+
+// earliestAfter returns the earlier of next and t among those after the
+// instant; zero counts as unset.
+func earliestAfter(next, t, after time.Time) time.Time {
+	if t.IsZero() || !t.After(after) {
+		return next
+	}
+
+	if next.IsZero() || t.Before(next) {
+		return t
+	}
+
+	return next
+}
+
+// memberAt reports whether a membership with the expiry counts at the
+// instant.
+func memberAt(expiry, now time.Time) bool {
+	return expiry.IsZero() || now.Before(expiry)
 }
 
 // IsBuiltin reports whether the server owns the group.
@@ -55,14 +110,20 @@ func (g AccessGroup) IsBuiltin() bool {
 	return g.Builtin != ""
 }
 
-// Contains reports whether the node is a member, through its owner or
-// directly. The builtin all group contains every node.
+// Contains reports whether the node is a member now, through its owner
+// or directly. The builtin all group contains every node.
 func (g AccessGroup) Contains(node NodeView) bool {
+	return g.ContainsAt(node, time.Now())
+}
+
+// ContainsAt is [AccessGroup.Contains] at an instant: a temporary
+// membership counts until its expiry.
+func (g AccessGroup) ContainsAt(node NodeView, now time.Time) bool {
 	if g.Builtin == GroupBuiltinAll {
 		return true
 	}
 
-	if slices.Contains(g.NodeIDs, node.ID()) {
+	if slices.Contains(g.NodeIDs, node.ID()) && memberAt(g.NodeExpiry(node.ID()), now) {
 		return true
 	}
 
@@ -70,7 +131,9 @@ func (g AccessGroup) Contains(node NodeView) bool {
 		return false
 	}
 
-	return slices.Contains(g.UserIDs, UserID(node.UserID().Get()))
+	uid := UserID(node.UserID().Get())
+
+	return slices.Contains(g.UserIDs, uid) && memberAt(g.UserExpiry(uid), now)
 }
 
 // AccessProtocol is the protocol an access rule matches.
@@ -120,8 +183,23 @@ type AccessRule struct {
 	// PostureIDs are the postures a source must satisfy, any one of
 	// them; empty means no posture check.
 	PostureIDs []PostureID
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	// ExpiresAt is when the rule stops applying; nil never does. An
+	// expired rule is kept, shown as expired, until it is extended or
+	// deleted.
+	ExpiresAt *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// Active reports whether the rule applies at the instant: enabled and
+// not expired.
+func (r AccessRule) Active(now time.Time) bool {
+	return r.Enabled && (r.ExpiresAt == nil || now.Before(*r.ExpiresAt))
+}
+
+// Expired reports whether the rule's expiry has passed.
+func (r AccessRule) Expired(now time.Time) bool {
+	return r.ExpiresAt != nil && !now.Before(*r.ExpiresAt)
 }
 
 // AccessModel is every group, rule and network, loaded together because
@@ -131,6 +209,25 @@ type AccessModel struct {
 	Rules    []AccessRule
 	Networks []Network
 	Postures []Posture
+}
+
+// NextExpiry returns the earliest rule or membership expiry after the
+// instant, or zero when nothing is due: the moment the policy has to be
+// recompiled without anyone touching it.
+func (m AccessModel) NextExpiry(after time.Time) time.Time {
+	var next time.Time
+
+	for _, r := range m.Rules {
+		if r.ExpiresAt != nil && r.Enabled {
+			next = earliestAfter(next, *r.ExpiresAt, after)
+		}
+	}
+
+	for _, g := range m.Groups {
+		next = earliestAfter(next, g.NextExpiry(after), after)
+	}
+
+	return next
 }
 
 // Network returns the network with the ID.
@@ -246,6 +343,8 @@ var (
 	ErrRuleNotFound       = errors.New("access rule not found")
 	ErrRulePortsWithout   = errors.New("ports apply only to tcp and udp")
 	ErrRulePortsInvalid   = errors.New("ports must be a comma-separated list of ports or ranges between 1 and 65535")
+	ErrRuleExpiryPast     = errors.New("rule expiry must be in the future")
+	ErrMemberExpiryPast   = errors.New("membership expiry must be in the future")
 )
 
 const maxAccessNameLength = 64

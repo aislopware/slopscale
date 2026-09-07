@@ -16,6 +16,7 @@ import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { toast } from "~/components/ui/toast.ts";
+import { fromLocalInput, toLocalInput } from "~/lib/time.ts";
 
 export interface RuleDialogProps {
   /** The rule to edit; absent when creating one. */
@@ -61,6 +62,8 @@ interface Draft {
   readonly ports: string;
   readonly bidirectional: boolean;
   readonly enabled: boolean;
+  /** A datetime-local value; empty means the rule never expires. */
+  readonly expires: string;
 }
 
 function draftFrom(rule: AccessRule | undefined): Draft {
@@ -74,6 +77,7 @@ function draftFrom(rule: AccessRule | undefined): Draft {
     ports: rule?.ports ?? "",
     bidirectional: rule?.bidirectional ?? false,
     enabled: rule?.enabled ?? true,
+    expires: toLocalInput(rule?.expiresAt),
   };
 }
 
@@ -106,6 +110,7 @@ function RuleForm({
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
 
+    const expiresAt = fromLocalInput(draft.expires);
     const body = {
       name: draft.name.trim(),
       description: draft.description.trim(),
@@ -116,6 +121,7 @@ function RuleForm({
       sourceGroupIds: [...draft.sources],
       destinationGroupIds: [...draft.destinations],
       postureIds: [...draft.postures],
+      ...(expiresAt === undefined ? {} : { expiresAt }),
     };
     const done = {
       onSuccess: (): void => {
@@ -212,6 +218,16 @@ function RuleFields({
         />
       )}
       <ProtocolFields draft={draft} onChange={onChange} />
+      <Input
+        label="Expires"
+        required={false}
+        type="datetime-local"
+        description="The rule stops applying at this time and is kept, marked expired, until it is extended or deleted. Empty means never."
+        value={draft.expires}
+        onChange={(event) => {
+          onChange({ expires: event.target.value });
+        }}
+      />
       <Switch.Group>
         <Switch.Legend>Options</Switch.Legend>
         <OptionSwitch

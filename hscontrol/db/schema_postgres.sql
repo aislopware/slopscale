@@ -138,6 +138,7 @@ CREATE TABLE groups(
   name text NOT NULL,
   description text,
   builtin text,
+  requestable boolean DEFAULT false,
   created_at timestamptz,
   updated_at timestamptz
 );
@@ -148,6 +149,7 @@ CREATE TABLE group_nodes(
   group_id bigint NOT NULL,
   node_id bigint NOT NULL,
   created_at timestamptz,
+  expires_at timestamptz,
   CONSTRAINT fk_group_nodes_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
   CONSTRAINT fk_group_nodes_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
 );
@@ -158,6 +160,7 @@ CREATE TABLE group_users(
   group_id bigint NOT NULL,
   user_id bigint NOT NULL,
   created_at timestamptz,
+  expires_at timestamptz,
   CONSTRAINT fk_group_users_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
   CONSTRAINT fk_group_users_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -171,6 +174,7 @@ CREATE TABLE access_rules(
   protocol text NOT NULL,
   ports text,
   bidirectional boolean DEFAULT false,
+  expires_at timestamptz,
   created_at timestamptz,
   updated_at timestamptz
 );
@@ -209,6 +213,25 @@ CREATE UNIQUE INDEX idx_access_rule_postures_rule_posture ON access_rule_posture
 -- NetBird's networks work; see docs/ref/networks.md. The routers
 -- advertise the prefixes and the network approves them; the groups get
 -- the routes.
+CREATE TABLE access_requests(
+  id bigserial PRIMARY KEY,
+  user_id bigint NOT NULL,
+  node_id bigint,
+  group_id bigint NOT NULL,
+  reason text,
+  duration_seconds bigint NOT NULL,
+  status text NOT NULL,
+  decided_by text,
+  note text,
+  created_at timestamptz,
+  decided_at timestamptz,
+  expires_at timestamptz,
+  CONSTRAINT fk_access_requests_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_requests_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_requests_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_access_requests_status ON access_requests(status, id);
+
 CREATE TABLE networks(
   id bigserial PRIMARY KEY,
   name text NOT NULL,

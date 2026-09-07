@@ -169,6 +169,26 @@ _Postures_ tab and a _Required postures_ picker in the console's access
 controls cover it. See
 [Device trust](https://headscale.net/development/ref/device-trust/).
 
+### Temporary access
+
+Access can now end on its own. An access rule takes an `expiresAt` and
+stops applying past it, kept in the list as expired until it is extended
+or deleted; a machine or user can be added to a group until a time and
+leaves it again afterwards. A group can be marked requestable, and a
+signed-in user, a member included, asks to join it for five minutes to
+thirty days, for one machine or all of theirs, with a reason; anyone with
+the `policy_file` scope approves for the duration asked or another one,
+or denies with a note, and the membership is added with its expiry at
+once. The server sweeps expired rules and memberships every minute and
+rebuilds the policy. `--expires` on `headscale access-rules` and
+`headscale groups add-node|add-user`, `--requestable` on
+`headscale groups`, `headscale access-requests`,
+`/api/v1/access-request`, the `accessRequestCreated`,
+`accessRequestApproved` and `accessRequestDenied` webhook events, the
+`access_request.*` audit actions, a _My access_ page for every signed-in
+user and a _Requests_ tab under the console's access controls cover it.
+See [Temporary access](https://headscale.net/development/ref/temporary-access/).
+
 ### Networks
 
 Subnets and exit nodes can now be handed to groups as networks, the way

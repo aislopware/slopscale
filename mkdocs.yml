@@ -196,6 +196,7 @@ nav:
       - User roles: ref/roles.md
       - Device and user approval: ref/approval.md
       - Device trust: ref/device-trust.md
+      - Temporary access: ref/temporary-access.md
       - Node sharing: ref/sharing.md
       - Groups and access rules: ref/access-control.md
       - Networks: ref/networks.md

@@ -30,21 +30,24 @@ show the rest, newest first.
 
 ## Events
 
-| Type                | When                                                                               |
-| ------------------- | ---------------------------------------------------------------------------------- |
-| `nodeCreated`       | A machine registered.                                                              |
-| `nodeNeedsApproval` | A machine registered while device approval is on.                                  |
-| `nodeApproved`      | A machine was approved.                                                            |
-| `nodeKeyExpired`    | A machine's key expired.                                                           |
-| `nodeDeleted`       | A machine was removed.                                                             |
-| `nodeSuspended`     | An administrator suspended a machine; see [Device trust](device-trust.md).         |
-| `nodeUnsuspended`   | A machine's suspension was lifted.                                                 |
-| `policyUpdate`      | The policy file was saved or reloaded, or a group, access rule or network changed. |
-| `userCreated`       | A user was created, by an operator or by a first login.                            |
-| `userNeedsApproval` | A user was created while users approval is on.                                     |
-| `userApproved`      | A user was approved.                                                               |
-| `userRoleUpdated`   | A user's role changed.                                                             |
-| `userDeleted`       | A user was deleted.                                                                |
+| Type                    | When                                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------------- |
+| `nodeCreated`           | A machine registered.                                                                  |
+| `nodeNeedsApproval`     | A machine registered while device approval is on.                                      |
+| `nodeApproved`          | A machine was approved.                                                                |
+| `nodeKeyExpired`        | A machine's key expired.                                                               |
+| `nodeDeleted`           | A machine was removed.                                                                 |
+| `nodeSuspended`         | An administrator suspended a machine; see [Device trust](device-trust.md).             |
+| `nodeUnsuspended`       | A machine's suspension was lifted.                                                     |
+| `policyUpdate`          | The policy file was saved or reloaded, or a group, access rule or network changed.     |
+| `userCreated`           | A user was created, by an operator or by a first login.                                |
+| `userNeedsApproval`     | A user was created while users approval is on.                                         |
+| `userApproved`          | A user was approved.                                                                   |
+| `userRoleUpdated`       | A user's role changed.                                                                 |
+| `userDeleted`           | A user was deleted.                                                                    |
+| `accessRequestCreated`  | A user asked to join a group for a while; see [Temporary access](temporary-access.md). |
+| `accessRequestApproved` | An approver granted the request and the membership was added.                          |
+| `accessRequestDenied`   | An approver turned the request down.                                                   |
 
 `GET /api/v1/webhook/event-types` and `headscale webhooks event-types` list
 them. The `test` event goes to every endpoint on request and needs no

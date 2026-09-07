@@ -21,6 +21,7 @@ type (
 		Name        string
 		Description string
 		Builtin     string
+		Requestable bool
 		CreatedAt   *time.Time
 		UpdatedAt   *time.Time
 	}
@@ -29,12 +30,14 @@ type (
 		GroupID   uint64
 		NodeID    uint64
 		CreatedAt *time.Time
+		ExpiresAt *time.Time
 	}
 	groupUserRow struct {
 		ID        uint64 `sql:"primary_key"`
 		GroupID   uint64
 		UserID    uint64
 		CreatedAt *time.Time
+		ExpiresAt *time.Time
 	}
 	accessRuleRow struct {
 		ID            uint64 `sql:"primary_key"`
@@ -44,6 +47,7 @@ type (
 		Protocol      string
 		Ports         string
 		Bidirectional bool
+		ExpiresAt     *time.Time
 		CreatedAt     *time.Time
 		UpdatedAt     *time.Time
 	}
@@ -76,12 +80,42 @@ const (
 	ruleSideDestination = "dst"
 )
 
+// accessGroup adds the membership rows to a group under construction.
+type accessGroup types.AccessGroup
+
+func (g *accessGroup) addNode(r groupNodeRow) {
+	id := types.NodeID(r.NodeID)
+	g.NodeIDs = append(g.NodeIDs, id)
+
+	if r.ExpiresAt != nil {
+		if g.NodeExpiries == nil {
+			g.NodeExpiries = map[types.NodeID]time.Time{}
+		}
+
+		g.NodeExpiries[id] = *r.ExpiresAt
+	}
+}
+
+func (g *accessGroup) addUser(r groupUserRow) {
+	id := types.UserID(r.UserID)
+	g.UserIDs = append(g.UserIDs, id)
+
+	if r.ExpiresAt != nil {
+		if g.UserExpiries == nil {
+			g.UserExpiries = map[types.UserID]time.Time{}
+		}
+
+		g.UserExpiries[id] = *r.ExpiresAt
+	}
+}
+
 func (r groupRow) group() types.AccessGroup {
 	g := types.AccessGroup{
 		ID:          types.GroupID(r.ID),
 		Name:        r.Name,
 		Description: r.Description,
 		Builtin:     r.Builtin,
+		Requestable: r.Requestable,
 	}
 
 	if r.CreatedAt != nil {
@@ -104,6 +138,11 @@ func (r accessRuleRow) rule() types.AccessRule {
 		Protocol:      types.AccessProtocol(r.Protocol),
 		Ports:         r.Ports,
 		Bidirectional: r.Bidirectional,
+	}
+
+	if r.ExpiresAt != nil {
+		at := *r.ExpiresAt
+		rule.ExpiresAt = &at
 	}
 
 	if r.CreatedAt != nil {
@@ -207,13 +246,13 @@ func LoadAccessModel(q Querier) (types.AccessModel, error) {
 
 	for _, r := range nodes {
 		if i, ok := groupIdx[r.GroupNode.GroupID]; ok {
-			model.Groups[i].NodeIDs = append(model.Groups[i].NodeIDs, types.NodeID(r.GroupNode.NodeID))
+			(*accessGroup)(&model.Groups[i]).addNode(r.GroupNode)
 		}
 	}
 
 	for _, r := range users {
 		if i, ok := groupIdx[r.GroupUser.GroupID]; ok {
-			model.Groups[i].UserIDs = append(model.Groups[i].UserIDs, types.UserID(r.GroupUser.UserID))
+			(*accessGroup)(&model.Groups[i]).addUser(r.GroupUser)
 		}
 	}
 
@@ -278,6 +317,7 @@ func insertGroup(q Querier, group types.AccessGroup) (types.AccessGroup, error) 
 		Name:        group.Name,
 		Description: group.Description,
 		Builtin:     group.Builtin,
+		Requestable: group.Requestable,
 		CreatedAt:   &now,
 		UpdatedAt:   &now,
 	}
@@ -302,9 +342,9 @@ func insertGroup(q Querier, group types.AccessGroup) (types.AccessGroup, error) 
 }
 
 // CreateGroup adds an operator-made group.
-func (hsdb *HSDatabase) CreateGroup(name, description string) (types.AccessGroup, error) {
+func (hsdb *HSDatabase) CreateGroup(name, description string, requestable bool) (types.AccessGroup, error) {
 	return Write(hsdb, func(tx *Tx) (types.AccessGroup, error) {
-		return insertGroup(tx, types.AccessGroup{Name: name, Description: description})
+		return insertGroup(tx, types.AccessGroup{Name: name, Description: description, Requestable: requestable})
 	})
 }
 
@@ -358,24 +398,28 @@ func getGroup(q Querier, id types.GroupID) (types.AccessGroup, error) {
 	}
 
 	for _, r := range nodes {
-		group.NodeIDs = append(group.NodeIDs, types.NodeID(r.GroupNode.NodeID))
+		(*accessGroup)(&group).addNode(r.GroupNode)
 	}
 
 	for _, r := range users {
-		group.UserIDs = append(group.UserIDs, types.UserID(r.GroupUser.UserID))
+		(*accessGroup)(&group).addUser(r.GroupUser)
 	}
 
 	return group, nil
 }
 
 // UpdateGroup renames or re-describes a group.
-func (hsdb *HSDatabase) UpdateGroup(id types.GroupID, name, description string) (types.AccessGroup, error) {
+func (hsdb *HSDatabase) UpdateGroup(
+	id types.GroupID, name, description string, requestable bool,
+) (types.AccessGroup, error) {
 	return Write(hsdb, func(tx *Tx) (types.AccessGroup, error) {
 		now := time.Now().UTC()
 
 		affected, err := tx.executor().exec(
-			table.Groups.UPDATE(table.Groups.Name, table.Groups.Description, table.Groups.UpdatedAt).
-				SET(name, description, now).
+			table.Groups.UPDATE(
+				table.Groups.Name, table.Groups.Description, table.Groups.Requestable, table.Groups.UpdatedAt,
+			).
+				SET(name, description, requestable, now).
 				WHERE(table.Groups.ID.EQ(jet.Uint64(uint64(id)))),
 		)
 		if err != nil {
@@ -422,7 +466,14 @@ func (hsdb *HSDatabase) SetGroupMembers(
 	return Write(hsdb, func(tx *Tx) (types.AccessGroup, error) {
 		ex := tx.executor()
 
-		_, err := ex.exec(table.GroupNodes.DELETE().WHERE(table.GroupNodes.GroupID.EQ(jet.Uint64(uint64(id)))))
+		// A member that stays keeps its expiry, so replacing the list
+		// does not quietly make a temporary membership permanent.
+		before, err := getGroup(tx, id)
+		if err != nil {
+			return types.AccessGroup{}, err
+		}
+
+		_, err = ex.exec(table.GroupNodes.DELETE().WHERE(table.GroupNodes.GroupID.EQ(jet.Uint64(uint64(id)))))
 		if err != nil {
 			return types.AccessGroup{}, fmt.Errorf("clearing nodes of group %d: %w", id, err)
 		}
@@ -433,14 +484,14 @@ func (hsdb *HSDatabase) SetGroupMembers(
 		}
 
 		for _, nid := range dedupe(nodeIDs) {
-			err = AddGroupNode(tx, id, nid)
+			err = AddGroupNode(tx, id, nid, expiryPtr(before.NodeExpiry(nid)))
 			if err != nil {
 				return types.AccessGroup{}, err
 			}
 		}
 
 		for _, uid := range dedupe(userIDs) {
-			err = AddGroupUser(tx, id, uid)
+			err = AddGroupUser(tx, id, uid, expiryPtr(before.UserExpiry(uid)))
 			if err != nil {
 				return types.AccessGroup{}, err
 			}
@@ -474,10 +525,11 @@ func touchGroup(q Querier, id types.GroupID) error {
 	return nil
 }
 
-// AddGroupNode makes the node a direct member of the group.
-func (hsdb *HSDatabase) AddGroupNode(id types.GroupID, nodeID types.NodeID) error {
+// AddGroupNode makes the node a direct member of the group, until the
+// expiry when one is given.
+func (hsdb *HSDatabase) AddGroupNode(id types.GroupID, nodeID types.NodeID, expiresAt *time.Time) error {
 	return hsdb.Write(func(tx *Tx) error {
-		err := AddGroupNode(tx, id, nodeID)
+		err := AddGroupNode(tx, id, nodeID, expiresAt)
 		if err != nil {
 			return err
 		}
@@ -487,9 +539,9 @@ func (hsdb *HSDatabase) AddGroupNode(id types.GroupID, nodeID types.NodeID) erro
 }
 
 // AddGroupNode is the query behind [HSDatabase.AddGroupNode].
-func AddGroupNode(q Querier, id types.GroupID, nodeID types.NodeID) error {
+func AddGroupNode(q Querier, id types.GroupID, nodeID types.NodeID, expiresAt *time.Time) error {
 	now := time.Now().UTC()
-	row := groupNodeRow{GroupID: uint64(id), NodeID: nodeID.Uint64(), CreatedAt: &now}
+	row := groupNodeRow{GroupID: uint64(id), NodeID: nodeID.Uint64(), CreatedAt: &now, ExpiresAt: utcPtr(expiresAt)}
 
 	_, err := q.executor().exec(table.GroupNodes.INSERT(table.GroupNodes.MutableColumns).MODEL(&row))
 	if err != nil {
@@ -501,6 +553,100 @@ func AddGroupNode(q Querier, id types.GroupID, nodeID types.NodeID) error {
 	}
 
 	return nil
+}
+
+// GrantGroupNode adds a temporary membership or extends one: a member
+// whose membership ends earlier gets the new expiry, a permanent member
+// stays permanent.
+func GrantGroupNode(q Querier, id types.GroupID, nodeID types.NodeID, expiresAt time.Time) error {
+	err := AddGroupNode(q, id, nodeID, &expiresAt)
+	if !errors.Is(err, types.ErrGroupMemberExists) {
+		return err
+	}
+
+	_, err = q.executor().exec(
+		table.GroupNodes.UPDATE(table.GroupNodes.ExpiresAt).SET(expiresAt.UTC()).WHERE(
+			table.GroupNodes.GroupID.EQ(jet.Uint64(uint64(id))).
+				AND(table.GroupNodes.NodeID.EQ(jet.Uint64(nodeID.Uint64()))).
+				AND(table.GroupNodes.ExpiresAt.IS_NOT_NULL()).
+				AND(table.GroupNodes.ExpiresAt.LT(jet.TimestampExp(timeArg(expiresAt.UTC())))),
+		),
+	)
+	if err != nil {
+		return fmt.Errorf("extending node %d in group %d: %w", nodeID, id, err)
+	}
+
+	return nil
+}
+
+// GrantGroupUser is [GrantGroupNode] for a user membership.
+func GrantGroupUser(q Querier, id types.GroupID, userID types.UserID, expiresAt time.Time) error {
+	err := AddGroupUser(q, id, userID, &expiresAt)
+	if !errors.Is(err, types.ErrGroupMemberExists) {
+		return err
+	}
+
+	_, err = q.executor().exec(
+		table.GroupUsers.UPDATE(table.GroupUsers.ExpiresAt).SET(expiresAt.UTC()).WHERE(
+			table.GroupUsers.GroupID.EQ(jet.Uint64(uint64(id))).
+				AND(table.GroupUsers.UserID.EQ(jet.Uint64(uint64(userID)))).
+				AND(table.GroupUsers.ExpiresAt.IS_NOT_NULL()).
+				AND(table.GroupUsers.ExpiresAt.LT(jet.TimestampExp(timeArg(expiresAt.UTC())))),
+		),
+	)
+	if err != nil {
+		return fmt.Errorf("extending user %d in group %d: %w", userID, id, err)
+	}
+
+	return nil
+}
+
+// DeleteExpiredMemberships drops the temporary memberships whose expiry
+// passed and reports how many went.
+func (hsdb *HSDatabase) DeleteExpiredMemberships(now time.Time) (int64, error) {
+	return Write(hsdb, func(tx *Tx) (int64, error) {
+		at := jet.TimestampExp(timeArg(now.UTC()))
+
+		nodes, err := tx.executor().exec(
+			table.GroupNodes.DELETE().WHERE(
+				table.GroupNodes.ExpiresAt.IS_NOT_NULL().AND(table.GroupNodes.ExpiresAt.LT_EQ(at)),
+			),
+		)
+		if err != nil {
+			return 0, fmt.Errorf("deleting expired node memberships: %w", err)
+		}
+
+		users, err := tx.executor().exec(
+			table.GroupUsers.DELETE().WHERE(
+				table.GroupUsers.ExpiresAt.IS_NOT_NULL().AND(table.GroupUsers.ExpiresAt.LT_EQ(at)),
+			),
+		)
+		if err != nil {
+			return 0, fmt.Errorf("deleting expired user memberships: %w", err)
+		}
+
+		return nodes + users, nil
+	})
+}
+
+// expiryPtr turns a zero-or-not instant into the optional form.
+func expiryPtr(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+
+	return &t
+}
+
+// utcPtr copies an optional instant in UTC for storage.
+func utcPtr(t *time.Time) *time.Time {
+	if t == nil {
+		return nil
+	}
+
+	at := t.UTC()
+
+	return &at
 }
 
 // RemoveGroupNode drops the node's direct membership.
@@ -524,10 +670,11 @@ func (hsdb *HSDatabase) RemoveGroupNode(id types.GroupID, nodeID types.NodeID) e
 	})
 }
 
-// AddGroupUser makes the user's devices members of the group.
-func (hsdb *HSDatabase) AddGroupUser(id types.GroupID, userID types.UserID) error {
+// AddGroupUser makes the user's devices members of the group, until the
+// expiry when one is given.
+func (hsdb *HSDatabase) AddGroupUser(id types.GroupID, userID types.UserID, expiresAt *time.Time) error {
 	return hsdb.Write(func(tx *Tx) error {
-		err := AddGroupUser(tx, id, userID)
+		err := AddGroupUser(tx, id, userID, expiresAt)
 		if err != nil {
 			return err
 		}
@@ -537,9 +684,9 @@ func (hsdb *HSDatabase) AddGroupUser(id types.GroupID, userID types.UserID) erro
 }
 
 // AddGroupUser is the query behind [HSDatabase.AddGroupUser].
-func AddGroupUser(q Querier, id types.GroupID, userID types.UserID) error {
+func AddGroupUser(q Querier, id types.GroupID, userID types.UserID, expiresAt *time.Time) error {
 	now := time.Now().UTC()
-	row := groupUserRow{GroupID: uint64(id), UserID: uint64(userID), CreatedAt: &now}
+	row := groupUserRow{GroupID: uint64(id), UserID: uint64(userID), CreatedAt: &now, ExpiresAt: utcPtr(expiresAt)}
 
 	_, err := q.executor().exec(table.GroupUsers.INSERT(table.GroupUsers.MutableColumns).MODEL(&row))
 	if err != nil {
@@ -588,7 +735,7 @@ func AddNodeToGroups(q Querier, nodeID types.NodeID, groupIDs []types.GroupID) e
 			return err
 		}
 
-		err = AddGroupNode(q, gid, nodeID)
+		err = AddGroupNode(q, gid, nodeID, nil)
 		if err != nil && !errors.Is(err, types.ErrGroupMemberExists) {
 			return err
 		}
@@ -608,6 +755,7 @@ func (hsdb *HSDatabase) CreateAccessRule(rule types.AccessRule) (types.AccessRul
 			Protocol:      string(rule.Protocol),
 			Ports:         rule.Ports,
 			Bidirectional: rule.Bidirectional,
+			ExpiresAt:     utcPtr(rule.ExpiresAt),
 			CreatedAt:     &now,
 			UpdatedAt:     &now,
 		}
@@ -648,11 +796,11 @@ func (hsdb *HSDatabase) UpdateAccessRule(rule types.AccessRule) (types.AccessRul
 			table.AccessRules.UPDATE(
 				table.AccessRules.Name, table.AccessRules.Description, table.AccessRules.Enabled,
 				table.AccessRules.Protocol, table.AccessRules.Ports, table.AccessRules.Bidirectional,
-				table.AccessRules.UpdatedAt,
+				table.AccessRules.ExpiresAt, table.AccessRules.UpdatedAt,
 			).SET(
 				rule.Name, rule.Description, rule.Enabled,
 				string(rule.Protocol), rule.Ports, rule.Bidirectional,
-				now,
+				utcPtr(rule.ExpiresAt), now,
 			).WHERE(table.AccessRules.ID.EQ(jet.Uint64(uint64(rule.ID)))),
 		)
 		if err != nil {

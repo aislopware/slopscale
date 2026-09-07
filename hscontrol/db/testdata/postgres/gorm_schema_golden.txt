@@ -1,3 +1,15 @@
+COL access_requests.id bigint null=NO default=nextval('access_requests_id_seq'::regclass)
+COL access_requests.user_id bigint null=NO
+COL access_requests.node_id bigint null=YES
+COL access_requests.group_id bigint null=NO
+COL access_requests.reason text null=YES
+COL access_requests.duration_seconds bigint null=NO
+COL access_requests.status text null=NO
+COL access_requests.decided_by text null=YES
+COL access_requests.note text null=YES
+COL access_requests.created_at timestamp with time zone null=YES
+COL access_requests.decided_at timestamp with time zone null=YES
+COL access_requests.expires_at timestamp with time zone null=YES
 COL access_rule_groups.id bigint null=NO default=nextval('access_rule_groups_id_seq'::regclass)
 COL access_rule_groups.rule_id bigint null=NO
 COL access_rule_groups.group_id bigint null=NO
@@ -12,6 +24,7 @@ COL access_rules.enabled boolean null=YES default=true
 COL access_rules.protocol text null=NO
 COL access_rules.ports text null=YES
 COL access_rules.bidirectional boolean null=YES default=false
+COL access_rules.expires_at timestamp with time zone null=YES
 COL access_rules.created_at timestamp with time zone null=YES
 COL access_rules.updated_at timestamp with time zone null=YES
 COL api_keys.id bigint null=NO default=nextval('api_keys_id_seq'::regclass)
@@ -40,14 +53,17 @@ COL group_nodes.id bigint null=NO default=nextval('group_nodes_id_seq'::regclass
 COL group_nodes.group_id bigint null=NO
 COL group_nodes.node_id bigint null=NO
 COL group_nodes.created_at timestamp with time zone null=YES
+COL group_nodes.expires_at timestamp with time zone null=YES
 COL group_users.id bigint null=NO default=nextval('group_users_id_seq'::regclass)
 COL group_users.group_id bigint null=NO
 COL group_users.user_id bigint null=NO
 COL group_users.created_at timestamp with time zone null=YES
+COL group_users.expires_at timestamp with time zone null=YES
 COL groups.id bigint null=NO default=nextval('groups_id_seq'::regclass)
 COL groups.name text null=NO
 COL groups.description text null=YES
 COL groups.builtin text null=YES
+COL groups.requestable boolean null=YES default=false
 COL groups.created_at timestamp with time zone null=YES
 COL groups.updated_at timestamp with time zone null=YES
 COL migrations.id character varying len=255 null=NO
@@ -190,11 +206,13 @@ COL webhooks.created_at timestamp with time zone null=YES
 COL webhooks.updated_at timestamp with time zone null=YES
 COL webhooks.last_delivery_at timestamp with time zone null=YES
 COL webhooks.last_delivery_status text null=YES
+IDX CREATE INDEX idx_access_requests_status ON public.access_requests USING btree (status, id)
 IDX CREATE INDEX idx_audit_events_actor_user_id ON public.audit_events USING btree (actor_user_id)
 IDX CREATE INDEX idx_audit_events_created_at ON public.audit_events USING btree (created_at)
 IDX CREATE INDEX idx_policies_deleted_at ON public.policies USING btree (deleted_at)
 IDX CREATE INDEX idx_users_deleted_at ON public.users USING btree (deleted_at)
 IDX CREATE INDEX idx_webhook_deliveries_webhook ON public.webhook_deliveries USING btree (webhook_id, id)
+IDX CREATE UNIQUE INDEX access_requests_pkey ON public.access_requests USING btree (id)
 IDX CREATE UNIQUE INDEX access_rule_groups_pkey ON public.access_rule_groups USING btree (id)
 IDX CREATE UNIQUE INDEX access_rule_postures_pkey ON public.access_rule_postures USING btree (id)
 IDX CREATE UNIQUE INDEX access_rules_pkey ON public.access_rules USING btree (id)
@@ -244,6 +262,15 @@ IDX CREATE UNIQUE INDEX settings_pkey ON public.settings USING btree (key)
 IDX CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)
 IDX CREATE UNIQUE INDEX webhook_deliveries_pkey ON public.webhook_deliveries USING btree (id)
 IDX CREATE UNIQUE INDEX webhooks_pkey ON public.webhooks USING btree (id)
+CON access_requests access_requests_duration_seconds_not_null NOT NULL duration_seconds
+CON access_requests access_requests_group_id_not_null NOT NULL group_id
+CON access_requests access_requests_id_not_null NOT NULL id
+CON access_requests access_requests_pkey PRIMARY KEY (id)
+CON access_requests access_requests_status_not_null NOT NULL status
+CON access_requests access_requests_user_id_not_null NOT NULL user_id
+CON access_requests fk_access_requests_group FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+CON access_requests fk_access_requests_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
+CON access_requests fk_access_requests_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 CON access_rule_groups access_rule_groups_group_id_not_null NOT NULL group_id
 CON access_rule_groups access_rule_groups_id_not_null NOT NULL id
 CON access_rule_groups access_rule_groups_pkey PRIMARY KEY (id)

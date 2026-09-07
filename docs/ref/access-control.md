@@ -49,6 +49,12 @@ Rules and the policy file combine: the rules compile into grants that sit next
 to the file's own, and a connection is allowed when either admits it. The
 file's `tests` run against the combined result.
 
+## Temporary access
+
+A rule and a membership can carry an expiry, and a group can be marked
+requestable so users ask to join it for a while and an approver decides.
+See [Temporary access](temporary-access.md).
+
 ## Structuring groups
 
 Groups work best when each one answers one question. Groups of users describe

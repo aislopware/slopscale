@@ -3,6 +3,7 @@ package v2
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/juanfont/headscale/hscontrol/types"
 	"go4.org/netipx"
@@ -61,14 +62,16 @@ func accessGrants(model types.AccessModel) []Grant {
 	return append(ruleGrants(model), networkGrants(model)...)
 }
 
-// ruleGrants turns the enabled rules of the model into grants. A
-// bidirectional rule is two grants, one per direction. A rule that
-// names a group the model no longer has skips that side entry.
+// ruleGrants turns the active rules of the model into grants: enabled
+// and not expired. A bidirectional rule is two grants, one per direction.
+// A rule that names a group the model no longer has skips that side
+// entry.
 func ruleGrants(model types.AccessModel) []Grant {
 	grants := make([]Grant, 0, len(model.Rules))
+	now := time.Now()
 
 	for _, rule := range model.Rules {
-		if !rule.Enabled {
+		if !rule.Active(now) {
 			continue
 		}
 

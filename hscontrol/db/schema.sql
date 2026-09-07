@@ -194,6 +194,9 @@ CREATE TABLE groups(
   name text NOT NULL,
   description text,
   builtin text,
+  -- requestable lets members ask to join the group for a while; see
+  -- access_requests.
+  requestable numeric DEFAULT false,
   created_at datetime,
   updated_at datetime
 );
@@ -204,6 +207,8 @@ CREATE TABLE group_nodes(
   group_id integer NOT NULL,
   node_id integer NOT NULL,
   created_at datetime,
+  -- expires_at ends a temporary membership; NULL is permanent.
+  expires_at datetime,
 
   CONSTRAINT fk_group_nodes_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
   CONSTRAINT fk_group_nodes_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
@@ -215,6 +220,7 @@ CREATE TABLE group_users(
   group_id integer NOT NULL,
   user_id integer NOT NULL,
   created_at datetime,
+  expires_at datetime,
 
   CONSTRAINT fk_group_users_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
   CONSTRAINT fk_group_users_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -232,6 +238,9 @@ CREATE TABLE access_rules(
   protocol text NOT NULL,
   ports text,
   bidirectional numeric DEFAULT false,
+  -- expires_at is when the rule stops applying; NULL never does. An
+  -- expired rule is kept so it can be extended or deleted.
+  expires_at datetime,
   created_at datetime,
   updated_at datetime
 );
@@ -272,6 +281,30 @@ CREATE TABLE access_rule_postures(
   CONSTRAINT fk_access_rule_postures_posture FOREIGN KEY(posture_id) REFERENCES postures(id) ON DELETE CASCADE
 );
 CREATE UNIQUE INDEX idx_access_rule_postures_rule_posture ON access_rule_postures(rule_id, posture_id);
+
+-- access_requests are asks from a user to join a requestable group for a
+-- while, for one machine (node_id) or every machine they own (node_id
+-- NULL); see docs/ref/temporary-access.md. Approval adds the membership
+-- with expires_at; the request keeps the outcome for the record.
+CREATE TABLE access_requests(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  user_id integer NOT NULL,
+  node_id integer,
+  group_id integer NOT NULL,
+  reason text,
+  duration_seconds integer NOT NULL,
+  status text NOT NULL,
+  decided_by text,
+  note text,
+  created_at datetime,
+  decided_at datetime,
+  expires_at datetime,
+
+  CONSTRAINT fk_access_requests_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_requests_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_requests_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+);
+CREATE INDEX idx_access_requests_status ON access_requests(status, id);
 
 -- networks are sets of prefixes reached through routing nodes, the way
 -- NetBird's networks work; see docs/ref/networks.md. The routers
