@@ -5,7 +5,8 @@
     This page contains community contributions. The projects listed here are not
     maintained by the headscale authors and are written by community members.
 
-Headscale doesn't provide a built-in web interface but users may pick one from the available options.
+Headscale ships its own [admin console](../console.md) at `/admin/`. The
+community projects below predate it and remain available.
 
 - [headscale-ui](https://github.com/gurucomputing/headscale-ui)
     - ![GitHub stars](https://img.shields.io/github/stars/gurucomputing/headscale-ui?style=flat)

@@ -35,6 +35,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
 	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/juanfont/headscale/web"
 	"github.com/pkg/profile"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/acme"
@@ -1095,6 +1096,12 @@ func (h *Headscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	// Ping response endpoint: receives HEAD from clients responding
 	// to a [tailcfg.PingRequest]. The unguessable ping ID serves as authentication.
 	r.Head("/machine/ping-response", h.PingResponseHandler)
+
+	// The admin console is a static bundle embedded at build time; it
+	// authenticates against /api/v1 with an API key, so nothing here is
+	// privileged. See package web.
+	r.Handle(strings.TrimSuffix(web.Prefix, "/"), web.Handler())
+	r.Handle(web.Prefix+"*", web.Handler())
 
 	r.Get("/favicon.ico", FaviconHandler)
 	r.Get("/", BlankHandler)

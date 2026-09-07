@@ -80,6 +80,15 @@ carries `auto-exit-node`, so `tailscale exit-node suggest` names it and clients
 set to `--exit-node=auto:any` pick it. See
 [Global exit node](https://headscale.net/development/ref/routes/#global-exit-node).
 
+### Admin console
+
+The server now serves a web console at `/admin/`: machines, users, pre-auth
+and API keys, the policy editor, device and user approval, node sharing and the
+global exit node, all from a browser. It signs in with an API key and shows
+exactly what that key's role allows. Release binaries and container images
+include it; when building from source, run `make web` before `make build`.
+See [Admin console](https://headscale.net/development/ref/console/).
+
 ### BREAKING
 
 #### API
@@ -113,6 +122,7 @@ set to `--exit-node=auto:any` pick it. See
 - User roles: `headscale users set-role`, a `Role` column in `headscale users list`, `POST /api/v1/user/{id}/role`, `GET /api/v1/whoami`, a `userId` on API keys and `headscale apikeys create --user`; the v2 user object's `role` field and `?role=` filter now reflect the real role
 - The `is-admin` node capability, previously stamped on every node, is now stamped only on devices of the owner and admins; `is-owner` on the owner's. Clients use these for admin-console affordances in their UI only
 - `POST /api/v1/apikey` without an `expiration` now mints a key that never expires instead of one that was already expired
+- Admin console at `/admin/`, embedded in the binary; `make web` builds it from `web/`
 - Global exit node: `headscale nodes global-exit-node`, `POST /api/v1/node/{id}/global-exit-node` and `globalExitNode` on nodes
 - Node sharing: `headscale nodes share|unshare`, `POST /api/v1/node/{id}/share`, `DELETE /api/v1/node/{id}/share/{userId}`, `sharedWith` on nodes and the `autogroup:shared` policy source
 - Device and user approval: `headscale settings get|set`, `headscale nodes approve`, `headscale users approve`, `headscale preauthkeys create --preauthorized`, an `Approved` column in `headscale nodes list` and `headscale users list`, `GET|POST /api/v1/settings`, `POST /api/v1/node/{id}/approve`, `POST /api/v1/user/{id}/approve`, `approved`/`approvedAt` on nodes and users and `preauthorized` on pre-auth keys; the v2 API's `PATCH /api/v2/tailnet/{tailnet}/settings` now updates `devicesApprovalOn` and `usersApprovalOn` instead of returning 501, `POST /api/v2/device/{id}/authorized` accepts `false`, and `POST /api/v2/users/{id}/approve|suspend|restore` exist

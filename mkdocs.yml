@@ -191,6 +191,7 @@ nav:
       - DNS: ref/dns.md
       - DERP: ref/derp.md
       - API: ref/api.md
+      - Admin console: ref/console.md
       - User roles: ref/roles.md
       - Device and user approval: ref/approval.md
       - Node sharing: ref/sharing.md
