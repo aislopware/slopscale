@@ -74,12 +74,16 @@ export function protocolLabel(protocol: string): string {
   return protocolLabels[toProtocol(protocol)];
 }
 
+/** Whether the protocol carries a port list. */
+export function hasPorts(protocol: string): boolean {
+  return protocol === "tcp" || protocol === "udp";
+}
+
 /** "TCP 22, 443" or "Any protocol"; ports only exist for tcp and udp. */
 export function protocolSummary(rule: Pick<AccessRule, "protocol" | "ports">): string {
   const label = protocolLabel(rule.protocol);
-  const hasPorts = rule.protocol === "tcp" || rule.protocol === "udp";
 
-  if (!hasPorts) {
+  if (!hasPorts(rule.protocol)) {
     return label;
   }
 

@@ -137,10 +137,16 @@ func groupAliases(model types.AccessModel, ids []types.GroupID) Aliases {
 // accessProtocolPorts renders the rule's protocol and ports the way a
 // grant's "ip" field parses. ICMP covers both IP versions.
 func accessProtocolPorts(rule types.AccessRule) []ProtocolPort {
+	return protocolPorts(rule.Protocol, rule.Ports)
+}
+
+// protocolPorts renders a protocol and port list the way a grant
+// carries them. An empty port list is every port.
+func protocolPorts(protocol types.AccessProtocol, portList string) []ProtocolPort {
 	ports := []tailcfg.PortRange{tailcfg.PortRangeAny}
 
-	if rule.Protocol.HasPorts() {
-		ranges, err := types.ParsePortList(rule.Ports)
+	if protocol.HasPorts() {
+		ranges, err := types.ParsePortList(portList)
 		if err == nil && len(ranges) > 0 {
 			ports = make([]tailcfg.PortRange, 0, len(ranges))
 			for _, r := range ranges {
@@ -149,7 +155,7 @@ func accessProtocolPorts(rule types.AccessRule) []ProtocolPort {
 		}
 	}
 
-	switch rule.Protocol {
+	switch protocol {
 	case types.AccessProtocolTCP:
 		return []ProtocolPort{{Protocol: ProtocolNameTCP, Ports: ports}}
 	case types.AccessProtocolUDP:
@@ -205,11 +211,9 @@ func networkGrants(model types.AccessModel) []Grant {
 		}
 
 		grants = append(grants, Grant{
-			Sources:      sources,
-			Destinations: destinations,
-			InternetProtocols: []ProtocolPort{
-				{Protocol: ProtocolNameWildcard, Ports: []tailcfg.PortRange{tailcfg.PortRangeAny}},
-			},
+			Sources:           sources,
+			Destinations:      destinations,
+			InternetProtocols: protocolPorts(network.ProtocolOrAll(), network.Ports),
 		})
 	}
 

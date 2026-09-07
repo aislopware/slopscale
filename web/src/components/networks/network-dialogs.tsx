@@ -6,7 +6,11 @@ import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { Group, Network, Node } from "~/api/queries.ts";
+import type { NetworkRequestBody } from "~/api/schema.gen.ts";
+import { hasPorts, portsError, toProtocol } from "~/components/access/model.ts";
+import type { Protocol } from "~/components/access/model.ts";
 import { groupItems } from "~/components/access/pickers.ts";
+import { ProtocolFields } from "~/components/access/protocol-fields.tsx";
 import { parseList } from "~/components/dns/model.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { prefixesError } from "~/components/networks/model.ts";
@@ -50,6 +54,8 @@ interface Draft {
   readonly prefixes: string;
   readonly routers: readonly string[];
   readonly groups: readonly string[];
+  readonly protocol: Protocol;
+  readonly ports: string;
   readonly enabled: boolean;
 }
 
@@ -60,6 +66,8 @@ function draftFrom(network: Network | undefined): Draft {
     prefixes: (network?.prefixes ?? []).join("\n"),
     routers: network?.routerNodeIds ?? [],
     groups: network?.groupIds ?? [],
+    protocol: toProtocol(network?.protocol ?? "all"),
+    ports: network?.ports ?? "",
     enabled: network?.enabled ?? true,
   };
 }
@@ -72,7 +80,7 @@ function draftIssue(draft: Draft): string | null {
     return "incomplete";
   }
 
-  return prefixesError(prefixes);
+  return prefixesError(prefixes) ?? (hasPorts(draft.protocol) ? portsError(draft.ports) : null);
 }
 
 /** Machines that advertise something come first, with what they advertise as the hint. */
@@ -98,6 +106,20 @@ function routerItems(nodes: readonly Node[]): PickerItem[] {
     });
 }
 
+/** The request body for the draft, trimmed the way the server stores it. */
+function bodyFrom(draft: Draft): NetworkRequestBody {
+  return {
+    name: draft.name.trim(),
+    description: draft.description.trim(),
+    enabled: draft.enabled,
+    prefixes: parseList(draft.prefixes),
+    routerNodeIds: [...draft.routers],
+    groupIds: [...draft.groups],
+    protocol: draft.protocol,
+    ports: hasPorts(draft.protocol) ? draft.ports.trim() : "",
+  };
+}
+
 function NetworkForm({
   network,
   groups,
@@ -116,14 +138,7 @@ function NetworkForm({
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
 
-    const body = {
-      name: draft.name.trim(),
-      description: draft.description.trim(),
-      enabled: draft.enabled,
-      prefixes: parseList(draft.prefixes),
-      routerNodeIds: [...draft.routers],
-      groupIds: [...draft.groups],
-    };
+    const body = bodyFrom(draft);
     const done = {
       onSuccess: (): void => {
         toast.success(network === undefined ? "Network created" : "Network updated");
@@ -198,6 +213,7 @@ function NetworkForm({
         }}
         empty="No group matches."
       />
+      <ProtocolFields draft={draft} onChange={update} />
       <Switch
         checked={draft.enabled}
         onCheckedChange={(enabled) => {

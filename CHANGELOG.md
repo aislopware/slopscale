@@ -252,10 +252,12 @@ that route them and the groups that receive them: the routes are approved on
 the routers when the network is created and withdrawn when it is disabled or
 deleted (a route the operator approved by hand before the network stays), and
 only the machines in its groups ever see them, which makes a split tunnel
-without a policy file. Two routers make a failover pair. Manage
-networks from the console's _Networks_ page, which also lists every route any
-machine advertises, with `headscale networks`, or through `/api/v1/network`.
-See [Networks](https://headscale.net/development/ref/networks/).
+without a policy file. Two routers make a failover pair. A network can narrow
+what its groups reach behind the routers to a protocol and ports, the way an
+access rule does, so a printer subnet can be handed out on TCP 631 alone.
+Manage networks from the console's _Networks_ page, which also lists every
+route any machine advertises, with `headscale networks`, or through
+`/api/v1/network`. See [Networks](https://headscale.net/development/ref/networks/).
 
 ### Global exit node
 

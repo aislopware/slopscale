@@ -556,6 +556,12 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609130900-ssh-recordings",
 			run: migrateSSHRecordings,
 		},
+		{
+			// Port-level networks: a network may narrow the reach to a
+			// protocol and ports. See docs/ref/networks.md.
+			id:  "202609140900-network-ports",
+			run: migrateNetworkPorts,
+		},
 	}
 }
 
@@ -1812,4 +1818,23 @@ func migrateSSHRecordings(tx *Tx) error {
 			},
 		},
 	})
+}
+
+// migrateNetworkPorts (202609140900) adds the protocol and ports
+// columns to networks. Existing networks keep every protocol.
+func migrateNetworkPorts(tx *Tx) error {
+	for _, col := range []struct {
+		table, column string
+		typ           columnType
+	}{
+		{"networks", "protocol", typeText},
+		{"networks", "ports", typeText},
+	} {
+		err := tx.ex.addColumnIfMissing(col.table, col.column, col.typ)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

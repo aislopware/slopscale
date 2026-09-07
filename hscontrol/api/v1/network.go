@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -41,6 +42,8 @@ type Network struct {
 	Description   string          `json:"description"`
 	Enabled       bool            `json:"enabled"`
 	ExitNode      bool            `doc:"The prefixes are the exit routes."               json:"exitNode"`
+	Protocol      string          `doc:"One of all, tcp, udp, icmp."                     json:"protocol"`
+	Ports         string          `doc:"Ports or ranges for tcp and udp; empty is all."  json:"ports"`
 	Prefixes      []string        `json:"prefixes"                                       nullable:"false"`
 	RouterNodeIDs []string        `json:"routerNodeIds"                                  nullable:"false"`
 	GroupIDs      []string        `doc:"Groups whose machines get the routes."           json:"groupIds"  nullable:"false"` //nolint:lll // struct tag
@@ -54,6 +57,10 @@ type NetworkRequestBody struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	Enabled     *bool  `doc:"Defaults to true."      json:"enabled,omitempty"`
+	// Protocol and Ports narrow what the groups may reach behind the
+	// routers; omitted means every protocol and port.
+	Protocol string `doc:"One of all, tcp, udp, icmp; defaults to all."            json:"protocol,omitempty"`
+	Ports    string `doc:"Ports or ranges such as 22,80-90, for tcp and udp only." json:"ports,omitempty"`
 	// Prefixes are CIDRs or addresses; 0.0.0.0/0 or ::/0 make an exit
 	// node offer.
 	Prefixes []string `doc:"CIDRs or addresses." json:"prefixes"`
@@ -123,6 +130,8 @@ func networkFromBody(body NetworkRequestBody) (types.Network, error) {
 		Name:          body.Name,
 		Description:   body.Description,
 		Enabled:       body.Enabled == nil || *body.Enabled,
+		Protocol:      types.AccessProtocol(strings.ToLower(body.Protocol)),
+		Ports:         strings.TrimSpace(body.Ports),
 		Prefixes:      prefixes,
 		RouterNodeIDs: routers,
 		GroupIDs:      groups,
@@ -146,6 +155,8 @@ func networkFrom(b Backend, n types.Network) Network {
 		Description:   n.Description,
 		Enabled:       n.Enabled,
 		ExitNode:      n.IsExitNode(),
+		Protocol:      string(n.ProtocolOrAll()),
+		Ports:         n.Ports,
 		Prefixes:      prefixStrings(n.Prefixes),
 		RouterNodeIDs: make([]string, 0, len(n.RouterNodeIDs)),
 		GroupIDs:      make([]string, 0, len(n.GroupIDs)),
@@ -201,6 +212,8 @@ func networkRouterFrom(b Backend, n types.Network, id types.NodeID) NetworkRoute
 func auditNetworkDetails(ctx context.Context, n types.Network) {
 	audit.Detail(ctx, "enabled", n.Enabled)
 	audit.Detail(ctx, "prefixes", prefixStrings(n.Prefixes))
+	audit.Detail(ctx, "protocol", string(n.ProtocolOrAll()))
+	audit.Detail(ctx, "ports", n.Ports)
 	audit.Detail(ctx, "routerNodeIds", n.RouterNodeIDs)
 	audit.Detail(ctx, "groupIds", n.GroupIDs)
 }

@@ -9,7 +9,7 @@ import type { Group, Network } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { GroupChips } from "~/components/access/group-chips.tsx";
-import { groupName } from "~/components/access/model.ts";
+import { groupName, protocolSummary } from "~/components/access/model.ts";
 import { prefixesSummary } from "~/components/networks/model.ts";
 import { useNetworkMutations } from "~/components/networks/mutations.ts";
 import { NetworkMenu } from "~/components/networks/network-menu.tsx";
@@ -113,8 +113,16 @@ function NameCell({ network }: { readonly network: NetworkRow }): ReactElement {
   );
 }
 
+/** The prefixes, and the protocol and ports when the network narrows them. */
 function PrefixesCell({ network }: { readonly network: Network }): ReactElement {
-  return <span className="font-mono text-[0.9em]">{prefixesSummary(network.prefixes)}</span>;
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <span className="font-mono text-[0.9em]">{prefixesSummary(network.prefixes)}</span>
+      {network.protocol === "all" || network.protocol === "" ? null : (
+        <span className="truncate text-xs text-kumo-subtle">{protocolSummary(network)}</span>
+      )}
+    </div>
+  );
 }
 
 /** Each router with its liveness; one that stopped advertising a prefix gets a warning. */

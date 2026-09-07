@@ -31,6 +31,8 @@ func init() {
 	createNetworkCmd.Flags().StringSliceP("prefix", "p", []string{}, "Network prefixes (CIDR)")
 	createNetworkCmd.Flags().StringSliceP("router", "r", []string{}, "Router node identifiers")
 	createNetworkCmd.Flags().StringSliceP("group", "g", []string{}, "Group identifiers")
+	createNetworkCmd.Flags().String("protocol", "all", "Protocol the groups may use: all, tcp, udp, icmp")
+	createNetworkCmd.Flags().String("ports", "", "Ports or ranges for tcp and udp, such as 22,80-90; empty is all")
 	createNetworkCmd.Flags().Bool("disabled", false, "Create network in disabled state")
 	mustMarkRequired(createNetworkCmd, "name", "group")
 
@@ -40,6 +42,8 @@ func init() {
 	updateNetworkCmd.Flags().StringSliceP("prefix", "p", []string{}, "Network prefixes (CIDR)")
 	updateNetworkCmd.Flags().StringSliceP("router", "r", []string{}, "Router node identifiers")
 	updateNetworkCmd.Flags().StringSliceP("group", "g", []string{}, "Group identifiers")
+	updateNetworkCmd.Flags().String("protocol", "all", "Protocol the groups may use: all, tcp, udp, icmp")
+	updateNetworkCmd.Flags().String("ports", "", "Ports or ranges for tcp and udp, such as 22,80-90; empty is all")
 	updateNetworkCmd.Flags().Bool("disabled", false, "Disable the network")
 	mustMarkRequired(updateNetworkCmd, "identifier")
 
@@ -80,7 +84,7 @@ var listNetworksCmd = &cobra.Command{
 				rows := networksToRows(networks)
 
 				return renderTable(
-					[]string{"ID", "Name", "Enabled", "Prefixes", "Routers", "Groups", "Exit node"},
+					[]string{"ID", "Name", "Enabled", "Prefixes", "Access", "Routers", "Groups", "Exit node"},
 					rows,
 				)
 			})
@@ -135,6 +139,11 @@ var createNetworkCmd = &cobra.Command{
 				desc, _ := cmd.Flags().GetString("description")
 				body.Description = &desc
 			}
+
+			protocol, _ := cmd.Flags().GetString("protocol")
+			ports, _ := cmd.Flags().GetString("ports")
+			body.Protocol = &protocol
+			body.Ports = &ports
 
 			resp, err := client.CreateNetworkWithResponse(ctx, body)
 			if err != nil {
@@ -278,6 +287,8 @@ func buildUpdateNetworkBody(
 	prefixes := current.Prefixes
 	groups := current.GroupIds
 	routers := current.RouterNodeIds
+	protocol := current.Protocol
+	ports := current.Ports
 
 	body := clientv1.UpdateNetworkJSONRequestBody{
 		Name:          current.Name,
@@ -286,6 +297,18 @@ func buildUpdateNetworkBody(
 		Prefixes:      &prefixes,
 		GroupIds:      &groups,
 		RouterNodeIds: &routers,
+		Protocol:      &protocol,
+		Ports:         &ports,
+	}
+
+	if cmd.Flags().Changed("protocol") {
+		p, _ := cmd.Flags().GetString("protocol")
+		body.Protocol = &p
+	}
+
+	if cmd.Flags().Changed("ports") {
+		p, _ := cmd.Flags().GetString("ports")
+		body.Ports = &p
 	}
 
 	if cmd.Flags().Changed("name") {
@@ -347,6 +370,7 @@ func networksToRows(networks []clientv1.Network) [][]string {
 			n.Name,
 			onOff(n.Enabled),
 			strings.Join(n.Prefixes, ", "),
+			protocolPortsText(n.Protocol, n.Ports),
 			strings.Join(routerNames, ", "),
 			strings.Join(n.GroupIds, ", "),
 			exitNode,
@@ -370,6 +394,7 @@ func printNetworkHuman(n *clientv1.Network) error {
 	}
 
 	fmt.Printf("Enabled: %s\n", onOff(n.Enabled))
+	fmt.Printf("Access: %s\n", protocolPortsText(n.Protocol, n.Ports))
 
 	if len(n.Prefixes) > 0 {
 		fmt.Printf("Prefixes: %s\n", strings.Join(n.Prefixes, ", "))
@@ -411,4 +436,17 @@ func printNetworkHuman(n *clientv1.Network) error {
 	}
 
 	return renderTable([]string{"ID", "Name", "Online", "Serving", "Missing"}, rows)
+}
+
+// protocolPortsText renders "tcp:22,80-90", "icmp" or "all".
+func protocolPortsText(protocol, ports string) string {
+	if protocol == "" {
+		protocol = "all"
+	}
+
+	if ports == "" {
+		return protocol
+	}
+
+	return protocol + ":" + ports
 }

@@ -220,6 +220,28 @@ func TestNetworkGrants(t *testing.T) {
 
 	model.Networks[0].Prefixes = []netip.Prefix{netip.MustParsePrefix("10.10.0.0/24")}
 
+	// A network narrowed to tcp 22 and 8000-8100 grants only those ports.
+	model.Networks[0].Protocol = types.AccessProtocolTCP
+	model.Networks[0].Ports = "22, 8000-8100"
+
+	_, err = pm.SetAccessModel(model)
+	require.NoError(t, err)
+
+	// It shares eng's tcp rule, so the two fold into one filter rule.
+	filter, _ = pm.Filter()
+	require.Len(t, filter, 1)
+	assert.Equal(t, []int{6}, filter[0].IPProto)
+	assert.Contains(t, filter[0].DstPorts, tailcfg.NetPortRange{
+		IP: "10.10.0.0/24", Ports: tailcfg.PortRange{First: 22, Last: 22},
+	})
+	assert.Contains(t, filter[0].DstPorts, tailcfg.NetPortRange{
+		IP: "10.10.0.0/24", Ports: tailcfg.PortRange{First: 8000, Last: 8100},
+	})
+	assert.NotContains(t, filter[0].DstPorts, tailcfg.NetPortRange{IP: "10.10.0.0/24", Ports: tailcfg.PortRangeAny})
+
+	model.Networks[0].Protocol = ""
+	model.Networks[0].Ports = ""
+
 	// A disabled network contributes nothing.
 	model.Networks[0].Enabled = false
 

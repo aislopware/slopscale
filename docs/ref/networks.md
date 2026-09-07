@@ -62,8 +62,16 @@ machines follow the user, tagged machines join directly.
 Reachability follows the tailnet. While the tailnet is open (no enabled access
 rule and no restricting policy file), a machine that has the route can use it.
 Once something makes the tailnet enforce, the network's groups may reach its
-prefixes on every port, and nothing else may; a network on its own never
-switches enforcement on. The routes page under _Networks_ lists every route any
+prefixes on the network's protocol and ports (every port unless the network
+narrows them), and nothing else may; a network on its own never switches
+enforcement on.
+
+A network can narrow what its groups reach behind the routers. The protocol
+is one of `all`, `tcp`, `udp` or `icmp`, and for TCP and UDP a port list such
+as `22, 8000-8100` limits the reach further, the same fields an access rule
+has. A network for a printer subnet on `tcp` port 631 hands out the whole
+route but lets its groups print and nothing more. The narrowing only takes
+effect while the tailnet enforces; on an open tailnet the route stays open. The routes page under _Networks_ lists every route any
 machine advertises, network-owned or not, and approves the rest by hand.
 
 A group that a network uses cannot be deleted until the network drops it.
@@ -83,6 +91,10 @@ is created with `POST /api/v1/network`:
 }
 ```
 
+`protocol` (`all`, `tcp`, `udp`, `icmp`; defaults to `all`) and `ports`
+(a comma list of ports or ranges, for TCP and UDP) narrow what the groups may
+reach behind the routers.
+
 `PUT /api/v1/network/{id}` replaces the whole record, `PATCH` with
 `{"enabled": false}` switches it off, and `DELETE` removes it. The response
 carries a `routers` list with each router's liveness, the prefixes it serves
@@ -90,3 +102,4 @@ and the ones it does not advertise.
 
 `headscale networks` has `list`, `show`, `create`, `update` (which fetches the
 network and replaces only the flags given), `enable`, `disable` and `delete`.
+`create` and `update` take `--protocol` and `--ports`.

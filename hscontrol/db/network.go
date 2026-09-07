@@ -17,6 +17,8 @@ type (
 		Name        string
 		Description string
 		Enabled     bool
+		Protocol    string
+		Ports       string
 		CreatedAt   *time.Time
 		UpdatedAt   *time.Time
 	}
@@ -56,6 +58,8 @@ func (r networkRow) network() types.Network {
 		Name:        r.Name,
 		Description: r.Description,
 		Enabled:     r.Enabled,
+		Protocol:    types.AccessProtocol(r.Protocol),
+		Ports:       r.Ports,
 	}
 
 	if r.CreatedAt != nil {
@@ -169,6 +173,8 @@ func (hsdb *HSDatabase) CreateNetwork(network types.Network) (types.Network, err
 			Name:        network.Name,
 			Description: network.Description,
 			Enabled:     network.Enabled,
+			Protocol:    string(network.ProtocolOrAll()),
+			Ports:       network.Ports,
 			CreatedAt:   &now,
 			UpdatedAt:   &now,
 		}
@@ -206,9 +212,11 @@ func (hsdb *HSDatabase) UpdateNetwork(network types.Network) (types.Network, err
 
 		affected, err := tx.executor().exec(
 			table.Networks.UPDATE(
-				table.Networks.Name, table.Networks.Description, table.Networks.Enabled, table.Networks.UpdatedAt,
+				table.Networks.Name, table.Networks.Description, table.Networks.Enabled,
+				table.Networks.Protocol, table.Networks.Ports, table.Networks.UpdatedAt,
 			).SET(
-				network.Name, network.Description, network.Enabled, now,
+				network.Name, network.Description, network.Enabled,
+				string(network.ProtocolOrAll()), network.Ports, now,
 			).WHERE(table.Networks.ID.EQ(jet.Uint64(uint64(network.ID)))),
 		)
 		if err != nil {

@@ -315,6 +315,8 @@ CREATE TABLE networks(
   name text NOT NULL,
   description text,
   enabled numeric DEFAULT true,
+  protocol text,
+  ports text,
   created_at datetime,
   updated_at datetime
 );

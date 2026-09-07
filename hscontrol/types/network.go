@@ -36,9 +36,23 @@ type Network struct {
 	// make a high-availability pair; the primary is elected as usual.
 	RouterNodeIDs []NodeID
 	// GroupIDs are the groups whose machines get the routes.
-	GroupIDs  []GroupID
+	GroupIDs []GroupID
+	// Protocol and Ports narrow what the groups may reach behind the
+	// routers, the way an access rule's do. The zero protocol means
+	// every protocol and port.
+	Protocol  AccessProtocol
+	Ports     string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+// ProtocolOrAll returns the protocol, "all" when none is stored.
+func (n Network) ProtocolOrAll() AccessProtocol {
+	if n.Protocol == "" {
+		return AccessProtocolAll
+	}
+
+	return n.Protocol
 }
 
 // IsExitNode reports whether the network offers the exit routes.
@@ -131,5 +145,16 @@ func ValidateNetwork(n Network) error {
 		return ErrNetworkNoGroups
 	}
 
-	return nil
+	protocol, err := ParseAccessProtocol(string(n.ProtocolOrAll()))
+	if err != nil {
+		return err
+	}
+
+	if n.Ports != "" && !protocol.HasPorts() {
+		return ErrRulePortsWithout
+	}
+
+	_, err = ParsePortList(n.Ports)
+
+	return err
 }

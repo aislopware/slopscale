@@ -237,6 +237,8 @@ CREATE TABLE networks(
   name text NOT NULL,
   description text,
   enabled boolean DEFAULT true,
+  protocol text,
+  ports text,
   created_at timestamptz,
   updated_at timestamptz
 );

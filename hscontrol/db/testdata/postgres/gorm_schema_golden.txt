@@ -96,6 +96,8 @@ COL networks.id bigint null=NO default=nextval('networks_id_seq'::regclass)
 COL networks.name text null=NO
 COL networks.description text null=YES
 COL networks.enabled boolean null=YES default=true
+COL networks.protocol text null=YES
+COL networks.ports text null=YES
 COL networks.created_at timestamp with time zone null=YES
 COL networks.updated_at timestamp with time zone null=YES
 COL node_attributes.id bigint null=NO default=nextval('node_attributes_id_seq'::regclass)
