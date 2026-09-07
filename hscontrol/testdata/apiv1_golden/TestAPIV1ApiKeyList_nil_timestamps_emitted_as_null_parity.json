@@ -4,10 +4,12 @@
     "apiKeys": [
       {
         "createdAt": "\u003ctimestamp\u003e",
+        "description": "",
         "expiration": null,
         "id": "1",
         "lastSeen": null,
         "prefix": "\u003csecret\u003e",
+        "scopes": [],
         "userId": null
       }
     ]

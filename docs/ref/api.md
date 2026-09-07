@@ -21,6 +21,17 @@ A key created this way is all-access. To hand out less, create the key for a use
 headscale apikeys create --user <USER_ID>
 ```
 
+A key can also be limited to some operations with scopes, the same vocabulary the OAuth clients use, and carry a
+description saying what it is for. The scopes never reach past the caller that mints the key or the role of the
+user that owns it: a scope the caller cannot delegate is dropped, and a caller that can delegate none of them is
+refused. A key without scopes keeps its owner's whole role.
+
+```shell
+headscale apikeys create --user <USER_ID> --scope dns --scope devices:core:read --description "Resolver sync"
+```
+
+The console's _Keys_ page offers the same when creating an API key, and lists each key's scopes and description.
+
 To list the API keys currently associated with the server:
 
 ```shell

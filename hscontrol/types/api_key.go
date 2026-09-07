@@ -24,6 +24,13 @@ type APIKey struct {
 	// upgraded database matches a freshly-migrated one.
 	UserID *uint
 
+	// Scopes narrow the key below its owner's role; empty is the whole
+	// role (or, without an owner, everything). A scope the owner's role
+	// does not hold grants nothing.
+	Scopes []string
+	// Description names the key for whoever reads the list.
+	Description string
+
 	CreatedAt  *time.Time
 	Expiration *time.Time
 	LastSeen   *time.Time

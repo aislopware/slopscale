@@ -558,8 +558,60 @@ func userRecordsToUsers(records []userRecord) []types.User {
 	return users
 }
 
+// apiKeyRow is a row of the api_keys table; scopes is a JSON array.
+type apiKeyRow struct {
+	ID          uint64 `sql:"primary_key"`
+	Prefix      string
+	Hash        []byte
+	UserID      *uint
+	Scopes      string
+	Description string
+	CreatedAt   *time.Time
+	Expiration  *time.Time
+	LastSeen    *time.Time
+}
+
+func (r *apiKeyRow) key() (*types.APIKey, error) {
+	key := &types.APIKey{
+		ID:          r.ID,
+		Prefix:      r.Prefix,
+		Hash:        r.Hash,
+		UserID:      r.UserID,
+		Description: r.Description,
+		CreatedAt:   r.CreatedAt,
+		Expiration:  r.Expiration,
+		LastSeen:    r.LastSeen,
+	}
+
+	err := unmarshalJSONColumn(r.Scopes, &key.Scopes)
+	if err != nil {
+		return nil, fmt.Errorf("api key %d scopes: %w", r.ID, err)
+	}
+
+	return key, nil
+}
+
+func apiKeyRowFrom(key *types.APIKey) (apiKeyRow, error) {
+	scopes, err := marshalJSONColumn(key.Scopes)
+	if err != nil {
+		return apiKeyRow{}, fmt.Errorf("scopes: %w", err)
+	}
+
+	return apiKeyRow{
+		ID:          key.ID,
+		Prefix:      key.Prefix,
+		Hash:        key.Hash,
+		UserID:      key.UserID,
+		Scopes:      scopes,
+		Description: key.Description,
+		CreatedAt:   key.CreatedAt,
+		Expiration:  key.Expiration,
+		LastSeen:    key.LastSeen,
+	}, nil
+}
+
 type apiKeyRecord struct {
-	Key types.APIKey `alias:"api_keys"`
+	Key apiKeyRow `alias:"api_keys"`
 }
 
 type policyRecord struct {

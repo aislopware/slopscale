@@ -33,6 +33,16 @@ var (
 func (hsdb *HSDatabase) CreateAPIKey(
 	expiration *time.Time,
 ) (string, *types.APIKey, error) {
+	return hsdb.CreateScopedAPIKey(expiration, nil, "")
+}
+
+// CreateScopedAPIKey creates a key that carries scopes and a description.
+// The caller has already narrowed the scopes to what it may delegate.
+func (hsdb *HSDatabase) CreateScopedAPIKey(
+	expiration *time.Time,
+	scopes []string,
+	description string,
+) (string, *types.APIKey, error) {
 	// Generate public prefix (12 chars)
 	prefix := rands.HexString(apiKeyPrefixLength)
 
@@ -50,16 +60,23 @@ func (hsdb *HSDatabase) CreateAPIKey(
 
 	now := time.Now()
 	key := types.APIKey{
-		Prefix:     prefix,
-		Hash:       hash,
-		CreatedAt:  &now,
-		Expiration: expiration,
+		Prefix:      prefix,
+		Hash:        hash,
+		Scopes:      scopes,
+		Description: description,
+		CreatedAt:   &now,
+		Expiration:  expiration,
+	}
+
+	row, err := apiKeyRowFrom(&key)
+	if err != nil {
+		return "", nil, err
 	}
 
 	var inserted idRow
 
 	err = hsdb.ex.query(
-		table.APIKeys.INSERT(table.APIKeys.MutableColumns).MODEL(&key).RETURNING(table.APIKeys.ID.AS("id_row.id")),
+		table.APIKeys.INSERT(table.APIKeys.MutableColumns).MODEL(&row).RETURNING(table.APIKeys.ID.AS("id_row.id")),
 		&inserted,
 	)
 	if err != nil {
@@ -83,9 +100,15 @@ func (hsdb *HSDatabase) ListAPIKeys() ([]types.APIKey, error) {
 		return nil, err
 	}
 
-	keys := make([]types.APIKey, len(records))
+	keys := make([]types.APIKey, 0, len(records))
+
 	for i := range records {
-		keys[i] = records[i].Key
+		key, err := records[i].Key.key()
+		if err != nil {
+			return nil, err
+		}
+
+		keys = append(keys, *key)
 	}
 
 	return keys, nil
@@ -105,7 +128,7 @@ func queryAPIKey(q Querier, where jet.BoolExpression) (*types.APIKey, error) {
 		return nil, err
 	}
 
-	return &record.Key, nil
+	return record.Key.key()
 }
 
 // apiKeyByPrefix is the lookup every authenticated API request makes,
@@ -123,7 +146,7 @@ func (hsdb *HSDatabase) GetAPIKey(prefix string) (*types.APIKey, error) {
 		return nil, err
 	}
 
-	return &record.Key, nil
+	return record.Key.key()
 }
 
 // GetAPIKeyByID returns a [types.APIKey] for a given id.

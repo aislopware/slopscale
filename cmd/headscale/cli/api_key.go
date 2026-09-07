@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	clientv1 "github.com/juanfont/headscale/gen/client/v1"
 	"github.com/juanfont/headscale/hscontrol/util"
@@ -24,6 +25,9 @@ func init() {
 		StringP("expiration", "e", DefaultAPIKeyExpiry, "Human-readable expiration of the key (e.g. 30m, 24h)")
 	createAPIKeyCmd.Flags().
 		Uint64P("user", "u", 0, "Owning user ID; the key is bounded by the user's role (0: all-access key)")
+	createAPIKeyCmd.Flags().
+		StringSlice("scope", []string{}, "Scope to limit the key to, such as dns or devices:core:read (repeatable)")
+	createAPIKeyCmd.Flags().String("description", "", "What the key is for")
 
 	apiKeysCmd.AddCommand(createAPIKeyCmd)
 
@@ -80,13 +84,17 @@ var listAPIKeys = &cobra.Command{
 					rows = append(rows, []string{
 						key.Id,
 						key.Prefix,
+						key.Description,
 						user,
+						strings.Join(key.Scopes, ", "),
 						expiration,
 						created,
 					})
 				}
 
-				return renderTable([]string{"ID", "Prefix", "User", colExpiration, colCreated}, rows)
+				return renderTable(
+					[]string{"ID", "Prefix", "Description", "User", "Scopes", colExpiration, colCreated}, rows,
+				)
 			})
 		},
 	),
@@ -112,6 +120,14 @@ If you lose a key, create a new one and revoke (expire) the old one.`,
 			if user, _ := cmd.Flags().GetUint64("user"); user != 0 {
 				userID := strconv.FormatUint(user, util.Base10)
 				body.UserId = &userID
+			}
+
+			if scopes, _ := cmd.Flags().GetStringSlice("scope"); len(scopes) > 0 {
+				body.Scopes = &scopes
+			}
+
+			if description, _ := cmd.Flags().GetString("description"); description != "" {
+				body.Description = &description
 			}
 
 			resp, err := client.CreateApiKeyWithResponse(ctx, body)

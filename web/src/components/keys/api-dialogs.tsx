@@ -1,4 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
+import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactElement, SubmitEvent } from "react";
@@ -13,6 +14,7 @@ import { CreatedKey, useCreatedKey } from "~/components/keys/created-key.tsx";
 import { expirationFor, expiryOptions } from "~/components/keys/expiration.ts";
 import type { ExpiryChoice } from "~/components/keys/expiration.ts";
 import { useApiKeyMutations } from "~/components/keys/mutations.ts";
+import { scopeItems } from "~/components/keys/scopes.ts";
 import {
   DialogClose,
   DialogContent,
@@ -20,6 +22,7 @@ import {
   DialogFooter,
   DialogRoot,
 } from "~/components/ui/dialog.tsx";
+import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { userLabel } from "~/lib/node.ts";
 
 const revealNote = "The full key is shown this once and cannot be read again.";
@@ -50,7 +53,7 @@ export function CreateApiKeyDialog({
         title={created === null ? "Create API key" : "API key created"}
         description={
           created === null
-            ? "The key authenticates calls to the headscale API with the permissions of its owner."
+            ? "The key authenticates calls to the headscale API with the permissions of its owner, or with the scopes you pick."
             : undefined
         }
       >
@@ -76,12 +79,19 @@ function CreateApiKeyForm({
   const { create } = useApiKeyMutations();
   const [expiry, setExpiry] = useState<ExpiryChoice>("90d");
   const [userId, setUserId] = useState(me.user?.id ?? "");
+  const [description, setDescription] = useState("");
+  const [scopes, setScopes] = useState<readonly string[]>([]);
 
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
-    const expiration = expirationFor(expiry);
+    const body = {
+      expiration: expirationFor(expiry),
+      description: description.trim(),
+      scopes: [...scopes],
+      ...(userId === "" ? {} : { userId }),
+    };
     create.mutate(
-      { body: userId === "" ? { expiration } : { expiration, userId } },
+      { body },
       {
         onSuccess: (data) => {
           onCreated(data.apiKey);
@@ -92,6 +102,15 @@ function CreateApiKeyForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
+      <Input
+        label="Description"
+        required={false}
+        value={description}
+        placeholder="CI deploy, monitoring…"
+        onChange={(event) => {
+          setDescription(event.target.value);
+        }}
+      />
       <Select
         className="w-full"
         label="Expiration"
@@ -115,6 +134,15 @@ function CreateApiKeyForm({
           }}
         />
       ) : null}
+      <MultiPicker
+        label="Scopes"
+        description="Limit the key to these operations. Empty means everything its owner may do; a scope the owner lacks is dropped."
+        placeholder="Everything the owner may do"
+        items={scopeItems(me)}
+        value={scopes}
+        onValueChange={setScopes}
+        empty="No scope matches."
+      />
       <DialogError message={create.isError ? errorMessage(create.error) : undefined} />
       <DialogFooter>
         <DialogClose render={<Button variant="secondary">Cancel</Button>} />

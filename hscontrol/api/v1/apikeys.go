@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/audit"
+	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
 
@@ -31,6 +33,9 @@ type ApiKey struct {
 	// UserID is the owning user, whose role bounds the key; null for a legacy
 	// all-access key.
 	UserID *string `doc:"Owning user id; null for a legacy key." format:"uint64" json:"userId" nullable:"true"`
+	// Scopes narrow the key below its owner's role; empty is the whole role.
+	Scopes      []string `doc:"Scopes the key is limited to; empty means its owner's whole role." json:"scopes" nullable:"false"` //nolint:lll // struct tag
+	Description string   `json:"description"`
 }
 
 // CreateApiKeyRequestBody is the v1.CreateApiKeyRequest body.
@@ -43,6 +48,11 @@ type CreateApiKeyRequestBody struct {
 	// it is the owner or an admin; only those, or the socket, may mint a key
 	// without a user.
 	UserID string `doc:"Owning user id; empty for a legacy all-access key." format:"uint64" json:"userId,omitempty"`
+	// Scopes limit the key to some operations, within what the caller and
+	// the owner's role may do; a scope the caller cannot delegate is
+	// dropped. Empty keeps the owner's whole role.
+	Scopes      []string `doc:"Scopes to limit the key to; empty keeps the owner's whole role." json:"scopes,omitempty"`      //nolint:lll // struct tag
+	Description string   `doc:"What the key is for."                                            json:"description,omitempty"` //nolint:lll // struct tag
 }
 
 // ExpireApiKeyRequestBody is the v1.ExpireApiKeyRequest body.
@@ -102,35 +112,7 @@ func registerAPIKeys(api huma.API, b Backend) {
 		Tags:     []string{"ApiKeys"},
 		Security: bearerAuth,
 	}, "apikey.create", "apikey", ""), func(ctx context.Context, in *createAPIKeyInput) (*createAPIKeyOutput, error) {
-		// A missing expiration is a key that never expires. The gRPC handler
-		// defaulted it to the zero time, which minted a key that was expired
-		// before it was printed; the CLI always sends one, so nothing relied
-		// on that.
-		userID, err := apiKeyOwner(ctx, b, in.Body.UserID)
-		if err != nil {
-			return nil, err
-		}
-
-		keyStr, apiKey, err := b.State.CreateAPIKeyForUser(in.Body.Expiration, userID)
-		if err != nil {
-			return nil, huma.Error500InternalServerError("creating api key", err)
-		}
-
-		// The prefix names the key; the key itself is a secret.
-		audit.Target(ctx, "", apiKey.Prefix, "")
-
-		if userID != nil {
-			audit.Detail(ctx, "userId", formatID(uint64(*userID)))
-		}
-
-		if in.Body.Expiration != nil {
-			audit.Detail(ctx, "expiration", in.Body.Expiration.Format(time.RFC3339))
-		}
-
-		out := &createAPIKeyOutput{}
-		out.Body.APIKey = keyStr
-
-		return out, nil
+		return createAPIKey(ctx, b, in)
 	})
 
 	huma.Register(api, audited(huma.Operation{
@@ -294,7 +276,45 @@ func apiKeyFromState(k *types.APIKey) ApiKey {
 		out.UserID = &uid
 	}
 
+	out.Scopes = emptyIfNil(k.Scopes)
+	out.Description = k.Description
+
 	return out
+}
+
+// apiKeyScopes validates the scopes a new key asks for and narrows them
+// to what the caller may delegate, so a key never outgrows its minter. An
+// unknown scope is a client error rather than a silent drop.
+func apiKeyScopes(ctx context.Context, requested []string) ([]string, error) {
+	if len(requested) == 0 {
+		return nil, nil
+	}
+
+	known := scope.Known()
+	wanted := make([]scope.Scope, 0, len(requested))
+
+	for _, raw := range requested {
+		s := scope.Scope(strings.TrimSpace(raw))
+		if !slices.Contains(known, s) {
+			return nil, huma.Error400BadRequest("unknown scope " + strconv.Quote(string(s)))
+		}
+
+		if !slices.Contains(wanted, s) {
+			wanted = append(wanted, s)
+		}
+	}
+
+	narrowed := caller(ctx).Narrow(wanted)
+	if len(narrowed) == 0 {
+		return nil, huma.Error403Forbidden("none of the requested scopes may be delegated by this caller")
+	}
+
+	out := make([]string, 0, len(narrowed))
+	for _, s := range narrowed {
+		out = append(out, string(s))
+	}
+
+	return out, nil
 }
 
 // apiKeyOwner resolves the user a new key should belong to and checks the
@@ -304,7 +324,9 @@ func apiKeyOwner(ctx context.Context, b Backend, rawUserID string) (*types.UserI
 	p := caller(ctx)
 
 	if rawUserID == "" {
-		if !p.Bounded {
+		// A scoped key without an owner is bounded by its scopes alone;
+		// what it mints has no owner either and is narrowed below.
+		if !p.Bounded || !p.HasUser() {
 			return nil, nil //nolint:nilnil // no owner is a legacy all-access key
 		}
 
@@ -352,4 +374,49 @@ func apiKeyMaskedPrefix(prefix string) string {
 	}
 
 	return prefix + "***"
+}
+
+// createAPIKey mints a key within the caller's authority: the owner it
+// may mint for and the scopes it may delegate.
+func createAPIKey(ctx context.Context, b Backend, in *createAPIKeyInput) (*createAPIKeyOutput, error) {
+	// A missing expiration is a key that never expires. The gRPC handler
+	// defaulted it to the zero time, which minted a key that was expired
+	// before it was printed; the CLI always sends one, so nothing relied
+	// on that.
+	userID, err := apiKeyOwner(ctx, b, in.Body.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	scopes, err := apiKeyScopes(ctx, in.Body.Scopes)
+	if err != nil {
+		return nil, err
+	}
+
+	keyStr, apiKey, err := b.State.CreateScopedAPIKey(
+		in.Body.Expiration, userID, scopes, strings.TrimSpace(in.Body.Description),
+	)
+	if err != nil {
+		return nil, huma.Error500InternalServerError("creating api key", err)
+	}
+
+	// The prefix names the key; the key itself is a secret.
+	audit.Target(ctx, "", apiKey.Prefix, "")
+
+	if userID != nil {
+		audit.Detail(ctx, "userId", formatID(uint64(*userID)))
+	}
+
+	if len(scopes) > 0 {
+		audit.Detail(ctx, "scopes", scopes)
+	}
+
+	if in.Body.Expiration != nil {
+		audit.Detail(ctx, "expiration", in.Body.Expiration.Format(time.RFC3339))
+	}
+
+	out := &createAPIKeyOutput{}
+	out.Body.APIKey = keyStr
+
+	return out, nil
 }

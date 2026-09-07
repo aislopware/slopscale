@@ -2,9 +2,10 @@
 // may do. Both API versions authenticate through it, so a credential means
 // the same thing everywhere: a locally trusted transport (the unix socket)
 // may do anything; an API key without a user is the historical all-access
-// admin key; an API key owned by a user is bounded by the user's role; an
-// OAuth access token is bounded by its scopes; a console session cookie is
-// bounded by the signed-in user's role.
+// admin key; an API key owned by a user is bounded by the user's role, and
+// by its own scopes when it was minted with some; an OAuth access token is
+// bounded by its scopes; a console session cookie is bounded by the
+// signed-in user's role.
 package principal
 
 import (
@@ -143,14 +144,32 @@ func Authenticate(auth Authenticator, token string) (Principal, error) {
 	}
 
 	p := Principal{Kind: APIKey, Credential: key.Prefix}
-	if key.UserID == nil {
-		return p, nil
+	if key.UserID != nil {
+		p.UserID = types.UserID(*key.UserID)
+		p.Bounded = true
+		p = applyRole(auth, p)
 	}
 
-	p.UserID = types.UserID(*key.UserID)
-	p.Bounded = true
+	return applyKeyScopes(p, key), nil
+}
 
-	return applyRole(auth, p), nil
+// applyKeyScopes narrows p to the scopes minted on the key, within what
+// the owner's role grants: a key without scopes keeps the role, a key
+// without an owner gets exactly its scopes.
+func applyKeyScopes(p Principal, key *types.APIKey) Principal {
+	if len(key.Scopes) == 0 {
+		return p
+	}
+
+	wanted := scope.Parse(key.Scopes)
+	if p.Bounded {
+		wanted = scope.Narrow(p.Scopes, wanted)
+	}
+
+	p.Bounded = true
+	p.Scopes = wanted
+
+	return p
 }
 
 // AuthenticateSession resolves a console session cookie. The session is

@@ -34,7 +34,10 @@ following Tailscale's user roles. The first user of a fresh server becomes the
 owner; existing users start as members, and `headscale users set-role` picks an
 owner and assigns the rest. An API key created for a user
 (`headscale apikeys create --user`) is bounded by that user's role, on the v1 and
-v2 APIs alike; keys without a user keep their all-access meaning. The policy
+v2 APIs alike; keys without a user keep their all-access meaning. A key can
+further be limited to some operations with `--scope` (or the scope picker on
+the console's _Keys_ page) and carry a `--description`; scopes never reach past
+the minting caller or the owner's role. The policy
 gains `autogroup:owner`, `autogroup:admin`, `autogroup:network-admin`,
 `autogroup:it-admin` and `autogroup:auditor`, and the devices of the owner and
 admins carry Tailscale's `is-admin` capability. See

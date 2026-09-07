@@ -66,6 +66,13 @@ func newFakeAuth() fakeAuth {
 			"member":  {ID: 4, UserID: new(uint(3))},
 			"orphan":  {ID: 5, UserID: new(uint(99))},
 			"auditor": {ID: 6, UserID: new(uint(4))},
+			// Scoped keys: the owner's key keeps only DNS; the network
+			// admin's key asked for users, which the role lacks, and
+			// routes, which it holds; the legacy key gets exactly its
+			// scopes.
+			"owner-dns":     {ID: 7, UserID: new(uint(1)), Scopes: []string{"dns"}},
+			"netadm-scoped": {ID: 8, UserID: new(uint(2)), Scopes: []string{"users", "devices:routes"}},
+			"legacy-read":   {ID: 9, Scopes: []string{"all:read"}},
 		},
 		tokens: map[string]*types.OAuthAccessToken{
 			types.AccessTokenPrefix + "routes": {Scopes: []string{"devices:routes"}, Tags: []string{"tag:web"}},
@@ -129,6 +136,21 @@ func TestAuthenticate(t *testing.T) {
 			token: "auditor", wantKind: APIKey, wantUser: 4, wantRole: types.RoleAuditor, bounded: true,
 			allows: []scope.Scope{scope.AllRead, scope.UsersRead, scope.PolicyFileRead},
 			denies: []scope.Scope{scope.Users, scope.PolicyFile},
+		},
+		{
+			token: "owner-dns", wantKind: APIKey, wantUser: 1, wantRole: types.RoleOwner, bounded: true,
+			allows: []scope.Scope{scope.DNS, scope.DNSRead},
+			denies: []scope.Scope{scope.All, scope.Users, scope.PolicyFile},
+		},
+		{
+			token: "netadm-scoped", wantKind: APIKey, wantUser: 2, wantRole: types.RoleNetworkAdmin, bounded: true,
+			allows: []scope.Scope{scope.DevicesRoutes, scope.DevicesRoutesRead},
+			denies: []scope.Scope{scope.Users, scope.UsersRead, scope.PolicyFile, scope.DNS},
+		},
+		{
+			token: "legacy-read", wantKind: APIKey, bounded: true,
+			allows: []scope.Scope{scope.AllRead, scope.UsersRead, scope.PolicyFileRead},
+			denies: []scope.Scope{scope.All, scope.Users},
 		},
 		{
 			token: types.AccessTokenPrefix + "routes", wantKind: AccessToken, bounded: true, wantOAuth: true,

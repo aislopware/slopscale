@@ -569,6 +569,12 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609141000-group-dns-rules",
 			run: migrateGroupDNSRules,
 		},
+		{
+			// Scoped API keys: a key may carry scopes narrowing it below
+			// its owner's role, and a description. See docs/ref/api.md.
+			id:  "202609141100-api-key-scopes",
+			run: migrateAPIKeyScopes,
+		},
 	}
 }
 
@@ -1897,4 +1903,23 @@ func migrateGroupDNSRules(tx *Tx) error {
 			},
 		},
 	})
+}
+
+// migrateAPIKeyScopes (202609141100) adds the scopes and description
+// columns to api_keys. Existing keys keep their owner's whole role.
+func migrateAPIKeyScopes(tx *Tx) error {
+	for _, col := range []struct {
+		table, column string
+		typ           columnType
+	}{
+		{"api_keys", "scopes", typeText},
+		{"api_keys", "description", typeText},
+	} {
+		err := tx.ex.addColumnIfMissing(col.table, col.column, col.typ)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

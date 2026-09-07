@@ -69,6 +69,8 @@ CREATE TABLE pre_auth_keys(
 );
 CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON pre_auth_keys(prefix) WHERE prefix IS NOT NULL AND prefix != '';
 
+-- scopes is a JSON array of scope names narrowing the key below its
+-- owner's role, empty for the whole role; description names the key.
 CREATE TABLE api_keys(
   id integer PRIMARY KEY AUTOINCREMENT,
   prefix text,
@@ -76,6 +78,8 @@ CREATE TABLE api_keys(
   user_id integer,
   expiration datetime,
   last_seen datetime,
+  scopes text,
+  description text,
 
   created_at datetime
 );

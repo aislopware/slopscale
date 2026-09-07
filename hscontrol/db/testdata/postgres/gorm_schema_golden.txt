@@ -34,6 +34,8 @@ COL api_keys.user_id bigint null=YES
 COL api_keys.created_at timestamp with time zone null=YES
 COL api_keys.expiration timestamp with time zone null=YES
 COL api_keys.last_seen timestamp with time zone null=YES
+COL api_keys.scopes text null=YES
+COL api_keys.description text null=YES
 COL audit_events.id bigint null=NO default=nextval('audit_events_id_seq'::regclass)
 COL audit_events.created_at timestamp with time zone null=NO
 COL audit_events.actor_kind text null=NO

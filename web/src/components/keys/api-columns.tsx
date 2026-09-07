@@ -1,3 +1,4 @@
+import { Badge } from "@cloudflare/kumo/components/badge";
 import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
@@ -5,6 +6,7 @@ import type { ApiKey, User } from "~/api/queries.ts";
 import { ExpiryCell, KeyPrefix } from "~/components/keys/cells.tsx";
 import { KeyActions } from "~/components/keys/key-actions.tsx";
 import { useApiKeyMutations } from "~/components/keys/mutations.ts";
+import { scopeLabel } from "~/components/keys/scopes.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
@@ -17,14 +19,19 @@ export const emptyUsers: readonly User[] = [];
 const helper = createAppColumnHelper<ApiKey>();
 
 export const apiKeyColumns = helper.columns([
-  helper.accessor((apiKey) => apiKey.prefix, {
+  helper.accessor((apiKey) => `${apiKey.prefix} ${apiKey.description}`, {
     id: "prefix",
-    header: "Prefix",
+    header: "Key",
     enableSorting: true,
-    cell: ({ row }) => (
-      <KeyPrefix text={row.original.prefix} copy={row.original.prefix} label="Copy prefix" />
-    ),
+    cell: ({ row }) => <KeyCell apiKey={row.original} />,
     meta: { className: "min-w-36" },
+  }),
+  helper.accessor((apiKey) => apiKey.scopes.join(" "), {
+    id: "scopes",
+    header: "Scopes",
+    enableSorting: false,
+    cell: ({ row }) => <ScopesCell scopes={row.original.scopes} />,
+    meta: { className: "hidden min-w-40 md:table-cell" },
   }),
   helper.accessor((apiKey) => apiKey.userId ?? "", {
     id: "user",
@@ -77,6 +84,35 @@ export const apiKeyColumns = helper.columns([
     meta: { className: "w-12 text-right" },
   }),
 ]);
+
+/** The masked prefix with the description under it. */
+function KeyCell({ apiKey }: { readonly apiKey: ApiKey }): ReactElement {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <KeyPrefix text={apiKey.prefix} copy={apiKey.prefix} label="Copy prefix" />
+      {apiKey.description === "" ? null : (
+        <span className="truncate text-xs text-kumo-subtle">{apiKey.description}</span>
+      )}
+    </div>
+  );
+}
+
+/** The scopes as badges; a key without any acts with its owner's whole role. */
+function ScopesCell({ scopes }: { readonly scopes: readonly string[] }): ReactElement {
+  if (scopes.length === 0) {
+    return <span className="text-kumo-subtle">Whole role</span>;
+  }
+
+  return (
+    <span className="flex flex-wrap gap-1">
+      {scopes.map((scope) => (
+        <Badge key={scope} variant="secondary">
+          {scopeLabel(scope)}
+        </Badge>
+      ))}
+    </span>
+  );
+}
 
 function UserCell({
   userId,

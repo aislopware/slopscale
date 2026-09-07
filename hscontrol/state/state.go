@@ -1431,7 +1431,20 @@ func (s *State) CreateAPIKey(expiration *time.Time) (string, *types.APIKey, erro
 // CreateAPIKeyForUser generates an API key owned by userID, so the key is
 // bounded by the user's role. A nil userID mints a legacy all-access key.
 func (s *State) CreateAPIKeyForUser(expiration *time.Time, userID *types.UserID) (string, *types.APIKey, error) {
-	keyStr, apiKey, err := s.db.CreateAPIKey(expiration)
+	return s.CreateScopedAPIKey(expiration, userID, nil, "")
+}
+
+// CreateScopedAPIKey generates an API key that carries scopes, narrowing it
+// below its owner's role, and a description. The caller has already
+// narrowed the scopes to what it may delegate; empty scopes keep the
+// owner's whole role.
+func (s *State) CreateScopedAPIKey(
+	expiration *time.Time,
+	userID *types.UserID,
+	scopes []string,
+	description string,
+) (string, *types.APIKey, error) {
+	keyStr, apiKey, err := s.db.CreateScopedAPIKey(expiration, scopes, description)
 	if err != nil || userID == nil {
 		return keyStr, apiKey, err
 	}

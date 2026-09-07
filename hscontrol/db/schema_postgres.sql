@@ -51,7 +51,9 @@ CREATE TABLE api_keys(
   user_id bigint,
   created_at timestamptz,
   expiration timestamptz,
-  last_seen timestamptz
+  last_seen timestamptz,
+  scopes text,
+  description text
 );
 CREATE UNIQUE INDEX idx_api_keys_prefix ON api_keys(prefix);
 
