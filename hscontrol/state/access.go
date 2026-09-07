@@ -48,6 +48,10 @@ func (s *State) loadAccessModel() (change.Change, error) {
 
 	s.nodeStore.RebuildPeerMaps()
 
+	// Groups, rules and networks are policy to the tailnet, so a change to
+	// them is a policy update to a webhook subscriber.
+	s.emitPolicyUpdate()
+
 	c := change.PolicyChange()
 	c.Reason = "access model"
 

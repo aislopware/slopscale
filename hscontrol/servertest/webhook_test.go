@@ -133,7 +133,7 @@ func TestWebhookDeliveries(t *testing.T) {
 	status, body = apiCall(t, client, ownerKey, http.MethodPost, v1+"/webhook", map[string]any{
 		"url":           receiver.URL,
 		"description":   "ops channel",
-		"subscriptions": []string{"nodeCreated", "nodeDeleted", "userCreated", "userRoleUpdated"},
+		"subscriptions": []string{"nodeCreated", "nodeDeleted", "userCreated", "userRoleUpdated", "policyUpdate"},
 	})
 	require.Equal(t, http.StatusOK, status, body)
 
@@ -198,6 +198,12 @@ func TestWebhookDeliveries(t *testing.T) {
 
 	userEvent := receiver.waitFor(t, types.EventUserCreated)
 	assert.True(t, webhook.Verify(secret, userEvent.signature, userEvent.body, time.Now(), time.Minute))
+
+	// Groups and rules are policy to the tailnet, so creating a group is a
+	// policy update.
+	status, body = apiCall(t, client, ownerKey, http.MethodPost, v1+"/group", map[string]any{"name": "hooked"})
+	require.Equal(t, http.StatusOK, status, body)
+	receiver.waitFor(t, types.EventPolicyUpdate)
 
 	// Rotating the secret returns a new one and signs later events with it.
 	status, body = apiCall(t, client, ownerKey, http.MethodPost, v1+"/webhook/"+id+"/rotate", nil)

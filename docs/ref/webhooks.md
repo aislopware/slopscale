@@ -30,19 +30,19 @@ show the rest, newest first.
 
 ## Events
 
-| Type                | When                                                    |
-| ------------------- | ------------------------------------------------------- |
-| `nodeCreated`       | A machine registered.                                   |
-| `nodeNeedsApproval` | A machine registered while device approval is on.       |
-| `nodeApproved`      | A machine was approved.                                 |
-| `nodeKeyExpired`    | A machine's key expired.                                |
-| `nodeDeleted`       | A machine was removed.                                  |
-| `policyUpdate`      | The policy was changed or reloaded.                     |
-| `userCreated`       | A user was created, by an operator or by a first login. |
-| `userNeedsApproval` | A user was created while users approval is on.          |
-| `userApproved`      | A user was approved.                                    |
-| `userRoleUpdated`   | A user's role changed.                                  |
-| `userDeleted`       | A user was deleted.                                     |
+| Type                | When                                                                               |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| `nodeCreated`       | A machine registered.                                                              |
+| `nodeNeedsApproval` | A machine registered while device approval is on.                                  |
+| `nodeApproved`      | A machine was approved.                                                            |
+| `nodeKeyExpired`    | A machine's key expired.                                                           |
+| `nodeDeleted`       | A machine was removed.                                                             |
+| `policyUpdate`      | The policy file was saved or reloaded, or a group, access rule or network changed. |
+| `userCreated`       | A user was created, by an operator or by a first login.                            |
+| `userNeedsApproval` | A user was created while users approval is on.                                     |
+| `userApproved`      | A user was approved.                                                               |
+| `userRoleUpdated`   | A user's role changed.                                                             |
+| `userDeleted`       | A user was deleted.                                                                |
 
 `GET /api/v1/webhook/event-types` and `headscale webhooks event-types` list
 them. The `test` event goes to every endpoint on request and needs no

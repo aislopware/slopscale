@@ -267,14 +267,15 @@ func NewState(cfg *types.Config) (*State, error) {
 		return nil, err
 	}
 
-	s.webhooks = webhook.New(db, tailnetName(cfg))
-
-	err = s.loadWebhooks()
+	_, err = s.loadAccessModel()
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = s.loadAccessModel()
+	// Webhooks come after the first loads so that boot emits nothing.
+	s.webhooks = webhook.New(db, tailnetName(cfg))
+
+	err = s.loadWebhooks()
 	if err != nil {
 		return nil, err
 	}
