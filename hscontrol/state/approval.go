@@ -273,17 +273,58 @@ func requireApprovedUser(user *types.User) error {
 	return nil
 }
 
-// approvedPeerCandidates drops nodes that are waiting for approval before
-// the policy builds the peer map, so an unapproved node has no peers and
-// appears in nobody's.
-func approvedPeerCandidates(nodes []types.NodeView) []types.NodeView {
-	approved := nodes[:0:0]
+// admittedPeerCandidates drops nodes that are waiting for approval or
+// suspended before the policy builds the peer map, so such a node has no
+// peers and appears in nobody's.
+func admittedPeerCandidates(nodes []types.NodeView) []types.NodeView {
+	admitted := nodes[:0:0]
 
 	for _, n := range nodes {
-		if n.IsApproved() {
-			approved = append(approved, n)
+		if n.IsAdmitted() {
+			admitted = append(admitted, n)
 		}
 	}
 
-	return approved
+	return admitted
+}
+
+// SetNodeSuspension suspends a node or lifts the suspension. A suspended
+// node stays registered and keeps its addresses, but it gets no peers, no
+// peer sees it and its client is told it is not authorized until the
+// suspension is lifted; the change reaches every node and the node
+// itself, as an approval change does.
+func (s *State) SetNodeSuspension(nodeID types.NodeID, suspended bool) (types.NodeView, change.Change, error) {
+	var suspendedAt *time.Time
+	if suspended {
+		suspendedAt = new(time.Now().UTC())
+	}
+
+	var wasSuspended bool
+
+	n, ok := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
+		wasSuspended = node.IsSuspended()
+		node.SuspendedAt = suspendedAt
+	})
+	if !ok {
+		return types.NodeView{}, change.Change{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, nodeID)
+	}
+
+	// persistNodeToDB leaves suspended_at alone, as it does approved_at.
+	err := s.db.NodeSetSuspension(nodeID, suspendedAt)
+	if err != nil {
+		return types.NodeView{}, change.Change{}, fmt.Errorf("setting node suspension in database: %w", err)
+	}
+
+	if suspended != wasSuspended {
+		s.emitNodeSuspension(n, suspended)
+	}
+
+	c, err := s.policyChangeAfterApproval()
+	if err != nil {
+		return n, change.Change{}, err
+	}
+
+	c.Reason = "node suspension"
+
+	return n, c, nil
 }

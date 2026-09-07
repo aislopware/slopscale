@@ -252,7 +252,7 @@ func NewState(cfg *types.Config) (*State, error) {
 	nodeStore := NewNodeStore(
 		nodes,
 		func(nodes []types.NodeView) map[types.NodeID][]types.NodeView {
-			return polMan.BuildPeerMap(views.SliceOf(approvedPeerCandidates(nodes)))
+			return polMan.BuildPeerMap(views.SliceOf(admittedPeerCandidates(nodes)))
 		},
 		batchSize,
 		batchTimeout,
@@ -824,8 +824,8 @@ func (s *State) ListPeers(nodeID types.NodeID, peerIDs ...types.NodeID) views.Sl
 	// policy (buildTailPeers and the shared visiblePeerIDs filter), because
 	// the snapshot peer map is not rebuilt on policy changes. Approval is
 	// applied here as the snapshot peer map applies it: a node waiting for
-	// approval has no peers and is nobody's peer.
-	if requester, ok := s.nodeStore.GetNode(nodeID); !ok || !requester.IsApproved() {
+	// approval, or suspended, has no peers and is nobody's peer.
+	if requester, ok := s.nodeStore.GetNode(nodeID); !ok || !requester.IsAdmitted() {
 		return views.SliceOf([]types.NodeView{})
 	}
 
@@ -839,7 +839,7 @@ func (s *State) ListPeers(nodeID types.NodeID, peerIDs ...types.NodeID) views.Sl
 	var filteredNodes []types.NodeView
 
 	for _, node := range allNodes.All() {
-		if _, exists := nodeIDSet[node.ID()]; exists && node.IsApproved() {
+		if _, exists := nodeIDSet[node.ID()]; exists && node.IsAdmitted() {
 			filteredNodes = append(filteredNodes, node)
 		}
 	}
@@ -1101,8 +1101,8 @@ func (s *State) ExpireExpiredNodes(lastCheck time.Time) (time.Time, []change.Cha
 
 // SSHPolicy returns the SSH access policy for a node.
 func (s *State) SSHPolicy(node types.NodeView) (*tailcfg.SSHPolicy, error) {
-	if !node.IsApproved() {
-		return nil, nil //nolint:nilnil // a node waiting for approval has no SSH policy
+	if !node.IsAdmitted() {
+		return nil, nil //nolint:nilnil // a node waiting for approval, or suspended, has no SSH policy
 	}
 
 	return s.polMan.SSHPolicy(s.cfg.ServerURL, node)
@@ -1123,7 +1123,7 @@ func (s *State) Filter() ([]tailcfg.FilterRule, []matcher.Match) {
 
 // FilterForNode returns filter rules for a specific node, handling autogroup:self per-node.
 func (s *State) FilterForNode(node types.NodeView) ([]tailcfg.FilterRule, error) {
-	if !node.IsApproved() {
+	if !node.IsAdmitted() {
 		return nil, nil
 	}
 

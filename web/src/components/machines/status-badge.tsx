@@ -9,6 +9,7 @@ const variants = {
   offline: "neutral",
   pending: "warning",
   expired: "error",
+  suspended: "error",
 } as const satisfies Record<NodeStatus, "success" | "neutral" | "warning" | "error">;
 
 /** The one status indicator for a machine: a dot badge with the same wording everywhere. */

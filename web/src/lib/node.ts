@@ -7,9 +7,14 @@ export function isExitRoute(route: string): boolean {
   return exitRoutes.includes(route);
 }
 
-export type NodeStatus = "online" | "offline" | "pending" | "expired";
+export type NodeStatus = "online" | "offline" | "pending" | "expired" | "suspended";
 
+/** Suspension wins over the rest: a suspended machine is cut off whatever else is true of it. */
 export function nodeStatus(node: Node, now: Date = new Date()): NodeStatus {
+  if (node.suspended) {
+    return "suspended";
+  }
+
   if (!node.approved) {
     return "pending";
   }

@@ -38,19 +38,21 @@ var registerMethodToV1Enum = map[string]string{
 // fields: scalars and slices always (no omitempty), nested messages and optional
 // timestamps as JSON null when unset.
 type Node struct {
-	ID          string          `format:"uint64"                                        json:"id"`
+	ID          string          `format:"uint64"                                           json:"id"`
 	MachineKey  string          `json:"machineKey"`
 	NodeKey     string          `json:"nodeKey"`
 	DiscoKey    string          `json:"discoKey"`
-	IPAddresses []string        `json:"ipAddresses"                                     nullable:"false"`
+	IPAddresses []string        `json:"ipAddresses"                                        nullable:"false"`
 	Name        string          `json:"name"`
 	User        *User           `json:"user"`
-	LastSeen    *time.Time      `json:"lastSeen"                                        nullable:"true"`
-	Expiry      *time.Time      `json:"expiry"                                          nullable:"true"`
+	LastSeen    *time.Time      `json:"lastSeen"                                           nullable:"true"`
+	Expiry      *time.Time      `json:"expiry"                                             nullable:"true"`
 	PreAuthKey  *NodePreAuthKey `json:"preAuthKey"`
 	CreatedAt   time.Time       `json:"createdAt"`
-	Approved    bool            `doc:"false while the node waits for an administrator." json:"approved"`
-	ApprovedAt  *time.Time      `json:"approvedAt"                                      nullable:"true"`
+	Approved    bool            `doc:"false while the node waits for an administrator."    json:"approved"`
+	ApprovedAt  *time.Time      `json:"approvedAt"                                         nullable:"true"`
+	Suspended   bool            `doc:"true while an administrator has suspended the node." json:"suspended"`
+	SuspendedAt *time.Time      `json:"suspendedAt"                                        nullable:"true"`
 
 	//nolint:lll // struct tag enum list cannot be wrapped
 	RegisterMethod string `enum:"REGISTER_METHOD_UNSPECIFIED,REGISTER_METHOD_AUTH_KEY,REGISTER_METHOD_CLI,REGISTER_METHOD_OIDC" json:"registerMethod"`
@@ -689,6 +691,12 @@ func nodeFromView(view types.NodeView) Node {
 	if view.ApprovedAt().Valid() {
 		at := view.ApprovedAt().Get()
 		n.ApprovedAt = &at
+	}
+
+	if view.SuspendedAt().Valid() {
+		at := view.SuspendedAt().Get()
+		n.Suspended = true
+		n.SuspendedAt = &at
 	}
 
 	if view.User().Valid() {

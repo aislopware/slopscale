@@ -82,6 +82,9 @@ func (src *Node) Clone() *Node {
 	if dst.ApprovedAt != nil {
 		dst.ApprovedAt = new(*src.ApprovedAt)
 	}
+	if dst.SuspendedAt != nil {
+		dst.SuspendedAt = new(*src.SuspendedAt)
+	}
 	dst.SharedWith = append(src.SharedWith[:0:0], src.SharedWith...)
 	if dst.DeletedAt != nil {
 		dst.DeletedAt = new(*src.DeletedAt)
@@ -114,6 +117,7 @@ var _NodeCloneNeedsRegeneration = Node(struct {
 	LastSeen       *time.Time
 	ApprovedRoutes Prefixes
 	ApprovedAt     *time.Time
+	SuspendedAt    *time.Time
 	SharedWith     []UserID
 	GlobalExitNode bool
 	CreatedAt      time.Time

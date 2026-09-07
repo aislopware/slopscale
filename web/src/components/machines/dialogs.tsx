@@ -203,6 +203,42 @@ export function ExpireDialog({
 }
 
 /**
+ * Suspending is reversible, so it asks for one click; lifting a suspension needs no dialog at all
+ * and is done from the menu directly.
+ */
+export function SuspendDialog({
+  node,
+  open,
+  onOpenChange,
+  mutations,
+}: NodeDialogProps): ReactElement {
+  const { suspend } = mutations;
+
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Suspend machine?"
+      description={`${nodeName(node)} stays registered but loses every peer and cannot reach the tailnet until you lift the suspension. The device does not need to sign in again afterwards.`}
+      confirmLabel="Suspend"
+      loading={suspend.isPending}
+      error={suspend.isError ? errorMessage(suspend.error) : undefined}
+      onConfirm={() => {
+        suspend.mutate(
+          { params: { path: { nodeId: node.id } }, body: { suspended: true } },
+          {
+            onSuccess: () => {
+              toast.success("Machine suspended");
+              onOpenChange(false);
+            },
+          },
+        );
+      }}
+    />
+  );
+}
+
+/**
  * Removing a machine is not undoable and the tailnet keeps working without it, so it asks for the
  * name to be typed rather than for one more click.
  */

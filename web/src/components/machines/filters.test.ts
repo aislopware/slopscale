@@ -63,17 +63,18 @@ const connected = node("1");
 const offline = node("2", { online: false });
 const pending = node("3", { approved: false });
 const expired = node("4", { online: false, expiry: "2025-01-01T00:00:00Z" });
-const everything = [connected, offline, pending, expired];
+const suspended = node("5", { suspended: true, suspendedAt: "2025-06-01T00:00:00Z" });
+const everything = [connected, offline, pending, expired, suspended];
 
 describe(filterNodes, () => {
   it("keeps everything for the default tab", () => {
-    expect(filterNodes(everything, { status: "all", user: "" }, now)).toHaveLength(4);
+    expect(filterNodes(everything, { status: "all", user: "" }, now)).toHaveLength(5);
   });
 
-  it("counts an expired key as offline, because it is not reachable either", () => {
+  it("counts an expired key and a suspended machine as offline, since neither is reachable", () => {
     const ids = filterNodes(everything, { status: "offline", user: "" }, now).map((row) => row.id);
 
-    expect(ids).toStrictEqual(["2", "4"]);
+    expect(ids).toStrictEqual(["2", "4", "5"]);
   });
 
   it("separates connected from waiting for approval", () => {
@@ -82,7 +83,7 @@ describe(filterNodes, () => {
   });
 
   it("matches the owner and anyone the machine is shared with", () => {
-    const shared = node("5", { user: { ...ada, id: "9" }, sharedWith: ["1"] });
+    const shared = node("6", { user: { ...ada, id: "9" }, sharedWith: ["1"] });
     const rows = filterNodes([connected, shared], { status: "all", user: "1" }, now);
 
     expect(rows).toStrictEqual([connected, shared]);
@@ -92,9 +93,9 @@ describe(filterNodes, () => {
 describe(statusCounts, () => {
   it("counts every tab, with all as the total", () => {
     expect(statusCounts(everything, now)).toStrictEqual({
-      all: 4,
+      all: 5,
       online: 1,
-      offline: 2,
+      offline: 3,
       pending: 1,
     });
   });

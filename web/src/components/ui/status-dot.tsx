@@ -8,6 +8,7 @@ const styles: Record<NodeStatus, { dot: string; label: string }> = {
   offline: { dot: "bg-kumo-inactive", label: "Disconnected" },
   pending: { dot: "bg-kumo-warning", label: "Needs approval" },
   expired: { dot: "bg-kumo-danger", label: "Key expired" },
+  suspended: { dot: "bg-kumo-danger", label: "Suspended" },
 };
 
 export function statusLabel(status: NodeStatus): string {

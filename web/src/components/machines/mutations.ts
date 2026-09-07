@@ -13,6 +13,7 @@ interface NodeMutations {
   readonly setRoutes: Mutation<"post", "/api/v1/node/{nodeId}/approve_routes">;
   readonly setGlobalExitNode: Mutation<"post", "/api/v1/node/{nodeId}/global-exit-node">;
   readonly expire: Mutation<"post", "/api/v1/node/{nodeId}/expire">;
+  readonly suspend: Mutation<"post", "/api/v1/node/{nodeId}/suspend">;
   readonly share: Mutation<"post", "/api/v1/node/{nodeId}/share">;
   readonly unshare: Mutation<"delete", "/api/v1/node/{nodeId}/share/{userId}">;
   readonly remove: Mutation<"delete", "/api/v1/node/{nodeId}">;
@@ -58,6 +59,7 @@ export function useNodeMutations(): NodeMutations {
       },
     }),
     expire: api.useMutation("post", "/api/v1/node/{nodeId}/expire", { onSuccess: refresh }),
+    suspend: api.useMutation("post", "/api/v1/node/{nodeId}/suspend", { onSuccess: refresh }),
     share: api.useMutation("post", "/api/v1/node/{nodeId}/share", { onSuccess: refresh }),
     unshare: api.useMutation("delete", "/api/v1/node/{nodeId}/share/{userId}", {
       onSuccess: async () => {

@@ -3,13 +3,14 @@ import { useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import type { Node } from "~/api/queries.ts";
-import { DeleteDialog, ExpireDialog } from "~/components/machines/dialogs.tsx";
+import { DeleteDialog, ExpireDialog, SuspendDialog } from "~/components/machines/dialogs.tsx";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { toast } from "~/components/ui/toast.ts";
 
-type Pending = "expire" | "delete" | null;
+type Pending = "suspend" | "expire" | "delete" | null;
 
-/** The two actions an operator cannot take back, kept away from the rest of the page. */
+/** The actions that cut a machine off, kept away from the rest of the page. */
 export function DangerZone({ node }: { readonly node: Node }): ReactElement {
   const mutations = useNodeMutations();
   const [pending, setPending] = useState<Pending>(null);
@@ -22,6 +23,40 @@ export function DangerZone({ node }: { readonly node: Node }): ReactElement {
   return (
     <>
       <Section title="Danger zone">
+        <DangerRow
+          title={node.suspended ? "Lift the suspension" : "Suspend this machine"}
+          description={
+            node.suspended
+              ? "Gives the machine its peers back. Nobody needs to sign in on it."
+              : "Cuts the machine off without touching its key; you can lift it any time."
+          }
+          action={
+            <Button
+              variant="secondary"
+              size="sm"
+              loading={mutations.suspend.isPending}
+              onClick={() => {
+                if (node.suspended) {
+                  mutations.suspend.mutate(
+                    { params: { path: { nodeId: node.id } }, body: { suspended: false } },
+                    {
+                      onSuccess: () => {
+                        toast.success("Suspension lifted");
+                      },
+                      onError: (error) => {
+                        toast.error("Could not lift the suspension", error);
+                      },
+                    },
+                  );
+                } else {
+                  setPending("suspend");
+                }
+              }}
+            >
+              {node.suspended ? "Lift suspension" : "Suspend"}
+            </Button>
+          }
+        />
         <DangerRow
           title="Expire the machine key"
           description="Disconnects the machine until someone signs in on it again."
@@ -53,6 +88,12 @@ export function DangerZone({ node }: { readonly node: Node }): ReactElement {
           }
         />
       </Section>
+      <SuspendDialog
+        node={node}
+        mutations={mutations}
+        open={pending === "suspend"}
+        onOpenChange={close}
+      />
       <ExpireDialog
         node={node}
         mutations={mutations}

@@ -55,6 +55,8 @@ const eventHints: Readonly<Record<string, string>> = {
   nodeNeedsApproval: "A machine is waiting for approval",
   nodeApproved: "A machine was approved",
   nodeKeyExpired: "A machine's key expired",
+  nodeSuspended: "A machine was suspended",
+  nodeUnsuspended: "A machine's suspension was lifted",
   nodeDeleted: "A machine was removed",
   policyUpdate: "The policy changed",
   userCreated: "A user was created",

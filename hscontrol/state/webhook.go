@@ -287,6 +287,18 @@ func (s *State) emitNodeDeleted(node types.NodeView) {
 	s.emit(types.EventNodeDeleted, fmt.Sprintf("Node %s was removed.", nodeLabel(node)), s.nodeEventData(node))
 }
 
+// emitNodeSuspension reports a suspension or its lifting.
+func (s *State) emitNodeSuspension(node types.NodeView, suspended bool) {
+	if suspended {
+		s.emit(types.EventNodeSuspended, fmt.Sprintf("Node %s was suspended.", nodeLabel(node)), s.nodeEventData(node))
+
+		return
+	}
+
+	s.emit(types.EventNodeUnsuspended,
+		fmt.Sprintf("The suspension of node %s was lifted.", nodeLabel(node)), s.nodeEventData(node))
+}
+
 func (s *State) emitNodeKeyExpired(node types.NodeView) {
 	s.emit(
 		types.EventNodeKeyExpired,

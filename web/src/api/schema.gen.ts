@@ -686,6 +686,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/node/{nodeId}/suspend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suspend node
+         * @description Suspends a node or lifts the suspension. A suspended node stays registered and keeps its addresses, but it has no peers, no peer sees it and its client is told it is not authorized until the suspension is lifted. Unlike expiring the key, lifting a suspension needs no login on the device.
+         *
+         *     Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["suspendNode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/node/{nodeId}/tags": {
         parameters: {
             query?: never;
@@ -1543,6 +1565,10 @@ export interface components {
             /** @description IDs of the users the node is shared with. */
             sharedWith: string[];
             subnetRoutes: string[];
+            /** @description true while an administrator has suspended the node. */
+            suspended: boolean;
+            /** Format: date-time */
+            suspendedAt: string | null;
             tags: string[];
             user: components["schemas"]["User"];
         };
@@ -1643,6 +1669,10 @@ export interface components {
         SetGlobalExitNodeRequestBody: {
             /** @description false clears the mark. */
             enabled?: boolean;
+        };
+        SetSuspensionRequestBody: {
+            /** @description false lifts the suspension. */
+            suspended?: boolean;
         };
         SetTagsRequestBody: {
             tags?: string[] | null;
@@ -1834,6 +1864,7 @@ export type SetApprovalRequestBody = components['schemas']['SetApprovalRequestBo
 export type SetApprovedRoutesRequestBody = components['schemas']['SetApprovedRoutesRequestBody'];
 export type SetDnsRequestBody = components['schemas']['SetDNSRequestBody'];
 export type SetGlobalExitNodeRequestBody = components['schemas']['SetGlobalExitNodeRequestBody'];
+export type SetSuspensionRequestBody = components['schemas']['SetSuspensionRequestBody'];
 export type SetTagsRequestBody = components['schemas']['SetTagsRequestBody'];
 export type Settings = components['schemas']['Settings'];
 export type SetUserRoleRequestBody = components['schemas']['SetUserRoleRequestBody'];
@@ -3289,6 +3320,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    suspendNode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SetSuspensionRequestBody"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {

@@ -7,7 +7,9 @@ import {
   DotsThreeIcon,
   GlobeIcon,
   PathIcon,
+  PauseIcon,
   PencilSimpleIcon,
+  PlayIcon,
   ShareNetworkIcon,
   TagIcon,
   TrashIcon,
@@ -22,17 +24,19 @@ import {
   DeleteDialog,
   ExpireDialog,
   RenameDialog,
+  SuspendDialog,
   TagsDialog,
 } from "~/components/machines/dialogs.tsx";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
 import { ownerId } from "~/components/machines/owner.ts";
 import { RoutesDialog } from "~/components/machines/routes-dialog.tsx";
 import { ShareDialog } from "~/components/machines/share-dialog.tsx";
+import { toast } from "~/components/ui/toast.ts";
 import { advertisesExit, isTagged } from "~/lib/node.ts";
 
 const actionsIconSize = 18;
 
-type Dialog = "rename" | "tags" | "routes" | "share" | "expire" | "delete";
+type Dialog = "rename" | "tags" | "routes" | "share" | "suspend" | "expire" | "delete";
 
 export interface MachineMenuProps {
   readonly node: Node;
@@ -99,6 +103,55 @@ export function MachineMenu({
         onOpenChange={close}
       />
     </>
+  );
+}
+
+/** Suspend asks first; lifting a suspension is one click, since it only gives access back. */
+function SuspendItem({
+  node,
+  core,
+  mutations,
+  onOpen,
+}: {
+  readonly node: Node;
+  readonly core: boolean;
+  readonly mutations: ReturnType<typeof useNodeMutations>;
+  readonly onOpen: (dialog: Dialog) => void;
+}): ReactElement {
+  if (node.suspended) {
+    return (
+      <DropdownMenu.Item
+        icon={PlayIcon}
+        disabled={!core}
+        onClick={() => {
+          mutations.suspend.mutate(
+            { params: { path: { nodeId: node.id } }, body: { suspended: false } },
+            {
+              onSuccess: () => {
+                toast.success("Suspension lifted");
+              },
+              onError: (error) => {
+                toast.error("Could not lift the suspension", error);
+              },
+            },
+          );
+        }}
+      >
+        Lift suspension
+      </DropdownMenu.Item>
+    );
+  }
+
+  return (
+    <DropdownMenu.Item
+      icon={PauseIcon}
+      disabled={!core}
+      onClick={() => {
+        onOpen("suspend");
+      }}
+    >
+      Suspend…
+    </DropdownMenu.Item>
   );
 }
 
@@ -187,6 +240,7 @@ function MachineMenuItems({
       {hideDestructive ? null : (
         <>
           <DropdownMenu.Separator />
+          <SuspendItem node={node} core={core} mutations={mutations} onOpen={onOpen} />
           <DropdownMenu.Item
             icon={ClockIcon}
             disabled={!core}
@@ -237,6 +291,7 @@ function MachineDialogs({
       <TagsDialog open={dialog === "tags"} {...props} />
       <RoutesDialog open={dialog === "routes"} {...props} />
       <ShareDialog open={dialog === "share"} users={users} {...props} />
+      <SuspendDialog open={dialog === "suspend"} {...props} />
       <ExpireDialog open={dialog === "expire"} {...props} />
       <DeleteDialog open={dialog === "delete"} {...props} />
     </>

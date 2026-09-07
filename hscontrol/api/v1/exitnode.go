@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 )
 
@@ -43,26 +42,7 @@ func registerGlobalExitNode(api huma.API, b Backend) {
 	}, scope.DevicesRoutes), "node.global_exit_node.set", "node", "nodeId"), func(
 		ctx context.Context, in *setGlobalExitNodeInput,
 	) (*nodeOutput, error) {
-		nodeID, err := parseNodeID(in.NodeID)
-		if err != nil {
-			return nil, err
-		}
-
-		enabled := in.Body.enabled()
-		audit.Detail(ctx, "enabled", enabled)
-
-		node, nodeChange, err := b.State.SetGlobalExitNode(nodeID, enabled)
-		if err != nil {
-			return nil, mapError("setting global exit node", err)
-		}
-
-		audit.Target(ctx, "", "", node.GivenName())
-
-		b.Change(nodeChange)
-
-		out := &nodeOutput{}
-		out.Body.Node = nodeFromView(node)
-
-		return out, nil
+		return switchNode(ctx, b, in.NodeID, "enabled", in.Body.enabled(), "setting global exit node",
+			b.State.SetGlobalExitNode)
 	})
 }

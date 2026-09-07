@@ -84,8 +84,31 @@ func (b *MapResponseBuilder) WithSelfNode() *MapResponseBuilder {
 	}
 
 	b.resp.Node = tailnode
+	b.resp.DisplayMessages = suspensionMessages(nv)
 
 	return b
+}
+
+// suspendedMessageID keys the health message a suspended node shows.
+const suspendedMessageID tailcfg.DisplayMessageID = "headscale-suspended"
+
+// suspensionMessages tells a suspended client why it lost its peers, and
+// clears the message again once the suspension is lifted. The client
+// applies the map as a patch, so the nil entry deletes it.
+func suspensionMessages(nv types.NodeView) map[tailcfg.DisplayMessageID]*tailcfg.DisplayMessage {
+	if !nv.IsSuspended() {
+		return map[tailcfg.DisplayMessageID]*tailcfg.DisplayMessage{suspendedMessageID: nil}
+	}
+
+	return map[tailcfg.DisplayMessageID]*tailcfg.DisplayMessage{
+		suspendedMessageID: {
+			Title: "This device is suspended",
+			Text: "An administrator suspended this device. It stays signed in but cannot reach " +
+				"the tailnet until the suspension is lifted.",
+			Severity:            tailcfg.SeverityHigh,
+			ImpactsConnectivity: true,
+		},
+	}
 }
 
 func (b *MapResponseBuilder) WithDebugType(t debugType) *MapResponseBuilder {

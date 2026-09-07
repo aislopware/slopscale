@@ -93,6 +93,7 @@ COL nodes.updated_at timestamp with time zone null=YES
 COL nodes.deleted_at timestamp with time zone null=YES
 COL nodes.approved_at timestamp with time zone null=YES
 COL nodes.global_exit_node boolean null=YES default=false
+COL nodes.suspended_at timestamp with time zone null=YES
 COL oauth_access_tokens.id bigint null=NO default=nextval('oauth_access_tokens_id_seq'::regclass)
 COL oauth_access_tokens.prefix text null=YES
 COL oauth_access_tokens.hash bytea null=YES

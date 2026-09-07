@@ -515,6 +515,14 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609091300-network-route-approvals",
 			run: migrateNetworkRouteApprovals,
 		},
+		{
+			// Node suspension: nodes gain suspended_at, NULL for
+			// everything that exists. See docs/ref/device-trust.md.
+			id: "202609100900-node-suspended-at",
+			run: func(tx *Tx) error {
+				return tx.ex.addColumnIfMissing("nodes", "suspended_at", typeTimestamp)
+			},
+		},
 	}
 }
 

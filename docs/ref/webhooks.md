@@ -37,6 +37,8 @@ show the rest, newest first.
 | `nodeApproved`      | A machine was approved.                                                            |
 | `nodeKeyExpired`    | A machine's key expired.                                                           |
 | `nodeDeleted`       | A machine was removed.                                                             |
+| `nodeSuspended`     | An administrator suspended a machine; see [Device trust](device-trust.md).         |
+| `nodeUnsuspended`   | A machine's suspension was lifted.                                                 |
 | `policyUpdate`      | The policy file was saved or reloaded, or a group, access rule or network changed. |
 | `userCreated`       | A user was created, by an operator or by a first login.                            |
 | `userNeedsApproval` | A user was created while users approval is on.                                     |

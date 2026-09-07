@@ -112,6 +112,10 @@ const (
 	EventNodeApproved      WebhookEventType = "nodeApproved"
 	EventNodeKeyExpired    WebhookEventType = "nodeKeyExpired"
 	EventNodeDeleted       WebhookEventType = "nodeDeleted"
+	// EventNodeSuspended and EventNodeUnsuspended have no Tailscale
+	// counterpart; see docs/ref/device-trust.md.
+	EventNodeSuspended     WebhookEventType = "nodeSuspended"
+	EventNodeUnsuspended   WebhookEventType = "nodeUnsuspended"
 	EventPolicyUpdate      WebhookEventType = "policyUpdate"
 	EventUserCreated       WebhookEventType = "userCreated"
 	EventUserNeedsApproval WebhookEventType = "userNeedsApproval"
@@ -129,6 +133,8 @@ var WebhookEventTypes = []WebhookEventType{
 	EventNodeApproved,
 	EventNodeKeyExpired,
 	EventNodeDeleted,
+	EventNodeSuspended,
+	EventNodeUnsuspended,
 	EventPolicyUpdate,
 	EventUserCreated,
 	EventUserNeedsApproval,

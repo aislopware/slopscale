@@ -42,6 +42,7 @@ type nodeRow struct {
 	Expiry         *time.Time
 	ApprovedRoutes string
 	ApprovedAt     *time.Time
+	SuspendedAt    *time.Time
 	GlobalExitNode bool
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
@@ -104,6 +105,7 @@ func (r *nodeRow) node() (*types.Node, error) {
 		Expiry:         r.Expiry,
 		LastSeen:       r.LastSeen,
 		ApprovedAt:     r.ApprovedAt,
+		SuspendedAt:    r.SuspendedAt,
 		GlobalExitNode: r.GlobalExitNode,
 		CreatedAt:      r.CreatedAt,
 		UpdatedAt:      r.UpdatedAt,
@@ -179,6 +181,7 @@ func nodeRowFrom(node *types.Node) (nodeRow, error) {
 		LastSeen:       node.LastSeen,
 		Expiry:         node.Expiry,
 		ApprovedAt:     node.ApprovedAt,
+		SuspendedAt:    node.SuspendedAt,
 		GlobalExitNode: node.GlobalExitNode,
 		CreatedAt:      node.CreatedAt,
 		UpdatedAt:      node.UpdatedAt,

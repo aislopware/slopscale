@@ -96,27 +96,8 @@ func registerApproval(api huma.API, b Backend) {
 	}, scope.DevicesCore), "node.approval.set", "node", "nodeId"), func(
 		ctx context.Context, in *approveNodeInput,
 	) (*nodeOutput, error) {
-		nodeID, err := parseNodeID(in.NodeID)
-		if err != nil {
-			return nil, err
-		}
-
-		approved := in.Body.approved()
-		audit.Detail(ctx, "approved", approved)
-
-		node, nodeChange, err := b.State.SetNodeApproval(nodeID, approved)
-		if err != nil {
-			return nil, mapError("approving node", err)
-		}
-
-		audit.Target(ctx, "", "", node.GivenName())
-
-		b.Change(nodeChange)
-
-		out := &nodeOutput{}
-		out.Body.Node = nodeFromView(node)
-
-		return out, nil
+		return switchNode(ctx, b, in.NodeID, "approved", in.Body.approved(), "approving node",
+			b.State.SetNodeApproval)
 	})
 
 	huma.Register(api, audited(withScope(huma.Operation{

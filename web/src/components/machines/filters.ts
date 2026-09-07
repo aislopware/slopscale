@@ -3,8 +3,8 @@ import { ownerId } from "~/components/machines/owner.ts";
 import { nodeStatus } from "~/lib/node.ts";
 
 /**
- * The segmented status filter above the machines table. There is no separate tab for an expired
- * key: such a machine is not reachable either, so it belongs with the offline ones.
+ * The segmented status filter above the machines table. There is no separate tab for an expired key
+ * or a suspended machine: neither is reachable, so both belong with the offline ones.
  */
 export const statusFilters = ["all", "online", "offline", "pending"] as const;
 
@@ -31,7 +31,7 @@ function matchesStatus(node: Node, status: StatusFilter, now: Date): boolean {
 
   const current = nodeStatus(node, now);
 
-  return status === "offline" ? current === "offline" || current === "expired" : current === status;
+  return status === "offline" ? current !== "online" && current !== "pending" : current === status;
 }
 
 export interface MachineFilter {

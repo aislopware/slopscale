@@ -27,7 +27,7 @@ export const emptyUsers: readonly User[] = [];
 
 const helper = createAppColumnHelper<Node>();
 
-const statusOrder = { online: 0, pending: 1, offline: 2, expired: 3 } as const;
+const statusOrder = { online: 0, pending: 1, suspended: 2, offline: 3, expired: 4 } as const;
 const markSize = 13;
 
 export const columns = helper.columns([

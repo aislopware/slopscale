@@ -572,6 +572,14 @@ func (hsdb *HSDatabase) NodeSetGlobalExitNode(nodeID types.NodeID, on bool) erro
 	})
 }
 
+// NodeSetSuspension records when an administrator suspended the node;
+// nil lifts the suspension.
+func (hsdb *HSDatabase) NodeSetSuspension(nodeID types.NodeID, suspendedAt *time.Time) error {
+	return hsdb.Write(func(tx *Tx) error {
+		return updateNodeColumn(tx, nodeID, table.Nodes.SuspendedAt, suspendedAt)
+	})
+}
+
 // NodeSetApproval records when a node was admitted to the tailnet; nil
 // withdraws the approval so the node waits for an administrator again.
 func NodeSetApproval(q Querier, nodeID types.NodeID, approvedAt *time.Time) error {

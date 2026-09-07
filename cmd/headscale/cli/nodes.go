@@ -64,6 +64,11 @@ func init() {
 	approveNodeCmd.Flags().Bool("revoke", false, "Withdraw the approval instead of granting it")
 	nodeCmd.AddCommand(approveNodeCmd)
 
+	suspendNodeCmd.Flags().Uint64P("identifier", "i", 0, "Node identifier (ID)")
+	mustMarkRequired(suspendNodeCmd, "identifier")
+	suspendNodeCmd.Flags().Bool("revoke", false, "Lift the suspension instead of imposing it")
+	nodeCmd.AddCommand(suspendNodeCmd)
+
 	shareNodeCmd.Flags().Uint64P("identifier", "i", 0, "Node identifier (ID)")
 	mustMarkRequired(shareNodeCmd, "identifier")
 	shareNodeCmd.Flags().StringP("user", "u", "", "ID of the user to share the node with")
@@ -216,6 +221,31 @@ Use --revoke to withdraw the approval again.`,
 			*nodeToggleResponse, error,
 		) {
 			resp, err := client.ApproveNodeWithResponse(ctx, id, clientv1.ApproveNodeJSONRequestBody{Approved: &on})
+			if err != nil {
+				return nil, err
+			}
+
+			return &nodeToggleResponse{resp.StatusCode(), resp.ApplicationproblemJSONDefault, resp.JSON200}, nil
+		},
+	),
+}
+
+var suspendNodeCmd = &cobra.Command{
+	Use:   "suspend",
+	Short: "Suspend a node, or lift the suspension with --revoke",
+	Long: `Suspends a node. It stays registered and keeps its addresses, but it has no
+peers, no peer sees it and its client is told it is not authorized. Unlike
+expiring the key, lifting the suspension needs no login on the device.
+
+Use --revoke to lift the suspension again.`,
+	RunE: toggleNodeRunE(
+		"suspending node",
+		"Node suspended",
+		"Node suspension lifted",
+		func(ctx context.Context, client *clientv1.ClientWithResponses, id string, on bool) (
+			*nodeToggleResponse, error,
+		) {
+			resp, err := client.SuspendNodeWithResponse(ctx, id, clientv1.SuspendNodeJSONRequestBody{Suspended: &on})
 			if err != nil {
 				return nil, err
 			}
@@ -607,6 +637,10 @@ func nodesToPtables(nodes []clientv1.Node) (pterm.TableData, error) {
 		approved := pterm.LightRed("pending")
 		if node.Approved {
 			approved = pterm.LightGreen("yes")
+		}
+
+		if node.Suspended {
+			approved = pterm.LightRed("suspended")
 		}
 
 		tags := strings.Join(node.Tags, "\n")

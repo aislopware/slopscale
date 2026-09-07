@@ -135,6 +135,10 @@ CREATE TABLE nodes(
   -- approved_at is NULL while a node registered with device approval on
   -- waits for an administrator; it gets no peers and no peer sees it.
   approved_at datetime,
+  -- suspended_at is set while an administrator has suspended the node:
+  -- it stays registered but gets no peers, no peer sees it and its
+  -- client is told it is not authorized. NULL for an active node.
+  suspended_at datetime,
   -- global_exit_node marks an exit node every client is told to prefer:
   -- it gets suggest-exit-node and every node auto-exit-node.
   global_exit_node numeric DEFAULT false,

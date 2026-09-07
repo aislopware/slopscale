@@ -284,6 +284,15 @@ func (v NodeView) ApprovedAt() views.ValuePointer[time.Time] {
 	return views.ValuePointerOf(v.ж.ApprovedAt)
 }
 
+// SuspendedAt is set while an administrator has suspended the node.
+// A suspended node stays registered and keeps its addresses, but it
+// gets no peers, no peer sees it and its client is told it is not
+// authorized. Only [State.SetNodeSuspension] writes it; the map
+// request path leaves it alone like [Node.ApprovedAt].
+func (v NodeView) SuspendedAt() views.ValuePointer[time.Time] {
+	return views.ValuePointerOf(v.ж.SuspendedAt)
+}
+
 // SharedWith lists the users the node has been shared with, in
 // ascending id order. The policy resolves autogroup:shared from it
 // and the map response marks the node as shared to those users'
@@ -347,6 +356,7 @@ var _NodeViewNeedsRegeneration = Node(struct {
 	LastSeen       *time.Time
 	ApprovedRoutes Prefixes
 	ApprovedAt     *time.Time
+	SuspendedAt    *time.Time
 	SharedWith     []UserID
 	GlobalExitNode bool
 	CreatedAt      time.Time

@@ -324,7 +324,7 @@ func nodeToRegisterResponse(node types.NodeView) *tailcfg.RegisterResponse {
 
 		// The client learns its approval from the self node in the netmap;
 		// this mirrors it for the registration reply.
-		MachineAuthorized: node.IsApproved(),
+		MachineAuthorized: node.IsAdmitted(),
 	}
 
 	// For tagged nodes, use the [types.TaggedDevices] special user
@@ -508,7 +508,7 @@ func (h *Headscale) handleRegisterWithAuthKey(
 	h.Change(changed, routesChange)
 
 	resp := &tailcfg.RegisterResponse{
-		MachineAuthorized: node.IsApproved(),
+		MachineAuthorized: node.IsAdmitted(),
 		NodeKeyExpired:    node.IsExpired(),
 		User:              node.Owner().TailscaleUser(),
 		Login:             node.Owner().TailscaleLogin(),

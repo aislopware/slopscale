@@ -174,6 +174,13 @@ type Node struct {
 	// approval: it then gets no peers and no peer sees it.
 	ApprovedAt *time.Time
 
+	// SuspendedAt is set while an administrator has suspended the node.
+	// A suspended node stays registered and keeps its addresses, but it
+	// gets no peers, no peer sees it and its client is told it is not
+	// authorized. Only [State.SetNodeSuspension] writes it; the map
+	// request path leaves it alone like [Node.ApprovedAt].
+	SuspendedAt *time.Time
+
 	// SharedWith lists the users the node has been shared with, in
 	// ascending id order. The policy resolves autogroup:shared from it
 	// and the map response marks the node as shared to those users'
@@ -251,6 +258,19 @@ func (node *Node) IsExpired() bool {
 // See [Node.ApprovedAt].
 func (node *Node) IsApproved() bool {
 	return node.ApprovedAt != nil && !node.ApprovedAt.IsZero()
+}
+
+// IsSuspended reports whether an administrator has suspended the node.
+// See [Node.SuspendedAt].
+func (node *Node) IsSuspended() bool {
+	return node.SuspendedAt != nil && !node.SuspendedAt.IsZero()
+}
+
+// IsAdmitted reports whether the node takes part in the tailnet: it is
+// approved and not suspended. Everything that hands out peers or the
+// filter checks this, not [Node.IsApproved] alone.
+func (node *Node) IsAdmitted() bool {
+	return node.IsApproved() && !node.IsSuspended()
 }
 
 // IsSharedWith reports whether the node has been shared with the user.
@@ -962,6 +982,24 @@ func (nv NodeView) IsApproved() bool {
 	return nv.ж.IsApproved()
 }
 
+// IsSuspended reports whether an administrator has suspended the node.
+func (nv NodeView) IsSuspended() bool {
+	if !nv.Valid() {
+		return false
+	}
+
+	return nv.ж.IsSuspended()
+}
+
+// IsAdmitted reports whether the node is approved and not suspended.
+func (nv NodeView) IsAdmitted() bool {
+	if !nv.Valid() {
+		return false
+	}
+
+	return nv.ж.IsAdmitted()
+}
+
 // IsSharedWith reports whether the node has been shared with the user.
 func (nv NodeView) IsSharedWith(uid UserID) bool {
 	if !nv.Valid() {
@@ -1319,7 +1357,7 @@ func (nv NodeView) tailNode(
 
 		Tags: nv.Tags().AsSlice(),
 
-		MachineAuthorized: nv.IsApproved() && !nv.IsExpired(),
+		MachineAuthorized: nv.IsAdmitted() && !nv.IsExpired(),
 		Expired:           nv.IsExpired(),
 	}
 

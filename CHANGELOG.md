@@ -131,6 +131,18 @@ console's _Webhooks_ page, with `headscale webhooks`, or through
 `/api/v1/webhook`. See
 [Webhooks](https://headscale.net/development/ref/webhooks/).
 
+### Device trust
+
+A machine can be suspended: it stays registered with its key and addresses
+but loses every peer and cannot reach the tailnet, and its client shows a
+health message saying so, until an administrator lifts the suspension.
+Nobody has to sign in on the device afterwards, which makes it the
+reversible alternative to expiring the key. `headscale nodes suspend`,
+`POST /api/v1/node/{id}/suspend`, the machine's menu and danger zone in the
+console, the `node.suspension.set` audit action and the `nodeSuspended` and
+`nodeUnsuspended` webhook events cover it. See
+[Device trust](https://headscale.net/development/ref/device-trust/).
+
 ### Networks
 
 Subnets and exit nodes can now be handed to groups as networks, the way
