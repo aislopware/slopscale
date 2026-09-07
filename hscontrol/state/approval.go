@@ -41,6 +41,9 @@ func (s *State) SetKeyExpiry(d time.Duration) error {
 		return err
 	}
 
+	s.settingsMu.Lock()
+	defer s.settingsMu.Unlock()
+
 	err = s.db.SaveKeyExpiry(d)
 	if err != nil {
 		return err
@@ -58,6 +61,9 @@ func (s *State) SetKeyExpiry(d time.Duration) error {
 // requirement that no longer exists; the returned change carries that
 // fan-out.
 func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error) {
+	s.settingsMu.Lock()
+	defer s.settingsMu.Unlock()
+
 	settings := s.Settings()
 
 	switch key {

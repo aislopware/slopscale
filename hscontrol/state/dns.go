@@ -56,6 +56,9 @@ func (s *State) SetDNS(settings types.DNSSettings) (DNSStatus, change.Change, er
 		return DNSStatus{}, change.Change{}, types.ErrDNSExtraRecordsFromFile
 	}
 
+	s.dnsMu.Lock()
+	defer s.dnsMu.Unlock()
+
 	err = s.db.SaveDNSSettings(settings)
 	if err != nil {
 		return DNSStatus{}, change.Change{}, fmt.Errorf("saving dns settings: %w", err)
@@ -69,6 +72,9 @@ func (s *State) SetDNS(settings types.DNSSettings) (DNSStatus, change.Change, er
 // ResetDNS drops the runtime DNS settings so the config file is in force
 // again, and pushes the result to every client.
 func (s *State) ResetDNS() (DNSStatus, change.Change, error) {
+	s.dnsMu.Lock()
+	defer s.dnsMu.Unlock()
+
 	err := s.db.DeleteDNSSettings()
 	if err != nil {
 		return DNSStatus{}, change.Change{}, fmt.Errorf("deleting dns settings: %w", err)
