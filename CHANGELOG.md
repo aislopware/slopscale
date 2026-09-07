@@ -97,6 +97,18 @@ join them. Manage it all from the console's _Access controls_ page, with
 and `/api/v1/access-rule`. See
 [Groups and access rules](https://headscale.net/development/ref/access-control/).
 
+### Networks
+
+Subnets and exit nodes can now be handed to groups as networks, the way
+NetBird's networks and routes work. A network names prefixes, the machines
+that route them and the groups that receive them: the routes are approved on
+the routers when the network is created and withdrawn when it is disabled or
+deleted, and only the machines in its groups ever see them, which makes a
+split tunnel without a policy file. Two routers make a failover pair. Manage
+networks from the console's _Networks_ page, which also lists every route any
+machine advertises, with `headscale networks`, or through `/api/v1/network`.
+See [Networks](https://headscale.net/development/ref/networks/).
+
 ### Global exit node
 
 `headscale nodes global-exit-node --identifier <node>` (or

@@ -1,0 +1,92 @@
+# Networks
+
+A network is a set of prefixes reached through one or more routing machines
+and handed out only to the machines in the groups you pick, the way NetBird's
+networks and routes work. It replaces the per-machine route approval and the
+policy needed to restrict who sees a subnet: the network approves the routes
+on its routers and trims them out of the map of every machine outside its
+groups, so those machines never learn the route exists. That is the split
+tunnel most operators want, with no policy file involved.
+
+A network with the exit routes (`0.0.0.0/0` and `::/0`) is an exit node
+offer to its groups. Naming either exit route brings the other, because
+clients advertise them as a pair.
+
+## Setting one up
+
+1. On the routing machine, advertise the prefixes as you would for any
+   [subnet router](routes.md#subnet-router) or [exit node](routes.md#exit-node):
+
+    ```console
+    $ sudo tailscale set --advertise-routes=10.10.0.0/24
+    ```
+
+    IP forwarding must be on; see [Enable IP forwarding](routes.md#enable-ip-forwarding).
+
+1. Create the network with the prefixes, the routing machine and the groups
+   that get the routes. From the console's _Networks_ page, or:
+
+    ```console
+    $ headscale networks create --name "Office LAN" --prefix 10.10.0.0/24 --router 7 --group 2
+    ```
+
+    The routes are approved on the router at once, no separate approval step.
+    The machines in group 2 receive them; nobody else does. Use the builtin
+    _All_ group to hand the routes to everyone.
+
+1. On a machine in the group, check that the route arrived:
+
+    ```console
+    $ tailscale status --json | jq '.Peer[] | select(.HostName == "office-router") | .PrimaryRoutes'
+    ```
+
+Two or more routers make a failover pair: every one advertises the same
+prefixes and Headscale elects a primary, as for any
+[high availability](routes.md#high-availability) router. The console marks a
+router that stops advertising one of the network's prefixes; the network
+still hands out whatever the other routers serve.
+
+## What a network does and does not do
+
+Approval belongs to the network. Creating or enabling a network approves its
+prefixes on its routers; editing it withdraws the approvals that no longer
+match and adds the new ones; disabling or deleting it withdraws them all.
+Approvals made by hand on the machine's routes page are left alone, so a
+route approved both ways stays approved when the network goes.
+
+Distribution follows the groups. A machine receives a network's routes when it
+is in one of the network's groups or is itself one of the routers. Group
+membership is the same as for [access rules](access-control.md): a user's
+machines follow the user, tagged machines join directly.
+
+Reachability follows the tailnet. While the tailnet is open (no enabled access
+rule and no restricting policy file), a machine that has the route can use it.
+Once something makes the tailnet enforce, the network's groups may reach its
+prefixes on every port, and nothing else may; a network on its own never
+switches enforcement on. The routes page under _Networks_ lists every route any
+machine advertises, network-owned or not, and approves the rest by hand.
+
+A group that a network uses cannot be deleted until the network drops it.
+
+## API and CLI
+
+Networks live at `/api/v1/network` and need the `devices:routes` scope
+(`devices:routes:read` to list), the same scope as route approval. A network
+is created with `POST /api/v1/network`:
+
+```json
+{
+  "name": "Office LAN",
+  "prefixes": ["10.10.0.0/24"],
+  "routerNodeIds": ["7"],
+  "groupIds": ["2"]
+}
+```
+
+`PUT /api/v1/network/{id}` replaces the whole record, `PATCH` with
+`{"enabled": false}` switches it off, and `DELETE` removes it. The response
+carries a `routers` list with each router's liveness, the prefixes it serves
+and the ones it does not advertise.
+
+`headscale networks` has `list`, `show`, `create`, `update` (which fetches the
+network and replaces only the flags given), `enable`, `disable` and `delete`.

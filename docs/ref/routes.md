@@ -11,6 +11,9 @@ nodes](https://tailscale.com/docs/features/exit-nodes) for a tailnet.
   node. Use it to securely access the Internet on an untrusted Wi-Fi or to access online services that expect traffic
   from a specific IP address.
 
+To hand a subnet or exit node to some machines only, with the approval made
+for you, see [Networks](networks.md).
+
 ## Subnet router
 
 The setup of a subnet router requires double opt-in, once from a subnet router and once on the control server to allow

@@ -100,9 +100,15 @@ account menu with *Sign out*.
 - **Keys**: pre-auth keys (create with reusable, ephemeral, pre-authorized and
   tags; expire; delete) and API keys. New keys are shown once, with a copy
   button.
-- **Access controls**: the [policy](policy.md) in an editor with syntax
-  highlighting. *Check* validates the draft against the server without saving;
-  *Save* applies it. Leaving the page with unsaved changes asks first.
+- **Access controls**: [groups and access rules](access-control.md), and the
+  [policy](policy.md) file in an editor with syntax highlighting. *Check*
+  validates the draft against the server without saving; *Save* applies it.
+  Leaving the page with unsaved changes asks first.
+- **Networks**: [networks](networks.md) that hand subnets and exit nodes to
+  groups, and a list of every route any machine advertises, with approval for
+  the ones no network owns.
+- **DNS**: nameservers, split DNS, search domains and extra records, changed
+  at runtime; see [DNS](dns.md).
 - **Audit log**: who changed what, newest first, with filters by action, user
   and time; see [Audit log](audit.md).
 - **Settings**: the [device and user approval](approval.md) switches, the
