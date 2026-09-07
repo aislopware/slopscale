@@ -224,6 +224,47 @@ func TestNodeCommands(t *testing.T) {
 			want: "Node approval revoked\n",
 		},
 		{
+			name:  "share posts the user id",
+			src:   shareNodeCmd,
+			flags: map[string]string{"identifier": "7", "user": "3"},
+			routes: map[string]apiHandler{
+				"POST /api/v1/node/{id}/share": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+					assert.Equal(t, "7", r.PathValue("id"))
+
+					var body clientv1.ShareNodeRequestBody
+
+					decodeBody(t, r, &body)
+					assert.Equal(t, "3", body.UserId)
+
+					shared := laptop
+					shared.SharedWith = []string{"3"}
+					writeJSON(t, w, clientv1.NodeOutputBody{Node: shared})
+				},
+			},
+			want: "Node shared\n",
+		},
+		{
+			name:    "share rejects a user name",
+			src:     shareNodeCmd,
+			flags:   map[string]string{"identifier": "7", "user": "bob"},
+			wantErr: "--user must be a user id",
+		},
+		{
+			name:  "unshare deletes the share",
+			src:   unshareNodeCmd,
+			flags: map[string]string{"identifier": "7", "user": "3"},
+			routes: map[string]apiHandler{
+				"DELETE /api/v1/node/{id}/share/{userId}": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+					assert.Equal(t, "7", r.PathValue("id"))
+					assert.Equal(t, "3", r.PathValue("userId"))
+					writeJSON(t, w, clientv1.NodeOutputBody{Node: laptop})
+				},
+			},
+			want: "Node share removed\n",
+		},
+		{
 			name:  "expire without a time expires now",
 			src:   expireNodeCmd,
 			flags: map[string]string{"identifier": "7"},

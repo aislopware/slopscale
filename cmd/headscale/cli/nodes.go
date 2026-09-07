@@ -64,6 +64,18 @@ func init() {
 	approveNodeCmd.Flags().Bool("revoke", false, "Withdraw the approval instead of granting it")
 	nodeCmd.AddCommand(approveNodeCmd)
 
+	shareNodeCmd.Flags().Uint64P("identifier", "i", 0, "Node identifier (ID)")
+	mustMarkRequired(shareNodeCmd, "identifier")
+	shareNodeCmd.Flags().StringP("user", "u", "", "ID of the user to share the node with")
+	mustMarkRequired(shareNodeCmd, "user")
+	nodeCmd.AddCommand(shareNodeCmd)
+
+	unshareNodeCmd.Flags().Uint64P("identifier", "i", 0, "Node identifier (ID)")
+	mustMarkRequired(unshareNodeCmd, "identifier")
+	unshareNodeCmd.Flags().StringP("user", "u", "", "ID of the user to stop sharing the node with")
+	mustMarkRequired(unshareNodeCmd, "user")
+	nodeCmd.AddCommand(unshareNodeCmd)
+
 	nodeCmd.AddCommand(backfillNodeIPsCmd)
 }
 
@@ -216,6 +228,82 @@ Use --revoke to withdraw the approval again.`,
 			}
 
 			return printOutput(cmd, resp.JSON200.Node, msg)
+		},
+	),
+}
+
+var shareNodeCmd = &cobra.Command{
+	Use:   "share",
+	Short: "Share a node with a user",
+	Long: `Gives the user's personal devices access to the node wherever the policy
+names autogroup:shared, and marks the node as shared in their netmaps. The
+node gets no access back. A member may share the nodes they own.`,
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			identifier, _ := cmd.Flags().GetUint64("identifier")
+
+			user, err := shareUserFlag(cmd)
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.ShareNodeWithResponse(
+				ctx,
+				strconv.FormatUint(identifier, util.Base10),
+				clientv1.ShareNodeJSONRequestBody{UserId: user},
+			)
+			if err != nil {
+				return fmt.Errorf("sharing node: %w", err)
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			return printOutput(cmd, resp.JSON200.Node, "Node shared")
+		},
+	),
+}
+
+// shareUserFlag reads --user as a user id; the node commands take names
+// elsewhere, but sharing addresses the user by id like the API does.
+func shareUserFlag(cmd *cobra.Command) (string, error) {
+	user, _ := cmd.Flags().GetString("user")
+
+	_, err := strconv.ParseUint(user, util.Base10, 64)
+	if err != nil {
+		return "", fmt.Errorf("--user must be a user id: %w", err)
+	}
+
+	return user, nil
+}
+
+var unshareNodeCmd = &cobra.Command{
+	Use:   "unshare",
+	Short: "Stop sharing a node with a user",
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			identifier, _ := cmd.Flags().GetUint64("identifier")
+
+			user, err := shareUserFlag(cmd)
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.UnshareNodeWithResponse(
+				ctx,
+				strconv.FormatUint(identifier, util.Base10),
+				user,
+			)
+			if err != nil {
+				return fmt.Errorf("unsharing node: %w", err)
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			return printOutput(cmd, resp.JSON200.Node, "Node share removed")
 		},
 	),
 }
