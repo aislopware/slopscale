@@ -87,6 +87,7 @@ set to `--exit-node=auto:any` pick it. See
 - The gRPC API is removed; all programmatic access now goes through the HTTP API at `/api/v1` [#3324](https://github.com/juanfont/headscale/pull/3324)
 - API errors are now RFC 7807 `application/problem+json`, including authentication failures, instead of the previous gRPC-status JSON shape [#3324](https://github.com/juanfont/headscale/pull/3324)
 - Errors that previously returned HTTP 500 — unknown users or nodes, malformed input, duplicate names — now return the correct 404, 400 or 409 [#3324](https://github.com/juanfont/headscale/pull/3324)
+- `GET /api/v1/policy` returns 404 instead of 500 when no policy has been set
 - The OpenAPI document is OpenAPI 3.1 at `/api/v1/openapi.yaml` (docs at `/api/v1/docs`), replacing Swagger 2.0 at `/swagger` [#3324](https://github.com/juanfont/headscale/pull/3324)
 
 #### CLI

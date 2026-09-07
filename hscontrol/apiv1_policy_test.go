@@ -35,11 +35,11 @@ func TestAPIV1PolicyGet(t *testing.T) {
 	t.Run("empty parity", func(t *testing.T) {
 		t.Parallel()
 
-		// With no policy stored, the DB load fails; this is treated as a server
-		// fault (500), matching the legacy contract.
+		// With no policy stored there is nothing to return: 404, so a client
+		// can tell "not set yet" from a server fault.
 		h := newAPIV1Harness(t)
 		res := h.assertParity(t, http.MethodGet, "/api/v1/policy", nil)
-		assertStatus(t, res, http.StatusInternalServerError)
+		assertStatus(t, res, http.StatusNotFound)
 	})
 
 	t.Run("set parity", func(t *testing.T) {

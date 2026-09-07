@@ -2,6 +2,7 @@ package apiv1
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -93,6 +94,10 @@ func handleGetPolicy(b Backend) (*getPolicyOutput, error) {
 	switch b.Cfg.Policy.Mode {
 	case types.PolicyModeDB:
 		p, err := b.State.GetPolicy()
+		if errors.Is(err, types.ErrPolicyNotFound) {
+			return nil, huma.Error404NotFound(err.Error())
+		}
+
 		if err != nil {
 			return nil, huma.Error500InternalServerError("loading ACL from database", err)
 		}
