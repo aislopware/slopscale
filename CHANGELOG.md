@@ -80,8 +80,12 @@ once; MagicDNS and the base domain stay in the configuration file. Settings set
 this way are stored in the database, replace the file's `dns` section until
 `headscale dns reset` (or `DELETE /api/v1/dns`) returns to it, and are logged as
 `dns.set` and `dns.reset`. The new `dns` and `dns:read` scopes gate them; a
-network admin may write, an IT admin may read. See
-[DNS](https://headscale.net/development/ref/dns/).
+network admin may write, an IT admin may read. Only what the Tailscale
+client can use is accepted: a nameserver is an IP, an IP with port, or the
+DNS over HTTPS URL of a provider the client knows (Cloudflare, Google, Quad9,
+NextDNS and the like), and extra records are A or AAAA. An extra-records file
+(`dns.extra_records_path`) keeps owning the records while the rest is edited.
+See [DNS](https://headscale.net/development/ref/dns/).
 
 ### Groups and access rules
 
@@ -112,13 +116,19 @@ and the console's _Settings_ page shows both. See
 Headscale can now post events to your own endpoints or to a Slack,
 Mattermost, Google Chat or Discord incoming webhook: a machine joining,
 needing approval, being approved, expiring or being removed, a user being
-created, approved, changing role or being deleted, and policy changes. The
-delivery format and the `Tailscale-Webhook-Signature` header are Tailscale's,
-so a receiver written for Tailscale works unchanged, and the v2 API exposes
-the same endpoints as Tailscale's `webhooks` resource. Each endpoint has a
-secret shown once, a test button, a rotate action and a history of its last
-hundred deliveries with status, attempts and timing. Manage them from the console's _Webhooks_ page, with
-`headscale webhooks`, or through `/api/v1/webhook`. See
+created, approved, changing role or being deleted, and policy changes
+(including group, rule and network edits). The delivery format, the event
+data fields and the `Tailscale-Webhook-Signature` header are Tailscale's, so a
+receiver written for Tailscale works unchanged, and the v2 API exposes the
+same endpoints and `webhooks`/`webhooks:read` scopes as Tailscale's `webhooks`
+resource; every admin role manages them, an auditor reads. Each endpoint has
+a secret shown once, a test button, a rotate action and a history of its last
+hundred deliveries with status, attempts and timing. Deliveries are posted to
+the configured URL only (no redirects), at most sixteen at a time from a
+bounded queue, and logs and audit entries carry the endpoint's host rather
+than the URL, which for chat providers is a credential. Manage them from the
+console's _Webhooks_ page, with `headscale webhooks`, or through
+`/api/v1/webhook`. See
 [Webhooks](https://headscale.net/development/ref/webhooks/).
 
 ### Networks
@@ -127,8 +137,9 @@ Subnets and exit nodes can now be handed to groups as networks, the way
 NetBird's networks and routes work. A network names prefixes, the machines
 that route them and the groups that receive them: the routes are approved on
 the routers when the network is created and withdrawn when it is disabled or
-deleted, and only the machines in its groups ever see them, which makes a
-split tunnel without a policy file. Two routers make a failover pair. Manage
+deleted (a route the operator approved by hand before the network stays), and
+only the machines in its groups ever see them, which makes a split tunnel
+without a policy file. Two routers make a failover pair. Manage
 networks from the console's _Networks_ page, which also lists every route any
 machine advertises, with `headscale networks`, or through `/api/v1/network`.
 See [Networks](https://headscale.net/development/ref/networks/).
