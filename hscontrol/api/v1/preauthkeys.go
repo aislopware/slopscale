@@ -105,11 +105,9 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 			return nil, err
 		}
 
-		for _, tag := range in.Body.ACLTags {
-			tagErr := validateTag(tag)
-			if tagErr != nil {
-				return nil, huma.Error400BadRequest("invalid tag", tagErr)
-			}
+		err = validateTags(in.Body.ACLTags)
+		if err != nil {
+			return nil, err
 		}
 
 		// CreatePreAuthKey requires a non-nil pointer; zero-stamp when unset.
@@ -135,20 +133,9 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 
 		preauthorized := in.Body.Preauthorized == nil || *in.Body.Preauthorized
 
-		groupIDs, err := parseGroupIDs("groupIds", in.Body.GroupIDs)
+		groupIDs, err := keyGroups(ctx, b, in.Body.GroupIDs)
 		if err != nil {
 			return nil, err
-		}
-
-		for _, gid := range groupIDs {
-			_, getErr := b.State.GetGroup(gid)
-			if getErr != nil {
-				return nil, mapError("creating pre-auth key", getErr)
-			}
-		}
-
-		if len(groupIDs) > 0 {
-			audit.Detail(ctx, "groupIds", in.Body.GroupIDs)
 		}
 
 		audit.Detail(ctx, "reusable", in.Body.Reusable)
@@ -382,4 +369,38 @@ func parsePreAuthKeyID(s string) (uint64, error) {
 	}
 
 	return id, nil
+}
+
+// keyGroups parses and checks the groups a key should enrol nodes in, and
+// records them on the audit event when there are any.
+func keyGroups(ctx context.Context, b Backend, ids []string) ([]types.GroupID, error) {
+	groupIDs, err := parseGroupIDs("groupIds", ids)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, gid := range groupIDs {
+		_, getErr := b.State.GetGroup(gid)
+		if getErr != nil {
+			return nil, mapError("creating pre-auth key", getErr)
+		}
+	}
+
+	if len(groupIDs) > 0 {
+		audit.Detail(ctx, "groupIds", ids)
+	}
+
+	return groupIDs, nil
+}
+
+// validateTags rejects the first malformed tag as a 400.
+func validateTags(tags []string) error {
+	for _, tag := range tags {
+		tagErr := validateTag(tag)
+		if tagErr != nil {
+			return huma.Error400BadRequest("invalid tag", tagErr)
+		}
+	}
+
+	return nil
 }
