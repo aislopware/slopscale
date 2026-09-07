@@ -18,9 +18,13 @@ func init() {
 		"Require an administrator to approve new nodes (unless registered with a preauthorized key)")
 	setSettingsCmd.Flags().Bool("users-approval", false,
 		"Require an administrator to approve users created by OIDC login")
+	setSettingsCmd.Flags().Int64("key-expiry-days", 0,
+		"Cap node key expiry at this many days after a login; 0 leaves the config file and the client in charge")
 }
 
-var errNoSettingGiven = errors.New("give at least one of --devices-approval or --users-approval")
+var errNoSettingGiven = errors.New(
+	"give at least one of --devices-approval, --users-approval or --key-expiry-days",
+)
 
 var settingsCmd = &cobra.Command{
 	Use:   "settings",
@@ -66,7 +70,12 @@ users approval off approves every node or user that was waiting.`,
 				body.UsersApprovalOn = &on
 			}
 
-			if body.DevicesApprovalOn == nil && body.UsersApprovalOn == nil {
+			if cmd.Flags().Changed("key-expiry-days") {
+				days, _ := cmd.Flags().GetInt64("key-expiry-days")
+				body.KeyExpiryDays = &days
+			}
+
+			if body.DevicesApprovalOn == nil && body.UsersApprovalOn == nil && body.KeyExpiryDays == nil {
 				return errNoSettingGiven
 			}
 
@@ -91,9 +100,23 @@ func printSettings(cmd *cobra.Command, settings *clientv1.Settings) error {
 			[][]string{
 				{"Device approval", onOff(settings.DevicesApprovalOn)},
 				{"Users approval", onOff(settings.UsersApprovalOn)},
+				{"Key expiry", keyExpiryLabel(settings)},
 			},
 		)
 	})
+}
+
+// keyExpiryLabel names the cap, or the config file's default when there
+// is none.
+func keyExpiryLabel(settings *clientv1.Settings) string {
+	switch {
+	case settings.KeyExpiryDays > 0:
+		return fmt.Sprintf("%d days", settings.KeyExpiryDays)
+	case settings.DefaultKeyExpiryDays > 0:
+		return fmt.Sprintf("client's choice, %d days by default (config file)", settings.DefaultKeyExpiryDays)
+	default:
+		return "client's choice, never by default (config file)"
+	}
 }
 
 func onOff(on bool) string {
