@@ -110,6 +110,13 @@ func fixedCases(t *testing.T) []fixedCase {
 			jet:   selectNodeShares().WHERE(table.NodeShares.NodeID.EQ(jet.Uint64(7))),
 		},
 		{name: "all shares", fixed: allShares, jet: selectNodeShares()},
+		{
+			name:  "attributes of node",
+			fixed: attributesOfNode,
+			args:  []any{uint64(7)},
+			jet:   selectNodeAttributes().WHERE(table.NodeAttributes.NodeID.EQ(jet.Uint64(7))),
+		},
+		{name: "all attributes", fixed: allAttributes, jet: selectNodeAttributes()},
 	}
 
 	return slices.Concat(static, nodeUpdateCases(&row))

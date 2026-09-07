@@ -66,6 +66,14 @@ COL networks.description text null=YES
 COL networks.enabled boolean null=YES default=true
 COL networks.created_at timestamp with time zone null=YES
 COL networks.updated_at timestamp with time zone null=YES
+COL node_attributes.id bigint null=NO default=nextval('node_attributes_id_seq'::regclass)
+COL node_attributes.node_id bigint null=NO
+COL node_attributes.key text null=NO
+COL node_attributes.value text null=NO
+COL node_attributes.expires_at timestamp with time zone null=YES
+COL node_attributes.comment text null=YES
+COL node_attributes.created_at timestamp with time zone null=YES
+COL node_attributes.updated_at timestamp with time zone null=YES
 COL node_shares.id bigint null=NO default=nextval('node_shares_id_seq'::regclass)
 COL node_shares.node_id bigint null=NO
 COL node_shares.user_id bigint null=NO
@@ -94,6 +102,7 @@ COL nodes.deleted_at timestamp with time zone null=YES
 COL nodes.approved_at timestamp with time zone null=YES
 COL nodes.global_exit_node boolean null=YES default=false
 COL nodes.suspended_at timestamp with time zone null=YES
+COL nodes.posture text null=YES
 COL oauth_access_tokens.id bigint null=NO default=nextval('oauth_access_tokens_id_seq'::regclass)
 COL oauth_access_tokens.prefix text null=YES
 COL oauth_access_tokens.hash bytea null=YES
@@ -196,6 +205,7 @@ IDX CREATE UNIQUE INDEX idx_network_prefixes_network_prefix ON public.network_pr
 IDX CREATE UNIQUE INDEX idx_network_route_approvals_node_prefix ON public.network_route_approvals USING btree (node_id, prefix)
 IDX CREATE UNIQUE INDEX idx_network_routers_network_node ON public.network_routers USING btree (network_id, node_id)
 IDX CREATE UNIQUE INDEX idx_networks_name ON public.networks USING btree (name)
+IDX CREATE UNIQUE INDEX idx_node_attributes_node_key ON public.node_attributes USING btree (node_id, key)
 IDX CREATE UNIQUE INDEX idx_node_shares_node_user ON public.node_shares USING btree (node_id, user_id)
 IDX CREATE UNIQUE INDEX idx_oauth_access_tokens_prefix ON public.oauth_access_tokens USING btree (prefix)
 IDX CREATE UNIQUE INDEX idx_oauth_clients_client_id ON public.oauth_clients USING btree (client_id)
@@ -208,6 +218,7 @@ IDX CREATE UNIQUE INDEX network_prefixes_pkey ON public.network_prefixes USING b
 IDX CREATE UNIQUE INDEX network_route_approvals_pkey ON public.network_route_approvals USING btree (id)
 IDX CREATE UNIQUE INDEX network_routers_pkey ON public.network_routers USING btree (id)
 IDX CREATE UNIQUE INDEX networks_pkey ON public.networks USING btree (id)
+IDX CREATE UNIQUE INDEX node_attributes_pkey ON public.node_attributes USING btree (id)
 IDX CREATE UNIQUE INDEX node_shares_pkey ON public.node_shares USING btree (id)
 IDX CREATE UNIQUE INDEX nodes_pkey ON public.nodes USING btree (id)
 IDX CREATE UNIQUE INDEX oauth_access_tokens_pkey ON public.oauth_access_tokens USING btree (id)
@@ -283,6 +294,12 @@ CON network_routers network_routers_pkey PRIMARY KEY (id)
 CON networks networks_id_not_null NOT NULL id
 CON networks networks_name_not_null NOT NULL name
 CON networks networks_pkey PRIMARY KEY (id)
+CON node_attributes fk_node_attributes_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
+CON node_attributes node_attributes_id_not_null NOT NULL id
+CON node_attributes node_attributes_key_not_null NOT NULL key
+CON node_attributes node_attributes_node_id_not_null NOT NULL node_id
+CON node_attributes node_attributes_pkey PRIMARY KEY (id)
+CON node_attributes node_attributes_value_not_null NOT NULL value
 CON node_shares fk_node_shares_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
 CON node_shares fk_node_shares_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 CON node_shares node_shares_id_not_null NOT NULL id

@@ -15,6 +15,7 @@ import { GroupsSection } from "~/components/machines/groups.tsx";
 import { MachineMenu } from "~/components/machines/menu.tsx";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
 import { AddressesSection, OverviewSection } from "~/components/machines/overview.tsx";
+import { PostureSection } from "~/components/machines/posture.tsx";
 import { GlobalExitSection, RoutesSection } from "~/components/machines/routes.tsx";
 import { SharingSection } from "~/components/machines/sharing.tsx";
 import { StatusBadge } from "~/components/machines/status-badge.tsx";
@@ -69,6 +70,7 @@ function MachinePage(): ReactElement {
         <div className="flex flex-col gap-6">
           <OverviewSection node={node} />
           <RoutesSection node={node} canEdit={routes} />
+          <PostureSection node={node} me={me} />
           {groups.data === undefined ? null : (
             <GroupsSection node={node} groups={groups.data.groups} users={userList} me={me} />
           )}

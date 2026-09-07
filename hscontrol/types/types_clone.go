@@ -85,6 +85,8 @@ func (src *Node) Clone() *Node {
 	if dst.SuspendedAt != nil {
 		dst.SuspendedAt = new(*src.SuspendedAt)
 	}
+	dst.Posture = src.Posture.Clone()
+	dst.Attributes = append(src.Attributes[:0:0], src.Attributes...)
 	dst.SharedWith = append(src.SharedWith[:0:0], src.SharedWith...)
 	if dst.DeletedAt != nil {
 		dst.DeletedAt = new(*src.DeletedAt)
@@ -118,6 +120,8 @@ var _NodeCloneNeedsRegeneration = Node(struct {
 	ApprovedRoutes Prefixes
 	ApprovedAt     *time.Time
 	SuspendedAt    *time.Time
+	Posture        *PostureIdentity
+	Attributes     []NodeAttribute
 	SharedWith     []UserID
 	GlobalExitNode bool
 	CreatedAt      time.Time
@@ -174,4 +178,42 @@ var _PreAuthKeyCloneNeedsRegeneration = PreAuthKey(struct {
 	CreatedAt     *time.Time
 	Expiration    *time.Time
 	Revoked       *time.Time
+}{})
+
+// Clone makes a deep copy of PostureIdentity.
+// The result aliases no memory with the original.
+func (src *PostureIdentity) Clone() *PostureIdentity {
+	if src == nil {
+		return nil
+	}
+	dst := new(PostureIdentity)
+	*dst = *src
+	dst.SerialNumbers = append(src.SerialNumbers[:0:0], src.SerialNumbers...)
+	return dst
+}
+
+// A compilation failure here means this code must be regenerated, with the command at the top of this file.
+var _PostureIdentityCloneNeedsRegeneration = PostureIdentity(struct {
+	SerialNumbers []string
+	Disabled      bool
+	CollectedAt   time.Time
+}{})
+
+// Clone makes a deep copy of NodeAttribute.
+// The result aliases no memory with the original.
+func (src *NodeAttribute) Clone() *NodeAttribute {
+	if src == nil {
+		return nil
+	}
+	dst := new(NodeAttribute)
+	*dst = *src
+	return dst
+}
+
+// A compilation failure here means this code must be regenerated, with the command at the top of this file.
+var _NodeAttributeCloneNeedsRegeneration = NodeAttribute(struct {
+	Key       string
+	Value     AttributeValue
+	ExpiresAt time.Time
+	Comment   string
 }{})

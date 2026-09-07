@@ -173,8 +173,9 @@ func fixedNode(q Querier, stmt *fixedSQL, args ...any) (*types.Node, error) {
 	return nodeWithShares(q, &record)
 }
 
-// nodesWithShares converts the records and attaches their shares; every
-// production node read goes through it or [nodeWithShares].
+// nodesWithShares converts the records and attaches their shares and
+// attributes; every production node read goes through it or
+// [nodeWithShares].
 func nodesWithShares(q Querier, records []nodeRecord) (types.Nodes, error) {
 	nodes, err := nodeRecordsToNodes(records)
 	if err != nil {
@@ -186,7 +187,7 @@ func nodesWithShares(q Querier, records []nodeRecord) (types.Nodes, error) {
 		return nil, err
 	}
 
-	return nodes, nil
+	return nodes, attachAttributes(q, nodes)
 }
 
 func nodeWithShares(q Querier, record *nodeRecord) (*types.Node, error) {
@@ -200,7 +201,7 @@ func nodeWithShares(q Querier, record *nodeRecord) (*types.Node, error) {
 		return nil, err
 	}
 
-	return node, nil
+	return node, attachAttributesToNode(q, node)
 }
 
 func nodeIDList(ids []types.NodeID) []jet.Expression {
@@ -569,6 +570,24 @@ func (hsdb *HSDatabase) NodeSetApproval(nodeID types.NodeID, approvedAt *time.Ti
 func (hsdb *HSDatabase) NodeSetGlobalExitNode(nodeID types.NodeID, on bool) error {
 	return hsdb.Write(func(tx *Tx) error {
 		return updateNodeColumn(tx, nodeID, table.Nodes.GlobalExitNode, on)
+	})
+}
+
+// NodeSetPosture stores the device identity the client reported.
+func (hsdb *HSDatabase) NodeSetPosture(nodeID types.NodeID, posture *types.PostureIdentity) error {
+	var column *string
+
+	if posture != nil {
+		encoded, err := marshalJSONColumn(posture)
+		if err != nil {
+			return err
+		}
+
+		column = &encoded
+	}
+
+	return hsdb.Write(func(tx *Tx) error {
+		return updateNodeColumn(tx, nodeID, table.Nodes.Posture, column)
 	})
 }
 

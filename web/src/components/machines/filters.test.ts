@@ -53,6 +53,8 @@ function node(id: string, overrides: Partial<Node> = {}): Node {
     registerMethod: "REGISTER_METHOD_CLI",
     sharedWith: [],
     subnetRoutes: [],
+    suspended: false,
+    suspendedAt: null,
     tags: [],
     user: ada,
     ...overrides,

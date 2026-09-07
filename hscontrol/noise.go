@@ -208,6 +208,10 @@ func (h *Headscale) NoiseUpgradeHandler(
 		r.Route("/webclient", func(_ chi.Router) {})
 
 		r.Post("/c2n", ns.NotImplementedHandler)
+
+		// Clients post the serialised answer to a c2n request the server
+		// sent as a [tailcfg.PingRequest] here; see [State.CollectPosture].
+		r.Post("/c2n-response", ns.headscale.C2NResponseHandler)
 	})
 
 	ns.httpBaseConfig = &http.Server{
@@ -298,6 +302,32 @@ func (h *Headscale) PingResponseHandler(
 		writer.WriteHeader(http.StatusOK)
 	} else {
 		http.Error(writer, "unknown or expired ping", http.StatusNotFound)
+	}
+}
+
+// c2nMaxResponse bounds a c2n answer; a posture identity is a few
+// hundred bytes.
+const c2nMaxResponse = 1 << 20
+
+// C2NResponseHandler receives the answer a client posts to a c2n request.
+// The unguessable id serves as authentication, as for pings.
+func (h *Headscale) C2NResponseHandler(writer http.ResponseWriter, req *http.Request) {
+	id := req.URL.Query().Get("id")
+	if id == "" {
+		http.Error(writer, "missing c2n ID", http.StatusBadRequest)
+		return
+	}
+
+	body, err := io.ReadAll(io.LimitReader(req.Body, c2nMaxResponse))
+	if err != nil {
+		http.Error(writer, "reading response", http.StatusBadRequest)
+		return
+	}
+
+	if h.state.CompleteC2N(id, body) {
+		writer.WriteHeader(http.StatusOK)
+	} else {
+		http.Error(writer, "unknown or expired c2n request", http.StatusNotFound)
 	}
 }
 
@@ -458,6 +488,7 @@ func (ns *noiseServer) PollNetMapHandler(
 	if !sess.isStreaming() {
 		sess.serve()
 	} else {
+		//nolint:contextcheck // the stream context lives on the session struct
 		sess.serveLongPoll()
 	}
 }

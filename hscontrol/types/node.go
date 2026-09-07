@@ -181,6 +181,15 @@ type Node struct {
 	// request path leaves it alone like [Node.ApprovedAt].
 	SuspendedAt *time.Time
 
+	// Posture is the device identity the client last reported over c2n,
+	// nil until the server asked. Only [State.CollectPosture] writes it.
+	Posture *PostureIdentity
+
+	// Attributes are the custom posture attributes set through the API,
+	// in key order, expired ones included until the sweeper drops them.
+	// Only the attribute operations on State write them.
+	Attributes []NodeAttribute
+
 	// SharedWith lists the users the node has been shared with, in
 	// ascending id order. The policy resolves autogroup:shared from it
 	// and the map response marks the node as shared to those users'
@@ -1217,7 +1226,23 @@ func (nv NodeView) HasPolicyChange(other NodeView) bool {
 		return true
 	}
 
-	return false
+	// The policy's postures read the attribute map, so what feeds it
+	// counts: the reported OS and versions, the serials and the custom
+	// attributes.
+	return !maps.EqualFunc(nv.PostureAttributes(time.Time{}), other.PostureAttributes(time.Time{}), attributeEqual)
+}
+
+// attributeEqual compares two attribute values, which are scalars or
+// serial number lists.
+func attributeEqual(a, b any) bool {
+	as, aok := a.([]string)
+	bs, bok := b.([]string)
+
+	if aok || bok {
+		return aok && bok && slices.Equal(as, bs)
+	}
+
+	return a == b
 }
 
 // TailNodes converts a slice of [NodeView] values into Tailscale [tailcfg.Node] values.

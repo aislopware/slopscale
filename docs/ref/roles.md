@@ -14,18 +14,19 @@ the [policy](policy.md), which may address roles through
 
 ## The roles
 
-| Role            | Users, devices, keys, settings | Policy and routes | Webhooks | Reads everything | Assigns roles |
-| --------------- | ------------------------------ | ----------------- | -------- | ---------------- | ------------- |
-| `owner`         | write                          | write             | write    | yes              | yes           |
-| `admin`         | write                          | write             | write    | yes              | yes           |
-| `network-admin` | read                           | write             | write    | yes              | no            |
-| `it-admin`      | write                          | read              | write    | yes              | no            |
-| `auditor`       | read                           | read              | read     | yes              | no            |
-| `member`        | none                           | none              | none     | no               | no            |
+| Role            | Users, devices, keys, settings | Policy and routes | Webhooks, posture | Reads everything | Assigns roles |
+| --------------- | ------------------------------ | ----------------- | ----------------- | ---------------- | ------------- |
+| `owner`         | write                          | write             | write             | yes              | yes           |
+| `admin`         | write                          | write             | write             | yes              | yes           |
+| `network-admin` | read                           | write             | write             | yes              | no            |
+| `it-admin`      | write                          | read              | write             | yes              | no            |
+| `auditor`       | read                           | read              | read              | yes              | no            |
+| `member`        | none                           | none              | none              | no               | no            |
 
 "Users, devices, keys, settings" are the `users`, `devices:core`, `auth_keys`,
 `oauth_keys` and `feature_settings` scopes of the v2 API; "policy and routes"
-are `policy_file`, `devices:routes` and `dns`; webhooks are `webhooks`. The v1 API declares the same scopes on
+are `policy_file`, `devices:routes` and `dns`; webhooks and posture are
+`webhooks` and `devices:posture_attributes`. The v1 API declares the same scopes on
 its operations, so a credential means the same thing on both APIs. Run
 `GET /api/v1/whoami` to see the role and permissions a credential carries.
 

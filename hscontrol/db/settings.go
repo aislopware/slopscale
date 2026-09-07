@@ -43,6 +43,8 @@ func (hsdb *HSDatabase) LoadSettings() (types.Settings, error) {
 			target = &settings.DevicesApprovalOn
 		case types.SettingUsersApprovalOn:
 			target = &settings.UsersApprovalOn
+		case types.SettingPostureIdentityOn:
+			target = &settings.PostureIdentityOn
 		case types.SettingKeyExpiry:
 			d, err := time.ParseDuration(r.Setting.Value)
 			if err != nil {

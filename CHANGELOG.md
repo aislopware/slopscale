@@ -140,7 +140,18 @@ Nobody has to sign in on the device afterwards, which makes it the
 reversible alternative to expiring the key. `headscale nodes suspend`,
 `POST /api/v1/node/{id}/suspend`, the machine's menu and danger zone in the
 console, the `node.suspension.set` audit action and the `nodeSuspended` and
-`nodeUnsuspended` webhook events cover it. See
+`nodeUnsuspended` webhook events cover it.
+
+Every machine now carries a device posture the policy can check, following
+Tailscale's device posture: `node:os`, `node:tsVersion` and the other
+attributes derived from what the client reports, `node:serialNumber` once the
+new `postureIdentityOn` setting lets the server ask clients for their
+identity, and `custom:...` attributes an operator sets with an optional
+expiry, so a temporary marker such as an on-call rotation removes itself.
+`GET /api/v1/node/{id}/posture`, `PUT` and `DELETE /api/v1/node/{id}/attributes/{key}`, Tailscale's
+`/api/v2/device/{id}/attributes`, `headscale nodes posture` and a _Device
+posture_ section on the machine's page in the console cover it, under the
+new `devices:posture_attributes` scope. See
 [Device trust](https://headscale.net/development/ref/device-trust/).
 
 ### Networks
@@ -582,7 +593,7 @@ connected" routers that maintain their control session but cannot route packets.
 - Install `config-example.yaml` as example for the debian package [#3186](https://github.com/juanfont/headscale/pull/3186)
 - Fix user-owned re-registration with zero client expiry and no default storing `0001-01-01 00:00:00` in the database instead of `NULL` [#3199](https://github.com/juanfont/headscale/pull/3199)
 - Fix `tailscaled` restart on a node with no expiry resetting `NULL` to `0001-01-01 00:00:00` in the database, affecting both tagged and untagged nodes [#3197](https://github.com/juanfont/headscale/pull/3197)
-- Backfill `nodes.expiry` rows persisted by older versions as `0001-01-01 00:00:00` to `NULL`, so nodes upgraded from <0.28 stop reporting as expired [#3284](https://github.com/juanfont/headscale/issues/3284)
+- Backfill `nodes.expiry` rows persisted by older versions as `0001-01-01 00:00:00` to `NULL`, so nodes upgraded from \<0.28 stop reporting as expired [#3284](https://github.com/juanfont/headscale/issues/3284)
 - Update reverse proxy documentation for `trusted_proxies` configuration option [#3292](https://github.com/juanfont/headscale/pull/3292)
 
 ## 0.28.0 (2026-02-04)
@@ -628,9 +639,12 @@ sequentially through each stable release, selecting the latest patch version ava
 ### BREAKING
 
 - **API**: The Node message in the gRPC/REST API has been simplified - the `ForcedTags`, `InvalidTags`, and `ValidTags` fields have been removed and replaced with a single `Tags` field that contains the node's applied tags [#2993](https://github.com/juanfont/headscale/pull/2993)
+
   - API clients should use the `Tags` field instead of `ValidTags`
   - The `headscale nodes list` CLI command now always shows a Tags column and the `--tags` flag has been removed
+
 - **PreAuthKey CLI**: Commands now use ID-based operations instead of user+key combinations [#2992](https://github.com/juanfont/headscale/pull/2992)
+
   - `headscale preauthkeys create` no longer requires `--user` flag (optional for tracking creation)
   - `headscale preauthkeys list` lists all keys (no longer filtered by user)
   - `headscale preauthkeys expire --id <ID>` replaces `--user <USER> <KEY>`
@@ -655,26 +669,36 @@ sequentially through each stable release, selecting the latest patch version ava
   ```
 
 - **Tags**: The gRPC `SetTags` endpoint now allows converting user-owned nodes to tagged nodes by setting tags. [#2885](https://github.com/juanfont/headscale/pull/2885)
+
 - **Tags**: Tags are now resolved from the node's stored Tags field only [#2931](https://github.com/juanfont/headscale/pull/2931)
+
   - `--advertise-tags` is processed during registration, not on every policy evaluation
   - PreAuthKey tagged devices ignore `--advertise-tags` from clients
   - User-owned nodes can use `--advertise-tags` if authorized by `tagOwners` policy
   - Tags can be managed via CLI (`headscale nodes tag`) or the SetTags API after registration
+
 - Database migration support removed for pre-0.25.0 databases [#2883](https://github.com/juanfont/headscale/pull/2883)
+
   - If you are running a version older than 0.25.0, you must upgrade to 0.25.1 first, then upgrade to this release
   - See the [upgrade path documentation](https://headscale.net/stable/about/faq/#what-is-the-recommended-update-path-can-i-skip-multiple-versions-while-updating) for detailed guidance
   - In version 0.29, all migrations before 0.28.0 will also be removed
+
 - Remove ability to move nodes between users [#2922](https://github.com/juanfont/headscale/pull/2922)
+
   - The `headscale nodes move` CLI command has been removed
   - The `MoveNode` API endpoint has been removed
   - Nodes are permanently associated with their user or tag at registration time
+
 - Add `oidc.email_verified_required` config option to control email verification requirement [#2860](https://github.com/juanfont/headscale/pull/2860)
+
   - When `true` (default), only verified emails can authenticate via OIDC in conjunction with `oidc.allowed_domains` or
     `oidc.allowed_users`. Previous versions allowed to authenticate with an unverified email but did not store the email
     address in the user profile. This is now rejected during authentication with an `unverified email` error.
   - When `false`, unverified emails are allowed for OIDC authentication and the email address is stored in the user
     profile regardless of its verification state.
+
 - **SSH Policy**: Wildcard (`*`) is no longer supported as an SSH destination [#3009](https://github.com/juanfont/headscale/issues/3009)
+
   - Use `autogroup:member` for user-owned devices
   - Use `autogroup:tagged` for tagged devices
   - Use specific tags (e.g., `tag:server`) for targeted access
@@ -694,8 +718,9 @@ sequentially through each stable release, selecting the latest patch version ava
 - **SSH Policy**: SSH source/destination validation now enforces Tailscale's security model [#3010](https://github.com/juanfont/headscale/issues/3010)
 
   Per [Tailscale SSH documentation](https://tailscale.com/docs/features/tailscale-ssh), the following rules are now enforced:
+
   1. **Tags cannot SSH to user-owned devices**: SSH rules with `tag:*` or `autogroup:tagged` as source cannot have username destinations (e.g., `alice@`) or `autogroup:member`/`autogroup:self` as destination
-  2. **Username destinations require same-user source**: If destination is a specific username (e.g., `alice@`), the source must be that exact same user only. Use `autogroup:self` for same-user SSH access instead
+  1. **Username destinations require same-user source**: If destination is a specific username (e.g., `alice@`), the source must be that exact same user only. Use `autogroup:self` for same-user SSH access instead
 
   **Invalid policies now rejected at load time:**
 
@@ -860,7 +885,7 @@ the code base over time and make it more correct and efficient.
     - `laptop-🚀` → `invalid-j1k2l3` (emoji not allowed)
   - **Hostinfo Updates / CLI**: Invalid hostnames are rejected with an error
     - Valid names are accepted or lowercased
-    - Names with invalid characters, too short (<2), too long (>63), or
+    - Names with invalid characters, too short (\<2), too long (>63), or
       starting/ending with hyphen are rejected
 
 ### Changes
@@ -1665,7 +1690,7 @@ part of adopting [#1460](https://github.com/juanfont/headscale/pull/1460).
 
 ## 0.14.0 (2022-02-24)
 
-**UPCOMING ### BREAKING From the **next\*\* version (`0.15.0`), all machines
+\*\*UPCOMING ### BREAKING From the \*\*next\*\* version (`0.15.0`), all machines
 will be able to communicate regardless of if they are in the same namespace.
 This means that the behaviour currently limited to ACLs will become default.
 From version `0.15.0`, all limitation of communications must be done with ACLs.
@@ -1711,7 +1736,7 @@ behaviour.
 
 - `ip_prefix` is now superseded by `ip_prefixes` in the configuration [#208](https://github.com/juanfont/headscale/pull/208)
 - Upgrade `tailscale` (1.20.4) and other dependencies to latest [#314](https://github.com/juanfont/headscale/pull/314)
-- fix swapped machine<->namespace labels in `/metrics` [#312](https://github.com/juanfont/headscale/pull/312)
+- fix swapped machine\<->namespace labels in `/metrics` [#312](https://github.com/juanfont/headscale/pull/312)
 - remove key-value based update mechanism for namespace changes [#316](https://github.com/juanfont/headscale/pull/316)
 
 **0.12.4 (2022-01-29):**
@@ -1753,8 +1778,8 @@ tagging)
   - This change requires a new format for private key, private keys are now
     generated automatically:
     1. Delete your current key
-    2. Restart `headscale`, a new key will be generated.
-    3. Restart all Tailscale clients to fetch the new key
+    1. Restart `headscale`, a new key will be generated.
+    1. Restart all Tailscale clients to fetch the new key
 
 ### Changes
 

@@ -56,6 +56,8 @@ function node(id: string, available: string[], approved: string[]): Node {
     },
     registerMethod: "REGISTER_METHOD_CLI",
     sharedWith: [],
+    suspended: false,
+    suspendedAt: null,
     subnetRoutes: [],
     tags: [],
     user: owner,

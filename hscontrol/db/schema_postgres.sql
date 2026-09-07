@@ -104,9 +104,23 @@ CREATE TABLE nodes(
   approved_at timestamptz,
   global_exit_node boolean DEFAULT false,
   suspended_at timestamptz,
+  posture text,
   CONSTRAINT fk_nodes_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_nodes_auth_key FOREIGN KEY(auth_key_id) REFERENCES pre_auth_keys(id)
 );
+
+CREATE TABLE node_attributes(
+  id bigserial PRIMARY KEY,
+  node_id bigint NOT NULL,
+  key text NOT NULL,
+  value text NOT NULL,
+  expires_at timestamptz,
+  comment text,
+  created_at timestamptz,
+  updated_at timestamptz,
+  CONSTRAINT fk_node_attributes_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_node_attributes_node_key ON node_attributes(node_id, key);
 
 CREATE TABLE node_shares(
   id bigserial PRIMARY KEY,

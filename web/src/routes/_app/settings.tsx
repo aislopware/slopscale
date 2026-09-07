@@ -4,7 +4,7 @@ import type { ReactElement } from "react";
 
 import { serverInfoQuery, settingsQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
-import { ApprovalSection } from "~/components/settings/approval-section.tsx";
+import { ApprovalSection, DeviceTrustSection } from "~/components/settings/approval-section.tsx";
 import { KeyExpirySection } from "~/components/settings/key-expiry-section.tsx";
 import { ServerSection } from "~/components/settings/server-section.tsx";
 import { SessionSection } from "~/components/settings/session-section.tsx";
@@ -34,6 +34,7 @@ function SettingsPage(): ReactElement {
       />
       <div className="flex max-w-3xl flex-col gap-6">
         <ApprovalSection settings={settings} canEdit={canEdit} />
+        <DeviceTrustSection settings={settings} canEdit={canEdit} />
         <KeyExpirySection settings={settings} canEdit={canEdit} />
         <SessionSection me={me} />
         <ServerSection info={info} />

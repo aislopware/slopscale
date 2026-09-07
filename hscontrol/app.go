@@ -35,6 +35,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
 	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
 	"github.com/juanfont/headscale/web"
 	"github.com/pkg/profile"
 	"github.com/rs/zerolog/log"
@@ -870,6 +871,15 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 	accessTokenTicker := time.NewTicker(time.Hour)
 	defer accessTokenTicker.Stop()
 
+	// Posture identity is asked of every connected node whose report is
+	// stale, and custom attributes with an expiry are swept every minute
+	// so a temporary grant ends when it says.
+	postureTicker := time.NewTicker(state.PostureCollectionInterval)
+	defer postureTicker.Stop()
+
+	attributeTicker := time.NewTicker(time.Minute)
+	defer attributeTicker.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -901,8 +911,64 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 
 		case <-haHealthChan:
 			haProber.ProbeOnce(ctx, h.Change)
+
+		case <-postureTicker.C:
+			h.state.CollectStalePostures(ctx, h.mapBatcher.IsConnected, h.Change)
+
+		case <-attributeTicker.C:
+			h.expireNodeAttributes()
 		}
 	}
+}
+
+// expireNodeAttributes drops custom posture attributes past their expiry
+// and publishes the recompute.
+func (h *Headscale) expireNodeAttributes() {
+	c, err := h.state.ExpireNodeAttributes(time.Now())
+	if err != nil {
+		log.Error().Err(err).Msg("expiring node attributes")
+
+		return
+	}
+
+	if !c.IsEmpty() {
+		h.Change(c)
+	}
+}
+
+// postureConnectDelay leaves a freshly connected client time to read its
+// first map before a c2n request follows it.
+const postureConnectDelay = 2 * time.Second
+
+// collectPostureOnConnect asks a node that just connected for its
+// identity when the setting is on and its report is missing or a day
+// old, so a new machine's serial shows up without waiting for the cycle.
+func (h *Headscale) collectPostureOnConnect(ctx context.Context, nodeID types.NodeID) {
+	if !h.state.Settings().PostureIdentityOn {
+		return
+	}
+
+	node, ok := h.state.GetNodeByID(nodeID)
+	if !ok || node.Posture().Valid() && time.Since(node.Posture().CollectedAt()) < state.PostureMaxAge {
+		return
+	}
+
+	// The stream's context ends with the stream; the collection outlives
+	// the map request that started it.
+	ctx = context.WithoutCancel(ctx)
+
+	time.AfterFunc(postureConnectDelay, func() {
+		_, c, err := h.state.CollectPosture(ctx, nodeID, h.mapBatcher.IsConnected(nodeID), h.Change)
+		if err != nil {
+			log.Debug().Err(err).Uint64(zf.NodeID, nodeID.Uint64()).Msg("posture collection on connect failed")
+
+			return
+		}
+
+		if !c.IsEmpty() {
+			h.Change(c)
+		}
+	})
 }
 
 // reapRevokedPreAuthKeys destroys pre-auth keys that were revoked more than

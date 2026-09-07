@@ -86,6 +86,17 @@ func mustMarkRequired(cmd *cobra.Command, names ...string) {
 	}
 }
 
+// mustMarkPersistentRequired is [mustMarkRequired] for persistent flags,
+// which subcommands inherit.
+func mustMarkPersistentRequired(cmd *cobra.Command, names ...string) {
+	for _, n := range names {
+		err := cmd.MarkPersistentFlagRequired(n)
+		if err != nil {
+			panic(fmt.Sprintf("marking persistent flag %q required on %q: %v", n, cmd.Name(), err))
+		}
+	}
+}
+
 func newHeadscaleServerWithConfig() (*hscontrol.Headscale, error) {
 	cfg, err := types.LoadServerConfig()
 	if err != nil {

@@ -18,12 +18,14 @@ func init() {
 		"Require an administrator to approve new nodes (unless registered with a preauthorized key)")
 	setSettingsCmd.Flags().Bool("users-approval", false,
 		"Require an administrator to approve users created by OIDC login")
+	setSettingsCmd.Flags().Bool("posture-identity", false,
+		"Ask clients for their hardware serial numbers, for node:serialNumber posture checks")
 	setSettingsCmd.Flags().Int64("key-expiry-days", 0,
 		"Cap node key expiry at this many days after a login; 0 leaves the config file and the client in charge")
 }
 
 var errNoSettingGiven = errors.New(
-	"give at least one of --devices-approval, --users-approval or --key-expiry-days",
+	"give at least one of --devices-approval, --users-approval, --posture-identity or --key-expiry-days",
 )
 
 var settingsCmd = &cobra.Command{
@@ -70,12 +72,18 @@ users approval off approves every node or user that was waiting.`,
 				body.UsersApprovalOn = &on
 			}
 
+			if cmd.Flags().Changed("posture-identity") {
+				on, _ := cmd.Flags().GetBool("posture-identity")
+				body.PostureIdentityOn = &on
+			}
+
 			if cmd.Flags().Changed("key-expiry-days") {
 				days, _ := cmd.Flags().GetInt64("key-expiry-days")
 				body.KeyExpiryDays = &days
 			}
 
-			if body.DevicesApprovalOn == nil && body.UsersApprovalOn == nil && body.KeyExpiryDays == nil {
+			if body.DevicesApprovalOn == nil && body.UsersApprovalOn == nil && body.KeyExpiryDays == nil &&
+				body.PostureIdentityOn == nil {
 				return errNoSettingGiven
 			}
 
@@ -100,6 +108,7 @@ func printSettings(cmd *cobra.Command, settings *clientv1.Settings) error {
 			[][]string{
 				{"Device approval", onOff(settings.DevicesApprovalOn)},
 				{"Users approval", onOff(settings.UsersApprovalOn)},
+				{"Posture identity", onOff(settings.PostureIdentityOn)},
 				{"Key expiry", keyExpiryLabel(settings)},
 			},
 		)

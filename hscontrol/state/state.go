@@ -136,6 +136,8 @@ type State struct {
 
 	// pings tracks pending ping requests and their response channels.
 	pings *pingTracker
+	// c2n tracks pending control-to-node requests; see posture.go.
+	c2n *c2nTracker
 
 	// sshCheckAuth tracks when source nodes last completed SSH check auth.
 	//
@@ -268,6 +270,7 @@ func NewState(cfg *types.Config) (*State, error) {
 		authCache: authCache,
 		nodeStore: nodeStore,
 		pings:     newPingTracker(),
+		c2n:       newC2NTracker(),
 
 		sshCheckAuth:  make(map[sshCheckPair]time.Time),
 		registerLocks: xsync.NewMap[key.MachinePublic, *sync.Mutex](),

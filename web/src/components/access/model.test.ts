@@ -63,6 +63,8 @@ function node(id: string, owner: User, tags: string[] = []): Node {
     },
     registerMethod: "REGISTER_METHOD_CLI",
     sharedWith: [],
+    suspended: false,
+    suspendedAt: null,
     subnetRoutes: [],
     tags,
     user: owner,

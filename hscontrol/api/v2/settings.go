@@ -59,9 +59,10 @@ type (
 // that was waiting. The other Tailscale settings are file-based here and
 // are rejected.
 type UpdateTailnetSettings struct {
-	DevicesApprovalOn      *bool `json:"devicesApprovalOn,omitempty"`
-	DevicesKeyDurationDays *int  `doc:"0 leaves the config file and the client in charge." json:"devicesKeyDurationDays,omitempty" maximum:"365" minimum:"0"` //nolint:lll // struct tag
-	UsersApprovalOn        *bool `json:"usersApprovalOn,omitempty"`
+	DevicesApprovalOn           *bool `json:"devicesApprovalOn,omitempty"`
+	DevicesKeyDurationDays      *int  `doc:"0 leaves the config file and the client in charge." json:"devicesKeyDurationDays,omitempty" maximum:"365" minimum:"0"` //nolint:lll // struct tag
+	UsersApprovalOn             *bool `json:"usersApprovalOn,omitempty"`
+	PostureIdentityCollectionOn *bool `json:"postureIdentityCollectionOn,omitempty"`
 }
 
 func tailnetSettings(b Backend) TailnetSettings {
@@ -75,6 +76,7 @@ func tailnetSettings(b Backend) TailnetSettings {
 		DevicesApprovalOn:                      current.DevicesApprovalOn,
 		DevicesKeyDurationDays:                 int(keyDuration / (hoursPerDay * time.Hour)),
 		HTTPSEnabled:                           cfg.TLS.CertPath != "" || cfg.TLS.LetsEncrypt.Hostname != "",
+		PostureIdentityCollectionOn:            current.PostureIdentityOn,
 		UsersApprovalOn:                        current.UsersApprovalOn,
 		UsersRoleAllowedToJoinExternalTailnets: "none",
 	}
@@ -124,6 +126,7 @@ func registerSettings(api huma.API, b Backend) {
 		}{
 			{types.SettingDevicesApprovalOn, in.Body.DevicesApprovalOn},
 			{types.SettingUsersApprovalOn, in.Body.UsersApprovalOn},
+			{types.SettingPostureIdentityOn, in.Body.PostureIdentityCollectionOn},
 		}
 
 		for _, u := range updates {

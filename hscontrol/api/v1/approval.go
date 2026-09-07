@@ -25,6 +25,9 @@ type SetApprovalRequestBody struct {
 type Settings struct {
 	DevicesApprovalOn bool `doc:"New nodes wait for an administrator unless they register with a preauthorized key." json:"devicesApprovalOn"` //nolint:lll // struct tag
 	UsersApprovalOn   bool `doc:"Users created by OIDC login wait for an administrator before registering nodes."    json:"usersApprovalOn"`   //nolint:lll // struct tag
+	// PostureIdentityOn lets the server ask clients for their hardware
+	// serial numbers, which the policy can then check as node:serialNumber.
+	PostureIdentityOn bool `json:"postureIdentityOn"`
 	// KeyExpiryDays caps how long a node key stays valid after a login;
 	// 0 leaves the config file's node.expiry and the client in charge.
 	KeyExpiryDays int `json:"keyExpiryDays"`
@@ -38,6 +41,7 @@ type Settings struct {
 type UpdateSettingsRequestBody struct {
 	DevicesApprovalOn *bool `json:"devicesApprovalOn,omitempty"`
 	UsersApprovalOn   *bool `json:"usersApprovalOn,omitempty"`
+	PostureIdentityOn *bool `json:"postureIdentityOn,omitempty"`
 	// KeyExpiryDays 0 switches the cap off.
 	KeyExpiryDays *int `json:"keyExpiryDays,omitempty" maximum:"365" minimum:"0"`
 }
@@ -72,6 +76,7 @@ func settingsFrom(s types.Settings, cfg *types.Config) Settings {
 	out := Settings{
 		DevicesApprovalOn: s.DevicesApprovalOn,
 		UsersApprovalOn:   s.UsersApprovalOn,
+		PostureIdentityOn: s.PostureIdentityOn,
 		KeyExpiryDays:     int(s.KeyExpiry / day),
 	}
 
@@ -164,6 +169,7 @@ func registerApproval(api huma.API, b Backend) {
 		}{
 			{types.SettingDevicesApprovalOn, in.Body.DevicesApprovalOn},
 			{types.SettingUsersApprovalOn, in.Body.UsersApprovalOn},
+			{types.SettingPostureIdentityOn, in.Body.PostureIdentityOn},
 		}
 
 		for _, u := range updates {

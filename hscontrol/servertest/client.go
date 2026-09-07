@@ -2,8 +2,10 @@ package servertest
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/juanfont/headscale/hscontrol/types"
 	"tailscale.com/control/controlclient"
+	_ "tailscale.com/feature/c2n" // answers c2n pings
 	"tailscale.com/health"
 	"tailscale.com/net/netmon"
 	"tailscale.com/net/tsdial"
@@ -69,6 +72,26 @@ type clientConfig struct {
 	tags      []string
 	user      *types.User
 	authKey   string
+	hostinfo  func(*tailcfg.Hostinfo)
+	serials   []string
+	posture   bool
+}
+
+// WithHostinfo lets a test shape the [tailcfg.Hostinfo] the client
+// registers with: OS, versions, device model and the like.
+func WithHostinfo(f func(*tailcfg.Hostinfo)) ClientOption {
+	return func(c *clientConfig) { c.hostinfo = f }
+}
+
+// WithSerialNumbers makes the client answer the server's c2n posture
+// identity request with these serial numbers, as a client with posture
+// checking on does. Without it the client answers that posture checking
+// is off.
+func WithSerialNumbers(serials ...string) ClientOption {
+	return func(c *clientConfig) {
+		c.serials = serials
+		c.posture = true
+	}
 }
 
 // WithAuthKey registers with the given pre-auth key instead of one the
@@ -134,7 +157,7 @@ func NewClient(tb testing.TB, server *TestServer, name string, opts ...ClientOpt
 		authKey = server.CreatePreAuthKey(tb, uid)
 	}
 
-	tc := newTestClient(tb, server, name, cc.hostname, authKey)
+	tc := newTestClient(tb, server, name, cc.hostname, authKey, cc)
 	tc.user = user
 
 	// Register with the server.
@@ -150,8 +173,12 @@ func NewClient(tb testing.TB, server *TestServer, name string, opts ...ClientOpt
 // [TestClient] wired to the server's in-memory network. An empty authKey
 // leaves the client to log in interactively. The client is not registered
 // and not polling yet; cleanup is registered on tb.
-func newTestClient(tb testing.TB, server *TestServer, name, hostname, authKey string) *TestClient {
+func newTestClient(tb testing.TB, server *TestServer, name, hostname, authKey string, cc *clientConfig) *TestClient {
 	tb.Helper()
+
+	if cc == nil {
+		cc = &clientConfig{}
+	}
 
 	bus := eventbus.New()
 	tracker := health.NewTracker(bus)
@@ -164,20 +191,26 @@ func newTestClient(tb testing.TB, server *TestServer, name, hostname, authKey st
 
 	machineKey := key.NewMachine()
 
+	hostinfo := &tailcfg.Hostinfo{
+		BackendLogID: "servertest-" + name,
+		Hostname:     hostname,
+	}
+	if cc.hostinfo != nil {
+		cc.hostinfo(hostinfo)
+	}
+
 	direct, err := controlclient.NewDirect(controlclient.Options{
 		Persist:              persist.Persist{},
 		GetMachinePrivateKey: func() (key.MachinePrivate, error) { return machineKey, nil },
 		ServerURL:            server.URL,
 		AuthKey:              authKey,
-		Hostinfo: &tailcfg.Hostinfo{
-			BackendLogID: "servertest-" + name,
-			Hostname:     hostname,
-		},
-		DiscoPublicKey: key.NewDisco().Public(),
-		Logf:           tb.Logf,
-		HealthTracker:  tracker,
-		Dialer:         dialer,
-		Bus:            bus,
+		Hostinfo:             hostinfo,
+		DiscoPublicKey:       key.NewDisco().Public(),
+		Logf:                 tb.Logf,
+		HealthTracker:        tracker,
+		Dialer:               dialer,
+		Bus:                  bus,
+		C2NHandler:           c2nHandler(cc),
 	})
 	if err != nil {
 		tb.Fatalf("servertest: NewDirect(%s): %v", name, err)
@@ -233,7 +266,7 @@ type loginResult struct {
 func NewPendingLogin(tb testing.TB, server *TestServer, name string) *PendingLogin {
 	tb.Helper()
 
-	tc := newTestClient(tb, server, name, name, "")
+	tc := newTestClient(tb, server, name, name, "", nil)
 
 	return tc.startPendingLogin(tb)
 }
@@ -753,4 +786,23 @@ func (c *TestClient) waitForPeers(
 			tb.Fatalf("servertest: %s(%s, %d): timeout after %v (got %d peers)", op, c.Name, n, timeout, got)
 		}
 	}
+}
+
+// c2nHandler answers the control-to-node requests the server sends
+// through the map stream, the way the real client's handler does for the
+// posture identity request.
+func c2nHandler(cc *clientConfig) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /posture/identity", func(w http.ResponseWriter, _ *http.Request) {
+		resp := tailcfg.C2NPostureIdentityResponse{PostureDisabled: !cc.posture}
+		if cc.posture {
+			resp.SerialNumbers = cc.serials
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+
+		_ = json.NewEncoder(w).Encode(resp)
+	})
+
+	return mux
 }

@@ -89,6 +89,8 @@ const laptop: Node = {
   },
   registerMethod: "REGISTER_METHOD_OIDC",
   sharedWith: [],
+  suspended: false,
+  suspendedAt: null,
   subnetRoutes: [],
   tags: [],
   user: alice,

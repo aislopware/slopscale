@@ -39,6 +39,11 @@ const (
 	DevicesRoutes     Scope = "devices:routes"
 	DevicesRoutesRead Scope = "devices:routes:read"
 
+	// DevicesPostureAttributes gates a node's posture: the collected
+	// identity and the custom attributes, as Tailscale scopes them.
+	DevicesPostureAttributes     Scope = "devices:posture_attributes"
+	DevicesPostureAttributesRead Scope = "devices:posture_attributes:read"
+
 	PolicyFile     Scope = "policy_file"
 	PolicyFileRead Scope = "policy_file:read"
 
@@ -75,6 +80,7 @@ func Known() []Scope {
 		OAuthKeys, OAuthKeysRead,
 		DevicesCore, DevicesCoreRead,
 		DevicesRoutes, DevicesRoutesRead,
+		DevicesPostureAttributes, DevicesPostureAttributesRead,
 		PolicyFile, PolicyFileRead,
 		FeatureSettings, FeatureSettingsRead,
 		Users, UsersRead,
@@ -150,7 +156,7 @@ func RequiresTags(scopes []Scope) bool {
 // Tailscale's role matrix: owner and admin do everything; a network admin
 // manages the policy, routes and DNS and reads the rest; an IT admin manages
 // users, devices and keys and reads the policy; both manage webhooks and
-// read the audit log;
+// posture attributes and read the audit log;
 // an auditor reads everything; a member has no admin access.
 func ForRole(role types.Role) []Scope {
 	switch role {
@@ -158,13 +164,13 @@ func ForRole(role types.Role) []Scope {
 		return []Scope{All}
 	case types.RoleNetworkAdmin:
 		return []Scope{
-			PolicyFile, DevicesRoutes, DNS, Webhooks,
+			PolicyFile, DevicesRoutes, DevicesPostureAttributes, DNS, Webhooks,
 			UsersRead, DevicesCoreRead, AuthKeysRead, OAuthKeysRead, FeatureSettingsRead,
 			LogsConfigurationRead,
 		}
 	case types.RoleITAdmin:
 		return []Scope{
-			Users, DevicesCore, AuthKeys, OAuthKeys, FeatureSettings, Webhooks,
+			Users, DevicesCore, DevicesPostureAttributes, AuthKeys, OAuthKeys, FeatureSettings, Webhooks,
 			PolicyFileRead, DevicesRoutesRead, DNSRead,
 			LogsConfigurationRead,
 		}

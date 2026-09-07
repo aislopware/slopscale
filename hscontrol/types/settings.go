@@ -22,6 +22,11 @@ const (
 	// that asks for nothing gets it. It overrides the config file's
 	// node.expiry while set; zero leaves the file in charge.
 	SettingKeyExpiry SettingKey = "key_expiry"
+	// SettingPostureIdentityOn lets the server ask clients for their
+	// device identity (hardware serial numbers) over c2n, the way
+	// Tailscale's postureIdentityCollectionOn does. Off, nothing is
+	// asked and node:serialNumber is never set.
+	SettingPostureIdentityOn SettingKey = "posture_identity_on"
 )
 
 // Key expiry bounds: a cap shorter than an hour would log nodes out
@@ -49,6 +54,7 @@ func ValidateKeyExpiry(d time.Duration) error {
 type Settings struct {
 	DevicesApprovalOn bool
 	UsersApprovalOn   bool
+	PostureIdentityOn bool
 	// KeyExpiry is the tailnet's key expiry cap; zero means off.
 	KeyExpiry time.Duration
 }

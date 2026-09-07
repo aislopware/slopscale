@@ -139,6 +139,9 @@ CREATE TABLE nodes(
   -- it stays registered but gets no peers, no peer sees it and its
   -- client is told it is not authorized. NULL for an active node.
   suspended_at datetime,
+  -- posture is the device identity the client reported over c2n as
+  -- JSON (types.PostureIdentity), NULL until the server asked.
+  posture text,
   -- global_exit_node marks an exit node every client is told to prefer:
   -- it gets suggest-exit-node and every node auto-exit-node.
   global_exit_node numeric DEFAULT false,
@@ -150,6 +153,23 @@ CREATE TABLE nodes(
   CONSTRAINT fk_nodes_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_nodes_auth_key FOREIGN KEY(auth_key_id) REFERENCES pre_auth_keys(id)
 );
+
+-- node_attributes are the custom posture attributes set through the API,
+-- Tailscale style: a "custom:" key with a string, number or bool value
+-- (JSON in value) that may expire; see docs/ref/device-trust.md.
+CREATE TABLE node_attributes(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  node_id integer NOT NULL,
+  key text NOT NULL,
+  value text NOT NULL,
+  expires_at datetime,
+  comment text,
+  created_at datetime,
+  updated_at datetime,
+
+  CONSTRAINT fk_node_attributes_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_node_attributes_node_key ON node_attributes(node_id, key);
 
 -- node_shares records the users a node has been shared with. The policy
 -- resolves autogroup:shared per node from it; see docs/ref/sharing.md.

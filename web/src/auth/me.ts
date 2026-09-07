@@ -15,6 +15,8 @@ export type Scope =
   | "devices:core:read"
   | "devices:routes"
   | "devices:routes:read"
+  | "devices:posture_attributes"
+  | "devices:posture_attributes:read"
   | "policy_file"
   | "policy_file:read"
   | "feature_settings"

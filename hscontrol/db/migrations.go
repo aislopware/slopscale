@@ -523,6 +523,13 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 				return tx.ex.addColumnIfMissing("nodes", "suspended_at", typeTimestamp)
 			},
 		},
+		{
+			// Device posture: nodes gain posture, the identity the client
+			// reported, and node_attributes holds the custom attributes.
+			// See docs/ref/device-trust.md.
+			id:  "202609100930-node-posture",
+			run: migrateNodePosture,
+		},
 	}
 }
 
@@ -1516,6 +1523,46 @@ func migrateWebhookDeliveries(tx *Tx) error {
 )`,
 			indexes: []string{
 				`CREATE INDEX idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, id)`,
+			},
+		},
+	})
+}
+
+// migrateNodePosture (202609100930) adds nodes.posture and creates the
+// node_attributes table.
+func migrateNodePosture(tx *Tx) error {
+	err := tx.ex.addColumnIfMissing("nodes", "posture", typeText)
+	if err != nil {
+		return err
+	}
+
+	return createTables(tx, []tableDefinition{
+		{
+			name: "node_attributes",
+			sqlite: `CREATE TABLE node_attributes(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  node_id integer NOT NULL,
+  key text NOT NULL,
+  value text NOT NULL,
+  expires_at datetime,
+  comment text,
+  created_at datetime,
+  updated_at datetime,
+  CONSTRAINT fk_node_attributes_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+)`,
+			postgres: `CREATE TABLE node_attributes(
+  id bigserial PRIMARY KEY,
+  node_id bigint NOT NULL,
+  key text NOT NULL,
+  value text NOT NULL,
+  expires_at timestamptz,
+  comment text,
+  created_at timestamptz,
+  updated_at timestamptz,
+  CONSTRAINT fk_node_attributes_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_node_attributes_node_key ON node_attributes(node_id, key)`,
 			},
 		},
 	})

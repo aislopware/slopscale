@@ -43,6 +43,7 @@ type nodeRow struct {
 	ApprovedRoutes string
 	ApprovedAt     *time.Time
 	SuspendedAt    *time.Time
+	Posture        *string
 	GlobalExitNode bool
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
@@ -151,6 +152,15 @@ func (r *nodeRow) node() (*types.Node, error) {
 		}
 	}
 
+	if r.Posture != nil && hasJSONValue(*r.Posture) {
+		node.Posture = new(types.PostureIdentity)
+
+		err = unmarshalJSONColumn(*r.Posture, node.Posture)
+		if err != nil {
+			return nil, fmt.Errorf("node %d posture: %w", r.ID, err)
+		}
+	}
+
 	err = unmarshalJSONColumn(r.Tags, &node.Tags)
 	if err != nil {
 		return nil, fmt.Errorf("node %d tags: %w", r.ID, err)
@@ -193,6 +203,17 @@ func nodeRowFrom(node *types.Node) (nodeRow, error) {
 	row.Endpoints, err = marshalJSONColumn(node.Endpoints)
 	if err != nil {
 		return nodeRow{}, fmt.Errorf("endpoints: %w", err)
+	}
+
+	if node.Posture != nil {
+		var posture string
+
+		posture, err = marshalJSONColumn(node.Posture)
+		if err != nil {
+			return nodeRow{}, fmt.Errorf("posture: %w", err)
+		}
+
+		row.Posture = &posture
 	}
 
 	row.HostInfo, err = marshalJSONColumn(node.Hostinfo)

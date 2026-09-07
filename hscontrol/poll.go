@@ -285,6 +285,8 @@ func (m *mapSession) serveLongPoll() {
 	m.h.Change(mapReqChange)
 	m.h.Change(connectChanges...)
 
+	m.h.collectPostureOnConnect(ctx, m.node.ID)
+
 	// Loop through updates and continuously send them to the
 	// client.
 	for {

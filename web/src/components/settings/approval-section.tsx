@@ -35,18 +35,63 @@ const approvals: readonly ApprovalSwitch[] = [
   },
 ];
 
-export function ApprovalSection({
+const trust: readonly ApprovalSwitch[] = [
+  {
+    id: "posture",
+    title: "Collect device identity",
+    description:
+      "Ask connected machines for their hardware serial numbers, so postures can check node:serialNumber. A machine only answers when its client has posture checking on (tailscale set --posture-checking=true).",
+    read: (settings) => settings.postureIdentityOn,
+    write: (on) => ({ postureIdentityOn: on }),
+  },
+];
+
+export function ApprovalSection(props: {
+  readonly settings: Settings;
+  readonly canEdit: boolean;
+}): ReactElement {
+  return (
+    <SwitchSection
+      title="Approval"
+      description="Changes apply immediately."
+      rows={approvals}
+      {...props}
+    />
+  );
+}
+
+export function DeviceTrustSection(props: {
+  readonly settings: Settings;
+  readonly canEdit: boolean;
+}): ReactElement {
+  return (
+    <SwitchSection
+      title="Device trust"
+      description="What the server may learn about machines for posture checks."
+      rows={trust}
+      {...props}
+    />
+  );
+}
+
+function SwitchSection({
+  title,
+  description,
+  rows,
   settings,
   canEdit,
 }: {
+  readonly title: string;
+  readonly description: string;
+  readonly rows: readonly ApprovalSwitch[];
   readonly settings: Settings;
   readonly canEdit: boolean;
 }): ReactElement {
   const update = useSettingsMutation();
 
   return (
-    <Section title="Approval" description="Changes apply immediately." bodyClassName="p-0">
-      {approvals.map((row) => (
+    <Section title={title} description={description} bodyClassName="p-0">
+      {rows.map((row) => (
         <SettingRow
           key={row.id}
           title={row.title}

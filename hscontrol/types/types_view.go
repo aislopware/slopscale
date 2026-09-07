@@ -19,7 +19,7 @@ import (
 	"tailscale.com/types/views"
 )
 
-//go:generate go run tailscale.com/cmd/cloner  -clonefunc=false -type=User,Node,PreAuthKey
+//go:generate go run tailscale.com/cmd/cloner  -clonefunc=false -type=User,Node,PreAuthKey,PostureIdentity,NodeAttribute
 
 // View returns a read-only view of User.
 func (p *User) View() UserView {
@@ -293,6 +293,15 @@ func (v NodeView) SuspendedAt() views.ValuePointer[time.Time] {
 	return views.ValuePointerOf(v.ж.SuspendedAt)
 }
 
+// Posture is the device identity the client last reported over c2n,
+// nil until the server asked. Only [State.CollectPosture] writes it.
+func (v NodeView) Posture() PostureIdentityView { return v.ж.Posture.View() }
+
+// Attributes are the custom posture attributes set through the API,
+// in key order, expired ones included until the sweeper drops them.
+// Only the attribute operations on State write them.
+func (v NodeView) Attributes() views.Slice[NodeAttribute] { return views.SliceOf(v.ж.Attributes) }
+
 // SharedWith lists the users the node has been shared with, in
 // ascending id order. The policy resolves autogroup:shared from it
 // and the map response marks the node as shared to those users'
@@ -357,6 +366,8 @@ var _NodeViewNeedsRegeneration = Node(struct {
 	ApprovedRoutes Prefixes
 	ApprovedAt     *time.Time
 	SuspendedAt    *time.Time
+	Posture        *PostureIdentity
+	Attributes     []NodeAttribute
 	SharedWith     []UserID
 	GlobalExitNode bool
 	CreatedAt      time.Time
@@ -506,4 +517,175 @@ var _PreAuthKeyViewNeedsRegeneration = PreAuthKey(struct {
 	CreatedAt     *time.Time
 	Expiration    *time.Time
 	Revoked       *time.Time
+}{})
+
+// View returns a read-only view of PostureIdentity.
+func (p *PostureIdentity) View() PostureIdentityView {
+	return PostureIdentityView{ж: p}
+}
+
+// PostureIdentityView provides a read-only view over PostureIdentity.
+//
+// Its methods should only be called if `Valid()` returns true.
+type PostureIdentityView struct {
+	// ж is the underlying mutable value, named with a hard-to-type
+	// character that looks pointy like a pointer.
+	// It is named distinctively to make you think of how dangerous it is to escape
+	// to callers. You must not let callers be able to mutate it.
+	ж *PostureIdentity
+}
+
+// Valid reports whether v's underlying value is non-nil.
+func (v PostureIdentityView) Valid() bool { return v.ж != nil }
+
+// AsStruct returns a clone of the underlying value which aliases no memory with
+// the original.
+func (v PostureIdentityView) AsStruct() *PostureIdentity {
+	if v.ж == nil {
+		return nil
+	}
+	return v.ж.Clone()
+}
+
+// MarshalJSON implements [jsonv1.Marshaler].
+func (v PostureIdentityView) MarshalJSON() ([]byte, error) {
+	return jsonv1.Marshal(v.ж)
+}
+
+// MarshalJSONTo implements [jsonv2.MarshalerTo].
+func (v PostureIdentityView) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return jsonv2.MarshalEncode(enc, v.ж)
+}
+
+// UnmarshalJSON implements [jsonv1.Unmarshaler].
+func (v *PostureIdentityView) UnmarshalJSON(b []byte) error {
+	if v.ж != nil {
+		return errors.New("already initialized")
+	}
+	if len(b) == 0 {
+		return nil
+	}
+	var x PostureIdentity
+	if err := jsonv1.Unmarshal(b, &x); err != nil {
+		return err
+	}
+	v.ж = &x
+	return nil
+}
+
+// UnmarshalJSONFrom implements [jsonv2.UnmarshalerFrom].
+func (v *PostureIdentityView) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if v.ж != nil {
+		return errors.New("already initialized")
+	}
+	var x PostureIdentity
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
+		return err
+	}
+	v.ж = &x
+	return nil
+}
+
+// SerialNumbers are the hardware serial numbers the client found,
+// empty when it found none or refused.
+func (v PostureIdentityView) SerialNumbers() views.Slice[string] {
+	return views.SliceOf(v.ж.SerialNumbers)
+}
+
+// Disabled is set when the client has posture checking switched off
+// (`tailscale set --posture-checking=false`, or an MDM key), in which
+// case it reports nothing.
+func (v PostureIdentityView) Disabled() bool { return v.ж.Disabled }
+
+// CollectedAt is when the client answered.
+func (v PostureIdentityView) CollectedAt() time.Time { return v.ж.CollectedAt }
+
+// A compilation failure here means this code must be regenerated, with the command at the top of this file.
+var _PostureIdentityViewNeedsRegeneration = PostureIdentity(struct {
+	SerialNumbers []string
+	Disabled      bool
+	CollectedAt   time.Time
+}{})
+
+// View returns a read-only view of NodeAttribute.
+func (p *NodeAttribute) View() NodeAttributeView {
+	return NodeAttributeView{ж: p}
+}
+
+// NodeAttributeView provides a read-only view over NodeAttribute.
+//
+// Its methods should only be called if `Valid()` returns true.
+type NodeAttributeView struct {
+	// ж is the underlying mutable value, named with a hard-to-type
+	// character that looks pointy like a pointer.
+	// It is named distinctively to make you think of how dangerous it is to escape
+	// to callers. You must not let callers be able to mutate it.
+	ж *NodeAttribute
+}
+
+// Valid reports whether v's underlying value is non-nil.
+func (v NodeAttributeView) Valid() bool { return v.ж != nil }
+
+// AsStruct returns a clone of the underlying value which aliases no memory with
+// the original.
+func (v NodeAttributeView) AsStruct() *NodeAttribute {
+	if v.ж == nil {
+		return nil
+	}
+	return v.ж.Clone()
+}
+
+// MarshalJSON implements [jsonv1.Marshaler].
+func (v NodeAttributeView) MarshalJSON() ([]byte, error) {
+	return jsonv1.Marshal(v.ж)
+}
+
+// MarshalJSONTo implements [jsonv2.MarshalerTo].
+func (v NodeAttributeView) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return jsonv2.MarshalEncode(enc, v.ж)
+}
+
+// UnmarshalJSON implements [jsonv1.Unmarshaler].
+func (v *NodeAttributeView) UnmarshalJSON(b []byte) error {
+	if v.ж != nil {
+		return errors.New("already initialized")
+	}
+	if len(b) == 0 {
+		return nil
+	}
+	var x NodeAttribute
+	if err := jsonv1.Unmarshal(b, &x); err != nil {
+		return err
+	}
+	v.ж = &x
+	return nil
+}
+
+// UnmarshalJSONFrom implements [jsonv2.UnmarshalerFrom].
+func (v *NodeAttributeView) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if v.ж != nil {
+		return errors.New("already initialized")
+	}
+	var x NodeAttribute
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
+		return err
+	}
+	v.ж = &x
+	return nil
+}
+
+func (v NodeAttributeView) Key() string           { return v.ж.Key }
+func (v NodeAttributeView) Value() AttributeValue { return v.ж.Value }
+
+// ExpiresAt, when not zero, is when the attribute disappears on its
+// own.
+func (v NodeAttributeView) ExpiresAt() time.Time { return v.ж.ExpiresAt }
+func (v NodeAttributeView) Comment() string      { return v.ж.Comment }
+
+// A compilation failure here means this code must be regenerated, with the command at the top of this file.
+var _NodeAttributeViewNeedsRegeneration = NodeAttribute(struct {
+	Key       string
+	Value     AttributeValue
+	ExpiresAt time.Time
+	Comment   string
 }{})

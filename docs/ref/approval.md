@@ -13,7 +13,9 @@ and user approval:
 | `usersApprovalOn`   | A user created by an OpenID Connect login waits for an administrator before any node of theirs can register. Users an administrator creates never wait. |
 
 Both are off on a fresh server and after an upgrade; everything that existed
-before the switches did counts as approved.
+before the switches did counts as approved. A third switch,
+`postureIdentityOn`, belongs to [device trust](device-trust.md) and lets
+the server collect serial numbers from clients.
 
 ## Settings
 
