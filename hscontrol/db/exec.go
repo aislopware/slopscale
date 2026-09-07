@@ -280,6 +280,8 @@ func (e *executor) query(stmt statement, dest any) error {
 func (e *executor) runQuery(runner qrm.DB, query string, args []any, dest any) error {
 	start := time.Now()
 
+	utcArgs(args)
+
 	rows, err := qrm.Query(e.ctx, runner, query, args, dest)
 	err = translateErr(err)
 
@@ -303,6 +305,8 @@ func (e *executor) runExec(runner qrm.DB, query string, args []any) (int64, erro
 
 	var affected int64
 
+	utcArgs(args)
+
 	res, err := runner.ExecContext(e.ctx, query, args...)
 	if err == nil {
 		affected, err = rowsAffected(res)
@@ -311,6 +315,25 @@ func (e *executor) runExec(runner qrm.DB, query string, args []any) (int64, erro
 	e.log.trace(start, query, args, affected, err)
 
 	return affected, err
+}
+
+// utcArgs rewrites every time.Time argument to UTC in place. SQLite has
+// no timestamp type: the driver binds a time as text with its zone offset
+// and the engine compares text, so a local-zone cutoff against a UTC
+// column (or a database moved between hosts in different zones) orders
+// wrongly. Binding everything in UTC makes stored values and comparisons
+// agree whatever zone the caller used; PostgreSQL is unaffected either way.
+func utcArgs(args []any) {
+	for i, a := range args {
+		switch t := a.(type) {
+		case time.Time:
+			args[i] = t.UTC()
+		case *time.Time:
+			if t != nil {
+				args[i] = t.UTC()
+			}
+		}
+	}
 }
 
 func rowsAffected(res sql.Result) (int64, error) {
@@ -333,6 +356,8 @@ func (e *executor) execRaw(query string, args ...any) (int64, error) {
 	start := time.Now()
 
 	var affected int64
+
+	utcArgs(args)
 
 	res, err := e.db.ExecContext(e.ctx, query, args...)
 	if err == nil {
