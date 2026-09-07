@@ -20,8 +20,13 @@ $ headscale webhooks create --url https://ops.example.com/headscale \
 The response carries the secret once. Store it on the receiver; a later read
 never shows it again. `headscale webhooks rotate` issues a new one, and
 `headscale webhooks test` sends a `test` event so you can check the receiver
-before anything real happens. The last delivery's status is kept per endpoint
-and shown in the list.
+before anything real happens.
+
+The server keeps the last 100 deliveries per endpoint, each with the event
+type, the final HTTP status or error, how many attempts it took and how long.
+The list shows the newest one; _Deliveries_ in the console's row menu,
+`headscale webhooks deliveries`, or `GET /api/v1/webhook/{id}/deliveries`
+show the rest, newest first.
 
 ## Events
 

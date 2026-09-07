@@ -116,8 +116,8 @@ created, approved, changing role or being deleted, and policy changes. The
 delivery format and the `Tailscale-Webhook-Signature` header are Tailscale's,
 so a receiver written for Tailscale works unchanged, and the v2 API exposes
 the same endpoints as Tailscale's `webhooks` resource. Each endpoint has a
-secret shown once, a test button, a rotate action and its last delivery
-status. Manage them from the console's _Webhooks_ page, with
+secret shown once, a test button, a rotate action and a history of its last
+hundred deliveries with status, attempts and timing. Manage them from the console's _Webhooks_ page, with
 `headscale webhooks`, or through `/api/v1/webhook`. See
 [Webhooks](https://headscale.net/development/ref/webhooks/).
 
