@@ -1,13 +1,12 @@
 {
   "name": "headscale-admin",
-  "private": true,
-  "type": "module",
   "version": "0.0.0",
+  "private": true,
   "description": "Headscale admin console: a client-rendered React app served by the headscale server under /admin/.",
-  "engines": {
-    "node": ">=24",
-    "bun": ">=1.4"
-  },
+  "workspaces": [
+    "codegen"
+  ],
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -66,7 +65,8 @@
     "vitest": "5.0.0",
     "vitest-browser-react": "2.3.0"
   },
-  "workspaces": [
-    "codegen"
-  ]
+  "engines": {
+    "bun": ">=1.4",
+    "node": ">=24"
+  }
 }

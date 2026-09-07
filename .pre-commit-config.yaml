@@ -44,8 +44,17 @@ repos:
         name: prettier
         entry: prettier --write --list-different
         language: system
-        exclude: ^docs/
+        exclude: ^(docs|web|\.claude)/
         types_or: [javascript, jsx, ts, tsx, yaml, json, html, css, scss, sass, markdown]
+
+      # The admin console has its own toolchain (oxfmt, oxlint, tsc); run it
+      # once per commit that touches web/ instead of per file.
+      - id: web-check
+        name: web check
+        entry: bash -c 'cd web && bun install --frozen-lockfile --silent && bun run typecheck && bun run lint && bun run fmt:check'
+        language: system
+        files: ^web/
+        pass_filenames: false
 
       # mdformat for docs
       - id: mdformat

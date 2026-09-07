@@ -78,6 +78,17 @@ WIP commits on feature branches only.
   `TestHAProberProperty`; that one runs 100 real handshake rounds and takes
   over half an hour, so run it explicitly when touching HA election.
 
+The admin console in `web/` is a separate toolchain (bun, TypeScript 7,
+oxlint, oxfmt, Vite; see `web/README.md`) with its own strict gate
+(`make lint-web`, part of `make lint`). Its UI is Cloudflare Kumo: use Kumo
+components and semantic tokens, never hand-rolled primitives or raw
+colours, and follow the Kumo design skill in `.claude/skills/kumo-design`. It talks only to `/api/v1` with the
+operator's API key, so it holds no privilege of its own; `web/embed.go`
+embeds `web/dist` and serves it at `/admin/`, or a "not built" page when
+`make web` did not run. `web/dist/.gitkeep` keeps the embed pattern valid
+on a fresh checkout. Its API types come from `gen/openapi/v1.yaml` via
+`make web-generate`; regenerate and commit both after changing the v1 API.
+
 ## Invariants
 
 Migrations run in place on users' production databases, so their rules are

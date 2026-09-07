@@ -26,7 +26,8 @@ endef
 
 # Source file collections using shell find for better performance
 GO_SOURCES := $(shell find . -name '*.go' -not -path './gen/*' -not -path './vendor/*')
-PRETTIER_SOURCES := $(shell find . \( -name '*.md' -o -name '*.yaml' -o -name '*.yml' -o -name '*.ts' -o -name '*.js' -o -name '*.html' -o -name '*.css' -o -name '*.scss' -o -name '*.sass' \) -not -path './gen/*' -not -path './vendor/*' -not -path './node_modules/*')
+PRETTIER_SOURCES := $(shell find . \( -name '*.md' -o -name '*.yaml' -o -name '*.yml' -o -name '*.ts' -o -name '*.js' -o -name '*.html' -o -name '*.css' -o -name '*.scss' -o -name '*.sass' \) -not -path './gen/*' -not -path './vendor/*' -not -path './node_modules/*' -not -path './web/*')
+WEB_SOURCES := $(shell find web -type f -not -path 'web/node_modules/*' -not -path 'web/codegen/node_modules/*' -not -path 'web/dist/*')
 
 # Default target
 .PHONY: all
@@ -40,11 +41,53 @@ check-deps:
 	$(call check_tool,mdformat)
 	$(call check_tool,prettier)
 
+.PHONY: check-web-deps
+check-web-deps:
+	$(call check_tool,bun)
+
 # Build targets
 .PHONY: build
 build: check-deps $(GO_SOURCES) go.mod go.sum
 	@echo "Building headscale..."
 	go build $(PIE_FLAGS) -ldflags "-X main.version=$(VERSION)" -o headscale ./cmd/headscale
+
+# Admin console. The React app in web/ is built by bun and embedded into
+# the binary by web/embed.go, so `make web` must run before `make build`
+# for the console to ship; without it the server serves a placeholder at
+# /admin/. Runtime dependencies are pinned by web/bun.lock.
+.PHONY: web-deps
+web-deps: check-web-deps web/package.json web/bun.lock
+	@echo "Installing console dependencies..."
+	cd web && bun install --frozen-lockfile
+
+.PHONY: web
+web: web-deps $(WEB_SOURCES)
+	@echo "Building admin console..."
+	cd web && bun run build
+
+# Regenerate the console's API types from the served OpenAPI document. The
+# spec is committed under gen/openapi so the TypeScript output is
+# reproducible without a Go toolchain.
+.PHONY: web-generate
+web-generate: web-deps
+	@echo "Generating console API types..."
+	go run ./cmd/gen-openapi -out gen/openapi/v1.yaml
+	cd web && bun run generate && bun run fmt
+
+.PHONY: lint-web
+lint-web: web-deps
+	@echo "Checking admin console..."
+	cd web && bun run typecheck && bun run lint && bun run fmt:check
+
+.PHONY: fmt-web
+fmt-web: web-deps
+	@echo "Formatting admin console..."
+	cd web && bun run fmt && bun run lint:fix
+
+.PHONY: test-web
+test-web: web-deps
+	@echo "Running console tests..."
+	cd web && bun run test
 
 # Test targets
 .PHONY: test
@@ -55,7 +98,7 @@ test: check-deps $(GO_SOURCES) go.mod go.sum
 
 # Formatting targets
 .PHONY: fmt
-fmt: fmt-go fmt-mdformat fmt-prettier
+fmt: fmt-go fmt-mdformat fmt-prettier fmt-web
 
 .PHONY: fmt-go
 fmt-go: check-deps $(GO_SOURCES)
@@ -78,7 +121,7 @@ fmt-prettier: check-deps $(PRETTIER_SOURCES)
 # formatter (see .golangci.yaml), go vet, a tidy/verified module graph, and a
 # vulnerability scan of the dependency tree.
 .PHONY: lint
-lint: lint-go lint-mod lint-vuln
+lint: lint-go lint-mod lint-vuln lint-web
 
 .PHONY: lint-go
 lint-go: check-deps $(GO_SOURCES) go.mod go.sum
@@ -103,6 +146,7 @@ generate: check-deps
 	@echo "Generating code..."
 	go generate ./...
 	$(MAKE) client
+	$(MAKE) web-generate
 
 # Emit the OpenAPI spec on demand. The server serves it live at /openapi.yaml;
 # this is for external consumers or inspection and is not committed.
@@ -129,7 +173,7 @@ client:
 # Clean targets
 .PHONY: clean
 clean:
-	rm -rf headscale gen/client
+	rm -rf headscale gen/client web/dist/assets web/dist/index.html
 
 # Development workflow
 .PHONY: dev
@@ -151,7 +195,7 @@ help:
 	@echo "  test         - Run Go tests"
 	@echo "  fmt          - Format all code (Go, docs, markup)"
 	@echo "  lint         - Lint all code (golangci-lint, vet, mod tidy, govulncheck)"
-	@echo "  generate     - Generate code (go generate + client)"
+	@echo "  generate     - Generate code (go generate + client + web-generate)"
 	@echo "  dev          - Full development workflow (fmt + lint + test + build)"
 	@echo "  clean        - Clean build artifacts"
 	@echo ""
@@ -160,6 +204,10 @@ help:
 	@echo "  fmt-mdformat - Format documentation only"
 	@echo "  fmt-prettier - Format markup and config files only"
 	@echo "  lint-go      - Lint Go code only"
+	@echo "  web          - Build the admin console into web/dist (embedded by build)"
+	@echo "  web-generate - Regenerate the console's API types from the OpenAPI spec"
+	@echo "  lint-web     - Typecheck, lint and format-check the admin console"
+	@echo "  test-web     - Run the admin console's browser tests"
 	@echo ""
 	@echo "Dependencies:"
 	@echo "  check-deps   - Verify required tools are available"

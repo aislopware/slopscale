@@ -105,6 +105,29 @@
           golangci-lint-langserver = prev.golangci-lint-langserver.override {
             buildGoModule = buildGo;
           };
+
+          # web/bun.lock is written by bun 1.4 (lockfile version 2), which
+          # older bun cannot parse; pin the version the console is built with.
+          bun = prev.bun.overrideAttrs (finalAttrs: _: {
+            version = "1.4.1";
+            __intentionallyOverridingVersion = true;
+            passthru = {
+              sources = {
+                "aarch64-darwin" = prev.fetchurl {
+                  url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-darwin-aarch64.zip";
+                  hash = "sha256-2Jc86DX6eGflzHmv7m/G8a4BF6pL1fwlRv0AxRL3E4Y=";
+                };
+                "aarch64-linux" = prev.fetchurl {
+                  url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-linux-aarch64.zip";
+                  hash = "sha256-WAzndTMQjcaxC+wXITl+T1qkTpCXJtokUdSD38XlgdY=";
+                };
+                "x86_64-linux" = prev.fetchurl {
+                  url = "https://github.com/oven-sh/bun/releases/download/bun-v${finalAttrs.version}/bun-linux-x64-baseline.zip";
+                  hash = "sha256-qMnGc4IC4vztVV3YYKlTxWwM0Fn3UEHnAQroGjKAJkY=";
+                };
+              };
+            };
+          });
         };
     }
     // flake-utils.lib.eachDefaultSystem
@@ -124,6 +147,9 @@
           ++ [
             golangci-lint
             golangci-lint-langserver
+            # Admin console toolchain (web/): bun runs the pinned oxlint,
+            # oxfmt, TypeScript and Vite from web/bun.lock.
+            bun
             golines
             prettier
             nixpkgs-fmt
@@ -222,7 +248,7 @@
             prettier = true;
             prettierExts = [ "ts" "js" "md" "yaml" "yml" "sass" "css" "scss" "html" ];
             # Mirror .prettierignore (docs/ are mkdocs-flavoured; gen/ generated).
-            fmtExclude = [ ./gen ./docs ];
+            fmtExclude = [ ./gen ./docs ./web ];
           });
         };
       in

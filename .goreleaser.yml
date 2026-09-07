@@ -4,6 +4,8 @@ before:
   hooks:
     - go mod tidy
     - go mod vendor
+    # Embed the admin console (web/embed.go) into every binary and image.
+    - make web
 
 release:
   prerelease: auto

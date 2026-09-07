@@ -50,6 +50,9 @@ jobs:
       - name: Set commit timestamp
         run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> $GITHUB_ENV
 
+      - name: Build admin console
+        run: make web
+
       - name: Build and push to GHCR
         env:
           KO_DOCKER_REPO: ghcr.io/juanfont/headscale
@@ -95,6 +98,9 @@ jobs:
 
       - uses: NixOS/nix-installer-action@62c1943b776c509394b550f3f983adc14e9212d6 # v1.0.0
       - uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
+
+      - name: Build admin console
+        run: make web
 
       # cgo cross build: zigcc (Nix devShell) maps GOOS/GOARCH to a zig
       # target and the binary links statically against musl.
