@@ -162,14 +162,21 @@ func apiv2DevicesGoClient(t *testing.T, srv *servertest.TestServer, baseURL, api
 	require.NoError(t, dr.SetTags(ctx, deviceID, []string{"tag:ci"}))
 	assert.Equal(t, []string{"tag:ci"}, srvNodeView(t, srv, id).Tags().AsSlice())
 
-	// SetAuthorized(true) is a no-op success; de-auth is rejected and inert.
+	// SetAuthorized(true) is a no-op success; de-auth withdraws the
+	// node's approval and re-auth restores it.
 	require.NoError(t, dr.SetAuthorized(ctx, deviceID, true))
 	dev, err = dr.Get(ctx, deviceID)
 	require.NoError(t, err)
 	assert.True(t, dev.Authorized)
 
-	require.Error(t, dr.SetAuthorized(ctx, deviceID, false), "de-authorization is unsupported")
-	assert.True(t, srvNodeView(t, srv, id).Valid(), "rejected de-auth left the node present")
+	require.NoError(t, dr.SetAuthorized(ctx, deviceID, false))
+	dev, err = dr.Get(ctx, deviceID)
+	require.NoError(t, err)
+	assert.False(t, dev.Authorized)
+	assert.False(t, srvNodeView(t, srv, id).IsApproved(), "de-auth withdrew the approval")
+
+	require.NoError(t, dr.SetAuthorized(ctx, deviceID, true))
+	assert.True(t, srvNodeView(t, srv, id).IsApproved())
 
 	// Delete — gone from the tool and the server.
 	require.NoError(t, dr.Delete(ctx, deviceID))
