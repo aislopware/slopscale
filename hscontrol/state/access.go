@@ -364,6 +364,13 @@ func (s *State) PolicyFileEnforces() bool {
 	return s.polMan.FileEnforces()
 }
 
+// Enforces reports whether the tailnet has a packet filter, from the file
+// or from an enabled rule. A network's protocol and ports narrow reach
+// only while it does.
+func (s *State) Enforces() bool {
+	return s.polMan.Enforces()
+}
+
 // SetAccessRuleEnabled flips one rule's switch, reading the rest of the
 // rule from the store so a stale client copy cannot overwrite it.
 func (s *State) SetAccessRuleEnabled(

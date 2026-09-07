@@ -19,11 +19,13 @@ export function NetworkMenu({
   network,
   groups,
   nodes,
+  enforcing,
   me,
 }: {
   readonly network: Network;
   readonly groups: readonly Group[];
   readonly nodes: readonly Node[];
+  readonly enforcing: boolean;
   readonly me: Me;
 }): ReactElement {
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -76,6 +78,7 @@ export function NetworkMenu({
         network={network}
         groups={groups}
         nodes={nodes}
+        enforcing={enforcing}
         open={dialog === "edit"}
         onOpenChange={close}
         mutations={mutations}

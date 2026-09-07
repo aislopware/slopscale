@@ -22,6 +22,8 @@ const emptyIconSize = 32;
 export interface NetworksTabProps {
   readonly me: Me;
   readonly networks: readonly Network[];
+  /** Whether the tailnet has a packet filter, so a network's protocol and ports take effect. */
+  readonly enforcing: boolean;
   readonly groups: readonly Group[];
   readonly nodes: readonly Node[];
   readonly search: string;
@@ -32,6 +34,7 @@ export interface NetworksTabProps {
 export function NetworksTab({
   me,
   networks,
+  enforcing,
   groups,
   nodes,
   search,
@@ -49,7 +52,7 @@ export function NetworksTab({
     getRowId: (network) => network.id,
     state: { globalFilter: query },
     initialState: { sorting: [{ id: "name", desc: false }] },
-    meta: { me, groups, nodes, networks },
+    meta: { me, groups, nodes, networks, enforcing },
   });
 
   const total = networks.length;
@@ -131,6 +134,7 @@ export function NetworksTab({
       <NetworkDialog
         groups={groups}
         nodes={nodes}
+        enforcing={enforcing}
         open={creating}
         onOpenChange={setCreating}
         mutations={mutations}

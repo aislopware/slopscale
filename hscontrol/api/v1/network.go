@@ -97,6 +97,11 @@ type (
 	listNetworksOutput struct {
 		Body struct {
 			Networks []Network `json:"networks" nullable:"false"`
+			// Enforcing tells a client whether a network's protocol and
+			// ports mean anything yet: they narrow reach only once the
+			// tailnet has a packet filter, from the policy file or an
+			// enabled access rule.
+			Enforcing bool `doc:"Whether the tailnet has a packet filter, so the networks' protocol and ports take effect." json:"enforcing"` //nolint:lll // struct tag
 		}
 	}
 )
@@ -232,6 +237,7 @@ func registerNetworks(api huma.API, b Backend) {
 		model := b.State.AccessModel()
 
 		out := &listNetworksOutput{}
+		out.Body.Enforcing = b.State.Enforces()
 		out.Body.Networks = make([]Network, 0, len(model.Networks))
 
 		for _, n := range model.Networks {

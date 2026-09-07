@@ -62,6 +62,8 @@ declare module "@tanstack/react-table" {
     eventTypes?: readonly string[];
     /** Whether the policy file restricts traffic on its own; false means the rules are all there is. */
     policyFileEnforces?: boolean;
+    /** Whether the tailnet has a packet filter at all, so a network's protocol and ports apply. */
+    enforcing?: boolean;
     /** Whether the server can answer ip:country postures. */
     geoIpAvailable?: boolean;
     /** Whether the caller may approve or deny access requests. */

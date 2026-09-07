@@ -48,7 +48,7 @@ function NetworksPage(): ReactElement {
   const { me } = Route.useRouteContext();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  const { networks } = useSuspenseQuery(networksQuery).data;
+  const { networks, enforcing } = useSuspenseQuery(networksQuery).data;
   const { groups } = useSuspenseQuery(groupsQuery).data;
   const { nodes } = useSuspenseQuery(nodesQuery).data;
   const tab = search.tab ?? "networks";
@@ -84,6 +84,7 @@ function NetworksPage(): ReactElement {
           <NetworksTab
             me={me}
             networks={networks}
+            enforcing={enforcing}
             groups={groups}
             nodes={nodes}
             search={text}

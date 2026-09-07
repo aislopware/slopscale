@@ -595,6 +595,20 @@ func (pm *PolicyManager) FileEnforces() bool {
 	return pm.pol.fileEnforces()
 }
 
+// Enforces reports whether the tailnet runs with a packet filter at all:
+// the file restricts, or an enabled access rule does. Without one the
+// narrowing on networks (protocol, ports) has nothing to apply to.
+func (pm *PolicyManager) Enforces() bool {
+	if pm == nil {
+		return false
+	}
+
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	return pm.pol.enforces()
+}
+
 // Filter returns the current filter rules for the entire tailnet and the associated matchers.
 func (pm *PolicyManager) Filter() ([]tailcfg.FilterRule, []matcher.Match) {
 	if pm == nil {

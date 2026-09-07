@@ -1,13 +1,15 @@
 import { DeleteResource } from "@cloudflare/kumo";
+import { Banner } from "@cloudflare/kumo/components/banner";
 import { Input, Textarea } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
+import { InfoIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { Group, Network, Node } from "~/api/queries.ts";
 import type { NetworkRequestBody } from "~/api/schema.gen.ts";
-import { hasPorts, portsError, toProtocol } from "~/components/access/model.ts";
+import { hasPorts, isNarrowed, portsError, toProtocol } from "~/components/access/model.ts";
 import type { Protocol } from "~/components/access/model.ts";
 import { groupItems } from "~/components/access/pickers.ts";
 import { ProtocolFields } from "~/components/access/protocol-fields.tsx";
@@ -26,6 +28,8 @@ export interface NetworkDialogProps {
   readonly network?: Network | undefined;
   readonly groups: readonly Group[];
   readonly nodes: readonly Node[];
+  /** Whether the tailnet has a packet filter; without one the protocol and ports do nothing yet. */
+  readonly enforcing: boolean;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly mutations: NetworkMutations;
@@ -124,6 +128,7 @@ function NetworkForm({
   network,
   groups,
   nodes,
+  enforcing,
   onOpenChange,
   mutations,
 }: Omit<NetworkDialogProps, "open">): ReactElement {
@@ -214,6 +219,7 @@ function NetworkForm({
         empty="No group matches."
       />
       <ProtocolFields draft={draft} onChange={update} />
+      <NarrowingNotice draft={draft} enforcing={enforcing} />
       <Switch
         checked={draft.enabled}
         onCheckedChange={(enabled) => {
@@ -235,6 +241,29 @@ function NetworkForm({
         disabled={draftIssue(draft) !== null}
       />
     </form>
+  );
+}
+
+/** Says when the protocol and ports on the form do nothing yet because the tailnet is open. */
+function NarrowingNotice({
+  draft,
+  enforcing,
+}: {
+  readonly draft: Pick<Draft, "protocol" | "ports">;
+  readonly enforcing: boolean;
+}): ReactElement | null {
+  if (enforcing || !isNarrowed(draft)) {
+    return null;
+  }
+
+  return (
+    <Banner
+      size="sm"
+      variant="alert"
+      icon={<InfoIcon />}
+      title="The narrowing is not in force yet"
+      description="The tailnet is open: no enabled access rule and no restricting policy file, so the groups reach every port behind the routers. The protocol and ports take effect once a rule is enabled."
+    />
   );
 }
 

@@ -79,6 +79,11 @@ export function hasPorts(protocol: string): boolean {
   return protocol === "tcp" || protocol === "udp";
 }
 
+/** Whether a rule or network narrows reach below "any protocol, any port". */
+export function isNarrowed(rule: Pick<AccessRule, "protocol" | "ports">): boolean {
+  return rule.protocol !== "" && rule.protocol !== "all";
+}
+
 /** "TCP 22, 443" or "Any protocol"; ports only exist for tcp and udp. */
 export function protocolSummary(rule: Pick<AccessRule, "protocol" | "ports">): string {
   const label = protocolLabel(rule.protocol);

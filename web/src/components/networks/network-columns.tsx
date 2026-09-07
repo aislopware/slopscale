@@ -9,7 +9,7 @@ import type { Group, Network } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { GroupChips } from "~/components/access/group-chips.tsx";
-import { groupName, protocolSummary } from "~/components/access/model.ts";
+import { groupName, isNarrowed, protocolSummary } from "~/components/access/model.ts";
 import { prefixesSummary } from "~/components/networks/model.ts";
 import { useNetworkMutations } from "~/components/networks/mutations.ts";
 import { NetworkMenu } from "~/components/networks/network-menu.tsx";
@@ -47,7 +47,9 @@ export const networkColumns = helper.columns([
     id: "prefixes",
     header: "Prefixes",
     enableSorting: false,
-    cell: ({ row }) => <PrefixesCell network={row.original} />,
+    cell: ({ row, table }) => (
+      <PrefixesCell network={row.original} enforcing={table.options.meta?.enforcing === true} />
+    ),
     meta: { className: "min-w-36" },
   }),
   helper.accessor((network) => network.routers.map((router) => router.name).join(" "), {
@@ -82,10 +84,16 @@ export const networkColumns = helper.columns([
     id: "actions",
     header: "",
     cell: ({ row, table }) => {
-      const { me, groups, nodes } = table.options.meta ?? {};
+      const { me, groups, nodes, enforcing } = table.options.meta ?? {};
 
       return me === undefined ? null : (
-        <NetworkMenu network={row.original} groups={groups ?? []} nodes={nodes ?? []} me={me} />
+        <NetworkMenu
+          network={row.original}
+          groups={groups ?? []}
+          nodes={nodes ?? []}
+          enforcing={enforcing === true}
+          me={me}
+        />
       );
     },
     meta: { className: "w-12 text-right" },
@@ -113,14 +121,28 @@ function NameCell({ network }: { readonly network: NetworkRow }): ReactElement {
   );
 }
 
-/** The prefixes, and the protocol and ports when the network narrows them. */
-function PrefixesCell({ network }: { readonly network: Network }): ReactElement {
+/**
+ * The prefixes, and the protocol and ports when the network narrows them. The narrowing only
+ * applies once the tailnet has a packet filter, so on an open tailnet the cell says so.
+ */
+function PrefixesCell({
+  network,
+  enforcing,
+}: {
+  readonly network: Network;
+  readonly enforcing: boolean;
+}): ReactElement {
+  const narrowed = isNarrowed(network);
+
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="font-mono text-[0.9em]">{prefixesSummary(network.prefixes)}</span>
-      {network.protocol === "all" || network.protocol === "" ? null : (
-        <span className="truncate text-xs text-kumo-subtle">{protocolSummary(network)}</span>
-      )}
+      {narrowed ? (
+        <span className="truncate text-xs text-kumo-subtle">
+          {protocolSummary(network)}
+          {enforcing ? null : <span className="text-kumo-warning"> · not in force</span>}
+        </span>
+      ) : null}
     </div>
   );
 }

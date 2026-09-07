@@ -58,6 +58,9 @@ type PolicyManager interface {
 	// FileEnforces reports whether the policy file alone restricts
 	// traffic, so callers can tell what disabling the last rule means.
 	FileEnforces() bool
+	// Enforces reports whether the tailnet has a packet filter at all, from
+	// the file or an enabled access rule.
+	Enforces() bool
 	SetUsers(users []types.User) (bool, error)
 	SetNodes(nodes views.Slice[types.NodeView]) (bool, error)
 	// NodeCanHaveTag reports whether the given node can have the given tag.
