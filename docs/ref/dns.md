@@ -52,7 +52,8 @@ The split DNS above reaches every machine. A group DNS rule hands domains and na
 receive it, and the machines in those groups send queries for the zones there, on top of the split DNS everyone
 gets. A machine joining or leaving a group picks the rule up or loses it at once. A domain the tailnet also splits
 keeps the global resolvers first and adds the rule's after them. The nameservers take the same forms as everywhere
-else, and a group a rule names cannot be deleted until the rule drops it.
+else, and a group a rule names cannot be deleted until the rule drops it. The zones MagicDNS answers on the client,
+the base domain and the reverse zones of the tailnet's prefixes, cannot be routed by a rule.
 
 Rules live on the console's _DNS_ page under _Split DNS per group_, in `headscale dns rules` (`list`, `create`,
 `update`, `delete`) and at `/api/v1/dns/rule` (`GET`, `POST`, `PUT /{id}`, `DELETE /{id}`), gated by the `dns` and

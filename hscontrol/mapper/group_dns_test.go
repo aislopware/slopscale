@@ -58,4 +58,23 @@ func TestGenerateDNSConfigGroupRoutes(t *testing.T) {
 		require.NotNil(t, got)
 		assert.Equal(t, map[string][]*dnstype.Resolver{"corp.example.com": {global}}, got.Routes)
 	})
+
+	t.Run("leaves the zones the client answers itself alone", func(t *testing.T) {
+		t.Parallel()
+
+		cfg := &types.Config{TailcfgDNSConfig: &tailcfg.DNSConfig{
+			Proxied: true,
+			Routes:  map[string][]*dnstype.Resolver{"64.100.in-addr.arpa": {}},
+		}}
+		node := (&types.Node{Hostname: "laptop"}).View()
+
+		got := generateDNSConfig(cfg, node, nil, map[string][]*dnstype.Resolver{
+			"64.100.in-addr.arpa": {corp},
+			"lab.example.com":     {lab},
+		})
+		require.NotNil(t, got)
+		assert.Empty(t, got.Routes["64.100.in-addr.arpa"], "the reverse zone still resolves locally")
+		assert.NotNil(t, got.Routes["64.100.in-addr.arpa"], "and stays an empty list, not nil")
+		assert.Equal(t, []*dnstype.Resolver{lab}, got.Routes["lab.example.com"])
+	})
 }

@@ -80,6 +80,12 @@ func TestGroupDNSRules(t *testing.T) {
 			{"groupIds": []string{}},
 			{"domains": []string{"corp..example"}},
 			{"nameservers": []string{"ns.example"}},
+			// The zones MagicDNS answers on the client are not for
+			// forwarding: the reverse zone of the tailnet, a name
+			// under it, and the base domain.
+			{"domains": []string{"64.100.in-addr.arpa"}},
+			{"domains": []string{"1.64.100.in-addr.arpa"}},
+			{"domains": []string{"ts.example"}},
 		} {
 			body := maps.Clone(good)
 			maps.Copy(body, bad)

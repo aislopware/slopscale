@@ -132,6 +132,12 @@ func (s *State) validateGroupDNSRule(rule types.GroupDNSRule) error {
 		return err
 	}
 
+	for _, domain := range rule.Domains {
+		if s.cfg.ResolvesLocally(domain) {
+			return fmt.Errorf("%w: %s", types.ErrGroupDNSRuleReservedZone, domain)
+		}
+	}
+
 	model := s.AccessModel()
 
 	for _, id := range rule.GroupIDs {

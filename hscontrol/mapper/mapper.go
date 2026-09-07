@@ -130,12 +130,19 @@ func generateDNSConfig(
 	dnsConfig.CertDomains = node.CertDomains(cfg)
 
 	// The node's groups add split DNS on top of the tailnet's: a domain
-	// both name gets the group's resolvers after the global ones.
+	// both name gets the group's resolvers after the global ones. A
+	// route with an empty resolver list is MagicDNS telling the client
+	// to answer itself (the reverse zones); appending to it would turn
+	// local NXDOMAIN into a forwarded query, so those stay as they are.
 	if len(groupRoutes) > 0 && dnsConfig.Routes == nil {
 		dnsConfig.Routes = make(map[string][]*dnstype.Resolver, len(groupRoutes))
 	}
 
 	for domain, rs := range groupRoutes {
+		if existing, ok := dnsConfig.Routes[domain]; ok && len(existing) == 0 {
+			continue
+		}
+
 		dnsConfig.Routes[domain] = append(dnsConfig.Routes[domain], rs...)
 	}
 

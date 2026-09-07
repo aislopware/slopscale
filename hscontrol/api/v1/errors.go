@@ -74,6 +74,7 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrGroupDNSRuleNoDomains),
 		errors.Is(err, types.ErrGroupDNSRuleNoNameservers),
 		errors.Is(err, types.ErrGroupDNSRuleNoGroups),
+		errors.Is(err, types.ErrGroupDNSRuleReservedZone),
 		errors.Is(err, types.ErrKeyExpiryOutOfRange),
 		errors.Is(err, types.ErrWebhookURLInvalid),
 		errors.Is(err, types.ErrWebhookNoSubscriptions),

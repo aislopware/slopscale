@@ -45,6 +45,7 @@ var (
 	ErrGroupDNSRuleNoNameservers = errors.New("dns rule needs at least one nameserver")
 	ErrGroupDNSRuleNoGroups      = errors.New("dns rule needs at least one group")
 	ErrGroupDNSRuleNotFound      = errors.New("dns rule not found")
+	ErrGroupDNSRuleReservedZone  = errors.New("dns rule domain is resolved by MagicDNS")
 )
 
 // Normalize trims and lowercases the domains and drops blanks and

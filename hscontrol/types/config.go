@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -1728,6 +1729,49 @@ func (c *Config) CloneTailcfgDNSConfig() *tailcfg.DNSConfig {
 	}
 
 	return c.TailcfgDNSConfig.Clone()
+}
+
+// LocalDNSDomains lists the domains the client resolves itself when
+// MagicDNS is on: the base domain and the reverse zones of the tailnet's
+// prefixes. A split DNS route for one of them, or a name under one,
+// would send the client to a nameserver for names only it knows.
+func (c *Config) LocalDNSDomains() []string {
+	tailcfgDNSMu.RLock()
+	defer tailcfgDNSMu.RUnlock()
+
+	if c.TailcfgDNSConfig == nil || !c.TailcfgDNSConfig.Proxied {
+		return nil
+	}
+
+	var out []string
+
+	for domain, resolvers := range c.TailcfgDNSConfig.Routes {
+		if resolvers != nil && len(resolvers) == 0 {
+			out = append(out, domain)
+		}
+	}
+
+	if base := c.effectiveDNSLocked().BaseDomain; base != "" {
+		out = append(out, strings.TrimSuffix(base, "."))
+	}
+
+	slices.Sort(out)
+
+	return out
+}
+
+// ResolvesLocally reports whether domain is one of [Config.LocalDNSDomains]
+// or a name under one.
+func (c *Config) ResolvesLocally(domain string) bool {
+	domain = strings.ToLower(strings.TrimSuffix(domain, "."))
+
+	for _, local := range c.LocalDNSDomains() {
+		if domain == local || strings.HasSuffix(domain, "."+local) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // SetExtraRecords replaces the extra records read from
