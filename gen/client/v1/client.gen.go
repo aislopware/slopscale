@@ -221,6 +221,17 @@ type CreateUserRequestBody struct {
 	PictureUrl  *string `json:"pictureUrl,omitempty"`
 }
 
+// DERPRegion defines model for DERPRegion.
+type DERPRegion struct {
+	Code string `json:"code"`
+
+	// Embedded Served by this headscale.
+	Embedded bool   `json:"embedded"`
+	Id       int64  `json:"id"`
+	Name     string `json:"name"`
+	Nodes    int64  `json:"nodes"`
+}
+
 // DNS defines model for DNS.
 type DNS struct {
 	// BaseDomain From the config file.
@@ -592,6 +603,32 @@ type RuleOutputBody struct {
 	Rule AccessRule `json:"rule"`
 }
 
+// ServerInfo defines model for ServerInfo.
+type ServerInfo struct {
+	BaseDomain                 string       `json:"baseDomain"`
+	BuildTime                  string       `json:"buildTime"`
+	Commit                     string       `json:"commit"`
+	Database                   string       `json:"database"`
+	DerpRegions                []DERPRegion `json:"derpRegions"`
+	DerpServer                 bool         `json:"derpServer"`
+	DerpStun                   string       `json:"derpStun"`
+	EphemeralInactivityTimeout string       `json:"ephemeralInactivityTimeout"`
+	GoVersion                  string       `json:"goVersion"`
+	Ipv4Prefix                 string       `json:"ipv4Prefix"`
+	Ipv6Prefix                 string       `json:"ipv6Prefix"`
+	ListenAddr                 string       `json:"listenAddr"`
+	MagicDns                   bool         `json:"magicDns"`
+	NodeExpiry                 string       `json:"nodeExpiry"`
+	OidcIssuer                 string       `json:"oidcIssuer"`
+	OidcScopes                 []string     `json:"oidcScopes"`
+	PolicyMode                 string       `json:"policyMode"`
+	PolicyPath                 string       `json:"policyPath"`
+	ServerUrl                  string       `json:"serverUrl"`
+	StartedAt                  time.Time    `json:"startedAt"`
+	Tls                        string       `json:"tls"`
+	Version                    string       `json:"version"`
+}
+
 // SetApprovalRequestBody defines model for SetApprovalRequestBody.
 type SetApprovalRequestBody struct {
 	// Approved false withdraws the approval.
@@ -631,8 +668,11 @@ type SetUserRoleRequestBody struct {
 
 // Settings defines model for Settings.
 type Settings struct {
+	DefaultKeyExpiryDays int64 `json:"defaultKeyExpiryDays"`
+
 	// DevicesApprovalOn New nodes wait for an administrator unless they register with a preauthorized key.
-	DevicesApprovalOn bool `json:"devicesApprovalOn"`
+	DevicesApprovalOn bool  `json:"devicesApprovalOn"`
+	KeyExpiryDays     int64 `json:"keyExpiryDays"`
 
 	// UsersApprovalOn Users created by OIDC login wait for an administrator before registering nodes.
 	UsersApprovalOn bool `json:"usersApprovalOn"`
@@ -646,8 +686,9 @@ type ShareNodeRequestBody struct {
 
 // UpdateSettingsRequestBody defines model for UpdateSettingsRequestBody.
 type UpdateSettingsRequestBody struct {
-	DevicesApprovalOn *bool `json:"devicesApprovalOn,omitempty"`
-	UsersApprovalOn   *bool `json:"usersApprovalOn,omitempty"`
+	DevicesApprovalOn *bool  `json:"devicesApprovalOn,omitempty"`
+	KeyExpiryDays     *int64 `json:"keyExpiryDays,omitempty"`
+	UsersApprovalOn   *bool  `json:"usersApprovalOn,omitempty"`
 }
 
 // User defines model for User.
@@ -1623,6 +1664,15 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
 	ExpirePreAuthKey(ctx context.Context, body ExpirePreAuthKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetServerInfo Get server info
+	//
+	// The build, addresses and config file values of the running server.
+	//
+	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/server (the `GetServerInfo` operationId).
+	GetServerInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSettings Get settings
 	//
@@ -3263,6 +3313,25 @@ func (c *Client) ExpirePreAuthKeyWithBody(ctx context.Context, contentType strin
 // Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
 func (c *Client) ExpirePreAuthKey(ctx context.Context, body ExpirePreAuthKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewExpirePreAuthKeyRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetServerInfo Get server info
+//
+// The build, addresses and config file values of the running server.
+//
+// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/server (the `GetServerInfo` operationId).
+func (c *Client) GetServerInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetServerInfoRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -5806,6 +5875,33 @@ func NewExpirePreAuthKeyRequestWithBody(server string, contentType string, body 
 	return req, nil
 }
 
+// NewGetServerInfoRequest constructs an http.Request for the GetServerInfo method
+func NewGetServerInfoRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/server")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetSettingsRequest constructs an http.Request for the GetSettings method
 func NewGetSettingsRequest(server string) (*http.Request, error) {
 	var err error
@@ -7007,6 +7103,17 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/preauthkey/expire (the `ExpirePreAuthKey` operationId).
 	ExpirePreAuthKeyWithResponse(ctx context.Context, body ExpirePreAuthKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*ExpirePreAuthKeyResponse, error)
+
+	// GetServerInfoWithResponse Get server info
+	//
+	// The build, addresses and config file values of the running server.
+	//
+	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/server (the `GetServerInfo` operationId).
+	GetServerInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetServerInfoResponse, error)
 
 	// GetSettingsWithResponse Get settings
 	//
@@ -9778,6 +9885,54 @@ func (r ExpirePreAuthKeyResponse) ContentType() string {
 	return ""
 }
 
+type GetServerInfoResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ServerInfo
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetServerInfoResponse) GetJSON200() *ServerInfo {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetServerInfoResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetServerInfoResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetServerInfoResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetServerInfoResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetServerInfoResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetSettingsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -11471,6 +11626,23 @@ func (c *ClientWithResponses) ExpirePreAuthKeyWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseExpirePreAuthKeyResponse(rsp)
+}
+
+// GetServerInfoWithResponse Get server info
+//
+// The build, addresses and config file values of the running server.
+//
+// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/server (the `GetServerInfo` operationId).
+func (c *ClientWithResponses) GetServerInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetServerInfoResponse, error) {
+	rsp, err := c.GetServerInfo(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetServerInfoResponse(rsp)
 }
 
 // GetSettingsWithResponse Get settings
@@ -13487,6 +13659,39 @@ func ParseExpirePreAuthKeyResponse(rsp *http.Response) (*ExpirePreAuthKeyRespons
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest ExpirePreAuthKeyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetServerInfoResponse parses an HTTP response from a GetServerInfoWithResponse call
+func ParseGetServerInfoResponse(rsp *http.Response) (*GetServerInfoResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetServerInfoResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ServerInfo
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

@@ -295,6 +295,29 @@ components:
         pictureUrl:
           type: string
       type: object
+    DERPRegion:
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+        embedded:
+          description: Served by this headscale.
+          type: boolean
+        id:
+          format: int64
+          type: integer
+        name:
+          type: string
+        nodes:
+          format: int64
+          type: integer
+      required:
+        - id
+        - code
+        - name
+        - nodes
+        - embedded
+      type: object
     DNS:
       additionalProperties: false
       properties:
@@ -1032,6 +1055,82 @@ components:
       required:
         - rule
       type: object
+    ServerInfo:
+      additionalProperties: false
+      properties:
+        baseDomain:
+          type: string
+        buildTime:
+          type: string
+        commit:
+          type: string
+        database:
+          type: string
+        derpRegions:
+          items:
+            $ref: "#/components/schemas/DERPRegion"
+          type: array
+        derpServer:
+          type: boolean
+        derpStun:
+          type: string
+        ephemeralInactivityTimeout:
+          type: string
+        goVersion:
+          type: string
+        ipv4Prefix:
+          type: string
+        ipv6Prefix:
+          type: string
+        listenAddr:
+          type: string
+        magicDns:
+          type: boolean
+        nodeExpiry:
+          type: string
+        oidcIssuer:
+          type: string
+        oidcScopes:
+          items:
+            type: string
+          type: array
+        policyMode:
+          type: string
+        policyPath:
+          type: string
+        serverUrl:
+          type: string
+        startedAt:
+          format: date-time
+          type: string
+        tls:
+          type: string
+        version:
+          type: string
+      required:
+        - version
+        - commit
+        - buildTime
+        - goVersion
+        - startedAt
+        - serverUrl
+        - listenAddr
+        - ipv4Prefix
+        - ipv6Prefix
+        - baseDomain
+        - magicDns
+        - database
+        - policyMode
+        - policyPath
+        - tls
+        - oidcIssuer
+        - oidcScopes
+        - derpRegions
+        - derpServer
+        - derpStun
+        - ephemeralInactivityTimeout
+        - nodeExpiry
+      type: object
     SetApprovalRequestBody:
       additionalProperties: false
       properties:
@@ -1110,15 +1209,23 @@ components:
     Settings:
       additionalProperties: false
       properties:
+        defaultKeyExpiryDays:
+          format: int64
+          type: integer
         devicesApprovalOn:
           description: New nodes wait for an administrator unless they register with a preauthorized key.
           type: boolean
+        keyExpiryDays:
+          format: int64
+          type: integer
         usersApprovalOn:
           description: Users created by OIDC login wait for an administrator before registering nodes.
           type: boolean
       required:
         - devicesApprovalOn
         - usersApprovalOn
+        - keyExpiryDays
+        - defaultKeyExpiryDays
       type: object
     ShareNodeRequestBody:
       additionalProperties: false
@@ -1135,6 +1242,11 @@ components:
       properties:
         devicesApprovalOn:
           type: boolean
+        keyExpiryDays:
+          format: int64
+          maximum: 365
+          minimum: 0
+          type: integer
         usersApprovalOn:
           type: boolean
       type: object
@@ -2998,6 +3110,32 @@ paths:
         - PreAuthKeys
       x-audit-action: preauthkey.expire
       x-required-scope: auth_keys
+  /api/v1/server:
+    get:
+      description: |-
+        The build, addresses and config file values of the running server.
+
+        Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getServerInfo
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerInfo"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get server info
+      tags:
+        - Settings
+      x-required-scope: feature_settings:read
   /api/v1/settings:
     get:
       description: Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).

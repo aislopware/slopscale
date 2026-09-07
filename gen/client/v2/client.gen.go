@@ -231,7 +231,10 @@ type TailnetSettings struct {
 // UpdateTailnetSettings defines model for UpdateTailnetSettings.
 type UpdateTailnetSettings struct {
 	DevicesApprovalOn *bool `json:"devicesApprovalOn,omitempty"`
-	UsersApprovalOn   *bool `json:"usersApprovalOn,omitempty"`
+
+	// DevicesKeyDurationDays 0 leaves the config file and the client in charge.
+	DevicesKeyDurationDays *int64 `json:"devicesKeyDurationDays,omitempty"`
+	UsersApprovalOn        *bool  `json:"usersApprovalOn,omitempty"`
 }
 
 // User defines model for User.
@@ -752,7 +755,7 @@ type ClientInterface interface {
 
 	// UpdateTailnetSettingsWithBody Update tailnet settings
 	//
-	// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
+	// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -763,7 +766,7 @@ type ClientInterface interface {
 
 	// UpdateTailnetSettings Update tailnet settings
 	//
-	// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
+	// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -1507,7 +1510,7 @@ func (c *Client) GetTailnetSettings(ctx context.Context, tailnet string, reqEdit
 
 // UpdateTailnetSettingsWithBody Update tailnet settings
 //
-// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
+// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -1528,7 +1531,7 @@ func (c *Client) UpdateTailnetSettingsWithBody(ctx context.Context, tailnet stri
 
 // UpdateTailnetSettings Update tailnet settings
 //
-// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
+// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -3510,7 +3513,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateTailnetSettingsWithBodyWithResponse Update tailnet settings
 	//
-	// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
+	// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -3521,7 +3524,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateTailnetSettingsWithResponse Update tailnet settings
 	//
-	// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
+	// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -6593,7 +6596,7 @@ func (c *ClientWithResponses) GetTailnetSettingsWithResponse(ctx context.Context
 
 // UpdateTailnetSettingsWithBodyWithResponse Update tailnet settings
 //
-// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
+// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -6610,7 +6613,7 @@ func (c *ClientWithResponses) UpdateTailnetSettingsWithBodyWithResponse(ctx cont
 
 // UpdateTailnetSettingsWithResponse Update tailnet settings
 //
-// Changes devicesApprovalOn and usersApprovalOn; the other settings are file-based in Headscale and cannot be changed here.
+// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //

@@ -840,6 +840,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/server": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get server info
+         * @description The build, addresses and config file values of the running server.
+         *
+         *     Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getServerInfo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings": {
         parameters: {
             query?: never;
@@ -1138,6 +1160,16 @@ export interface components {
         DeleteNodeOutputBody: Record<string, unknown>;
         DeletePreAuthKeyOutputBody: Record<string, unknown>;
         DeleteUserOutputBody: Record<string, unknown>;
+        DERPRegion: {
+            code: string;
+            /** @description Served by this headscale. */
+            embedded: boolean;
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** Format: int64 */
+            nodes: number;
+        };
         DNS: {
             /** @description From the config file. */
             baseDomain: string;
@@ -1420,6 +1452,31 @@ export interface components {
         RuleOutputBody: {
             rule: components["schemas"]["AccessRule"];
         };
+        ServerInfo: {
+            baseDomain: string;
+            buildTime: string;
+            commit: string;
+            database: string;
+            derpRegions: components["schemas"]["DERPRegion"][];
+            derpServer: boolean;
+            derpStun: string;
+            ephemeralInactivityTimeout: string;
+            goVersion: string;
+            ipv4Prefix: string;
+            ipv6Prefix: string;
+            listenAddr: string;
+            magicDns: boolean;
+            nodeExpiry: string;
+            oidcIssuer: string;
+            oidcScopes: string[];
+            policyMode: string;
+            policyPath: string;
+            serverUrl: string;
+            /** Format: date-time */
+            startedAt: string;
+            tls: string;
+            version: string;
+        };
         SetApprovalRequestBody: {
             /** @description false withdraws the approval. */
             approved?: boolean;
@@ -1444,8 +1501,12 @@ export interface components {
             tags?: string[] | null;
         };
         Settings: {
+            /** Format: int64 */
+            defaultKeyExpiryDays: number;
             /** @description New nodes wait for an administrator unless they register with a preauthorized key. */
             devicesApprovalOn: boolean;
+            /** Format: int64 */
+            keyExpiryDays: number;
             /** @description Users created by OIDC login wait for an administrator before registering nodes. */
             usersApprovalOn: boolean;
         };
@@ -1462,6 +1523,8 @@ export interface components {
         };
         UpdateSettingsRequestBody: {
             devicesApprovalOn?: boolean;
+            /** Format: int64 */
+            keyExpiryDays?: number;
             usersApprovalOn?: boolean;
         };
         User: {
@@ -1526,6 +1589,7 @@ export type DeleteApiKeyOutputBody = components['schemas']['DeleteAPIKeyOutputBo
 export type DeleteNodeOutputBody = components['schemas']['DeleteNodeOutputBody'];
 export type DeletePreAuthKeyOutputBody = components['schemas']['DeletePreAuthKeyOutputBody'];
 export type DeleteUserOutputBody = components['schemas']['DeleteUserOutputBody'];
+export type DerpRegion = components['schemas']['DERPRegion'];
 export type Dns = components['schemas']['DNS'];
 export type DnsRecord = components['schemas']['DNSRecord'];
 export type DnsSettings = components['schemas']['DNSSettings'];
@@ -1564,6 +1628,7 @@ export type PreAuthKey = components['schemas']['PreAuthKey'];
 export type PreAuthKeyOutputBody = components['schemas']['PreAuthKeyOutputBody'];
 export type RuleEnabledInputBody = components['schemas']['RuleEnabledInputBody'];
 export type RuleOutputBody = components['schemas']['RuleOutputBody'];
+export type ServerInfo = components['schemas']['ServerInfo'];
 export type SetApprovalRequestBody = components['schemas']['SetApprovalRequestBody'];
 export type SetApprovedRoutesRequestBody = components['schemas']['SetApprovedRoutesRequestBody'];
 export type SetDnsRequestBody = components['schemas']['SetDNSRequestBody'];
@@ -3343,6 +3408,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExpirePreAuthKeyOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getServerInfo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerInfo"];
                 };
             };
             /** @description Error */
