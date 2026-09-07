@@ -37,6 +37,7 @@ func init() {
 	webhooksCmd.AddCommand(rotateWebhookCmd)
 	webhooksCmd.AddCommand(testWebhookCmd)
 	webhooksCmd.AddCommand(deleteWebhookCmd)
+	webhooksCmd.AddCommand(listWebhookDeliveriesCmd)
 
 	showWebhookCmd.Flags().Uint64P("identifier", "i", 0, "Webhook identifier (ID)")
 	mustMarkRequired(showWebhookCmd, "identifier")
@@ -64,6 +65,9 @@ func init() {
 
 	deleteWebhookCmd.Flags().Uint64P("identifier", "i", 0, "Webhook identifier (ID)")
 	mustMarkRequired(deleteWebhookCmd, "identifier")
+
+	listWebhookDeliveriesCmd.Flags().Uint64P("identifier", "i", 0, "Webhook identifier (ID)")
+	mustMarkRequired(listWebhookDeliveriesCmd, "identifier")
 }
 
 var webhooksCmd = &cobra.Command{
@@ -139,6 +143,42 @@ var listWebhookEventTypesCmd = &cobra.Command{
 				}
 
 				return nil
+			})
+		},
+	),
+}
+
+var listWebhookDeliveriesCmd = &cobra.Command{
+	Use:     "deliveries",
+	Short:   "List the newest deliveries of a webhook",
+	Aliases: []string{"history"},
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			identifier, _ := cmd.Flags().GetUint64("identifier")
+			hookID := strconv.FormatUint(identifier, util.Base10)
+
+			resp, err := client.ListWebhookDeliveriesWithResponse(ctx, hookID)
+			if err != nil {
+				return fmt.Errorf("listing webhook deliveries: %w", err)
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			deliveries := resp.JSON200.Deliveries
+
+			return printListOutput(cmd, deliveries, func() error {
+				if len(deliveries) == 0 {
+					fmt.Println("No deliveries yet")
+
+					return nil
+				}
+
+				return renderTable(
+					[]string{"Time", "Event", "Result", "Status", "Attempts", "Duration"},
+					deliveriesToRows(deliveries),
+				)
 			})
 		},
 	),
@@ -396,6 +436,28 @@ func formatLastDelivery(status string, at *time.Time) string {
 	}
 
 	return fmt.Sprintf("%s (%s)", status, timeStr)
+}
+
+func deliveriesToRows(deliveries []clientv1.WebhookDelivery) [][]string {
+	rows := make([][]string, 0, len(deliveries))
+
+	for _, d := range deliveries {
+		result := "failed"
+		if d.Ok {
+			result = "delivered"
+		}
+
+		rows = append(rows, []string{
+			d.At.Format("2006-01-02 15:04:05"),
+			d.EventType,
+			result,
+			d.Status,
+			strconv.FormatInt(d.Attempts, util.Base10),
+			(time.Duration(d.DurationMs) * time.Millisecond).String(),
+		})
+	}
+
+	return rows
 }
 
 func webhooksToRows(webhooks []clientv1.Webhook) [][]string {

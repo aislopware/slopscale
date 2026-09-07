@@ -125,6 +125,42 @@ func TestWebhookCommands(t *testing.T) {
 			},
 		},
 		{
+			name:  "deliveries renders the history",
+			src:   listWebhookDeliveriesCmd,
+			flags: map[string]string{"identifier": "7"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/webhook/7/deliveries": func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+					t.Helper()
+					writeJSON(t, w, clientv1.WebhookDeliveriesOutputBody{
+						Deliveries: []clientv1.WebhookDelivery{
+							{Id: "2", EventType: "test", Status: "204", Ok: true, Attempts: 1, DurationMs: 120},
+							{
+								Id:         "1",
+								EventType:  "nodeCreated",
+								Status:     "503",
+								Ok:         false,
+								Attempts:   4,
+								DurationMs: 42500,
+							},
+						},
+					})
+				},
+			},
+			wantIn: []string{"test", "delivered", "204", "nodeCreated", "failed", "503", "4", "42.5s"},
+		},
+		{
+			name:  "deliveries says so when there are none",
+			src:   listWebhookDeliveriesCmd,
+			flags: map[string]string{"identifier": "7"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/webhook/7/deliveries": func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+					t.Helper()
+					writeJSON(t, w, clientv1.WebhookDeliveriesOutputBody{Deliveries: []clientv1.WebhookDelivery{}})
+				},
+			},
+			wantIn: []string{"No deliveries yet"},
+		},
+		{
 			name: "create builds the right body and prints secret",
 			src:  createWebhookCmd,
 			flags: map[string]string{
