@@ -97,6 +97,16 @@ join them. Manage it all from the console's _Access controls_ page, with
 and `/api/v1/access-rule`. See
 [Groups and access rules](https://headscale.net/development/ref/access-control/).
 
+### Key expiry setting and server info
+
+`headscale settings set --key-expiry-days` (or `keyExpiryDays` on
+`/api/v1/settings`, `devicesKeyDurationDays` on the v2 tailnet settings)
+caps how long a login stays valid, the way Tailscale's key expiry setting
+does, without a config change or restart. `GET /api/v1/server` reports the
+build, addresses, DERP regions and config file values of the running server,
+and the console's _Settings_ page shows both. See
+[Device and user approval](https://headscale.net/development/ref/approval/#key-expiry).
+
 ### Networks
 
 Subnets and exit nodes can now be handed to groups as networks, the way

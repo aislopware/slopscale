@@ -112,7 +112,8 @@ account menu with *Sign out*.
 - **Audit log**: who changed what, newest first, with filters by action, user
   and time; see [Audit log](audit.md).
 - **Settings**: the [device and user approval](approval.md) switches, the
-  signed-in credential's role and scopes, and the server's database health.
+  key expiry cap, the signed-in credential's role and scopes, and the server's
+  build, addresses, DERP regions and config file values.
 
 ## Building from source
 

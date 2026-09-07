@@ -31,6 +31,26 @@ the owner and admins hold.
 Switching a setting off approves every node or user that was waiting, so
 nothing stays stuck behind a requirement that no longer exists.
 
+### Key expiry
+
+The same endpoint carries the tailnet's key expiry, following
+[Tailscale's key expiry](https://tailscale.com/docs/features/key-expiry):
+`keyExpiryDays` caps how long a login stays valid. A client that asks for
+longer is shortened to it, and a login that asks for nothing gets it. It
+applies to the next login of each node, never to tagged nodes, and does not
+touch a node whose expiry an administrator disabled. Zero, the default,
+leaves the config file's `node.expiry` and the client in charge; the
+response reports that file value as `defaultKeyExpiryDays`.
+
+```console
+headscale settings set --key-expiry-days 90
+```
+
+The v2 API exposes it as `devicesKeyDurationDays`. The console's _Settings_
+page has it under _Key expiry_, next to a read-only _Server_ card showing the
+build, addresses, DERP regions and config file values from
+`GET /api/v1/server`.
+
 ## Devices
 
 A node waiting for approval is registered and keeps its address, but it gets
