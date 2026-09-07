@@ -252,9 +252,12 @@ type Node struct {
 	Online          bool               `json:"online"`
 	PreAuthKey      NodePreAuthKey     `json:"preAuthKey"`
 	RegisterMethod  NodeRegisterMethod `json:"registerMethod"`
-	SubnetRoutes    []string           `json:"subnetRoutes"`
-	Tags            []string           `json:"tags"`
-	User            User               `json:"user"`
+
+	// SharedWith IDs of the users the node is shared with.
+	SharedWith   []string `json:"sharedWith"`
+	SubnetRoutes []string `json:"subnetRoutes"`
+	Tags         []string `json:"tags"`
+	User         User     `json:"user"`
 }
 
 // NodeRegisterMethod defines model for Node.RegisterMethod.
@@ -340,6 +343,12 @@ type Settings struct {
 
 	// UsersApprovalOn Users created by OIDC login wait for an administrator before registering nodes.
 	UsersApprovalOn bool `json:"usersApprovalOn"`
+}
+
+// ShareNodeRequestBody defines model for ShareNodeRequestBody.
+type ShareNodeRequestBody struct {
+	// UserId ID of the user to share the node with.
+	UserId string `json:"userId"`
 }
 
 // UpdateSettingsRequestBody defines model for UpdateSettingsRequestBody.
@@ -442,6 +451,9 @@ type SetApprovedRoutesJSONRequestBody = SetApprovedRoutesRequestBody
 
 // ExpireNodeJSONRequestBody defines body for ExpireNode for application/json ContentType.
 type ExpireNodeJSONRequestBody = ExpireNodeRequestBody
+
+// ShareNodeJSONRequestBody defines body for ShareNode for application/json ContentType.
+type ShareNodeJSONRequestBody = ShareNodeRequestBody
 
 // SetTagsJSONRequestBody defines body for SetTags for application/json ContentType.
 type SetTagsJSONRequestBody = SetTagsRequestBody
@@ -764,6 +776,29 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/rename/{newName} (the `RenameNode` operationId).
 	RenameNode(ctx context.Context, nodeId string, newName string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ShareNodeWithBody Share node with a user
+	//
+	// Gives the user's personal devices access to the node wherever the policy names autogroup:shared, and marks the node as shared in their netmaps. The node gets no access back. A member may share the nodes they own; sharing any node needs the devices scope.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/share (the `ShareNode` operationId).
+	ShareNodeWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ShareNode Share node with a user
+	//
+	// Gives the user's personal devices access to the node wherever the policy names autogroup:shared, and marks the node as shared in their netmaps. The node gets no access back. A member may share the nodes they own; sharing any node needs the devices scope.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/share (the `ShareNode` operationId).
+	ShareNode(ctx context.Context, nodeId string, body ShareNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnshareNode Stop sharing node with a user
+	//
+	// Corresponds with DELETE /api/v1/node/{nodeId}/share/{userId} (the `UnshareNode` operationId).
+	UnshareNode(ctx context.Context, nodeId string, userId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetTagsWithBody Set tags
 	//
@@ -1481,6 +1516,59 @@ func (c *Client) ExpireNode(ctx context.Context, nodeId string, body ExpireNodeJ
 // Corresponds with POST /api/v1/node/{nodeId}/rename/{newName} (the `RenameNode` operationId).
 func (c *Client) RenameNode(ctx context.Context, nodeId string, newName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRenameNodeRequest(c.Server, nodeId, newName)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ShareNodeWithBody Share node with a user
+//
+// Gives the user's personal devices access to the node wherever the policy names autogroup:shared, and marks the node as shared in their netmaps. The node gets no access back. A member may share the nodes they own; sharing any node needs the devices scope.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/node/{nodeId}/share (the `ShareNode` operationId).
+func (c *Client) ShareNodeWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewShareNodeRequestWithBody(c.Server, nodeId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ShareNode Share node with a user
+//
+// Gives the user's personal devices access to the node wherever the policy names autogroup:shared, and marks the node as shared in their netmaps. The node gets no access back. A member may share the nodes they own; sharing any node needs the devices scope.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/node/{nodeId}/share (the `ShareNode` operationId).
+func (c *Client) ShareNode(ctx context.Context, nodeId string, body ShareNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewShareNodeRequest(c.Server, nodeId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UnshareNode Stop sharing node with a user
+//
+// Corresponds with DELETE /api/v1/node/{nodeId}/share/{userId} (the `UnshareNode` operationId).
+func (c *Client) UnshareNode(ctx context.Context, nodeId string, userId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUnshareNodeRequest(c.Server, nodeId, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -2764,6 +2852,94 @@ func NewRenameNodeRequest(server string, nodeId string, newName string) (*http.R
 	return req, nil
 }
 
+// NewShareNodeRequest calls the generic ShareNode builder with application/json body
+func NewShareNodeRequest(server string, nodeId string, body ShareNodeJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewShareNodeRequestWithBody(server, nodeId, "application/json", bodyReader)
+}
+
+// NewShareNodeRequestWithBody constructs an http.Request for the ShareNode method, with any body, and a specified content type
+func NewShareNodeRequestWithBody(server string, nodeId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/share", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUnshareNodeRequest constructs an http.Request for the UnshareNode method
+func NewUnshareNodeRequest(server string, nodeId string, userId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "userId", userId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/share/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewSetTagsRequest calls the generic SetTags builder with application/json body
 func NewSetTagsRequest(server string, nodeId string, body SetTagsJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -3742,6 +3918,31 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/rename/{newName} (the `RenameNode` operationId).
 	RenameNodeWithResponse(ctx context.Context, nodeId string, newName string, reqEditors ...RequestEditorFn) (*RenameNodeResponse, error)
+
+	// ShareNodeWithBodyWithResponse Share node with a user
+	//
+	// Gives the user's personal devices access to the node wherever the policy names autogroup:shared, and marks the node as shared in their netmaps. The node gets no access back. A member may share the nodes they own; sharing any node needs the devices scope.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/share (the `ShareNode` operationId).
+	ShareNodeWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ShareNodeResponse, error)
+
+	// ShareNodeWithResponse Share node with a user
+	//
+	// Gives the user's personal devices access to the node wherever the policy names autogroup:shared, and marks the node as shared in their netmaps. The node gets no access back. A member may share the nodes they own; sharing any node needs the devices scope.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/share (the `ShareNode` operationId).
+	ShareNodeWithResponse(ctx context.Context, nodeId string, body ShareNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*ShareNodeResponse, error)
+
+	// UnshareNodeWithResponse Stop sharing node with a user
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/node/{nodeId}/share/{userId} (the `UnshareNode` operationId).
+	UnshareNodeWithResponse(ctx context.Context, nodeId string, userId string, reqEditors ...RequestEditorFn) (*UnshareNodeResponse, error)
 
 	// SetTagsWithBodyWithResponse Set tags
 	//
@@ -4852,6 +5053,102 @@ func (r RenameNodeResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r RenameNodeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ShareNodeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodeOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ShareNodeResponse) GetJSON200() *NodeOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ShareNodeResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ShareNodeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ShareNodeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ShareNodeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ShareNodeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UnshareNodeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodeOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UnshareNodeResponse) GetJSON200() *NodeOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UnshareNodeResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UnshareNodeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UnshareNodeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UnshareNodeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UnshareNodeResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -6075,6 +6372,49 @@ func (c *ClientWithResponses) RenameNodeWithResponse(ctx context.Context, nodeId
 	return ParseRenameNodeResponse(rsp)
 }
 
+// ShareNodeWithBodyWithResponse Share node with a user
+//
+// Gives the user's personal devices access to the node wherever the policy names autogroup:shared, and marks the node as shared in their netmaps. The node gets no access back. A member may share the nodes they own; sharing any node needs the devices scope.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/share (the `ShareNode` operationId).
+func (c *ClientWithResponses) ShareNodeWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ShareNodeResponse, error) {
+	rsp, err := c.ShareNodeWithBody(ctx, nodeId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseShareNodeResponse(rsp)
+}
+
+// ShareNodeWithResponse Share node with a user
+//
+// Gives the user's personal devices access to the node wherever the policy names autogroup:shared, and marks the node as shared in their netmaps. The node gets no access back. A member may share the nodes they own; sharing any node needs the devices scope.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/share (the `ShareNode` operationId).
+func (c *ClientWithResponses) ShareNodeWithResponse(ctx context.Context, nodeId string, body ShareNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*ShareNodeResponse, error) {
+	rsp, err := c.ShareNode(ctx, nodeId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseShareNodeResponse(rsp)
+}
+
+// UnshareNodeWithResponse Stop sharing node with a user
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/node/{nodeId}/share/{userId} (the `UnshareNode` operationId).
+func (c *ClientWithResponses) UnshareNodeWithResponse(ctx context.Context, nodeId string, userId string, reqEditors ...RequestEditorFn) (*UnshareNodeResponse, error) {
+	rsp, err := c.UnshareNode(ctx, nodeId, userId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnshareNodeResponse(rsp)
+}
+
 // SetTagsWithBodyWithResponse Set tags
 //
 // Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -7051,6 +7391,72 @@ func ParseRenameNodeResponse(rsp *http.Response) (*RenameNodeResponse, error) {
 	}
 
 	response := &RenameNodeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodeOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseShareNodeResponse parses an HTTP response from a ShareNodeWithResponse call
+func ParseShareNodeResponse(rsp *http.Response) (*ShareNodeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ShareNodeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodeOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUnshareNodeResponse parses an HTTP response from a UnshareNodeWithResponse call
+func ParseUnshareNodeResponse(rsp *http.Response) (*UnshareNodeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UnshareNodeResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
