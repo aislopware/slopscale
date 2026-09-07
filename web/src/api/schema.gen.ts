@@ -437,6 +437,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/network": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List networks
+         * @description Networks are prefixes reached through routing nodes and handed out to the machines in their groups, the way NetBird's networks work.
+         *
+         *     Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listNetworks"];
+        put?: never;
+        /**
+         * Create network
+         * @description Approves the prefixes on the routers and hands the routes to the machines in the groups. Once the tailnet enforces access, the groups may also reach the prefixes.
+         *
+         *     Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["createNetwork"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/network/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get network
+         * @description Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getNetwork"];
+        /**
+         * Replace network
+         * @description Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        put: operations["updateNetwork"];
+        post?: never;
+        /**
+         * Delete network
+         * @description Withdraws the route approvals the network made.
+         *
+         *     Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["deleteNetwork"];
+        options?: never;
+        head?: never;
+        /**
+         * Enable or disable network
+         * @description Off withdraws the route approvals the network made and stops handing out its routes.
+         *
+         *     Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        patch: operations["setNetworkEnabled"];
+        trace?: never;
+    };
     "/api/v1/node": {
         parameters: {
             query?: never;
@@ -1209,6 +1273,9 @@ export interface components {
         ListGroupsOutputBody: {
             groups: components["schemas"]["Group"][];
         };
+        ListNetworksOutputBody: {
+            networks: components["schemas"]["Network"][];
+        };
         ListNodesOutputBody: {
             nodes: components["schemas"]["Node"][];
         };
@@ -1221,6 +1288,51 @@ export interface components {
         };
         ListUsersOutputBody: {
             users: components["schemas"]["User"][];
+        };
+        Network: {
+            /** Format: date-time */
+            createdAt: string;
+            description: string;
+            enabled: boolean;
+            /** @description The prefixes are the exit routes. */
+            exitNode: boolean;
+            /** @description Groups whose machines get the routes. */
+            groupIds: string[];
+            /** Format: uint64 */
+            id: string;
+            name: string;
+            prefixes: string[];
+            routerNodeIds: string[];
+            /** @description The routers with what they advertise and serve. */
+            routers: components["schemas"]["NetworkRouter"][];
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        NetworkEnabledInputBody: {
+            enabled: boolean;
+        };
+        NetworkOutputBody: {
+            network: components["schemas"]["Network"];
+        };
+        NetworkRequestBody: {
+            description?: string;
+            /** @description Defaults to true. */
+            enabled?: boolean;
+            /** @description Groups whose machines get the routes. */
+            groupIds: string[] | null;
+            name: string;
+            /** @description CIDRs or addresses. */
+            prefixes: string[] | null;
+            /** @description Nodes that route the prefixes. */
+            routerNodeIds?: string[] | null;
+        };
+        NetworkRouter: {
+            missingPrefixes: string[];
+            name: string;
+            /** Format: uint64 */
+            nodeId: string;
+            online: boolean;
+            primaryPrefixes: string[];
         };
         Node: {
             /** @description false while the node waits for an administrator. */
@@ -1433,10 +1545,16 @@ export type HealthResponseBody = components['schemas']['HealthResponseBody'];
 export type ListApiKeysOutputBody = components['schemas']['ListAPIKeysOutputBody'];
 export type ListAuditOutputBody = components['schemas']['ListAuditOutputBody'];
 export type ListGroupsOutputBody = components['schemas']['ListGroupsOutputBody'];
+export type ListNetworksOutputBody = components['schemas']['ListNetworksOutputBody'];
 export type ListNodesOutputBody = components['schemas']['ListNodesOutputBody'];
 export type ListPreAuthKeysOutputBody = components['schemas']['ListPreAuthKeysOutputBody'];
 export type ListRulesOutputBody = components['schemas']['ListRulesOutputBody'];
 export type ListUsersOutputBody = components['schemas']['ListUsersOutputBody'];
+export type Network = components['schemas']['Network'];
+export type NetworkEnabledInputBody = components['schemas']['NetworkEnabledInputBody'];
+export type NetworkOutputBody = components['schemas']['NetworkOutputBody'];
+export type NetworkRequestBody = components['schemas']['NetworkRequestBody'];
+export type NetworkRouter = components['schemas']['NetworkRouter'];
 export type Node = components['schemas']['Node'];
 export type NodeOutputBody = components['schemas']['NodeOutputBody'];
 export type NodePreAuthKey = components['schemas']['NodePreAuthKey'];
@@ -2380,6 +2498,200 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponseBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listNetworks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListNetworksOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createNetwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getNetwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updateNetwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteNetwork: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmptyOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    setNetworkEnabled: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NetworkEnabledInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkOutputBody"];
                 };
             };
             /** @description Error */

@@ -607,6 +607,16 @@ components:
       required:
         - groups
       type: object
+    ListNetworksOutputBody:
+      additionalProperties: false
+      properties:
+        networks:
+          items:
+            $ref: "#/components/schemas/Network"
+          type: array
+      required:
+        - networks
+      type: object
     ListNodesOutputBody:
       additionalProperties: false
       properties:
@@ -649,6 +659,135 @@ components:
           type: array
       required:
         - users
+      type: object
+    Network:
+      additionalProperties: false
+      properties:
+        createdAt:
+          format: date-time
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+        exitNode:
+          description: The prefixes are the exit routes.
+          type: boolean
+        groupIds:
+          description: Groups whose machines get the routes.
+          items:
+            type: string
+          type: array
+        id:
+          format: uint64
+          type: string
+        name:
+          type: string
+        prefixes:
+          items:
+            type: string
+          type: array
+        routerNodeIds:
+          items:
+            type: string
+          type: array
+        routers:
+          description: The routers with what they advertise and serve.
+          items:
+            $ref: "#/components/schemas/NetworkRouter"
+          type: array
+        updatedAt:
+          format: date-time
+          type: string
+      required:
+        - id
+        - name
+        - description
+        - enabled
+        - exitNode
+        - prefixes
+        - routerNodeIds
+        - groupIds
+        - routers
+        - createdAt
+        - updatedAt
+      type: object
+    NetworkEnabledInputBody:
+      additionalProperties: false
+      properties:
+        enabled:
+          type: boolean
+      required:
+        - enabled
+      type: object
+    NetworkOutputBody:
+      additionalProperties: false
+      properties:
+        network:
+          $ref: "#/components/schemas/Network"
+      required:
+        - network
+      type: object
+    NetworkRequestBody:
+      additionalProperties: false
+      properties:
+        description:
+          type: string
+        enabled:
+          description: Defaults to true.
+          type: boolean
+        groupIds:
+          description: Groups whose machines get the routes.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        name:
+          type: string
+        prefixes:
+          description: CIDRs or addresses.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        routerNodeIds:
+          description: Nodes that route the prefixes.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - name
+        - prefixes
+        - groupIds
+      type: object
+    NetworkRouter:
+      additionalProperties: false
+      properties:
+        missingPrefixes:
+          items:
+            type: string
+          type: array
+        name:
+          type: string
+        nodeId:
+          format: uint64
+          type: string
+        online:
+          type: boolean
+        primaryPrefixes:
+          items:
+            type: string
+          type: array
+      required:
+        - nodeId
+        - name
+        - online
+        - missingPrefixes
+        - primaryPrefixes
       type: object
     Node:
       additionalProperties: false
@@ -2018,6 +2157,202 @@ paths:
       summary: Health check
       tags:
         - Health
+  /api/v1/network:
+    get:
+      description: |-
+        Networks are prefixes reached through routing nodes and handed out to the machines in their groups, the way NetBird's networks work.
+
+        Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listNetworks
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListNetworksOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List networks
+      tags:
+        - Networks
+      x-required-scope: devices:routes:read
+    post:
+      description: |-
+        Approves the prefixes on the routers and hands the routes to the machines in the groups. Once the tailnet enforces access, the groups may also reach the prefixes.
+
+        Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createNetwork
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NetworkRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create network
+      tags:
+        - Networks
+      x-audit-action: network.create
+      x-required-scope: devices:routes
+  /api/v1/network/{id}:
+    delete:
+      description: |-
+        Withdraws the route approvals the network made.
+
+        Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteNetwork
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmptyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete network
+      tags:
+        - Networks
+      x-audit-action: network.delete
+      x-required-scope: devices:routes
+    get:
+      description: Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getNetwork
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get network
+      tags:
+        - Networks
+      x-required-scope: devices:routes:read
+    patch:
+      description: |-
+        Off withdraws the route approvals the network made and stops handing out its routes.
+
+        Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: setNetworkEnabled
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NetworkEnabledInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Enable or disable network
+      tags:
+        - Networks
+      x-audit-action: network.update
+      x-required-scope: devices:routes
+    put:
+      description: Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateNetwork
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NetworkRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Replace network
+      tags:
+        - Networks
+      x-audit-action: network.update
+      x-required-scope: devices:routes
   /api/v1/node:
     get:
       description: Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).

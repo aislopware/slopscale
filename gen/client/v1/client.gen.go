@@ -410,6 +410,11 @@ type ListGroupsOutputBody struct {
 	Groups []Group `json:"groups"`
 }
 
+// ListNetworksOutputBody defines model for ListNetworksOutputBody.
+type ListNetworksOutputBody struct {
+	Networks []Network `json:"networks"`
+}
+
 // ListNodesOutputBody defines model for ListNodesOutputBody.
 type ListNodesOutputBody struct {
 	Nodes []Node `json:"nodes"`
@@ -429,6 +434,64 @@ type ListRulesOutputBody struct {
 // ListUsersOutputBody defines model for ListUsersOutputBody.
 type ListUsersOutputBody struct {
 	Users []User `json:"users"`
+}
+
+// Network defines model for Network.
+type Network struct {
+	CreatedAt   time.Time `json:"createdAt"`
+	Description string    `json:"description"`
+	Enabled     bool      `json:"enabled"`
+
+	// ExitNode The prefixes are the exit routes.
+	ExitNode bool `json:"exitNode"`
+
+	// GroupIds Groups whose machines get the routes.
+	GroupIds      []string `json:"groupIds"`
+	Id            string   `json:"id"`
+	Name          string   `json:"name"`
+	Prefixes      []string `json:"prefixes"`
+	RouterNodeIds []string `json:"routerNodeIds"`
+
+	// Routers The routers with what they advertise and serve.
+	Routers   []NetworkRouter `json:"routers"`
+	UpdatedAt time.Time       `json:"updatedAt"`
+}
+
+// NetworkEnabledInputBody defines model for NetworkEnabledInputBody.
+type NetworkEnabledInputBody struct {
+	Enabled bool `json:"enabled"`
+}
+
+// NetworkOutputBody defines model for NetworkOutputBody.
+type NetworkOutputBody struct {
+	Network Network `json:"network"`
+}
+
+// NetworkRequestBody defines model for NetworkRequestBody.
+type NetworkRequestBody struct {
+	Description *string `json:"description,omitempty"`
+
+	// Enabled Defaults to true.
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// GroupIds Groups whose machines get the routes.
+	GroupIds *[]string `json:"groupIds"`
+	Name     string    `json:"name"`
+
+	// Prefixes CIDRs or addresses.
+	Prefixes *[]string `json:"prefixes"`
+
+	// RouterNodeIds Nodes that route the prefixes.
+	RouterNodeIds *[]string `json:"routerNodeIds,omitempty"`
+}
+
+// NetworkRouter defines model for NetworkRouter.
+type NetworkRouter struct {
+	MissingPrefixes []string `json:"missingPrefixes"`
+	Name            string   `json:"name"`
+	NodeId          string   `json:"nodeId"`
+	Online          bool     `json:"online"`
+	PrimaryPrefixes []string `json:"primaryPrefixes"`
 }
 
 // Node defines model for Node.
@@ -716,6 +779,15 @@ type UpdateGroupJSONRequestBody = GroupRequestBody
 
 // AddGroupMemberJSONRequestBody defines body for AddGroupMember for application/json ContentType.
 type AddGroupMemberJSONRequestBody = GroupMemberRequestBody
+
+// CreateNetworkJSONRequestBody defines body for CreateNetwork for application/json ContentType.
+type CreateNetworkJSONRequestBody = NetworkRequestBody
+
+// SetNetworkEnabledJSONRequestBody defines body for SetNetworkEnabled for application/json ContentType.
+type SetNetworkEnabledJSONRequestBody = NetworkEnabledInputBody
+
+// UpdateNetworkJSONRequestBody defines body for UpdateNetwork for application/json ContentType.
+type UpdateNetworkJSONRequestBody = NetworkRequestBody
 
 // ApproveNodeJSONRequestBody defines body for ApproveNode for application/json ContentType.
 type ApproveNodeJSONRequestBody = SetApprovalRequestBody
@@ -1204,6 +1276,93 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/health (the `Health` operationId).
 	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListNetworks List networks
+	//
+	// Networks are prefixes reached through routing nodes and handed out to the machines in their groups, the way NetBird's networks work.
+	//
+	// Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/network (the `ListNetworks` operationId).
+	ListNetworks(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateNetworkWithBody Create network
+	//
+	// Approves the prefixes on the routers and hands the routes to the machines in the groups. Once the tailnet enforces access, the groups may also reach the prefixes.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/network (the `CreateNetwork` operationId).
+	CreateNetworkWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateNetwork Create network
+	//
+	// Approves the prefixes on the routers and hands the routes to the machines in the groups. Once the tailnet enforces access, the groups may also reach the prefixes.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/network (the `CreateNetwork` operationId).
+	CreateNetwork(ctx context.Context, body CreateNetworkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteNetwork Delete network
+	//
+	// Withdraws the route approvals the network made.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v1/network/{id} (the `DeleteNetwork` operationId).
+	DeleteNetwork(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetNetwork Get network
+	//
+	// Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/network/{id} (the `GetNetwork` operationId).
+	GetNetwork(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetNetworkEnabledWithBody Enable or disable network
+	//
+	// Off withdraws the route approvals the network made and stops handing out its routes.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/network/{id} (the `SetNetworkEnabled` operationId).
+	SetNetworkEnabledWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetNetworkEnabled Enable or disable network
+	//
+	// Off withdraws the route approvals the network made and stops handing out its routes.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/network/{id} (the `SetNetworkEnabled` operationId).
+	SetNetworkEnabled(ctx context.Context, id string, body SetNetworkEnabledJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateNetworkWithBody Replace network
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/network/{id} (the `UpdateNetwork` operationId).
+	UpdateNetworkWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateNetwork Replace network
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/network/{id} (the `UpdateNetwork` operationId).
+	UpdateNetwork(ctx context.Context, id string, body UpdateNetworkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListNodes List nodes
 	//
@@ -2367,6 +2526,183 @@ func (c *Client) RemoveGroupUser(ctx context.Context, id string, userId string, 
 // Corresponds with GET /api/v1/health (the `Health` operationId).
 func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewHealthRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListNetworks List networks
+//
+// Networks are prefixes reached through routing nodes and handed out to the machines in their groups, the way NetBird's networks work.
+//
+// Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/network (the `ListNetworks` operationId).
+func (c *Client) ListNetworks(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListNetworksRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateNetworkWithBody Create network
+//
+// Approves the prefixes on the routers and hands the routes to the machines in the groups. Once the tailnet enforces access, the groups may also reach the prefixes.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/network (the `CreateNetwork` operationId).
+func (c *Client) CreateNetworkWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateNetworkRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateNetwork Create network
+//
+// Approves the prefixes on the routers and hands the routes to the machines in the groups. Once the tailnet enforces access, the groups may also reach the prefixes.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/network (the `CreateNetwork` operationId).
+func (c *Client) CreateNetwork(ctx context.Context, body CreateNetworkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateNetworkRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteNetwork Delete network
+//
+// Withdraws the route approvals the network made.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v1/network/{id} (the `DeleteNetwork` operationId).
+func (c *Client) DeleteNetwork(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteNetworkRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetNetwork Get network
+//
+// Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/network/{id} (the `GetNetwork` operationId).
+func (c *Client) GetNetwork(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNetworkRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetNetworkEnabledWithBody Enable or disable network
+//
+// Off withdraws the route approvals the network made and stops handing out its routes.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/network/{id} (the `SetNetworkEnabled` operationId).
+func (c *Client) SetNetworkEnabledWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetNetworkEnabledRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetNetworkEnabled Enable or disable network
+//
+// Off withdraws the route approvals the network made and stops handing out its routes.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/network/{id} (the `SetNetworkEnabled` operationId).
+func (c *Client) SetNetworkEnabled(ctx context.Context, id string, body SetNetworkEnabledJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetNetworkEnabledRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateNetworkWithBody Replace network
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/network/{id} (the `UpdateNetwork` operationId).
+func (c *Client) UpdateNetworkWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateNetworkRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateNetwork Replace network
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/network/{id} (the `UpdateNetwork` operationId).
+func (c *Client) UpdateNetwork(ctx context.Context, id string, body UpdateNetworkJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateNetworkRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -4367,6 +4703,235 @@ func NewHealthRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListNetworksRequest constructs an http.Request for the ListNetworks method
+func NewListNetworksRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/network")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateNetworkRequest calls the generic CreateNetwork builder with application/json body
+func NewCreateNetworkRequest(server string, body CreateNetworkJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateNetworkRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateNetworkRequestWithBody constructs an http.Request for the CreateNetwork method, with any body, and a specified content type
+func NewCreateNetworkRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/network")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteNetworkRequest constructs an http.Request for the DeleteNetwork method
+func NewDeleteNetworkRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/network/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetNetworkRequest constructs an http.Request for the GetNetwork method
+func NewGetNetworkRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/network/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetNetworkEnabledRequest calls the generic SetNetworkEnabled builder with application/json body
+func NewSetNetworkEnabledRequest(server string, id string, body SetNetworkEnabledJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetNetworkEnabledRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewSetNetworkEnabledRequestWithBody constructs an http.Request for the SetNetworkEnabled method, with any body, and a specified content type
+func NewSetNetworkEnabledRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/network/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUpdateNetworkRequest calls the generic UpdateNetwork builder with application/json body
+func NewUpdateNetworkRequest(server string, id string, body UpdateNetworkJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateNetworkRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdateNetworkRequestWithBody constructs an http.Request for the UpdateNetwork method, with any body, and a specified content type
+func NewUpdateNetworkRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/network/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListNodesRequest constructs an http.Request for the ListNodes method
 func NewListNodesRequest(server string, params *ListNodesParams) (*http.Request, error) {
 	var err error
@@ -6069,6 +6634,99 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/health (the `Health` operationId).
 	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
+
+	// ListNetworksWithResponse List networks
+	//
+	// Networks are prefixes reached through routing nodes and handed out to the machines in their groups, the way NetBird's networks work.
+	//
+	// Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/network (the `ListNetworks` operationId).
+	ListNetworksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListNetworksResponse, error)
+
+	// CreateNetworkWithBodyWithResponse Create network
+	//
+	// Approves the prefixes on the routers and hands the routes to the machines in the groups. Once the tailnet enforces access, the groups may also reach the prefixes.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/network (the `CreateNetwork` operationId).
+	CreateNetworkWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateNetworkResponse, error)
+
+	// CreateNetworkWithResponse Create network
+	//
+	// Approves the prefixes on the routers and hands the routes to the machines in the groups. Once the tailnet enforces access, the groups may also reach the prefixes.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/network (the `CreateNetwork` operationId).
+	CreateNetworkWithResponse(ctx context.Context, body CreateNetworkJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateNetworkResponse, error)
+
+	// DeleteNetworkWithResponse Delete network
+	//
+	// Withdraws the route approvals the network made.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/network/{id} (the `DeleteNetwork` operationId).
+	DeleteNetworkWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteNetworkResponse, error)
+
+	// GetNetworkWithResponse Get network
+	//
+	// Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/network/{id} (the `GetNetwork` operationId).
+	GetNetworkWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetNetworkResponse, error)
+
+	// SetNetworkEnabledWithBodyWithResponse Enable or disable network
+	//
+	// Off withdraws the route approvals the network made and stops handing out its routes.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/network/{id} (the `SetNetworkEnabled` operationId).
+	SetNetworkEnabledWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetNetworkEnabledResponse, error)
+
+	// SetNetworkEnabledWithResponse Enable or disable network
+	//
+	// Off withdraws the route approvals the network made and stops handing out its routes.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/network/{id} (the `SetNetworkEnabled` operationId).
+	SetNetworkEnabledWithResponse(ctx context.Context, id string, body SetNetworkEnabledJSONRequestBody, reqEditors ...RequestEditorFn) (*SetNetworkEnabledResponse, error)
+
+	// UpdateNetworkWithBodyWithResponse Replace network
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/network/{id} (the `UpdateNetwork` operationId).
+	UpdateNetworkWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateNetworkResponse, error)
+
+	// UpdateNetworkWithResponse Replace network
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/network/{id} (the `UpdateNetwork` operationId).
+	UpdateNetworkWithResponse(ctx context.Context, id string, body UpdateNetworkJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateNetworkResponse, error)
 
 	// ListNodesWithResponse List nodes
 	//
@@ -7866,6 +8524,294 @@ func (r HealthResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r HealthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListNetworksResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListNetworksOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListNetworksResponse) GetJSON200() *ListNetworksOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListNetworksResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListNetworksResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListNetworksResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListNetworksResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListNetworksResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateNetworkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NetworkOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CreateNetworkResponse) GetJSON200() *NetworkOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CreateNetworkResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateNetworkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateNetworkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateNetworkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateNetworkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteNetworkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmptyOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteNetworkResponse) GetJSON200() *EmptyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeleteNetworkResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteNetworkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteNetworkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteNetworkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteNetworkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetNetworkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NetworkOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetNetworkResponse) GetJSON200() *NetworkOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetNetworkResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetNetworkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNetworkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNetworkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetNetworkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetNetworkEnabledResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NetworkOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetNetworkEnabledResponse) GetJSON200() *NetworkOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r SetNetworkEnabledResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetNetworkEnabledResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetNetworkEnabledResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetNetworkEnabledResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetNetworkEnabledResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateNetworkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NetworkOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateNetworkResponse) GetJSON200() *NetworkOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateNetworkResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateNetworkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateNetworkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateNetworkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateNetworkResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -9920,6 +10866,153 @@ func (c *ClientWithResponses) HealthWithResponse(ctx context.Context, reqEditors
 	return ParseHealthResponse(rsp)
 }
 
+// ListNetworksWithResponse List networks
+//
+// Networks are prefixes reached through routing nodes and handed out to the machines in their groups, the way NetBird's networks work.
+//
+// Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/network (the `ListNetworks` operationId).
+func (c *ClientWithResponses) ListNetworksWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListNetworksResponse, error) {
+	rsp, err := c.ListNetworks(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListNetworksResponse(rsp)
+}
+
+// CreateNetworkWithBodyWithResponse Create network
+//
+// Approves the prefixes on the routers and hands the routes to the machines in the groups. Once the tailnet enforces access, the groups may also reach the prefixes.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/network (the `CreateNetwork` operationId).
+func (c *ClientWithResponses) CreateNetworkWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateNetworkResponse, error) {
+	rsp, err := c.CreateNetworkWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateNetworkResponse(rsp)
+}
+
+// CreateNetworkWithResponse Create network
+//
+// Approves the prefixes on the routers and hands the routes to the machines in the groups. Once the tailnet enforces access, the groups may also reach the prefixes.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/network (the `CreateNetwork` operationId).
+func (c *ClientWithResponses) CreateNetworkWithResponse(ctx context.Context, body CreateNetworkJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateNetworkResponse, error) {
+	rsp, err := c.CreateNetwork(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateNetworkResponse(rsp)
+}
+
+// DeleteNetworkWithResponse Delete network
+//
+// Withdraws the route approvals the network made.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/network/{id} (the `DeleteNetwork` operationId).
+func (c *ClientWithResponses) DeleteNetworkWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteNetworkResponse, error) {
+	rsp, err := c.DeleteNetwork(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteNetworkResponse(rsp)
+}
+
+// GetNetworkWithResponse Get network
+//
+// Requires the `devices:routes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/network/{id} (the `GetNetwork` operationId).
+func (c *ClientWithResponses) GetNetworkWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetNetworkResponse, error) {
+	rsp, err := c.GetNetwork(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNetworkResponse(rsp)
+}
+
+// SetNetworkEnabledWithBodyWithResponse Enable or disable network
+//
+// Off withdraws the route approvals the network made and stops handing out its routes.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/network/{id} (the `SetNetworkEnabled` operationId).
+func (c *ClientWithResponses) SetNetworkEnabledWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetNetworkEnabledResponse, error) {
+	rsp, err := c.SetNetworkEnabledWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetNetworkEnabledResponse(rsp)
+}
+
+// SetNetworkEnabledWithResponse Enable or disable network
+//
+// Off withdraws the route approvals the network made and stops handing out its routes.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/network/{id} (the `SetNetworkEnabled` operationId).
+func (c *ClientWithResponses) SetNetworkEnabledWithResponse(ctx context.Context, id string, body SetNetworkEnabledJSONRequestBody, reqEditors ...RequestEditorFn) (*SetNetworkEnabledResponse, error) {
+	rsp, err := c.SetNetworkEnabled(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetNetworkEnabledResponse(rsp)
+}
+
+// UpdateNetworkWithBodyWithResponse Replace network
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/network/{id} (the `UpdateNetwork` operationId).
+func (c *ClientWithResponses) UpdateNetworkWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateNetworkResponse, error) {
+	rsp, err := c.UpdateNetworkWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateNetworkResponse(rsp)
+}
+
+// UpdateNetworkWithResponse Replace network
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/network/{id} (the `UpdateNetwork` operationId).
+func (c *ClientWithResponses) UpdateNetworkWithResponse(ctx context.Context, id string, body UpdateNetworkJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateNetworkResponse, error) {
+	rsp, err := c.UpdateNetwork(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateNetworkResponse(rsp)
+}
+
 // ListNodesWithResponse List nodes
 //
 // Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -11536,6 +12629,204 @@ func ParseHealthResponse(rsp *http.Response) (*HealthResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest HealthResponseBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListNetworksResponse parses an HTTP response from a ListNetworksWithResponse call
+func ParseListNetworksResponse(rsp *http.Response) (*ListNetworksResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListNetworksResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListNetworksOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateNetworkResponse parses an HTTP response from a CreateNetworkWithResponse call
+func ParseCreateNetworkResponse(rsp *http.Response) (*CreateNetworkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateNetworkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NetworkOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteNetworkResponse parses an HTTP response from a DeleteNetworkWithResponse call
+func ParseDeleteNetworkResponse(rsp *http.Response) (*DeleteNetworkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteNetworkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmptyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetNetworkResponse parses an HTTP response from a GetNetworkWithResponse call
+func ParseGetNetworkResponse(rsp *http.Response) (*GetNetworkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNetworkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NetworkOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetNetworkEnabledResponse parses an HTTP response from a SetNetworkEnabledWithResponse call
+func ParseSetNetworkEnabledResponse(rsp *http.Response) (*SetNetworkEnabledResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetNetworkEnabledResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NetworkOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateNetworkResponse parses an HTTP response from a UpdateNetworkWithResponse call
+func ParseUpdateNetworkResponse(rsp *http.Response) (*UpdateNetworkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateNetworkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NetworkOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
