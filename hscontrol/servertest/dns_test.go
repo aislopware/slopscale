@@ -2,6 +2,7 @@ package servertest_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"tailscale.com/tailcfg"
 	"tailscale.com/types/netmap"
 )
 
@@ -73,9 +75,9 @@ func TestDNSSettingsEndToEnd(t *testing.T) {
 
 	t.Run("a network admin replaces the settings and the client gets them", func(t *testing.T) {
 		status, body := apiCall(t, client, netKey, http.MethodPut, v1+"/dns", map[string]any{
-			"nameservers":      []string{"9.9.9.9", "https://dns.example/dns-query"},
+			"nameservers":      []string{"9.9.9.9", "https://dns.nextdns.io/abc123"},
 			"overrideLocalDns": true,
-			"splitNameservers": map[string][]string{"Corp.Example": {"10.0.0.1"}},
+			"splitNameservers": map[string][]string{"Corp.Example": {"10.0.0.1:5353"}},
 			"searchDomains":    []string{"api.example"},
 			"extraRecords":     []map[string]string{{"name": "grafana.ts.example", "type": "A", "value": "100.64.0.9"}},
 		})
@@ -92,7 +94,9 @@ func TestDNSSettingsEndToEnd(t *testing.T) {
 		assert.Empty(t, nm.DNS.FallbackResolvers, "override local DNS moves the resolvers")
 		assert.Equal(t, []string{"ts.example", "api.example"}, nm.DNS.Domains)
 		require.Contains(t, nm.DNS.Routes, "corp.example", "the domain is lowercased")
-		assert.Equal(t, "10.0.0.1", nm.DNS.Routes["corp.example"][0].Addr)
+		assert.Equal(t, "10.0.0.1:5353", nm.DNS.Routes["corp.example"][0].Addr, "a port survives to the client")
+		assert.True(t, strings.HasPrefix(nm.DNS.Resolvers[1].Addr, "https://dns.nextdns.io/abc123?device_"),
+			"NextDNS gets the node's identity: %s", nm.DNS.Resolvers[1].Addr)
 		assert.Contains(t, nm.DNS.Routes, "64.100.in-addr.arpa", "the MagicDNS zones survive")
 		require.Len(t, nm.DNS.ExtraRecords, 1)
 		assert.Equal(t, "grafana.ts.example", nm.DNS.ExtraRecords[0].Name)
@@ -104,6 +108,13 @@ func TestDNSSettingsEndToEnd(t *testing.T) {
 			"nameservers": []string{"one.one.one.one"},
 		})
 		assert.Equal(t, http.StatusBadRequest, status, body)
+
+		for _, unsupported := range []string{"tls://dns.example", "https://dns.example/dns-query"} {
+			status, body = apiCall(t, client, netKey, http.MethodPut, v1+"/dns", map[string]any{
+				"nameservers": []string{unsupported},
+			})
+			assert.Equal(t, http.StatusBadRequest, status, "the client cannot use %s: %v", unsupported, body)
+		}
 
 		status, body = apiCall(t, client, netKey, http.MethodPut, v1+"/dns", map[string]any{
 			"extraRecords": []map[string]string{{"name": "x.ts.example", "type": "MX", "value": "mail"}},
@@ -133,7 +144,7 @@ func TestDNSSettingsEndToEnd(t *testing.T) {
 	t.Run("the v2 endpoints edit one aspect at a time", func(t *testing.T) {
 		status, body := apiCall(t, client, ownerKey, http.MethodGet, v2+"/nameservers", nil)
 		require.Equal(t, http.StatusOK, status, body)
-		assert.Equal(t, []any{"9.9.9.9", "https://dns.example/dns-query"}, body["dns"])
+		assert.Equal(t, []any{"9.9.9.9", "https://dns.nextdns.io/abc123"}, body["dns"])
 		assert.Equal(t, true, body["magicDNS"])
 
 		status, body = apiCall(t, client, ownerKey, http.MethodPost, v2+"/nameservers", map[string]any{
@@ -224,4 +235,53 @@ func TestDNSSettingsEndToEnd(t *testing.T) {
 		assert.True(t, actions["dns.set"], "audit: %v", actions)
 		assert.True(t, actions["dns.reset"], "audit: %v", actions)
 	})
+}
+
+// TestDNSEditsWithFileOwnedRecords checks that dns.extra_records_path
+// owning the records does not block edits of everything else: the v2
+// endpoints and a v1 PUT without records still work, while the file's
+// records stay in the effective settings.
+func TestDNSEditsWithFileOwnedRecords(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t, servertest.WithDNS(types.DNSConfig{
+		MagicDNS:         true,
+		BaseDomain:       "ts.example",
+		ExtraRecordsPath: t.TempDir() + "/records.json",
+		Nameservers:      types.Nameservers{Global: []string{"1.1.1.1"}},
+	}))
+	srv.App.SetExtraRecordsForTest([]tailcfg.DNSRecord{{Name: "file.ts.example", Type: "A", Value: "100.64.0.7"}})
+
+	client := srv.HTTPClient(t)
+	v1 := srv.URL + "/api/v1"
+	v2 := srv.URL + "/api/v2/tailnet/-/dns"
+
+	owner := srv.CreateUser(t, "dns-file-owner")
+	ownerKey := srv.CreateAPIKey(t, owner)
+
+	status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/dns", nil)
+	require.Equal(t, http.StatusOK, status, body)
+	assert.Len(t, field(t, body, "effective", "extraRecords"), 1, "the file's records are effective")
+
+	status, body = apiCall(t, client, ownerKey, http.MethodPost, v2+"/nameservers", map[string]any{
+		"dns": []string{"9.9.9.9"},
+	})
+	require.Equal(t, http.StatusOK, status, "a v2 edit leaves the file's records alone: %v", body)
+
+	status, body = apiCall(t, client, ownerKey, http.MethodPost, v2+"/searchpaths", map[string]any{
+		"searchPaths": []string{"lab.example"},
+	})
+	require.Equal(t, http.StatusOK, status, body)
+
+	status, body = apiCall(t, client, ownerKey, http.MethodPut, v1+"/dns", map[string]any{
+		"nameservers":  []string{"8.8.8.8"},
+		"extraRecords": []map[string]string{{"name": "x.ts.example", "type": "A", "value": "100.64.0.1"}},
+	})
+	assert.Equal(t, http.StatusBadRequest, status, "records are the file's while the path is set: %v", body)
+
+	status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/dns", nil)
+	require.Equal(t, http.StatusOK, status, body)
+	assert.Equal(t, []any{"9.9.9.9"}, field(t, body, "effective", "nameservers"))
+	assert.Equal(t, []any{"lab.example"}, field(t, body, "effective", "searchDomains"))
+	assert.Len(t, field(t, body, "effective", "extraRecords"), 1, "the file's records survive the edits")
 }

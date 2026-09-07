@@ -136,7 +136,7 @@ export function ExtraRecordsSection({
         <DialogContent
           size="base"
           title={dialog === "new" ? "Add record" : "Edit record"}
-          description="Machines resolve the name through MagicDNS. Only A, AAAA and TXT records are served."
+          description="Machines resolve the name through MagicDNS. Only A and AAAA records are served."
         >
           <RecordForm
             editing={dialog === "new" || dialog === "closed" ? null : dialog}
@@ -221,7 +221,7 @@ function RecordForm({
         <Input
           label="Value"
           value={record.value}
-          placeholder={record.type === "TXT" ? "v=spf1 -all" : "100.64.0.3"}
+          placeholder="100.64.0.3"
           spellCheck={false}
           autoComplete="off"
           onChange={(event) => {

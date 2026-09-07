@@ -32,8 +32,7 @@ describe(isNameserver, () => {
     "1:2:3:4:5:6:7:8",
     "10.0.0.1:5353",
     "[fd00::1]:53",
-    "https://dns.example/dns-query",
-    "tls://dns.example",
+    "https://dns.nextdns.io/abc123",
   ])("accepts %s", (value) => {
     expect(isNameserver(value)).toBe(true);
   });
@@ -43,6 +42,7 @@ describe(isNameserver, () => {
     "one.one.one.one",
     "999.1.1.1",
     "http://dns.example",
+    "tls://dns.example",
     "1.1.1.1:70000",
     "1:2:3:4:5:6:7:8:9",
     "1::2::3",
@@ -69,7 +69,7 @@ describe(isDomain, () => {
 describe(recordError, () => {
   it("accepts a value that matches the type", () => {
     expect(recordError({ name: "a.corp", type: "", value: "10.0.0.5" })).toBeNull();
-    expect(recordError({ name: "a.corp", type: "TXT", value: "v=spf1 -all" })).toBeNull();
+    expect(recordError({ name: "a.corp", type: "AAAA", value: "fd00::5" })).toBeNull();
   });
 
   it("names what is wrong", () => {
@@ -102,9 +102,9 @@ describe("editing helpers", () => {
   });
 
   it("replaces a record in place and removes by index", () => {
-    const next = withRecord(base, { name: "B.Corp.", type: "TXT", value: " hi " }, 0);
+    const next = withRecord(base, { name: "B.Corp.", type: "A", value: " 10.0.0.9 " }, 0);
 
-    expect(next.extraRecords).toStrictEqual([{ name: "b.corp", type: "TXT", value: "hi" }]);
+    expect(next.extraRecords).toStrictEqual([{ name: "b.corp", type: "A", value: "10.0.0.9" }]);
     expect(
       withRecord(base, { name: "c.corp", type: "", value: "10.0.0.7" }).extraRecords,
     ).toHaveLength(2);

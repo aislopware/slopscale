@@ -9,7 +9,9 @@ import (
 	"slices"
 	"strings"
 
+	"tailscale.com/net/dns/publicdns"
 	"tailscale.com/tailcfg"
+	"tailscale.com/types/dnstype"
 )
 
 // SettingDNS is the settings row that holds a [DNSSettings] as JSON. When
@@ -79,7 +81,15 @@ var ErrDNSSettingsInvalid = errors.New("invalid dns settings")
 // Errors returned by [DNSSettings.Validate] and the setters.
 var (
 	ErrDNSNameserverInvalid = fmt.Errorf(
-		"%w: nameserver must be an IP address, an IP:port, or an https:// or tls:// URL",
+		"%w: nameserver must be an IP address, an IP:port, or the DNS over HTTPS URL of a known provider",
+		ErrDNSSettingsInvalid,
+	)
+	// ErrDNSResolverUnsupported is returned for a resolver URL the
+	// Tailscale client cannot use: it does DNS over HTTPS only for the
+	// providers it knows (Cloudflare, Google, Quad9, NextDNS, ControlD
+	// and the like) and DNS over TLS not at all.
+	ErrDNSResolverUnsupported = fmt.Errorf(
+		"%w: the Tailscale client supports DNS over HTTPS only for known providers and no tls:// resolvers",
 		ErrDNSSettingsInvalid,
 	)
 	ErrDNSDomainInvalid      = fmt.Errorf("%w: invalid domain name", ErrDNSSettingsInvalid)
@@ -88,7 +98,7 @@ var (
 	)
 	ErrDNSRecordNameEmpty   = fmt.Errorf("%w: record name must not be empty", ErrDNSSettingsInvalid)
 	ErrDNSRecordTypeInvalid = fmt.Errorf(
-		"%w: record type must be A, AAAA, TXT or empty", ErrDNSSettingsInvalid,
+		"%w: record type must be A, AAAA or empty; the client serves only address records", ErrDNSSettingsInvalid,
 	)
 	ErrDNSRecordValueEmpty   = fmt.Errorf("%w: record value must not be empty", ErrDNSSettingsInvalid)
 	ErrDNSRecordValueNotIP   = fmt.Errorf("%w: record value must be an IP address", ErrDNSSettingsInvalid)
@@ -205,22 +215,44 @@ func (s DNSSettings) Validate() error {
 }
 
 func validateNameserver(ns string) error {
+	_, err := ParseResolver(ns)
+
+	return err
+}
+
+// ParseResolver turns a nameserver as configured into the resolver the
+// client receives. It accepts what the pinned client can use: an IP, an
+// IP:port, or the DNS over HTTPS URL of a provider the client knows how
+// to reach without bootstrap DNS. Validation and the map response share
+// it, so nothing that passes validation is dropped on the way out.
+func ParseResolver(ns string) (*dnstype.Resolver, error) {
 	_, addrErr := netip.ParseAddr(ns)
 	if addrErr == nil {
-		return nil
+		return &dnstype.Resolver{Addr: ns}, nil
 	}
 
 	_, portErr := netip.ParseAddrPort(ns)
 	if portErr == nil {
-		return nil
+		return &dnstype.Resolver{Addr: ns}, nil
 	}
 
 	u, err := url.Parse(ns)
-	if err == nil && (u.Scheme == "https" || u.Scheme == "tls") && u.Host != "" {
-		return nil
+	if err != nil || u.Host == "" {
+		return nil, fmt.Errorf("%w: %q", ErrDNSNameserverInvalid, ns)
 	}
 
-	return fmt.Errorf("%w: %q", ErrDNSNameserverInvalid, ns)
+	switch u.Scheme {
+	case "https":
+		if len(publicdns.DoHIPsOfBase(ns)) == 0 {
+			return nil, fmt.Errorf("%w: %q", ErrDNSResolverUnsupported, ns)
+		}
+
+		return &dnstype.Resolver{Addr: ns}, nil
+	case "tls":
+		return nil, fmt.Errorf("%w: %q", ErrDNSResolverUnsupported, ns)
+	default:
+		return nil, fmt.Errorf("%w: %q", ErrDNSNameserverInvalid, ns)
+	}
 }
 
 // domainLabelRe matches one DNS label: letters, digits, underscores and
@@ -272,7 +304,6 @@ func validateRecord(r tailcfg.DNSRecord) error {
 		if addrErr != nil || !addr.Is6() {
 			return fmt.Errorf("%w: %q", ErrDNSRecordValueNotIPv6, r.Value)
 		}
-	case "TXT":
 	default:
 		return fmt.Errorf("%w: %q", ErrDNSRecordTypeInvalid, r.Type)
 	}

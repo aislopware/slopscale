@@ -8,6 +8,7 @@ import { EntryList } from "~/components/dns/entry-list.tsx";
 import type { Entry } from "~/components/dns/entry-list.tsx";
 import {
   domainError,
+  editableSettings,
   normalizeDomain,
   withSearchDomain,
   withoutSearchDomain,
@@ -27,7 +28,7 @@ export function SearchDomainsSection({
   readonly mutations: DnsMutations;
 }): ReactElement {
   const [adding, setAdding] = useState(false);
-  const settings = dns.effective;
+  const settings = editableSettings(dns);
   const entries: Entry[] = [];
 
   if (dns.baseDomain !== "") {

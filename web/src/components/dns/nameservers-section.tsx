@@ -94,7 +94,7 @@ export function NameserversSection({
         open={adding}
         onOpenChange={setAdding}
         title="Add nameserver"
-        description="An IP address, an IP with port, or a DNS-over-HTTPS (https://) or DNS-over-TLS (tls://) URL."
+        description="An IP address, an IP with port, or the DNS-over-HTTPS URL of a provider Tailscale knows, such as https://dns.nextdns.io/abc123."
         label="Nameserver"
         placeholder="1.1.1.1"
         validate={nameserverError}

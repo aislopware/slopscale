@@ -262,7 +262,7 @@ func parseRecordEntry(entry string) (clientv1.DNSRecord, error) {
 	typeStr, val, hasColon := strings.Cut(rest, ":")
 	if hasColon {
 		upper := strings.ToUpper(typeStr)
-		if upper == "A" || upper == "AAAA" || upper == "TXT" {
+		if upper == "A" || upper == "AAAA" {
 			if val == "" {
 				return clientv1.DNSRecord{}, fmt.Errorf("%w: %q", errDNSFlagFormat, entry)
 			}

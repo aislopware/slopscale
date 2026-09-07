@@ -996,39 +996,27 @@ func dns() (DNSConfig, error) {
 	return dns, nil
 }
 
-// parseResolvers converts nameserver strings into DNS resolvers.
-// If a nameserver is a valid IP, it will be used as a regular resolver.
-// If a nameserver is a valid URL, it will be used as a DoH resolver.
-// If a nameserver is neither a valid URL nor a valid IP, it will be ignored.
-// When domain is non-empty, it is included in the warning for invalid entries.
+// parseResolvers turns the nameservers of the config file into resolvers
+// with [ParseResolver]. An entry the client could not use is logged and
+// left out; the API validates the same rule up front instead. When domain
+// is non-empty, it is included in the warning.
 func parseResolvers(nameservers []string, domain string) []*dnstype.Resolver {
 	var resolvers []*dnstype.Resolver
 
 	for _, nsStr := range nameservers {
-		_, addrErr := netip.ParseAddr(nsStr)
-		if addrErr == nil {
-			resolvers = append(resolvers, &dnstype.Resolver{
-				Addr: nsStr,
-			})
+		resolver, err := ParseResolver(nsStr)
+		if err != nil {
+			e := log.Warn().Err(err).Str("nameserver", nsStr)
+			if domain != "" {
+				e = e.Str("domain", domain)
+			}
+
+			e.Msg("unusable nameserver, ignoring")
 
 			continue
 		}
 
-		_, urlErr := url.Parse(nsStr)
-		if urlErr == nil {
-			resolvers = append(resolvers, &dnstype.Resolver{
-				Addr: nsStr,
-			})
-
-			continue
-		}
-
-		e := log.Warn().Str("nameserver", nsStr)
-		if domain != "" {
-			e = e.Str("domain", domain)
-		}
-
-		e.Msg("invalid nameserver, ignoring")
+		resolvers = append(resolvers, resolver)
 	}
 
 	return resolvers

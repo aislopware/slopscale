@@ -50,7 +50,7 @@ func TestDNSSettingsValidate(t *testing.T) {
 			name: "everything valid",
 			settings: DNSSettings{
 				Nameservers: []string{
-					"1.1.1.1", "2606:4700:4700::1111", "10.0.0.1:5353", "https://dns.example/q", "tls://dns.example",
+					"1.1.1.1", "2606:4700:4700::1111", "10.0.0.1:5353", "https://dns.nextdns.io/abc123",
 				},
 				SplitNameservers: map[string][]string{"corp.example": {"10.0.0.1"}},
 				SearchDomains:    []string{"lab.example"},
@@ -58,7 +58,6 @@ func TestDNSSettingsValidate(t *testing.T) {
 					{Name: "a.corp", Value: "10.0.0.5"},
 					{Name: "a.corp", Type: "A", Value: "10.0.0.5"},
 					{Name: "a.corp", Type: "AAAA", Value: "fd00::5"},
-					{Name: "a.corp", Type: "TXT", Value: "v=spf1 -all"},
 				},
 			},
 		},
@@ -72,6 +71,16 @@ func TestDNSSettingsValidate(t *testing.T) {
 			name:     "http nameserver",
 			settings: DNSSettings{Nameservers: []string{"http://dns.example"}},
 			wantErr:  ErrDNSNameserverInvalid,
+		},
+		{
+			name:     "tls nameserver, which the client cannot use",
+			settings: DNSSettings{Nameservers: []string{"tls://dns.example"}},
+			wantErr:  ErrDNSResolverUnsupported,
+		},
+		{
+			name:     "unknown DoH provider",
+			settings: DNSSettings{Nameservers: []string{"https://dns.example/dns-query"}},
+			wantErr:  ErrDNSResolverUnsupported,
 		},
 		{name: "bad split domain", settings: split("not a domain", "1.1.1.1"), wantErr: ErrDNSDomainInvalid},
 		{name: "split without servers", settings: split("corp.example"), wantErr: ErrDNSSplitNoNameservers},
@@ -87,6 +96,11 @@ func TestDNSSettingsValidate(t *testing.T) {
 		{name: "A record with v6", settings: rec("a.corp", "A", "fd00::5"), wantErr: ErrDNSRecordValueNotIPv4},
 		{name: "AAAA record with v4", settings: rec("a.corp", "AAAA", "10.0.0.5"), wantErr: ErrDNSRecordValueNotIPv6},
 		{name: "unknown record type", settings: rec("a.corp", "MX", "x"), wantErr: ErrDNSRecordTypeInvalid},
+		{
+			name:     "TXT record, which the client does not serve",
+			settings: rec("a.corp", "TXT", "v=spf1 -all"),
+			wantErr:  ErrDNSRecordTypeInvalid,
+		},
 	}
 
 	for _, tt := range tests {

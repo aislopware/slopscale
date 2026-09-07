@@ -1,8 +1,9 @@
+import type { Dns } from "~/api/queries.ts";
 import type { DnsRecord, DnsSettings } from "~/api/schema.gen.ts";
 
 export type RecordType = DnsRecord["type"];
 
-export const recordTypes: readonly RecordType[] = ["", "A", "AAAA", "TXT"];
+export const recordTypes: readonly RecordType[] = ["", "A", "AAAA"];
 
 export function recordTypeLabel(type: RecordType): string {
   return type === "" ? "Auto (A or AAAA)" : type;
@@ -15,6 +16,21 @@ export function splitEntries(settings: DnsSettings): readonly (readonly [string,
       servers === null ? [] : [[domain, servers]],
     )
     .toSorted(([left], [right]) => left.localeCompare(right));
+}
+
+/**
+ * What an editor may send back: the effective settings without the extra records when
+ * dns.extra_records_path owns them, since the server refuses a PUT that carries records while the
+ * file is in charge.
+ */
+export function editableSettings(dns: Dns): DnsSettings {
+  const settings = cloneSettings(dns.effective);
+
+  if (dns.extraRecordsPath !== "") {
+    settings.extraRecords = [];
+  }
+
+  return settings;
 }
 
 /** A copy every editor starts from, so a PUT always carries the whole configuration. */
@@ -78,7 +94,7 @@ function isUrl(value: string): boolean {
   try {
     const url = new URL(value);
 
-    return (url.protocol === "https:" || url.protocol === "tls:") && url.hostname !== "";
+    return url.protocol === "https:" && url.hostname !== "";
   } catch {
     return false;
   }
@@ -101,7 +117,11 @@ function hostAndPort(value: string): readonly [string, string] | null {
   return [value.slice(0, colon), value.slice(colon + 1)];
 }
 
-/** What the server accepts as a resolver: an IP, an IP with port, or a DoH/DoT URL. */
+/**
+ * The shape the server accepts as a resolver: an IP, an IP with port, or an https:// URL. Whether
+ * the client knows the DoH provider is checked by the server, which answers 400 for one it does
+ * not.
+ */
 export function isNameserver(value: string): boolean {
   if (isIp(value) || isUrl(value)) {
     return true;
@@ -139,7 +159,7 @@ export function nameserverError(value: string): string | null {
 
   return isNameserver(value)
     ? null
-    : "Use an IP address, an IP with port, or an https:// or tls:// URL.";
+    : "Use an IP address, an IP with port, or the https:// URL of a known DNS-over-HTTPS provider.";
 }
 
 export function nameserversError(values: readonly string[]): string | null {
@@ -187,9 +207,6 @@ export function recordError(record: DnsRecord): string | null {
     }
     case "AAAA": {
       return isIpv6(value) ? null : "An AAAA record needs an IPv6 address.";
-    }
-    case "TXT": {
-      return null;
     }
     default: {
       return null;

@@ -86,8 +86,16 @@ func dnsSplit(m map[string][]string) DNSSplit {
 }
 
 // updateDNS applies edit to the effective settings and stores the result.
+// Extra records the dns.extra_records_path file owns are left out of the
+// write, since they are not the tailnet's to change here.
 func updateDNS(b Backend, edit func(*types.DNSSettings)) (types.DNSSettings, change.Change, error) {
-	settings := b.State.DNS().Effective
+	status := b.State.DNS()
+
+	settings := status.Effective
+	if status.ExtraRecordsPath != "" {
+		settings.ExtraRecords = nil
+	}
+
 	edit(&settings)
 
 	st, c, err := b.State.SetDNS(settings)

@@ -210,7 +210,7 @@ function SplitForm({
       />
       <Textarea
         label="Nameservers"
-        description="One per line: an IP, an IP with port, or an https:// or tls:// URL."
+        description="One per line: an IP, an IP with port, or a known provider's DNS-over-HTTPS URL."
         value={servers}
         placeholder={"10.0.0.53\n10.0.0.54"}
         spellCheck={false}

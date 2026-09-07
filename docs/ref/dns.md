@@ -37,7 +37,13 @@ and `GET /api/v1/dns` report both what clients receive and what the file says, a
 change is pushed to the clients at once and logged in the [audit log](audit.md) as `dns.set` or `dns.reset`.
 
 When `dns.extra_records_path` is set, that file owns the extra records: the records set at runtime are rejected and the
-console shows the file's records read-only.
+console shows the file's records read-only. The other settings can still be edited; the file's records stay in force.
+
+Only what the Tailscale client can use is accepted. A nameserver is an IP address, an IP with a port, or the DNS over
+HTTPS URL of a provider the client knows how to reach without bootstrap DNS (Cloudflare, Google, Quad9, NextDNS,
+ControlD and the other entries of Tailscale's `publicdns` list); the client does not do DNS over TLS or DNS over HTTPS
+to an arbitrary host, so `tls://` URLs and unknown `https://` URLs are refused. Extra records are `A` or `AAAA`; the
+client serves nothing else.
 
 ## Setting extra DNS records
 

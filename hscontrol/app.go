@@ -780,6 +780,13 @@ func (h *Headscale) StartEphemeralGCForTest(tb testing.TB) {
 	tb.Cleanup(func() { h.ephemeralGC.Close() })
 }
 
+// SetExtraRecordsForTest serves records as if the extra-records file held
+// them, for tests that do not run [Headscale.Serve] and its file watcher.
+func (h *Headscale) SetExtraRecordsForTest(records []tailcfg.DNSRecord) {
+	h.cfg.SetExtraRecords(records)
+	h.Change(change.ExtraRecords())
+}
+
 // apiV1Backend is the v1 API's view of the server, including whether the
 // console can sign in through the identity provider.
 func (h *Headscale) apiV1Backend() apiv1.Backend {

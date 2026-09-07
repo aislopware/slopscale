@@ -20,8 +20,8 @@ const tagDNS = "DNS"
 
 // DNSRecord is an extra record MagicDNS serves.
 type DNSRecord struct {
-	Name  string `doc:"Fully qualified name, without trailing dot."           json:"name"`
-	Type  string `doc:"A, AAAA or TXT; empty picks A or AAAA from the value." enum:",A,AAAA,TXT" json:"type"` //nolint:lll // struct tag
+	Name  string `doc:"Fully qualified name, without trailing dot." json:"name"`
+	Type  string `doc:"A or AAAA; empty picks one from the value."  enum:",A,AAAA" json:"type"`
 	Value string `json:"value"`
 }
 
