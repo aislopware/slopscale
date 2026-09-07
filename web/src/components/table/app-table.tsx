@@ -16,7 +16,7 @@ import {
 } from "@tanstack/react-table";
 import type { CellData, RowData, TableFeatures } from "@tanstack/react-table";
 
-import type { AccessRule, Group, Node, User } from "~/api/queries.ts";
+import type { AccessRule, Group, Network, Node, User } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 
 /**
@@ -57,6 +57,7 @@ declare module "@tanstack/react-table" {
     nodes?: readonly Node[];
     groups?: readonly Group[];
     rules?: readonly AccessRule[];
+    networks?: readonly Network[];
     /** Whether the policy file restricts traffic on its own; false means the rules are all there is. */
     policyFileEnforces?: boolean;
   }

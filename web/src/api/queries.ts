@@ -25,6 +25,7 @@ export type AuditEvent = AuditPage["events"][number];
 export type Group = MethodResponse<typeof api, "get", "/api/v1/group">["groups"][number];
 export type AccessRule = MethodResponse<typeof api, "get", "/api/v1/access-rule">["rules"][number];
 export type Dns = MethodResponse<typeof api, "get", "/api/v1/dns">;
+export type Network = MethodResponse<typeof api, "get", "/api/v1/network">["networks"][number];
 
 export const nodesQuery = api.queryOptions("get", "/api/v1/node");
 export const usersQuery = api.queryOptions("get", "/api/v1/user");
@@ -34,6 +35,7 @@ export const settingsQuery = api.queryOptions("get", "/api/v1/settings");
 export const groupsQuery = api.queryOptions("get", "/api/v1/group");
 export const accessRulesQuery = api.queryOptions("get", "/api/v1/access-rule");
 export const dnsQuery = api.queryOptions("get", "/api/v1/dns");
+export const networksQuery = api.queryOptions("get", "/api/v1/network");
 /** What the server reports before any policy has been stored. */
 export const emptyPolicy: Policy = { policy: "", updatedAt: "" };
 
@@ -128,7 +130,8 @@ type Collection =
   | "/api/v1/policy"
   | "/api/v1/group"
   | "/api/v1/access-rule"
-  | "/api/v1/dns";
+  | "/api/v1/dns"
+  | "/api/v1/network";
 
 /** Refetches every query under the given paths; a node change touches the node list and its detail. */
 export async function invalidate(
