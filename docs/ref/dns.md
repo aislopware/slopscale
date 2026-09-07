@@ -1,7 +1,43 @@
 # DNS
 
 Headscale supports [most DNS features](../about/features.md) from Tailscale. DNS related settings can be configured
-within the `dns` section of the [configuration file](configuration.md).
+within the `dns` section of the [configuration file](configuration.md), and most of them can be changed while the
+server runs, from the admin console, the API or the CLI.
+
+## Changing DNS settings at runtime
+
+The `dns` section of the configuration file is what a fresh server sends to its clients. Everything in it except
+`magic_dns` and `base_domain` can be replaced without a restart:
+
+- the global nameservers (`nameservers.global`) and whether clients use them for every query
+  (`override_local_dns`),
+- split DNS (`nameservers.split`), the resolvers for particular domains,
+- the search domains (`search_domains`), and
+- the extra records (`extra_records`).
+
+MagicDNS and the base domain name the machines, so they stay in the configuration file.
+
+The admin console edits the settings under _DNS_. The API has `GET`, `PUT` and `DELETE /api/v1/dns`, where `PUT`
+replaces every setting at once and `DELETE` returns to the configuration file, and the v2 API has Tailscale's
+`/api/v2/tailnet/-/dns/nameservers`, `/dns/preferences`, `/dns/searchpaths` and `/dns/split-dns` endpoints, so the
+Tailscale Terraform provider and other tooling written against them work unchanged. Both need the `dns` scope
+(`dns:read` to look); a network admin holds it, an IT admin can only read. The CLI mirrors the API:
+
+```console
+$ headscale dns show
+$ headscale dns set --nameserver 1.1.1.1 --nameserver 1.0.0.1 --override-local-dns \
+    --split corp.example=10.0.0.53 --search-domain corp.example \
+    --record grafana.myvpn.example.com=100.64.0.3
+$ headscale dns reset
+```
+
+Settings set this way are stored in the database and survive restarts. While they are in force the configuration
+file's `dns` section is ignored, except for `magic_dns`, `base_domain` and `extra_records_path`; `headscale dns show`
+and `GET /api/v1/dns` report both what clients receive and what the file says, and a reset goes back to the file. Every
+change is pushed to the clients at once and logged in the [audit log](audit.md) as `dns.set` or `dns.reset`.
+
+When `dns.extra_records_path` is set, that file owns the extra records: the records set at runtime are rejected and the
+console shows the file's records read-only.
 
 ## Setting extra DNS records
 

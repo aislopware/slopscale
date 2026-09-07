@@ -25,7 +25,7 @@ the [policy](policy.md), which may address roles through
 
 "Users, devices, keys, settings" are the `users`, `devices:core`, `auth_keys`,
 `oauth_keys` and `feature_settings` scopes of the v2 API; "policy and routes"
-are `policy_file` and `devices:routes`. The v1 API declares the same scopes on
+are `policy_file`, `devices:routes` and `dns`. The v1 API declares the same scopes on
 its operations, so a credential means the same thing on both APIs. Run
 `GET /api/v1/whoami` to see the role and permissions a credential carries.
 

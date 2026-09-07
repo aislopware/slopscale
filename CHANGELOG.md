@@ -70,6 +70,19 @@ node as a peer marked with the owner as sharer, the shared node gets no access
 back, and a policy that never names `autogroup:shared` ignores shares. See
 [Node sharing](https://headscale.net/development/ref/sharing/).
 
+### DNS settings at runtime
+
+The DNS configuration no longer needs a restart. Global nameservers, override
+local DNS, split DNS, search domains and extra records can be changed from the
+admin console's _DNS_ page, `headscale dns set`, `PUT /api/v1/dns` or
+Tailscale's `/api/v2/tailnet/-/dns/*` endpoints, and reach every client at
+once; MagicDNS and the base domain stay in the configuration file. Settings set
+this way are stored in the database, replace the file's `dns` section until
+`headscale dns reset` (or `DELETE /api/v1/dns`) returns to it, and are logged as
+`dns.set` and `dns.reset`. The new `dns` and `dns:read` scopes gate them; a
+network admin may write, an IT admin may read. See
+[DNS](https://headscale.net/development/ref/dns/).
+
 ### Groups and access rules
 
 Access can now be managed without a policy file, the way NetBird does it.
