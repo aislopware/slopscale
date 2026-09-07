@@ -9,6 +9,8 @@ import { useTableContext } from "~/components/table/app-table.tsx";
 export interface DataTableProps {
   /** Rendered in place of the body when the (filtered) model is empty. */
   readonly empty: ReactNode;
+  /** Rendered under the rows: "Showing N of M", paging. */
+  readonly footer?: ReactNode;
   /** Adds a click handler and pointer cursor to every row. */
   readonly onRowClick?: ((rowId: string) => void) | undefined;
   readonly rowClassName?: string;
@@ -19,13 +21,18 @@ export interface DataTableProps {
  * `meta.className` for cell widths and alignment and `enableSorting` for a sortable header;
  * everything else is the column's `cell` renderer.
  */
-export function DataTable({ empty, onRowClick, rowClassName }: DataTableProps): ReactElement {
+export function DataTable({
+  empty,
+  footer,
+  onRowClick,
+  rowClassName,
+}: DataTableProps): ReactElement {
   const table = useTableContext();
   const { rows } = table.getRowModel();
 
   return (
     <Table>
-      <Table.Header>
+      <Table.Header variant="compact">
         {table.getHeaderGroups().map((group) => (
           <Table.Row key={group.id}>
             {group.headers.map((header) => {
@@ -89,6 +96,18 @@ export function DataTable({ empty, onRowClick, rowClassName }: DataTableProps): 
           ))
         )}
       </Table.Body>
+      {footer === undefined ? null : (
+        <Table.Footer>
+          <Table.Row>
+            <Table.Cell
+              colSpan={table.getAllLeafColumns().length}
+              className="p-0 [&>div]:border-t-0"
+            >
+              {footer}
+            </Table.Cell>
+          </Table.Row>
+        </Table.Footer>
+      )}
     </Table>
   );
 }

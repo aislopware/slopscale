@@ -127,7 +127,7 @@ function UserMenuItems({
         <DropdownMenu.Item
           // A rendered item drops the item's own icon and children, so the link carries both.
           render={
-            <Link to="/machines" search={{ user: user.id, q: "", status: "all" }}>
+            <Link to="/machines" search={{ user: user.id }}>
               <DevicesIcon className="mr-2 size-4" />
               View machines
             </Link>

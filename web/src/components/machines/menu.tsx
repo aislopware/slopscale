@@ -25,6 +25,7 @@ import {
   TagsDialog,
 } from "~/components/machines/dialogs.tsx";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
+import { ownerId } from "~/components/machines/owner.ts";
 import { RoutesDialog } from "~/components/machines/routes-dialog.tsx";
 import { ShareDialog } from "~/components/machines/share-dialog.tsx";
 import { advertisesExit, isTagged } from "~/lib/node.ts";
@@ -39,10 +40,18 @@ export interface MachineMenuProps {
   readonly users: readonly User[];
   /** Renders the trigger as a labelled button instead of the icon. */
   readonly labelled?: boolean;
+  /** Leaves out expire and remove, for pages that offer them in a danger zone of their own. */
+  readonly hideDestructive?: boolean;
 }
 
 /** Every action on one machine, gated by the caller's scopes. */
-export function MachineMenu({ node, me, users, labelled = false }: MachineMenuProps): ReactElement {
+export function MachineMenu({
+  node,
+  me,
+  users,
+  labelled = false,
+  hideDestructive = false,
+}: MachineMenuProps): ReactElement {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const mutations = useNodeMutations();
   const close = (open: boolean): void => {
@@ -73,7 +82,13 @@ export function MachineMenu({ node, me, users, labelled = false }: MachineMenuPr
           }
         />
         <DropdownMenu.Content align="end">
-          <MachineMenuItems node={node} me={me} mutations={mutations} onOpen={setDialog} />
+          <MachineMenuItems
+            node={node}
+            me={me}
+            mutations={mutations}
+            hideDestructive={hideDestructive}
+            onOpen={setDialog}
+          />
         </DropdownMenu.Content>
       </DropdownMenu>
       <MachineDialogs
@@ -91,16 +106,18 @@ function MachineMenuItems({
   node,
   me,
   mutations,
+  hideDestructive,
   onOpen,
 }: {
   readonly node: Node;
   readonly me: Me;
   readonly mutations: ReturnType<typeof useNodeMutations>;
+  readonly hideDestructive: boolean;
   readonly onOpen: (dialog: Dialog) => void;
 }): ReactElement {
   const core = can(me, "devices:core");
   const routes = can(me, "devices:routes");
-  const ownNode = me.user !== undefined && !isTagged(node) && node.user.id === me.user.id;
+  const ownNode = me.user !== undefined && ownerId(node) === me.user.id;
   const share = core || ownNode;
 
   return (
@@ -165,26 +182,30 @@ function MachineMenuItems({
       >
         Share…
       </DropdownMenu.Item>
-      <DropdownMenu.Separator />
-      <DropdownMenu.Item
-        icon={ClockIcon}
-        disabled={!core}
-        onClick={() => {
-          onOpen("expire");
-        }}
-      >
-        Expire key…
-      </DropdownMenu.Item>
-      <DropdownMenu.Item
-        icon={TrashIcon}
-        variant="danger"
-        disabled={!core}
-        onClick={() => {
-          onOpen("delete");
-        }}
-      >
-        Remove…
-      </DropdownMenu.Item>
+      {hideDestructive ? null : (
+        <>
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item
+            icon={ClockIcon}
+            disabled={!core}
+            onClick={() => {
+              onOpen("expire");
+            }}
+          >
+            Expire key…
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            icon={TrashIcon}
+            variant="danger"
+            disabled={!core}
+            onClick={() => {
+              onOpen("delete");
+            }}
+          >
+            Remove…
+          </DropdownMenu.Item>
+        </>
+      )}
     </>
   );
 }

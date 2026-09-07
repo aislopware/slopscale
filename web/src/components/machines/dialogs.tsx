@@ -1,3 +1,5 @@
+// DeleteResource is exported from the package root only.
+import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Input, InputArea } from "@cloudflare/kumo/components/input";
 import { useState } from "react";
@@ -152,8 +154,8 @@ function TagsForm({ node, onOpenChange, mutations }: Omit<NodeDialogProps, "open
         label="Tags"
         description={
           <>
-            One per line or comma separated; <span className="font-mono text-[0.9em]">tag:</span> is
-            added when missing.
+            One per line or comma separated; <span className="font-mono">tag:</span> is added when
+            missing.
           </>
         }
         value={text}
@@ -200,6 +202,10 @@ export function ExpireDialog({
   );
 }
 
+/**
+ * Removing a machine is not undoable and the tailnet keeps working without it, so it asks for the
+ * name to be typed rather than for one more click.
+ */
 export function DeleteDialog({
   node,
   open,
@@ -209,15 +215,15 @@ export function DeleteDialog({
   const { remove } = mutations;
 
   return (
-    <ConfirmDialog
+    <DeleteResource
       open={open}
       onOpenChange={onOpenChange}
-      title="Remove machine?"
-      description={`${nodeName(node)} is removed from the tailnet along with its routes and sharing. The device can register again with a new key.`}
-      confirmLabel="Remove"
-      loading={remove.isPending}
-      error={remove.isError ? errorMessage(remove.error) : undefined}
-      onConfirm={() => {
+      resourceType="machine"
+      resourceName={nodeName(node)}
+      deleteButtonText="Remove machine"
+      isDeleting={remove.isPending}
+      {...(remove.isError ? { errorMessage: errorMessage(remove.error) } : {})}
+      onDelete={() => {
         remove.mutate({ params: { path: { nodeId: node.id } } });
       }}
     />

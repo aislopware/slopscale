@@ -1,15 +1,16 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { ApiKey, User } from "~/api/queries.ts";
+import { ExpiryCell, KeyPrefix } from "~/components/keys/cells.tsx";
 import { KeyActions } from "~/components/keys/key-actions.tsx";
 import { useApiKeyMutations } from "~/components/keys/mutations.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { Avatar } from "~/components/ui/avatar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { userLabel } from "~/lib/node.ts";
-import { isPast, parseTime } from "~/lib/time.ts";
+import { parseTime } from "~/lib/time.ts";
 
 export const emptyUsers: readonly User[] = [];
 
@@ -21,11 +22,9 @@ export const apiKeyColumns = helper.columns([
     header: "Prefix",
     enableSorting: true,
     cell: ({ row }) => (
-      <span className="rounded-sm bg-kumo-tint px-1 py-0.5 font-mono text-[0.9em] text-kumo-default">
-        {row.original.prefix}
-      </span>
+      <KeyPrefix text={row.original.prefix} copy={row.original.prefix} label="Copy prefix" />
     ),
-    meta: { className: "min-w-32" },
+    meta: { className: "min-w-36" },
   }),
   helper.accessor((apiKey) => apiKey.userId ?? "", {
     id: "user",
@@ -35,26 +34,14 @@ export const apiKeyColumns = helper.columns([
     cell: ({ row, table }) => (
       <UserCell userId={row.original.userId} users={table.options.meta?.users ?? emptyUsers} />
     ),
-  }),
-  helper.accessor((apiKey) => parseTime(apiKey.createdAt)?.getTime() ?? 0, {
-    id: "created",
-    header: "Created",
-    enableSorting: true,
-    enableGlobalFilter: false,
-    sortDescFirst: true,
-    cell: ({ row }) => (
-      <span className="text-kumo-subtle">
-        <RelativeTime value={row.original.createdAt} />
-      </span>
-    ),
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "min-w-40" },
   }),
   helper.accessor((apiKey) => parseTime(apiKey.expiration)?.getTime() ?? 0, {
     id: "expiration",
     header: "Expires",
     enableSorting: true,
     enableGlobalFilter: false,
-    cell: ({ row }) => <ExpiresCell value={row.original.expiration} />,
+    cell: ({ row }) => <ExpiryCell value={row.original.expiration} />,
     meta: { className: "whitespace-nowrap" },
   }),
   helper.accessor((apiKey) => parseTime(apiKey.lastSeen)?.getTime() ?? 0, {
@@ -65,7 +52,20 @@ export const apiKeyColumns = helper.columns([
     sortDescFirst: true,
     cell: ({ row }) => (
       <span className="text-kumo-subtle">
-        <RelativeTime value={row.original.lastSeen} />
+        <RelativeTime value={row.original.lastSeen} never="Never used" />
+      </span>
+    ),
+    meta: { className: "hidden md:table-cell whitespace-nowrap" },
+  }),
+  helper.accessor((apiKey) => parseTime(apiKey.createdAt)?.getTime() ?? 0, {
+    id: "created",
+    header: "Created",
+    enableSorting: true,
+    enableGlobalFilter: false,
+    sortDescFirst: true,
+    cell: ({ row }) => (
+      <span className="text-kumo-subtle">
+        <RelativeTime value={row.original.createdAt} />
       </span>
     ),
     meta: { className: "hidden lg:table-cell whitespace-nowrap" },
@@ -86,30 +86,16 @@ function UserCell({
   readonly users: readonly User[];
 }): ReactElement {
   if (userId === null || userId === "") {
-    return <span className="text-kumo-inactive">—</span>;
+    return <span className="text-kumo-subtle">All access</span>;
   }
 
   const user = users.find((candidate) => candidate.id === userId);
+  const name = user === undefined ? `User ${userId}` : userLabel(user);
 
   return (
-    <span className="text-kumo-default">
-      {user === undefined ? `User ${userId}` : userLabel(user)}
-    </span>
-  );
-}
-
-function ExpiresCell({ value }: { readonly value: string | null }): ReactElement {
-  if (isPast(parseTime(value))) {
-    return (
-      <Badge variant="error" appearance="dot">
-        Expired
-      </Badge>
-    );
-  }
-
-  return (
-    <span className="text-kumo-subtle">
-      <RelativeTime value={value} never="Never" />
+    <span className="flex min-w-0 items-center gap-2">
+      <Avatar name={name} size="sm" />
+      <span className="truncate text-kumo-default">{name}</span>
     </span>
   );
 }
@@ -123,7 +109,6 @@ function ApiKeyMenu({ apiKey }: { readonly apiKey: ApiKey }): ReactElement {
       expire={{
         title: "Expire API key?",
         description: `Anything still using ${apiKey.prefix} stops being able to call the API.`,
-        confirmLabel: "Expire key",
         pending: expire.isPending,
         error: expire.isError ? errorMessage(expire.error) : undefined,
         run: (done) => {
@@ -139,9 +124,8 @@ function ApiKeyMenu({ apiKey }: { readonly apiKey: ApiKey }): ReactElement {
         },
       }}
       remove={{
-        title: "Delete API key?",
-        description: `Key ${apiKey.prefix} is removed for good and cannot be restored.`,
-        confirmLabel: "Delete",
+        resourceType: "API key",
+        resourceName: apiKey.prefix,
         pending: remove.isPending,
         error: remove.isError ? errorMessage(remove.error) : undefined,
         run: (done) => {

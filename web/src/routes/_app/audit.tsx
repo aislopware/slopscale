@@ -1,4 +1,10 @@
+import { Button } from "@cloudflare/kumo/components/button";
+import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { Select } from "@cloudflare/kumo/components/select";
+import { Tabs } from "@cloudflare/kumo/components/tabs";
+import type { TabsItem } from "@cloudflare/kumo/components/tabs";
+import { Tooltip } from "@cloudflare/kumo/components/tooltip";
+import { InfoIcon } from "@phosphor-icons/react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import type { ReactElement } from "react";
@@ -8,12 +14,16 @@ import { auditQuery, auditRanges, usersQuery } from "~/api/queries.ts";
 import type { AuditFilters, AuditRange, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { EventsTable } from "~/components/audit/events-table.tsx";
+import { AuditStats } from "~/components/audit/stats.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
-import { Card } from "~/components/ui/card.tsx";
+import { TableToolbar } from "~/components/table/toolbar.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { userLabel } from "~/lib/node.ts";
 
 const defaultRange: AuditRange = "7d";
+
+/** Clearing the filters puts every control back where the page starts. */
+const clearedSearch = { action: "", actor: "", since: defaultRange } as const;
 
 const optionalText = optional(string(), "");
 const optionalRange = optional(picklist(auditRanges), defaultRange);
@@ -50,13 +60,17 @@ export const Route = createFileRoute("/_app/audit")({
   component: AuditPage,
 });
 
-const rangeOptions: readonly { value: AuditRange; label: string }[] = [
-  { value: "1h", label: "Last hour" },
-  { value: "24h", label: "Last 24 hours" },
-  { value: "7d", label: "Last 7 days" },
-  { value: "30d", label: "Last 30 days" },
-  { value: "all", label: "All time" },
+const rangeTabs: TabsItem[] = [
+  { value: "1h", label: "1h" },
+  { value: "24h", label: "24h" },
+  { value: "7d", label: "7d" },
+  { value: "30d", label: "30d" },
+  { value: "all", label: "All" },
 ];
+
+function isRange(value: string): value is AuditRange {
+  return (auditRanges as readonly string[]).includes(value);
+}
 
 function filtersOf(search: AuditSearch): AuditFilters {
   return { action: search.action, actorUserId: search.actor, range: search.since };
@@ -65,6 +79,13 @@ function filtersOf(search: AuditSearch): AuditFilters {
 /** Whether anything narrows the list, so an empty page means "nothing matched", not "nothing yet". */
 function isFiltered(search: AuditSearch): boolean {
   return search.action !== "" || search.actor !== "" || search.since !== "all";
+}
+
+function userOptions(users: readonly User[]): { value: string; label: string }[] {
+  return [
+    { value: "", label: "Any user" },
+    ...users.map((user) => ({ value: user.id, label: userLabel(user) })),
+  ];
 }
 
 function AuditPage(): ReactElement {
@@ -80,9 +101,27 @@ function AuditPage(): ReactElement {
       <PageHeader
         title="Audit log"
         description="Who changed what through the API and the console."
+        actions={
+          <Tabs
+            variant="segmented"
+            size="sm"
+            aria-label="Time range"
+            tabs={rangeTabs}
+            value={search.since}
+            onValueChange={(value) => {
+              void navigate({
+                search: (previous) => ({
+                  ...previous,
+                  since: isRange(value) ? value : defaultRange,
+                }),
+              });
+            }}
+          />
+        }
       />
-      <Card>
-        <div className="flex flex-wrap items-center gap-2 border-b border-kumo-line px-5 py-3">
+      <AuditStats events={rows} />
+      <LayerCard className="overflow-clip p-0">
+        <TableToolbar>
           <SearchInput
             value={search.action}
             placeholder="Filter by action"
@@ -93,10 +132,24 @@ function AuditPage(): ReactElement {
               });
             }}
           />
+          <Tooltip
+            side="bottom"
+            content="An action ending in a dot matches a prefix: node. keeps every node action."
+            render={
+              <Button
+                variant="ghost"
+                shape="square"
+                size="xs"
+                icon={InfoIcon}
+                aria-label="How the action filter matches"
+              />
+            }
+          />
           {users.data === undefined ? null : (
             <Select
+              size="sm"
               aria-label="Filter by user"
-              className="w-48"
+              className="w-44"
               value={search.actor}
               items={userOptions(users.data.users)}
               onValueChange={(value) => {
@@ -104,39 +157,20 @@ function AuditPage(): ReactElement {
               }}
             />
           )}
-          <Select
-            aria-label="Filter by time"
-            className="w-40"
-            value={search.since}
-            items={rangeOptions}
-            onValueChange={(value) => {
-              void navigate({
-                search: (previous) => ({ ...previous, since: value ?? defaultRange }),
-              });
-            }}
-          />
-          <span className="text-sm text-kumo-subtle">
-            An action ending in a dot is a prefix:{" "}
-            <span className="font-mono text-[0.9em]">node.</span> keeps every node action.
-          </span>
-        </div>
+        </TableToolbar>
         <EventsTable
           events={rows}
           filtered={isFiltered(search)}
+          onClearFilters={() => {
+            void navigate({ search: () => ({ ...clearedSearch }) });
+          }}
           hasMore={events.hasNextPage}
           loadingMore={events.isFetchingNextPage}
           onLoadMore={() => {
             void events.fetchNextPage();
           }}
         />
-      </Card>
+      </LayerCard>
     </>
   );
-}
-
-function userOptions(users: readonly User[]): { value: string; label: string }[] {
-  return [
-    { value: "", label: "Any user" },
-    ...users.map((user) => ({ value: user.id, label: userLabel(user) })),
-  ];
 }

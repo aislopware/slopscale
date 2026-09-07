@@ -6,6 +6,7 @@ import { errorMessage } from "~/api/error.ts";
 import type { User } from "~/api/queries.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import type { NodeDialogProps } from "~/components/machines/dialogs.tsx";
+import { ownerId } from "~/components/machines/owner.ts";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { userLabel } from "~/lib/node.ts";
@@ -45,7 +46,7 @@ function ShareForm({
   mutations,
 }: Omit<ShareDialogProps, "open">): ReactElement {
   const candidates = users.filter(
-    (user) => user.id !== node.user.id && !node.sharedWith.includes(user.id),
+    (user) => user.id !== ownerId(node) && !node.sharedWith.includes(user.id),
   );
   const [userId, setUserId] = useState(candidates[0]?.id ?? "");
   const { share } = mutations;

@@ -1,258 +1,110 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
-import { Banner } from "@cloudflare/kumo/components/banner";
 import { Button } from "@cloudflare/kumo/components/button";
-import { WarningCircleIcon, WarningIcon } from "@phosphor-icons/react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useBlocker } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import type { ReactElement } from "react";
+import { LayerCard } from "@cloudflare/kumo/components/layer-card";
+import { EditorView } from "@codemirror/view";
+import { FileCodeIcon } from "@phosphor-icons/react";
+import { useImperativeHandle, useRef } from "react";
+import type { ReactElement, Ref } from "react";
 
-import { api } from "~/api/client.ts";
-import { errorMessage } from "~/api/error.ts";
-import { invalidate } from "~/api/queries.ts";
-import type { Policy } from "~/api/queries.ts";
-import { Card, CardHeader } from "~/components/ui/card.tsx";
 import { CodeEditor } from "~/components/ui/code-editor.tsx";
-import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
-import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { toast } from "~/components/ui/toast.ts";
-import { parseTime } from "~/lib/time.ts";
 
-interface Issue {
-  readonly title: string;
-  readonly message: string;
+const iconSize = 14;
+
+function lineCount(text: string): number {
+  return text === "" ? 0 : text.split("\n").length;
 }
 
-function isSaveShortcut(event: KeyboardEvent): boolean {
-  return event.key.toLowerCase() === "s" && (event.metaKey || event.ctrlKey);
-}
-
-/** Asks before a navigation would drop unsaved edits, and warns on reload too. */
-function LeaveGuard({ dirty }: { readonly dirty: boolean }): ReactElement {
-  const blocker = useBlocker({
-    shouldBlockFn: () => dirty,
-    enableBeforeUnload: dirty,
-    withResolver: true,
-  });
-
-  return (
-    <ConfirmDialog
-      open={blocker.status === "blocked"}
-      onOpenChange={(open) => {
-        if (!open) {
-          blocker.reset?.();
-        }
-      }}
-      title="Leave without saving?"
-      description="The policy has unsaved changes. They are lost if you leave this page."
-      confirmLabel="Leave"
-      onConfirm={() => {
-        blocker.proceed?.();
-      }}
-    />
-  );
-}
-
-interface ToolbarProps {
-  readonly updatedAt: string;
-  readonly dirty: boolean;
-  readonly canEdit: boolean;
-  readonly checking: boolean;
-  readonly saving: boolean;
-  readonly onDiscard: () => void;
-  readonly onCheck: () => void;
-  readonly onSave: () => void;
-}
-
-function Toolbar({
-  updatedAt,
-  dirty,
-  canEdit,
-  checking,
-  saving,
-  onDiscard,
-  onCheck,
-  onSave,
-}: ToolbarProps): ReactElement {
-  return (
-    <CardHeader className="flex-wrap items-center py-2.5">
-      <div className="flex items-center gap-2 text-kumo-subtle">
-        {parseTime(updatedAt) === null ? (
-          <span>Never saved</span>
-        ) : (
-          <span>
-            Updated <RelativeTime value={updatedAt} />
-          </span>
-        )}
-        {dirty ? <Badge variant="warning">Modified</Badge> : null}
-      </div>
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" disabled={!dirty} onClick={onDiscard}>
-          Discard
-        </Button>
-        <Button variant="secondary" size="sm" loading={checking} onClick={onCheck}>
-          Check
-        </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          disabled={!dirty || !canEdit}
-          loading={saving}
-          onClick={onSave}
-        >
-          Save
-        </Button>
-      </div>
-    </CardHeader>
-  );
-}
-
-export /** A permissive first policy that names the building blocks an operator will edit. */
-const starterPolicy = `{
-  // Groups collect users; tags label machines that no user owns.
-  "groups": {
-    "group:admin": [],
-  },
-  "tagOwners": {
-    "tag:server": ["group:admin"],
-  },
-
-  // Grants replace ACLs: who may reach what, on which ports.
-  "grants": [
-    { "src": ["autogroup:member"], "dst": ["autogroup:self"], "ip": ["*"] },
-    { "src": ["group:admin"], "dst": ["*"], "ip": ["*"] },
-    { "src": ["autogroup:shared"], "dst": ["autogroup:member"], "ip": ["*"] },
-  ],
-
-  // Who may SSH where, when the client runs Tailscale SSH.
-  "ssh": [
-    { "action": "check", "src": ["group:admin"], "dst": ["tag:server"], "users": ["autogroup:nonroot", "root"] },
-  ],
-}
-`;
-
-interface PolicyEditorProps {
-  readonly policy: Policy;
-  readonly canEdit: boolean;
+/** What the page can ask the editor to do beyond changing its text. */
+export interface PolicyEditorHandle {
+  /** Selects the first occurrence of `text` and scrolls it into view; no-op when it is absent. */
+  reveal: (text: string) => void;
 }
 
 /**
- * The HuJSON policy editor. The draft lives here; the server copy stays the reference the
- * "Modified" badge and the leave guard compare against.
+ * CodeMirror owns the DOM inside the host, so the view is found through it rather than through a
+ * prop: `~/components/ui/code-editor.tsx` stays a plain controlled textarea from the outside.
  */
-export function PolicyEditor({ policy, canEdit }: PolicyEditorProps): ReactElement {
-  const queryClient = useQueryClient();
-  const [draft, setDraft] = useState(policy.policy);
-  const [issue, setIssue] = useState<Issue | null>(null);
-  const dirty = draft !== policy.policy;
+function reveal(host: HTMLElement | null, text: string): void {
+  const view = host === null ? null : EditorView.findFromDOM(host);
 
-  const check = api.useMutation("post", "/api/v1/policy/check", {
-    onSuccess: () => {
-      setIssue(null);
-      toast.success("Policy is valid");
-    },
-    onError: (error) => {
-      setIssue({ title: "Policy is not valid", message: errorMessage(error) });
-    },
-  });
-
-  const save = api.useMutation("put", "/api/v1/policy", {
-    onSuccess: async (saved) => {
-      setIssue(null);
-      setDraft(saved.policy);
-      toast.success("Policy saved");
-      await invalidate(queryClient, "/api/v1/policy");
-    },
-    onError: (error) => {
-      setIssue({ title: "Could not save the policy", message: errorMessage(error) });
-    },
-  });
-
-  function submit(): void {
-    if (dirty && canEdit) {
-      save.mutate({ body: { policy: draft } });
-    }
+  if (view === null) {
+    return;
   }
 
-  const commit = useRef(submit);
+  const start = view.state.doc.toString().indexOf(text);
 
-  useEffect(() => {
-    commit.current = submit;
+  if (start === -1) {
+    return;
+  }
+
+  view.dispatch({
+    selection: { anchor: start, head: start + text.length },
+    scrollIntoView: true,
   });
+  view.focus();
+}
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent): void {
-      if (isSaveShortcut(event)) {
-        event.preventDefault();
-        commit.current();
-      }
-    }
+export interface PolicyEditorProps {
+  readonly value: string;
+  readonly onChange: (next: string) => void;
+  readonly readOnly: boolean;
+  /** Shows the Discard action; the draft differs from the stored policy. */
+  readonly dirty: boolean;
+  readonly onDiscard: () => void;
+  readonly ref?: Ref<PolicyEditorHandle>;
+}
 
-    globalThis.addEventListener("keydown", onKeyDown);
+/**
+ * The HuJSON editor on its own surface, under a slim toolbar that names the file the policy would
+ * be on disk and counts its lines, so the card reads as an editor rather than another panel.
+ */
+export function PolicyEditor({
+  value,
+  onChange,
+  readOnly,
+  dirty,
+  onDiscard,
+  ref,
+}: PolicyEditorProps): ReactElement {
+  const lines = lineCount(value);
+  const host = useRef<HTMLDivElement>(null);
 
-    return (): void => {
-      globalThis.removeEventListener("keydown", onKeyDown);
-    };
-  }, []);
+  useImperativeHandle(ref, () => ({
+    reveal: (text: string): void => {
+      reveal(host.current, text);
+    },
+  }));
 
   return (
-    <div className="flex flex-col gap-4">
-      {issue === null ? null : (
-        <Banner
-          variant="error"
-          icon={<WarningCircleIcon />}
-          title={issue.title}
-          description={issue.message}
-        />
-      )}
-      {policy.policy === "" ? (
-        <Banner
-          variant="alert"
-          icon={<WarningIcon />}
-          title="No policy is set"
-          description="Every user can reach every device until a policy is saved."
-          {...(canEdit && draft === ""
-            ? {
-                action: (
-                  <Banner.Action
-                    variant="secondary"
-                    onClick={() => {
-                      setDraft(starterPolicy);
-                    }}
-                  >
-                    Start from a template
-                  </Banner.Action>
-                ),
-              }
-            : {})}
-        />
-      ) : null}
-      <Card className="overflow-hidden">
-        <Toolbar
-          updatedAt={policy.updatedAt}
-          dirty={dirty}
-          canEdit={canEdit}
-          checking={check.isPending}
-          saving={save.isPending}
-          onDiscard={() => {
-            setDraft(policy.policy);
-            setIssue(null);
-          }}
-          onCheck={() => {
-            check.mutate({ body: { policy: draft } });
-          }}
-          onSave={submit}
-        />
-        <div className="h-[60vh] min-h-96">
-          <CodeEditor
-            value={draft}
-            onChange={setDraft}
-            readOnly={!canEdit}
-            aria-label="Tailnet policy"
-          />
+    <LayerCard className="flex min-w-0 flex-col overflow-hidden p-0">
+      <div className="flex items-center justify-between gap-3 border-b border-kumo-line bg-kumo-recessed px-3 py-2 text-xs text-kumo-subtle">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="flex h-lh items-center">
+            <FileCodeIcon size={iconSize} aria-hidden />
+          </span>
+          <span className="truncate font-mono text-kumo-default">policy.hujson</span>
+          <span aria-hidden>·</span>
+          <span>{lines === 1 ? "1 line" : `${lines} lines`}</span>
+          {readOnly ? (
+            <>
+              <span aria-hidden>·</span>
+              <span>Read only</span>
+            </>
+          ) : null}
         </div>
-      </Card>
-      <LeaveGuard dirty={dirty} />
-    </div>
+        {dirty ? (
+          <Button variant="ghost" size="xs" onClick={onDiscard}>
+            Discard
+          </Button>
+        ) : null}
+      </div>
+      <div ref={host} className="h-[60vh] min-h-96">
+        <CodeEditor
+          value={value}
+          onChange={onChange}
+          readOnly={readOnly}
+          aria-label="Tailnet policy"
+        />
+      </div>
+    </LayerCard>
   );
 }

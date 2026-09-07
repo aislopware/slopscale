@@ -21,7 +21,7 @@ export default defineConfig({
   // the dev server from re-optimising (and briefly serving two React copies)
   // the first time a page pulls in a new one.
   optimizeDeps: {
-    include: ["@cloudflare/kumo/components/*", "@cloudflare/kumo/utils"],
+    include: ["@cloudflare/kumo", "@cloudflare/kumo/components/*", "@cloudflare/kumo/utils"],
   },
   server: {
     proxy: {

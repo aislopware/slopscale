@@ -1,3 +1,5 @@
+import type { BadgeVariant } from "@cloudflare/kumo/components/badge";
+
 /** The roles the server accepts, most to least privileged. */
 export const userRoles = [
   "owner",
@@ -20,25 +22,46 @@ export interface RoleOption {
 export const roleOptions: readonly RoleOption[] = [
   {
     value: "owner",
-    label: "owner",
+    label: "Owner",
     description: "Full control, and the only role that can transfer ownership.",
   },
-  { value: "admin", label: "admin", description: "Everything except the owner." },
+  { value: "admin", label: "Admin", description: "Everything except the owner." },
   {
     value: "network-admin",
-    label: "network-admin",
+    label: "Network admin",
     description: "Policy, DNS and route approval; reads everything else.",
   },
   {
     value: "it-admin",
-    label: "it-admin",
+    label: "IT admin",
     description: "Users, devices, keys and settings; reads policy and routes.",
   },
-  { value: "auditor", label: "auditor", description: "Reads everything, changes nothing." },
-  { value: "member", label: "member", description: "No admin access." },
+  { value: "auditor", label: "Auditor", description: "Reads everything, changes nothing." },
+  { value: "member", label: "Member", description: "No admin access." },
 ];
 
 /** Narrows the role string the API returns; unknown roles fall back to the least privileged. */
 export function toRole(role: string): UserRole {
   return userRoles.find((known) => known === role) ?? "member";
+}
+
+/** Roles that reach the console's admin surfaces; the "Admins" filter on the users page. */
+const adminRoles = new Set<UserRole>(["owner", "admin", "network-admin", "it-admin"]);
+
+/** Sentence-case name for a role, for badges and menus. */
+export function roleName(role: string): string {
+  return roleOptions.find((option) => option.value === toRole(role))?.label ?? "Member";
+}
+
+export function isAdminRole(role: string): boolean {
+  return adminRoles.has(toRole(role));
+}
+
+/** Owner is the one seat that outranks everything, so it gets the strongest badge. */
+export function roleVariant(role: string): BadgeVariant {
+  if (role === "owner") {
+    return "primary";
+  }
+
+  return role === "admin" ? "info" : "secondary";
 }

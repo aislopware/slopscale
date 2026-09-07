@@ -62,6 +62,24 @@ describe(Shell, () => {
     await expect.element(screen.getByRole("link", { name: "Audit log" })).not.toBeInTheDocument();
   });
 
+  it("opens the quick search palette on the pages the caller may see", async () => {
+    const screen = await render(
+      app({ ...allAccess, allAccess: false, permissions: { "users:read": true } }),
+    );
+
+    await screen.getByRole("button", { name: /Quick search/u }).click();
+
+    const palette = screen.getByRole("dialog");
+    await expect.element(palette).toBeVisible();
+    await expect.element(palette.getByText("Users")).toBeVisible();
+    await expect.element(palette.getByText("Machines")).not.toBeInTheDocument();
+
+    await palette.getByRole("combobox").fill("over");
+
+    await expect.element(palette.getByText("Overview")).toBeVisible();
+    await expect.element(palette.getByText("Users")).not.toBeInTheDocument();
+  });
+
   it("shows the audit log to a caller that may read it", async () => {
     const screen = await render(
       app({

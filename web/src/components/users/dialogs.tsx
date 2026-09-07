@@ -1,3 +1,4 @@
+import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
@@ -6,7 +7,6 @@ import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { User } from "~/api/queries.ts";
-import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import {
   DialogClose,
   DialogContent,
@@ -282,6 +282,10 @@ function RoleForm({
   );
 }
 
+/**
+ * Deleting a user takes their machines and keys with it, so it asks for the username to be typed
+ * back rather than a plain yes/no.
+ */
 export function DeleteUserDialog({
   user,
   open,
@@ -291,15 +295,15 @@ export function DeleteUserDialog({
   const { remove } = mutations;
 
   return (
-    <ConfirmDialog
+    <DeleteResource
       open={open}
       onOpenChange={onOpenChange}
-      title="Delete user?"
-      description={`${userLabel(user)} is deleted along with their machines, pre-auth keys and API keys. This cannot be undone.`}
-      confirmLabel="Delete"
-      loading={remove.isPending}
-      error={remove.isError ? errorMessage(remove.error) : undefined}
-      onConfirm={() => {
+      resourceType="user"
+      resourceName={user.name}
+      deleteButtonText="Delete user"
+      isDeleting={remove.isPending}
+      {...(remove.isError ? { errorMessage: errorMessage(remove.error) } : {})}
+      onDelete={() => {
         remove.mutate(
           { params: { path: { id: user.id } } },
           {

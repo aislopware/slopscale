@@ -1,0 +1,83 @@
+import { Button } from "@cloudflare/kumo/components/button";
+import { Empty } from "@cloudflare/kumo/components/empty";
+import { DevicesIcon, PlusIcon } from "@phosphor-icons/react";
+import type { ReactElement } from "react";
+
+import type { StatusFilter } from "~/components/machines/filters.ts";
+
+const iconSize = 40;
+/** The table already draws the card edge, and the heading belongs to the row, not the page. */
+const emptyClass = "border-none bg-kumo-base [&>h2]:text-base";
+
+export interface MachinesEmptyProps {
+  /** How many machines exist at all, before any filter. */
+  readonly total: number;
+  readonly status: StatusFilter;
+  /** Whether a search or a user filter is narrowing the rows as well. */
+  readonly narrowed: boolean;
+  readonly canCreateKeys: boolean;
+  readonly onAddMachine: () => void;
+  readonly onClearFilters: () => void;
+}
+
+/**
+ * What the table says when it has no rows. Each case offers the one action that fixes it: an empty
+ * tailnet gets the machine it is missing, a filter that hides everything gets a way out.
+ */
+export function MachinesEmpty({
+  total,
+  status,
+  narrowed,
+  canCreateKeys,
+  onAddMachine,
+  onClearFilters,
+}: MachinesEmptyProps): ReactElement {
+  if (total === 0) {
+    return (
+      <Empty
+        size="sm"
+        className={emptyClass}
+        icon={<DevicesIcon size={iconSize} />}
+        title="No machines yet"
+        description="Register a device with a pre-auth key or by signing in; it appears here immediately."
+        contents={
+          canCreateKeys ? (
+            <Button variant="secondary" size="sm" icon={PlusIcon} onClick={onAddMachine}>
+              Add machine
+            </Button>
+          ) : null
+        }
+      />
+    );
+  }
+
+  if (status === "pending" && !narrowed) {
+    return (
+      <Empty
+        size="sm"
+        className={emptyClass}
+        title="No machines need approval"
+        description="Every machine on the tailnet has been approved."
+        contents={
+          <Button variant="secondary" size="sm" onClick={onClearFilters}>
+            View all machines
+          </Button>
+        }
+      />
+    );
+  }
+
+  return (
+    <Empty
+      size="sm"
+      className={emptyClass}
+      title="No machines match"
+      description="Try a different search or filter."
+      contents={
+        <Button variant="secondary" size="sm" onClick={onClearFilters}>
+          Clear filters
+        </Button>
+      }
+    />
+  );
+}

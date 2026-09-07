@@ -84,10 +84,14 @@ set to `--exit-node=auto:any` pick it. See
 
 The server now serves a web console at `/admin/`: machines, users, pre-auth
 and API keys, the policy editor, device and user approval, node sharing and the
-global exit node, all from a browser. It signs in only through the configured
-identity provider (Google, or any OIDC issuer) and shows exactly what that
-user's role allows. Release binaries and container images
-include it; when building from source, run `make web` before `make build`.
+global exit node and the audit log, all from a browser. The overview shows
+counts, what is waiting for approval and the machines seen most recently. The
+sidebar counts pending approvals next to _Machines_ and _Users_, Cmd-K
+opens a search over pages, machines and users, and every table filters in
+place. There is a dark mode. It signs in only through the configured identity
+provider (Google, or any OIDC issuer) and shows what that user's role allows.
+Release binaries and container images include it. When building from source,
+run `make web` before `make build`.
 See [Admin console](https://headscale.net/development/ref/console/).
 
 ### Audit log

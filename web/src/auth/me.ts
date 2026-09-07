@@ -1,6 +1,7 @@
 import type { MethodResponse } from "openapi-react-query";
 
 import { api } from "~/api/client.ts";
+import { roleName } from "~/components/users/roles.ts";
 
 /** The scopes the server knows; `Whoami.permissions` has one entry per scope. */
 export type Scope =
@@ -56,7 +57,7 @@ export function roleLabel(me: Me): string | null {
     return null;
   }
 
-  return me.role;
+  return roleName(me.role);
 }
 
 /** The overview greeting: a user's name, or what kind of credential is signed in. */

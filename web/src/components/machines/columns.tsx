@@ -1,13 +1,16 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
-import { GlobeIcon, PathIcon, ShareNetworkIcon, StarIcon } from "@phosphor-icons/react";
+import { GlobeIcon, PathIcon, ShareNetworkIcon, StarIcon, TagIcon } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import type { Node, User } from "~/api/queries.ts";
+import { CopyText } from "~/components/machines/copy-text.tsx";
+import { expiryWorthShowing } from "~/components/machines/filters.ts";
 import { MachineMenu } from "~/components/machines/menu.tsx";
 import { StatusBadge } from "~/components/machines/status-badge.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { Avatar } from "~/components/ui/avatar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import {
   approvedSubnets,
@@ -25,6 +28,7 @@ export const emptyUsers: readonly User[] = [];
 const helper = createAppColumnHelper<Node>();
 
 const statusOrder = { online: 0, pending: 1, offline: 2, expired: 3 } as const;
+const markSize = 13;
 
 export const columns = helper.columns([
   helper.accessor((node) => nodeName(node), {
@@ -32,15 +36,17 @@ export const columns = helper.columns([
     header: "Machine",
     enableSorting: true,
     cell: ({ row }) => <NameCell node={row.original} />,
-    meta: { className: "w-[28%] min-w-56" },
+    meta: { className: "w-[30%] min-w-56" },
   }),
   helper.accessor((node) => ownerLabel(node), {
     id: "owner",
     header: "Owner",
     enableSorting: true,
     cell: ({ row }) => <OwnerCell node={row.original} />,
+    meta: { className: "w-[18%]" },
   }),
-  helper.accessor((node) => node.ipAddresses.join(" "), {
+  // The hostname rides along here so a search matches it without a column of its own.
+  helper.accessor((node) => [...node.ipAddresses, node.name].join(" "), {
     id: "addresses",
     header: "Addresses",
     enableSorting: false,
@@ -60,11 +66,7 @@ export const columns = helper.columns([
     enableSorting: true,
     enableGlobalFilter: false,
     sortDescFirst: true,
-    cell: ({ row }) => (
-      <span className="text-kumo-subtle">
-        {row.original.online ? "Now" : <RelativeTime value={row.original.lastSeen} />}
-      </span>
-    ),
+    cell: ({ row }) => <LastSeenCell node={row.original} />,
     meta: { className: "hidden whitespace-nowrap lg:table-cell" },
   }),
   helper.display({
@@ -85,105 +87,124 @@ function NameCell({ node }: { readonly node: Node }): ReactElement {
   const name = nodeName(node);
 
   return (
-    <div className="flex min-w-0 flex-col gap-1">
+    <div className="flex min-w-0 flex-col gap-0.5">
       <Link
         to="/machines/$nodeId"
         params={{ nodeId: node.id }}
-        className="block truncate font-medium text-kumo-default hover:underline"
+        className="block truncate font-medium text-kumo-default hover:text-kumo-link hover:underline focus-visible:underline"
       >
         {name}
       </Link>
-      <div className="flex flex-wrap items-center gap-1.5 text-sm text-kumo-subtle">
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-kumo-subtle">
         {node.name === name ? null : (
-          <span className="truncate font-mono text-[0.9em]">{node.name}</span>
+          <span className="truncate font-mono text-xs">{node.name}</span>
         )}
+        {node.tags.map((tag) => (
+          <Badge key={tag} variant="secondary">
+            <span className="font-mono">{tag}</span>
+          </Badge>
+        ))}
         <Attributes node={node} />
       </div>
     </div>
   );
 }
 
+/** What the machine does for the tailnet, as icons; the actionable one keeps its words. */
 function Attributes({ node }: { readonly node: Node }): ReactElement | null {
   const subnets = approvedSubnets(node);
   const pending = pendingRoutes(node);
-  const items: ReactElement[] = [];
+  const marks: ReactElement[] = [];
 
   if (node.globalExitNode) {
-    items.push(
-      <Tooltip key="global" content="Global exit node: every client is told to prefer it">
-        <Badge variant="blue" icon={StarIcon}>
-          Global exit
-        </Badge>
-      </Tooltip>,
+    marks.push(
+      <Mark key="global" hint="Global exit node: every client is told to prefer it">
+        <StarIcon size={markSize} weight="fill" className="text-kumo-warning" />
+      </Mark>,
     );
   } else if (isExitNode(node)) {
-    items.push(
-      <Tooltip key="exit" content="Exit node">
-        <Badge variant="outline" icon={GlobeIcon}>
-          Exit node
-        </Badge>
-      </Tooltip>,
+    marks.push(
+      <Mark key="exit" hint="Approved exit node">
+        <GlobeIcon size={markSize} />
+      </Mark>,
     );
   }
 
   if (subnets.length > 0) {
-    items.push(
-      <Tooltip key="subnets" content={subnets.join(", ")}>
-        <Badge variant="outline" icon={PathIcon}>
-          {subnets.length === 1 ? "1 subnet" : `${subnets.length} subnets`}
-        </Badge>
-      </Tooltip>,
-    );
-  }
-
-  if (pending.length > 0) {
-    items.push(
-      <Tooltip key="pending" content={`Waiting for approval: ${pending.join(", ")}`}>
-        <Badge variant="warning" icon={PathIcon}>
-          {pending.length === 1 ? "1 route pending" : `${pending.length} routes pending`}
-        </Badge>
-      </Tooltip>,
+    marks.push(
+      <Mark key="subnets" hint={`Routes ${subnets.join(", ")}`}>
+        <PathIcon size={markSize} />
+      </Mark>,
     );
   }
 
   if (node.sharedWith.length > 0) {
-    items.push(
-      <Tooltip key="shared" content="Shared with other users">
-        <Badge variant="outline" icon={ShareNetworkIcon}>
-          Shared
-        </Badge>
-      </Tooltip>,
+    marks.push(
+      <Mark key="shared" hint="Shared with other users">
+        <ShareNetworkIcon size={markSize} />
+      </Mark>,
     );
   }
 
-  return items.length === 0 ? null : <span className="flex flex-wrap gap-1">{items}</span>;
+  if (marks.length === 0 && pending.length === 0) {
+    return null;
+  }
+
+  return (
+    <span className="flex items-center gap-1.5">
+      {marks}
+      {pending.length === 0 ? null : (
+        <Tooltip content={`Waiting for approval: ${pending.join(", ")}`}>
+          <Badge variant="warning" icon={PathIcon}>
+            {pending.length === 1 ? "1 route" : `${pending.length} routes`}
+          </Badge>
+        </Tooltip>
+      )}
+    </span>
+  );
+}
+
+function Mark({
+  hint,
+  children,
+}: {
+  readonly hint: string;
+  readonly children: ReactElement;
+}): ReactElement {
+  return (
+    <Tooltip content={hint}>
+      <span className="flex h-lh items-center text-kumo-subtle">{children}</span>
+    </Tooltip>
+  );
 }
 
 function OwnerCell({ node }: { readonly node: Node }): ReactElement {
   if (isTagged(node)) {
     return (
-      <div className="flex flex-wrap gap-1">
-        {node.tags.map((tag) => (
-          <Badge key={tag} variant="neutral">
-            <span className="font-mono text-[0.9em]">{tag}</span>
-          </Badge>
-        ))}
-      </div>
+      <span className="flex items-center gap-1.5 text-kumo-subtle">
+        <span className="flex h-lh items-center">
+          <TagIcon size={markSize} />
+        </span>
+        Tagged
+      </span>
     );
   }
 
+  const label = ownerLabel(node);
+
   return (
-    <Link to="/users" search={{ q: node.user.name }} className="text-kumo-default hover:underline">
-      {ownerLabel(node)}
-    </Link>
+    <span className="flex min-w-0 items-center gap-2">
+      <Avatar name={label} size="sm" />
+      <span className="truncate">{label}</span>
+    </span>
   );
 }
 
 function AddressCell({ node }: { readonly node: Node }): ReactElement {
   return (
-    <div className="flex flex-col font-mono text-[0.9em] text-kumo-subtle">
+    <div className="flex flex-col items-start gap-0.5 text-kumo-subtle">
       {node.ipAddresses.map((address) => (
-        <span key={address}>{address}</span>
+        <CopyText key={address} value={address} />
       ))}
     </div>
   );
@@ -191,19 +212,25 @@ function AddressCell({ node }: { readonly node: Node }): ReactElement {
 
 function StatusCell({ node }: { readonly node: Node }): ReactElement {
   const status = nodeStatus(node);
-  const expiry = parseTime(node.expiry);
+  const soon = expiryWorthShowing(parseTime(node.expiry));
 
   return (
     <div className="flex flex-col items-start gap-1">
       <StatusBadge status={status} />
-      {expiry === null ? (
-        <span className="text-sm text-kumo-subtle">Key never expires</span>
-      ) : (
-        <span className="text-sm text-kumo-subtle">
+      {soon ? (
+        <span className="text-xs text-kumo-subtle">
           {status === "expired" ? "Expired " : "Expires "}
           <RelativeTime value={node.expiry} />
         </span>
-      )}
+      ) : null}
     </div>
+  );
+}
+
+function LastSeenCell({ node }: { readonly node: Node }): ReactElement {
+  return (
+    <span className="text-kumo-subtle">
+      {node.online ? "Now" : <RelativeTime value={node.lastSeen} />}
+    </span>
   );
 }

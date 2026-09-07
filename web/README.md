@@ -13,13 +13,26 @@ server at `/admin/` (see `embed.go`, which embeds `dist/` into the binary).
   more than a couple of fields.
 - [Cloudflare Kumo](https://kumo-ui.com) (`@cloudflare/kumo`, Base UI +
   Tailwind CSS 4) for every component, with `@phosphor-icons/react` for
-  icons. `src/components/ui` holds only the console's compositions of Kumo
-  parts (page header, card, dialog scaffold, confirm dialog, toast manager,
-  status dot, code editor). Colours are Kumo's semantic tokens
-  (`bg-kumo-base`, `text-kumo-subtle`, ...) and dark mode is `data-mode` on
-  `<html>`; the vendored Kumo lint rules in `lint/` reject raw palette
-  colours and `dark:` variants. The design rules the UI follows are the
-  Kumo design skill at `../.claude/skills/kumo-design/SKILL.md`.
+  icons. `src/components/ui` holds only the console's own compositions of
+  Kumo parts. `PageHeader` is the title row with a meta line and actions.
+  `Section` puts a 14px title above one `LayerCard`, and cards never nest.
+  `DefinitionList` is label/value rows with a copy button on hover.
+  `Avatar` is the initials mark. The rest are dialog scaffolds, the toast
+  manager and the code editor. `src/components/table` adds the toolbar that
+  sits inside the table card (search, segmented `Tabs`, primary action),
+  the "Showing N of M" footer and `DataTable` with Kumo's compact header.
+  The shell in `src/components/layout` is Kumo's `Sidebar` with grouped
+  navigation and live approval badges, a `CommandPalette` on Cmd-K over
+  pages, machines and users, and `Breadcrumbs` in the top bar. A detail
+  page calls `useBreadcrumb(name)` to put its name in the trail. Colours
+  are Kumo's semantic tokens (`bg-kumo-base`, `text-kumo-subtle`, ...) and
+  dark mode is `data-mode` on `<html>`. The vendored Kumo lint rules in
+  `lint/` reject raw palette colours and `dark:` variants. The design rules
+  come from the Kumo design skill at
+  `../.claude/skills/kumo-design/SKILL.md`. The ones that matter most here
+  are 14px content text, sentence case, `font-semibold` at most,
+  `ring ring-kumo-line` instead of border plus shadow, `Empty size="sm"`
+  inside cards and `DeleteResource` for destructive confirmations.
 - The API client is `openapi-fetch` + `openapi-react-query` over types
   generated from the server's OpenAPI document (`src/api/schema.gen.ts`).
   Regenerate with `make web-generate` from the repository root after changing

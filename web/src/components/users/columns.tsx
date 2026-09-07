@@ -3,30 +3,35 @@ import type { ReactElement } from "react";
 
 import type { User } from "~/api/queries.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { Avatar } from "~/components/ui/avatar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { UserMenu } from "~/components/users/menu.tsx";
+import { roleName, roleVariant } from "~/components/users/roles.ts";
 import { userLabel } from "~/lib/node.ts";
 
 const helper = createAppColumnHelper<User>();
 
+const providerNames: Record<string, string> = { oidc: "OpenID Connect", local: "Local" };
+
 /** Users without an identity provider were created here; the API leaves the field empty. */
-function providerLabel(user: User): string {
-  return user.provider === "" ? "local" : user.provider;
+export function providerLabel(user: User): string {
+  return providerNames[user.provider] ?? (user.provider === "" ? "Local" : user.provider);
 }
 
-function initial(user: User): string {
-  return (userLabel(user).trim()[0] ?? "?").toUpperCase();
+/** Local is the default, so only an external provider earns the second line under the email. */
+function externalProvider(user: User): string | null {
+  return user.provider === "" || user.provider === "local" ? null : providerLabel(user);
 }
 
 export const columns = helper.columns([
   helper.accessor((user) => `${userLabel(user)} ${user.name}`, {
     id: "name",
-    header: "Name",
+    header: "User",
     enableSorting: true,
     cell: ({ row }) => <NameCell user={row.original} />,
-    meta: { className: "w-[30%] min-w-56" },
+    meta: { className: "w-[26%] min-w-52" },
   }),
-  helper.accessor((user) => user.email, {
+  helper.accessor((user) => `${user.email} ${providerLabel(user)}`, {
     id: "email",
     header: "Email",
     enableSorting: true,
@@ -37,24 +42,34 @@ export const columns = helper.columns([
     header: "Role",
     enableSorting: true,
     cell: ({ row }) => (
-      <Badge variant={row.original.role === "owner" ? "info" : "secondary"}>
-        {row.original.role}
-      </Badge>
+      <Badge variant={roleVariant(row.original.role)}>{roleName(row.original.role)}</Badge>
     ),
+    meta: { className: "whitespace-nowrap" },
   }),
   helper.accessor((user) => (user.approved ? 1 : 0), {
     id: "status",
     header: "Status",
     enableSorting: true,
     enableGlobalFilter: false,
-    cell: ({ row }) => <StatusCell user={row.original} />,
+    cell: ({ row }) => (
+      <Badge variant={row.original.approved ? "success" : "warning"} appearance="dot">
+        {row.original.approved ? "Approved" : "Needs approval"}
+      </Badge>
+    ),
+    meta: { className: "whitespace-nowrap" },
   }),
-  helper.accessor((user) => providerLabel(user), {
-    id: "provider",
-    header: "Provider",
+  helper.accessor((user) => user.createdAt, {
+    id: "joined",
+    header: "Joined",
     enableSorting: true,
-    cell: ({ row }) => <span className="text-kumo-subtle">{providerLabel(row.original)}</span>,
-    meta: { className: "hidden md:table-cell" },
+    enableGlobalFilter: false,
+    sortDescFirst: true,
+    cell: ({ row }) => (
+      <span className="text-kumo-subtle">
+        <RelativeTime value={row.original.createdAt} />
+      </span>
+    ),
+    meta: { className: "hidden md:table-cell whitespace-nowrap" },
   }),
   helper.display({
     id: "actions",
@@ -69,39 +84,38 @@ export const columns = helper.columns([
 ]);
 
 function NameCell({ user }: { readonly user: User }): ReactElement {
+  const label = userLabel(user);
+
   return (
-    <div className="flex items-center gap-3">
-      <span
-        aria-hidden
-        className="flex size-7 shrink-0 items-center justify-center rounded-full bg-kumo-tint text-sm font-medium text-kumo-default"
-      >
-        {initial(user)}
-      </span>
+    <div className="flex items-center gap-2.5">
+      <Avatar name={label} size="lg" />
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="truncate font-medium text-kumo-default">{userLabel(user)}</span>
-        <span className="truncate text-sm text-kumo-subtle">{user.name}</span>
+        <span className="truncate font-medium text-kumo-default">{label}</span>
+        {label === user.name ? null : (
+          <span className="truncate text-xs text-kumo-subtle">{user.name}</span>
+        )}
       </div>
     </div>
   );
 }
 
 function EmailCell({ user }: { readonly user: User }): ReactElement {
-  if (user.email === "") {
-    return <span className="text-kumo-inactive">No email</span>;
+  const provider = externalProvider(user);
+
+  if (user.email === "" && provider === null) {
+    return <span className="text-kumo-inactive">—</span>;
   }
 
-  return <span className="text-kumo-subtle">{user.email}</span>;
-}
-
-function StatusCell({ user }: { readonly user: User }): ReactElement {
   return (
-    <div className="flex flex-col items-start gap-1">
-      <Badge variant={user.approved ? "success" : "warning"} appearance="dot">
-        {user.approved ? "Active" : "Needs approval"}
-      </Badge>
-      <span className="text-sm text-kumo-subtle">
-        Joined <RelativeTime value={user.createdAt} />
-      </span>
+    <div className="flex min-w-0 flex-col gap-0.5">
+      {user.email === "" ? (
+        <span className="text-kumo-inactive">—</span>
+      ) : (
+        <span className="truncate text-kumo-subtle">{user.email}</span>
+      )}
+      {provider === null ? null : (
+        <span className="truncate text-xs text-kumo-subtle">{provider}</span>
+      )}
     </div>
   );
 }

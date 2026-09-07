@@ -4,7 +4,7 @@ import { Switch } from "@cloudflare/kumo/components/switch";
 import { SignOutIcon } from "@phosphor-icons/react";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement } from "react";
 
 import { api } from "~/api/client.ts";
 import { invalidate, settingsQuery } from "~/api/queries.ts";
@@ -13,8 +13,10 @@ import type { UpdateSettingsRequestBody } from "~/api/schema.gen.ts";
 import { can, displayName, roleLabel } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { signOut } from "~/auth/session.ts";
-import { Card, CardHeader, CardTitle } from "~/components/ui/card.tsx";
+import { DefinitionList } from "~/components/ui/definition-list.tsx";
+import type { Definition } from "~/components/ui/definition-list.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
+import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 export const Route = createFileRoute("/_app/settings")({
@@ -32,11 +34,13 @@ function SettingsPage(): ReactElement {
     <>
       <PageHeader
         title="Settings"
-        description="Tailnet-wide switches. Changes apply immediately."
+        description="Tailnet-wide switches, the session this browser holds and the server it talks to."
       />
-      <ApprovalCard settings={settings.data} canEdit={can(me, "feature_settings")} />
-      <ConsoleCard me={me} />
-      <ServerCard />
+      <div className="flex max-w-3xl flex-col gap-6">
+        <ApprovalSection settings={settings.data} canEdit={can(me, "feature_settings")} />
+        <ConsoleSection me={me} />
+        <ServerSection />
+      </div>
     </>
   );
 }
@@ -68,7 +72,28 @@ const approvals: readonly ApprovalSwitch[] = [
   },
 ];
 
-function ApprovalCard({
+/** Title and description on the left, the control on the right; hairlines between rows. */
+function SettingRow({
+  title,
+  description,
+  control,
+}: {
+  readonly title: string;
+  readonly description: string;
+  readonly control: ReactElement;
+}): ReactElement {
+  return (
+    <SectionRow className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+      <div className="flex min-w-0 flex-col gap-1">
+        <span className="font-medium text-kumo-strong">{title}</span>
+        <p className="max-w-prose text-kumo-subtle">{description}</p>
+      </div>
+      <span className="flex h-lh shrink-0 items-center">{control}</span>
+    </SectionRow>
+  );
+}
+
+function ApprovalSection({
   settings,
   canEdit,
 }: {
@@ -86,15 +111,15 @@ function ApprovalCard({
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Approval</CardTitle>
-      </CardHeader>
-      <div className="flex flex-col divide-y divide-kumo-line">
-        {approvals.map((row) => (
-          <div key={row.id} className="flex flex-col gap-1.5 px-5 py-4">
+    <Section title="Approval" description="Changes apply immediately." bodyClassName="p-0">
+      {approvals.map((row) => (
+        <SettingRow
+          key={row.id}
+          title={row.title}
+          description={row.description}
+          control={
             <Switch
-              label={row.title}
+              aria-label={row.title}
               checked={row.read(settings)}
               disabled={!canEdit || update.isPending}
               transitioning={update.isPending}
@@ -109,11 +134,10 @@ function ApprovalCard({
                 );
               }}
             />
-            <p className="max-w-prose text-kumo-subtle">{row.description}</p>
-          </div>
-        ))}
-      </div>
-    </Card>
+          }
+        />
+      ))}
+    </Section>
   );
 }
 
@@ -121,63 +145,59 @@ const kindLabels: Record<string, string> = {
   api_key: "API key",
   local: "Local socket",
   oauth: "OAuth token",
+  session: "Browser session",
 };
 
-function Row({
-  label,
-  children,
-}: {
-  readonly label: string;
-  readonly children: ReactNode;
-}): ReactElement {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-3">
-      <dt className="text-kumo-subtle">{label}</dt>
-      <dd className="flex flex-wrap items-center justify-end gap-1.5 text-kumo-default">
-        {children}
-      </dd>
-    </div>
-  );
-}
-
-function ConsoleCard({ me }: { readonly me: Me }): ReactElement {
+function consoleItems(me: Me): readonly Definition[] {
   const role = roleLabel(me);
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>This console</CardTitle>
-      </CardHeader>
-      <dl className="flex flex-col divide-y divide-kumo-line">
-        <Row label="Signed in as">
+  return [
+    {
+      label: "Signed in as",
+      value: (
+        <span className="flex items-center gap-1.5">
           {displayName(me)}
-          {me.user === undefined ? null : (
-            <Badge variant="neutral">{kindLabels[me.kind] ?? me.kind}</Badge>
-          )}
-        </Row>
-        <Row label="Role">
-          {role === null ? (
-            <span className="text-kumo-subtle">Not bound to a user</span>
-          ) : (
-            <Badge variant="info">{role}</Badge>
-          )}
-        </Row>
-        <Row label="Scopes">
-          <ScopeList me={me} />
-        </Row>
-      </dl>
-      <div className="border-t border-kumo-line px-5 py-4">
-        <Button
-          variant="secondary"
-          icon={SignOutIcon}
-          onClick={() => {
-            void signOut();
-          }}
-        >
-          Sign out
-        </Button>
-      </div>
-    </Card>
+          <Badge variant="secondary">{kindLabels[me.kind] ?? me.kind}</Badge>
+        </span>
+      ),
+    },
+    {
+      label: "Role",
+      value:
+        role === null ? (
+          <span className="text-kumo-subtle">Not bound to a user</span>
+        ) : (
+          <Badge variant="info">{role}</Badge>
+        ),
+    },
+    { label: "Scopes", value: <ScopeList me={me} /> },
+  ];
+}
+
+function ConsoleSection({ me }: { readonly me: Me }): ReactElement {
+  return (
+    <Section
+      title="Current session"
+      description="Who this browser is signed in as. The console holds no privilege of its own."
+      bodyClassName="p-0"
+    >
+      <DefinitionList items={consoleItems(me)} />
+      <SettingRow
+        title="Sign out"
+        description="Ends this browser session. Machines and keys are unaffected."
+        control={
+          <Button
+            variant="secondary"
+            icon={SignOutIcon}
+            onClick={() => {
+              void signOut();
+            }}
+          >
+            Sign out
+          </Button>
+        }
+      />
+    </Section>
   );
 }
 
@@ -191,40 +211,39 @@ function ScopeList({ me }: { readonly me: Me }): ReactElement {
   }
 
   return (
-    <>
+    <span className="flex flex-wrap justify-end gap-1">
       {me.scopes.map((scope) => (
-        <Badge key={scope} variant="neutral" className="font-mono text-[0.9em] font-normal">
+        <Badge key={scope} variant="secondary" className="font-mono text-[0.9em] font-normal">
           {scope}
         </Badge>
       ))}
-    </>
+    </span>
   );
 }
 
-function ServerCard(): ReactElement {
+function ServerSection(): ReactElement {
   const health = api.useQuery("get", "/api/v1/health");
+  const reachable = health.data?.databaseConnectivity === true;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Server</CardTitle>
-      </CardHeader>
-      <dl className="flex flex-col divide-y divide-kumo-line">
-        <Row label="Database">
-          {health.data?.databaseConnectivity === true ? (
-            <Badge appearance="dot" variant="success">
-              Reachable
-            </Badge>
-          ) : (
-            <Badge appearance="dot" variant="error">
-              Unreachable
-            </Badge>
-          )}
-        </Row>
-        <Row label="API base">
-          <span className="font-mono text-[0.9em]">{globalThis.location.origin}</span>
-        </Row>
-      </dl>
-    </Card>
+    <Section title="Server" description="What this console is talking to." bodyClassName="p-0">
+      <DefinitionList
+        items={[
+          {
+            label: "Database",
+            value: (
+              <Badge appearance="dot" variant={reachable ? "success" : "error"}>
+                {reachable ? "Reachable" : "Unreachable"}
+              </Badge>
+            ),
+          },
+          {
+            label: "API base",
+            value: globalThis.location.origin,
+            copy: globalThis.location.origin,
+          },
+        ]}
+      />
+    </Section>
   );
 }

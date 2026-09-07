@@ -1,56 +1,27 @@
+import { Breadcrumbs } from "@cloudflare/kumo/components/breadcrumbs";
 import { Button } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Sidebar } from "@cloudflare/kumo/components/sidebar";
-import { Text } from "@cloudflare/kumo/components/text";
 import { cn } from "@cloudflare/kumo/utils";
-import type { Icon } from "@phosphor-icons/react";
-import {
-  ClockCounterClockwiseIcon,
-  DesktopIcon,
-  GearSixIcon,
-  KeyIcon,
-  ShieldCheckIcon,
-  SignOutIcon,
-  SquaresFourIcon,
-  UsersIcon,
-  WaveformIcon,
-} from "@phosphor-icons/react";
+import { MagnifyingGlassIcon, SignOutIcon, WaveformIcon } from "@phosphor-icons/react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
+import { useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import { api } from "~/api/client.ts";
-import type { Me, Scope } from "~/auth/me.ts";
+import { nodesQuery, usersQuery } from "~/api/queries.ts";
+import type { Me } from "~/auth/me.ts";
 import { can, displayName, roleLabel } from "~/auth/me.ts";
 import { signOut } from "~/auth/session.ts";
+import type { NavItem } from "~/components/layout/nav.ts";
+import { isActive, visibleGroups } from "~/components/layout/nav.ts";
+import { QuickSearch } from "~/components/layout/quick-search.tsx";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
+import { Avatar } from "~/components/ui/avatar.tsx";
+import { BreadcrumbProvider, useBreadcrumbLeaf } from "~/lib/breadcrumbs.tsx";
 
-interface NavItem {
-  readonly to: "/" | "/machines" | "/users" | "/keys" | "/policy" | "/settings" | "/audit";
-  readonly label: string;
-  readonly icon: Icon;
-  /** Hidden without this scope; members without any scope still get their machines. */
-  readonly scope?: Scope;
-  readonly exact?: boolean;
-}
-
-const nav: readonly NavItem[] = [
-  { to: "/", label: "Overview", icon: SquaresFourIcon, exact: true },
-  { to: "/machines", label: "Machines", icon: DesktopIcon, scope: "devices:core:read" },
-  { to: "/users", label: "Users", icon: UsersIcon, scope: "users:read" },
-  { to: "/keys", label: "Keys", icon: KeyIcon },
-  { to: "/policy", label: "Access controls", icon: ShieldCheckIcon, scope: "policy_file:read" },
-  { to: "/settings", label: "Settings", icon: GearSixIcon, scope: "feature_settings:read" },
-  {
-    to: "/audit",
-    label: "Audit log",
-    icon: ClockCounterClockwiseIcon,
-    scope: "logs:configuration:read",
-  },
-];
-
-function isActive(item: NavItem, pathname: string): boolean {
-  return item.exact === true ? pathname === item.to : pathname.startsWith(item.to);
-}
+const healthEvery = 30_000;
 
 export function Shell({
   me,
@@ -60,74 +31,165 @@ export function Shell({
   readonly children: ReactNode;
 }): ReactElement {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  const items = nav.filter((item) => item.scope === undefined || can(me, item.scope));
-  const current = items.find((item) => isActive(item, pathname));
+  const groups = visibleGroups(me);
+  const pages = groups.flatMap((group) => group.items);
+  const current = pages.find((item) => isActive(item, pathname));
+  const counts = usePendingCounts(me);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
-    <Sidebar.Provider defaultOpen collapsible="offcanvas">
-      <Sidebar className="sticky top-0 h-svh">
-        <Sidebar.Header>
-          <Brand />
-        </Sidebar.Header>
-        <Sidebar.Content>
-          <Sidebar.Group>
-            <Sidebar.Menu>
-              {items.map((item) => (
+    <BreadcrumbProvider>
+      <Sidebar.Provider defaultOpen collapsible="icon" peekable>
+        <Sidebar className="sticky top-0 h-svh">
+          <Sidebar.Header>
+            <Brand />
+          </Sidebar.Header>
+          <Sidebar.Content>
+            <Sidebar.Group>
+              <Sidebar.Menu>
                 <Sidebar.MenuButton
-                  key={item.to}
-                  href={item.to}
-                  icon={item.icon}
-                  active={isActive(item, pathname)}
-                  tooltip={item.label}
+                  icon={MagnifyingGlassIcon}
+                  tooltip="Quick search (⌘K)"
+                  className="ring ring-kumo-line group-data-[state=collapsed]/sidebar:ring-transparent"
+                  onClick={() => {
+                    setSearchOpen(true);
+                  }}
                 >
-                  {item.label}
+                  <span className="flex flex-1 items-center justify-between gap-2">
+                    Quick search…
+                    <kbd className="rounded border border-kumo-hairline px-1 text-[10px] text-kumo-subtle">
+                      ⌘K
+                    </kbd>
+                  </span>
                 </Sidebar.MenuButton>
-              ))}
-            </Sidebar.Menu>
-          </Sidebar.Group>
-        </Sidebar.Content>
-        <Sidebar.Footer>
-          <HealthIndicator />
-        </Sidebar.Footer>
-      </Sidebar>
-      <div className="flex min-h-svh min-w-0 flex-1 flex-col bg-kumo-canvas">
-        <header className="sticky top-0 z-10 flex h-[58px] shrink-0 items-center justify-between gap-3 border-b border-kumo-line bg-kumo-base px-4 lg:px-8">
-          <div className="flex items-center gap-2">
-            <Sidebar.Trigger />
-            <Text bold>{current?.label ?? ""}</Text>
-          </div>
-          <div className="flex items-center gap-1">
-            <ThemeToggle />
-            <AccountMenu me={me} />
-          </div>
-        </header>
-        <main className="flex-1 px-4 py-6 lg:px-8">
-          <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">{children}</div>
-        </main>
-      </div>
-    </Sidebar.Provider>
+              </Sidebar.Menu>
+            </Sidebar.Group>
+            {groups.map((group, index) => (
+              <Sidebar.Group key={group.label ?? index}>
+                {group.label === undefined ? null : (
+                  <Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>
+                )}
+                <Sidebar.Menu>
+                  {group.items.map((item) => (
+                    <Sidebar.MenuButton
+                      key={item.to}
+                      href={item.to}
+                      icon={item.icon}
+                      active={isActive(item, pathname)}
+                      tooltip={item.label}
+                    >
+                      {item.label}
+                      <PendingBadge item={item} counts={counts} />
+                    </Sidebar.MenuButton>
+                  ))}
+                </Sidebar.Menu>
+              </Sidebar.Group>
+            ))}
+          </Sidebar.Content>
+          <Sidebar.Footer>
+            <div className="flex items-center justify-between gap-2 group-data-[state=collapsed]/sidebar:flex-col">
+              <HealthIndicator />
+              <Sidebar.Trigger />
+            </div>
+          </Sidebar.Footer>
+        </Sidebar>
+        <div className="flex min-h-svh min-w-0 flex-1 flex-col bg-kumo-canvas">
+          <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 border-b border-kumo-line bg-kumo-base px-4 lg:px-6">
+            <Trail current={current} />
+            <div className="flex items-center gap-1">
+              <ThemeToggle />
+              <AccountMenu me={me} />
+            </div>
+          </header>
+          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
+            <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6">{children}</div>
+          </main>
+        </div>
+        <QuickSearch me={me} pages={pages} open={searchOpen} onOpenChange={setSearchOpen} />
+      </Sidebar.Provider>
+    </BreadcrumbProvider>
+  );
+}
+
+interface PendingCounts {
+  readonly pendingNodes: number;
+  readonly pendingUsers: number;
+}
+
+function usePendingCounts(me: Me): PendingCounts {
+  const nodes = useQuery({ ...nodesQuery, enabled: can(me, "devices:core:read") });
+  const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
+
+  return {
+    pendingNodes: (nodes.data?.nodes ?? []).filter((node) => !node.approved).length,
+    pendingUsers: (users.data?.users ?? []).filter((user) => !user.approved).length,
+  };
+}
+
+function PendingBadge({
+  item,
+  counts,
+}: {
+  readonly item: NavItem;
+  readonly counts: PendingCounts;
+}): ReactElement | null {
+  if (item.badge === undefined) {
+    return null;
+  }
+
+  const count = counts[item.badge];
+
+  return count === 0 ? null : (
+    <Sidebar.MenuBadge title={`${count} waiting for approval`}>{count}</Sidebar.MenuBadge>
   );
 }
 
 function Brand(): ReactElement {
   return (
-    <div className="flex items-center gap-2 px-1">
-      <span className="flex size-7 items-center justify-center rounded-md bg-kumo-contrast text-kumo-inverse">
-        <WaveformIcon className="size-4" weight="bold" />
+    <div className="flex w-full min-w-0 items-center gap-2 px-2 group-data-[state=collapsed]/sidebar:px-0">
+      <WaveformIcon className="size-5 shrink-0 text-kumo-brand" weight="duotone" />
+      <span className="flex-1 truncate font-semibold text-kumo-strong group-data-[state=collapsed]/sidebar:hidden">
+        headscale
       </span>
-      <Text bold>headscale</Text>
+    </div>
+  );
+}
+
+/** Breadcrumb trail: the section, then the page a detail route announced through useBreadcrumb. */
+function Trail({ current }: { readonly current: NavItem | undefined }): ReactElement {
+  const leaf = useBreadcrumbLeaf();
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <Sidebar.Trigger className="md:hidden" />
+      <Breadcrumbs>
+        {current === undefined || leaf === null ? (
+          <Breadcrumbs.Current>{current?.label ?? "headscale"}</Breadcrumbs.Current>
+        ) : (
+          <>
+            <Breadcrumbs.Link href={current.to}>{current.label}</Breadcrumbs.Link>
+            <Breadcrumbs.Separator />
+            <Breadcrumbs.Current>{leaf}</Breadcrumbs.Current>
+          </>
+        )}
+      </Breadcrumbs>
     </div>
   );
 }
 
 function HealthIndicator(): ReactElement {
-  const health = api.useQuery("get", "/api/v1/health", undefined, { refetchInterval: 30_000 });
+  const health = api.useQuery("get", "/api/v1/health", undefined, {
+    refetchInterval: healthEvery,
+  });
   const state = healthState(health.isPending, health.data?.databaseConnectivity === true);
 
   return (
-    <div className="flex items-center gap-2 px-2 py-1 text-xs text-kumo-subtle">
-      <span aria-hidden className={cn("size-2 rounded-full", state.dot)} />
-      {state.label}
+    <div
+      className="flex min-w-0 items-center gap-2 px-2 text-xs text-kumo-subtle"
+      title={state.label}
+    >
+      <span aria-hidden className={cn("size-2 shrink-0 rounded-full", state.dot)} />
+      <span className="truncate group-data-[state=collapsed]/sidebar:hidden">{state.label}</span>
     </div>
   );
 }
@@ -152,24 +214,26 @@ const kindLabels: Record<string, string> = {
 function AccountMenu({ me }: { readonly me: Me }): ReactElement {
   const name = displayName(me);
   const role = roleLabel(me);
-  const initial = name.slice(0, 1).toUpperCase();
 
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger
         render={
-          <Button variant="ghost" shape="circle" size="sm" aria-label="Account" title={name}>
-            <span className="text-xs font-medium">{initial}</span>
+          <Button variant="ghost" shape="square" size="sm" aria-label="Account" title={name}>
+            <Avatar name={name} />
           </Button>
         }
       />
       <DropdownMenu.Content align="end" className="min-w-56">
         <DropdownMenu.Group>
-          <DropdownMenu.Label className="flex flex-col gap-0.5">
-            <span className="font-medium text-kumo-default">{name}</span>
-            <span className="text-kumo-subtle">
-              {kindLabels[me.kind] ?? me.kind}
-              {role === null ? "" : ` · ${role}`}
+          <DropdownMenu.Label className="flex items-center gap-2">
+            <Avatar name={name} size="lg" />
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="truncate font-medium text-kumo-default">{name}</span>
+              <span className="truncate text-xs text-kumo-subtle">
+                {kindLabels[me.kind] ?? me.kind}
+                {role === null ? "" : ` · ${role}`}
+              </span>
             </span>
           </DropdownMenu.Label>
           <DropdownMenu.Separator />

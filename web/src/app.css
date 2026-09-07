@@ -27,15 +27,7 @@
   html {
     font-family: var(--font-sans);
     font-feature-settings: "cv02", "cv03", "cv04", "calt";
-    letter-spacing: -0.01em;
     line-height: 1.5;
-  }
-
-  pre,
-  code,
-  kbd,
-  .font-mono {
-    letter-spacing: normal;
   }
 
   /* Content text is 14px (Kumo's text-base); larger sizes are for headings only. */

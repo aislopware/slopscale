@@ -15,6 +15,7 @@ import { CreatedKey, useCreatedKey } from "~/components/keys/created-key.tsx";
 import { expirationFor, expiryOptions } from "~/components/keys/expiration.ts";
 import type { ExpiryChoice } from "~/components/keys/expiration.ts";
 import { usePreAuthKeyMutations } from "~/components/keys/mutations.ts";
+import { connectCommand } from "~/components/machines/connect.ts";
 import {
   DialogClose,
   DialogContent,
@@ -54,14 +55,33 @@ function parseTags(text: string): string[] {
     .map((tag) => (tag.startsWith("tag:") ? tag : `tag:${tag}`));
 }
 
+/**
+ * What the caller came for. The keys page mints a key; everywhere else the key is a means to an end
+ * and the dialog says so, down to the command that uses it.
+ */
+export type PreAuthKeyIntent = "key" | "add-machine";
+
+const titles: Record<PreAuthKeyIntent, { readonly form: string; readonly created: string }> = {
+  key: { form: "Create pre-auth key", created: "Key created" },
+  "add-machine": { form: "Add machine", created: "Add machine" },
+};
+
+const descriptions: Record<PreAuthKeyIntent, string> = {
+  key: "A machine registers with the key instead of signing in, so it belongs to the user you pick.",
+  "add-machine":
+    "A machine joins by registering itself with a pre-auth key, so it belongs to the user you pick.",
+};
+
 export function CreatePreAuthKeyDialog({
   me,
   open,
   onOpenChange,
+  intent = "key",
 }: {
   readonly me: Me;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
+  readonly intent?: PreAuthKeyIntent;
 }): ReactElement {
   const [created, setCreated] = useCreatedKey(open);
   const close = (): void => {
@@ -72,17 +92,18 @@ export function CreatePreAuthKeyDialog({
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="base"
-        title={created === null ? "Create pre-auth key" : "Key created"}
-        description={
-          created === null
-            ? "A machine registers with the key instead of signing in, so it belongs to the user you pick."
-            : undefined
-        }
+        title={created === null ? titles[intent].form : titles[intent].created}
+        description={created === null ? descriptions[intent] : undefined}
       >
         {created === null ? (
           <CreatePreAuthKeyForm me={me} onCreated={setCreated} />
         ) : (
-          <CreatedKey value={created} note={revealNote} onDone={close} />
+          <CreatedKey
+            value={created}
+            note={revealNote}
+            {...(intent === "add-machine" ? { command: connectCommand(created) } : {})}
+            onDone={close}
+          />
         )}
       </DialogContent>
     </DialogRoot>

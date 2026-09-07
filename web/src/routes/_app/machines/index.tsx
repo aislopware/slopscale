@@ -1,34 +1,40 @@
-import { LinkButton } from "@cloudflare/kumo/components/button";
-import { Empty } from "@cloudflare/kumo/components/empty";
-import { Select } from "@cloudflare/kumo/components/select";
-import { DevicesIcon } from "@phosphor-icons/react";
+import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useDeferredValue } from "react";
+import { useDeferredValue, useState } from "react";
 import type { ReactElement } from "react";
 import { fallback, object, optional, picklist, string } from "valibot";
 
 import { nodesQuery, usersQuery } from "~/api/queries.ts";
-import type { Node, User } from "~/api/queries.ts";
+import type { Node } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
+import { CreatePreAuthKeyDialog } from "~/components/keys/preauth-dialogs.tsx";
 import { columns, emptyUsers } from "~/components/machines/columns.tsx";
+import { MachinesEmpty } from "~/components/machines/empty.tsx";
+import {
+  defaultStatus,
+  filterNodes,
+  statusCounts,
+  statusFilters,
+  toStatusFilter,
+} from "~/components/machines/filters.ts";
+import { MachinesToolbar } from "~/components/machines/list-toolbar.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { SearchInput } from "~/components/table/search-input.tsx";
-import { Card } from "~/components/ui/card.tsx";
+import { TableFooter } from "~/components/table/toolbar.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
-import { nodeStatus, userLabel } from "~/lib/node.ts";
 
-const statuses = ["all", "online", "offline", "pending", "expired"] as const;
-type StatusFilter = (typeof statuses)[number];
-
-const optionalText = optional(string(), "");
-const optionalStatus = optional(picklist(statuses), "all");
+/**
+ * Every filter is optional and absent at its default, so the plain `/machines` link the sidebar and
+ * the breadcrumbs point at is the URL the page produces when nothing is filtered.
+ */
+const optionalText = fallback(string(), "");
+const optionalStatus = fallback(picklist(statusFilters), defaultStatus);
 
 const searchSchema = object({
-  q: fallback(optionalText, ""),
-  status: fallback(optionalStatus, "all"),
-  user: fallback(optionalText, ""),
+  q: optional(optionalText),
+  status: optional(optionalStatus),
+  user: optional(optionalText),
 });
 
 export const Route = createFileRoute("/_app/machines/")({
@@ -43,125 +49,122 @@ export const Route = createFileRoute("/_app/machines/")({
   component: MachinesPage,
 });
 
-const statusOptions: readonly { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "Any status" },
-  { value: "online", label: "Connected" },
-  { value: "offline", label: "Disconnected" },
-  { value: "pending", label: "Needs approval" },
-  { value: "expired", label: "Expired" },
-];
-
-const emptyIconSize = 48;
-
 function MachinesPage(): ReactElement {
   const { me } = Route.useRouteContext();
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const nodes = useSuspenseQuery(nodesQuery);
+  const [addingMachine, setAddingMachine] = useState(false);
   const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
-  const rows = filterNodes(nodes.data.nodes, search.status, search.user);
-  const query = useDeferredValue(search.q);
+  const status = toStatusFilter(search.status);
+  const user = search.user ?? "";
+  const query = search.q ?? "";
+  const machines = nodes.data.nodes;
+  const rows = filterNodes(machines, { status, user });
+  const deferred = useDeferredValue(query);
 
   const table = useAppTable({
     data: rows,
     columns,
     getRowId: (node) => node.id,
-    state: { globalFilter: query },
+    state: { globalFilter: deferred },
     initialState: { sorting: [{ id: "name", desc: false }] },
     meta: { me, users: users.data?.users ?? emptyUsers },
   });
 
-  const pending = nodes.data.nodes.filter((node) => !node.approved).length;
+  const shown = table.getRowModel().rows.length;
+
+  function clearFilters(): void {
+    void navigate({ search: {} });
+  }
+
+  function addMachine(): void {
+    setAddingMachine(true);
+  }
 
   return (
     <>
-      <PageHeader title="Machines" description={describe(nodes.data.nodes.length, pending)} />
-      <Card>
-        <div className="flex flex-wrap items-center gap-2 border-b border-kumo-line px-5 py-3">
-          <SearchInput
-            value={search.q}
-            placeholder="Search by name, address, user or tag"
-            onValueChange={(value) => {
-              void navigate({ search: (previous) => ({ ...previous, q: value }), replace: true });
-            }}
-          />
-          <Select
-            aria-label="Filter by status"
-            className="w-40"
-            value={search.status}
-            items={statusOptions}
-            onValueChange={(value) => {
-              void navigate({ search: (previous) => ({ ...previous, status: value ?? "all" }) });
-            }}
-          />
-          {users.data === undefined ? null : (
-            <Select
-              aria-label="Filter by user"
-              className="w-48"
-              value={search.user}
-              items={userOptions(users.data.users)}
-              onValueChange={(value) => {
-                void navigate({ search: (previous) => ({ ...previous, user: value ?? "" }) });
-              }}
-            />
-          )}
-        </div>
+      <PageHeader title="Machines" meta={summary(machines)} />
+      <LayerCard className="overflow-hidden">
+        <MachinesToolbar
+          me={me}
+          query={query}
+          onAddMachine={addMachine}
+          status={status}
+          user={user}
+          users={users.data?.users}
+          counts={statusCounts(machines)}
+          onQueryChange={(value) => {
+            void navigate({
+              search: (previous) => ({ ...previous, q: value === "" ? undefined : value }),
+              replace: true,
+            });
+          }}
+          onStatusChange={(value) => {
+            void navigate({
+              search: (previous) => ({
+                ...previous,
+                status: value === defaultStatus ? undefined : value,
+              }),
+            });
+          }}
+          onUserChange={(value) => {
+            void navigate({
+              search: (previous) => ({ ...previous, user: value === "" ? undefined : value }),
+            });
+          }}
+        />
         <table.AppTable>
           <DataTable
             onRowClick={(nodeId) => {
               void navigate({ to: "/machines/$nodeId", params: { nodeId } });
             }}
             empty={
-              nodes.data.nodes.length === 0 ? (
-                <Empty
-                  size="sm"
-                  icon={<DevicesIcon size={emptyIconSize} />}
-                  title="No machines yet"
-                  description="Register a device with a pre-auth key or by signing in; it appears here immediately."
-                  contents={
-                    can(me, "auth_keys") ? (
-                      <LinkButton href="/keys" variant="secondary">
-                        Create a pre-auth key
-                      </LinkButton>
-                    ) : null
-                  }
-                />
-              ) : (
-                <Empty
-                  size="sm"
-                  title="No machines match"
-                  description="Try a different search or filter."
-                />
+              <MachinesEmpty
+                total={machines.length}
+                status={status}
+                narrowed={query !== "" || user !== ""}
+                canCreateKeys={can(me, "auth_keys")}
+                onAddMachine={addMachine}
+                onClearFilters={clearFilters}
+              />
+            }
+            footer={
+              machines.length === 0 ? undefined : (
+                <TableFooter>
+                  Showing {shown} of {machines.length}
+                </TableFooter>
               )
             }
           />
         </table.AppTable>
-      </Card>
+      </LayerCard>
+      <CreatePreAuthKeyDialog
+        me={me}
+        intent="add-machine"
+        open={addingMachine}
+        onOpenChange={setAddingMachine}
+      />
     </>
   );
 }
 
-function describe(total: number, pending: number): string {
-  const machines = total === 1 ? "1 machine" : `${total} machines`;
+/** The header's small facts line: how many machines there are and what is waiting. */
+function summary(machines: readonly Node[]): ReactElement {
+  const counts = statusCounts(machines);
+  const total = machines.length === 1 ? "1 machine" : `${machines.length} machines`;
 
-  return pending === 0 ? machines : `${machines}, ${pending} waiting for approval`;
-}
-
-function filterNodes(nodes: readonly Node[], status: StatusFilter, user: string): Node[] {
-  const now = new Date();
-
-  return nodes.filter((node) => {
-    if (user !== "" && node.user.id !== user && !node.sharedWith.includes(user)) {
-      return false;
-    }
-
-    return status === "all" || nodeStatus(node, now) === status;
-  });
-}
-
-function userOptions(users: readonly User[]): { value: string; label: string }[] {
-  return [
-    { value: "", label: "Any user" },
-    ...users.map((user) => ({ value: user.id, label: userLabel(user) })),
-  ];
+  return (
+    <>
+      <span>{total}</span>
+      <span aria-hidden>·</span>
+      <span>{counts.online} connected</span>
+      {counts.pending === 0 ? null : (
+        <>
+          <span aria-hidden>·</span>
+          <span className="text-kumo-warning">{counts.pending} waiting for approval</span>
+        </>
+      )}
+    </>
+  );
 }
