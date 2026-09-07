@@ -92,7 +92,7 @@ export const networkColumns = helper.columns([
   }),
 ]);
 
-function NameCell({ network }: { readonly network: Network }): ReactElement {
+function NameCell({ network }: { readonly network: NetworkRow }): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="flex items-center gap-1.5">
@@ -104,6 +104,11 @@ function NameCell({ network }: { readonly network: Network }): ReactElement {
       {network.description === "" ? null : (
         <span className="truncate text-xs text-kumo-subtle">{network.description}</span>
       )}
+      {/* The "Handed to" column is hidden on phones; say it here so a reader
+          without edit rights still sees who gets the network. */}
+      <span className="truncate text-xs text-kumo-subtle md:hidden">
+        {network.groupNames === "" ? "Handed to no group" : `Handed to ${network.groupNames}`}
+      </span>
     </div>
   );
 }
