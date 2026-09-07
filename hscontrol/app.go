@@ -453,11 +453,7 @@ func (h *Headscale) Serve() error {
 	// The Huma v1 API mux matches full /api/v1/... paths and is shared by
 	// the local unix socket (served without authentication, local trust)
 	// and the remote TCP router (served behind the API-key middleware).
-	humaMux, _ := apiv1.Handler(apiv1.Backend{
-		State:  h.state,
-		Change: h.Change,
-		Cfg:    h.cfg,
-	})
+	humaMux, _ := apiv1.Handler(h.apiV1Backend())
 
 	// The Headscale v2 API. Served behind Basic/Bearer auth on the remote
 	// listener, and over the local unix socket (local trust) so the CLI can
@@ -763,11 +759,7 @@ func (h *Headscale) Change(cs ...change.Change) {
 // The handler serves the Tailscale control protocol including the /key
 // endpoint and /ts2021 Noise upgrade path.
 func (h *Headscale) HTTPHandler() http.Handler {
-	humaMux, _ := apiv1.Handler(apiv1.Backend{
-		State:  h.state,
-		Change: h.Change,
-		Cfg:    h.cfg,
-	})
+	humaMux, _ := apiv1.Handler(h.apiV1Backend())
 
 	humaV2Mux, _ := apiv2.Handler(apiv2.Backend{
 		State:  h.state,
@@ -834,6 +826,25 @@ func (h *Headscale) StartEphemeralGCForTest(tb testing.TB) {
 	tb.Cleanup(func() { h.ephemeralGC.Close() })
 }
 
+// apiV1Backend is the v1 API's view of the server, including whether the
+// console can sign in through the identity provider.
+func (h *Headscale) apiV1Backend() apiv1.Backend {
+	b := apiv1.Backend{
+		State:  h.state,
+		Change: h.Change,
+		Cfg:    h.cfg,
+	}
+
+	if provider, ok := h.authProvider.(*AuthProviderOIDC); ok {
+		b.ConsoleLogin = &apiv1.ConsoleLogin{
+			Provider: provider.ConsoleProvider().Name,
+			Path:     ConsoleLoginPath,
+		}
+	}
+
+	return b
+}
+
 // Redirect to our TLS url.
 func (h *Headscale) redirect(w http.ResponseWriter, req *http.Request) {
 	target := h.cfg.ServerURL + req.URL.RequestURI()
@@ -893,7 +904,8 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 	}
 
 	// OAuth access tokens are short-lived (1h) and re-minted on demand; reap
-	// expired rows hourly so the table stays bounded.
+	// expired rows hourly so the table stays bounded. Console sessions and
+	// the audit log ride the same hour.
 	accessTokenTicker := time.NewTicker(time.Hour)
 	defer accessTokenTicker.Stop()
 
@@ -908,6 +920,8 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 
 		case <-accessTokenTicker.C:
 			h.reapExpiredAccessTokens()
+			h.reapExpiredSessions()
+			h.reapAuditEvents()
 
 		case <-expireTicker.C:
 			lastExpiryCheck = h.expireNodesTick(lastExpiryCheck)
@@ -950,6 +964,30 @@ func (h *Headscale) reapExpiredAccessTokens() {
 		log.Error().Err(err).Msg("reaping expired oauth access tokens")
 	} else if reaped > 0 {
 		log.Debug().Int64("count", reaped).Msg("reaped expired oauth access tokens")
+	}
+}
+
+// reapExpiredSessions removes console sessions past their expiry.
+func (h *Headscale) reapExpiredSessions() {
+	reaped, err := h.state.DeleteExpiredSessions(time.Now())
+	if err != nil {
+		log.Error().Err(err).Msg("reaping expired console sessions")
+	} else if reaped > 0 {
+		log.Debug().Int64("count", reaped).Msg("reaped expired console sessions")
+	}
+}
+
+// reapAuditEvents applies cfg.Audit.Retention; zero keeps everything.
+func (h *Headscale) reapAuditEvents() {
+	if h.cfg.Audit.Retention <= 0 {
+		return
+	}
+
+	reaped, err := h.state.DeleteAuditEventsBefore(time.Now().Add(-h.cfg.Audit.Retention))
+	if err != nil {
+		log.Error().Err(err).Msg("reaping audit events")
+	} else if reaped > 0 {
+		log.Info().Int64("count", reaped).Msg("reaped audit events past retention")
 	}
 }
 
@@ -1069,6 +1107,7 @@ func (h *Headscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 
 	if provider, ok := h.authProvider.(*AuthProviderOIDC); ok {
 		r.Get("/oidc/callback", provider.OIDCCallbackHandler)
+		r.Get(ConsoleLoginPath, provider.ConsoleLoginHandler)
 		r.Post("/register/confirm/{auth_id}", provider.RegisterConfirmHandler)
 	}
 

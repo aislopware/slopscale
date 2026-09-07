@@ -78,6 +78,11 @@ type AuthInfo struct {
 	AuthID       types.AuthID
 	Verifier     *string
 	Registration bool
+
+	// Console marks a sign-in to the admin console: no node is involved,
+	// the callback opens a session and sends the browser to Redirect.
+	Console  bool
+	Redirect string
 }
 
 type AuthProviderOIDC struct {
@@ -237,6 +242,13 @@ func (a *AuthProviderOIDC) OIDCCallbackHandler(
 		return
 	}
 
+	user, err = a.promoteConfiguredAdmin(user, claims)
+	if err != nil {
+		httpUserError(writer, NewHTTPError(http.StatusInternalServerError, "could not apply admin_users", err))
+
+		return
+	}
+
 	// TODO(kradalby): Is this comment right?
 	// If the node exists, then the node should be reauthenticated,
 	// if the node does not exist, and the machine key exists, then
@@ -245,6 +257,12 @@ func (a *AuthProviderOIDC) OIDCCallbackHandler(
 	if authInfo == nil {
 		log.Debug().Caller().Str("state", state).Msg("state not found in cache, login session may have expired")
 		httpUserError(writer, NewHTTPError(http.StatusGone, "login session expired, try again", nil))
+
+		return
+	}
+
+	if authInfo.Console {
+		a.handleConsoleCallback(writer, req, authInfo, user)
 
 		return
 	}
@@ -562,16 +580,17 @@ func (a *AuthProviderOIDC) authHandler(
 		return
 	}
 
+	a.startAuth(writer, req, AuthInfo{AuthID: authID, Registration: registration})
+}
+
+// startAuth sends the browser to the identity provider with info cached
+// under a fresh state, so the callback can pick the flow up again.
+func (a *AuthProviderOIDC) startAuth(writer http.ResponseWriter, req *http.Request, registrationInfo AuthInfo) {
 	// Set the state and nonce cookies to protect against CSRF attacks
 	state := setCSRFCookie(writer, req, "state", a.cookiesSecure())
 
 	// Set the state and nonce cookies to protect against CSRF attacks
 	nonce := setCSRFCookie(writer, req, "nonce", a.cookiesSecure())
-
-	registrationInfo := AuthInfo{
-		AuthID:       authID,
-		Registration: registration,
-	}
 
 	extras := make([]oauth2.AuthCodeOption, 0, len(a.cfg.ExtraParams)+defaultOAuthOptionsCount)
 	// Add PKCE verification if enabled
