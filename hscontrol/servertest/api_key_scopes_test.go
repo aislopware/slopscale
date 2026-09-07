@@ -1,7 +1,10 @@
 package servertest_test
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/juanfont/headscale/hscontrol/servertest"
@@ -133,4 +136,81 @@ func TestScopedAPIKeys(t *testing.T) {
 		assert.Nil(t, body["user"], "a key minted by an ownerless key has no owner either")
 		assert.Equal(t, false, field(t, body, "permissions", "dns"))
 	})
+
+	t.Run("omitting scopes inherits the minter's", func(t *testing.T) {
+		// An ownerless dns:read key: an empty body must not mint the
+		// all-access key an empty scope list stands for.
+		status, body := apiCall(t, client, ownerKey, http.MethodPost, v1+"/apikey", map[string]any{
+			"scopes": []string{"dns:read"},
+		})
+		require.Equal(t, http.StatusOK, status, body)
+
+		status, body = apiCall(t, client, mintedKey(t, body), http.MethodPost, v1+"/apikey", map[string]any{})
+		require.Equal(t, http.StatusOK, status, body)
+
+		status, body = apiCall(t, client, mintedKey(t, body), http.MethodGet, v1+"/whoami", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, false, body["allAccess"])
+		assert.Equal(t, true, field(t, body, "permissions", "dns:read"))
+		assert.Equal(t, false, field(t, body, "permissions", "dns"))
+		assert.Equal(t, false, field(t, body, "permissions", "users:read"))
+
+		// A network admin's routes-only key: an empty body must not
+		// recover the whole role.
+		status, body = apiCall(t, client, netKey, http.MethodPost, v1+"/apikey", map[string]any{
+			"scopes": []string{"devices:routes"},
+		})
+		require.Equal(t, http.StatusOK, status, body)
+
+		status, body = apiCall(t, client, mintedKey(t, body), http.MethodPost, v1+"/apikey", map[string]any{})
+		require.Equal(t, http.StatusOK, status, body)
+
+		status, body = apiCall(t, client, mintedKey(t, body), http.MethodGet, v1+"/whoami", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, userID(netAdmin), field(t, body, "user", "id"))
+		assert.Equal(t, true, field(t, body, "permissions", "devices:routes"))
+		assert.Equal(t, false, field(t, body, "permissions", "policy_file"), "the role holds it, the key did not")
+	})
+
+	t.Run("an oauth token cannot mint api keys", func(t *testing.T) {
+		creator := owner.ID
+		secret, _, err := srv.State().CreateOAuthClient([]string{"auth_keys"}, []string{"tag:web"}, "minter", &creator)
+		require.NoError(t, err)
+
+		token := accessToken(t, client, srv.URL, secret)
+
+		status, body := apiCall(t, client, token, http.MethodPost, v1+"/apikey", map[string]any{
+			"scopes": []string{"auth_keys"},
+		})
+		assert.Equal(t, http.StatusForbidden, status, "an api key has no tags to be bounded by: %v", body)
+	})
+}
+
+// accessToken exchanges an OAuth client secret for an access token at the
+// server's token endpoint.
+func accessToken(t *testing.T, client *http.Client, baseURL, secret string) string {
+	t.Helper()
+
+	form := url.Values{"client_secret": {secret}}
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost,
+		baseURL+"/api/v2/oauth/token", strings.NewReader(form.Encode()))
+	require.NoError(t, err)
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	var body struct {
+		AccessToken string `json:"access_token"`
+	}
+
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.NotEmpty(t, body.AccessToken)
+
+	return body.AccessToken
 }

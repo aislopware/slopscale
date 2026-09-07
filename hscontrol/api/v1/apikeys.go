@@ -284,10 +284,23 @@ func apiKeyFromState(k *types.APIKey) ApiKey {
 
 // apiKeyScopes validates the scopes a new key asks for and narrows them
 // to what the caller may delegate, so a key never outgrows its minter. An
-// unknown scope is a client error rather than a silent drop.
+// unknown scope is a client error rather than a silent drop. A caller
+// whose credential carries its own scopes and names none inherits them:
+// an empty list on a stored key means the owner's whole role (or, without
+// an owner, everything), which such a caller may not hand out.
 func apiKeyScopes(ctx context.Context, requested []string) ([]string, error) {
+	p := caller(ctx)
+
 	if len(requested) == 0 {
-		return nil, nil
+		if !p.Scoped {
+			return nil, nil
+		}
+
+		if len(p.Scopes) == 0 {
+			return nil, huma.Error403Forbidden("this credential has no scopes to delegate")
+		}
+
+		return scopeStrings(p.Scopes), nil
 	}
 
 	known := scope.Known()
@@ -304,17 +317,22 @@ func apiKeyScopes(ctx context.Context, requested []string) ([]string, error) {
 		}
 	}
 
-	narrowed := caller(ctx).Narrow(wanted)
+	narrowed := p.Narrow(wanted)
 	if len(narrowed) == 0 {
 		return nil, huma.Error403Forbidden("none of the requested scopes may be delegated by this caller")
 	}
 
-	out := make([]string, 0, len(narrowed))
-	for _, s := range narrowed {
+	return scopeStrings(narrowed), nil
+}
+
+// scopeStrings renders scopes for storage.
+func scopeStrings(scopes []scope.Scope) []string {
+	out := make([]string, 0, len(scopes))
+	for _, s := range scopes {
 		out = append(out, string(s))
 	}
 
-	return out, nil
+	return out
 }
 
 // apiKeyOwner resolves the user a new key should belong to and checks the
@@ -379,6 +397,13 @@ func apiKeyMaskedPrefix(prefix string) string {
 // createAPIKey mints a key within the caller's authority: the owner it
 // may mint for and the scopes it may delegate.
 func createAPIKey(ctx context.Context, b Backend, in *createAPIKeyInput) (*createAPIKeyOutput, error) {
+	// An API key carries scopes but not tags, so a token bounded to some
+	// tags could launder its way to auth keys for any tag through one.
+	// Tokens mint tokens (through their client), not API keys.
+	if caller(ctx).IsOAuth() {
+		return nil, huma.Error403Forbidden("an OAuth access token cannot mint API keys")
+	}
+
 	// A missing expiration is a key that never expires. The gRPC handler
 	// defaulted it to the zero time, which minted a key that was expired
 	// before it was printed; the CLI always sends one, so nothing relied

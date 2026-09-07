@@ -60,6 +60,11 @@ type Principal struct {
 	// principal (socket, legacy key, owner or admin key) is unbounded.
 	Bounded bool
 	Scopes  []scope.Scope
+	// Scoped reports whether the credential carries its own scope list (an
+	// OAuth token, an API key minted with scopes) rather than standing for
+	// a user's whole role. A credential it mints without naming scopes
+	// inherits that list, so omitting scopes never widens.
+	Scoped bool
 	// Tags an OAuth token may assign; nil for every other kind.
 	Tags []string
 
@@ -132,6 +137,7 @@ func Authenticate(auth Authenticator, token string) (Principal, error) {
 		return Principal{
 			Kind:       AccessToken,
 			Bounded:    true,
+			Scoped:     true,
 			Scopes:     scope.Parse(at.Scopes),
 			Tags:       at.Tags,
 			Credential: at.ClientID,
@@ -167,6 +173,7 @@ func applyKeyScopes(p Principal, key *types.APIKey) Principal {
 	}
 
 	p.Bounded = true
+	p.Scoped = true
 	p.Scopes = wanted
 
 	return p

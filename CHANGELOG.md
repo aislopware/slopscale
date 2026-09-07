@@ -37,7 +37,8 @@ owner and assigns the rest. An API key created for a user
 v2 APIs alike; keys without a user keep their all-access meaning. A key can
 further be limited to some operations with `--scope` (or the scope picker on
 the console's _Keys_ page) and carry a `--description`; scopes never reach past
-the minting caller or the owner's role. The policy
+the minting caller or the owner's role, a scoped key that names no scopes
+passes its own on, and an OAuth token cannot mint API keys. The policy
 gains `autogroup:owner`, `autogroup:admin`, `autogroup:network-admin`,
 `autogroup:it-admin` and `autogroup:auditor`, and the devices of the owner and
 admins carry Tailscale's `is-admin` capability. See
