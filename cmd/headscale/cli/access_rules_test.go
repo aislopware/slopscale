@@ -129,23 +129,17 @@ func TestAccessRuleCommands(t *testing.T) {
 			want: "Access rule updated\n",
 		},
 		{
-			name:  "enable fetches then PUTs with Enabled=true",
+			name:  "enable PATCHes the switch",
 			src:   enableAccessRuleCmd,
 			flags: map[string]string{"identifier": "6"},
 			routes: map[string]apiHandler{
-				"GET /api/v1/access-rule/{id}": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
-					t.Helper()
-					assert.Equal(t, "6", r.PathValue("id"))
-					writeJSON(t, w, clientv1.RuleOutputBody{Rule: disabledRule})
-				},
-				"PUT /api/v1/access-rule/{id}": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				"PATCH /api/v1/access-rule/{id}": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 					t.Helper()
 					assert.Equal(t, "6", r.PathValue("id"))
 
-					var body clientv1.UpdateAccessRuleJSONRequestBody
+					var body clientv1.SetAccessRuleEnabledJSONRequestBody
 					decodeBody(t, r, &body)
-					require.NotNil(t, body.Enabled)
-					assert.True(t, *body.Enabled)
+					assert.True(t, body.Enabled)
 
 					enabledRule := disabledRule
 					enabledRule.Enabled = true
@@ -155,23 +149,17 @@ func TestAccessRuleCommands(t *testing.T) {
 			want: "Access rule enabled\n",
 		},
 		{
-			name:  "disable fetches then PUTs with Enabled=false",
+			name:  "disable PATCHes the switch",
 			src:   disableAccessRuleCmd,
 			flags: map[string]string{"identifier": "5"},
 			routes: map[string]apiHandler{
-				"GET /api/v1/access-rule/{id}": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
-					t.Helper()
-					assert.Equal(t, "5", r.PathValue("id"))
-					writeJSON(t, w, clientv1.RuleOutputBody{Rule: rule})
-				},
-				"PUT /api/v1/access-rule/{id}": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				"PATCH /api/v1/access-rule/{id}": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 					t.Helper()
 					assert.Equal(t, "5", r.PathValue("id"))
 
-					var body clientv1.UpdateAccessRuleJSONRequestBody
+					var body clientv1.SetAccessRuleEnabledJSONRequestBody
 					decodeBody(t, r, &body)
-					require.NotNil(t, body.Enabled)
-					assert.False(t, *body.Enabled)
+					assert.False(t, body.Enabled)
 
 					disabledCopy := rule
 					disabledCopy.Enabled = false

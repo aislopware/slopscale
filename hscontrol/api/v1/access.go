@@ -17,7 +17,13 @@ import (
 const tagAccessControl = "Access control"
 
 func init() {
-	registrations = append(registrations, registerGroups, registerGroupMembers, registerAccessRules)
+	registrations = append(
+		registrations,
+		registerGroups,
+		registerGroupMembers,
+		registerAccessRules,
+		registerAccessRuleSwitch,
+	)
 }
 
 // Group is a named set of machines: the machines listed directly and
@@ -125,6 +131,12 @@ type (
 		ID   string `format:"uint64" path:"id"`
 		Body AccessRuleRequestBody
 	}
+	ruleEnabledInput struct {
+		ID   string `format:"uint64" path:"id"`
+		Body struct {
+			Enabled bool `json:"enabled"`
+		}
+	}
 	ruleOutput struct {
 		Body struct {
 			Rule AccessRule `json:"rule"`
@@ -133,6 +145,10 @@ type (
 	listRulesOutput struct {
 		Body struct {
 			Rules []AccessRule `json:"rules" nullable:"false"`
+			// PolicyFileEnforces tells a client what the rules stand on:
+			// false means the tailnet is allow-all as soon as no rule is
+			// enabled.
+			PolicyFileEnforces bool `json:"policyFileEnforces"`
 		}
 	}
 )
@@ -619,6 +635,7 @@ func registerAccessRules(api huma.API, b Backend) {
 		rules := b.State.ListAccessRules()
 
 		out := &listRulesOutput{}
+		out.Body.PolicyFileEnforces = b.State.PolicyFileEnforces()
 
 		out.Body.Rules = make([]AccessRule, 0, len(rules))
 		for _, r := range rules {
@@ -715,6 +732,42 @@ func registerAccessRules(api huma.API, b Backend) {
 
 		audit.Target(ctx, "", "", updated.Name)
 		auditRuleDetails(ctx, updated)
+
+		b.Change(c)
+
+		out := &ruleOutput{}
+		out.Body.Rule = ruleFrom(updated)
+
+		return out, nil
+	})
+}
+
+// registerAccessRuleSwitch adds the endpoints that act on a rule without a
+// body of its own: the enable switch and delete.
+func registerAccessRuleSwitch(api huma.API, b Backend) {
+	huma.Register(api, audited(withScope(huma.Operation{
+		OperationID: "setAccessRuleEnabled",
+		Method:      http.MethodPatch,
+		Path:        "/api/v1/access-rule/{id}",
+		Summary:     "Enable or disable access rule",
+		Description: "Changes only the switch; the rest of the rule is read from the server, not the request.",
+		Tags:        []string{tagAccessControl},
+		Security:    bearerAuth,
+	}, scope.PolicyFile), "access_rule.update", "access_rule", "id"), func(
+		ctx context.Context, in *ruleEnabledInput,
+	) (*ruleOutput, error) {
+		id, err := parseRuleID(in.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		updated, c, err := b.State.SetAccessRuleEnabled(id, in.Body.Enabled)
+		if err != nil {
+			return nil, mapError("updating access rule", err)
+		}
+
+		audit.Target(ctx, "", "", updated.Name)
+		audit.Detail(ctx, "enabled", in.Body.Enabled)
 
 		b.Change(c)
 

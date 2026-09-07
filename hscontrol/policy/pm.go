@@ -34,6 +34,9 @@ type PolicyManager interface {
 	// SetAccessModel replaces the database's groups and access rules,
 	// which compile into grants next to the policy file's.
 	SetAccessModel(model types.AccessModel) (bool, error)
+	// FileEnforces reports whether the policy file alone restricts
+	// traffic, so callers can tell what disabling the last rule means.
+	FileEnforces() bool
 	SetUsers(users []types.User) (bool, error)
 	SetNodes(nodes views.Slice[types.NodeView]) (bool, error)
 	// NodeCanHaveTag reports whether the given node can have the given tag.

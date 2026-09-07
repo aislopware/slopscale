@@ -254,35 +254,18 @@ func setAccessRuleEnabled(
 	identifier, _ := cmd.Flags().GetUint64("identifier")
 	ruleID := strconv.FormatUint(identifier, util.Base10)
 
-	getResp, err := client.GetAccessRuleWithResponse(ctx, ruleID)
-	if err != nil {
-		return fmt.Errorf("getting access rule: %w", err)
-	}
-
-	if getResp.StatusCode() != http.StatusOK {
-		return apiError(getResp.StatusCode(), getResp.ApplicationproblemJSONDefault)
-	}
-
-	rule := getResp.JSON200.Rule
-	body := clientv1.UpdateAccessRuleJSONRequestBody{
-		Name:                rule.Name,
-		Description:         &rule.Description,
-		Enabled:             &enabled,
-		Protocol:            rule.Protocol,
-		Ports:               &rule.Ports,
-		Bidirectional:       &rule.Bidirectional,
-		SourceGroupIds:      &rule.SourceGroupIds,
-		DestinationGroupIds: &rule.DestinationGroupIds,
-	}
-
-	updateResp, err := client.UpdateAccessRuleWithResponse(ctx, ruleID, body)
+	// PATCH changes only the switch, so a rule edited elsewhere since the
+	// last list is not overwritten with stale fields.
+	resp, err := client.SetAccessRuleEnabledWithResponse(ctx, ruleID, clientv1.SetAccessRuleEnabledJSONRequestBody{
+		Enabled: enabled,
+	})
 	if err != nil {
 		return fmt.Errorf("updating access rule: %w", err)
 	}
 
-	if updateResp.StatusCode() != http.StatusOK {
-		return apiError(updateResp.StatusCode(), updateResp.ApplicationproblemJSONDefault)
+	if resp.StatusCode() != http.StatusOK {
+		return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
 	}
 
-	return printOutput(cmd, updateResp.JSON200.Rule, successMsg)
+	return printOutput(cmd, resp.JSON200.Rule, successMsg)
 }

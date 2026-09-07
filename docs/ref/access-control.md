@@ -79,9 +79,14 @@ A rule is created with `POST /api/v1/access-rule`:
 }
 ```
 
-`PUT /api/v1/access-rule/{id}` replaces every field, and `DELETE` removes the
-rule. Every change is audited as `group.*` or `access_rule.*` and reaches
-connected clients at once.
+`PUT /api/v1/access-rule/{id}` replaces every field,
+`PATCH /api/v1/access-rule/{id}` with `{"enabled": false}` flips only the
+switch (the rest of the rule is read on the server, so a stale copy cannot
+overwrite someone else's edit), and `DELETE` removes the rule. The list
+carries `policyFileEnforces`, which is false when no policy file restricts
+traffic: then the rules are all that keeps the tailnet from allow-all, and
+disabling the last one opens it. Every change is audited as `group.*` or
+`access_rule.*` and reaches connected clients at once.
 
 The CLI mirrors the API:
 

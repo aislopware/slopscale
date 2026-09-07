@@ -432,6 +432,20 @@ func (pm *PolicyManager) SetAccessModel(model types.AccessModel) (bool, error) {
 	return pm.updateLocked()
 }
 
+// FileEnforces reports whether the policy file has acls or grants of its
+// own; without them the access rules are the only thing keeping the
+// tailnet from allow-all.
+func (pm *PolicyManager) FileEnforces() bool {
+	if pm == nil {
+		return false
+	}
+
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	return pm.pol.fileEnforces()
+}
+
 // Filter returns the current filter rules for the entire tailnet and the associated matchers.
 func (pm *PolicyManager) Filter() ([]tailcfg.FilterRule, []matcher.Match) {
 	if pm == nil {

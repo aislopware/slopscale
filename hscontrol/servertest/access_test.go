@@ -171,15 +171,20 @@ func TestAccessRulesEndToEnd(t *testing.T) {
 	})
 
 	t.Run("disabling the last rule restores allow-all", func(t *testing.T) {
-		status, body := apiCall(t, client, ownerKey, http.MethodPut, v1+"/access-rule/"+ruleID, map[string]any{
-			"name":                "Engineering and servers",
-			"enabled":             false,
-			"protocol":            "all",
-			"sourceGroupIds":      []string{engID},
-			"destinationGroupIds": []string{serversID},
+		// Without a policy file the rules are all that restricts the
+		// tailnet, and the list says so for the console's warnings.
+		status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/access-rule", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, false, field(t, body, "policyFileEnforces"))
+
+		// PATCH flips the switch and keeps every other field.
+		status, body = apiCall(t, client, ownerKey, http.MethodPatch, v1+"/access-rule/"+ruleID, map[string]any{
+			"enabled": false,
 		})
 		require.Equal(t, http.StatusOK, status, body)
 		assert.Equal(t, false, field(t, body, "rule", "enabled"))
+		assert.Equal(t, "Engineering and servers", field(t, body, "rule", "name"))
+		assert.Equal(t, true, field(t, body, "rule", "bidirectional"))
 
 		carolNode.WaitForCondition(t, "every peer again", accessWait, func(nm *netmap.NetworkMap) bool {
 			return len(nm.Peers) == 2

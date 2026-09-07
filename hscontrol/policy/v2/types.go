@@ -2265,11 +2265,16 @@ type Policy struct {
 // of allow-all: the file has acls or grants, or the access model has an
 // enabled rule.
 func (pol *Policy) enforces() bool {
+	return pol.fileEnforces() || (pol != nil && hasAccessGrants(pol.access))
+}
+
+// fileEnforces reports whether the policy file alone has acls or grants.
+func (pol *Policy) fileEnforces() bool {
 	if pol == nil {
 		return false
 	}
 
-	return pol.ACLs != nil || pol.Grants != nil || hasAccessGrants(pol.access)
+	return pol.ACLs != nil || pol.Grants != nil
 }
 
 // MarshalJSON is deliberately not implemented for [Policy].

@@ -315,6 +315,29 @@ func (s *State) ListAccessRules() []types.AccessRule {
 	return s.AccessModel().Rules
 }
 
+// PolicyFileEnforces reports whether the policy file restricts traffic on
+// its own, which decides whether the access rules are all that stands
+// between the tailnet and allow-all.
+func (s *State) PolicyFileEnforces() bool {
+	return s.polMan.FileEnforces()
+}
+
+// SetAccessRuleEnabled flips one rule's switch, reading the rest of the
+// rule from the store so a stale client copy cannot overwrite it.
+func (s *State) SetAccessRuleEnabled(
+	id types.AccessRuleID,
+	enabled bool,
+) (types.AccessRule, change.Change, error) {
+	rule, err := s.GetAccessRule(id)
+	if err != nil {
+		return types.AccessRule{}, change.Change{}, err
+	}
+
+	rule.Enabled = enabled
+
+	return s.UpdateAccessRule(rule)
+}
+
 // GetAccessRule returns one rule.
 func (s *State) GetAccessRule(id types.AccessRuleID) (types.AccessRule, error) {
 	for _, r := range s.AccessModel().Rules {
