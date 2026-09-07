@@ -294,10 +294,10 @@ func runHS(ctx context.Context, bin, config string, args ...string) ([]byte, err
 }
 
 // extractUserID parses the JSON output of "users create" and returns the
-// user ID.
+// user ID. The API renders uint64 identifiers as strings.
 func extractUserID(data []byte) (uint64, error) {
 	var user struct {
-		ID uint64 `json:"id"`
+		ID string `json:"id"`
 	}
 
 	err := json.Unmarshal(data, &user)
@@ -305,7 +305,12 @@ func extractUserID(data []byte) (uint64, error) {
 		return 0, fmt.Errorf("unmarshalling user JSON: %w (raw: %s)", err, data)
 	}
 
-	return user.ID, nil
+	id, err := strconv.ParseUint(user.ID, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parsing user id %q: %w", user.ID, err)
+	}
+
+	return id, nil
 }
 
 // extractAuthKey parses the JSON output of "preauthkeys create" and
