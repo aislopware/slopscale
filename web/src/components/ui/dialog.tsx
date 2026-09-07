@@ -18,9 +18,10 @@ export interface DialogContentProps {
 }
 
 /**
- * Kumo's dialog with the console's standard header: sentence-case title, optional description,
- * close button. Body content follows; end with {@link DialogFooter}. Always render it, driven by
- * `open` on the root, so the open/close animation plays.
+ * Kumo's dialog in the same shape as its DeleteResource block: a bordered header with the
+ * sentence-case title and close button, the body with an optional description first, and a bordered
+ * {@link DialogFooter}. Always render it, driven by `open` on the root, so the open/close animation
+ * plays.
  */
 export function DialogContent({
   title,
@@ -30,14 +31,9 @@ export function DialogContent({
   children,
 }: DialogContentProps): ReactElement {
   return (
-    <Dialog size={size} className={cn("flex flex-col gap-4 px-6 py-5", className)}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <Dialog.Title className="text-lg font-semibold text-kumo-default">{title}</Dialog.Title>
-          {description === undefined ? null : (
-            <Dialog.Description className="text-kumo-subtle">{description}</Dialog.Description>
-          )}
-        </div>
+    <Dialog size={size} className={cn("flex flex-col p-0", className)}>
+      <div className="flex items-center justify-between gap-4 border-b border-kumo-line px-6 py-4">
+        <Dialog.Title className="text-lg font-semibold text-kumo-default">{title}</Dialog.Title>
         <Dialog.Close
           render={
             <Button
@@ -51,13 +47,28 @@ export function DialogContent({
           }
         />
       </div>
-      {children}
+      <div className="flex flex-col gap-4 p-6">
+        {description === undefined ? null : (
+          <Dialog.Description className="max-w-prose text-pretty text-kumo-subtle">
+            {description}
+          </Dialog.Description>
+        )}
+        {children}
+      </div>
     </Dialog>
   );
 }
 
 export function DialogFooter({ className, ...props }: ComponentProps<"div">): ReactElement {
-  return <div className={cn("flex justify-end gap-2 pt-1", className)} {...props} />;
+  return (
+    <div
+      className={cn(
+        "-mx-6 mt-2 -mb-6 flex justify-end gap-3 border-t border-kumo-line px-6 py-4",
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 /** The request error shown inside a dialog, above its footer. */

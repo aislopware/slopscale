@@ -30,22 +30,24 @@ export function ConfirmDialog({
 }: ConfirmDialogProps): ReactElement {
   return (
     <Dialog.Root role="alertdialog" open={open} onOpenChange={onOpenChange}>
-      <Dialog size="sm" className="flex flex-col gap-4 px-6 py-5">
-        <div className="flex items-center gap-3">
+      <Dialog size="sm" className="flex flex-col p-0">
+        <div className="flex items-center gap-3 border-b border-kumo-line px-6 py-4">
           {destructive ? (
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-kumo-danger/20">
-              <WarningIcon size={20} weight="fill" className="text-kumo-danger" />
-            </span>
+            <WarningIcon size={20} weight="fill" className="shrink-0 text-kumo-danger" />
           ) : null}
           <Dialog.Title className="text-lg font-semibold text-kumo-default">{title}</Dialog.Title>
         </div>
-        {description === undefined ? null : (
-          <Dialog.Description className="text-kumo-subtle">{description}</Dialog.Description>
-        )}
-        {error === undefined || error === "" ? null : (
-          <Banner variant="error" title="Request failed" description={error} />
-        )}
-        <div className="flex justify-end gap-2 pt-1">
+        <div className="flex flex-col gap-4 p-6">
+          {description === undefined ? null : (
+            <Dialog.Description className="max-w-prose text-pretty text-kumo-subtle">
+              {description}
+            </Dialog.Description>
+          )}
+          {error === undefined || error === "" ? null : (
+            <Banner variant="error" title="Request failed" description={error} />
+          )}
+        </div>
+        <div className="flex justify-end gap-3 border-t border-kumo-line px-6 py-4">
           <Dialog.Close render={<Button variant="secondary">Cancel</Button>} />
           <Button
             variant={destructive ? "destructive" : "primary"}

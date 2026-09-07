@@ -150,15 +150,17 @@ function MachineMenuItems({
       >
         Edit tags…
       </DropdownMenu.Item>
-      <DropdownMenu.Item
-        icon={PathIcon}
-        disabled={!routes}
-        onClick={() => {
-          onOpen("routes");
-        }}
-      >
-        Approve routes…
-      </DropdownMenu.Item>
+      {node.availableRoutes.length > 0 || node.approvedRoutes.length > 0 ? (
+        <DropdownMenu.Item
+          icon={PathIcon}
+          disabled={!routes}
+          onClick={() => {
+            onOpen("routes");
+          }}
+        >
+          Approve routes…
+        </DropdownMenu.Item>
+      ) : null}
       {advertisesExit(node) ? (
         <DropdownMenu.Item
           icon={GlobeIcon}

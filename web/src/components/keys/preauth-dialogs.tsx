@@ -213,7 +213,7 @@ function PreAuthKeyFields({
         <Switch.Legend>Options</Switch.Legend>
         <OptionSwitch
           label="Reusable"
-          description="register more than one machine with the same key"
+          description="Registers more than one machine with the same key."
           checked={draft.reusable}
           onChange={(reusable) => {
             onChange({ reusable });
@@ -221,7 +221,7 @@ function PreAuthKeyFields({
         />
         <OptionSwitch
           label="Ephemeral"
-          description="the machine is removed when it goes offline"
+          description="The machine is removed when it goes offline."
           checked={draft.ephemeral}
           onChange={(ephemeral) => {
             onChange({ ephemeral });
@@ -229,7 +229,7 @@ function PreAuthKeyFields({
         />
         <OptionSwitch
           label="Pre-authorized"
-          description="skip device approval"
+          description="The machine skips device approval."
           checked={draft.preauthorized}
           onChange={(preauthorized) => {
             onChange({ preauthorized });
@@ -312,9 +312,9 @@ function OptionSwitch({
       checked={checked}
       onCheckedChange={onChange}
       label={
-        <span>
+        <span className="flex flex-col gap-0.5">
           <span className="font-medium text-kumo-default">{label}</span>
-          <span className="text-kumo-subtle"> — {description}</span>
+          <span className="text-xs text-kumo-subtle">{description}</span>
         </span>
       }
     />

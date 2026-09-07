@@ -59,22 +59,22 @@ function EventRows({
           }
         }}
       >
-        <Table.Cell className="w-32 whitespace-nowrap text-kumo-subtle">
+        <Table.Cell className="whitespace-nowrap text-kumo-subtle">
           <RelativeTime value={event.createdAt} />
         </Table.Cell>
-        <Table.Cell className="w-44">
+        <Table.Cell>
           <ActorCell event={event} />
         </Table.Cell>
-        <Table.Cell className="w-52">
+        <Table.Cell>
           <ActionCell event={event} />
         </Table.Cell>
-        <Table.Cell className="w-48">
+        <Table.Cell>
           <TargetCell event={event} />
         </Table.Cell>
-        <Table.Cell className="w-24">
+        <Table.Cell>
           <ResultCell event={event} />
         </Table.Cell>
-        <Table.Cell className="hidden lg:table-cell">
+        <Table.Cell className="hidden w-full max-w-0 lg:table-cell">
           <DetailCell event={event} onOpen={onOpen} />
         </Table.Cell>
         <Table.Cell className="w-10 text-right">
@@ -131,12 +131,12 @@ export function EventsTable({
     <Table>
       <Table.Header variant="compact" sticky className={stickyHeader}>
         <Table.Row>
-          <Table.Head className="w-32">Time</Table.Head>
-          <Table.Head className="w-44">Actor</Table.Head>
-          <Table.Head className="w-52">Action</Table.Head>
-          <Table.Head className="w-48">Target</Table.Head>
-          <Table.Head className="w-24">Result</Table.Head>
-          <Table.Head className="hidden lg:table-cell">Detail</Table.Head>
+          <Table.Head>Time</Table.Head>
+          <Table.Head>Actor</Table.Head>
+          <Table.Head>Action</Table.Head>
+          <Table.Head>Target</Table.Head>
+          <Table.Head>Result</Table.Head>
+          <Table.Head className="hidden w-full lg:table-cell">Detail</Table.Head>
           <Table.Head className="w-10">
             <span className="sr-only">Details</span>
           </Table.Head>

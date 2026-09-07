@@ -202,9 +202,9 @@ function OwnerCell({ node }: { readonly node: Node }): ReactElement {
 
 function AddressCell({ node }: { readonly node: Node }): ReactElement {
   return (
-    <div className="flex flex-col items-start gap-0.5 text-kumo-subtle">
+    <div className="flex flex-col items-start gap-0.5 whitespace-nowrap text-kumo-subtle">
       {node.ipAddresses.map((address) => (
-        <CopyText key={address} value={address} />
+        <CopyText key={address} value={address} className="max-w-none" />
       ))}
     </div>
   );

@@ -1,15 +1,12 @@
 import { Breadcrumbs } from "@cloudflare/kumo/components/breadcrumbs";
-import { Button } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Sidebar } from "@cloudflare/kumo/components/sidebar";
-import { cn } from "@cloudflare/kumo/utils";
 import { MagnifyingGlassIcon, SignOutIcon, WaveformIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
-import { api } from "~/api/client.ts";
 import { nodesQuery, usersQuery } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import { can, displayName, roleLabel } from "~/auth/me.ts";
@@ -20,8 +17,6 @@ import { QuickSearch } from "~/components/layout/quick-search.tsx";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { BreadcrumbProvider, useBreadcrumbLeaf } from "~/lib/breadcrumbs.tsx";
-
-const healthEvery = 30_000;
 
 export function Shell({
   me,
@@ -40,24 +35,24 @@ export function Shell({
   return (
     <BreadcrumbProvider>
       <Sidebar.Provider defaultOpen collapsible="icon" peekable>
-        <Sidebar className="sticky top-0 h-svh">
-          <Sidebar.Header>
+        <Sidebar className="md:sticky md:top-0 md:h-svh">
+          <Sidebar.Header className="h-12">
             <Brand />
           </Sidebar.Header>
           <Sidebar.Content>
-            <Sidebar.Group>
+            <Sidebar.Group className="pb-2">
               <Sidebar.Menu>
                 <Sidebar.MenuButton
                   icon={MagnifyingGlassIcon}
                   tooltip="Quick search (⌘K)"
-                  className="ring ring-kumo-line group-data-[state=collapsed]/sidebar:ring-transparent"
+                  className="bg-kumo-base font-normal text-kumo-subtle ring ring-kumo-line group-data-[state=collapsed]/sidebar:bg-transparent group-data-[state=collapsed]/sidebar:ring-transparent"
                   onClick={() => {
                     setSearchOpen(true);
                   }}
                 >
                   <span className="flex flex-1 items-center justify-between gap-2">
                     Quick search…
-                    <kbd className="rounded border border-kumo-hairline px-1 text-[10px] text-kumo-subtle">
+                    <kbd className="rounded border border-kumo-hairline px-1 font-sans text-[10px] text-kumo-subtle">
                       ⌘K
                     </kbd>
                   </span>
@@ -86,11 +81,8 @@ export function Shell({
               </Sidebar.Group>
             ))}
           </Sidebar.Content>
-          <Sidebar.Footer>
-            <div className="flex items-center justify-between gap-2 group-data-[state=collapsed]/sidebar:flex-col">
-              <HealthIndicator />
-              <Sidebar.Trigger />
-            </div>
+          <Sidebar.Footer className="justify-end">
+            <Sidebar.Trigger />
           </Sidebar.Footer>
         </Sidebar>
         <div className="flex min-h-svh min-w-0 flex-1 flex-col bg-kumo-canvas">
@@ -146,7 +138,7 @@ function PendingBadge({
 
 function Brand(): ReactElement {
   return (
-    <div className="flex w-full min-w-0 items-center gap-2 px-2 group-data-[state=collapsed]/sidebar:px-0">
+    <div className="flex w-full min-w-0 items-center gap-2 px-2 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0">
       <WaveformIcon className="size-5 shrink-0 text-kumo-brand" weight="duotone" />
       <span className="flex-1 truncate font-semibold text-kumo-strong group-data-[state=collapsed]/sidebar:hidden">
         headscale
@@ -177,33 +169,6 @@ function Trail({ current }: { readonly current: NavItem | undefined }): ReactEle
   );
 }
 
-function HealthIndicator(): ReactElement {
-  const health = api.useQuery("get", "/api/v1/health", undefined, {
-    refetchInterval: healthEvery,
-  });
-  const state = healthState(health.isPending, health.data?.databaseConnectivity === true);
-
-  return (
-    <div
-      className="flex min-w-0 items-center gap-2 px-2 text-xs text-kumo-subtle"
-      title={state.label}
-    >
-      <span aria-hidden className={cn("size-2 shrink-0 rounded-full", state.dot)} />
-      <span className="truncate group-data-[state=collapsed]/sidebar:hidden">{state.label}</span>
-    </div>
-  );
-}
-
-function healthState(pending: boolean, ok: boolean): { label: string; dot: string } {
-  if (pending) {
-    return { label: "Checking server…", dot: "bg-kumo-inactive" };
-  }
-
-  return ok
-    ? { label: "Server healthy", dot: "bg-kumo-success" }
-    : { label: "Server unhealthy", dot: "bg-kumo-danger" };
-}
-
 const kindLabels: Record<string, string> = {
   local: "Local socket",
   api_key: "API key",
@@ -219,9 +184,14 @@ function AccountMenu({ me }: { readonly me: Me }): ReactElement {
     <DropdownMenu>
       <DropdownMenu.Trigger
         render={
-          <Button variant="ghost" shape="square" size="sm" aria-label="Account" title={name}>
-            <Avatar name={name} />
-          </Button>
+          <button
+            type="button"
+            aria-label="Account"
+            title={name}
+            className="flex cursor-pointer items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand"
+          >
+            <Avatar name={name} size="lg" />
+          </button>
         }
       />
       <DropdownMenu.Content align="end" className="min-w-56">

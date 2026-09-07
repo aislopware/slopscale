@@ -31,84 +31,86 @@ export function DataTable({
   const { rows } = table.getRowModel();
 
   return (
-    <Table>
-      <Table.Header variant="compact">
-        {table.getHeaderGroups().map((group) => (
-          <Table.Row key={group.id}>
-            {group.headers.map((header) => {
-              const sortable = header.column.getCanSort();
-              const sorted = header.column.getIsSorted();
-              const className = header.column.columnDef.meta?.className;
-
-              return (
-                <Table.Head key={header.id} {...(className === undefined ? {} : { className })}>
-                  {header.isPlaceholder ? null : (
-                    <HeaderContent
-                      sortable={sortable}
-                      sorted={sorted}
-                      onToggle={header.column.getToggleSortingHandler()}
-                    >
-                      <table.FlexRender header={header} />
-                    </HeaderContent>
-                  )}
-                </Table.Head>
-              );
-            })}
-          </Table.Row>
-        ))}
-      </Table.Header>
-      <Table.Body>
-        {rows.length === 0 ? (
-          <Table.Row>
-            <Table.Cell colSpan={table.getAllLeafColumns().length} className="p-0">
-              {empty}
-            </Table.Cell>
-          </Table.Row>
-        ) : (
-          rows.map((row) => (
-            <Table.Row
-              key={row.id}
-              className={cn(onRowClick !== undefined && "cursor-pointer", rowClassName)}
-              onClick={
-                onRowClick === undefined
-                  ? undefined
-                  : (event) => {
-                      // Clicks on controls inside a row belong to the control.
-                      if (
-                        !(event.target instanceof Element) ||
-                        event.target.closest("button, a, input, [role=menu]") === null
-                      ) {
-                        onRowClick(row.id);
-                      }
-                    }
-              }
-            >
-              {row.getAllCells().map((cell) => {
-                const className = cell.column.columnDef.meta?.className;
+    <div className="overflow-x-auto">
+      <Table>
+        <Table.Header variant="compact">
+          {table.getHeaderGroups().map((group) => (
+            <Table.Row key={group.id}>
+              {group.headers.map((header) => {
+                const sortable = header.column.getCanSort();
+                const sorted = header.column.getIsSorted();
+                const className = header.column.columnDef.meta?.className;
 
                 return (
-                  <Table.Cell key={cell.id} {...(className === undefined ? {} : { className })}>
-                    <table.FlexRender cell={cell} />
-                  </Table.Cell>
+                  <Table.Head key={header.id} {...(className === undefined ? {} : { className })}>
+                    {header.isPlaceholder ? null : (
+                      <HeaderContent
+                        sortable={sortable}
+                        sorted={sorted}
+                        onToggle={header.column.getToggleSortingHandler()}
+                      >
+                        <table.FlexRender header={header} />
+                      </HeaderContent>
+                    )}
+                  </Table.Head>
                 );
               })}
             </Table.Row>
-          ))
+          ))}
+        </Table.Header>
+        <Table.Body>
+          {rows.length === 0 ? (
+            <Table.Row>
+              <Table.Cell colSpan={table.getAllLeafColumns().length} className="p-0">
+                {empty}
+              </Table.Cell>
+            </Table.Row>
+          ) : (
+            rows.map((row) => (
+              <Table.Row
+                key={row.id}
+                className={cn(onRowClick !== undefined && "cursor-pointer", rowClassName)}
+                onClick={
+                  onRowClick === undefined
+                    ? undefined
+                    : (event) => {
+                        // Clicks on controls inside a row belong to the control.
+                        if (
+                          !(event.target instanceof Element) ||
+                          event.target.closest("button, a, input, [role=menu]") === null
+                        ) {
+                          onRowClick(row.id);
+                        }
+                      }
+                }
+              >
+                {row.getAllCells().map((cell) => {
+                  const className = cell.column.columnDef.meta?.className;
+
+                  return (
+                    <Table.Cell key={cell.id} {...(className === undefined ? {} : { className })}>
+                      <table.FlexRender cell={cell} />
+                    </Table.Cell>
+                  );
+                })}
+              </Table.Row>
+            ))
+          )}
+        </Table.Body>
+        {footer === undefined ? null : (
+          <Table.Footer>
+            <Table.Row>
+              <Table.Cell
+                colSpan={table.getAllLeafColumns().length}
+                className="p-0 [&>div]:border-t-0"
+              >
+                {footer}
+              </Table.Cell>
+            </Table.Row>
+          </Table.Footer>
         )}
-      </Table.Body>
-      {footer === undefined ? null : (
-        <Table.Footer>
-          <Table.Row>
-            <Table.Cell
-              colSpan={table.getAllLeafColumns().length}
-              className="p-0 [&>div]:border-t-0"
-            >
-              {footer}
-            </Table.Cell>
-          </Table.Row>
-        </Table.Footer>
-      )}
-    </Table>
+      </Table>
+    </div>
   );
 }
 

@@ -29,15 +29,13 @@ export function DefinitionList({
   readonly className?: string;
 }): ReactElement {
   return (
-    <dl
-      className={cn("grid", columns === 2 ? "sm:grid-cols-2 sm:gap-x-8" : "grid-cols-1", className)}
-    >
+    <dl className={cn("grid", columns === 2 ? "xl:grid-cols-2" : "grid-cols-1", className)}>
       {items.map((item, index) => (
         <div
           key={item.key ?? index}
           className={cn(
             "group flex min-w-0 items-baseline justify-between gap-4 border-t border-kumo-hairline px-5 py-2.5 first:border-t-0",
-            columns === 2 && "sm:nth-[2]:border-t-0",
+            columns === 2 && "xl:nth-[2]:border-t-0",
           )}
         >
           <dt className="shrink-0 text-kumo-subtle">{item.label}</dt>

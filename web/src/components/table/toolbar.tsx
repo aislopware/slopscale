@@ -17,13 +17,13 @@ export function TableToolbar({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-2 border-b border-kumo-line bg-kumo-base px-3 py-2.5",
+        "flex flex-wrap items-start gap-2 border-b border-kumo-line bg-kumo-base px-3 py-2.5",
         className,
       )}
     >
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{children}</div>
       {actions === undefined ? null : (
-        <div className="flex shrink-0 items-center gap-2">{actions}</div>
+        <div className="flex min-h-9 shrink-0 items-center gap-2">{actions}</div>
       )}
     </div>
   );

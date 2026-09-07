@@ -181,7 +181,11 @@ export function DetailCell({
   return (
     <div className="flex flex-wrap items-center gap-1">
       {shown.map(([key, value]) => (
-        <Badge key={key} variant="secondary" className="font-mono font-normal">
+        <Badge
+          key={key}
+          variant="secondary"
+          className="max-w-full font-mono font-normal [&>span]:truncate"
+        >
           {key}={clip(detailText(value))}
         </Badge>
       ))}

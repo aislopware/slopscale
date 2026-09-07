@@ -36,7 +36,7 @@ export function Avatar({
     <span
       aria-hidden
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-md bg-kumo-elevated font-medium text-kumo-strong ring ring-kumo-line",
+        "inline-flex shrink-0 items-center justify-center rounded-md bg-kumo-elevated leading-none font-medium text-kumo-strong ring ring-kumo-line",
         sizes[size],
         className,
       )}
