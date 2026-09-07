@@ -449,5 +449,11 @@ func (s *State) normalizeAccessRule(rule types.AccessRule) (types.AccessRule, er
 		}
 	}
 
+	for _, id := range rule.PostureIDs {
+		if _, ok := model.Posture(id); !ok {
+			return types.AccessRule{}, fmt.Errorf("%w: %d", types.ErrPostureNotFound, id)
+		}
+	}
+
 	return rule, nil
 }

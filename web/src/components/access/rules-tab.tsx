@@ -6,7 +6,7 @@ import { InfoIcon, PlusIcon, ShieldCheckIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
-import type { AccessRule, Group } from "~/api/queries.ts";
+import type { AccessRule, Group, Posture } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
@@ -24,6 +24,7 @@ export interface RulesTabProps {
   readonly me: Me;
   readonly rules: readonly AccessRule[];
   readonly groups: readonly Group[];
+  readonly postures: readonly Posture[];
   /** Whether the policy file restricts traffic on its own; false means the rules are all there is. */
   readonly policyFileEnforces: boolean;
   readonly search: string;
@@ -35,6 +36,7 @@ export function RulesTab({
   me,
   rules,
   groups,
+  postures,
   policyFileEnforces,
   search,
   onSearchChange,
@@ -44,7 +46,7 @@ export function RulesTab({
   const [creating, setCreating] = useState(false);
   const mutations = useAccessMutations();
   const enabled = rules.filter((rule) => rule.enabled).length;
-  const rows = useMemo(() => toRuleRows(rules, groups), [rules, groups]);
+  const rows = useMemo(() => toRuleRows(rules, groups, postures), [rules, groups, postures]);
 
   const table = useAppTable({
     data: rows,
@@ -52,7 +54,7 @@ export function RulesTab({
     getRowId: (rule) => rule.id,
     state: { globalFilter: query },
     initialState: { sorting: [{ id: "name", desc: false }] },
-    meta: { me, groups, rules, policyFileEnforces },
+    meta: { me, groups, postures, rules, policyFileEnforces },
   });
 
   const total = rules.length;
@@ -137,6 +139,7 @@ export function RulesTab({
       </LayerCard>
       <RuleDialog
         groups={groups}
+        postures={postures}
         policyFileEnforces={policyFileEnforces}
         open={creating}
         onOpenChange={setCreating}

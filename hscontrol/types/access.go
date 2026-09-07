@@ -117,8 +117,11 @@ type AccessRule struct {
 	Bidirectional       bool
 	SourceGroupIDs      []GroupID
 	DestinationGroupIDs []GroupID
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
+	// PostureIDs are the postures a source must satisfy, any one of
+	// them; empty means no posture check.
+	PostureIDs []PostureID
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // AccessModel is every group, rule and network, loaded together because
@@ -127,6 +130,7 @@ type AccessModel struct {
 	Groups   []AccessGroup
 	Rules    []AccessRule
 	Networks []Network
+	Postures []Posture
 }
 
 // Network returns the network with the ID.

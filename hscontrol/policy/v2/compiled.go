@@ -357,8 +357,10 @@ func (pol *Policy) compileGrants(
 	grants = append(grants, accessGrants(pol.access)...)
 
 	compiled := make([]compiledGrant, 0, len(grants))
+	ctx := pol.postureContext()
 
 	for _, grant := range grants {
+		grant = pol.withPostureSources(grant, users, nodes, ctx)
 		// autogroup:shared is one source among the grant's sources; it
 		// compiles to its own per-node grant while the other sources
 		// compile as usual.

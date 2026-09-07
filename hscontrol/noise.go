@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"time"
 
@@ -480,6 +481,14 @@ func (ns *noiseServer) PollNetMapHandler(
 	if err != nil {
 		httpError(writer, err)
 		return
+	}
+
+	// Where the node connects from feeds the ip: posture attributes;
+	// RemoteAddr is the noise connection's peer, which the trusted proxy
+	// middleware has already rewritten from the forwarding headers.
+	addrPort, err := netip.ParseAddrPort(req.RemoteAddr)
+	if err == nil {
+		ns.headscale.Change(ns.headscale.state.NoteNodeSourceAddr(nv.ID(), addrPort.Addr()))
 	}
 
 	sess := ns.headscale.newMapSession(req.Context(), mapRequest, writer, nv.AsStruct())

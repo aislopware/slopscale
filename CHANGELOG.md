@@ -151,7 +151,22 @@ expiry, so a temporary marker such as an on-call rotation removes itself.
 `GET /api/v1/node/{id}/posture`, `PUT` and `DELETE /api/v1/node/{id}/attributes/{key}`, Tailscale's
 `/api/v2/device/{id}/attributes`, `headscale nodes posture` and a _Device
 posture_ section on the machine's page in the console cover it, under the
-new `devices:posture_attributes` scope. See
+new `devices:posture_attributes` scope.
+
+Postures turn those attributes into conditions. A posture is a list of
+expressions in Tailscale's syntax (`node:tsVersion >= '1.80'`,
+`node:serialNumber IN [...]`, `custom:oncall == true`,
+`ip:address IN ['203.0.113.0/24']`, `ip:country == 'VN'` with a MaxMind
+database at the new `policy.geoip_database`) and an optional weekly
+schedule with a time zone, outside of which it does not hold. Attached to
+an access rule, a posture narrows the rule's sources to the machines that
+satisfy it, and the policy recomputes itself when an attribute, the source
+address or a schedule boundary changes. The policy file takes Tailscale's
+`postures`, `srcPosture` and `defaultSrcPosture` as well. `/api/v1/posture`,
+`POST /api/v1/posture/check`, `GET /api/v1/node/{id}/postures`,
+`headscale postures`, the `--posture` flag of `headscale access-rules`, a
+_Postures_ tab and a _Required postures_ picker in the console's access
+controls cover it. See
 [Device trust](https://headscale.net/development/ref/device-trust/).
 
 ### Networks

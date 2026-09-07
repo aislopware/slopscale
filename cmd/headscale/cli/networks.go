@@ -151,7 +151,7 @@ var createNetworkCmd = &cobra.Command{
 }
 
 var updateNetworkCmd = &cobra.Command{
-	Use:   "update",
+	Use:   cmdUpdate,
 	Short: "Update a network",
 	Long: `Replaces the network configuration. The update command fetches the current
 network, overrides only the fields specified by flags, and sends the merged

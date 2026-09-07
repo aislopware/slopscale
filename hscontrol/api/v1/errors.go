@@ -5,6 +5,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/db"
+	"github.com/juanfont/headscale/hscontrol/posture"
 	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
@@ -29,6 +30,7 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrRuleNotFound),
 		errors.Is(err, types.ErrGroupMemberMissing),
 		errors.Is(err, types.ErrNetworkNotFound),
+		errors.Is(err, types.ErrPostureNotFound),
 		errors.Is(err, types.ErrWebhookNotFound):
 		return huma.Error404NotFound(msg, err)
 
@@ -68,7 +70,26 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrWebhookNoSubscriptions),
 		errors.Is(err, types.ErrWebhookEventUnknown),
 		errors.Is(err, types.ErrWebhookProviderUnknown),
-		errors.Is(err, types.ErrWebhookDescriptionLong):
+		errors.Is(err, types.ErrWebhookDescriptionLong),
+		errors.Is(err, types.ErrPostureNameEmpty),
+		errors.Is(err, types.ErrPostureNameTooLong),
+		errors.Is(err, types.ErrPostureNameInvalid),
+		errors.Is(err, types.ErrPostureEmpty),
+		errors.Is(err, types.ErrPostureTooMany),
+		errors.Is(err, types.ErrPostureCountryNoGeo),
+		errors.Is(err, posture.ErrEmpty),
+		errors.Is(err, posture.ErrAttribute),
+		errors.Is(err, posture.ErrOperator),
+		errors.Is(err, posture.ErrValue),
+		errors.Is(err, posture.ErrTrailing),
+		errors.Is(err, posture.ErrListExpected),
+		errors.Is(err, posture.ErrScalarWanted),
+		errors.Is(err, posture.ErrOrderedValue),
+		errors.Is(err, posture.ErrUnterminated),
+		errors.Is(err, posture.ErrUnknownPrefix),
+		errors.Is(err, posture.ErrScheduleDays),
+		errors.Is(err, posture.ErrScheduleTime),
+		errors.Is(err, posture.ErrScheduleTimezone):
 		return huma.Error400BadRequest(msg, err)
 
 	case errors.Is(err, state.ErrNodeKeyInUse),
@@ -78,7 +99,9 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrGroupNameTaken),
 		errors.Is(err, types.ErrGroupInUse),
 		errors.Is(err, types.ErrGroupMemberExists),
-		errors.Is(err, types.ErrNetworkNameTaken):
+		errors.Is(err, types.ErrNetworkNameTaken),
+		errors.Is(err, types.ErrPostureNameTaken),
+		errors.Is(err, types.ErrPostureInUse):
 		return huma.Error409Conflict(msg, err)
 
 	case errors.Is(err, state.ErrCannotChangeOwnRole),

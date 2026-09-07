@@ -50,11 +50,14 @@ type AccessRule struct {
 	Ports       string `doc:"Comma-separated ports and ranges, empty for every port." json:"ports"`
 	// Bidirectional lets both sides start connections; otherwise only
 	// the sources do.
-	Bidirectional       bool      `json:"bidirectional"`
-	SourceGroupIDs      []string  `json:"sourceGroupIds"      nullable:"false"`
-	DestinationGroupIDs []string  `json:"destinationGroupIds" nullable:"false"`
-	CreatedAt           time.Time `json:"createdAt"`
-	UpdatedAt           time.Time `json:"updatedAt"`
+	Bidirectional       bool     `json:"bidirectional"`
+	SourceGroupIDs      []string `json:"sourceGroupIds"      nullable:"false"`
+	DestinationGroupIDs []string `json:"destinationGroupIds" nullable:"false"`
+	// PostureIDs are the postures a source must satisfy, any one of
+	// them; empty means the rule checks none.
+	PostureIDs []string  `json:"postureIds" nullable:"false"`
+	CreatedAt  time.Time `json:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
 // GroupRequestBody creates or updates a group. Members are replaced when
@@ -76,12 +79,13 @@ type GroupMemberRequestBody struct {
 type AccessRuleRequestBody struct {
 	Name                string   `json:"name"`
 	Description         string   `json:"description,omitempty"`
-	Enabled             *bool    `doc:"Defaults to true."           json:"enabled,omitempty"`
-	Protocol            string   `doc:"One of all, tcp, udp, icmp." json:"protocol"`
+	Enabled             *bool    `doc:"Defaults to true."                                json:"enabled,omitempty"`
+	Protocol            string   `doc:"One of all, tcp, udp, icmp."                      json:"protocol"`
 	Ports               string   `json:"ports,omitempty"`
 	Bidirectional       bool     `json:"bidirectional,omitempty"`
 	SourceGroupIDs      []string `json:"sourceGroupIds"`
 	DestinationGroupIDs []string `json:"destinationGroupIds"`
+	PostureIDs          []string `doc:"Postures a source must satisfy, any one of them." json:"postureIds,omitempty"`
 }
 
 type (
@@ -187,8 +191,13 @@ func ruleFrom(r types.AccessRule) AccessRule {
 		Bidirectional:       r.Bidirectional,
 		SourceGroupIDs:      make([]string, 0, len(r.SourceGroupIDs)),
 		DestinationGroupIDs: make([]string, 0, len(r.DestinationGroupIDs)),
+		PostureIDs:          make([]string, 0, len(r.PostureIDs)),
 		CreatedAt:           r.CreatedAt,
 		UpdatedAt:           r.UpdatedAt,
+	}
+
+	for _, id := range r.PostureIDs {
+		out.PostureIDs = append(out.PostureIDs, formatID(uint64(id)))
 	}
 
 	for _, id := range r.SourceGroupIDs {
@@ -277,6 +286,11 @@ func ruleFromBody(body AccessRuleRequestBody) (types.AccessRule, error) {
 		return types.AccessRule{}, err
 	}
 
+	postures, err := parsePostureIDs(body.PostureIDs)
+	if err != nil {
+		return types.AccessRule{}, err
+	}
+
 	return types.AccessRule{
 		Name:                body.Name,
 		Description:         body.Description,
@@ -286,6 +300,7 @@ func ruleFromBody(body AccessRuleRequestBody) (types.AccessRule, error) {
 		Bidirectional:       body.Bidirectional,
 		SourceGroupIDs:      sources,
 		DestinationGroupIDs: destinations,
+		PostureIDs:          postures,
 	}, nil
 }
 
@@ -817,4 +832,8 @@ func auditRuleDetails(ctx context.Context, rule types.AccessRule) {
 	}
 
 	audit.Detail(ctx, "bidirectional", rule.Bidirectional)
+
+	if len(rule.PostureIDs) > 0 {
+		audit.Detail(ctx, "postures", len(rule.PostureIDs))
+	}
 }

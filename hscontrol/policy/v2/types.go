@@ -2087,6 +2087,9 @@ type ACL struct {
 	Protocol     Protocol         `json:"proto"`
 	Sources      Aliases          `json:"src"`
 	Destinations []AliasWithPorts `json:"dst"`
+	// SrcPosture names postures from the postures section; a source
+	// must satisfy one of them. When absent, defaultSrcPosture applies.
+	SrcPosture []string `json:"srcPosture,omitempty"`
 }
 
 // UnmarshalJSON implements custom unmarshalling for [ACL] that ignores fields starting with '#'.
@@ -2147,6 +2150,12 @@ type Grant struct {
 	App               tailcfg.PeerCapMap `json:"app,omitzero"`
 
 	Via []Tag `json:"via,omitzero"`
+
+	// SrcPosture names postures from the postures section; a source
+	// must satisfy one of them. When absent, defaultSrcPosture applies.
+	// Grants compiled from access rules name database postures as
+	// "posture:#<id>", a form the file cannot write.
+	SrcPosture []string `json:"srcPosture,omitempty"`
 }
 
 // NodeAttrGrant attaches Tailscale node capabilities (and/or an IP-pool
@@ -2195,6 +2204,7 @@ func aclToGrants(acl ACL) []Grant {
 					Protocol: acl.Protocol,
 					Ports:    dst.Ports,
 				}},
+				SrcPosture: acl.SrcPosture,
 			})
 		}
 
@@ -2211,6 +2221,7 @@ func aclToGrants(acl ACL) []Grant {
 					Protocol: acl.Protocol,
 					Ports:    dst.Ports,
 				}},
+				SrcPosture: acl.SrcPosture,
 			})
 		}
 	} else {
@@ -2223,6 +2234,7 @@ func aclToGrants(acl ACL) []Grant {
 					Protocol: acl.Protocol,
 					Ports:    dst.Ports,
 				}},
+				SrcPosture: acl.SrcPosture,
 			})
 		}
 	}
@@ -2255,10 +2267,32 @@ type Policy struct {
 	SSHTests            []SSHPolicyTest    `json:"sshTests,omitempty"`
 	RandomizeClientPort bool               `json:"randomizeClientPort,omitempty"`
 
+	// Postures are named lists of posture expressions, "posture:name"
+	// to a list such as ["node:os == 'macos'", "node:tsVersion >= '1.40'"],
+	// every expression of which a source must satisfy.
+	Postures Postures `json:"postures,omitempty"`
+	// DefaultSrcPosture applies to every acl and grant without a
+	// srcPosture of its own.
+	DefaultSrcPosture []string `json:"defaultSrcPosture,omitempty"`
+
 	// access is the database's groups and rules, attached by the policy
 	// manager before every compile so their grants compile next to the
 	// file's. It is never part of the file.
 	access types.AccessModel
+
+	// country resolves a source address to a country code for the
+	// ip:country posture attribute; nil without a GeoIP database.
+	country func(netip.Addr) string
+}
+
+// postureContext is what this compile evaluates postures with.
+func (pol *Policy) postureContext() postureContext {
+	ctx := postureContext{now: time.Now()}
+	if pol != nil {
+		ctx.country = pol.country
+	}
+
+	return ctx
 }
 
 // enforces reports whether compiling the policy yields a filter instead
@@ -3132,6 +3166,8 @@ func (pol *Policy) validate() error {
 	if sshTestErr != nil {
 		errs = append(errs, sshTestErr)
 	}
+
+	errs = append(errs, pol.validatePostures()...)
 
 	if len(errs) > 0 {
 		return fmt.Errorf("validating policy: %w", multierr.New(errs...))

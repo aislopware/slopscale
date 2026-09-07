@@ -93,6 +93,7 @@ function rule(id: string, sources: string[], destinations: string[]): AccessRule
     destinationGroupIds: destinations,
     enabled: true,
     id,
+    postureIds: [],
     name: `rule-${id}`,
     ports: "",
     protocol: "all",

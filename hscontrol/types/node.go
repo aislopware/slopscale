@@ -190,6 +190,11 @@ type Node struct {
 	// Only the attribute operations on State write them.
 	Attributes []NodeAttribute
 
+	// SourceAddr is the address the node's control connection last came
+	// from, as the trusted-proxy middleware resolved it. It is runtime
+	// state, never stored, and feeds the ip: posture attributes.
+	SourceAddr netip.Addr
+
 	// SharedWith lists the users the node has been shared with, in
 	// ascending id order. The policy resolves autogroup:shared from it
 	// and the map response marks the node as shared to those users'

@@ -31,6 +31,19 @@ type PolicyManager interface {
 	// from the current policy, avoiding trust of client-provided URL params.
 	SSHCheckParams(srcNodeID, dstNodeID types.NodeID) (time.Duration, bool)
 	SetPolicy(pol []byte) (bool, error)
+	// SetCountryLookup installs the GeoIP lookup for ip:country postures.
+	SetCountryLookup(lookup func(netip.Addr) string) (bool, error)
+	// UsesSourceAddress reports whether a posture in use reads where a
+	// node connects from.
+	UsesSourceAddress() bool
+	// NextScheduleBoundary returns when a scheduled posture next opens or
+	// closes, or the zero time.
+	NextScheduleBoundary(now time.Time) time.Time
+	// Recompile rebuilds the filter from unchanged inputs, for schedule
+	// boundaries and attribute expiries.
+	Recompile() (bool, error)
+	// MatchingPostures lists the database postures the node satisfies.
+	MatchingPostures(node types.NodeView) []types.Posture
 	// SetAccessModel replaces the database's groups and access rules,
 	// which compile into grants next to the policy file's.
 	SetAccessModel(model types.AccessModel) (bool, error)

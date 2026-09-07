@@ -4,30 +4,26 @@ import { DotsThreeIcon, PencilSimpleIcon, TrashIcon } from "@phosphor-icons/reac
 import { useState } from "react";
 import type { ReactElement } from "react";
 
-import type { AccessRule, Group, Posture } from "~/api/queries.ts";
+import type { AccessRule, Posture } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
-import { DeleteRuleDialog, RuleDialog } from "~/components/access/rule-dialogs.tsx";
+import { DeletePostureDialog, PostureDialog } from "~/components/access/posture-dialogs.tsx";
 
 const actionsIconSize = 18;
 
 type Dialog = "edit" | "delete";
 
-/** Edit and delete for one rule, gated by the policy scope. */
-export function RuleMenu({
-  rule,
-  groups,
-  postures,
+/** Edit and delete for one posture, gated by the policy scope. */
+export function PostureMenu({
+  posture,
   rules,
-  policyFileEnforces,
+  geoIpAvailable,
   me,
 }: {
-  readonly rule: AccessRule;
-  readonly groups: readonly Group[];
-  readonly postures: readonly Posture[];
+  readonly posture: Posture;
   readonly rules: readonly AccessRule[];
-  readonly policyFileEnforces: boolean;
+  readonly geoIpAvailable: boolean;
   readonly me: Me;
 }): ReactElement {
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -49,7 +45,7 @@ export function RuleMenu({
               shape="square"
               size="sm"
               icon={<DotsThreeIcon size={actionsIconSize} weight="bold" />}
-              aria-label={`Actions for rule ${rule.name}`}
+              aria-label={`Actions for posture ${posture.name}`}
             />
           }
         />
@@ -76,22 +72,16 @@ export function RuleMenu({
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu>
-      <RuleDialog
-        rule={rule}
-        groups={groups}
-        postures={postures}
-        policyFileEnforces={policyFileEnforces}
+      <PostureDialog
+        posture={posture}
+        geoIpAvailable={geoIpAvailable}
         open={dialog === "edit"}
         onOpenChange={close}
         mutations={mutations}
       />
-      <DeleteRuleDialog
-        rule={rule}
-        opensTailnet={
-          rule.enabled &&
-          !policyFileEnforces &&
-          rules.filter((candidate) => candidate.enabled).length === 1
-        }
+      <DeletePostureDialog
+        posture={posture}
+        rules={rules}
         open={dialog === "delete"}
         onOpenChange={close}
         mutations={mutations}

@@ -66,8 +66,9 @@ ______________________________________________________________________
 
 ## Limitations
 
-- [Device postures](https://tailscale.com/docs/features/device-posture) and the related sections such as `postures` or
-  `srcPosture` aren't supported.
+- [Device postures](https://tailscale.com/docs/features/device-posture) are supported through `postures`,
+  `srcPosture` and `defaultSrcPosture`; see [Device trust](device-trust.md#postures-in-the-policy-file). Postures in the
+  file have no schedule.
 - [IP sets](https://tailscale.com/docs/features/tailnet-policy-file/ip-sets) aren't supported.
 - A subset of [Autogroups](#autogroups) are available.
 

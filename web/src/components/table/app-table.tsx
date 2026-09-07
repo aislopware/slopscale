@@ -16,7 +16,7 @@ import {
 } from "@tanstack/react-table";
 import type { CellData, RowData, TableFeatures } from "@tanstack/react-table";
 
-import type { AccessRule, Group, Network, Node, User } from "~/api/queries.ts";
+import type { AccessRule, Group, Network, Node, Posture, User } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 
 /**
@@ -57,10 +57,13 @@ declare module "@tanstack/react-table" {
     nodes?: readonly Node[];
     groups?: readonly Group[];
     rules?: readonly AccessRule[];
+    postures?: readonly Posture[];
     networks?: readonly Network[];
     eventTypes?: readonly string[];
     /** Whether the policy file restricts traffic on its own; false means the rules are all there is. */
     policyFileEnforces?: boolean;
+    /** Whether the server can answer ip:country postures. */
+    geoIpAvailable?: boolean;
   }
 
   // The type parameters must mirror the package's declaration to merge.

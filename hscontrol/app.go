@@ -877,8 +877,12 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 	postureTicker := time.NewTicker(state.PostureCollectionInterval)
 	defer postureTicker.Stop()
 
+	// attributeTicker sweeps expired attributes and posture schedule
+	// boundaries; both have minute granularity.
 	attributeTicker := time.NewTicker(time.Minute)
 	defer attributeTicker.Stop()
+
+	lastScheduleCheck := time.Now()
 
 	for {
 		select {
@@ -915,9 +919,38 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 		case <-postureTicker.C:
 			h.state.CollectStalePostures(ctx, h.mapBatcher.IsConnected, h.Change)
 
-		case <-attributeTicker.C:
+		case now := <-attributeTicker.C:
 			h.expireNodeAttributes()
+
+			if h.postureBoundaryPassed(lastScheduleCheck, now) {
+				h.recompilePostures()
+			}
+
+			lastScheduleCheck = now
 		}
+	}
+}
+
+// postureBoundaryPassed reports whether a scheduled posture in use opened
+// or closed between the two instants.
+func (h *Headscale) postureBoundaryPassed(since, now time.Time) bool {
+	next := h.state.NextPostureBoundary(since)
+
+	return !next.IsZero() && !next.After(now)
+}
+
+// recompilePostures rebuilds the policy at a schedule boundary and
+// publishes the result.
+func (h *Headscale) recompilePostures() {
+	c, err := h.state.RecompilePostures()
+	if err != nil {
+		log.Error().Err(err).Msg("recompiling postures at a schedule boundary")
+
+		return
+	}
+
+	if !c.IsEmpty() {
+		h.Change(c)
 	}
 }
 

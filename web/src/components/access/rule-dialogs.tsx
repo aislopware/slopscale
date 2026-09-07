@@ -6,11 +6,11 @@ import { useState } from "react";
 import type { ReactElement, ReactNode, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
-import type { AccessRule, Group } from "~/api/queries.ts";
+import type { AccessRule, Group, Posture } from "~/api/queries.ts";
 import { portsError, protocolLabel, protocols, toProtocol } from "~/components/access/model.ts";
 import type { Protocol } from "~/components/access/model.ts";
 import type { AccessMutations } from "~/components/access/mutations.ts";
-import { groupItems } from "~/components/access/pickers.ts";
+import { groupItems, postureItems } from "~/components/access/pickers.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
@@ -21,6 +21,8 @@ export interface RuleDialogProps {
   /** The rule to edit; absent when creating one. */
   readonly rule?: AccessRule | undefined;
   readonly groups: readonly Group[];
+  /** Postures a rule may require of its sources. */
+  readonly postures: readonly Posture[];
   /** Whether the policy file restricts traffic on its own, which changes what a rule means. */
   readonly policyFileEnforces: boolean;
   readonly open: boolean;
@@ -54,6 +56,7 @@ interface Draft {
   readonly description: string;
   readonly sources: readonly string[];
   readonly destinations: readonly string[];
+  readonly postures: readonly string[];
   readonly protocol: Protocol;
   readonly ports: string;
   readonly bidirectional: boolean;
@@ -66,6 +69,7 @@ function draftFrom(rule: AccessRule | undefined): Draft {
     description: rule?.description ?? "",
     sources: rule?.sourceGroupIds ?? [],
     destinations: rule?.destinationGroupIds ?? [],
+    postures: rule?.postureIds ?? [],
     protocol: toProtocol(rule?.protocol ?? "all"),
     ports: rule?.ports ?? "",
     bidirectional: rule?.bidirectional ?? false,
@@ -89,6 +93,7 @@ function draftIssue(draft: Draft): string | null {
 function RuleForm({
   rule,
   groups,
+  postures,
   onOpenChange,
   mutations,
 }: Omit<RuleDialogProps, "open" | "policyFileEnforces">): ReactElement {
@@ -110,6 +115,7 @@ function RuleForm({
       bidirectional: draft.bidirectional,
       sourceGroupIds: [...draft.sources],
       destinationGroupIds: [...draft.destinations],
+      postureIds: [...draft.postures],
     };
     const done = {
       onSuccess: (): void => {
@@ -127,7 +133,7 @@ function RuleForm({
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <RuleFields draft={draft} groups={groups} onChange={update} />
+      <RuleFields draft={draft} groups={groups} postures={postures} onChange={update} />
       <DialogError message={mutation.isError ? errorMessage(mutation.error) : undefined} />
       <FormFooter
         label={rule === undefined ? "Create rule" : "Save"}
@@ -141,10 +147,12 @@ function RuleForm({
 function RuleFields({
   draft,
   groups,
+  postures,
   onChange,
 }: {
   readonly draft: Draft;
   readonly groups: readonly Group[];
+  readonly postures: readonly Posture[];
   readonly onChange: (patch: Partial<Draft>) => void;
 }): ReactElement {
   const items = groupItems(groups);
@@ -190,6 +198,19 @@ function RuleFields({
         }}
         empty="No group matches."
       />
+      {postures.length === 0 ? null : (
+        <MultiPicker
+          label="Required postures"
+          description="A source machine must satisfy at least one of them; none means any machine in the groups."
+          placeholder="Postures the source must meet…"
+          items={postureItems(postures)}
+          value={draft.postures}
+          onValueChange={(selected) => {
+            onChange({ postures: selected });
+          }}
+          empty="No posture matches."
+        />
+      )}
       <ProtocolFields draft={draft} onChange={onChange} />
       <Switch.Group>
         <Switch.Legend>Options</Switch.Legend>

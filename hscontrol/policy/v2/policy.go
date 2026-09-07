@@ -40,6 +40,15 @@ type PolicyManager struct {
 	// access is the database's groups and rules; see [Policy.access].
 	access types.AccessModel
 
+	// country is the GeoIP lookup handed to every compile; see
+	// [PolicyManager.SetCountryLookup].
+	country func(netip.Addr) string
+
+	// usesSourceAddress is set by the last compile when a posture in use
+	// reads an ip: attribute, so a node's source address change is only a
+	// policy change then.
+	usesSourceAddress bool
+
 	filterHash deephash.Sum
 	filter     []tailcfg.FilterRule
 	matchers   []matcher.Match
@@ -430,6 +439,89 @@ func (pm *PolicyManager) SetAccessModel(model types.AccessModel) (bool, error) {
 	pm.access = model
 
 	return pm.updateLocked()
+}
+
+// SetCountryLookup installs the GeoIP lookup postures read ip:country
+// from and recompiles, since the attribute may now resolve.
+func (pm *PolicyManager) SetCountryLookup(lookup func(netip.Addr) string) (bool, error) {
+	if pm == nil {
+		return false, nil
+	}
+
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	pm.country = lookup
+
+	return pm.updateLocked()
+}
+
+// UsesSourceAddress reports whether a posture in use reads where a node
+// connects from, so the caller knows a source address change matters.
+func (pm *PolicyManager) UsesSourceAddress() bool {
+	if pm == nil {
+		return false
+	}
+
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	return pm.usesSourceAddress
+}
+
+// NextScheduleBoundary returns when a scheduled posture in use next
+// opens or closes, or the zero time when none is scheduled.
+func (pm *PolicyManager) NextScheduleBoundary(now time.Time) time.Time {
+	if pm == nil {
+		return time.Time{}
+	}
+
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	return pm.pol.nextScheduleBoundary(now)
+}
+
+// Recompile rebuilds the filter from the same inputs, for the moments a
+// posture's outcome changes without any input the manager sees changing:
+// a schedule boundary, an attribute expiry.
+func (pm *PolicyManager) Recompile() (bool, error) {
+	if pm == nil {
+		return false, nil
+	}
+
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	changed, err := pm.updateLocked()
+	if err != nil {
+		return false, err
+	}
+
+	if changed {
+		pm.sshPolicyMap.Clear()
+		pm.filterRulesMap.Clear()
+		pm.matchersForNodeMap.Clear()
+	}
+
+	return changed, nil
+}
+
+// MatchingPostures lists the database postures the node satisfies now.
+func (pm *PolicyManager) MatchingPostures(node types.NodeView) []types.Posture {
+	if pm == nil {
+		return nil
+	}
+
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	pol := pm.pol
+	if pol == nil {
+		pol = &Policy{access: pm.access, country: pm.country}
+	}
+
+	return pol.matchingPostures(node, pol.postureContext())
 }
 
 // FileEnforces reports whether the policy file has acls or grants of its
@@ -1471,7 +1563,10 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 
 	if pm.pol != nil {
 		pm.pol.access = pm.access
+		pm.pol.country = pm.country
 	}
+
+	pm.usesSourceAddress = pm.pol.usesSourceAddress()
 
 	// Compile all grants once. Both global and per-node filter
 	// rules are derived from these compiled grants.
@@ -1685,6 +1780,10 @@ func (pm *PolicyManager) nodesHavePolicyAffectingChanges(newNodes views.Slice[ty
 		}
 
 		if newNode.HasPolicyChange(oldNode) {
+			return true
+		}
+
+		if pm.usesSourceAddress && newNode.SourceAddr() != oldNode.SourceAddr() {
 			return true
 		}
 

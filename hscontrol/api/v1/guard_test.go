@@ -70,7 +70,8 @@ func humaOperations(item *huma.PathItem) map[string]*huma.Operation {
 // unauditedOps are the writing operations that change nothing: they
 // validate input and answer.
 var unauditedOps = map[string]bool{
-	"POST /api/v1/policy/check": true,
+	"POST /api/v1/policy/check":  true,
+	"POST /api/v1/posture/check": true,
 }
 
 // TestEveryWritingOperationIsAudited guarantees no v1 operation that changes

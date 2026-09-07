@@ -80,15 +80,40 @@ func ruleGrants(model types.AccessModel) []Grant {
 		}
 
 		protocols := accessProtocolPorts(rule)
+		postures := rulePostureNames(model, rule)
 
-		grants = append(grants, Grant{Sources: sources, Destinations: destinations, InternetProtocols: protocols})
+		grants = append(grants, Grant{
+			Sources: sources, Destinations: destinations, InternetProtocols: protocols, SrcPosture: postures,
+		})
 
 		if rule.Bidirectional {
-			grants = append(grants, Grant{Sources: destinations, Destinations: sources, InternetProtocols: protocols})
+			grants = append(grants, Grant{
+				Sources: destinations, Destinations: sources, InternetProtocols: protocols, SrcPosture: postures,
+			})
 		}
 	}
 
 	return grants
+}
+
+// rulePostureNames names the rule's postures the way [grantPostures]
+// resolves database postures; one the model no longer has is skipped. A
+// rule whose postures were all deleted gets an empty, non-nil list so
+// the file's defaultSrcPosture does not apply to it.
+func rulePostureNames(model types.AccessModel, rule types.AccessRule) []string {
+	if len(rule.PostureIDs) == 0 {
+		return []string{}
+	}
+
+	names := make([]string, 0, len(rule.PostureIDs))
+
+	for _, id := range rule.PostureIDs {
+		if _, ok := model.Posture(id); ok {
+			names = append(names, dbPostureName(id))
+		}
+	}
+
+	return names
 }
 
 func groupAliases(model types.AccessModel, ids []types.GroupID) Aliases {

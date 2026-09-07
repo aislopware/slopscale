@@ -135,7 +135,7 @@ var setPolicy = &cobra.Command{
 	Long: `
 	Updates the existing ACL Policy with the provided policy. The policy must be a valid HuJSON object.
 	This command only works when the acl.policy_mode is set to "db", and the policy will be stored in the database.`,
-	Aliases: []string{"put", "update"},
+	Aliases: []string{"put", cmdUpdate},
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		policyPath, _ := cmd.Flags().GetString("file")
 

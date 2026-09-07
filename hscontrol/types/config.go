@@ -323,6 +323,10 @@ type CLIConfig struct {
 type PolicyConfig struct {
 	Path string
 	Mode PolicyMode
+	// GeoIPDatabase is the path of a MaxMind country database (an .mmdb
+	// such as GeoLite2-Country) the ip:country posture attribute is
+	// looked up in; empty leaves the attribute unset.
+	GeoIPDatabase string
 }
 
 func (p *PolicyConfig) IsEmpty() bool {
@@ -855,8 +859,9 @@ func policyConfig() PolicyConfig {
 	policyMode := viper.GetString("policy.mode")
 
 	return PolicyConfig{
-		Path: policyPath,
-		Mode: PolicyMode(policyMode),
+		Path:          policyPath,
+		Mode:          PolicyMode(policyMode),
+		GeoIPDatabase: viper.GetString("policy.geoip_database"),
 	}
 }
 

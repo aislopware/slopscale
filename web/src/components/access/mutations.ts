@@ -16,16 +16,20 @@ export interface AccessMutations {
   readonly updateRule: Mutation<"put", "/api/v1/access-rule/{id}">;
   readonly setRuleEnabled: Mutation<"patch", "/api/v1/access-rule/{id}">;
   readonly deleteRule: Mutation<"delete", "/api/v1/access-rule/{id}">;
+  readonly createPosture: Mutation<"post", "/api/v1/posture">;
+  readonly updatePosture: Mutation<"put", "/api/v1/posture/{id}">;
+  readonly deletePosture: Mutation<"delete", "/api/v1/posture/{id}">;
 }
 
 /**
- * Every group and rule mutation, each refreshing the group and rule queries on success. Errors are
- * left to the caller so dialogs can show them inline; the inline switches toast instead.
+ * Every group, rule and posture mutation, each refreshing the group and rule queries on success.
+ * Errors are left to the caller so dialogs can show them inline; the inline switches toast
+ * instead.
  */
 export function useAccessMutations(): AccessMutations {
   const queryClient = useQueryClient();
   const refresh = async (): Promise<void> => {
-    await invalidate(queryClient, "/api/v1/group", "/api/v1/access-rule");
+    await invalidate(queryClient, "/api/v1/group", "/api/v1/access-rule", "/api/v1/posture");
   };
 
   return {
@@ -50,6 +54,14 @@ export function useAccessMutations(): AccessMutations {
     deleteRule: api.useMutation("delete", "/api/v1/access-rule/{id}", {
       onSuccess: async () => {
         toast.success("Rule deleted");
+        await refresh();
+      },
+    }),
+    createPosture: api.useMutation("post", "/api/v1/posture", { onSuccess: refresh }),
+    updatePosture: api.useMutation("put", "/api/v1/posture/{id}", { onSuccess: refresh }),
+    deletePosture: api.useMutation("delete", "/api/v1/posture/{id}", {
+      onSuccess: async () => {
+        toast.success("Posture deleted");
         await refresh();
       },
     }),

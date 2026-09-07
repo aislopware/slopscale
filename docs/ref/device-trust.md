@@ -62,6 +62,8 @@ and `custom:` attributes are set by an operator.
 | `node:tagged`                       | Whether the node is tagged                                                                      |
 | `node:serialNumber`                 | The serial numbers the client collected, once identity collection is on                         |
 | `custom:...`                        | Set through the API, the CLI or the console                                                     |
+| `ip:address`                        | The address the machine's control connection comes from, as seen by the server                  |
+| `ip:country`                        | The ISO country code of that address; needs `policy.geoip_database`                             |
 
 `GET /api/v1/node/{id}/posture` returns the whole map, the identity report
 and the custom attributes; the v2 API has Tailscale's
@@ -106,3 +108,114 @@ Through the API, `PUT /api/v1/node/{id}/attributes/{key}` with
 `devices:posture_attributes`, which the owner, admins, network admins and IT
 admins hold. The audit log records `node.attribute.set`,
 `node.attribute.delete` and `node.posture.collect`.
+
+## Postures
+
+A posture names conditions a machine must meet. It has a list of
+expressions, all of which must hold, and optionally a weekly schedule
+outside of which it does not hold at all. A posture is attached to access
+rules, where it narrows the rule's sources to the machines that satisfy
+it, and it can be written into the policy file the way Tailscale's
+`postures` and `srcPosture` work. Postures are evaluated on the server
+from the attributes above, so a client cannot claim one.
+
+### Expressions
+
+An expression is an attribute, an operator and a value, in
+[Tailscale's syntax](https://tailscale.com/docs/features/device-posture#posture-conditions):
+
+```text
+node:os == 'macos'
+node:tsVersion >= '1.80'
+node:os IN ['macos', 'windows']
+node:serialNumber NOT IN ['C02XYZ123']
+custom:oncall == true
+custom:blocked NOT SET
+ip:address IN ['203.0.113.0/24', '198.51.100.9']
+ip:country == 'VN'
+```
+
+The operators are `==`, `!=`, `<`, `<=`, `>`, `>=`, `IN`, `NOT IN`,
+`IS SET` and `NOT SET`. Values are strings in single or double quotes,
+numbers, `true` and `false`, or a list in brackets. Version strings such
+as `node:tsVersion` compare segment by segment, so `'1.9'` is smaller than
+`'1.10'`. A string that is a CIDR matches an address inside it. An
+attribute the machine does not have satisfies only `NOT SET`; a
+list-valued attribute such as `node:serialNumber` satisfies `==`, `IN` and
+the ordered operators when any element does, and `!=` and `NOT IN` when
+none does.
+
+`ip:address` is the address the machine's control connection comes from,
+so behind a reverse proxy it is the proxy's address unless the proxy is
+configured to preserve the client address. `ip:country` needs a MaxMind
+GeoLite2 or GeoIP2 country database at `policy.geoip_database`; without
+one the server refuses a posture that uses it. A machine's source address
+counts once it has connected; a posture that uses one of the `ip:`
+attributes recomputes the policy for a machine when its address changes.
+
+`POST /api/v1/posture/check` and `headscale postures check --expr ...`
+parse expressions without storing them, and the console's posture editor
+checks each line as it is typed.
+
+### Schedules
+
+A schedule is a set of weekdays, a start and an end as `HH:MM`, and an
+IANA time zone, UTC when empty. An end before the start wraps past
+midnight, so `sat 22:00`–`06:00` runs into Sunday morning. The server
+recomputes the policy when a schedule boundary passes, to the minute, so
+the rules open and close on their own. A posture may have a schedule and
+no expressions, which makes a plain time window.
+
+### Attaching postures to rules
+
+A rule with postures admits a source machine only when it satisfies at
+least one of them; a rule without postures admits every machine in its
+source groups. The destinations are never narrowed. A posture a rule
+names cannot be deleted; remove it from the rule first.
+
+```console
+headscale postures create --name "Current client" \
+  --expr "node:tsVersion >= '1.80'" --expr "custom:blocked NOT SET"
+headscale postures create --name "Office hours" \
+  --days mon,tue,wed,thu,fri --start 09:00 --end 18:00 --timezone Asia/Ho_Chi_Minh
+headscale postures list
+headscale access-rules create --name "SSH from current clients" \
+  --src 2 --dst 3 --protocol tcp --ports 22 --posture 1
+headscale nodes posture show --identifier 7
+```
+
+Through the API, `GET`, `POST /api/v1/posture`, `GET`, `PUT`,
+`DELETE /api/v1/posture/{id}` and the `postureIds` field of an access
+rule, under `policy_file` (`policy_file:read` to list). `GET /api/v1/node/{id}/postures` lists the postures a machine satisfies right
+now, and the console shows them under _Device posture_ on the machine's
+page. The audit log records `posture.create`, `posture.update` and
+`posture.delete`. In the console, postures live in a _Postures_ tab next
+to the rules and groups, and a rule's editor has a _Required postures_
+picker.
+
+### Postures in the policy file
+
+The policy file takes Tailscale's `postures`, `srcPosture` and
+`defaultSrcPosture`:
+
+```json
+{
+  "postures": {
+    "posture:latestMac": ["node:os == 'macos'", "node:tsVersion >= '1.80'"],
+    "posture:office": ["ip:address IN ['203.0.113.0/24']"]
+  },
+  "defaultSrcPosture": ["posture:latestMac"],
+  "grants": [
+    { "src": ["group:eng"], "dst": ["tag:prod"], "ip": ["22"], "srcPosture": ["posture:office"] },
+    { "src": ["autogroup:member"], "dst": ["tag:web"], "ip": ["443"], "srcPosture": [] }
+  ]
+}
+```
+
+Posture names start with `posture:`. `srcPosture` on an ACL or a grant
+narrows its sources to the machines that satisfy any of the named
+postures; every expression inside one posture must hold.
+`defaultSrcPosture` applies to every rule without `srcPosture`, and an
+explicit empty `srcPosture` turns the default off for that rule. Postures
+in the file have no schedule; use a database posture for that. The
+`posture:#` prefix is reserved for the postures the access rules use.

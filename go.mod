@@ -28,6 +28,7 @@ require (
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/oauth2-proxy/mockoidc v0.0.0-20240214162133-caebfff84d25
 	github.com/ory/dockertest/v3 v3.12.0
+	github.com/oschwald/maxminddb-golang/v2 v2.5.0
 	github.com/pkg/profile v1.7.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/common v0.71.0

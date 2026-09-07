@@ -32,6 +32,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
 	"github.com/juanfont/headscale/hscontrol/webhook"
+	"github.com/oschwald/maxminddb-golang/v2"
 	"github.com/puzpuzpuz/xsync/v4"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -138,6 +139,9 @@ type State struct {
 	pings *pingTracker
 	// c2n tracks pending control-to-node requests; see posture.go.
 	c2n *c2nTracker
+
+	// geoIP answers ip:country for postures; nil without a database.
+	geoIP *maxminddb.Reader
 
 	// sshCheckAuth tracks when source nodes last completed SSH check auth.
 	//
@@ -293,6 +297,11 @@ func NewState(cfg *types.Config) (*State, error) {
 		return nil, err
 	}
 
+	err = s.openGeoIP(cfg.Policy.GeoIPDatabase)
+	if err != nil {
+		return nil, err
+	}
+
 	// Webhooks come after the first loads so that boot emits nothing.
 	s.webhooks = webhook.New(db, tailnetName(cfg))
 
@@ -316,6 +325,10 @@ func (s *State) Close() error {
 
 	if s.webhooks != nil {
 		s.webhooks.Close()
+	}
+
+	if s.geoIP != nil {
+		_ = s.geoIP.Close()
 	}
 
 	err := s.db.Close()

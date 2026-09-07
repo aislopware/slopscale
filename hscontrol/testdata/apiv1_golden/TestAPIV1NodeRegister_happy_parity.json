@@ -22,6 +22,8 @@
       "registerMethod": "REGISTER_METHOD_CLI",
       "sharedWith": [],
       "subnetRoutes": [],
+      "suspended": false,
+      "suspendedAt": null,
       "tags": [],
       "user": {
         "approved": true,

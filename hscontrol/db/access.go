@@ -181,10 +181,21 @@ func LoadAccessModel(q Querier) (types.AccessModel, error) {
 		return types.AccessModel{}, err
 	}
 
+	postures, err := loadPostures(q)
+	if err != nil {
+		return types.AccessModel{}, err
+	}
+
+	rulePostures, err := loadRulePostures(q)
+	if err != nil {
+		return types.AccessModel{}, err
+	}
+
 	model := types.AccessModel{
 		Groups:   make([]types.AccessGroup, 0, len(groups)),
 		Rules:    make([]types.AccessRule, 0, len(rules)),
 		Networks: networks,
+		Postures: postures,
 	}
 
 	groupIdx := make(map[uint64]int, len(groups))
@@ -209,7 +220,9 @@ func LoadAccessModel(q Querier) (types.AccessModel, error) {
 	ruleIdx := make(map[uint64]int, len(rules))
 
 	for i, r := range rules {
-		model.Rules = append(model.Rules, r.AccessRule.rule())
+		rule := r.AccessRule.rule()
+		rule.PostureIDs = rulePostures[rule.ID]
+		model.Rules = append(model.Rules, rule)
 		ruleIdx[r.AccessRule.ID] = i
 	}
 
@@ -617,6 +630,11 @@ func (hsdb *HSDatabase) CreateAccessRule(rule types.AccessRule) (types.AccessRul
 			return types.AccessRule{}, err
 		}
 
+		err = setRulePostures(tx, id, rule.PostureIDs)
+		if err != nil {
+			return types.AccessRule{}, err
+		}
+
 		return getAccessRule(tx, id)
 	})
 }
@@ -653,6 +671,11 @@ func (hsdb *HSDatabase) UpdateAccessRule(rule types.AccessRule) (types.AccessRul
 		}
 
 		err = setRuleSides(tx, rule.ID, rule.SourceGroupIDs, rule.DestinationGroupIDs)
+		if err != nil {
+			return types.AccessRule{}, err
+		}
+
+		err = setRulePostures(tx, rule.ID, rule.PostureIDs)
 		if err != nil {
 			return types.AccessRule{}, err
 		}
@@ -730,6 +753,22 @@ func getAccessRule(q Querier, id types.AccessRuleID) (types.AccessRule, error) {
 		case ruleSideDestination:
 			rule.DestinationGroupIDs = append(rule.DestinationGroupIDs, gid)
 		}
+	}
+
+	var postures []accessRulePostureRecord
+
+	err = q.executor().query(
+		jet.SELECT(table.AccessRulePostures.AllColumns).FROM(table.AccessRulePostures).
+			WHERE(table.AccessRulePostures.RuleID.EQ(jet.Uint64(uint64(id)))).
+			ORDER_BY(table.AccessRulePostures.PostureID.ASC()),
+		&postures,
+	)
+	if err != nil {
+		return types.AccessRule{}, fmt.Errorf("loading postures of access rule %d: %w", id, err)
+	}
+
+	for _, r := range postures {
+		rule.PostureIDs = append(rule.PostureIDs, types.PostureID(r.AccessRulePosture.PostureID))
 	}
 
 	return rule, nil

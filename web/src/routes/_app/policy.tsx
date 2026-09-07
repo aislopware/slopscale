@@ -9,20 +9,23 @@ import {
   groupsQuery,
   nodesQuery,
   policyQuery,
+  posturesQuery,
   usersQuery,
 } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { GroupsTab } from "~/components/access/groups-tab.tsx";
+import { PosturesTab } from "~/components/access/postures-tab.tsx";
 import { RulesTab } from "~/components/access/rules-tab.tsx";
 import { PolicyFileTab } from "~/components/policy/policy-file-tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
-const tabs = ["rules", "groups", "file"] as const;
+const tabs = ["rules", "groups", "postures", "file"] as const;
 type Tab = (typeof tabs)[number];
 
 const tabItems: readonly { value: Tab; label: string }[] = [
   { value: "rules", label: "Rules" },
   { value: "groups", label: "Groups" },
+  { value: "postures", label: "Postures" },
   { value: "file", label: "Policy file" },
 ];
 
@@ -48,6 +51,7 @@ export const Route = createFileRoute("/_app/policy")({
       context.queryClient.query(policyQuery),
       context.queryClient.query(groupsQuery),
       context.queryClient.query(accessRulesQuery),
+      context.queryClient.query(posturesQuery),
     ]);
   },
   component: PolicyPage,
@@ -60,6 +64,7 @@ function PolicyPage(): ReactElement {
   const policy = useSuspenseQuery(policyQuery).data;
   const { groups } = useSuspenseQuery(groupsQuery).data;
   const { rules, policyFileEnforces } = useSuspenseQuery(accessRulesQuery).data;
+  const { postures, geoIpAvailable } = useSuspenseQuery(posturesQuery).data;
   // Group membership names machines and users; a caller without those scopes still sees counts.
   const nodes = useQuery({ ...nodesQuery, enabled: can(me, "devices:core:read") });
   const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
@@ -97,6 +102,7 @@ function PolicyPage(): ReactElement {
             me={me}
             rules={rules}
             groups={groups}
+            postures={postures}
             policyFileEnforces={policyFileEnforces}
             search={text}
             onSearchChange={setSearch}
@@ -111,6 +117,18 @@ function PolicyPage(): ReactElement {
             rules={rules}
             nodes={nodes.data?.nodes}
             users={users.data?.users}
+            search={text}
+            onSearchChange={setSearch}
+          />
+        </TabPanel>
+      ) : null}
+      {tab === "postures" ? (
+        <TabPanel label="Postures">
+          <PosturesTab
+            me={me}
+            postures={postures}
+            rules={rules}
+            geoIpAvailable={geoIpAvailable}
             search={text}
             onSearchChange={setSearch}
           />

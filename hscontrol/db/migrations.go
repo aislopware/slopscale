@@ -530,6 +530,12 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609100930-node-posture",
 			run: migrateNodePosture,
 		},
+		{
+			// Postures: reusable conditions access rules require of a
+			// source node. See docs/ref/device-trust.md.
+			id:  "202609101000-postures",
+			run: migratePostures,
+		},
 	}
 }
 
@@ -1563,6 +1569,56 @@ func migrateNodePosture(tx *Tx) error {
 )`,
 			indexes: []string{
 				`CREATE UNIQUE INDEX idx_node_attributes_node_key ON node_attributes(node_id, key)`,
+			},
+		},
+	})
+}
+
+// migratePostures (202609101000) creates the postures and
+// access_rule_postures tables.
+func migratePostures(tx *Tx) error {
+	return createTables(tx, []tableDefinition{
+		{
+			name: "postures",
+			sqlite: `CREATE TABLE postures(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  description text,
+  expressions text NOT NULL,
+  schedule text,
+  created_at datetime,
+  updated_at datetime
+)`,
+			postgres: `CREATE TABLE postures(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  expressions text NOT NULL,
+  schedule text,
+  created_at timestamptz,
+  updated_at timestamptz
+)`,
+			indexes: []string{`CREATE UNIQUE INDEX idx_postures_name ON postures(name)`},
+		},
+		{
+			name: "access_rule_postures",
+			sqlite: `CREATE TABLE access_rule_postures(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  rule_id integer NOT NULL,
+  posture_id integer NOT NULL,
+  CONSTRAINT fk_access_rule_postures_rule FOREIGN KEY(rule_id) REFERENCES access_rules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_rule_postures_posture FOREIGN KEY(posture_id) REFERENCES postures(id) ON DELETE CASCADE
+)`,
+			postgres: `CREATE TABLE access_rule_postures(
+  id bigserial PRIMARY KEY,
+  rule_id bigint NOT NULL,
+  posture_id bigint NOT NULL,
+  CONSTRAINT fk_access_rule_postures_rule FOREIGN KEY(rule_id) REFERENCES access_rules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_rule_postures_posture FOREIGN KEY(posture_id) REFERENCES postures(id) ON DELETE CASCADE
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_access_rule_postures_rule_posture ` +
+					`ON access_rule_postures(rule_id, posture_id)`,
 			},
 		},
 	})

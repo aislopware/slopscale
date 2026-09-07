@@ -11,6 +11,7 @@ import type { CustomAttribute, NodePosture } from "~/api/schema.gen.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { AttributeDialog, attributeText } from "~/components/machines/attribute-dialog.tsx";
+import { MatchedPostures } from "~/components/machines/matched-postures.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
@@ -66,6 +67,7 @@ export function PostureSection({
       <DefinitionList items={derived(posture.data)} columns={2} />
       <Identity node={node} posture={posture.data} canEdit={canEdit} />
       <CustomAttributes node={node} posture={posture.data} canEdit={canEdit} />
+      <MatchedPostures node={node} />
     </Section>
   );
 }

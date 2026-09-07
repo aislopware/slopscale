@@ -53,6 +53,7 @@ func addAccessRuleFlags(cmd *cobra.Command) {
 	cmd.Flags().String("ports", "", "Ports (e.g. \"22,80-90\")")
 	cmd.Flags().Bool("bidirectional", false, "Allow bidirectional traffic")
 	cmd.Flags().Bool("disabled", false, "Create rule in disabled state")
+	cmd.Flags().StringSlice("posture", []string{}, "Posture identifier a source must satisfy (repeatable; any one)")
 }
 
 var accessRulesCmd = &cobra.Command{
@@ -127,6 +128,7 @@ var createAccessRuleCmd = &cobra.Command{
 			ports, _ := cmd.Flags().GetString("ports")
 			bidi, _ := cmd.Flags().GetBool("bidirectional")
 			disabled, _ := cmd.Flags().GetBool("disabled")
+			postures, _ := cmd.Flags().GetStringSlice("posture")
 			enabled := !disabled
 
 			body := clientv1.CreateAccessRuleJSONRequestBody{
@@ -137,6 +139,7 @@ var createAccessRuleCmd = &cobra.Command{
 				Bidirectional:       &bidi,
 				SourceGroupIds:      &srcs,
 				DestinationGroupIds: &dsts,
+				PostureIds:          &postures,
 			}
 
 			if cmd.Flags().Changed("description") {
@@ -159,7 +162,7 @@ var createAccessRuleCmd = &cobra.Command{
 }
 
 var updateAccessRuleCmd = &cobra.Command{
-	Use:   "update",
+	Use:   cmdUpdate,
 	Short: "Update an access rule",
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
@@ -174,6 +177,7 @@ var updateAccessRuleCmd = &cobra.Command{
 			ports, _ := cmd.Flags().GetString("ports")
 			bidi, _ := cmd.Flags().GetBool("bidirectional")
 			disabled, _ := cmd.Flags().GetBool("disabled")
+			postures, _ := cmd.Flags().GetStringSlice("posture")
 			enabled := !disabled
 
 			body := clientv1.UpdateAccessRuleJSONRequestBody{
@@ -185,6 +189,7 @@ var updateAccessRuleCmd = &cobra.Command{
 				Bidirectional:       &bidi,
 				SourceGroupIds:      &srcs,
 				DestinationGroupIds: &dsts,
+				PostureIds:          &postures,
 			}
 
 			resp, err := client.UpdateAccessRuleWithResponse(ctx, ruleID, body)

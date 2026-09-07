@@ -279,6 +279,11 @@ policy:
   # If the mode is set to "file", the path to a HuJSON file containing policies.
   path: ""
 
+  # Path of a MaxMind country database (GeoLite2-Country.mmdb or
+  # GeoIP2-Country.mmdb). When set, postures can check ip:country, the
+  # country of the address a node connects to the control server from.
+  # geoip_database: /var/lib/headscale/GeoLite2-Country.mmdb
+
 ## DNS
 #
 # headscale supports Tailscale's DNS configuration and MagicDNS.

@@ -247,6 +247,32 @@ CREATE TABLE access_rule_groups(
 );
 CREATE UNIQUE INDEX idx_access_rule_groups_rule_group_side ON access_rule_groups(rule_id, group_id, side);
 
+-- postures are reusable conditions on a source node: expressions in the
+-- policy file's posture language (JSON list in expressions) and an
+-- optional weekly schedule (JSON); see docs/ref/device-trust.md. An
+-- access rule that names postures lets a source through when any one of
+-- them holds.
+CREATE TABLE postures(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  description text,
+  expressions text NOT NULL,
+  schedule text,
+  created_at datetime,
+  updated_at datetime
+);
+CREATE UNIQUE INDEX idx_postures_name ON postures(name);
+
+CREATE TABLE access_rule_postures(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  rule_id integer NOT NULL,
+  posture_id integer NOT NULL,
+
+  CONSTRAINT fk_access_rule_postures_rule FOREIGN KEY(rule_id) REFERENCES access_rules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_rule_postures_posture FOREIGN KEY(posture_id) REFERENCES postures(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_access_rule_postures_rule_posture ON access_rule_postures(rule_id, posture_id);
+
 -- networks are sets of prefixes reached through routing nodes, the way
 -- NetBird's networks work; see docs/ref/networks.md. The routers
 -- advertise the prefixes and the network approves them; the groups get

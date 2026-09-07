@@ -10,6 +10,7 @@ const (
 	cmdShow   = "show"
 	cmdNew    = "new"
 	cmdDelete = "delete"
+	cmdUpdate = "update"
 	cmdExpire = "expire"
 
 	// Subcommand aliases.

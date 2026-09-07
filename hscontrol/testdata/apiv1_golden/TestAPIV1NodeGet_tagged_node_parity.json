@@ -47,6 +47,8 @@
       "registerMethod": "REGISTER_METHOD_AUTH_KEY",
       "sharedWith": [],
       "subnetRoutes": [],
+      "suspended": false,
+      "suspendedAt": null,
       "tags": [
         "tag:initial"
       ],

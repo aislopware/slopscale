@@ -4,12 +4,13 @@ import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
-import type { AccessRule, Group } from "~/api/queries.ts";
+import type { AccessRule, Group, Posture } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { GroupChips } from "~/components/access/group-chips.tsx";
 import { groupName, protocolSummary } from "~/components/access/model.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
+import { postureName } from "~/components/access/posture-model.ts";
 import { RuleMenu } from "~/components/access/rule-menu.tsx";
 import { createAppColumnHelper, useTableContext } from "~/components/table/app-table.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
@@ -19,13 +20,19 @@ import { toast } from "~/components/ui/toast.ts";
 export interface RuleRow extends AccessRule {
   readonly sourceNames: string;
   readonly destinationNames: string;
+  readonly postureNames: string;
 }
 
-export function toRuleRows(rules: readonly AccessRule[], groups: readonly Group[]): RuleRow[] {
+export function toRuleRows(
+  rules: readonly AccessRule[],
+  groups: readonly Group[],
+  postures: readonly Posture[],
+): RuleRow[] {
   return rules.map((rule) => ({
     ...rule,
     sourceNames: names(rule.sourceGroupIds, groups),
     destinationNames: names(rule.destinationGroupIds, groups),
+    postureNames: rule.postureIds.map((id) => postureName(postures, id)).join(", "),
   }));
 }
 
@@ -45,13 +52,11 @@ export const ruleColumns = helper.columns([
     cell: ({ row }) => <NameCell rule={row.original} />,
     meta: { className: "w-[26%] min-w-44" },
   }),
-  helper.accessor((rule) => rule.sourceNames, {
+  helper.accessor((rule) => `${rule.sourceNames} ${rule.postureNames}`, {
     id: "sources",
     header: "Sources",
     enableSorting: false,
-    cell: ({ row, table }) => (
-      <GroupChips ids={row.original.sourceGroupIds} groups={table.options.meta?.groups ?? []} />
-    ),
+    cell: ({ row }) => <SourcesCell rule={row.original} />,
     meta: { className: "min-w-32" },
   }),
   helper.accessor((rule) => (rule.bidirectional ? "both ways" : "one way"), {
@@ -97,12 +102,13 @@ export const ruleColumns = helper.columns([
     id: "actions",
     header: "",
     cell: ({ row, table }) => {
-      const { me, groups, rules, policyFileEnforces } = table.options.meta ?? {};
+      const { me, groups, postures, rules, policyFileEnforces } = table.options.meta ?? {};
 
       return me === undefined ? null : (
         <RuleMenu
           rule={row.original}
           groups={groups ?? []}
+          postures={postures ?? []}
           rules={rules ?? []}
           policyFileEnforces={policyFileEnforces === true}
           me={me}
@@ -122,6 +128,22 @@ function NameCell({ rule }: { readonly rule: AccessRule }): ReactElement {
       )}
       {/* The protocol column is hidden on small screens, so the name carries it there. */}
       <span className="truncate text-xs text-kumo-subtle md:hidden">{protocolSummary(rule)}</span>
+    </div>
+  );
+}
+
+/** The source groups, and under them the postures a source must satisfy. */
+function SourcesCell({ rule }: { readonly rule: RuleRow }): ReactElement {
+  const { groups } = useTableContext().options.meta ?? {};
+
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <GroupChips ids={rule.sourceGroupIds} groups={groups ?? []} />
+      {rule.postureIds.length === 0 ? null : (
+        <span className="truncate text-xs text-kumo-subtle" title={rule.postureNames}>
+          Requires {rule.postureNames}
+        </span>
+      )}
     </div>
   );
 }

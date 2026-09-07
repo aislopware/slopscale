@@ -46,6 +46,8 @@
         "registerMethod": "REGISTER_METHOD_AUTH_KEY",
         "sharedWith": [],
         "subnetRoutes": [],
+        "suspended": false,
+        "suspendedAt": null,
         "tags": [],
         "user": {
           "approved": true,
@@ -105,6 +107,8 @@
         "registerMethod": "REGISTER_METHOD_AUTH_KEY",
         "sharedWith": [],
         "subnetRoutes": [],
+        "suspended": false,
+        "suspendedAt": null,
         "tags": [],
         "user": {
           "approved": true,

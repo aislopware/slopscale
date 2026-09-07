@@ -1,4 +1,4 @@
-import type { Group, Node, User } from "~/api/queries.ts";
+import type { Group, Node, Posture, User } from "~/api/queries.ts";
 import { isBuiltin } from "~/components/access/model.ts";
 import type { PickerItem } from "~/components/ui/multi-picker.tsx";
 import { nodeName, ownerLabel, userLabel } from "~/lib/node.ts";
@@ -35,4 +35,10 @@ export function groupItems(groups: readonly Group[], { builtin = true } = {}): P
       hint: isBuiltin(group) ? everyMachine : group.description,
     }))
     .toSorted((left, right) => Number(builtinHint(right)) - Number(builtinHint(left)));
+}
+
+export function postureItems(postures: readonly Posture[]): PickerItem[] {
+  return postures
+    .map((posture) => ({ value: posture.id, label: posture.name, hint: posture.description }))
+    .toSorted((left, right) => left.label.localeCompare(right.label));
 }

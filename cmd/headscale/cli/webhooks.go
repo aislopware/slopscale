@@ -209,7 +209,7 @@ var createWebhookCmd = &cobra.Command{
 }
 
 var updateWebhookCmd = &cobra.Command{
-	Use:   "update",
+	Use:   cmdUpdate,
 	Short: "Update a webhook",
 	Long: `Replaces the webhook configuration. The update command fetches the current
 webhook, overrides only the fields specified by flags, and sends the merged
