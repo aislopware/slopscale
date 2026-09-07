@@ -32,4 +32,5 @@ func UseSchema(schema string) {
 	Sessions = Sessions.FromSchema(schema)
 	Settings = Settings.FromSchema(schema)
 	Users = Users.FromSchema(schema)
+	Webhooks = Webhooks.FromSchema(schema)
 }

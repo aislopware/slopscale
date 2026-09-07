@@ -683,6 +683,16 @@ components:
       required:
         - users
       type: object
+    ListWebhooksOutputBody:
+      additionalProperties: false
+      properties:
+        webhooks:
+          items:
+            $ref: "#/components/schemas/Webhook"
+          type: array
+      required:
+        - webhooks
+      type: object
     Network:
       additionalProperties: false
       properties:
@@ -1302,6 +1312,108 @@ components:
           $ref: "#/components/schemas/User"
       required:
         - user
+      type: object
+    Webhook:
+      additionalProperties: false
+      properties:
+        createdAt:
+          format: date-time
+          type: string
+        createdByUserId:
+          format: uint64
+          type: string
+        description:
+          type: string
+        id:
+          format: uint64
+          type: string
+        lastDeliveryAt:
+          format: date-time
+          type:
+            - string
+            - "null"
+        lastDeliveryStatus:
+          type: string
+        providerType:
+          type: string
+        secret:
+          type: string
+        subscriptions:
+          items:
+            type: string
+          type: array
+        updatedAt:
+          format: date-time
+          type: string
+        url:
+          type: string
+      required:
+        - id
+        - url
+        - description
+        - providerType
+        - subscriptions
+        - createdByUserId
+        - createdAt
+        - updatedAt
+        - lastDeliveryAt
+        - lastDeliveryStatus
+      type: object
+    WebhookEventTypes:
+      additionalProperties: false
+      properties:
+        types:
+          items:
+            type: string
+          type: array
+      required:
+        - types
+      type: object
+    WebhookOutputBody:
+      additionalProperties: false
+      properties:
+        webhook:
+          $ref: "#/components/schemas/Webhook"
+      required:
+        - webhook
+      type: object
+    WebhookRequestBody:
+      additionalProperties: false
+      properties:
+        description:
+          type: string
+        providerType:
+          enum:
+            - ""
+            - slack
+            - mattermost
+            - googlechat
+            - discord
+          type: string
+        subscriptions:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        url:
+          format: uri
+          type: string
+      required:
+        - url
+        - subscriptions
+      type: object
+    WebhookTestOutputBody:
+      additionalProperties: false
+      properties:
+        delivered:
+          type: boolean
+        status:
+          description: HTTP status or the error text.
+          type: string
+      required:
+        - delivered
+        - status
       type: object
     Whoami:
       additionalProperties: false
@@ -3406,6 +3518,254 @@ paths:
         - Users
       x-audit-action: user.rename
       x-required-scope: users
+  /api/v1/webhook:
+    get:
+      description: |-
+        Endpoints the server posts events to, signed with each endpoint's secret in the Tailscale-Webhook-Signature header. Secrets are not listed.
+
+        Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listWebhooks
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListWebhooksOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List webhooks
+      tags:
+        - Webhooks
+      x-required-scope: feature_settings:read
+    post:
+      description: |-
+        The response carries the signing secret; it is not shown again.
+
+        Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createWebhook
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create webhook
+      tags:
+        - Webhooks
+      x-audit-action: webhook.create
+      x-required-scope: feature_settings
+  /api/v1/webhook/event-types:
+    get:
+      description: Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listWebhookEventTypes
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookEventTypes"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List webhook event types
+      tags:
+        - Webhooks
+      x-required-scope: feature_settings:read
+  /api/v1/webhook/{id}:
+    delete:
+      description: Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteWebhook
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmptyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete webhook
+      tags:
+        - Webhooks
+      x-audit-action: webhook.delete
+      x-required-scope: feature_settings
+    get:
+      description: Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getWebhook
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get webhook
+      tags:
+        - Webhooks
+      x-required-scope: feature_settings:read
+    put:
+      description: |-
+        The secret stays; rotate it separately.
+
+        Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateWebhook
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Replace webhook
+      tags:
+        - Webhooks
+      x-audit-action: webhook.update
+      x-required-scope: feature_settings
+  /api/v1/webhook/{id}/rotate:
+    post:
+      description: |-
+        Replaces the signing secret and returns it; deliveries signed with the old one stop at once.
+
+        Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: rotateWebhookSecret
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Rotate webhook secret
+      tags:
+        - Webhooks
+      x-audit-action: webhook.rotate
+      x-required-scope: feature_settings
+  /api/v1/webhook/{id}/test:
+    post:
+      description: |-
+        Posts a test event now and reports the receiver's answer.
+
+        Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: testWebhook
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookTestOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Test webhook
+      tags:
+        - Webhooks
+      x-audit-action: webhook.test
+      x-required-scope: feature_settings
   /api/v1/whoami:
     get:
       description: Any authenticated caller may ask who it is; no scope is required.

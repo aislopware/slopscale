@@ -38,7 +38,7 @@ func sampleDNS() clientv1.DNS {
 			ExtraRecords: []clientv1.DNSRecord{
 				{
 					Name:  "myhost",
-					Type:  clientv1.A,
+					Type:  clientv1.DNSRecordTypeA,
 					Value: "1.2.3.4",
 				},
 			},
@@ -146,10 +146,10 @@ func TestDNSCommands(t *testing.T) {
 						records := *body.ExtraRecords
 						assert.Len(t, records, 2)
 						assert.Equal(t, "plain", records[0].Name)
-						assert.Equal(t, clientv1.Empty, records[0].Type)
+						assert.Equal(t, clientv1.DNSRecordTypeEmpty, records[0].Type)
 						assert.Equal(t, "1.2.3.4", records[0].Value)
 						assert.Equal(t, "typed", records[1].Name)
-						assert.Equal(t, clientv1.A, records[1].Type)
+						assert.Equal(t, clientv1.DNSRecordTypeA, records[1].Type)
 						assert.Equal(t, "5.6.7.8", records[1].Value)
 					}
 
@@ -289,9 +289,9 @@ func TestDNSSetRepeatFlags(t *testing.T) {
 				records := *body.ExtraRecords
 				assert.Len(t, records, 2)
 				assert.Equal(t, "plain", records[0].Name)
-				assert.Equal(t, clientv1.Empty, records[0].Type)
+				assert.Equal(t, clientv1.DNSRecordTypeEmpty, records[0].Type)
 				assert.Equal(t, "typed", records[1].Name)
-				assert.Equal(t, clientv1.A, records[1].Type)
+				assert.Equal(t, clientv1.DNSRecordTypeA, records[1].Type)
 			}
 
 			writeJSON(t, w, current)

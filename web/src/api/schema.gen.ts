@@ -996,6 +996,128 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List webhooks
+         * @description Endpoints the server posts events to, signed with each endpoint's secret in the Tailscale-Webhook-Signature header. Secrets are not listed.
+         *
+         *     Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listWebhooks"];
+        put?: never;
+        /**
+         * Create webhook
+         * @description The response carries the signing secret; it is not shown again.
+         *
+         *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["createWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhook/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get webhook
+         * @description Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getWebhook"];
+        /**
+         * Replace webhook
+         * @description The secret stays; rotate it separately.
+         *
+         *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        put: operations["updateWebhook"];
+        post?: never;
+        /**
+         * Delete webhook
+         * @description Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["deleteWebhook"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhook/{id}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate webhook secret
+         * @description Replaces the signing secret and returns it; deliveries signed with the old one stop at once.
+         *
+         *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["rotateWebhookSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhook/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test webhook
+         * @description Posts a test event now and reports the receiver's answer.
+         *
+         *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["testWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhook/event-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List webhook event types
+         * @description Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listWebhookEventTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/whoami": {
         parameters: {
             query?: never;
@@ -1321,6 +1443,9 @@ export interface components {
         ListUsersOutputBody: {
             users: components["schemas"]["User"][];
         };
+        ListWebhooksOutputBody: {
+            webhooks: components["schemas"]["Webhook"][];
+        };
         Network: {
             /** Format: date-time */
             createdAt: string;
@@ -1548,6 +1673,43 @@ export interface components {
         UserOutputBody: {
             user: components["schemas"]["User"];
         };
+        Webhook: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uint64 */
+            createdByUserId: string;
+            description: string;
+            /** Format: uint64 */
+            id: string;
+            /** Format: date-time */
+            lastDeliveryAt: string | null;
+            lastDeliveryStatus: string;
+            providerType: string;
+            secret?: string;
+            subscriptions: string[];
+            /** Format: date-time */
+            updatedAt: string;
+            url: string;
+        };
+        WebhookEventTypes: {
+            types: string[];
+        };
+        WebhookOutputBody: {
+            webhook: components["schemas"]["Webhook"];
+        };
+        WebhookRequestBody: {
+            description?: string;
+            /** @enum {string} */
+            providerType?: "" | "slack" | "mattermost" | "googlechat" | "discord";
+            subscriptions: string[] | null;
+            /** Format: uri */
+            url: string;
+        };
+        WebhookTestOutputBody: {
+            delivered: boolean;
+            /** @description HTTP status or the error text. */
+            status: string;
+        };
         Whoami: {
             allAccess: boolean;
             /** @description How the caller authenticated: local, api_key, oauth or session. */
@@ -1614,6 +1776,7 @@ export type ListNodesOutputBody = components['schemas']['ListNodesOutputBody'];
 export type ListPreAuthKeysOutputBody = components['schemas']['ListPreAuthKeysOutputBody'];
 export type ListRulesOutputBody = components['schemas']['ListRulesOutputBody'];
 export type ListUsersOutputBody = components['schemas']['ListUsersOutputBody'];
+export type ListWebhooksOutputBody = components['schemas']['ListWebhooksOutputBody'];
 export type Network = components['schemas']['Network'];
 export type NetworkEnabledInputBody = components['schemas']['NetworkEnabledInputBody'];
 export type NetworkOutputBody = components['schemas']['NetworkOutputBody'];
@@ -1640,6 +1803,11 @@ export type ShareNodeRequestBody = components['schemas']['ShareNodeRequestBody']
 export type UpdateSettingsRequestBody = components['schemas']['UpdateSettingsRequestBody'];
 export type User = components['schemas']['User'];
 export type UserOutputBody = components['schemas']['UserOutputBody'];
+export type Webhook = components['schemas']['Webhook'];
+export type WebhookEventTypes = components['schemas']['WebhookEventTypes'];
+export type WebhookOutputBody = components['schemas']['WebhookOutputBody'];
+export type WebhookRequestBody = components['schemas']['WebhookRequestBody'];
+export type WebhookTestOutputBody = components['schemas']['WebhookTestOutputBody'];
 export type Whoami = components['schemas']['Whoami'];
 export type $defs = Record<string, never>;
 export interface operations {
@@ -3698,6 +3866,256 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listWebhooks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListWebhooksOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updateWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmptyOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    rotateWebhookSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    testWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookTestOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listWebhookEventTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookEventTypes"];
                 };
             };
             /** @description Error */
