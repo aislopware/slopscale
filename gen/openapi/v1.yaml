@@ -1,5 +1,87 @@
 components:
   schemas:
+    AccessRule:
+      additionalProperties: false
+      properties:
+        bidirectional:
+          type: boolean
+        createdAt:
+          format: date-time
+          type: string
+        description:
+          type: string
+        destinationGroupIds:
+          items:
+            type: string
+          type: array
+        enabled:
+          type: boolean
+        id:
+          format: uint64
+          type: string
+        name:
+          type: string
+        ports:
+          description: Comma-separated ports and ranges, empty for every port.
+          type: string
+        protocol:
+          description: One of all, tcp, udp, icmp.
+          type: string
+        sourceGroupIds:
+          items:
+            type: string
+          type: array
+        updatedAt:
+          format: date-time
+          type: string
+      required:
+        - id
+        - name
+        - description
+        - enabled
+        - protocol
+        - ports
+        - bidirectional
+        - sourceGroupIds
+        - destinationGroupIds
+        - createdAt
+        - updatedAt
+      type: object
+    AccessRuleRequestBody:
+      additionalProperties: false
+      properties:
+        bidirectional:
+          type: boolean
+        description:
+          type: string
+        destinationGroupIds:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        enabled:
+          description: Defaults to true.
+          type: boolean
+        name:
+          type: string
+        ports:
+          type: string
+        protocol:
+          description: One of all, tcp, udp, icmp.
+          type: string
+        sourceGroupIds:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - name
+        - protocol
+        - sourceGroupIds
+        - destinationGroupIds
+      type: object
     ApiKey:
       additionalProperties: false
       properties:
@@ -185,6 +267,13 @@ components:
         expiration:
           format: date-time
           type: string
+        groupIds:
+          description: Groups a node registered with the key joins.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
         preauthorized:
           description: Defaults to true.
           type: boolean
@@ -232,6 +321,9 @@ components:
       additionalProperties: false
       type: object
     DeleteUserOutputBody:
+      additionalProperties: false
+      type: object
+    EmptyOutputBody:
       additionalProperties: false
       type: object
     ErrorDetail:
@@ -317,6 +409,79 @@ components:
           format: uint64
           type: string
       type: object
+    Group:
+      additionalProperties: false
+      properties:
+        builtin:
+          description: Empty for operator-made groups, "all" for the builtin group.
+          type: string
+        createdAt:
+          format: date-time
+          type: string
+        description:
+          type: string
+        id:
+          format: uint64
+          type: string
+        name:
+          type: string
+        nodeIds:
+          items:
+            type: string
+          type: array
+        updatedAt:
+          format: date-time
+          type: string
+        userIds:
+          items:
+            type: string
+          type: array
+      required:
+        - id
+        - name
+        - description
+        - builtin
+        - nodeIds
+        - userIds
+        - createdAt
+        - updatedAt
+      type: object
+    GroupMemberRequestBody:
+      additionalProperties: false
+      properties:
+        nodeId:
+          format: uint64
+          type: string
+        userId:
+          format: uint64
+          type: string
+      type: object
+    GroupOutputBody:
+      additionalProperties: false
+      properties:
+        group:
+          $ref: "#/components/schemas/Group"
+      required:
+        - group
+      type: object
+    GroupRequestBody:
+      additionalProperties: false
+      properties:
+        description:
+          type: string
+        name:
+          type: string
+        nodeIds:
+          items:
+            type: string
+          type: array
+        userIds:
+          items:
+            type: string
+          type: array
+      required:
+        - name
+      type: object
     HealthResponseBody:
       additionalProperties: false
       properties:
@@ -348,6 +513,16 @@ components:
         - events
         - nextBefore
       type: object
+    ListGroupsOutputBody:
+      additionalProperties: false
+      properties:
+        groups:
+          items:
+            $ref: "#/components/schemas/Group"
+          type: array
+      required:
+        - groups
+      type: object
     ListNodesOutputBody:
       additionalProperties: false
       properties:
@@ -367,6 +542,16 @@ components:
           type: array
       required:
         - preAuthKeys
+      type: object
+    ListRulesOutputBody:
+      additionalProperties: false
+      properties:
+        rules:
+          items:
+            $ref: "#/components/schemas/AccessRule"
+          type: array
+      required:
+        - rules
       type: object
     ListUsersOutputBody:
       additionalProperties: false
@@ -565,13 +750,18 @@ components:
         expiration:
           format: date-time
           type: string
+        groupIds:
+          description: Groups the registered node joins.
+          items:
+            type: string
+          type: array
         id:
           format: uint64
           type: string
         key:
           type: string
         preauthorized:
-          description: Nodes registered with the key skip device approval.
+          description: Registered nodes skip device approval.
           type: boolean
         reusable:
           type: boolean
@@ -590,6 +780,7 @@ components:
         - createdAt
         - aclTags
         - preauthorized
+        - groupIds
       type: object
     PreAuthKeyOutputBody:
       additionalProperties: false
@@ -598,6 +789,14 @@ components:
           $ref: "#/components/schemas/PreAuthKey"
       required:
         - preAuthKey
+      type: object
+    RuleOutputBody:
+      additionalProperties: false
+      properties:
+        rule:
+          $ref: "#/components/schemas/AccessRule"
+      required:
+        - rule
       type: object
     SetApprovalRequestBody:
       additionalProperties: false
@@ -763,6 +962,157 @@ info:
   version: v1
 openapi: 3.1.0
 paths:
+  /api/v1/access-rule:
+    get:
+      description: Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listAccessRules
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListRulesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List access rules
+      tags:
+        - Access control
+      x-required-scope: policy_file:read
+    post:
+      description: |-
+        Lets the source groups reach the destination groups on the protocol and ports. Rules only allow: once one is enabled, or the policy file has rules, everything not allowed is denied.
+
+        Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createAccessRule
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessRuleRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create access rule
+      tags:
+        - Access control
+      x-audit-action: access_rule.create
+      x-required-scope: policy_file
+  /api/v1/access-rule/{id}:
+    delete:
+      description: Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteAccessRule
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmptyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete access rule
+      tags:
+        - Access control
+      x-audit-action: access_rule.delete
+      x-required-scope: policy_file
+    get:
+      description: Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getAccessRule
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get access rule
+      tags:
+        - Access control
+      x-required-scope: policy_file:read
+    put:
+      description: Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateAccessRule
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessRuleRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Replace access rule
+      tags:
+        - Access control
+      x-audit-action: access_rule.update
+      x-required-scope: policy_file
   /api/v1/apikey:
     get:
       operationId: listApiKeys
@@ -1122,6 +1472,280 @@ paths:
         - Nodes
       x-audit-action: node.debug_create
       x-required-scope: devices:core
+  /api/v1/group:
+    get:
+      description: |-
+        Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none.
+
+        Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listGroups
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListGroupsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List groups
+      tags:
+        - Access control
+      x-required-scope: policy_file:read
+    post:
+      description: |-
+        Creates a group, with its machines and users when given.
+
+        Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createGroup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create group
+      tags:
+        - Access control
+      x-audit-action: group.create
+      x-required-scope: policy_file
+  /api/v1/group/{id}:
+    delete:
+      description: |-
+        Deletes a group no access rule names. The builtin group cannot be deleted.
+
+        Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteGroup
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmptyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete group
+      tags:
+        - Access control
+      x-audit-action: group.delete
+      x-required-scope: policy_file
+    get:
+      description: Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getGroup
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get group
+      tags:
+        - Access control
+      x-required-scope: policy_file:read
+    patch:
+      description: |-
+        Renames or re-describes a group and replaces its machines and users when given. The builtin group cannot be changed.
+
+        Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateGroup
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Update group
+      tags:
+        - Access control
+      x-audit-action: group.update
+      x-required-scope: policy_file
+  /api/v1/group/{id}/member:
+    post:
+      description: |-
+        Adds a machine (nodeId) or a user (userId) to the group.
+
+        Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: addGroupMember
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupMemberRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Add group member
+      tags:
+        - Access control
+      x-audit-action: group.member.add
+      x-required-scope: policy_file
+  /api/v1/group/{id}/node/{nodeId}:
+    delete:
+      description: Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: removeGroupNode
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Remove machine from group
+      tags:
+        - Access control
+      x-audit-action: group.member.remove
+      x-required-scope: policy_file
+  /api/v1/group/{id}/user/{userId}:
+    delete:
+      description: Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: removeGroupUser
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+        - in: path
+          name: userId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Remove user from group
+      tags:
+        - Access control
+      x-audit-action: group.member.remove
+      x-required-scope: policy_file
   /api/v1/health:
     get:
       description: Reports server health, including database connectivity.

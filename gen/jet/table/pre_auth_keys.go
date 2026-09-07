@@ -28,6 +28,7 @@ type preAuthKeysTable struct {
 	Used          sqlite.ColumnBool
 	Tags          sqlite.ColumnString
 	Preauthorized sqlite.ColumnBool
+	Groups        sqlite.ColumnString
 	Expiration    sqlite.ColumnTimestamp
 	Revoked       sqlite.ColumnTimestamp
 	CreatedAt     sqlite.ColumnTimestamp
@@ -83,11 +84,12 @@ func newPreAuthKeysTableImpl(schemaName, tableName, alias string) preAuthKeysTab
 		UsedColumn          = sqlite.BoolColumn("used")
 		TagsColumn          = sqlite.StringColumn("tags")
 		PreauthorizedColumn = sqlite.BoolColumn("preauthorized")
+		GroupsColumn        = sqlite.StringColumn("groups")
 		ExpirationColumn    = sqlite.TimestampColumn("expiration")
 		RevokedColumn       = sqlite.TimestampColumn("revoked")
 		CreatedAtColumn     = sqlite.TimestampColumn("created_at")
-		allColumns          = sqlite.ColumnList{IDColumn, KeyColumn, PrefixColumn, HashColumn, UserIDColumn, DescriptionColumn, ReusableColumn, EphemeralColumn, UsedColumn, TagsColumn, PreauthorizedColumn, ExpirationColumn, RevokedColumn, CreatedAtColumn}
-		mutableColumns      = sqlite.ColumnList{KeyColumn, PrefixColumn, HashColumn, UserIDColumn, DescriptionColumn, ReusableColumn, EphemeralColumn, UsedColumn, TagsColumn, PreauthorizedColumn, ExpirationColumn, RevokedColumn, CreatedAtColumn}
+		allColumns          = sqlite.ColumnList{IDColumn, KeyColumn, PrefixColumn, HashColumn, UserIDColumn, DescriptionColumn, ReusableColumn, EphemeralColumn, UsedColumn, TagsColumn, PreauthorizedColumn, GroupsColumn, ExpirationColumn, RevokedColumn, CreatedAtColumn}
+		mutableColumns      = sqlite.ColumnList{KeyColumn, PrefixColumn, HashColumn, UserIDColumn, DescriptionColumn, ReusableColumn, EphemeralColumn, UsedColumn, TagsColumn, PreauthorizedColumn, GroupsColumn, ExpirationColumn, RevokedColumn, CreatedAtColumn}
 		defaultColumns      = sqlite.ColumnList{EphemeralColumn, UsedColumn, PreauthorizedColumn}
 	)
 
@@ -106,6 +108,7 @@ func newPreAuthKeysTableImpl(schemaName, tableName, alias string) preAuthKeysTab
 		Used:          UsedColumn,
 		Tags:          TagsColumn,
 		Preauthorized: PreauthorizedColumn,
+		Groups:        GroupsColumn,
 		Expiration:    ExpirationColumn,
 		Revoked:       RevokedColumn,
 		CreatedAt:     CreatedAtColumn,
