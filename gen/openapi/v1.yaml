@@ -893,6 +893,14 @@ components:
           items:
             type: string
           type: array
+        suspended:
+          description: true while an administrator has suspended the node.
+          type: boolean
+        suspendedAt:
+          format: date-time
+          type:
+            - string
+            - "null"
         tags:
           items:
             type: string
@@ -913,6 +921,8 @@ components:
         - createdAt
         - approved
         - approvedAt
+        - suspended
+        - suspendedAt
         - registerMethod
         - givenName
         - online
@@ -1194,6 +1204,13 @@ components:
       properties:
         enabled:
           description: false clears the mark.
+          type: boolean
+      type: object
+    SetSuspensionRequestBody:
+      additionalProperties: false
+      properties:
+        suspended:
+          description: false lifts the suspension.
           type: boolean
       type: object
     SetTagsRequestBody:
@@ -3028,6 +3045,45 @@ paths:
       tags:
         - Nodes
       x-audit-action: node.unshare
+  /api/v1/node/{nodeId}/suspend:
+    post:
+      description: |-
+        Suspends a node or lifts the suspension. A suspended node stays registered and keeps its addresses, but it has no peers, no peer sees it and its client is told it is not authorized until the suspension is lifted. Unlike expiring the key, lifting a suspension needs no login on the device.
+
+        Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: suspendNode
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetSuspensionRequestBody"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Suspend node
+      tags:
+        - Nodes
+      x-audit-action: node.suspension.set
+      x-required-scope: devices:core
   /api/v1/node/{nodeId}/tags:
     post:
       description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).

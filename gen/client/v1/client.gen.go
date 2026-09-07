@@ -561,8 +561,12 @@ type Node struct {
 	// SharedWith IDs of the users the node is shared with.
 	SharedWith   []string `json:"sharedWith"`
 	SubnetRoutes []string `json:"subnetRoutes"`
-	Tags         []string `json:"tags"`
-	User         User     `json:"user"`
+
+	// Suspended true while an administrator has suspended the node.
+	Suspended   bool       `json:"suspended"`
+	SuspendedAt *time.Time `json:"suspendedAt"`
+	Tags        []string   `json:"tags"`
+	User        User       `json:"user"`
 }
 
 // NodeRegisterMethod defines model for Node.RegisterMethod.
@@ -682,6 +686,12 @@ type SetDNSRequestBody struct {
 type SetGlobalExitNodeRequestBody struct {
 	// Enabled false clears the mark.
 	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// SetSuspensionRequestBody defines model for SetSuspensionRequestBody.
+type SetSuspensionRequestBody struct {
+	// Suspended false lifts the suspension.
+	Suspended *bool `json:"suspended,omitempty"`
 }
 
 // SetTagsRequestBody defines model for SetTagsRequestBody.
@@ -933,6 +943,9 @@ type SetGlobalExitNodeJSONRequestBody = SetGlobalExitNodeRequestBody
 
 // ShareNodeJSONRequestBody defines body for ShareNode for application/json ContentType.
 type ShareNodeJSONRequestBody = ShareNodeRequestBody
+
+// SuspendNodeJSONRequestBody defines body for SuspendNode for application/json ContentType.
+type SuspendNodeJSONRequestBody = SetSuspensionRequestBody
 
 // SetTagsJSONRequestBody defines body for SetTags for application/json ContentType.
 type SetTagsJSONRequestBody = SetTagsRequestBody
@@ -1644,6 +1657,28 @@ type ClientInterface interface {
 	//
 	// Corresponds with DELETE /api/v1/node/{nodeId}/share/{userId} (the `UnshareNode` operationId).
 	UnshareNode(ctx context.Context, nodeId string, userId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SuspendNodeWithBody Suspend node
+	//
+	// Suspends a node or lifts the suspension. A suspended node stays registered and keeps its addresses, but it has no peers, no peer sees it and its client is told it is not authorized until the suspension is lifted. Unlike expiring the key, lifting a suspension needs no login on the device.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/suspend (the `SuspendNode` operationId).
+	SuspendNodeWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SuspendNode Suspend node
+	//
+	// Suspends a node or lifts the suspension. A suspended node stays registered and keeps its addresses, but it has no peers, no peer sees it and its client is told it is not authorized until the suspension is lifted. Unlike expiring the key, lifting a suspension needs no login on the device.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/suspend (the `SuspendNode` operationId).
+	SuspendNode(ctx context.Context, nodeId string, body SuspendNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetTagsWithBody Set tags
 	//
@@ -3264,6 +3299,48 @@ func (c *Client) ShareNode(ctx context.Context, nodeId string, body ShareNodeJSO
 // Corresponds with DELETE /api/v1/node/{nodeId}/share/{userId} (the `UnshareNode` operationId).
 func (c *Client) UnshareNode(ctx context.Context, nodeId string, userId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUnshareNodeRequest(c.Server, nodeId, userId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SuspendNodeWithBody Suspend node
+//
+// Suspends a node or lifts the suspension. A suspended node stays registered and keeps its addresses, but it has no peers, no peer sees it and its client is told it is not authorized until the suspension is lifted. Unlike expiring the key, lifting a suspension needs no login on the device.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/node/{nodeId}/suspend (the `SuspendNode` operationId).
+func (c *Client) SuspendNodeWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSuspendNodeRequestWithBody(c.Server, nodeId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SuspendNode Suspend node
+//
+// Suspends a node or lifts the suspension. A suspended node stays registered and keeps its addresses, but it has no peers, no peer sees it and its client is told it is not authorized until the suspension is lifted. Unlike expiring the key, lifting a suspension needs no login on the device.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/node/{nodeId}/suspend (the `SuspendNode` operationId).
+func (c *Client) SuspendNode(ctx context.Context, nodeId string, body SuspendNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSuspendNodeRequest(c.Server, nodeId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -5967,6 +6044,53 @@ func NewUnshareNodeRequest(server string, nodeId string, userId string) (*http.R
 	return req, nil
 }
 
+// NewSuspendNodeRequest calls the generic SuspendNode builder with application/json body
+func NewSuspendNodeRequest(server string, nodeId string, body SuspendNodeJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSuspendNodeRequestWithBody(server, nodeId, "application/json", bodyReader)
+}
+
+// NewSuspendNodeRequestWithBody constructs an http.Request for the SuspendNode method, with any body, and a specified content type
+func NewSuspendNodeRequestWithBody(server string, nodeId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/suspend", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewSetTagsRequest calls the generic SetTags builder with application/json body
 func NewSetTagsRequest(server string, nodeId string, body SetTagsJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -7700,6 +7824,28 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with DELETE /api/v1/node/{nodeId}/share/{userId} (the `UnshareNode` operationId).
 	UnshareNodeWithResponse(ctx context.Context, nodeId string, userId string, reqEditors ...RequestEditorFn) (*UnshareNodeResponse, error)
+
+	// SuspendNodeWithBodyWithResponse Suspend node
+	//
+	// Suspends a node or lifts the suspension. A suspended node stays registered and keeps its addresses, but it has no peers, no peer sees it and its client is told it is not authorized until the suspension is lifted. Unlike expiring the key, lifting a suspension needs no login on the device.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/suspend (the `SuspendNode` operationId).
+	SuspendNodeWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SuspendNodeResponse, error)
+
+	// SuspendNodeWithResponse Suspend node
+	//
+	// Suspends a node or lifts the suspension. A suspended node stays registered and keeps its addresses, but it has no peers, no peer sees it and its client is told it is not authorized until the suspension is lifted. Unlike expiring the key, lifting a suspension needs no login on the device.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/suspend (the `SuspendNode` operationId).
+	SuspendNodeWithResponse(ctx context.Context, nodeId string, body SuspendNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*SuspendNodeResponse, error)
 
 	// SetTagsWithBodyWithResponse Set tags
 	//
@@ -10334,6 +10480,54 @@ func (r UnshareNodeResponse) ContentType() string {
 	return ""
 }
 
+type SuspendNodeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodeOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SuspendNodeResponse) GetJSON200() *NodeOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r SuspendNodeResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SuspendNodeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SuspendNodeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SuspendNodeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SuspendNodeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type SetTagsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -12694,6 +12888,40 @@ func (c *ClientWithResponses) UnshareNodeWithResponse(ctx context.Context, nodeI
 	return ParseUnshareNodeResponse(rsp)
 }
 
+// SuspendNodeWithBodyWithResponse Suspend node
+//
+// Suspends a node or lifts the suspension. A suspended node stays registered and keeps its addresses, but it has no peers, no peer sees it and its client is told it is not authorized until the suspension is lifted. Unlike expiring the key, lifting a suspension needs no login on the device.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/suspend (the `SuspendNode` operationId).
+func (c *ClientWithResponses) SuspendNodeWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SuspendNodeResponse, error) {
+	rsp, err := c.SuspendNodeWithBody(ctx, nodeId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSuspendNodeResponse(rsp)
+}
+
+// SuspendNodeWithResponse Suspend node
+//
+// Suspends a node or lifts the suspension. A suspended node stays registered and keeps its addresses, but it has no peers, no peer sees it and its client is told it is not authorized until the suspension is lifted. Unlike expiring the key, lifting a suspension needs no login on the device.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/suspend (the `SuspendNode` operationId).
+func (c *ClientWithResponses) SuspendNodeWithResponse(ctx context.Context, nodeId string, body SuspendNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*SuspendNodeResponse, error) {
+	rsp, err := c.SuspendNode(ctx, nodeId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSuspendNodeResponse(rsp)
+}
+
 // SetTagsWithBodyWithResponse Set tags
 //
 // Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -14834,6 +15062,39 @@ func ParseUnshareNodeResponse(rsp *http.Response) (*UnshareNodeResponse, error) 
 	}
 
 	response := &UnshareNodeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodeOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSuspendNodeResponse parses an HTTP response from a SuspendNodeWithResponse call
+func ParseSuspendNodeResponse(rsp *http.Response) (*SuspendNodeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SuspendNodeResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
