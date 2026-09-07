@@ -19,9 +19,18 @@ import (
 var errUnknown = errors.New("unknown credential")
 
 type fakeAuth struct {
-	keys   map[string]*types.APIKey
-	tokens map[string]*types.OAuthAccessToken
-	users  map[types.UserID]*types.User
+	keys     map[string]*types.APIKey
+	tokens   map[string]*types.OAuthAccessToken
+	sessions map[string]*types.Session
+	users    map[types.UserID]*types.User
+}
+
+func (f fakeAuth) AuthenticateSession(token string) (*types.Session, error) {
+	if s, ok := f.sessions[token]; ok {
+		return s, nil
+	}
+
+	return nil, errUnknown
 }
 
 func (f fakeAuth) AuthenticateAPIKey(key string) (*types.APIKey, error) {
@@ -60,6 +69,11 @@ func newFakeAuth() fakeAuth {
 		},
 		tokens: map[string]*types.OAuthAccessToken{
 			types.AccessTokenPrefix + "routes": {Scopes: []string{"devices:routes"}, Tags: []string{"tag:web"}},
+		},
+		sessions: map[string]*types.Session{
+			"owner-session":  {ID: 7, UserID: 1},
+			"member-session": {ID: 8, UserID: 3},
+			"orphan-session": {ID: 9, UserID: 99},
 		},
 		users: map[types.UserID]*types.User{
 			1: {ID: 1, Role: types.RoleOwner},
@@ -253,6 +267,9 @@ func newTestAPI(t *testing.T, auth Authenticator) http.Handler {
 	huma.Register(api, huma.Operation{
 		OperationID: "self", Method: http.MethodGet, Path: "/self", Security: security,
 	}, echo)
+	huma.Register(api, RequireScope(huma.Operation{
+		OperationID: "write", Method: http.MethodPost, Path: "/users", Security: security,
+	}, scope.Users), echo)
 
 	return mux
 }
@@ -315,6 +332,159 @@ func TestMiddleware(t *testing.T) {
 			} else {
 				handler.ServeHTTP(rec, req)
 			}
+
+			assert.Equal(t, tt.want, rec.Code, rec.Body.String())
+
+			if tt.body != "" {
+				assert.Contains(t, rec.Body.String(), tt.body)
+			}
+		})
+	}
+}
+
+func TestAuthenticateSession(t *testing.T) {
+	t.Parallel()
+
+	auth := newFakeAuth()
+
+	p, err := AuthenticateSession(auth, "owner-session")
+	require.NoError(t, err)
+	assert.Equal(t, Session, p.Kind)
+	assert.Equal(t, types.UserID(1), p.UserID)
+	assert.Equal(t, types.RoleOwner, p.Role)
+	assert.False(t, p.Bounded, "an owner's session is all-access")
+	assert.Equal(t, uint64(7), p.SessionID)
+	assert.Equal(t, "7", p.Credential)
+
+	p, err = AuthenticateSession(auth, "member-session")
+	require.NoError(t, err)
+	assert.True(t, p.Bounded)
+	assert.Empty(t, p.Scopes)
+
+	p, err = AuthenticateSession(auth, "orphan-session")
+	require.NoError(t, err)
+	assert.True(t, p.Bounded, "a session whose user is gone grants nothing")
+	assert.Empty(t, p.Scopes)
+
+	_, err = AuthenticateSession(auth, "")
+	require.ErrorIs(t, err, ErrUnauthenticated)
+
+	_, err = AuthenticateSession(auth, "nope")
+	require.ErrorIs(t, err, ErrUnauthenticated)
+}
+
+func TestSessionCookie(t *testing.T) {
+	t.Parallel()
+
+	token, ok := SessionCookie("other=1; " + types.SessionCookieName + "=abc; x=y")
+	assert.True(t, ok)
+	assert.Equal(t, "abc", token)
+
+	_, ok = SessionCookie("other=1")
+	assert.False(t, ok)
+
+	_, ok = SessionCookie("")
+	assert.False(t, ok)
+
+	_, ok = SessionCookie(types.SessionCookieName + "=")
+	assert.False(t, ok)
+}
+
+// TestMiddlewareCookie pins the same-site rule: a session cookie signs a
+// request in only when the browser vouches that the page came from this
+// server, and a bearer token always wins over a cookie.
+func TestMiddlewareCookie(t *testing.T) {
+	t.Parallel()
+
+	handler := newTestAPI(t, newFakeAuth())
+	cookie := types.SessionCookieName + "=owner-session"
+
+	tests := []struct {
+		name    string
+		method  string
+		headers map[string]string
+		want    int
+		body    string
+	}{
+		{
+			name: "same-origin read", method: http.MethodGet,
+			headers: map[string]string{"Cookie": cookie, "Sec-Fetch-Site": "same-origin"},
+			want:    http.StatusOK, body: `"kind":3`,
+		},
+		{
+			name: "same-origin write", method: http.MethodPost,
+			headers: map[string]string{"Cookie": cookie, "Sec-Fetch-Site": "same-origin"},
+			want:    http.StatusOK,
+		},
+		{
+			name: "navigation read", method: http.MethodGet,
+			headers: map[string]string{"Cookie": cookie, "Sec-Fetch-Site": "none"},
+			want:    http.StatusOK,
+		},
+		{
+			name: "cross-site read refused", method: http.MethodGet,
+			headers: map[string]string{"Cookie": cookie, "Sec-Fetch-Site": "cross-site"},
+			want:    http.StatusForbidden,
+		},
+		{
+			name: "cross-site write refused", method: http.MethodPost,
+			headers: map[string]string{"Cookie": cookie, "Sec-Fetch-Site": "cross-site"},
+			want:    http.StatusForbidden,
+		},
+		{
+			name: "same-site subdomain refused", method: http.MethodPost,
+			headers: map[string]string{"Cookie": cookie, "Sec-Fetch-Site": "same-site"},
+			want:    http.StatusForbidden,
+		},
+		{
+			name: "old browser with matching origin", method: http.MethodPost,
+			headers: map[string]string{"Cookie": cookie, "Origin": "http://example.com"},
+			want:    http.StatusOK,
+		},
+		{
+			name: "old browser with foreign origin", method: http.MethodPost,
+			headers: map[string]string{"Cookie": cookie, "Origin": "https://evil.example"},
+			want:    http.StatusForbidden,
+		},
+		{
+			name: "no browser headers read", method: http.MethodGet,
+			headers: map[string]string{"Cookie": cookie},
+			want:    http.StatusOK,
+		},
+		{
+			name: "no browser headers write refused", method: http.MethodPost,
+			headers: map[string]string{"Cookie": cookie},
+			want:    http.StatusForbidden,
+		},
+		{
+			name: "unknown cookie", method: http.MethodGet,
+			headers: map[string]string{"Cookie": types.SessionCookieName + "=nope", "Sec-Fetch-Site": "same-origin"},
+			want:    http.StatusUnauthorized,
+		},
+		{
+			name:   "bearer wins over cookie",
+			method: http.MethodGet,
+			headers: map[string]string{
+				"Cookie":         cookie,
+				"Sec-Fetch-Site": "cross-site",
+				"Authorization":  "Bearer legacy",
+			},
+			want: http.StatusOK,
+			body: `"kind":1`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequestWithContext(t.Context(), tt.method, "http://example.com/users", http.NoBody)
+			for k, v := range tt.headers {
+				req.Header.Set(k, v)
+			}
+
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
 
 			assert.Equal(t, tt.want, rec.Code, rec.Body.String())
 

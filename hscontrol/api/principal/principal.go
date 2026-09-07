@@ -3,7 +3,8 @@
 // the same thing everywhere: a locally trusted transport (the unix socket)
 // may do anything; an API key without a user is the historical all-access
 // admin key; an API key owned by a user is bounded by the user's role; an
-// OAuth access token is bounded by its scopes.
+// OAuth access token is bounded by its scopes; a console session cookie is
+// bounded by the signed-in user's role.
 package principal
 
 import (
@@ -11,6 +12,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -28,11 +30,20 @@ const (
 	APIKey
 	// AccessToken is an OAuth access token minted by an OAuth client.
 	AccessToken
+	// Session is a browser signed in to the admin console through the
+	// identity provider; the credential is a cookie.
+	Session
 )
 
-// ErrUnauthenticated is returned when no credential, or an invalid one, is
-// presented.
-var ErrUnauthenticated = errors.New("unauthenticated")
+var (
+	// ErrUnauthenticated is returned when no credential, or an invalid one, is
+	// presented.
+	ErrUnauthenticated = errors.New("unauthenticated")
+	// ErrCrossSite is returned when a cookie-authenticated request comes
+	// from another site: the browser sent the cookie, the page did not
+	// come from this server.
+	ErrCrossSite = errors.New("cross-site request refused")
+)
 
 // Principal is the authenticated caller of one request.
 type Principal struct {
@@ -50,12 +61,20 @@ type Principal struct {
 	Scopes  []scope.Scope
 	// Tags an OAuth token may assign; nil for every other kind.
 	Tags []string
+
+	// Credential names the credential for the audit log without exposing
+	// it: an API key's prefix, an OAuth token's client, a session's ID.
+	Credential string
+	// SessionID is the console session behind a Session principal, so
+	// signing out can end exactly that session.
+	SessionID uint64
 }
 
 // Authenticator resolves credentials. *state.State satisfies it.
 type Authenticator interface {
 	AuthenticateAPIKey(key string) (*types.APIKey, error)
 	AuthenticateAccessToken(token string) (*types.OAuthAccessToken, error)
+	AuthenticateSession(token string) (*types.Session, error)
 	GetUserByID(id types.UserID) (*types.User, error)
 }
 
@@ -110,10 +129,11 @@ func Authenticate(auth Authenticator, token string) (Principal, error) {
 		}
 
 		return Principal{
-			Kind:    AccessToken,
-			Bounded: true,
-			Scopes:  scope.Parse(at.Scopes),
-			Tags:    at.Tags,
+			Kind:       AccessToken,
+			Bounded:    true,
+			Scopes:     scope.Parse(at.Scopes),
+			Tags:       at.Tags,
+			Credential: at.ClientID,
 		}, nil
 	}
 
@@ -122,7 +142,7 @@ func Authenticate(auth Authenticator, token string) (Principal, error) {
 		return Principal{}, ErrUnauthenticated
 	}
 
-	p := Principal{Kind: APIKey}
+	p := Principal{Kind: APIKey, Credential: key.Prefix}
 	if key.UserID == nil {
 		return p, nil
 	}
@@ -130,16 +150,47 @@ func Authenticate(auth Authenticator, token string) (Principal, error) {
 	p.UserID = types.UserID(*key.UserID)
 	p.Bounded = true
 
+	return applyRole(auth, p), nil
+}
+
+// AuthenticateSession resolves a console session cookie. The session is
+// bounded by its user's current role, read on every request, so a role
+// change or a deleted user takes effect without signing the browser out
+// by hand.
+func AuthenticateSession(auth Authenticator, token string) (Principal, error) {
+	if token == "" {
+		return Principal{}, ErrUnauthenticated
+	}
+
+	session, err := auth.AuthenticateSession(token)
+	if err != nil {
+		return Principal{}, ErrUnauthenticated
+	}
+
+	p := Principal{
+		Kind:       Session,
+		UserID:     session.UserID,
+		Bounded:    true,
+		Credential: strconv.FormatUint(session.ID, 10),
+		SessionID:  session.ID,
+	}
+
+	return applyRole(auth, p), nil
+}
+
+// applyRole bounds p by its user's current role; a missing user (deleted
+// after the credential was issued) leaves p bounded with no scopes.
+func applyRole(auth Authenticator, p Principal) Principal {
 	role, ok := userRole(auth, p.UserID)
 	if !ok {
-		return p, nil
+		return p
 	}
 
 	p.Role = role
 	p.Bounded = !role.IsAdmin()
 	p.Scopes = scope.ForRole(role)
 
-	return p, nil
+	return p
 }
 
 // userRole looks up a key owner's current role. A missing user (deleted
@@ -244,10 +295,35 @@ func RequiredScope(op *huma.Operation) (scope.Scope, bool) {
 	return s, ok
 }
 
+// SessionCookie extracts the console session token from a Cookie header.
+func SessionCookie(header string) (string, bool) {
+	if header == "" {
+		return "", false
+	}
+
+	cookies, err := http.ParseCookie(header)
+	if err != nil {
+		return "", false
+	}
+
+	for _, c := range cookies {
+		if c.Name == types.SessionCookieName && c.Value != "" {
+			return c.Value, true
+		}
+	}
+
+	return "", false
+}
+
 // Middleware authenticates every operation that declares security and
 // enforces the scope it declared. Operations without a declared scope (the
 // v2 keys handlers, which pick the scope from the request body) receive the
 // principal and finish the check themselves.
+//
+// A bearer token wins over a cookie. A cookie is honoured only for a
+// same-site request: the browser attaches it to any request aimed at this
+// server, so without the check a page on another site could act as the
+// signed-in operator.
 func Middleware(api huma.API, auth Authenticator) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		if p, ok := From(ctx.Context()); ok && p.Kind == LocalTrust {
@@ -262,14 +338,13 @@ func Middleware(api huma.API, auth Authenticator) func(huma.Context, func(huma.C
 			return
 		}
 
-		token, ok := Token(ctx.Header("Authorization"))
-		if !ok {
-			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "unauthorized")
+		p, err := authenticateRequest(ctx, auth)
+		if errors.Is(err, ErrCrossSite) {
+			_ = huma.WriteErr(api, ctx, http.StatusForbidden, err.Error())
 
 			return
 		}
 
-		p, err := Authenticate(auth, token)
 		if err != nil {
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "unauthorized")
 
@@ -285,4 +360,49 @@ func Middleware(api huma.API, auth Authenticator) func(huma.Context, func(huma.C
 
 		next(huma.WithValue(ctx, contextKey{}, p))
 	}
+}
+
+// authenticateRequest resolves the request's credential: the Authorization
+// header when present, else the session cookie under the same-site rule.
+func authenticateRequest(ctx huma.Context, auth Authenticator) (Principal, error) {
+	if token, ok := Token(ctx.Header("Authorization")); ok {
+		return Authenticate(auth, token)
+	}
+
+	token, ok := SessionCookie(ctx.Header("Cookie"))
+	if !ok {
+		return Principal{}, ErrUnauthenticated
+	}
+
+	if !sameSite(ctx) {
+		return Principal{}, ErrCrossSite
+	}
+
+	return AuthenticateSession(auth, token)
+}
+
+// sameSite reports whether a cookie-bearing request was made by a page this
+// server served. Browsers state it in Sec-Fetch-Site; an older browser
+// that omits the header is judged by Origin, which every cross-origin
+// request and every non-GET request carries. A request with neither is a
+// plain navigation or a non-browser client, which is fine for a read and
+// refused for a write.
+func sameSite(ctx huma.Context) bool {
+	switch ctx.Header("Sec-Fetch-Site") {
+	case "same-origin", "none":
+		return true
+	case "same-site", "cross-site":
+		return false
+	}
+
+	origin := ctx.Header("Origin")
+	if origin == "" {
+		return isSafeMethod(ctx.Method())
+	}
+
+	return strings.EqualFold(strings.TrimPrefix(strings.TrimPrefix(origin, "https://"), "http://"), ctx.Host())
+}
+
+func isSafeMethod(method string) bool {
+	return method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions
 }
