@@ -277,7 +277,10 @@ global exit node and the audit log, all from a browser. The overview shows
 counts, what is waiting for approval and the machines seen most recently. The
 sidebar counts pending approvals next to _Machines_ and _Users_, Cmd-K
 opens a search over pages, machines and users, and every table filters in
-place. There is a dark mode. It signs in only through the configured identity
+place. _Add machine_ hands over the join command per platform (Linux, macOS,
+Windows, Docker, the phone apps) with a QR code carrying the same line, so a
+machine without a shared clipboard can scan it. There is a dark mode. It signs
+in only through the configured identity
 provider (Google, or any OIDC issuer) and shows what that user's role allows.
 Release binaries and container images include it. When building from source,
 run `make web` before `make build`.

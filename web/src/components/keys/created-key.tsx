@@ -5,6 +5,7 @@ import { CheckCircleIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
+import { JoinCommand } from "~/components/machines/join-command.tsx";
 import { DialogFooter } from "~/components/ui/dialog.tsx";
 
 /**
@@ -30,13 +31,13 @@ export function useCreatedKey(open: boolean): [string | null, (key: string) => v
 export function CreatedKey({
   value,
   note,
-  command,
+  join = false,
   onDone,
 }: {
   readonly value: string;
   readonly note: ReactNode;
-  /** The command that uses the key, for a caller whose goal is a machine rather than a key. */
-  readonly command?: string;
+  /** Whether to hand over the join command per platform, for a caller whose goal is a machine. */
+  readonly join?: boolean;
   readonly onDone: () => void;
 }): ReactElement {
   return (
@@ -52,20 +53,7 @@ export function CreatedKey({
         tooltip={{ text: "Copy key", copiedText: "Copied" }}
         labels={{ copyAction: "Copy key" }}
       />
-      {command === undefined ? null : (
-        <div className="flex flex-col gap-1.5">
-          <p className="text-kumo-subtle">
-            Run this on the machine; it appears in the list within a few seconds.
-          </p>
-          <ClipboardText
-            size="base"
-            className="max-w-full"
-            text={command}
-            tooltip={{ text: "Copy command", copiedText: "Copied" }}
-            labels={{ copyAction: "Copy command" }}
-          />
-        </div>
-      )}
+      {join ? <JoinCommand authKey={value} /> : null}
       <DialogFooter>
         <Button variant="primary" onClick={onDone}>
           Done

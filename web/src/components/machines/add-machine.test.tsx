@@ -5,7 +5,7 @@ import { render } from "vitest-browser-react";
 import type { Me } from "~/auth/me.ts";
 import { CreatedKey } from "~/components/keys/created-key.tsx";
 import { CreatePreAuthKeyDialog } from "~/components/keys/preauth-dialogs.tsx";
-import { connectCommand } from "~/components/machines/connect.ts";
+import { connectCommand, joinInstructions, platforms } from "~/components/machines/connect.ts";
 
 /** No users:read, so the dialog asks for a user id instead of loading the user list. */
 const operator: Me = {
@@ -62,12 +62,12 @@ describe(CreatePreAuthKeyDialog, () => {
 });
 
 describe(CreatedKey, () => {
-  it("hands over the command that uses the key", async () => {
+  it("hands over the join command per platform with a QR code", async () => {
     const screen = await render(
       <CreatedKey
         value="secret"
         note="Shown once."
-        command={connectCommand("secret")}
+        join
         onDone={() => {
           // Nothing to close in a test.
         }}
@@ -75,17 +75,22 @@ describe(CreatedKey, () => {
     );
 
     await expect
-      .element(
-        screen.getByText(
-          `tailscale up --login-server=${globalThis.location.origin} --authkey=secret`,
-        ),
-      )
+      .element(screen.getByText(`sudo ${connectCommand("secret")}`, { exact: false }))
       .toBeVisible();
     await expect
-      .element(
-        screen.getByText("Run this on the machine; it appears in the list within a few seconds."),
-      )
+      .element(screen.getByRole("img", { name: "QR code with the Linux join command" }))
       .toBeVisible();
+
+    await screen.getByRole("tab", { name: "Docker" }).click();
+
+    await expect.element(screen.getByText("TS_AUTHKEY=secret", { exact: false })).toBeVisible();
+
+    await screen.getByRole("tab", { name: "iOS & Android" }).click();
+
+    await expect
+      .element(screen.getByRole("img", { name: "QR code with the server address" }))
+      .toBeVisible();
+    await expect.element(screen.getByText("Copy command")).not.toBeInTheDocument();
   });
 
   it("shows only the key when a key is what was asked for", async () => {
@@ -99,8 +104,26 @@ describe(CreatedKey, () => {
       />,
     );
 
-    await expect
-      .element(screen.getByText("Run this on the machine", { exact: false }))
-      .not.toBeInTheDocument();
+    await expect.element(screen.getByRole("tab", { name: "Linux" })).not.toBeInTheDocument();
+  });
+});
+
+describe(joinInstructions, () => {
+  it("puts the key and this server into every shell command", () => {
+    for (const platform of platforms.filter((known) => known !== "mobile")) {
+      const { command, qr } = joinInstructions(platform, "secret");
+
+      expect(command).toContain("secret");
+      expect(command).toContain(globalThis.location.origin);
+      expect(qr).toContain("secret");
+      expect(qr).not.toContain("\n");
+    }
+  });
+
+  it("hands the phone apps the server address instead of a command", () => {
+    const { command, qr } = joinInstructions("mobile", "secret");
+
+    expect(command).toBeNull();
+    expect(qr).toBe(globalThis.location.origin);
   });
 });

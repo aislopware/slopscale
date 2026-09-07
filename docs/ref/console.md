@@ -95,6 +95,10 @@ account menu with *Sign out*.
   routes. Search by name, address, user or tag and filter by status or user.
   Each machine has a detail page with its keys, routes (approve with a switch),
   sharing and the global exit node switch, plus rename, tag, expire and remove.
+  _Add machine_ mints a pre-auth key and hands over the join command for
+  Linux, macOS, Windows and Docker, next to a QR code carrying the same line
+  so a phone or a machine without a shared clipboard can pick it up; the
+  iOS and Android tab gives the server address and where the app takes it.
 - **Users**: create, rename, approve, change the [role](roles.md) and delete
   users.
 - **Keys**: pre-auth keys (create with reusable, ephemeral, pre-authorized and

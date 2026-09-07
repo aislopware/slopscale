@@ -16,7 +16,6 @@ import { CreatedKey, useCreatedKey } from "~/components/keys/created-key.tsx";
 import { expirationFor, expiryOptions } from "~/components/keys/expiration.ts";
 import type { ExpiryChoice } from "~/components/keys/expiration.ts";
 import { usePreAuthKeyMutations } from "~/components/keys/mutations.ts";
-import { connectCommand } from "~/components/machines/connect.ts";
 import {
   DialogClose,
   DialogContent,
@@ -105,7 +104,7 @@ export function CreatePreAuthKeyDialog({
           <CreatedKey
             value={created}
             note={revealNote}
-            {...(intent === "add-machine" ? { command: connectCommand(created) } : {})}
+            join={intent === "add-machine"}
             onDone={close}
           />
         )}

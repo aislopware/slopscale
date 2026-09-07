@@ -40,6 +40,7 @@
     "openapi-fetch": "0.17.0",
     "openapi-react-query": "0.5.4",
     "openapi-typescript-helpers": "0.1.0",
+    "qrcode-generator": "^2.0.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "valibot": "1.4.2"
