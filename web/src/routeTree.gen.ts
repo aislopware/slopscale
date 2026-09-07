@@ -19,6 +19,7 @@ import { Route as AppNetworksRouteImport } from './routes/_app/networks'
 import { Route as AppPolicyRouteImport } from './routes/_app/policy'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppUsersRouteImport } from './routes/_app/users'
+import { Route as AppWebhooksRouteImport } from './routes/_app/webhooks'
 import { Route as AppMachinesIndexRouteImport } from './routes/_app/machines/index'
 import { Route as AppMachinesNodeIdRouteImport } from './routes/_app/machines/$nodeId'
 
@@ -71,6 +72,11 @@ const AppUsersRoute = AppUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AppRoute,
 } as any)
+const AppWebhooksRoute = AppWebhooksRouteImport.update({
+  id: '/webhooks',
+  path: '/webhooks',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMachinesIndexRoute = AppMachinesIndexRouteImport.update({
   id: '/machines/',
   path: '/machines/',
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/policy': typeof AppPolicyRoute
   '/settings': typeof AppSettingsRoute
   '/users': typeof AppUsersRoute
+  '/webhooks': typeof AppWebhooksRoute
   '/machines/$nodeId': typeof AppMachinesNodeIdRoute
   '/machines/': typeof AppMachinesIndexRoute
 }
@@ -104,6 +111,7 @@ export interface FileRoutesByTo {
   '/policy': typeof AppPolicyRoute
   '/settings': typeof AppSettingsRoute
   '/users': typeof AppUsersRoute
+  '/webhooks': typeof AppWebhooksRoute
   '/': typeof AppIndexRoute
   '/machines/$nodeId': typeof AppMachinesNodeIdRoute
   '/machines': typeof AppMachinesIndexRoute
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   '/_app/policy': typeof AppPolicyRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/users': typeof AppUsersRoute
+  '/_app/webhooks': typeof AppWebhooksRoute
   '/_app/': typeof AppIndexRoute
   '/_app/machines/$nodeId': typeof AppMachinesNodeIdRoute
   '/_app/machines/': typeof AppMachinesIndexRoute
@@ -135,6 +144,7 @@ export interface FileRouteTypes {
     | '/policy'
     | '/settings'
     | '/users'
+    | '/webhooks'
     | '/machines/$nodeId'
     | '/machines/'
   fileRoutesByTo: FileRoutesByTo
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
     | '/policy'
     | '/settings'
     | '/users'
+    | '/webhooks'
     | '/'
     | '/machines/$nodeId'
     | '/machines'
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/_app/policy'
     | '/_app/settings'
     | '/_app/users'
+    | '/_app/webhooks'
     | '/_app/'
     | '/_app/machines/$nodeId'
     | '/_app/machines/'
@@ -243,6 +255,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppUsersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/webhooks': {
+      id: '/_app/webhooks'
+      path: '/webhooks'
+      fullPath: '/webhooks'
+      preLoaderRoute: typeof AppWebhooksRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/machines/': {
       id: '/_app/machines/'
       path: '/machines'
@@ -268,6 +287,7 @@ interface AppRouteChildren {
   AppPolicyRoute: typeof AppPolicyRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppUsersRoute: typeof AppUsersRoute
+  AppWebhooksRoute: typeof AppWebhooksRoute
   AppIndexRoute: typeof AppIndexRoute
   AppMachinesNodeIdRoute: typeof AppMachinesNodeIdRoute
   AppMachinesIndexRoute: typeof AppMachinesIndexRoute
@@ -281,6 +301,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppPolicyRoute: AppPolicyRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppUsersRoute: AppUsersRoute,
+  AppWebhooksRoute: AppWebhooksRoute,
   AppIndexRoute: AppIndexRoute,
   AppMachinesNodeIdRoute: AppMachinesNodeIdRoute,
   AppMachinesIndexRoute: AppMachinesIndexRoute,

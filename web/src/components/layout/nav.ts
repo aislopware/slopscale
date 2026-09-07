@@ -5,6 +5,7 @@ import {
   GearSixIcon,
   GlobeIcon,
   KeyIcon,
+  WebhooksLogoIcon,
   PathIcon,
   ShieldCheckIcon,
   SquaresFourIcon,
@@ -22,6 +23,7 @@ export type NavPath =
   | "/policy"
   | "/dns"
   | "/networks"
+  | "/webhooks"
   | "/settings"
   | "/audit";
 
@@ -63,6 +65,12 @@ export const navGroups: readonly NavGroup[] = [
       { to: "/policy", label: "Access controls", icon: ShieldCheckIcon, scope: "policy_file:read" },
       { to: "/networks", label: "Networks", icon: PathIcon, scope: "devices:routes:read" },
       { to: "/dns", label: "DNS", icon: GlobeIcon, scope: "dns:read" },
+      {
+        to: "/webhooks",
+        label: "Webhooks",
+        icon: WebhooksLogoIcon,
+        scope: "feature_settings:read",
+      },
       { to: "/settings", label: "Settings", icon: GearSixIcon, scope: "feature_settings:read" },
       {
         to: "/audit",

@@ -58,6 +58,7 @@ declare module "@tanstack/react-table" {
     groups?: readonly Group[];
     rules?: readonly AccessRule[];
     networks?: readonly Network[];
+    eventTypes?: readonly string[];
     /** Whether the policy file restricts traffic on its own; false means the rules are all there is. */
     policyFileEnforces?: boolean;
   }

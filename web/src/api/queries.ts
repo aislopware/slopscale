@@ -27,6 +27,7 @@ export type Group = MethodResponse<typeof api, "get", "/api/v1/group">["groups"]
 export type AccessRule = MethodResponse<typeof api, "get", "/api/v1/access-rule">["rules"][number];
 export type Dns = MethodResponse<typeof api, "get", "/api/v1/dns">;
 export type Network = MethodResponse<typeof api, "get", "/api/v1/network">["networks"][number];
+export type Webhook = MethodResponse<typeof api, "get", "/api/v1/webhook">["webhooks"][number];
 
 export const nodesQuery = api.queryOptions("get", "/api/v1/node");
 export const usersQuery = api.queryOptions("get", "/api/v1/user");
@@ -38,6 +39,8 @@ export const groupsQuery = api.queryOptions("get", "/api/v1/group");
 export const accessRulesQuery = api.queryOptions("get", "/api/v1/access-rule");
 export const dnsQuery = api.queryOptions("get", "/api/v1/dns");
 export const networksQuery = api.queryOptions("get", "/api/v1/network");
+export const webhooksQuery = api.queryOptions("get", "/api/v1/webhook");
+export const webhookEventTypesQuery = api.queryOptions("get", "/api/v1/webhook/event-types");
 /** What the server reports before any policy has been stored. */
 export const emptyPolicy: Policy = { policy: "", updatedAt: "" };
 
@@ -133,7 +136,8 @@ type Collection =
   | "/api/v1/group"
   | "/api/v1/access-rule"
   | "/api/v1/dns"
-  | "/api/v1/network";
+  | "/api/v1/network"
+  | "/api/v1/webhook";
 
 /** Refetches every query under the given paths; a node change touches the node list and its detail. */
 export async function invalidate(
