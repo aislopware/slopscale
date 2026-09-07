@@ -173,3 +173,33 @@ func TestTestRecordsRejection(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, store.status(4), "connect")
 }
+
+// TestDeliveryDoesNotFollowRedirects keeps the signed payload at the
+// configured URL: a receiver that redirects is recorded as a failure.
+func TestDeliveryDoesNotFollowRedirects(t *testing.T) {
+	t.Parallel()
+
+	var followed atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/elsewhere" {
+			followed.Add(1)
+			w.WriteHeader(http.StatusOK)
+
+			return
+		}
+
+		http.Redirect(w, r, "/elsewhere", http.StatusTemporaryRedirect)
+	}))
+	t.Cleanup(srv.Close)
+
+	store := &memStore{}
+	d := New(store, "example.ts.net")
+
+	err := d.Test(t.Context(), types.Webhook{ID: 9, URL: srv.URL + "/hook", Secret: "s"})
+	require.Error(t, err)
+	assert.Equal(t, int32(0), followed.Load(), "the redirect target is never posted to")
+	assert.False(t, store.record(9).OK)
+	assert.Contains(t, store.status(9), "redirect")
+	assert.False(t, retryable(0, err), "a redirect is the receiver's verdict, not a transient failure")
+}

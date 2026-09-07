@@ -67,12 +67,21 @@ func New(store Store, tailnet string) *Dispatcher {
 	return &Dispatcher{
 		store:   store,
 		tailnet: tailnet,
-		client:  &http.Client{Timeout: deliveryTimeout},
+		client:  &http.Client{Timeout: deliveryTimeout, CheckRedirect: noRedirect},
 		backoff: []time.Duration{2 * time.Second, 10 * time.Second, 30 * time.Second},
 		ctx:     ctx,
 		cancel:  cancel,
 		slots:   make(chan struct{}, maxInFlight),
 	}
+}
+
+// ErrRedirected is returned when the receiver answered with a redirect.
+var ErrRedirected = errors.New("webhook receiver redirected; deliveries are posted to the configured URL only")
+
+// noRedirect keeps a signed payload at the URL the operator configured
+// instead of following the receiver to wherever it points.
+func noRedirect(*http.Request, []*http.Request) error {
+	return ErrRedirected
 }
 
 // SetClient swaps the HTTP client, for tests and custom transports.
@@ -213,7 +222,7 @@ func (d *Dispatcher) deliverWithRetry(ctx context.Context, endpoint types.Webhoo
 // or a server-side status. A 4xx is the receiver's verdict.
 func retryable(status int, err error) bool {
 	if status == 0 {
-		return !errors.Is(err, context.Canceled)
+		return !errors.Is(err, context.Canceled) && !errors.Is(err, ErrRedirected)
 	}
 
 	return status >= http.StatusInternalServerError || status == http.StatusTooManyRequests

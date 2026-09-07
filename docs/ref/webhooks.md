@@ -80,8 +80,9 @@ none. Node events carry `nodeId`, `name`, `hostname`, `addresses`, and
 
 A failed delivery is retried three times, after 2, 10 and 30 seconds, when
 the receiver answered with a 5xx or 429 or did not answer at all. A 4xx is
-taken as the receiver's verdict and not retried. At most 16 deliveries are in
-flight at once and each waits up to 15 seconds for a response.
+taken as the receiver's verdict and not retried, and so is a redirect: the
+payload goes to the configured URL only. At most 16 deliveries are in flight
+at once and each waits up to 15 seconds for a response.
 
 ### Verifying the signature
 
