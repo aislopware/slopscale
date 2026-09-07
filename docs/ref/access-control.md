@@ -38,11 +38,12 @@ the source groups open connections to the members of the destination groups.
 The destination cannot open connections back unless the rule is
 _bidirectional_, which allows both directions.
 
-Rules only allow. While no rule is enabled and there is no policy file, every
-machine sees every other. The first enabled rule makes everything not
-allowed by a rule (or by the policy file) unreachable, so create the rules a
-tailnet needs before turning them on, or start with one rule from _All_ to
-_All_ and narrow it down.
+Rules only allow. While no rule is enabled and the policy file has no acls
+or grants, every machine sees every other. The first enabled rule makes
+everything not allowed by a rule (or by the policy file) unreachable, so
+create the rules a tailnet needs before turning them on, or start with one
+rule from _All_ to _All_ and narrow it down. The console asks before the
+last enabled rule is disabled or deleted when that would open the tailnet.
 
 Rules and the policy file combine: the rules compile into grants that sit next
 to the file's own, and a connection is allowed when either admits it. The
