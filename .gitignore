@@ -65,3 +65,6 @@ __debug_bin
 node_modules/
 /package-lock.json
 /package.json
+
+# Local secrets (Google OAuth client for the console)
+.env
