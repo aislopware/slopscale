@@ -196,6 +196,7 @@ nav:
       - User roles: ref/roles.md
       - Device and user approval: ref/approval.md
       - Node sharing: ref/sharing.md
+      - Groups and access rules: ref/access-control.md
       - Tags: ref/tags.md
       - Debug: ref/debug.md
       - Integration:

@@ -1,0 +1,94 @@
+# Groups and access rules
+
+Headscale can enforce access without a policy file. Machines and users go
+into named groups, and access rules say which groups may reach which on what
+protocol and ports. The admin console edits both under _Access controls_,
+and the same operations are on the API and the CLI. The model follows
+[NetBird's groups and policies](https://docs.netbird.io/manage/access-control):
+allow rules only, no ordering, and a tailnet that turns default-deny as soon as
+one rule is enabled.
+
+## Groups
+
+A group is a named set of machines. A machine belongs to it in one of two
+ways:
+
+- directly, when an operator adds the machine to the group, and
+- through its owner, when the operator adds the user to the group. Every
+  machine the user owns is then a member, including machines the user
+  registers later.
+
+Tagged machines have no owner, so they join groups directly. A machine can be
+in any number of groups. The builtin group _All_ holds every machine, lists
+no members and cannot be renamed, edited or deleted.
+
+Pre-auth keys carry groups too. A key created with `groupIds` enrols every
+machine it registers into those groups, the way a NetBird setup key does with
+its auto-groups. A group that has been deleted since is skipped.
+
+Deleting a user or a machine drops its memberships. A group an access rule
+names cannot be deleted; take it out of the rule first.
+
+## Access rules
+
+A rule has a name, a description, an enabled switch, a protocol (`all`,
+`tcp`, `udp` or `icmp`), ports for `tcp` and `udp` (`22,80,8000-8100`, empty
+for every port), source groups and destination groups. It lets the members of
+the source groups open connections to the members of the destination groups.
+The destination cannot open connections back unless the rule is
+_bidirectional_, which allows both directions.
+
+Rules only allow. While no rule is enabled and there is no policy file, every
+machine sees every other. The first enabled rule makes everything not
+allowed by a rule (or by the policy file) unreachable, so create the rules a
+tailnet needs before turning them on, or start with one rule from _All_ to
+_All_ and narrow it down.
+
+Rules and the policy file combine: the rules compile into grants that sit next
+to the file's own, and a connection is allowed when either admits it. The
+file's `tests` run against the combined result.
+
+## Structuring groups
+
+Groups work best when each one answers one question. Groups of users describe
+who: `engineering`, `support`, `contractors`. Groups of machines describe what:
+`production-servers`, `office-printers`, `ci-runners`. A rule then reads as a
+sentence, "engineering may reach production-servers on tcp 22 and 443", and
+a new engineer or a new server needs a group change, not a rule change.
+
+## API and CLI
+
+Groups live at `/api/v1/group` and rules at `/api/v1/access-rule`; both need
+the `policy_file` scope (`policy_file:read` for listing). A group is created
+with `POST /api/v1/group` and `{"name": "Engineering", "userIds": ["3"]}`,
+changed with `PATCH /api/v1/group/{id}`, which replaces the members it names
+and keeps the ones it omits, and deleted with `DELETE`. Single members are
+added with `POST /api/v1/group/{id}/member` and `{"nodeId": "7"}` or
+`{"userId": "3"}`, and removed with `DELETE /api/v1/group/{id}/node/{nodeId}`
+or `DELETE /api/v1/group/{id}/user/{userId}`.
+
+A rule is created with `POST /api/v1/access-rule`:
+
+```json
+{
+  "name": "SSH to servers",
+  "protocol": "tcp",
+  "ports": "22",
+  "sourceGroupIds": ["2"],
+  "destinationGroupIds": ["3"]
+}
+```
+
+`PUT /api/v1/access-rule/{id}` replaces every field, and `DELETE` removes the
+rule. Every change is audited as `group.*` or `access_rule.*` and reaches
+connected clients at once.
+
+The CLI mirrors the API:
+
+```console
+$ headscale groups create --name Engineering
+$ headscale groups add-user --identifier 2 --user 3
+$ headscale groups add-node --identifier 3 --node 7
+$ headscale access-rules create --name "SSH to servers" --src 2 --dst 3 --protocol tcp --ports 22
+$ headscale access-rules disable --identifier 1
+```
