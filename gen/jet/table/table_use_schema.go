@@ -20,6 +20,7 @@ func UseSchema(schema string) {
 	GroupNodes = GroupNodes.FromSchema(schema)
 	GroupUsers = GroupUsers.FromSchema(schema)
 	Groups = Groups.FromSchema(schema)
+	LogStreams = LogStreams.FromSchema(schema)
 	Migrations = Migrations.FromSchema(schema)
 	NetworkGroups = NetworkGroups.FromSchema(schema)
 	NetworkPrefixes = NetworkPrefixes.FromSchema(schema)

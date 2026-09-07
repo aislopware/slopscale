@@ -38,6 +38,36 @@ func (e DNSRecordType) Valid() bool {
 	}
 }
 
+// Defines values for LogStreamRequestBodyDestination.
+const (
+	Axiom   LogStreamRequestBodyDestination = "axiom"
+	Datadog LogStreamRequestBodyDestination = "datadog"
+	Elastic LogStreamRequestBodyDestination = "elastic"
+	Http    LogStreamRequestBodyDestination = "http"
+	Loki    LogStreamRequestBodyDestination = "loki"
+	Splunk  LogStreamRequestBodyDestination = "splunk"
+)
+
+// Valid indicates whether the value is a known member of the LogStreamRequestBodyDestination enum.
+func (e LogStreamRequestBodyDestination) Valid() bool {
+	switch e {
+	case Axiom:
+		return true
+	case Datadog:
+		return true
+	case Elastic:
+		return true
+	case Http:
+		return true
+	case Loki:
+		return true
+	case Splunk:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for NodeRegisterMethod.
 const (
 	REGISTERMETHODAUTHKEY     NodeRegisterMethod = "REGISTER_METHOD_AUTH_KEY"
@@ -65,10 +95,14 @@ func (e NodeRegisterMethod) Valid() bool {
 // Defines values for WebhookRequestBodyProviderType.
 const (
 	WebhookRequestBodyProviderTypeDiscord    WebhookRequestBodyProviderType = "discord"
+	WebhookRequestBodyProviderTypeEmail      WebhookRequestBodyProviderType = "email"
 	WebhookRequestBodyProviderTypeEmpty      WebhookRequestBodyProviderType = ""
 	WebhookRequestBodyProviderTypeGooglechat WebhookRequestBodyProviderType = "googlechat"
 	WebhookRequestBodyProviderTypeMattermost WebhookRequestBodyProviderType = "mattermost"
+	WebhookRequestBodyProviderTypeNtfy       WebhookRequestBodyProviderType = "ntfy"
 	WebhookRequestBodyProviderTypeSlack      WebhookRequestBodyProviderType = "slack"
+	WebhookRequestBodyProviderTypeTeams      WebhookRequestBodyProviderType = "teams"
+	WebhookRequestBodyProviderTypeTelegram   WebhookRequestBodyProviderType = "telegram"
 )
 
 // Valid indicates whether the value is a known member of the WebhookRequestBodyProviderType enum.
@@ -76,13 +110,21 @@ func (e WebhookRequestBodyProviderType) Valid() bool {
 	switch e {
 	case WebhookRequestBodyProviderTypeDiscord:
 		return true
+	case WebhookRequestBodyProviderTypeEmail:
+		return true
 	case WebhookRequestBodyProviderTypeEmpty:
 		return true
 	case WebhookRequestBodyProviderTypeGooglechat:
 		return true
 	case WebhookRequestBodyProviderTypeMattermost:
 		return true
+	case WebhookRequestBodyProviderTypeNtfy:
+		return true
 	case WebhookRequestBodyProviderTypeSlack:
+		return true
+	case WebhookRequestBodyProviderTypeTeams:
+		return true
+	case WebhookRequestBodyProviderTypeTelegram:
 		return true
 	default:
 		return false
@@ -491,7 +533,7 @@ type GroupRequestBody struct {
 	Name        string    `json:"name"`
 	NodeIds     *[]string `json:"nodeIds,omitempty"`
 
-	// Requestable Whether members may request to join the group for a while.
+	// Requestable Whether members may ask to join for a while.
 	Requestable *bool     `json:"requestable,omitempty"`
 	UserIds     *[]string `json:"userIds,omitempty"`
 }
@@ -515,6 +557,11 @@ type ListAuditOutputBody struct {
 // ListGroupsOutputBody defines model for ListGroupsOutputBody.
 type ListGroupsOutputBody struct {
 	Groups []Group `json:"groups"`
+}
+
+// ListLogStreamsOutputBody defines model for ListLogStreamsOutputBody.
+type ListLogStreamsOutputBody struct {
+	LogStreams []LogStream `json:"logStreams"`
 }
 
 // ListNetworksOutputBody defines model for ListNetworksOutputBody.
@@ -558,6 +605,48 @@ type ListUsersOutputBody struct {
 // ListWebhooksOutputBody defines model for ListWebhooksOutputBody.
 type ListWebhooksOutputBody struct {
 	Webhooks []Webhook `json:"webhooks"`
+}
+
+// LogStream defines model for LogStream.
+type LogStream struct {
+	CreatedAt          time.Time  `json:"createdAt"`
+	CreatedByUserId    string     `json:"createdByUserId"`
+	Delivered          int64      `json:"delivered"`
+	Destination        string     `json:"destination"`
+	Dropped            int64      `json:"dropped"`
+	Enabled            bool       `json:"enabled"`
+	HasToken           bool       `json:"hasToken"`
+	Id                 string     `json:"id"`
+	LastDeliveryAt     *time.Time `json:"lastDeliveryAt"`
+	LastDeliveryStatus string     `json:"lastDeliveryStatus"`
+	Name               string     `json:"name"`
+	UpdatedAt          time.Time  `json:"updatedAt"`
+	Url                string     `json:"url"`
+}
+
+// LogStreamOutputBody defines model for LogStreamOutputBody.
+type LogStreamOutputBody struct {
+	LogStream LogStream `json:"logStream"`
+}
+
+// LogStreamRequestBody defines model for LogStreamRequestBody.
+type LogStreamRequestBody struct {
+	Destination LogStreamRequestBodyDestination `json:"destination"`
+	Enabled     *bool                           `json:"enabled,omitempty"`
+	Name        string                          `json:"name"`
+	Token       *string                         `json:"token,omitempty"`
+	Url         string                          `json:"url"`
+}
+
+// LogStreamRequestBodyDestination defines model for LogStreamRequestBody.Destination.
+type LogStreamRequestBodyDestination string
+
+// LogStreamTestOutputBody defines model for LogStreamTestOutputBody.
+type LogStreamTestOutputBody struct {
+	Delivered bool `json:"delivered"`
+
+	// Status HTTP status or the error text.
+	Status string `json:"status"`
 }
 
 // Network defines model for Network.
@@ -1110,6 +1199,12 @@ type UpdateGroupJSONRequestBody = GroupRequestBody
 
 // AddGroupMemberJSONRequestBody defines body for AddGroupMember for application/json ContentType.
 type AddGroupMemberJSONRequestBody = GroupMemberRequestBody
+
+// CreateLogStreamJSONRequestBody defines body for CreateLogStream for application/json ContentType.
+type CreateLogStreamJSONRequestBody = LogStreamRequestBody
+
+// UpdateLogStreamJSONRequestBody defines body for UpdateLogStream for application/json ContentType.
+type UpdateLogStreamJSONRequestBody = LogStreamRequestBody
 
 // CreateNetworkJSONRequestBody defines body for CreateNetwork for application/json ContentType.
 type CreateNetworkJSONRequestBody = NetworkRequestBody
@@ -1712,6 +1807,78 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/health (the `Health` operationId).
 	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListLogStreams List log streams
+	//
+	// Sinks the audit log is shipped to, in batches shaped for each destination. Tokens are not listed.
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/log-stream (the `ListLogStreams` operationId).
+	ListLogStreams(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateLogStreamWithBody Create log stream
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/log-stream (the `CreateLogStream` operationId).
+	CreateLogStreamWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateLogStream Create log stream
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/log-stream (the `CreateLogStream` operationId).
+	CreateLogStream(ctx context.Context, body CreateLogStreamJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteLogStream Delete log stream
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v1/log-stream/{id} (the `DeleteLogStream` operationId).
+	DeleteLogStream(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetLogStream Get log stream
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/log-stream/{id} (the `GetLogStream` operationId).
+	GetLogStream(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateLogStreamWithBody Replace log stream
+	//
+	// An empty token keeps the stored one.
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/log-stream/{id} (the `UpdateLogStream` operationId).
+	UpdateLogStreamWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateLogStream Replace log stream
+	//
+	// An empty token keeps the stored one.
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/log-stream/{id} (the `UpdateLogStream` operationId).
+	UpdateLogStream(ctx context.Context, id string, body UpdateLogStreamJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// TestLogStream Test log stream
+	//
+	// Ships a test entry now and reports the sink's answer.
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with POST /api/v1/log-stream/{id}/test (the `TestLogStream` operationId).
+	TestLogStream(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListNetworks List networks
 	//
@@ -3417,6 +3584,158 @@ func (c *Client) RemoveGroupUser(ctx context.Context, id string, userId string, 
 // Corresponds with GET /api/v1/health (the `Health` operationId).
 func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewHealthRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListLogStreams List log streams
+//
+// Sinks the audit log is shipped to, in batches shaped for each destination. Tokens are not listed.
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/log-stream (the `ListLogStreams` operationId).
+func (c *Client) ListLogStreams(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListLogStreamsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateLogStreamWithBody Create log stream
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/log-stream (the `CreateLogStream` operationId).
+func (c *Client) CreateLogStreamWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateLogStreamRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateLogStream Create log stream
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/log-stream (the `CreateLogStream` operationId).
+func (c *Client) CreateLogStream(ctx context.Context, body CreateLogStreamJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateLogStreamRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteLogStream Delete log stream
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v1/log-stream/{id} (the `DeleteLogStream` operationId).
+func (c *Client) DeleteLogStream(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteLogStreamRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetLogStream Get log stream
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/log-stream/{id} (the `GetLogStream` operationId).
+func (c *Client) GetLogStream(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetLogStreamRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateLogStreamWithBody Replace log stream
+//
+// An empty token keeps the stored one.
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/log-stream/{id} (the `UpdateLogStream` operationId).
+func (c *Client) UpdateLogStreamWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateLogStreamRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateLogStream Replace log stream
+//
+// An empty token keeps the stored one.
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/log-stream/{id} (the `UpdateLogStream` operationId).
+func (c *Client) UpdateLogStream(ctx context.Context, id string, body UpdateLogStreamJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateLogStreamRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// TestLogStream Test log stream
+//
+// Ships a test entry now and reports the sink's answer.
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with POST /api/v1/log-stream/{id}/test (the `TestLogStream` operationId).
+func (c *Client) TestLogStream(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewTestLogStreamRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -6450,6 +6769,222 @@ func NewHealthRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListLogStreamsRequest constructs an http.Request for the ListLogStreams method
+func NewListLogStreamsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/log-stream")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateLogStreamRequest calls the generic CreateLogStream builder with application/json body
+func NewCreateLogStreamRequest(server string, body CreateLogStreamJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateLogStreamRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateLogStreamRequestWithBody constructs an http.Request for the CreateLogStream method, with any body, and a specified content type
+func NewCreateLogStreamRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/log-stream")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteLogStreamRequest constructs an http.Request for the DeleteLogStream method
+func NewDeleteLogStreamRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/log-stream/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetLogStreamRequest constructs an http.Request for the GetLogStream method
+func NewGetLogStreamRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/log-stream/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateLogStreamRequest calls the generic UpdateLogStream builder with application/json body
+func NewUpdateLogStreamRequest(server string, id string, body UpdateLogStreamJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateLogStreamRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdateLogStreamRequestWithBody constructs an http.Request for the UpdateLogStream method, with any body, and a specified content type
+func NewUpdateLogStreamRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/log-stream/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewTestLogStreamRequest constructs an http.Request for the TestLogStream method
+func NewTestLogStreamRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/log-stream/%s/test", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListNetworksRequest constructs an http.Request for the ListNetworks method
 func NewListNetworksRequest(server string) (*http.Request, error) {
 	var err error
@@ -9278,6 +9813,86 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/health (the `Health` operationId).
 	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
 
+	// ListLogStreamsWithResponse List log streams
+	//
+	// Sinks the audit log is shipped to, in batches shaped for each destination. Tokens are not listed.
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/log-stream (the `ListLogStreams` operationId).
+	ListLogStreamsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListLogStreamsResponse, error)
+
+	// CreateLogStreamWithBodyWithResponse Create log stream
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/log-stream (the `CreateLogStream` operationId).
+	CreateLogStreamWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateLogStreamResponse, error)
+
+	// CreateLogStreamWithResponse Create log stream
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/log-stream (the `CreateLogStream` operationId).
+	CreateLogStreamWithResponse(ctx context.Context, body CreateLogStreamJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateLogStreamResponse, error)
+
+	// DeleteLogStreamWithResponse Delete log stream
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/log-stream/{id} (the `DeleteLogStream` operationId).
+	DeleteLogStreamWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteLogStreamResponse, error)
+
+	// GetLogStreamWithResponse Get log stream
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/log-stream/{id} (the `GetLogStream` operationId).
+	GetLogStreamWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetLogStreamResponse, error)
+
+	// UpdateLogStreamWithBodyWithResponse Replace log stream
+	//
+	// An empty token keeps the stored one.
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/log-stream/{id} (the `UpdateLogStream` operationId).
+	UpdateLogStreamWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateLogStreamResponse, error)
+
+	// UpdateLogStreamWithResponse Replace log stream
+	//
+	// An empty token keeps the stored one.
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/log-stream/{id} (the `UpdateLogStream` operationId).
+	UpdateLogStreamWithResponse(ctx context.Context, id string, body UpdateLogStreamJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateLogStreamResponse, error)
+
+	// TestLogStreamWithResponse Test log stream
+	//
+	// Ships a test entry now and reports the sink's answer.
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/log-stream/{id}/test (the `TestLogStream` operationId).
+	TestLogStreamWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*TestLogStreamResponse, error)
+
 	// ListNetworksWithResponse List networks
 	//
 	// Networks are prefixes reached through routing nodes and handed out to the machines in their groups, the way NetBird's networks work.
@@ -11804,6 +12419,294 @@ func (r HealthResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r HealthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListLogStreamsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListLogStreamsOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListLogStreamsResponse) GetJSON200() *ListLogStreamsOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListLogStreamsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListLogStreamsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListLogStreamsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListLogStreamsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListLogStreamsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateLogStreamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *LogStreamOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CreateLogStreamResponse) GetJSON200() *LogStreamOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CreateLogStreamResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateLogStreamResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateLogStreamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateLogStreamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateLogStreamResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteLogStreamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmptyOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteLogStreamResponse) GetJSON200() *EmptyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeleteLogStreamResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteLogStreamResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteLogStreamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteLogStreamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteLogStreamResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetLogStreamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *LogStreamOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetLogStreamResponse) GetJSON200() *LogStreamOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetLogStreamResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetLogStreamResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetLogStreamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetLogStreamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetLogStreamResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateLogStreamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *LogStreamOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateLogStreamResponse) GetJSON200() *LogStreamOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateLogStreamResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateLogStreamResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateLogStreamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateLogStreamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateLogStreamResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type TestLogStreamResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *LogStreamTestOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r TestLogStreamResponse) GetJSON200() *LogStreamTestOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r TestLogStreamResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r TestLogStreamResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r TestLogStreamResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r TestLogStreamResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r TestLogStreamResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -15354,6 +16257,134 @@ func (c *ClientWithResponses) HealthWithResponse(ctx context.Context, reqEditors
 	return ParseHealthResponse(rsp)
 }
 
+// ListLogStreamsWithResponse List log streams
+//
+// Sinks the audit log is shipped to, in batches shaped for each destination. Tokens are not listed.
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/log-stream (the `ListLogStreams` operationId).
+func (c *ClientWithResponses) ListLogStreamsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListLogStreamsResponse, error) {
+	rsp, err := c.ListLogStreams(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListLogStreamsResponse(rsp)
+}
+
+// CreateLogStreamWithBodyWithResponse Create log stream
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/log-stream (the `CreateLogStream` operationId).
+func (c *ClientWithResponses) CreateLogStreamWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateLogStreamResponse, error) {
+	rsp, err := c.CreateLogStreamWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateLogStreamResponse(rsp)
+}
+
+// CreateLogStreamWithResponse Create log stream
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/log-stream (the `CreateLogStream` operationId).
+func (c *ClientWithResponses) CreateLogStreamWithResponse(ctx context.Context, body CreateLogStreamJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateLogStreamResponse, error) {
+	rsp, err := c.CreateLogStream(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateLogStreamResponse(rsp)
+}
+
+// DeleteLogStreamWithResponse Delete log stream
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/log-stream/{id} (the `DeleteLogStream` operationId).
+func (c *ClientWithResponses) DeleteLogStreamWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteLogStreamResponse, error) {
+	rsp, err := c.DeleteLogStream(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteLogStreamResponse(rsp)
+}
+
+// GetLogStreamWithResponse Get log stream
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/log-stream/{id} (the `GetLogStream` operationId).
+func (c *ClientWithResponses) GetLogStreamWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetLogStreamResponse, error) {
+	rsp, err := c.GetLogStream(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetLogStreamResponse(rsp)
+}
+
+// UpdateLogStreamWithBodyWithResponse Replace log stream
+//
+// An empty token keeps the stored one.
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/log-stream/{id} (the `UpdateLogStream` operationId).
+func (c *ClientWithResponses) UpdateLogStreamWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateLogStreamResponse, error) {
+	rsp, err := c.UpdateLogStreamWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateLogStreamResponse(rsp)
+}
+
+// UpdateLogStreamWithResponse Replace log stream
+//
+// An empty token keeps the stored one.
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/log-stream/{id} (the `UpdateLogStream` operationId).
+func (c *ClientWithResponses) UpdateLogStreamWithResponse(ctx context.Context, id string, body UpdateLogStreamJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateLogStreamResponse, error) {
+	rsp, err := c.UpdateLogStream(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateLogStreamResponse(rsp)
+}
+
+// TestLogStreamWithResponse Test log stream
+//
+// Ships a test entry now and reports the sink's answer.
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/log-stream/{id}/test (the `TestLogStream` operationId).
+func (c *ClientWithResponses) TestLogStreamWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*TestLogStreamResponse, error) {
+	rsp, err := c.TestLogStream(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseTestLogStreamResponse(rsp)
+}
+
 // ListNetworksWithResponse List networks
 //
 // Networks are prefixes reached through routing nodes and handed out to the machines in their groups, the way NetBird's networks work.
@@ -17823,6 +18854,204 @@ func ParseHealthResponse(rsp *http.Response) (*HealthResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest HealthResponseBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListLogStreamsResponse parses an HTTP response from a ListLogStreamsWithResponse call
+func ParseListLogStreamsResponse(rsp *http.Response) (*ListLogStreamsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListLogStreamsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListLogStreamsOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateLogStreamResponse parses an HTTP response from a CreateLogStreamWithResponse call
+func ParseCreateLogStreamResponse(rsp *http.Response) (*CreateLogStreamResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateLogStreamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LogStreamOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteLogStreamResponse parses an HTTP response from a DeleteLogStreamWithResponse call
+func ParseDeleteLogStreamResponse(rsp *http.Response) (*DeleteLogStreamResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteLogStreamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmptyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetLogStreamResponse parses an HTTP response from a GetLogStreamWithResponse call
+func ParseGetLogStreamResponse(rsp *http.Response) (*GetLogStreamResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetLogStreamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LogStreamOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateLogStreamResponse parses an HTTP response from a UpdateLogStreamWithResponse call
+func ParseUpdateLogStreamResponse(rsp *http.Response) (*UpdateLogStreamResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateLogStreamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LogStreamOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseTestLogStreamResponse parses an HTTP response from a TestLogStreamWithResponse call
+func ParseTestLogStreamResponse(rsp *http.Response) (*TestLogStreamResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &TestLogStreamResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LogStreamTestOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

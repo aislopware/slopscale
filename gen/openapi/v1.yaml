@@ -742,7 +742,7 @@ components:
             type: string
           type: array
         requestable:
-          description: Whether members may request to join the group for a while.
+          description: Whether members may ask to join for a while.
           type: boolean
         userIds:
           items:
@@ -791,6 +791,16 @@ components:
           type: array
       required:
         - groups
+      type: object
+    ListLogStreamsOutputBody:
+      additionalProperties: false
+      properties:
+        logStreams:
+          items:
+            $ref: "#/components/schemas/LogStream"
+          type: array
+      required:
+        - logStreams
       type: object
     ListNetworksOutputBody:
       additionalProperties: false
@@ -880,6 +890,109 @@ components:
           type: array
       required:
         - webhooks
+      type: object
+    LogStream:
+      additionalProperties: false
+      properties:
+        createdAt:
+          format: date-time
+          type: string
+        createdByUserId:
+          format: uint64
+          type: string
+        delivered:
+          format: int64
+          minimum: 0
+          type: integer
+        destination:
+          type: string
+        dropped:
+          format: int64
+          minimum: 0
+          type: integer
+        enabled:
+          type: boolean
+        hasToken:
+          type: boolean
+        id:
+          format: uint64
+          type: string
+        lastDeliveryAt:
+          format: date-time
+          type:
+            - string
+            - "null"
+        lastDeliveryStatus:
+          type: string
+        name:
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+        url:
+          type: string
+      required:
+        - id
+        - name
+        - destination
+        - url
+        - hasToken
+        - enabled
+        - createdByUserId
+        - createdAt
+        - updatedAt
+        - lastDeliveryAt
+        - lastDeliveryStatus
+        - delivered
+        - dropped
+      type: object
+    LogStreamOutputBody:
+      additionalProperties: false
+      properties:
+        logStream:
+          $ref: "#/components/schemas/LogStream"
+      required:
+        - logStream
+      type: object
+    LogStreamRequestBody:
+      additionalProperties: false
+      properties:
+        destination:
+          enum:
+            - http
+            - splunk
+            - elastic
+            - datadog
+            - axiom
+            - loki
+          type: string
+        enabled:
+          type: boolean
+        name:
+          maxLength: 100
+          minLength: 1
+          type: string
+        token:
+          maxLength: 4096
+          type: string
+        url:
+          type: string
+      required:
+        - name
+        - destination
+        - url
+      type: object
+    LogStreamTestOutputBody:
+      additionalProperties: false
+      properties:
+        delivered:
+          type: boolean
+        status:
+          description: HTTP status or the error text.
+          type: string
+      required:
+        - delivered
+        - status
       type: object
     Network:
       additionalProperties: false
@@ -1821,6 +1934,10 @@ components:
             - mattermost
             - googlechat
             - discord
+            - teams
+            - telegram
+            - ntfy
+            - email
           type: string
         subscriptions:
           items:
@@ -1829,7 +1946,6 @@ components:
             - array
             - "null"
         url:
-          format: uri
           type: string
       required:
         - url
@@ -3034,6 +3150,194 @@ paths:
       summary: Health check
       tags:
         - Health
+  /api/v1/log-stream:
+    get:
+      description: |-
+        Sinks the audit log is shipped to, in batches shaped for each destination. Tokens are not listed.
+
+        Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listLogStreams
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListLogStreamsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List log streams
+      tags:
+        - Log streaming
+      x-required-scope: logs:configuration:read
+    post:
+      description: Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createLogStream
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogStreamRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogStreamOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create log stream
+      tags:
+        - Log streaming
+      x-audit-action: logstream.create
+      x-required-scope: logs:configuration
+  /api/v1/log-stream/{id}:
+    delete:
+      description: Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteLogStream
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmptyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete log stream
+      tags:
+        - Log streaming
+      x-audit-action: logstream.delete
+      x-required-scope: logs:configuration
+    get:
+      description: Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getLogStream
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogStreamOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get log stream
+      tags:
+        - Log streaming
+      x-required-scope: logs:configuration:read
+    put:
+      description: |-
+        An empty token keeps the stored one.
+
+        Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateLogStream
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogStreamRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogStreamOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Replace log stream
+      tags:
+        - Log streaming
+      x-audit-action: logstream.update
+      x-required-scope: logs:configuration
+  /api/v1/log-stream/{id}/test:
+    post:
+      description: |-
+        Ships a test entry now and reports the sink's answer.
+
+        Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: testLogStream
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogStreamTestOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Test log stream
+      tags:
+        - Log streaming
+      x-audit-action: logstream.test
+      x-required-scope: logs:configuration
   /api/v1/network:
     get:
       description: |-

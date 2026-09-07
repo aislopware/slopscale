@@ -544,6 +544,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/log-stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List log streams
+         * @description Sinks the audit log is shipped to, in batches shaped for each destination. Tokens are not listed.
+         *
+         *     Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listLogStreams"];
+        put?: never;
+        /**
+         * Create log stream
+         * @description Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["createLogStream"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/log-stream/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get log stream
+         * @description Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getLogStream"];
+        /**
+         * Replace log stream
+         * @description An empty token keeps the stored one.
+         *
+         *     Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        put: operations["updateLogStream"];
+        post?: never;
+        /**
+         * Delete log stream
+         * @description Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["deleteLogStream"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/log-stream/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test log stream
+         * @description Ships a test entry now and reports the sink's answer.
+         *
+         *     Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["testLogStream"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/network": {
         parameters: {
             query?: never;
@@ -1808,7 +1886,7 @@ export interface components {
             description?: string;
             name: string;
             nodeIds?: string[];
-            /** @description Whether members may request to join the group for a while. */
+            /** @description Whether members may ask to join for a while. */
             requestable?: boolean;
             userIds?: string[];
         };
@@ -1824,6 +1902,9 @@ export interface components {
         };
         ListGroupsOutputBody: {
             groups: components["schemas"]["Group"][];
+        };
+        ListLogStreamsOutputBody: {
+            logStreams: components["schemas"]["LogStream"][];
         };
         ListNetworksOutputBody: {
             networks: components["schemas"]["Network"][];
@@ -1851,6 +1932,44 @@ export interface components {
         };
         ListWebhooksOutputBody: {
             webhooks: components["schemas"]["Webhook"][];
+        };
+        LogStream: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uint64 */
+            createdByUserId: string;
+            /** Format: int64 */
+            delivered: number;
+            destination: string;
+            /** Format: int64 */
+            dropped: number;
+            enabled: boolean;
+            hasToken: boolean;
+            /** Format: uint64 */
+            id: string;
+            /** Format: date-time */
+            lastDeliveryAt: string | null;
+            lastDeliveryStatus: string;
+            name: string;
+            /** Format: date-time */
+            updatedAt: string;
+            url: string;
+        };
+        LogStreamOutputBody: {
+            logStream: components["schemas"]["LogStream"];
+        };
+        LogStreamRequestBody: {
+            /** @enum {string} */
+            destination: "http" | "splunk" | "elastic" | "datadog" | "axiom" | "loki";
+            enabled?: boolean;
+            name: string;
+            token?: string;
+            url: string;
+        };
+        LogStreamTestOutputBody: {
+            delivered: boolean;
+            /** @description HTTP status or the error text. */
+            status: string;
         };
         Network: {
             /** Format: date-time */
@@ -2199,9 +2318,8 @@ export interface components {
         WebhookRequestBody: {
             description?: string;
             /** @enum {string} */
-            providerType?: "" | "slack" | "mattermost" | "googlechat" | "discord";
+            providerType?: "" | "slack" | "mattermost" | "googlechat" | "discord" | "teams" | "telegram" | "ntfy" | "email";
             subscriptions: string[] | null;
-            /** Format: uri */
             url: string;
         };
         WebhookTestOutputBody: {
@@ -2276,6 +2394,7 @@ export type HealthResponseBody = components['schemas']['HealthResponseBody'];
 export type ListApiKeysOutputBody = components['schemas']['ListAPIKeysOutputBody'];
 export type ListAuditOutputBody = components['schemas']['ListAuditOutputBody'];
 export type ListGroupsOutputBody = components['schemas']['ListGroupsOutputBody'];
+export type ListLogStreamsOutputBody = components['schemas']['ListLogStreamsOutputBody'];
 export type ListNetworksOutputBody = components['schemas']['ListNetworksOutputBody'];
 export type ListNodesOutputBody = components['schemas']['ListNodesOutputBody'];
 export type ListPosturesOutputBody = components['schemas']['ListPosturesOutputBody'];
@@ -2284,6 +2403,10 @@ export type ListRequestsOutputBody = components['schemas']['ListRequestsOutputBo
 export type ListRulesOutputBody = components['schemas']['ListRulesOutputBody'];
 export type ListUsersOutputBody = components['schemas']['ListUsersOutputBody'];
 export type ListWebhooksOutputBody = components['schemas']['ListWebhooksOutputBody'];
+export type LogStream = components['schemas']['LogStream'];
+export type LogStreamOutputBody = components['schemas']['LogStreamOutputBody'];
+export type LogStreamRequestBody = components['schemas']['LogStreamRequestBody'];
+export type LogStreamTestOutputBody = components['schemas']['LogStreamTestOutputBody'];
 export type Network = components['schemas']['Network'];
 export type NetworkEnabledInputBody = components['schemas']['NetworkEnabledInputBody'];
 export type NetworkOutputBody = components['schemas']['NetworkOutputBody'];
@@ -3481,6 +3604,196 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponseBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listLogStreams: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListLogStreamsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createLogStream: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogStreamRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogStreamOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getLogStream: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogStreamOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updateLogStream: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogStreamRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogStreamOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteLogStream: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmptyOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    testLogStream: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogStreamTestOutputBody"];
                 };
             };
             /** @description Error */
