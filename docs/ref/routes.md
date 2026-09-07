@@ -146,6 +146,32 @@ The setup of an exit node requires double opt-in, once from an exit node and onc
 within the tailnet. Optionally, use [`autoApprovers` to automatically approve an exit
 node](#automatically-approve-an-exit-node-with-auto-approvers).
 
+### Global exit node
+
+An administrator can mark an exit node as the one every client is told to
+prefer, with no policy involved:
+
+```console
+$ headscale nodes global-exit-node --identifier 7
+$ headscale nodes global-exit-node --identifier 7 --revoke
+```
+
+Marking approves the node's exit routes, so it serves as an exit node as soon
+as it advertises them. The node then carries the `suggest-exit-node`
+capability on every other client's view of it and every node carries
+`auto-exit-node`, the way Tailscale's exit node suggestions work: `tailscale exit-node suggest` names it, and a client set to use an exit node
+automatically picks it:
+
+```console
+$ sudo tailscale set --exit-node=auto:any
+```
+
+The control server cannot switch a client's exit-node use on by itself; that
+stays with the device (or its MDM policy). Several nodes may be marked, in
+which case each client picks the closest by DERP region. The same operation is
+`POST /api/v1/node/{id}/global-exit-node` with an optional `{"enabled": false}` body, and a node's `globalExitNode` field reports the mark. Clearing
+the mark keeps the approved routes.
+
 ### Setup an exit node
 
 #### Configure a node as exit node
