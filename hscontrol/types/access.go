@@ -3,6 +3,7 @@ package types
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"regexp"
 	"slices"
 	"strconv"
@@ -120,11 +121,81 @@ type AccessRule struct {
 	UpdatedAt           time.Time
 }
 
-// AccessModel is every group and rule, loaded together because the
-// policy compiles them together.
+// AccessModel is every group, rule and network, loaded together because
+// the policy compiles them together.
 type AccessModel struct {
-	Groups []AccessGroup
-	Rules  []AccessRule
+	Groups   []AccessGroup
+	Rules    []AccessRule
+	Networks []Network
+}
+
+// Network returns the network with the ID.
+func (m AccessModel) Network(id NetworkID) (Network, bool) {
+	for _, n := range m.Networks {
+		if n.ID == id {
+			return n, true
+		}
+	}
+
+	return Network{}, false
+}
+
+// NetworksUsingGroup lists the networks that distribute to the group.
+func (m AccessModel) NetworksUsingGroup(id GroupID) []Network {
+	var networks []Network
+
+	for _, n := range m.Networks {
+		if slices.Contains(n.GroupIDs, id) {
+			networks = append(networks, n)
+		}
+	}
+
+	return networks
+}
+
+// NetworkRoutes returns the prefixes the enabled networks assign to the
+// node as a router, without duplicates.
+func (m AccessModel) NetworkRoutes(nodeID NodeID) []netip.Prefix {
+	var routes []netip.Prefix
+
+	for _, n := range m.Networks {
+		if !n.Routes(nodeID) {
+			continue
+		}
+
+		for _, p := range n.Prefixes {
+			if !slices.Contains(routes, p) {
+				routes = append(routes, p)
+			}
+		}
+	}
+
+	return routes
+}
+
+// NetworksRouting lists the enabled networks in which the node routes
+// the prefix.
+func (m AccessModel) NetworksRouting(nodeID NodeID, prefix netip.Prefix) []Network {
+	var networks []Network
+
+	for _, n := range m.Networks {
+		if n.Routes(nodeID) && n.Covers(prefix) {
+			networks = append(networks, n)
+		}
+	}
+
+	return networks
+}
+
+// MemberOfAny reports whether the node is in one of the groups.
+func (m AccessModel) MemberOfAny(node NodeView, ids []GroupID) bool {
+	for _, id := range ids {
+		if g, ok := m.Group(id); ok && g.Contains(node) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Group returns the group with the ID.

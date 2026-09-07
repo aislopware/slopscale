@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"net/netip"
 	"testing"
 
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -165,4 +166,51 @@ func TestAccessProtocolPorts(t *testing.T) {
 		}},
 	})
 	assert.Empty(t, grants)
+}
+
+func TestNetworkGrants(t *testing.T) {
+	t.Parallel()
+
+	users, nodes, model := accessFixture()
+	model.Networks = []types.Network{
+		{
+			ID: 1, Name: "office", Enabled: true,
+			Prefixes: []netip.Prefix{netip.MustParsePrefix("10.10.0.0/24")},
+			GroupIDs: []types.GroupID{2},
+		},
+	}
+
+	pm, err := NewPolicyManager(nil, users, nodes.ViewSlice())
+	require.NoError(t, err)
+
+	// A network with an enforcing rule: eng reaches the server on 22 and
+	// the network's prefix on every port.
+	_, err = pm.SetAccessModel(model)
+	require.NoError(t, err)
+
+	filter, _ := pm.Filter()
+	require.Len(t, filter, 2)
+	assert.Equal(t, []string{"100.64.0.1-100.64.0.2"}, filter[1].SrcIPs)
+	assert.Equal(t, []tailcfg.NetPortRange{{IP: "10.10.0.0/24", Ports: tailcfg.PortRangeAny}}, filter[1].DstPorts)
+	assert.Nil(t, filter[1].IPProto)
+
+	// A disabled network contributes nothing.
+	model.Networks[0].Enabled = false
+
+	_, err = pm.SetAccessModel(model)
+	require.NoError(t, err)
+
+	filter, _ = pm.Filter()
+	assert.Len(t, filter, 1)
+
+	// A network alone never makes the tailnet enforce.
+	model.Networks[0].Enabled = true
+	model.Rules = nil
+
+	_, err = pm.SetAccessModel(model)
+	require.NoError(t, err)
+
+	filter, _ = pm.Filter()
+	assert.Equal(t, tailcfg.FilterAllowAll, filter)
+	assert.False(t, hasAccessGrants(model))
 }

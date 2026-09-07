@@ -1228,6 +1228,10 @@ func (s *State) RoutesForPeer(
 		}
 	}
 
+	// A prefix a network assigns to the peer is only for the network's
+	// groups and routers.
+	reduced = s.networkRoutesFor(viewer, peer, reduced)
+
 	// Co-router visibility: when the viewer advertises the same prefix
 	// that the peer is HA primary for, the viewer must see that route
 	// regardless of matcher authorization. HA secondaries need this to

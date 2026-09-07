@@ -54,10 +54,16 @@ func (g *accessGroup) resolve(_ *Policy, _ types.Users, nodes views.Slice[types.
 	return ipset, nil
 }
 
-// accessGrants turns the enabled rules of the model into grants. A
+// accessGrants turns the enabled rules and networks of the model into
+// grants.
+func accessGrants(model types.AccessModel) []Grant {
+	return append(ruleGrants(model), networkGrants(model)...)
+}
+
+// ruleGrants turns the enabled rules of the model into grants. A
 // bidirectional rule is two grants, one per direction. A rule that
 // names a group the model no longer has skips that side entry.
-func accessGrants(model types.AccessModel) []Grant {
+func ruleGrants(model types.AccessModel) []Grant {
 	grants := make([]Grant, 0, len(model.Rules))
 
 	for _, rule := range model.Rules {
@@ -131,8 +137,44 @@ func accessProtocolPorts(rule types.AccessRule) []ProtocolPort {
 	}
 }
 
+// networkGrants lets the groups of every enabled network reach its
+// prefixes on every port. They only matter once something else makes
+// the tailnet enforce; a network alone keeps it open, and the routes
+// themselves are handed out by membership, not by the filter.
+func networkGrants(model types.AccessModel) []Grant {
+	grants := make([]Grant, 0, len(model.Networks))
+
+	for _, network := range model.Networks {
+		if !network.Enabled {
+			continue
+		}
+
+		sources := groupAliases(model, network.GroupIDs)
+		if len(sources) == 0 || len(network.Prefixes) == 0 {
+			continue
+		}
+
+		destinations := make(Aliases, 0, len(network.Prefixes))
+		for _, p := range network.Prefixes {
+			prefix := Prefix(p)
+			destinations = append(destinations, &prefix)
+		}
+
+		grants = append(grants, Grant{
+			Sources:      sources,
+			Destinations: destinations,
+			InternetProtocols: []ProtocolPort{
+				{Protocol: ProtocolNameWildcard, Ports: []tailcfg.PortRange{tailcfg.PortRangeAny}},
+			},
+		})
+	}
+
+	return grants
+}
+
 // hasAccessGrants reports whether the model enforces anything: one
-// enabled rule with both sides makes the tailnet default-deny.
+// enabled rule with both sides makes the tailnet default-deny. Networks
+// do not count; see [networkGrants].
 func hasAccessGrants(model types.AccessModel) bool {
-	return len(accessGrants(model)) > 0
+	return len(ruleGrants(model)) > 0
 }

@@ -48,6 +48,21 @@ COL groups.builtin text null=YES
 COL groups.created_at timestamp with time zone null=YES
 COL groups.updated_at timestamp with time zone null=YES
 COL migrations.id character varying len=255 null=NO
+COL network_groups.id bigint null=NO default=nextval('network_groups_id_seq'::regclass)
+COL network_groups.network_id bigint null=NO
+COL network_groups.group_id bigint null=NO
+COL network_prefixes.id bigint null=NO default=nextval('network_prefixes_id_seq'::regclass)
+COL network_prefixes.network_id bigint null=NO
+COL network_prefixes.prefix text null=NO
+COL network_routers.id bigint null=NO default=nextval('network_routers_id_seq'::regclass)
+COL network_routers.network_id bigint null=NO
+COL network_routers.node_id bigint null=NO
+COL networks.id bigint null=NO default=nextval('networks_id_seq'::regclass)
+COL networks.name text null=NO
+COL networks.description text null=YES
+COL networks.enabled boolean null=YES default=true
+COL networks.created_at timestamp with time zone null=YES
+COL networks.updated_at timestamp with time zone null=YES
 COL node_shares.id bigint null=NO default=nextval('node_shares_id_seq'::regclass)
 COL node_shares.node_id bigint null=NO
 COL node_shares.user_id bigint null=NO
@@ -152,6 +167,10 @@ IDX CREATE UNIQUE INDEX idx_group_users_group_user ON public.group_users USING b
 IDX CREATE UNIQUE INDEX idx_groups_name ON public.groups USING btree (name)
 IDX CREATE UNIQUE INDEX idx_name_no_provider_identifier ON public.users USING btree (name) WHERE (provider_identifier IS NULL)
 IDX CREATE UNIQUE INDEX idx_name_provider_identifier ON public.users USING btree (name, provider_identifier)
+IDX CREATE UNIQUE INDEX idx_network_groups_network_group ON public.network_groups USING btree (network_id, group_id)
+IDX CREATE UNIQUE INDEX idx_network_prefixes_network_prefix ON public.network_prefixes USING btree (network_id, prefix)
+IDX CREATE UNIQUE INDEX idx_network_routers_network_node ON public.network_routers USING btree (network_id, node_id)
+IDX CREATE UNIQUE INDEX idx_networks_name ON public.networks USING btree (name)
 IDX CREATE UNIQUE INDEX idx_node_shares_node_user ON public.node_shares USING btree (node_id, user_id)
 IDX CREATE UNIQUE INDEX idx_oauth_access_tokens_prefix ON public.oauth_access_tokens USING btree (prefix)
 IDX CREATE UNIQUE INDEX idx_oauth_clients_client_id ON public.oauth_clients USING btree (client_id)
@@ -159,6 +178,10 @@ IDX CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON public.pre_auth_keys USING b
 IDX CREATE UNIQUE INDEX idx_provider_identifier ON public.users USING btree (provider_identifier) WHERE (provider_identifier IS NOT NULL)
 IDX CREATE UNIQUE INDEX idx_sessions_token_hash ON public.sessions USING btree (token_hash)
 IDX CREATE UNIQUE INDEX migrations_pkey ON public.migrations USING btree (id)
+IDX CREATE UNIQUE INDEX network_groups_pkey ON public.network_groups USING btree (id)
+IDX CREATE UNIQUE INDEX network_prefixes_pkey ON public.network_prefixes USING btree (id)
+IDX CREATE UNIQUE INDEX network_routers_pkey ON public.network_routers USING btree (id)
+IDX CREATE UNIQUE INDEX networks_pkey ON public.networks USING btree (id)
 IDX CREATE UNIQUE INDEX node_shares_pkey ON public.node_shares USING btree (id)
 IDX CREATE UNIQUE INDEX nodes_pkey ON public.nodes USING btree (id)
 IDX CREATE UNIQUE INDEX oauth_access_tokens_pkey ON public.oauth_access_tokens USING btree (id)
@@ -207,6 +230,26 @@ CON groups groups_name_not_null NOT NULL name
 CON groups groups_pkey PRIMARY KEY (id)
 CON migrations migrations_id_not_null NOT NULL id
 CON migrations migrations_pkey PRIMARY KEY (id)
+CON network_groups fk_network_groups_group FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+CON network_groups fk_network_groups_network FOREIGN KEY (network_id) REFERENCES networks(id) ON DELETE CASCADE
+CON network_groups network_groups_group_id_not_null NOT NULL group_id
+CON network_groups network_groups_id_not_null NOT NULL id
+CON network_groups network_groups_network_id_not_null NOT NULL network_id
+CON network_groups network_groups_pkey PRIMARY KEY (id)
+CON network_prefixes fk_network_prefixes_network FOREIGN KEY (network_id) REFERENCES networks(id) ON DELETE CASCADE
+CON network_prefixes network_prefixes_id_not_null NOT NULL id
+CON network_prefixes network_prefixes_network_id_not_null NOT NULL network_id
+CON network_prefixes network_prefixes_pkey PRIMARY KEY (id)
+CON network_prefixes network_prefixes_prefix_not_null NOT NULL prefix
+CON network_routers fk_network_routers_network FOREIGN KEY (network_id) REFERENCES networks(id) ON DELETE CASCADE
+CON network_routers fk_network_routers_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
+CON network_routers network_routers_id_not_null NOT NULL id
+CON network_routers network_routers_network_id_not_null NOT NULL network_id
+CON network_routers network_routers_node_id_not_null NOT NULL node_id
+CON network_routers network_routers_pkey PRIMARY KEY (id)
+CON networks networks_id_not_null NOT NULL id
+CON networks networks_name_not_null NOT NULL name
+CON networks networks_pkey PRIMARY KEY (id)
 CON node_shares fk_node_shares_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
 CON node_shares fk_node_shares_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 CON node_shares node_shares_id_not_null NOT NULL id

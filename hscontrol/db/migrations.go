@@ -492,6 +492,12 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609081000-access-groups",
 			run: migrateAccessGroups,
 		},
+		{
+			// Networks: prefixes reached through routing nodes and handed
+			// out to groups, NetBird style. See docs/ref/networks.md.
+			id:  "202609091000-networks",
+			run: migrateNetworks,
+		},
 	}
 }
 
@@ -504,11 +510,7 @@ func migrateAccessGroups(tx *Tx) error {
 		return err
 	}
 
-	tables := []struct {
-		name             string
-		sqlite, postgres string
-		indexes          []string
-	}{
+	tables := []tableDefinition{
 		{
 			name: "groups",
 			sqlite: `CREATE TABLE groups(
@@ -619,6 +621,19 @@ func migrateAccessGroups(tx *Tx) error {
 		},
 	}
 
+	return createTables(tx, tables)
+}
+
+// tableDefinition is a table a migration creates, with the DDL per
+// dialect and its indexes.
+type tableDefinition struct {
+	name             string
+	sqlite, postgres string
+	indexes          []string
+}
+
+// createTables creates the tables that do not exist yet.
+func createTables(tx *Tx, tables []tableDefinition) error {
 	for _, t := range tables {
 		exists, err := tx.ex.hasTable(t.name)
 		if err != nil {
@@ -641,6 +656,95 @@ func migrateAccessGroups(tx *Tx) error {
 	}
 
 	return nil
+}
+
+// migrateNetworks (202609091000) creates the networks, network_prefixes,
+// network_routers and network_groups tables.
+func migrateNetworks(tx *Tx) error {
+	tables := []tableDefinition{
+		{
+			name: "networks",
+			sqlite: `CREATE TABLE networks(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  description text,
+  enabled numeric DEFAULT true,
+  created_at datetime,
+  updated_at datetime
+)`,
+			postgres: `CREATE TABLE networks(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  enabled boolean DEFAULT true,
+  created_at timestamptz,
+  updated_at timestamptz
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_networks_name ON networks(name)`,
+			},
+		},
+		{
+			name: "network_prefixes",
+			sqlite: `CREATE TABLE network_prefixes(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  network_id integer NOT NULL,
+  prefix text NOT NULL,
+  CONSTRAINT fk_network_prefixes_network FOREIGN KEY(network_id) REFERENCES networks(id) ON DELETE CASCADE
+)`,
+			postgres: `CREATE TABLE network_prefixes(
+  id bigserial PRIMARY KEY,
+  network_id bigint NOT NULL,
+  prefix text NOT NULL,
+  CONSTRAINT fk_network_prefixes_network FOREIGN KEY(network_id) REFERENCES networks(id) ON DELETE CASCADE
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_network_prefixes_network_prefix ON network_prefixes(network_id, prefix)`,
+			},
+		},
+		{
+			name: "network_routers",
+			sqlite: `CREATE TABLE network_routers(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  network_id integer NOT NULL,
+  node_id integer NOT NULL,
+  CONSTRAINT fk_network_routers_network FOREIGN KEY(network_id) REFERENCES networks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_network_routers_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+)`,
+			postgres: `CREATE TABLE network_routers(
+  id bigserial PRIMARY KEY,
+  network_id bigint NOT NULL,
+  node_id bigint NOT NULL,
+  CONSTRAINT fk_network_routers_network FOREIGN KEY(network_id) REFERENCES networks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_network_routers_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_network_routers_network_node ON network_routers(network_id, node_id)`,
+			},
+		},
+		{
+			name: "network_groups",
+			sqlite: `CREATE TABLE network_groups(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  network_id integer NOT NULL,
+  group_id integer NOT NULL,
+  CONSTRAINT fk_network_groups_network FOREIGN KEY(network_id) REFERENCES networks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_network_groups_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+)`,
+			postgres: `CREATE TABLE network_groups(
+  id bigserial PRIMARY KEY,
+  network_id bigint NOT NULL,
+  group_id bigint NOT NULL,
+  CONSTRAINT fk_network_groups_network FOREIGN KEY(network_id) REFERENCES networks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_network_groups_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_network_groups_network_group ON network_groups(network_id, group_id)`,
+			},
+		},
+	}
+
+	return createTables(tx, tables)
 }
 
 // migrateSessions (202609080900) creates the sessions table.

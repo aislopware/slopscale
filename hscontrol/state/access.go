@@ -142,6 +142,10 @@ func (s *State) DeleteGroup(id types.GroupID) (change.Change, error) {
 		return change.Change{}, fmt.Errorf("%w: %s", types.ErrGroupInUse, strings.Join(names, ", "))
 	}
 
+	if networks := model.NetworksUsingGroup(id); len(networks) > 0 {
+		return change.Change{}, fmt.Errorf("%w: network %s", types.ErrGroupInUse, networkNames(networks))
+	}
+
 	err := s.db.DeleteGroup(id)
 	if err != nil {
 		return change.Change{}, err

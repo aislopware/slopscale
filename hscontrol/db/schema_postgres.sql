@@ -170,6 +170,49 @@ CREATE TABLE access_rule_groups(
 );
 CREATE UNIQUE INDEX idx_access_rule_groups_rule_group_side ON access_rule_groups(rule_id, group_id, side);
 
+-- networks are sets of prefixes reached through routing nodes, the way
+-- NetBird's networks work; see docs/ref/networks.md. The routers
+-- advertise the prefixes and the network approves them; the groups get
+-- the routes.
+CREATE TABLE networks(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  enabled boolean DEFAULT true,
+  created_at timestamptz,
+  updated_at timestamptz
+);
+CREATE UNIQUE INDEX idx_networks_name ON networks(name);
+
+CREATE TABLE network_prefixes(
+  id bigserial PRIMARY KEY,
+  network_id bigint NOT NULL,
+  prefix text NOT NULL,
+
+  CONSTRAINT fk_network_prefixes_network FOREIGN KEY(network_id) REFERENCES networks(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_network_prefixes_network_prefix ON network_prefixes(network_id, prefix);
+
+CREATE TABLE network_routers(
+  id bigserial PRIMARY KEY,
+  network_id bigint NOT NULL,
+  node_id bigint NOT NULL,
+
+  CONSTRAINT fk_network_routers_network FOREIGN KEY(network_id) REFERENCES networks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_network_routers_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_network_routers_network_node ON network_routers(network_id, node_id);
+
+CREATE TABLE network_groups(
+  id bigserial PRIMARY KEY,
+  network_id bigint NOT NULL,
+  group_id bigint NOT NULL,
+
+  CONSTRAINT fk_network_groups_network FOREIGN KEY(network_id) REFERENCES networks(id) ON DELETE CASCADE,
+  CONSTRAINT fk_network_groups_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_network_groups_network_group ON network_groups(network_id, group_id);
+
 CREATE TABLE policies(
   id bigserial PRIMARY KEY,
   created_at timestamptz,

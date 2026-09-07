@@ -176,9 +176,15 @@ func LoadAccessModel(q Querier) (types.AccessModel, error) {
 		return types.AccessModel{}, fmt.Errorf("loading access rule groups: %w", err)
 	}
 
+	networks, err := loadNetworks(q)
+	if err != nil {
+		return types.AccessModel{}, err
+	}
+
 	model := types.AccessModel{
-		Groups: make([]types.AccessGroup, 0, len(groups)),
-		Rules:  make([]types.AccessRule, 0, len(rules)),
+		Groups:   make([]types.AccessGroup, 0, len(groups)),
+		Rules:    make([]types.AccessRule, 0, len(rules)),
+		Networks: networks,
 	}
 
 	groupIdx := make(map[uint64]int, len(groups))

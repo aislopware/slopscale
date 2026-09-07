@@ -13,9 +13,12 @@ import (
 )
 
 // postgresGoldenPath holds the schema GORM created on PostgreSQL before the
-// move to jet, dumped with [dumpPostgresSchema]. schema_postgres.sql must
-// produce exactly the same columns, indexes and constraints so databases
-// created before and after the move are interchangeable.
+// move to jet, dumped with [dumpPostgresSchema], plus the tables migrations
+// added since. schema_postgres.sql must produce exactly the same columns,
+// indexes and constraints so databases created before and after the move
+// are interchangeable. After adding a table to both schema files, run the
+// test with HEADSCALE_UPDATE_GOLDEN=1 to rewrite the file, then check the
+// diff by eye.
 const postgresGoldenPath = "testdata/postgres/gorm_schema_golden.txt"
 
 func TestPostgresSchemaMatchesGolden(t *testing.T) {
@@ -25,6 +28,10 @@ func TestPostgresSchemaMatchesGolden(t *testing.T) {
 
 	got, err := dumpPostgresSchema(t.Context(), db.DB)
 	require.NoError(t, err)
+
+	if os.Getenv("HEADSCALE_UPDATE_GOLDEN") != "" {
+		require.NoError(t, os.WriteFile(postgresGoldenPath, []byte(got), 0o600))
+	}
 
 	want, err := os.ReadFile(postgresGoldenPath)
 	require.NoError(t, err)

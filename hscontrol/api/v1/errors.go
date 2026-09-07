@@ -27,7 +27,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, state.ErrRegistrationExpired),
 		errors.Is(err, types.ErrGroupNotFound),
 		errors.Is(err, types.ErrRuleNotFound),
-		errors.Is(err, types.ErrGroupMemberMissing):
+		errors.Is(err, types.ErrGroupMemberMissing),
+		errors.Is(err, types.ErrNetworkNotFound):
 		return huma.Error404NotFound(msg, err)
 
 	case errors.Is(err, state.ErrGivenNameInvalid),
@@ -55,7 +56,12 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrRulePortsWithout),
 		errors.Is(err, types.ErrRulePortsInvalid),
 		errors.Is(err, types.ErrInvalidAccessProtocol),
-		errors.Is(err, types.ErrDNSSettingsInvalid):
+		errors.Is(err, types.ErrDNSSettingsInvalid),
+		errors.Is(err, types.ErrNetworkNameEmpty),
+		errors.Is(err, types.ErrNetworkNameTooLong),
+		errors.Is(err, types.ErrNetworkNoPrefixes),
+		errors.Is(err, types.ErrNetworkNoGroups),
+		errors.Is(err, types.ErrNetworkPrefixInvalid):
 		return huma.Error400BadRequest(msg, err)
 
 	case errors.Is(err, state.ErrNodeKeyInUse),
@@ -64,7 +70,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, db.ErrNodeAlreadyShared),
 		errors.Is(err, types.ErrGroupNameTaken),
 		errors.Is(err, types.ErrGroupInUse),
-		errors.Is(err, types.ErrGroupMemberExists):
+		errors.Is(err, types.ErrGroupMemberExists),
+		errors.Is(err, types.ErrNetworkNameTaken):
 		return huma.Error409Conflict(msg, err)
 
 	case errors.Is(err, state.ErrCannotChangeOwnRole),
