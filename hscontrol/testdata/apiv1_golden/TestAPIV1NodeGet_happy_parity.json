@@ -10,6 +10,7 @@
       "discoKey": "\u003csecret\u003e",
       "expiry": null,
       "givenName": "node-a",
+      "globalExitNode": false,
       "id": "1",
       "ipAddresses": [],
       "lastSeen": "\u003ctimestamp\u003e",

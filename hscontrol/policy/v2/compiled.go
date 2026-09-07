@@ -158,7 +158,8 @@ func buildUserNodeIndex(
 }
 
 // compileNodeAttrs returns the per-node CapMap derived from policy
-// nodeAttrs plus the tailnet-wide [Policy.RandomizeClientPort] flag.
+// nodeAttrs, the tailnet-wide [Policy.RandomizeClientPort] flag and the
+// global exit nodes, which need no policy at all.
 //
 // Returns an error when a target alias fails to resolve so the caller
 // surfaces a corrupt policy instead of silently granting a partial set
@@ -167,16 +168,6 @@ func (pol *Policy) compileNodeAttrs(
 	users types.Users,
 	nodes views.Slice[types.NodeView],
 ) (map[types.NodeID]tailcfg.NodeCapMap, error) {
-	empty := map[types.NodeID]tailcfg.NodeCapMap{}
-
-	if pol == nil {
-		return empty, nil
-	}
-
-	if len(pol.NodeAttrs) == 0 && !pol.RandomizeClientPort {
-		return empty, nil
-	}
-
 	result := make(map[types.NodeID]tailcfg.NodeCapMap)
 	stamp := func(id types.NodeID, attr nodecap.Cap) {
 		capMap, ok := result[id]
@@ -195,6 +186,51 @@ func (pol *Policy) compileNodeAttrs(
 		}
 	}
 
+	stampGlobalExitNodes(nodes, stamp)
+
+	if pol == nil || (len(pol.NodeAttrs) == 0 && !pol.RandomizeClientPort) {
+		return result, nil
+	}
+
+	return result, pol.compilePolicyNodeAttrs(users, nodes, stamp)
+}
+
+// stampGlobalExitNodes gives every global exit node suggest-exit-node,
+// which [PeerCapMap] surfaces on its peer view once its exit routes are
+// approved, and every node auto-exit-node while at least one exists, so
+// clients may pick a suggested exit node automatically.
+func stampGlobalExitNodes(nodes views.Slice[types.NodeView], stamp func(types.NodeID, nodecap.Cap)) {
+	if !NodesHaveGlobalExitNode(nodes) {
+		return
+	}
+
+	for _, n := range nodes.All() {
+		if n.GlobalExitNode() {
+			stamp(n.ID(), nodecap.SuggestExitNode)
+		}
+
+		stamp(n.ID(), nodecap.AutoExitNode)
+	}
+}
+
+// NodesHaveGlobalExitNode reports whether any node is a global exit node.
+func NodesHaveGlobalExitNode(nodes views.Slice[types.NodeView]) bool {
+	for _, n := range nodes.All() {
+		if n.GlobalExitNode() {
+			return true
+		}
+	}
+
+	return false
+}
+
+// compilePolicyNodeAttrs stamps the caps the policy's nodeAttrs and
+// randomizeClientPort ask for.
+func (pol *Policy) compilePolicyNodeAttrs(
+	users types.Users,
+	nodes views.Slice[types.NodeView],
+	stamp func(types.NodeID, nodecap.Cap),
+) error {
 	// Cache each node's IPs once per call. Without the cache, the
 	// node-attr inner loop would call [types.NodeView.IPs] once per attr
 	// per node — O(grants × nodes) allocations of a 2-element slice
@@ -222,7 +258,7 @@ func (pol *Policy) compileNodeAttrs(
 
 		resolved, err := na.Targets.Resolve(pol, users, nodes)
 		if err != nil {
-			return nil, fmt.Errorf("nodeAttrs target %s: %w", na.Targets, err)
+			return fmt.Errorf("nodeAttrs target %s: %w", na.Targets, err)
 		}
 
 		if resolved == nil {
@@ -240,7 +276,7 @@ func (pol *Policy) compileNodeAttrs(
 		}
 	}
 
-	return result, nil
+	return nil
 }
 
 // stampRoleCaps adds to capMaps the capabilities a node inherits from its

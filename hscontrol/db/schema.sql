@@ -132,6 +132,9 @@ CREATE TABLE nodes(
   -- approved_at is NULL while a node registered with device approval on
   -- waits for an administrator; it gets no peers and no peer sees it.
   approved_at datetime,
+  -- global_exit_node marks an exit node every client is told to prefer:
+  -- it gets suggest-exit-node and every node auto-exit-node.
+  global_exit_node numeric DEFAULT false,
 
   created_at datetime,
   updated_at datetime,

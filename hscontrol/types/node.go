@@ -180,6 +180,12 @@ type Node struct {
 	// nodes. Only [State.ShareNode] and [State.UnshareNode] write it.
 	SharedWith []UserID
 
+	// GlobalExitNode marks an exit node every client is told to prefer:
+	// the node carries suggest-exit-node and every node auto-exit-node
+	// while at least one global exit node exists. Its exit routes are
+	// approved when it is set. Only [State.SetGlobalExitNode] writes it.
+	GlobalExitNode bool
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time
@@ -965,6 +971,12 @@ func (nv NodeView) IsSharedWith(uid UserID) bool {
 	return nv.ж.IsSharedWith(uid)
 }
 
+// IsGlobalExitNode reports whether the node is marked as a global exit
+// node; see [Node.GlobalExitNode].
+func (nv NodeView) IsGlobalExitNode() bool {
+	return nv.Valid() && nv.ж.GlobalExitNode
+}
+
 // IsEphemeral returns if the node is registered as an Ephemeral node.
 // https://tailscale.com/docs/features/ephemeral-nodes
 func (nv NodeView) IsEphemeral() bool {
@@ -1160,6 +1172,10 @@ func (nv NodeView) HasPolicyChange(other NodeView) bool {
 	}
 
 	if !views.SliceEqual(nv.SharedWith(), other.SharedWith()) {
+		return true
+	}
+
+	if nv.GlobalExitNode() != other.GlobalExitNode() {
 		return true
 	}
 

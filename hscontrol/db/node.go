@@ -565,6 +565,13 @@ func (hsdb *HSDatabase) NodeSetApproval(nodeID types.NodeID, approvedAt *time.Ti
 	})
 }
 
+// NodeSetGlobalExitNode records whether the node is a global exit node.
+func (hsdb *HSDatabase) NodeSetGlobalExitNode(nodeID types.NodeID, on bool) error {
+	return hsdb.Write(func(tx *Tx) error {
+		return updateNodeColumn(tx, nodeID, table.Nodes.GlobalExitNode, on)
+	})
+}
+
 // NodeSetApproval records when a node was admitted to the tailnet; nil
 // withdraws the approval so the node waits for an administrator again.
 func NodeSetApproval(q Querier, nodeID types.NodeID, approvedAt *time.Time) error {

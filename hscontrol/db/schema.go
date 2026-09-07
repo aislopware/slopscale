@@ -31,6 +31,9 @@ var (
 	// typeBoolTrue is a boolean that defaults to true, for flags that
 	// existing rows must keep behaving as if they had set.
 	typeBoolTrue = columnType{sqlite: "numeric DEFAULT true", postgres: "boolean DEFAULT true"}
+	// typeBoolFalse is a boolean that defaults to false, for flags that
+	// existing rows have not opted into.
+	typeBoolFalse = columnType{sqlite: "numeric DEFAULT false", postgres: "boolean DEFAULT false"}
 )
 
 func (t columnType) forDialect(d dialect) string {

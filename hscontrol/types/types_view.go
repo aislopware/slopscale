@@ -289,8 +289,14 @@ func (v NodeView) ApprovedAt() views.ValuePointer[time.Time] {
 // and the map response marks the node as shared to those users'
 // nodes. Only [State.ShareNode] and [State.UnshareNode] write it.
 func (v NodeView) SharedWith() views.Slice[UserID] { return views.SliceOf(v.ж.SharedWith) }
-func (v NodeView) CreatedAt() time.Time            { return v.ж.CreatedAt }
-func (v NodeView) UpdatedAt() time.Time            { return v.ж.UpdatedAt }
+
+// GlobalExitNode marks an exit node every client is told to prefer:
+// the node carries suggest-exit-node and every node auto-exit-node
+// while at least one global exit node exists. Its exit routes are
+// approved when it is set. Only [State.SetGlobalExitNode] writes it.
+func (v NodeView) GlobalExitNode() bool { return v.ж.GlobalExitNode }
+func (v NodeView) CreatedAt() time.Time { return v.ж.CreatedAt }
+func (v NodeView) UpdatedAt() time.Time { return v.ж.UpdatedAt }
 func (v NodeView) DeletedAt() views.ValuePointer[time.Time] {
 	return views.ValuePointerOf(v.ж.DeletedAt)
 }
@@ -342,6 +348,7 @@ var _NodeViewNeedsRegeneration = Node(struct {
 	ApprovedRoutes Prefixes
 	ApprovedAt     *time.Time
 	SharedWith     []UserID
+	GlobalExitNode bool
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	DeletedAt      *time.Time

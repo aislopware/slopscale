@@ -454,6 +454,24 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609071200-node-shares",
 			run: migrateNodeShares,
 		},
+		{
+			// Global exit node: nodes gain global_exit_node, off for
+			// everything that exists.
+			id: "202609071500-global-exit-node",
+			run: func(tx *Tx) error {
+				err := tx.ex.addColumnIfMissing("nodes", "global_exit_node", typeBoolFalse)
+				if err != nil {
+					return err
+				}
+
+				_, err = tx.ex.execRaw(`UPDATE nodes SET global_exit_node = false WHERE global_exit_node IS NULL`)
+				if err != nil {
+					return fmt.Errorf("backfilling nodes.global_exit_node: %w", err)
+				}
+
+				return nil
+			},
+		},
 	}
 }
 

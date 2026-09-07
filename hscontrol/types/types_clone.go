@@ -115,6 +115,7 @@ var _NodeCloneNeedsRegeneration = Node(struct {
 	ApprovedRoutes Prefixes
 	ApprovedAt     *time.Time
 	SharedWith     []UserID
+	GlobalExitNode bool
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	DeletedAt      *time.Time

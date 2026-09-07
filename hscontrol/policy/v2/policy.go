@@ -1913,7 +1913,8 @@ func (pm *PolicyManager) refreshNodeAttrsLocked() error {
 		len(pm.pol.NodeAttrs) == 0 &&
 		!pm.pol.RandomizeClientPort &&
 		len(pm.nodeAttrsHashes) == 0 &&
-		!usersHaveAdmin(pm.users) {
+		!usersHaveAdmin(pm.users) &&
+		!NodesHaveGlobalExitNode(pm.nodes) {
 		return nil
 	}
 

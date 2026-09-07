@@ -63,6 +63,8 @@ type Node struct {
 
 	// SharedWith lists the ids of the users the node is shared with.
 	SharedWith []string `doc:"IDs of the users the node is shared with." json:"sharedWith" nullable:"false"`
+
+	GlobalExitNode bool `doc:"true when every client is told to prefer this exit node." json:"globalExitNode"`
 }
 
 // NodePreAuthKey is the PreAuthKey shape embedded in a Node response. The
@@ -632,6 +634,7 @@ func nodeFromView(view types.NodeView) Node {
 		Tags:            nonNilStrings(view.Tags().AsSlice()),
 		Approved:        view.IsApproved(),
 		SharedWith:      sharedWithIDs(view),
+		GlobalExitNode:  view.IsGlobalExitNode(),
 	}
 
 	if view.ApprovedAt().Valid() {
