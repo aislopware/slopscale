@@ -19,6 +19,7 @@ export type PreAuthKey = MethodResponse<
 >["preAuthKeys"][number];
 export type ApiKey = MethodResponse<typeof api, "get", "/api/v1/apikey">["apiKeys"][number];
 export type Settings = MethodResponse<typeof api, "get", "/api/v1/settings">;
+export type ServerInfo = MethodResponse<typeof api, "get", "/api/v1/server">;
 export type Policy = MethodResponse<typeof api, "get", "/api/v1/policy">;
 export type AuditPage = MethodResponse<typeof api, "get", "/api/v1/audit">;
 export type AuditEvent = AuditPage["events"][number];
@@ -32,6 +33,7 @@ export const usersQuery = api.queryOptions("get", "/api/v1/user");
 export const preAuthKeysQuery = api.queryOptions("get", "/api/v1/preauthkey");
 export const apiKeysQuery = api.queryOptions("get", "/api/v1/apikey");
 export const settingsQuery = api.queryOptions("get", "/api/v1/settings");
+export const serverInfoQuery = api.queryOptions("get", "/api/v1/server");
 export const groupsQuery = api.queryOptions("get", "/api/v1/group");
 export const accessRulesQuery = api.queryOptions("get", "/api/v1/access-rule");
 export const dnsQuery = api.queryOptions("get", "/api/v1/dns");
