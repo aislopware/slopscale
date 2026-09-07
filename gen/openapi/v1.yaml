@@ -1,0 +1,1846 @@
+components:
+  schemas:
+    ApiKey:
+      additionalProperties: false
+      properties:
+        createdAt:
+          format: date-time
+          type:
+            - string
+            - "null"
+        expiration:
+          format: date-time
+          type:
+            - string
+            - "null"
+        id:
+          format: uint64
+          type: string
+        lastSeen:
+          format: date-time
+          type:
+            - string
+            - "null"
+        prefix:
+          type: string
+        userId:
+          description: Owning user id; null for a legacy key.
+          format: uint64
+          type:
+            - string
+            - "null"
+      required:
+        - id
+        - prefix
+        - expiration
+        - createdAt
+        - lastSeen
+        - userId
+      type: object
+    AuthApproveOutputBody:
+      additionalProperties: false
+      type: object
+    AuthApproveRequestBody:
+      additionalProperties: false
+      properties:
+        authId:
+          type: string
+      type: object
+    AuthRegisterOutputBody:
+      additionalProperties: false
+      properties:
+        node:
+          $ref: "#/components/schemas/Node"
+      required:
+        - node
+      type: object
+    AuthRegisterRequestBody:
+      additionalProperties: false
+      properties:
+        authId:
+          type: string
+        user:
+          type: string
+      type: object
+    AuthRejectOutputBody:
+      additionalProperties: false
+      type: object
+    AuthRejectRequestBody:
+      additionalProperties: false
+      properties:
+        authId:
+          type: string
+      type: object
+    BackfillNodeIPsOutputBody:
+      additionalProperties: false
+      properties:
+        changes:
+          items:
+            type: string
+          type: array
+      required:
+        - changes
+      type: object
+    CheckPolicyOutputBody:
+      additionalProperties: false
+      type: object
+    CreateAPIKeyOutputBody:
+      additionalProperties: false
+      properties:
+        apiKey:
+          type: string
+      required:
+        - apiKey
+      type: object
+    CreateApiKeyRequestBody:
+      additionalProperties: false
+      properties:
+        expiration:
+          format: date-time
+          type: string
+        userId:
+          description: Owning user id; empty for a legacy all-access key.
+          format: uint64
+          type: string
+      type: object
+    CreatePreAuthKeyRequestBody:
+      additionalProperties: false
+      properties:
+        aclTags:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        ephemeral:
+          type: boolean
+        expiration:
+          format: date-time
+          type: string
+        preauthorized:
+          description: Defaults to true.
+          type: boolean
+        reusable:
+          type: boolean
+        user:
+          format: uint64
+          type: string
+      type: object
+    CreateUserRequestBody:
+      additionalProperties: false
+      properties:
+        displayName:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        pictureUrl:
+          type: string
+      type: object
+    DebugCreateNodeRequestBody:
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        routes:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        user:
+          type: string
+      type: object
+    DeleteAPIKeyOutputBody:
+      additionalProperties: false
+      type: object
+    DeleteNodeOutputBody:
+      additionalProperties: false
+      type: object
+    DeletePreAuthKeyOutputBody:
+      additionalProperties: false
+      type: object
+    DeleteUserOutputBody:
+      additionalProperties: false
+      type: object
+    ErrorDetail:
+      additionalProperties: false
+      properties:
+        location:
+          description: Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'
+          type: string
+        message:
+          description: Error message text
+          type: string
+        value:
+          description: The value at the given location
+      type: object
+    ErrorModel:
+      additionalProperties: false
+      properties:
+        detail:
+          description: A human-readable explanation specific to this occurrence of the problem.
+          examples:
+            - Property foo is required but is missing.
+          type: string
+        errors:
+          description: Optional list of individual error details
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+          type:
+            - array
+            - "null"
+        instance:
+          description: A URI reference that identifies the specific occurrence of the problem.
+          examples:
+            - https://example.com/error-log/abc123
+          format: uri
+          type: string
+        status:
+          description: HTTP status code
+          examples:
+            - 400
+          format: int64
+          type: integer
+        title:
+          description: A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
+          examples:
+            - Bad Request
+          type: string
+        type:
+          default: about:blank
+          description: A URI reference to human-readable documentation for the error.
+          examples:
+            - https://example.com/errors/example
+          format: uri
+          type: string
+      type: object
+    ExpireAPIKeyOutputBody:
+      additionalProperties: false
+      type: object
+    ExpireApiKeyRequestBody:
+      additionalProperties: false
+      properties:
+        id:
+          format: uint64
+          type: string
+        prefix:
+          type: string
+      type: object
+    ExpireNodeRequestBody:
+      additionalProperties: false
+      properties:
+        disableExpiry:
+          type: boolean
+        expiry:
+          format: date-time
+          type: string
+      type: object
+    ExpirePreAuthKeyOutputBody:
+      additionalProperties: false
+      type: object
+    ExpirePreAuthKeyRequestBody:
+      additionalProperties: false
+      properties:
+        id:
+          format: uint64
+          type: string
+      type: object
+    HealthResponseBody:
+      additionalProperties: false
+      properties:
+        databaseConnectivity:
+          type: boolean
+      required:
+        - databaseConnectivity
+      type: object
+    ListAPIKeysOutputBody:
+      additionalProperties: false
+      properties:
+        apiKeys:
+          items:
+            $ref: "#/components/schemas/ApiKey"
+          type: array
+      required:
+        - apiKeys
+      type: object
+    ListNodesOutputBody:
+      additionalProperties: false
+      properties:
+        nodes:
+          items:
+            $ref: "#/components/schemas/Node"
+          type: array
+      required:
+        - nodes
+      type: object
+    ListPreAuthKeysOutputBody:
+      additionalProperties: false
+      properties:
+        preAuthKeys:
+          items:
+            $ref: "#/components/schemas/PreAuthKey"
+          type: array
+      required:
+        - preAuthKeys
+      type: object
+    ListUsersOutputBody:
+      additionalProperties: false
+      properties:
+        users:
+          items:
+            $ref: "#/components/schemas/User"
+          type: array
+      required:
+        - users
+      type: object
+    Node:
+      additionalProperties: false
+      properties:
+        approved:
+          description: false while the node waits for an administrator.
+          type: boolean
+        approvedAt:
+          format: date-time
+          type:
+            - string
+            - "null"
+        approvedRoutes:
+          items:
+            type: string
+          type: array
+        availableRoutes:
+          items:
+            type: string
+          type: array
+        createdAt:
+          format: date-time
+          type: string
+        discoKey:
+          type: string
+        expiry:
+          format: date-time
+          type:
+            - string
+            - "null"
+        givenName:
+          type: string
+        globalExitNode:
+          description: true when every client is told to prefer this exit node.
+          type: boolean
+        id:
+          format: uint64
+          type: string
+        ipAddresses:
+          items:
+            type: string
+          type: array
+        lastSeen:
+          format: date-time
+          type:
+            - string
+            - "null"
+        machineKey:
+          type: string
+        name:
+          type: string
+        nodeKey:
+          type: string
+        online:
+          type: boolean
+        preAuthKey:
+          $ref: "#/components/schemas/NodePreAuthKey"
+        registerMethod:
+          enum:
+            - REGISTER_METHOD_UNSPECIFIED
+            - REGISTER_METHOD_AUTH_KEY
+            - REGISTER_METHOD_CLI
+            - REGISTER_METHOD_OIDC
+          type: string
+        sharedWith:
+          description: IDs of the users the node is shared with.
+          items:
+            type: string
+          type: array
+        subnetRoutes:
+          items:
+            type: string
+          type: array
+        tags:
+          items:
+            type: string
+          type: array
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - id
+        - machineKey
+        - nodeKey
+        - discoKey
+        - ipAddresses
+        - name
+        - user
+        - lastSeen
+        - expiry
+        - preAuthKey
+        - createdAt
+        - approved
+        - approvedAt
+        - registerMethod
+        - givenName
+        - online
+        - approvedRoutes
+        - availableRoutes
+        - subnetRoutes
+        - tags
+        - sharedWith
+        - globalExitNode
+      type: object
+    NodeOutputBody:
+      additionalProperties: false
+      properties:
+        node:
+          $ref: "#/components/schemas/Node"
+      required:
+        - node
+      type: object
+    NodePreAuthKey:
+      additionalProperties: false
+      properties:
+        aclTags:
+          items:
+            type: string
+          type: array
+        createdAt:
+          format: date-time
+          type:
+            - string
+            - "null"
+        ephemeral:
+          type: boolean
+        expiration:
+          format: date-time
+          type:
+            - string
+            - "null"
+        id:
+          format: uint64
+          type: string
+        key:
+          type: string
+        preauthorized:
+          type: boolean
+        reusable:
+          type: boolean
+        used:
+          type: boolean
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - user
+        - id
+        - key
+        - reusable
+        - ephemeral
+        - used
+        - expiration
+        - createdAt
+        - aclTags
+        - preauthorized
+      type: object
+    PolicyRequestBody:
+      additionalProperties: false
+      properties:
+        policy:
+          type: string
+      type: object
+    PolicyResponseBody:
+      additionalProperties: false
+      properties:
+        policy:
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+      required:
+        - policy
+        - updatedAt
+      type: object
+    PreAuthKey:
+      additionalProperties: false
+      properties:
+        aclTags:
+          items:
+            type: string
+          type: array
+        createdAt:
+          format: date-time
+          type: string
+        ephemeral:
+          type: boolean
+        expiration:
+          format: date-time
+          type: string
+        id:
+          format: uint64
+          type: string
+        key:
+          type: string
+        preauthorized:
+          description: Nodes registered with the key skip device approval.
+          type: boolean
+        reusable:
+          type: boolean
+        used:
+          type: boolean
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - user
+        - id
+        - key
+        - reusable
+        - ephemeral
+        - used
+        - expiration
+        - createdAt
+        - aclTags
+        - preauthorized
+      type: object
+    PreAuthKeyOutputBody:
+      additionalProperties: false
+      properties:
+        preAuthKey:
+          $ref: "#/components/schemas/PreAuthKey"
+      required:
+        - preAuthKey
+      type: object
+    SetApprovalRequestBody:
+      additionalProperties: false
+      properties:
+        approved:
+          description: false withdraws the approval.
+          type: boolean
+      type: object
+    SetApprovedRoutesRequestBody:
+      additionalProperties: false
+      properties:
+        routes:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      type: object
+    SetGlobalExitNodeRequestBody:
+      additionalProperties: false
+      properties:
+        enabled:
+          description: false clears the mark.
+          type: boolean
+      type: object
+    SetTagsRequestBody:
+      additionalProperties: false
+      properties:
+        tags:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      type: object
+    SetUserRoleRequestBody:
+      additionalProperties: false
+      properties:
+        role:
+          description: One of owner, admin, network-admin, it-admin, auditor, member.
+          type: string
+      required:
+        - role
+      type: object
+    Settings:
+      additionalProperties: false
+      properties:
+        devicesApprovalOn:
+          description: New nodes wait for an administrator unless they register with a preauthorized key.
+          type: boolean
+        usersApprovalOn:
+          description: Users created by OIDC login wait for an administrator before registering nodes.
+          type: boolean
+      required:
+        - devicesApprovalOn
+        - usersApprovalOn
+      type: object
+    ShareNodeRequestBody:
+      additionalProperties: false
+      properties:
+        userId:
+          description: ID of the user to share the node with.
+          format: uint64
+          type: string
+      required:
+        - userId
+      type: object
+    UpdateSettingsRequestBody:
+      additionalProperties: false
+      properties:
+        devicesApprovalOn:
+          type: boolean
+        usersApprovalOn:
+          type: boolean
+      type: object
+    User:
+      additionalProperties: false
+      properties:
+        approved:
+          description: false while the user waits for an administrator.
+          type: boolean
+        approvedAt:
+          format: date-time
+          type:
+            - string
+            - "null"
+        createdAt:
+          format: date-time
+          type: string
+        displayName:
+          type: string
+        email:
+          type: string
+        id:
+          format: uint64
+          type: string
+        name:
+          type: string
+        profilePicUrl:
+          type: string
+        provider:
+          type: string
+        providerId:
+          type: string
+        role:
+          description: owner, admin, network-admin, it-admin, auditor or member
+          type: string
+      required:
+        - id
+        - name
+        - createdAt
+        - displayName
+        - email
+        - providerId
+        - provider
+        - profilePicUrl
+        - role
+        - approved
+        - approvedAt
+      type: object
+    UserOutputBody:
+      additionalProperties: false
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - user
+      type: object
+    Whoami:
+      additionalProperties: false
+      properties:
+        allAccess:
+          type: boolean
+        kind:
+          description: "How the caller authenticated: local (socket), api_key or oauth."
+          type: string
+        permissions:
+          additionalProperties:
+            type: boolean
+          type: object
+        role:
+          type: string
+        scopes:
+          items:
+            type: string
+          type: array
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - kind
+        - role
+        - allAccess
+        - scopes
+        - permissions
+      type: object
+  securitySchemes:
+    bearer:
+      scheme: bearer
+      type: http
+info:
+  description: Headscale control server API.
+  title: Headscale API
+  version: v1
+openapi: 3.1.0
+paths:
+  /api/v1/apikey:
+    get:
+      operationId: listApiKeys
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAPIKeysOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List API keys
+      tags:
+        - ApiKeys
+    post:
+      description: Any authenticated caller may mint a key for itself; a key for another user, or a legacy key without a user, needs the owner, an admin or the socket.
+      operationId: createApiKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateApiKeyRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateAPIKeyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create API key
+      tags:
+        - ApiKeys
+  /api/v1/apikey/expire:
+    post:
+      operationId: expireApiKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpireApiKeyRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpireAPIKeyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Expire API key
+      tags:
+        - ApiKeys
+  /api/v1/apikey/{prefix}:
+    delete:
+      operationId: deleteApiKey
+      parameters:
+        - in: path
+          name: prefix
+          required: true
+          schema:
+            type: string
+        - explode: false
+          in: query
+          name: id
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteAPIKeyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete API key
+      tags:
+        - ApiKeys
+  /api/v1/auth/approve:
+    post:
+      description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: authApprove
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthApproveRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthApproveOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Approve a pending auth session
+      tags:
+        - Auth
+      x-required-scope: devices:core
+  /api/v1/auth/register:
+    post:
+      description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: authRegister
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRegisterRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthRegisterOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Register node via auth flow
+      tags:
+        - Auth
+      x-required-scope: devices:core
+  /api/v1/auth/reject:
+    post:
+      description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: authReject
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRejectRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthRejectOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Reject a pending auth session
+      tags:
+        - Auth
+      x-required-scope: devices:core
+  /api/v1/debug/node:
+    post:
+      description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: debugCreateNode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DebugCreateNodeRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Debug create node
+      tags:
+        - Nodes
+      x-required-scope: devices:core
+  /api/v1/health:
+    get:
+      description: Reports server health, including database connectivity.
+      operationId: health
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponseBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Health check
+      tags:
+        - Health
+  /api/v1/node:
+    get:
+      description: Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listNodes
+      parameters:
+        - explode: false
+          in: query
+          name: user
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListNodesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List nodes
+      tags:
+        - Nodes
+      x-required-scope: devices:core:read
+  /api/v1/node/backfillips:
+    post:
+      description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: backfillNodeIPs
+      parameters:
+        - explode: false
+          in: query
+          name: confirmed
+          schema:
+            type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackfillNodeIPsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Backfill node IPs
+      tags:
+        - Nodes
+      x-required-scope: devices:core
+  /api/v1/node/register:
+    post:
+      description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: registerNode
+      parameters:
+        - explode: false
+          in: query
+          name: user
+          schema:
+            type: string
+        - explode: false
+          in: query
+          name: key
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Register node
+      tags:
+        - Nodes
+      x-required-scope: devices:core
+  /api/v1/node/{nodeId}:
+    delete:
+      description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteNode
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteNodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete node
+      tags:
+        - Nodes
+      x-required-scope: devices:core
+    get:
+      description: Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getNode
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get node
+      tags:
+        - Nodes
+      x-required-scope: devices:core:read
+  /api/v1/node/{nodeId}/approve:
+    post:
+      description: |-
+        Admits a node that registered while device approval was on, or withdraws the approval again. A node waiting for approval stays registered but has no peers and is not visible to any.
+
+        Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: approveNode
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetApprovalRequestBody"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Approve node
+      tags:
+        - Nodes
+      x-required-scope: devices:core
+  /api/v1/node/{nodeId}/approve_routes:
+    post:
+      description: Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: setApprovedRoutes
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetApprovedRoutesRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Set approved routes
+      tags:
+        - Nodes
+      x-required-scope: devices:routes
+  /api/v1/node/{nodeId}/expire:
+    post:
+      description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: expireNode
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpireNodeRequestBody"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Expire node
+      tags:
+        - Nodes
+      x-required-scope: devices:core
+  /api/v1/node/{nodeId}/global-exit-node:
+    post:
+      description: |-
+        Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+
+        Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: setGlobalExitNode
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetGlobalExitNodeRequestBody"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Mark node as global exit node
+      tags:
+        - Nodes
+      x-required-scope: devices:routes
+  /api/v1/node/{nodeId}/rename/{newName}:
+    post:
+      description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: renameNode
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+        - in: path
+          name: newName
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Rename node
+      tags:
+        - Nodes
+      x-required-scope: devices:core
+  /api/v1/node/{nodeId}/share:
+    post:
+      description: Gives the user's personal devices access to the node wherever the policy names autogroup:shared, and marks the node as shared in their netmaps. The node gets no access back. A member may share the nodes they own; sharing any node needs the devices scope.
+      operationId: shareNode
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ShareNodeRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Share node with a user
+      tags:
+        - Nodes
+  /api/v1/node/{nodeId}/share/{userId}:
+    delete:
+      operationId: unshareNode
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+        - in: path
+          name: userId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Stop sharing node with a user
+      tags:
+        - Nodes
+  /api/v1/node/{nodeId}/tags:
+    post:
+      description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: setTags
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetTagsRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Set tags
+      tags:
+        - Nodes
+      x-required-scope: devices:core
+  /api/v1/policy:
+    get:
+      description: Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getPolicy
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyResponseBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get policy
+      tags:
+        - Policy
+      x-required-scope: policy_file:read
+    put:
+      description: Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: setPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyResponseBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Set policy
+      tags:
+        - Policy
+      x-required-scope: policy_file
+  /api/v1/policy/check:
+    post:
+      description: |-
+        Validates the given policy against the server's live users and nodes without persisting it.
+
+        Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: checkPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckPolicyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Check policy
+      tags:
+        - Policy
+      x-required-scope: policy_file:read
+  /api/v1/preauthkey:
+    delete:
+      description: Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deletePreAuthKey
+      parameters:
+        - explode: false
+          in: query
+          name: id
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletePreAuthKeyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete pre-auth key
+      tags:
+        - PreAuthKeys
+      x-required-scope: auth_keys
+    get:
+      description: Requires the `auth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listPreAuthKeys
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListPreAuthKeysOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List pre-auth keys
+      tags:
+        - PreAuthKeys
+      x-required-scope: auth_keys:read
+    post:
+      description: Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createPreAuthKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePreAuthKeyRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreAuthKeyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create pre-auth key
+      tags:
+        - PreAuthKeys
+      x-required-scope: auth_keys
+  /api/v1/preauthkey/expire:
+    post:
+      description: Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: expirePreAuthKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpirePreAuthKeyRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpirePreAuthKeyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Expire pre-auth key
+      tags:
+        - PreAuthKeys
+      x-required-scope: auth_keys
+  /api/v1/settings:
+    get:
+      description: Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getSettings
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get settings
+      tags:
+        - Settings
+      x-required-scope: feature_settings:read
+    post:
+      description: |-
+        Changes the given switches. Switching device or users approval off approves every node or user that was waiting.
+
+        Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSettingsRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Settings"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Update settings
+      tags:
+        - Settings
+      x-required-scope: feature_settings
+  /api/v1/user:
+    get:
+      description: Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listUsers
+      parameters:
+        - explode: false
+          in: query
+          name: id
+          schema:
+            format: uint64
+            type: string
+        - explode: false
+          in: query
+          name: name
+          schema:
+            type: string
+        - explode: false
+          in: query
+          name: email
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListUsersOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List users
+      tags:
+        - Users
+      x-required-scope: users:read
+    post:
+      description: Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create user
+      tags:
+        - Users
+      x-required-scope: users
+  /api/v1/user/{id}:
+    delete:
+      description: Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteUser
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteUserOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete user
+      tags:
+        - Users
+      x-required-scope: users
+  /api/v1/user/{id}/approve:
+    post:
+      description: |-
+        Admits a user created by OIDC login while users approval was on, or withdraws the approval again, which also withdraws every node the user owns.
+
+        Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: approveUser
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetApprovalRequestBody"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Approve user
+      tags:
+        - Users
+      x-required-scope: users
+  /api/v1/user/{id}/role:
+    post:
+      description: |-
+        Assigns an admin role. Only the owner or an admin may assign roles, nobody may change their own, and assigning owner transfers ownership: the previous owner becomes an admin. The owner's role changes only by such a transfer.
+
+        Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: setUserRole
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetUserRoleRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Set user role
+      tags:
+        - Users
+      x-required-scope: users
+  /api/v1/user/{oldId}/rename/{newName}:
+    post:
+      description: Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: renameUser
+      parameters:
+        - in: path
+          name: oldId
+          required: true
+          schema:
+            format: uint64
+            type: string
+        - in: path
+          name: newName
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Rename user
+      tags:
+        - Users
+      x-required-scope: users
+  /api/v1/whoami:
+    get:
+      description: Any authenticated caller may ask who it is; no scope is required.
+      operationId: whoami
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Whoami"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Describe the caller
+      tags:
+        - Users
