@@ -2057,7 +2057,11 @@ export interface components {
             /** Format: uint64 */
             id: string;
             name: string;
+            /** @description Ports or ranges for tcp and udp; empty is all. */
+            ports: string;
             prefixes: string[];
+            /** @description One of all, tcp, udp, icmp. */
+            protocol: string;
             routerNodeIds: string[];
             /** @description The routers with what they advertise and serve. */
             routers: components["schemas"]["NetworkRouter"][];
@@ -2077,8 +2081,12 @@ export interface components {
             /** @description Groups whose machines get the routes. */
             groupIds: string[] | null;
             name: string;
+            /** @description Ports or ranges such as 22,80-90, for tcp and udp only. */
+            ports?: string;
             /** @description CIDRs or addresses. */
             prefixes: string[] | null;
+            /** @description One of all, tcp, udp, icmp; defaults to all. */
+            protocol?: string;
             /** @description Nodes that route the prefixes. */
             routerNodeIds?: string[] | null;
         };

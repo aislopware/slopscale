@@ -665,10 +665,16 @@ type Network struct {
 	ExitNode bool `json:"exitNode"`
 
 	// GroupIds Groups whose machines get the routes.
-	GroupIds      []string `json:"groupIds"`
-	Id            string   `json:"id"`
-	Name          string   `json:"name"`
-	Prefixes      []string `json:"prefixes"`
+	GroupIds []string `json:"groupIds"`
+	Id       string   `json:"id"`
+	Name     string   `json:"name"`
+
+	// Ports Ports or ranges for tcp and udp; empty is all.
+	Ports    string   `json:"ports"`
+	Prefixes []string `json:"prefixes"`
+
+	// Protocol One of all, tcp, udp, icmp.
+	Protocol      string   `json:"protocol"`
 	RouterNodeIds []string `json:"routerNodeIds"`
 
 	// Routers The routers with what they advertise and serve.
@@ -697,8 +703,14 @@ type NetworkRequestBody struct {
 	GroupIds *[]string `json:"groupIds"`
 	Name     string    `json:"name"`
 
+	// Ports Ports or ranges such as 22,80-90, for tcp and udp only.
+	Ports *string `json:"ports,omitempty"`
+
 	// Prefixes CIDRs or addresses.
 	Prefixes *[]string `json:"prefixes"`
+
+	// Protocol One of all, tcp, udp, icmp; defaults to all.
+	Protocol *string `json:"protocol,omitempty"`
 
 	// RouterNodeIds Nodes that route the prefixes.
 	RouterNodeIds *[]string `json:"routerNodeIds,omitempty"`

@@ -21,6 +21,8 @@ type networksTable struct {
 	Name        sqlite.ColumnString
 	Description sqlite.ColumnString
 	Enabled     sqlite.ColumnBool
+	Protocol    sqlite.ColumnString
+	Ports       sqlite.ColumnString
 	CreatedAt   sqlite.ColumnTimestamp
 	UpdatedAt   sqlite.ColumnTimestamp
 
@@ -68,10 +70,12 @@ func newNetworksTableImpl(schemaName, tableName, alias string) networksTable {
 		NameColumn        = sqlite.StringColumn("name")
 		DescriptionColumn = sqlite.StringColumn("description")
 		EnabledColumn     = sqlite.BoolColumn("enabled")
+		ProtocolColumn    = sqlite.StringColumn("protocol")
+		PortsColumn       = sqlite.StringColumn("ports")
 		CreatedAtColumn   = sqlite.TimestampColumn("created_at")
 		UpdatedAtColumn   = sqlite.TimestampColumn("updated_at")
-		allColumns        = sqlite.ColumnList{IDColumn, NameColumn, DescriptionColumn, EnabledColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns    = sqlite.ColumnList{NameColumn, DescriptionColumn, EnabledColumn, CreatedAtColumn, UpdatedAtColumn}
+		allColumns        = sqlite.ColumnList{IDColumn, NameColumn, DescriptionColumn, EnabledColumn, ProtocolColumn, PortsColumn, CreatedAtColumn, UpdatedAtColumn}
+		mutableColumns    = sqlite.ColumnList{NameColumn, DescriptionColumn, EnabledColumn, ProtocolColumn, PortsColumn, CreatedAtColumn, UpdatedAtColumn}
 		defaultColumns    = sqlite.ColumnList{EnabledColumn}
 	)
 
@@ -83,6 +87,8 @@ func newNetworksTableImpl(schemaName, tableName, alias string) networksTable {
 		Name:        NameColumn,
 		Description: DescriptionColumn,
 		Enabled:     EnabledColumn,
+		Protocol:    ProtocolColumn,
+		Ports:       PortsColumn,
 		CreatedAt:   CreatedAtColumn,
 		UpdatedAt:   UpdatedAtColumn,
 

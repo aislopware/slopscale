@@ -1030,10 +1030,16 @@ components:
           type: string
         name:
           type: string
+        ports:
+          description: Ports or ranges for tcp and udp; empty is all.
+          type: string
         prefixes:
           items:
             type: string
           type: array
+        protocol:
+          description: One of all, tcp, udp, icmp.
+          type: string
         routerNodeIds:
           items:
             type: string
@@ -1052,6 +1058,8 @@ components:
         - description
         - enabled
         - exitNode
+        - protocol
+        - ports
         - prefixes
         - routerNodeIds
         - groupIds
@@ -1092,6 +1100,9 @@ components:
             - "null"
         name:
           type: string
+        ports:
+          description: Ports or ranges such as 22,80-90, for tcp and udp only.
+          type: string
         prefixes:
           description: CIDRs or addresses.
           items:
@@ -1099,6 +1110,9 @@ components:
           type:
             - array
             - "null"
+        protocol:
+          description: One of all, tcp, udp, icmp; defaults to all.
+          type: string
         routerNodeIds:
           description: Nodes that route the prefixes.
           items:
