@@ -40,7 +40,7 @@ export function WebhookMenu({
 }): ReactElement {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const mutations = useWebhookMutations();
-  const writable = can(me, "feature_settings");
+  const writable = can(me, "webhooks");
   const close = (open: boolean): void => {
     if (!open) {
       setDialog(null);

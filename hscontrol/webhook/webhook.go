@@ -16,10 +16,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -46,17 +46,31 @@ type Dispatcher struct {
 	mu        sync.RWMutex
 	endpoints []types.Webhook
 
+	// lifeMu orders admission against shutdown: Emit and Test register
+	// work under it, Close flips closed under it, so nothing is admitted
+	// after Close starts waiting.
+	lifeMu sync.Mutex
+	closed bool
 	wg     sync.WaitGroup
-	closed atomic.Bool
 	ctx    context.Context //nolint:containedctx // bounds the deliveries in flight
 	cancel context.CancelFunc
-	// slots bounds the deliveries in flight.
+	// queue holds the deliveries waiting for a worker; a full queue drops
+	// the delivery and records that.
+	queue chan delivery
+	// slots bounds the deliveries in flight across workers and tests.
 	slots chan struct{}
+}
+
+// delivery is one event bound for one endpoint.
+type delivery struct {
+	endpoint types.Webhook
+	event    types.WebhookEvent
 }
 
 const (
 	deliveryTimeout = 15 * time.Second
 	maxInFlight     = 16
+	maxQueued       = 1024
 	maxResponseRead = 4 << 10
 )
 
@@ -64,16 +78,30 @@ const (
 func New(store Store, tailnet string) *Dispatcher {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	return &Dispatcher{
+	d := &Dispatcher{
 		store:   store,
 		tailnet: tailnet,
 		client:  &http.Client{Timeout: deliveryTimeout, CheckRedirect: noRedirect},
 		backoff: []time.Duration{2 * time.Second, 10 * time.Second, 30 * time.Second},
 		ctx:     ctx,
 		cancel:  cancel,
+		queue:   make(chan delivery, maxQueued),
 		slots:   make(chan struct{}, maxInFlight),
 	}
+
+	for range maxInFlight {
+		d.wg.Go(d.work)
+	}
+
+	return d
 }
+
+// ErrClosed is returned when the dispatcher is shutting down.
+var ErrClosed = errors.New("webhook dispatcher is closed")
+
+// ErrQueueFull is recorded for a delivery dropped because too many were
+// waiting.
+var ErrQueueFull = errors.New("webhook queue is full; delivery dropped")
 
 // ErrRedirected is returned when the receiver answered with a redirect.
 var ErrRedirected = errors.New("webhook receiver redirected; deliveries are posted to the configured URL only")
@@ -107,10 +135,19 @@ func (d *Dispatcher) Reload(endpoints []types.Webhook) {
 // cuts them off.
 const closeGrace = 5 * time.Second
 
-// Close drops new deliveries, waits a little for the ones in flight and
-// then cuts them off.
+// Close drops new deliveries, waits a little for the queued and in-flight
+// ones and then cuts them off. It returns once every worker has exited.
 func (d *Dispatcher) Close() {
-	d.closed.Store(true)
+	d.lifeMu.Lock()
+	if d.closed {
+		d.lifeMu.Unlock()
+
+		return
+	}
+
+	d.closed = true
+	close(d.queue)
+	d.lifeMu.Unlock()
 
 	done := make(chan struct{})
 
@@ -128,40 +165,60 @@ func (d *Dispatcher) Close() {
 	<-done
 }
 
-// Emit delivers the event to every endpoint subscribed to its type, in
-// the background. It never blocks the caller beyond the in-flight bound.
+// Emit queues the event for every endpoint subscribed to its type. It
+// never blocks: when the queue is full the delivery is dropped and
+// recorded as such.
 func (d *Dispatcher) Emit(t types.WebhookEventType, message string, data any) {
 	d.mu.RLock()
 	endpoints := d.endpoints
 	d.mu.RUnlock()
 
-	if d.closed.Load() {
-		return
-	}
-
-	event := d.event(t, message, data)
+	var event types.WebhookEvent
 
 	for _, endpoint := range endpoints {
 		if !endpoint.Subscribed(t) {
 			continue
 		}
 
-		d.wg.Go(func() {
-			select {
-			case d.slots <- struct{}{}:
-			case <-d.ctx.Done():
-				return
-			}
+		if event.Type == "" {
+			event = d.event(t, message, data)
+		}
 
-			defer func() { <-d.slots }()
-
-			d.deliverWithRetry(d.ctx, endpoint, event)
-		})
+		d.enqueue(delivery{endpoint: endpoint, event: event})
 	}
 }
 
 // Test delivers a test event to the endpoint now and reports how it went.
+// It takes one of the in-flight slots like any delivery, so a burst of
+// tests cannot push past the limit, and shutdown cuts it off.
 func (d *Dispatcher) Test(ctx context.Context, endpoint types.Webhook) error {
+	d.lifeMu.Lock()
+	if d.closed {
+		d.lifeMu.Unlock()
+
+		return ErrClosed
+	}
+
+	d.wg.Add(1)
+	d.lifeMu.Unlock()
+
+	defer d.wg.Done()
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Shutdown cuts a test off like any delivery in flight.
+	stop := context.AfterFunc(d.ctx, cancel) //nolint:contextcheck // d.ctx is the dispatcher's lifetime, not a request
+	defer stop()
+
+	select {
+	case d.slots <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	defer func() { <-d.slots }()
+
 	event := d.event(types.EventTest, "This is a test event from headscale.", nil)
 
 	started := time.Now()
@@ -169,6 +226,41 @@ func (d *Dispatcher) Test(ctx context.Context, endpoint types.Webhook) error {
 	d.record(endpoint.ID, event.Type, status, err, 1, time.Since(started))
 
 	return err
+}
+
+// work is one worker: it takes deliveries off the queue until the queue
+// closes. Once shutdown has cut the context, what is left is dropped.
+func (d *Dispatcher) work() {
+	for task := range d.queue {
+		if d.ctx.Err() != nil {
+			d.record(task.endpoint.ID, task.event.Type, 0, ErrClosed, 0, 0)
+
+			continue
+		}
+
+		d.deliverWithRetry(d.ctx, task.endpoint, task.event)
+	}
+}
+
+// enqueue hands one delivery to the workers, under lifeMu so it cannot
+// land on a queue that Close is closing.
+func (d *Dispatcher) enqueue(task delivery) {
+	d.lifeMu.Lock()
+	defer d.lifeMu.Unlock()
+
+	if d.closed {
+		return
+	}
+
+	select {
+	case d.queue <- task:
+	default:
+		d.record(task.endpoint.ID, task.event.Type, 0, ErrQueueFull, 0, 0)
+		log.Warn().
+			Uint64("webhook", uint64(task.endpoint.ID)).
+			Str("event", string(task.event.Type)).
+			Msg("webhook queue full, delivery dropped")
+	}
 }
 
 func (d *Dispatcher) event(t types.WebhookEventType, message string, data any) types.WebhookEvent {
@@ -188,6 +280,14 @@ func (d *Dispatcher) deliverWithRetry(ctx context.Context, endpoint types.Webhoo
 		err      error
 		attempts int
 	)
+
+	select {
+	case d.slots <- struct{}{}:
+	case <-ctx.Done():
+		return
+	}
+
+	defer func() { <-d.slots }()
 
 	started := time.Now()
 
@@ -211,8 +311,11 @@ func (d *Dispatcher) deliverWithRetry(ctx context.Context, endpoint types.Webhoo
 	d.record(endpoint.ID, event.Type, status, err, attempts, time.Since(started))
 
 	if err != nil {
+		// The URL is a credential for the chat providers, so only its
+		// host is logged.
 		log.Warn().Err(err).
-			Str("url", endpoint.URL).
+			Uint64("webhook", uint64(endpoint.ID)).
+			Str("host", endpoint.Host()).
 			Str("event", string(event.Type)).
 			Msg("webhook delivery failed")
 	}
@@ -251,6 +354,12 @@ func (d *Dispatcher) deliver(ctx context.Context, endpoint types.Webhook, event 
 
 	resp, err := d.client.Do(req)
 	if err != nil {
+		// A *url.Error prints the whole URL, which for the chat
+		// providers is the credential; keep the cause only.
+		if urlErr, ok := errors.AsType[*url.Error](err); ok {
+			err = urlErr.Err
+		}
+
 		return 0, fmt.Errorf("posting webhook: %w", err)
 	}
 	defer resp.Body.Close()

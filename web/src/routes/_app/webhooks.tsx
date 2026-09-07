@@ -49,7 +49,7 @@ function WebhooksPage(): ReactElement {
   const { types: eventTypes } = useSuspenseQuery(webhookEventTypesQuery).data;
   const text = search.q ?? "";
   const query = useDeferredValue(text);
-  const canEdit = can(me, "feature_settings");
+  const canEdit = can(me, "webhooks");
   const [creating, setCreating] = useState(false);
   const mutations = useWebhookMutations();
 

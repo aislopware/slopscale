@@ -31,13 +31,21 @@ func TestWebhookRoundTrip(t *testing.T) {
 
 	created.URL = "https://hooks.example/def"
 	created.Subscriptions = []types.WebhookEventType{types.EventPolicyUpdate}
-	created.Secret = "hswh-rotated"
+	created.Secret = "hswh-ignored"
 
 	updated, err := hsdb.UpdateWebhook(created)
 	require.NoError(t, err)
 	assert.Equal(t, "https://hooks.example/def", updated.URL)
-	assert.Equal(t, "hswh-rotated", updated.Secret)
+	assert.Equal(t, "hswh-secret", updated.Secret, "an edit leaves the secret alone")
 	assert.Equal(t, []types.WebhookEventType{types.EventPolicyUpdate}, updated.Subscriptions)
+
+	rotated, err := hsdb.SetWebhookSecret(created.ID, "hswh-rotated")
+	require.NoError(t, err)
+	assert.Equal(t, "hswh-rotated", rotated.Secret)
+	assert.Equal(t, "https://hooks.example/def", rotated.URL, "a rotation leaves the other fields alone")
+
+	_, err = hsdb.SetWebhookSecret(99999, "hswh-nobody")
+	require.ErrorIs(t, err, types.ErrWebhookNotFound)
 
 	at := time.Date(2026, 9, 9, 12, 0, 0, 0, time.UTC)
 	require.NoError(t, hsdb.RecordWebhookDelivery(types.WebhookDelivery{

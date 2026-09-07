@@ -158,8 +158,9 @@ func (hsdb *HSDatabase) CreateWebhook(w types.Webhook) (types.Webhook, error) {
 	})
 }
 
-// UpdateWebhook replaces the URL, description, provider, secret and
-// subscriptions of the webhook.
+// UpdateWebhook replaces the URL, description, provider and
+// subscriptions of the webhook. The secret is left alone; see
+// [HSDatabase.SetWebhookSecret].
 func (hsdb *HSDatabase) UpdateWebhook(w types.Webhook) (types.Webhook, error) {
 	return Write(hsdb, func(tx *Tx) (types.Webhook, error) {
 		row, err := webhookRowFrom(w)
@@ -170,9 +171,9 @@ func (hsdb *HSDatabase) UpdateWebhook(w types.Webhook) (types.Webhook, error) {
 		affected, err := tx.executor().exec(
 			table.Webhooks.UPDATE(
 				table.Webhooks.URL, table.Webhooks.Description, table.Webhooks.ProviderType,
-				table.Webhooks.Secret, table.Webhooks.Subscriptions, table.Webhooks.UpdatedAt,
+				table.Webhooks.Subscriptions, table.Webhooks.UpdatedAt,
 			).SET(
-				row.URL, row.Description, row.ProviderType, row.Secret, row.Subscriptions, time.Now().UTC(),
+				row.URL, row.Description, row.ProviderType, row.Subscriptions, time.Now().UTC(),
 			).WHERE(table.Webhooks.ID.EQ(jet.Uint64(uint64(w.ID)))),
 		)
 		if err != nil {
@@ -184,6 +185,27 @@ func (hsdb *HSDatabase) UpdateWebhook(w types.Webhook) (types.Webhook, error) {
 		}
 
 		return getWebhook(tx, w.ID)
+	})
+}
+
+// SetWebhookSecret replaces only the signing secret of the webhook, so a
+// rotation cannot clobber a concurrent edit of the other fields.
+func (hsdb *HSDatabase) SetWebhookSecret(id types.WebhookID, secret string) (types.Webhook, error) {
+	return Write(hsdb, func(tx *Tx) (types.Webhook, error) {
+		affected, err := tx.executor().exec(
+			table.Webhooks.UPDATE(table.Webhooks.Secret, table.Webhooks.UpdatedAt).
+				SET(secret, time.Now().UTC()).
+				WHERE(table.Webhooks.ID.EQ(jet.Uint64(uint64(id)))),
+		)
+		if err != nil {
+			return types.Webhook{}, fmt.Errorf("rotating webhook %d secret: %w", id, err)
+		}
+
+		if affected == 0 {
+			return types.Webhook{}, types.ErrWebhookNotFound
+		}
+
+		return getWebhook(tx, id)
 	})
 }
 

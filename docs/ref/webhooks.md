@@ -62,21 +62,25 @@ one. Each event has this shape:
     "tailnet": "example.com",
     "message": "Node laptop (alice) joined the tailnet.",
     "data": {
-      "nodeId": "12",
-      "name": "laptop",
-      "hostname": "alice-laptop",
-      "addresses": ["100.64.0.12", "fd7a:115c:a1e0::c"],
-      "user": "alice",
-      "expiresAt": "2027-03-06T09:12:44Z"
+      "nodeID": "12",
+      "deviceName": "laptop.example.com",
+      "managedBy": "alice@example.com",
+      "url": "https://headscale.example.com/admin/machines/12",
+      "expiration": "2027-03-06T09:12:44Z",
+      "addresses": ["100.64.0.12", "fd7a:115c:a1e0::c"]
     }
   }
 ]
 ```
 
 `tailnet` is the MagicDNS base domain, or the server's host when there is
-none. Node events carry `nodeId`, `name`, `hostname`, `addresses`, and
-`user` or `tags`; user events carry `userId`, `name`, `displayName`,
-`email` and `role`. `policyUpdate` has no data.
+none. The `data` fields are named as Tailscale names them, so a receiver
+written for Tailscale reads them as is. Node events carry `nodeID`,
+`deviceName` (the MagicDNS name), `managedBy` (the owner's email or login,
+or `tagged-devices`), `url` (the console page) and, when the key expires,
+`expiration`; `addresses` and `tags` are extra. User events carry `user`,
+`url` and `userID`, plus `displayName` when set; `userRoleUpdated` adds
+`oldRoles`, `newRoles` and `actor`. `policyUpdate` has no data.
 
 A failed delivery is retried three times, after 2, 10 and 30 seconds, when
 the receiver answered with a 5xx or 429 or did not answer at all. A 4xx is
@@ -131,4 +135,5 @@ signature header is still sent but those services ignore it.
 The v2 endpoints mirror Tailscale's:
 `GET/POST /api/v2/tailnet/-/webhooks`, `GET/PATCH/DELETE`, `/test` and
 `/rotate` on `/api/v2/webhooks/{endpointId}`. They require the
-`feature_settings` scope (`feature_settings:read` to list and read).
+`webhooks` scope (`webhooks:read` to list and read), which every admin role
+holds; an auditor reads.

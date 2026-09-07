@@ -195,6 +195,7 @@ func TestDeliveryDoesNotFollowRedirects(t *testing.T) {
 
 	store := &memStore{}
 	d := New(store, "example.ts.net")
+	t.Cleanup(d.Close)
 
 	err := d.Test(t.Context(), types.Webhook{ID: 9, URL: srv.URL + "/hook", Secret: "s"})
 	require.Error(t, err)
@@ -202,4 +203,89 @@ func TestDeliveryDoesNotFollowRedirects(t *testing.T) {
 	assert.False(t, store.record(9).OK)
 	assert.Contains(t, store.status(9), "redirect")
 	assert.False(t, retryable(0, err), "a redirect is the receiver's verdict, not a transient failure")
+}
+
+// TestTransportErrorsHideTheURL keeps a chat provider's credential, which
+// is the URL path, out of the recorded status.
+func TestTransportErrorsHideTheURL(t *testing.T) {
+	t.Parallel()
+
+	store := &memStore{}
+	d := New(store, "example.ts.net")
+	t.Cleanup(d.Close)
+
+	err := d.Test(t.Context(), types.Webhook{ID: 5, URL: "http://127.0.0.1:1/services/T0/B0/secret", Secret: "s"})
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "secret")
+	assert.NotContains(t, store.status(5), "secret")
+	assert.NotContains(t, store.status(5), "127.0.0.1:1/")
+}
+
+// TestCloseRefusesNewWork checks that shutdown drains the queue once
+// and admits nothing afterwards.
+func TestCloseRefusesNewWork(t *testing.T) {
+	t.Parallel()
+
+	var hits atomic.Int32
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	store := &memStore{}
+	d := New(store, "example.ts.net")
+	d.Reload([]types.Webhook{
+		{ID: 1, URL: srv.URL, Secret: "s", Subscriptions: []types.WebhookEventType{types.EventNodeCreated}},
+	})
+
+	for range 5 {
+		d.Emit(types.EventNodeCreated, "Node joined.", nil)
+	}
+
+	d.Close()
+	assert.Equal(t, int32(5), hits.Load(), "queued deliveries finish before Close returns")
+
+	d.Emit(types.EventNodeCreated, "Node joined.", nil)
+	require.ErrorIs(t, d.Test(t.Context(), types.Webhook{ID: 1, URL: srv.URL, Secret: "s"}), ErrClosed)
+	assert.Equal(t, int32(5), hits.Load(), "nothing is delivered after Close")
+
+	d.Close()
+}
+
+// TestQueueFullDropsAndRecords bounds the backlog: with every worker
+// stuck on a slow receiver and the queue full, a delivery is dropped and
+// the endpoint's status says so.
+func TestQueueFullDropsAndRecords(t *testing.T) {
+	t.Parallel()
+
+	release := make(chan struct{})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	store := &memStore{}
+	d := New(store, "example.ts.net")
+	d.Reload([]types.Webhook{
+		{ID: 1, URL: srv.URL, Secret: "s", Subscriptions: []types.WebhookEventType{types.EventNodeCreated}},
+	})
+
+	for range maxInFlight + maxQueued + 1 {
+		d.Emit(types.EventNodeCreated, "Node joined.", nil)
+	}
+
+	assert.Eventually(t, func() bool {
+		return store.status(1) == ErrQueueFull.Error()
+	}, 5*time.Second, 10*time.Millisecond, "the overflow is recorded")
+
+	close(release)
+	d.Close()
 }

@@ -28,7 +28,7 @@ headscale's own conventions. The headscale-native admin API stays at `/api/v1`
   token (`hskey-oauthtok-…`). See `authMiddleware`.
 - Each operation declares the Tailscale scope it requires (`auth_keys`,
   `oauth_keys`, `devices:core`, `devices:routes`, `policy_file`,
-  `feature_settings`, `users`, `dns`, each with a `:read` subset, plus
+  `feature_settings`, `users`, `dns`, `webhooks`, each with a `:read` subset, plus
   `all`/`all:read`, and the read-only `logs:configuration:read`).
   `requireScope` records it both for the middleware and in the generated
   OpenAPI, as an `x-required-scope` extension and a sentence in the operation

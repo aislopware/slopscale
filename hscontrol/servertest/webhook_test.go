@@ -163,8 +163,10 @@ func TestWebhookDeliveries(t *testing.T) {
 
 	nodeData, ok := created.events[0].Data.(map[string]any)
 	require.True(t, ok, "node events carry an object")
-	assert.Equal(t, "hooked", nodeData["name"])
-	assert.Equal(t, owner.Username(), nodeData["user"])
+	assert.Equal(t, "hooked", nodeData["deviceName"], "no base domain, so the name alone")
+	assert.Equal(t, owner.Username(), nodeData["managedBy"])
+	assert.NotEmpty(t, nodeData["nodeID"])
+	assert.Contains(t, nodeData["url"], "/admin/machines/")
 
 	// Unsubscribed events stay away: a policy update is not delivered.
 	status, body = apiCall(t, client, ownerKey, http.MethodPost, v1+"/webhook/"+id+"/test", nil)
@@ -371,4 +373,46 @@ func TestWebhookTailscaleAPI(t *testing.T) {
 
 	status, _ = apiCall(t, client, ownerKey, http.MethodGet, v2+"/webhooks/"+id, nil)
 	assert.Equal(t, http.StatusNotFound, status)
+}
+
+// TestWebhookRoles follows Tailscale: every admin role manages webhooks,
+// an auditor reads, a member sees nothing.
+func TestWebhookRoles(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	client := srv.HTTPClient(t)
+	v1 := srv.URL + "/api/v1"
+
+	owner := srv.CreateUser(t, "hook-roles-owner")
+	ownerKey := srv.CreateAPIKey(t, owner)
+	receiver := newWebhookReceiver(t)
+
+	keys := map[types.Role]string{}
+
+	for _, role := range []types.Role{types.RoleNetworkAdmin, types.RoleITAdmin, types.RoleAuditor, types.RoleMember} {
+		user := srv.CreateUser(t, "hook-roles-"+string(role))
+		status, body := apiCall(t, client, ownerKey, http.MethodPost, v1+"/user/"+userID(user)+"/role",
+			map[string]string{"role": string(role)})
+		require.Equal(t, http.StatusOK, status, body)
+
+		keys[role] = srv.CreateAPIKey(t, user)
+	}
+
+	create := map[string]any{"url": receiver.URL, "subscriptions": []string{"nodeCreated"}}
+
+	for _, role := range []types.Role{types.RoleNetworkAdmin, types.RoleITAdmin} {
+		status, body := apiCall(t, client, keys[role], http.MethodPost, v1+"/webhook", create)
+		assert.Equal(t, http.StatusOK, status, "%s creates: %v", role, body)
+	}
+
+	status, body := apiCall(t, client, keys[types.RoleAuditor], http.MethodGet, v1+"/webhook", nil)
+	assert.Equal(t, http.StatusOK, status, body)
+	assert.Len(t, body["webhooks"], 2)
+
+	status, body = apiCall(t, client, keys[types.RoleAuditor], http.MethodPost, v1+"/webhook", create)
+	assert.Equal(t, http.StatusForbidden, status, body)
+
+	status, body = apiCall(t, client, keys[types.RoleMember], http.MethodGet, v1+"/webhook", nil)
+	assert.Equal(t, http.StatusForbidden, status, body)
 }

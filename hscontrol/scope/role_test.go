@@ -21,8 +21,8 @@ func TestForRoleMatrix(t *testing.T) {
 	}{
 		{types.RoleOwner, writes, true},
 		{types.RoleAdmin, writes, true},
-		{types.RoleNetworkAdmin, []Scope{PolicyFile, DevicesRoutes}, true},
-		{types.RoleITAdmin, []Scope{Users, DevicesCore, AuthKeys, OAuthKeys, FeatureSettings}, true},
+		{types.RoleNetworkAdmin, []Scope{PolicyFile, DevicesRoutes, Webhooks}, true},
+		{types.RoleITAdmin, []Scope{Users, DevicesCore, AuthKeys, OAuthKeys, FeatureSettings, Webhooks}, true},
 		{types.RoleAuditor, nil, true},
 		{types.RoleMember, nil, false},
 		{types.Role(""), nil, false},

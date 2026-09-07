@@ -45,6 +45,8 @@ func (s *State) SetUserRole(
 		return nil, change.Change{}, fmt.Errorf("%w: %q", types.ErrInvalidRole, role)
 	}
 
+	var previous types.Role
+
 	user, err := hsdb.Write(s.db, func(tx *hsdb.Tx) (*types.User, error) {
 		user, err := hsdb.GetUserByID(tx, target)
 		if err != nil {
@@ -55,6 +57,8 @@ func (s *State) SetUserRole(
 		if err != nil {
 			return nil, err
 		}
+
+		previous = user.Role
 
 		if role == types.RoleOwner && user.Role != types.RoleOwner {
 			err = demoteOwners(tx)
@@ -76,7 +80,7 @@ func (s *State) SetUserRole(
 		return nil, change.Change{}, err
 	}
 
-	s.emitUserRoleUpdated(user)
+	s.emitUserRoleUpdated(user, previous, actor)
 
 	c, err := s.updatePolicyManagerUsers()
 	if err != nil {

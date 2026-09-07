@@ -121,7 +121,7 @@ func registerWebhooks(api huma.API, b Backend) {
 		Tags:        webhookTags,
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.FeatureSettingsRead), func(_ context.Context, in *tailnetInput) (*listWebhooksOutput, error) {
+	}, scope.WebhooksRead), func(_ context.Context, in *tailnetInput) (*listWebhooksOutput, error) {
 		err := requireDefaultTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
@@ -151,7 +151,7 @@ func registerWebhooks(api huma.API, b Backend) {
 		Tags:        webhookTags,
 		Security:    security,
 		Errors:      []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.FeatureSettings), "webhook.create", "webhook", ""), func(
+	}, scope.Webhooks), "webhook.create", "webhook", ""), func(
 		ctx context.Context, in *createWebhookInput,
 	) (*webhookOutput, error) {
 		err := requireDefaultTailnet(in.Tailnet)
@@ -179,7 +179,7 @@ func registerWebhooks(api huma.API, b Backend) {
 			return nil, mapError("creating webhook", err)
 		}
 
-		audit.Target(ctx, "", strconv.FormatUint(uint64(created.ID), 10), created.URL)
+		audit.Target(ctx, "", strconv.FormatUint(uint64(created.ID), 10), created.Host())
 		audit.Detail(ctx, "subscriptions", in.Body.Subscriptions)
 
 		return &webhookOutput{Body: webhookEndpointFrom(b, created, true)}, nil
@@ -196,7 +196,7 @@ func registerWebhookItem(api huma.API, b Backend) {
 		Tags:        webhookTags,
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.FeatureSettingsRead), func(_ context.Context, in *webhookIDInput) (*webhookOutput, error) {
+	}, scope.WebhooksRead), func(_ context.Context, in *webhookIDInput) (*webhookOutput, error) {
 		id, err := parseWebhookID(in.EndpointID)
 		if err != nil {
 			return nil, err
@@ -218,7 +218,7 @@ func registerWebhookItem(api huma.API, b Backend) {
 		Tags:        webhookTags,
 		Security:    security,
 		Errors:      []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.FeatureSettings), "webhook.update", "webhook", "endpointId"), func(
+	}, scope.Webhooks), "webhook.update", "webhook", "endpointId"), func(
 		ctx context.Context, in *updateWebhookInput,
 	) (*webhookOutput, error) {
 		id, err := parseWebhookID(in.EndpointID)
@@ -251,7 +251,7 @@ func registerWebhookItem(api huma.API, b Backend) {
 			return nil, mapError("updating webhook", err)
 		}
 
-		audit.Target(ctx, "", "", updated.URL)
+		audit.Target(ctx, "", "", updated.Host())
 
 		return &webhookOutput{Body: webhookEndpointFrom(b, updated, false)}, nil
 	})
@@ -266,7 +266,7 @@ func registerWebhookActions(api huma.API, b Backend) {
 		Tags:        webhookTags,
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.FeatureSettings), "webhook.delete", "webhook", "endpointId"), func(
+	}, scope.Webhooks), "webhook.delete", "webhook", "endpointId"), func(
 		ctx context.Context, in *webhookIDInput,
 	) (*emptyOutput, error) {
 		id, err := parseWebhookID(in.EndpointID)
@@ -284,7 +284,7 @@ func registerWebhookActions(api huma.API, b Backend) {
 			return nil, mapError("deleting webhook", err)
 		}
 
-		audit.Target(ctx, "", "", w.URL)
+		audit.Target(ctx, "", "", w.Host())
 
 		return &emptyOutput{}, nil
 	})
@@ -299,7 +299,7 @@ func registerWebhookActions(api huma.API, b Backend) {
 		Tags:     webhookTags,
 		Security: security,
 		Errors:   []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusBadGateway},
-	}, scope.FeatureSettings), "webhook.test", "webhook", "endpointId"), func(
+	}, scope.Webhooks), "webhook.test", "webhook", "endpointId"), func(
 		ctx context.Context, in *webhookIDInput,
 	) (*emptyOutput, error) {
 		id, err := parseWebhookID(in.EndpointID)
@@ -328,7 +328,7 @@ func registerWebhookActions(api huma.API, b Backend) {
 		Tags:        webhookTags,
 		Security:    security,
 		Errors:      []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.FeatureSettings), "webhook.rotate", "webhook", "endpointId"), func(
+	}, scope.Webhooks), "webhook.rotate", "webhook", "endpointId"), func(
 		ctx context.Context, in *webhookIDInput,
 	) (*webhookOutput, error) {
 		id, err := parseWebhookID(in.EndpointID)
@@ -341,7 +341,7 @@ func registerWebhookActions(api huma.API, b Backend) {
 			return nil, mapError("rotating webhook secret", err)
 		}
 
-		audit.Target(ctx, "", "", rotated.URL)
+		audit.Target(ctx, "", "", rotated.Host())
 
 		return &webhookOutput{Body: webhookEndpointFrom(b, rotated, true)}, nil
 	})

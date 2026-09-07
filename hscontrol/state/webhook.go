@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -36,7 +37,9 @@ func tailnetName(cfg *types.Config) string {
 	return cmp.Or(cfg.BaseDomain, cfg.Domain())
 }
 
-// loadWebhooks reads the endpoints into the dispatcher.
+// loadWebhooks reads the endpoints into the dispatcher. Callers that
+// change endpoints hold webhookMu across the write and this reload, so
+// the dispatcher never publishes a list older than the last write.
 func (s *State) loadWebhooks() error {
 	hooks, err := s.db.ListWebhooks()
 	if err != nil {
@@ -71,6 +74,9 @@ func (s *State) CreateWebhook(w types.Webhook) (types.Webhook, error) {
 		return types.Webhook{}, err
 	}
 
+	s.webhookMu.Lock()
+	defer s.webhookMu.Unlock()
+
 	created, err := s.db.CreateWebhook(w)
 	if err != nil {
 		return types.Webhook{}, err
@@ -80,21 +86,20 @@ func (s *State) CreateWebhook(w types.Webhook) (types.Webhook, error) {
 }
 
 // UpdateWebhook replaces the URL, description, provider and
-// subscriptions of an endpoint; the secret stays.
+// subscriptions of an endpoint; the secret stays. The secret column is
+// not written, so an edit cannot undo a rotation.
 func (s *State) UpdateWebhook(w types.Webhook) (types.Webhook, error) {
-	current, err := s.db.GetWebhook(w.ID)
-	if err != nil {
-		return types.Webhook{}, err
-	}
-
 	w.URL = strings.TrimSpace(w.URL)
-	w.Secret = current.Secret
-	w.CreatedBy = current.CreatedBy
+	// Validation wants a secret; the stored one is not read here.
+	w.Secret = newWebhookSecret()
 
-	err = types.ValidateWebhook(w)
+	err := types.ValidateWebhook(w)
 	if err != nil {
 		return types.Webhook{}, err
 	}
+
+	s.webhookMu.Lock()
+	defer s.webhookMu.Unlock()
 
 	updated, err := s.db.UpdateWebhook(w)
 	if err != nil {
@@ -107,14 +112,10 @@ func (s *State) UpdateWebhook(w types.Webhook) (types.Webhook, error) {
 // RotateWebhookSecret replaces the endpoint's secret and returns the
 // record with the new one.
 func (s *State) RotateWebhookSecret(id types.WebhookID) (types.Webhook, error) {
-	current, err := s.db.GetWebhook(id)
-	if err != nil {
-		return types.Webhook{}, err
-	}
+	s.webhookMu.Lock()
+	defer s.webhookMu.Unlock()
 
-	current.Secret = newWebhookSecret()
-
-	updated, err := s.db.UpdateWebhook(current)
+	updated, err := s.db.SetWebhookSecret(id, newWebhookSecret())
 	if err != nil {
 		return types.Webhook{}, err
 	}
@@ -135,6 +136,9 @@ func (s *State) ListWebhookDeliveries(id types.WebhookID) ([]types.WebhookDelive
 
 // DeleteWebhook removes an endpoint and stops delivering to it.
 func (s *State) DeleteWebhook(id types.WebhookID) error {
+	s.webhookMu.Lock()
+	defer s.webhookMu.Unlock()
+
 	err := s.db.DeleteWebhook(id)
 	if err != nil {
 		return err
@@ -152,6 +156,9 @@ func (s *State) TestWebhook(ctx context.Context, id types.WebhookID) error {
 	}
 
 	err = s.webhooks.Test(ctx, w)
+
+	s.webhookMu.Lock()
+	defer s.webhookMu.Unlock()
 
 	reloadErr := s.loadWebhooks()
 	if reloadErr != nil {
@@ -171,39 +178,66 @@ func (s *State) emit(t types.WebhookEventType, message string, data any) {
 	s.webhooks.Emit(t, message, data)
 }
 
-// webhookNodeData is the data an event about a node carries.
+// webhookNodeData is the data an event about a node carries, named as
+// Tailscale names it so a receiver written for Tailscale reads it as is.
+// addresses and tags are extra.
 type webhookNodeData struct {
-	NodeID    string   `json:"nodeId"`
-	Name      string   `json:"name"`
-	Hostname  string   `json:"hostname"`
-	Addresses []string `json:"addresses"`
-	User      string   `json:"user,omitempty"`
-	Tags      []string `json:"tags,omitempty"`
-	ExpiresAt string   `json:"expiresAt,omitempty"`
+	NodeID     string   `json:"nodeID"`
+	DeviceName string   `json:"deviceName"`
+	ManagedBy  string   `json:"managedBy"`
+	URL        string   `json:"url"`
+	Expiration string   `json:"expiration,omitempty"`
+	Addresses  []string `json:"addresses"`
+	Tags       []string `json:"tags,omitempty"`
 }
 
-func nodeEventData(node types.NodeView) webhookNodeData {
+// managedByTags is what Tailscale reports as the manager of a tagged node.
+const managedByTags = "tagged-devices"
+
+func (s *State) nodeEventData(node types.NodeView) webhookNodeData {
 	data := webhookNodeData{
-		NodeID:    node.ID().String(),
-		Name:      node.GivenName(),
-		Hostname:  node.Hostname(),
-		Addresses: []string{},
-		Tags:      slices.Clone(node.Tags().AsSlice()),
+		NodeID:     node.ID().String(),
+		DeviceName: node.GivenName(),
+		ManagedBy:  managedByTags,
+		URL:        s.consoleURL("machines/" + node.ID().String()),
+		Addresses:  []string{},
+		Tags:       slices.Clone(node.Tags().AsSlice()),
+	}
+
+	fqdn, err := node.GetFQDN(s.cfg.BaseDomain)
+	if err == nil && fqdn != "" {
+		data.DeviceName = fqdn
+	}
+
+	if !node.IsTagged() && node.User().Valid() {
+		data.ManagedBy = userLabel(node.User().AsStruct())
 	}
 
 	for _, ip := range node.IPs() {
 		data.Addresses = append(data.Addresses, ip.String())
 	}
 
-	if node.User().Valid() {
-		data.User = node.User().Name()
-	}
-
-	if node.Expiry().Valid() {
-		data.ExpiresAt = node.Expiry().Get().UTC().Format(time.RFC3339)
+	if node.Expiry().Valid() && !node.Expiry().Get().IsZero() {
+		data.Expiration = node.Expiry().Get().UTC().Format(time.RFC3339)
 	}
 
 	return data
+}
+
+// consoleURL is the admin console page for a path, the way Tailscale's
+// events link to its console.
+func (s *State) consoleURL(path string) string {
+	if s.cfg == nil || s.cfg.ServerURL == "" {
+		return ""
+	}
+
+	return strings.TrimSuffix(s.cfg.ServerURL, "/") + "/admin/" + path
+}
+
+// userLabel names a user the way Tailscale's events do: the email when
+// there is one, the login name otherwise.
+func userLabel(user *types.User) string {
+	return cmp.Or(user.Email, user.Name)
 }
 
 func nodeLabel(node types.NodeView) string {
@@ -215,66 +249,84 @@ func nodeLabel(node types.NodeView) string {
 	return label
 }
 
-// webhookUserData is the data an event about a user carries.
+// webhookUserData is the data an event about a user carries. user is the
+// name Tailscale uses; the rest is extra.
 type webhookUserData struct {
-	UserID      string `json:"userId"`
-	Name        string `json:"name"`
-	DisplayName string `json:"displayName,omitempty"`
-	Email       string `json:"email,omitempty"`
-	Role        string `json:"role,omitempty"`
+	User        string   `json:"user"`
+	URL         string   `json:"url"`
+	Actor       string   `json:"actor,omitempty"`
+	OldRoles    []string `json:"oldRoles,omitempty"`
+	NewRoles    []string `json:"newRoles,omitempty"`
+	UserID      string   `json:"userID"`
+	DisplayName string   `json:"displayName,omitempty"`
 }
 
-func userEventData(user *types.User) webhookUserData {
+func (s *State) userEventData(user *types.User) webhookUserData {
 	return webhookUserData{
+		User:        userLabel(user),
+		URL:         s.consoleURL("users?q=" + url.QueryEscape(user.Name)),
 		UserID:      strconv.FormatUint(uint64(user.ID), 10),
-		Name:        user.Name,
 		DisplayName: user.DisplayName,
-		Email:       user.Email,
-		Role:        string(user.Role),
 	}
 }
 
 func (s *State) emitNodeCreated(node types.NodeView) {
-	s.emit(types.EventNodeCreated, fmt.Sprintf("Node %s joined the tailnet.", nodeLabel(node)), nodeEventData(node))
+	s.emit(types.EventNodeCreated, fmt.Sprintf("Node %s joined the tailnet.", nodeLabel(node)), s.nodeEventData(node))
 
 	if !node.IsApproved() {
 		s.emit(types.EventNodeNeedsApproval,
-			fmt.Sprintf("Node %s is waiting for approval.", nodeLabel(node)), nodeEventData(node))
+			fmt.Sprintf("Node %s is waiting for approval.", nodeLabel(node)), s.nodeEventData(node))
 	}
 }
 
 func (s *State) emitNodeApproved(node types.NodeView) {
-	s.emit(types.EventNodeApproved, fmt.Sprintf("Node %s was approved.", nodeLabel(node)), nodeEventData(node))
+	s.emit(types.EventNodeApproved, fmt.Sprintf("Node %s was approved.", nodeLabel(node)), s.nodeEventData(node))
 }
 
 func (s *State) emitNodeDeleted(node types.NodeView) {
-	s.emit(types.EventNodeDeleted, fmt.Sprintf("Node %s was removed.", nodeLabel(node)), nodeEventData(node))
+	s.emit(types.EventNodeDeleted, fmt.Sprintf("Node %s was removed.", nodeLabel(node)), s.nodeEventData(node))
 }
 
 func (s *State) emitNodeKeyExpired(node types.NodeView) {
-	s.emit(types.EventNodeKeyExpired, fmt.Sprintf("The key of node %s expired.", nodeLabel(node)), nodeEventData(node))
+	s.emit(
+		types.EventNodeKeyExpired,
+		fmt.Sprintf("The key of node %s expired.", nodeLabel(node)),
+		s.nodeEventData(node),
+	)
 }
 
 func (s *State) emitUserCreated(user *types.User) {
-	s.emit(types.EventUserCreated, fmt.Sprintf("User %s was created.", user.Name), userEventData(user))
+	s.emit(types.EventUserCreated, fmt.Sprintf("User %s was created.", user.Name), s.userEventData(user))
 
 	if user.ApprovedAt == nil {
 		s.emit(types.EventUserNeedsApproval,
-			fmt.Sprintf("User %s is waiting for approval.", user.Name), userEventData(user))
+			fmt.Sprintf("User %s is waiting for approval.", user.Name), s.userEventData(user))
 	}
 }
 
 func (s *State) emitUserApproved(user *types.User) {
-	s.emit(types.EventUserApproved, fmt.Sprintf("User %s was approved.", user.Name), userEventData(user))
+	s.emit(types.EventUserApproved, fmt.Sprintf("User %s was approved.", user.Name), s.userEventData(user))
 }
 
-func (s *State) emitUserRoleUpdated(user *types.User) {
-	s.emit(types.EventUserRoleUpdated,
-		fmt.Sprintf("User %s is now %s.", user.Name, user.Role), userEventData(user))
+// emitUserRoleUpdated reports a role change with the roles before and
+// after and, when known, who made it.
+func (s *State) emitUserRoleUpdated(user *types.User, previous types.Role, actor *RoleActor) {
+	data := s.userEventData(user)
+	data.OldRoles = []string{string(previous)}
+	data.NewRoles = []string{string(user.Role)}
+
+	if actor != nil {
+		who, err := s.GetUserByID(actor.UserID)
+		if err == nil {
+			data.Actor = userLabel(who)
+		}
+	}
+
+	s.emit(types.EventUserRoleUpdated, fmt.Sprintf("User %s is now %s.", user.Name, user.Role), data)
 }
 
 func (s *State) emitUserDeleted(user *types.User) {
-	s.emit(types.EventUserDeleted, fmt.Sprintf("User %s was deleted.", user.Name), userEventData(user))
+	s.emit(types.EventUserDeleted, fmt.Sprintf("User %s was deleted.", user.Name), s.userEventData(user))
 }
 
 func (s *State) emitPolicyUpdate() {

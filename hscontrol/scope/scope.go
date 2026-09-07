@@ -53,6 +53,11 @@ const (
 	DNS     Scope = "dns"
 	DNSRead Scope = "dns:read"
 
+	// Webhooks gates the webhook endpoints, which Tailscale lets every
+	// admin role manage.
+	Webhooks     Scope = "webhooks"
+	WebhooksRead Scope = "webhooks:read"
+
 	// LogsConfigurationRead gates the audit log, which Tailscale calls the
 	// configuration log. There is no write scope: the log is append-only
 	// and written by the server.
@@ -74,6 +79,7 @@ func Known() []Scope {
 		FeatureSettings, FeatureSettingsRead,
 		Users, UsersRead,
 		DNS, DNSRead,
+		Webhooks, WebhooksRead,
 		LogsConfigurationRead,
 	}
 }
@@ -143,7 +149,8 @@ func RequiresTags(scopes []Scope) bool {
 // do more than this, whatever scopes it was minted with. The table follows
 // Tailscale's role matrix: owner and admin do everything; a network admin
 // manages the policy, routes and DNS and reads the rest; an IT admin manages
-// users, devices and keys and reads the policy; both read the audit log;
+// users, devices and keys and reads the policy; both manage webhooks and
+// read the audit log;
 // an auditor reads everything; a member has no admin access.
 func ForRole(role types.Role) []Scope {
 	switch role {
@@ -151,13 +158,13 @@ func ForRole(role types.Role) []Scope {
 		return []Scope{All}
 	case types.RoleNetworkAdmin:
 		return []Scope{
-			PolicyFile, DevicesRoutes, DNS,
+			PolicyFile, DevicesRoutes, DNS, Webhooks,
 			UsersRead, DevicesCoreRead, AuthKeysRead, OAuthKeysRead, FeatureSettingsRead,
 			LogsConfigurationRead,
 		}
 	case types.RoleITAdmin:
 		return []Scope{
-			Users, DevicesCore, AuthKeys, OAuthKeys, FeatureSettings,
+			Users, DevicesCore, AuthKeys, OAuthKeys, FeatureSettings, Webhooks,
 			PolicyFileRead, DevicesRoutesRead, DNSRead,
 			LogsConfigurationRead,
 		}

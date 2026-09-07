@@ -64,6 +64,17 @@ type WebhookDelivery struct {
 // WebhookDeliveryHistory is how many deliveries are kept per endpoint.
 const WebhookDeliveryHistory = 100
 
+// Host is the URL's host, which is safe to log and audit; the path and
+// query of a chat provider's URL are its credential.
+func (w Webhook) Host() string {
+	u, err := url.Parse(w.URL)
+	if err != nil {
+		return ""
+	}
+
+	return u.Host
+}
+
 // Subscribed reports whether the endpoint wants the event type.
 func (w Webhook) Subscribed(t WebhookEventType) bool {
 	return slices.Contains(w.Subscriptions, t)

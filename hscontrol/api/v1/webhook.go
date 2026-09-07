@@ -163,7 +163,7 @@ func registerWebhooks(api huma.API, b Backend) {
 		Summary:     "List webhook event types",
 		Tags:        []string{tagWebhooks},
 		Security:    bearerAuth,
-	}, scope.FeatureSettingsRead), func(_ context.Context, _ *struct{}) (*webhookEventTypesOutput, error) {
+	}, scope.WebhooksRead), func(_ context.Context, _ *struct{}) (*webhookEventTypesOutput, error) {
 		out := &webhookEventTypesOutput{}
 		out.Body.Types = make([]string, 0, len(types.WebhookEventTypes))
 
@@ -183,7 +183,7 @@ func registerWebhooks(api huma.API, b Backend) {
 			"the " + webhook.SignatureHeader + " header. Secrets are not listed.",
 		Tags:     []string{tagWebhooks},
 		Security: bearerAuth,
-	}, scope.FeatureSettingsRead), func(_ context.Context, _ *struct{}) (*listWebhooksOutput, error) {
+	}, scope.WebhooksRead), func(_ context.Context, _ *struct{}) (*listWebhooksOutput, error) {
 		hooks, err := b.State.ListWebhooks()
 		if err != nil {
 			return nil, mapError("listing webhooks", err)
@@ -206,7 +206,7 @@ func registerWebhooks(api huma.API, b Backend) {
 		Summary:     "Get webhook",
 		Tags:        []string{tagWebhooks},
 		Security:    bearerAuth,
-	}, scope.FeatureSettingsRead), func(_ context.Context, in *webhookIDInput) (*webhookOutput, error) {
+	}, scope.WebhooksRead), func(_ context.Context, in *webhookIDInput) (*webhookOutput, error) {
 		id, err := parseWebhookID(in.ID)
 		if err != nil {
 			return nil, err
@@ -231,7 +231,7 @@ func registerWebhooks(api huma.API, b Backend) {
 		Description: "The response carries the signing secret; it is not shown again.",
 		Tags:        []string{tagWebhooks},
 		Security:    bearerAuth,
-	}, scope.FeatureSettings), "webhook.create", "webhook", ""), func(
+	}, scope.Webhooks), "webhook.create", "webhook", ""), func(
 		ctx context.Context, in *webhookBodyInput,
 	) (*webhookOutput, error) {
 		w, err := webhookFromBody(in.Body)
@@ -246,7 +246,7 @@ func registerWebhooks(api huma.API, b Backend) {
 			return nil, mapError("creating webhook", err)
 		}
 
-		audit.Target(ctx, "", formatID(uint64(created.ID)), created.URL)
+		audit.Target(ctx, "", formatID(uint64(created.ID)), created.Host())
 		audit.Detail(ctx, "subscriptions", in.Body.Subscriptions)
 
 		out := &webhookOutput{}
@@ -263,7 +263,7 @@ func registerWebhooks(api huma.API, b Backend) {
 		Description: "The secret stays; rotate it separately.",
 		Tags:        []string{tagWebhooks},
 		Security:    bearerAuth,
-	}, scope.FeatureSettings), "webhook.update", "webhook", "id"), func(
+	}, scope.Webhooks), "webhook.update", "webhook", "id"), func(
 		ctx context.Context, in *webhookUpdateInput,
 	) (*webhookOutput, error) {
 		id, err := parseWebhookID(in.ID)
@@ -283,7 +283,7 @@ func registerWebhooks(api huma.API, b Backend) {
 			return nil, mapError("updating webhook", err)
 		}
 
-		audit.Target(ctx, "", "", updated.URL)
+		audit.Target(ctx, "", "", updated.Host())
 		audit.Detail(ctx, "subscriptions", in.Body.Subscriptions)
 
 		out := &webhookOutput{}
@@ -302,7 +302,7 @@ func registerWebhookActions(api huma.API, b Backend) {
 		Summary:     "Delete webhook",
 		Tags:        []string{tagWebhooks},
 		Security:    bearerAuth,
-	}, scope.FeatureSettings), "webhook.delete", "webhook", "id"), func(
+	}, scope.Webhooks), "webhook.delete", "webhook", "id"), func(
 		ctx context.Context, in *webhookIDInput,
 	) (*emptyOutput, error) {
 		id, err := parseWebhookID(in.ID)
@@ -320,7 +320,7 @@ func registerWebhookActions(api huma.API, b Backend) {
 			return nil, mapError("deleting webhook", err)
 		}
 
-		audit.Target(ctx, "", "", w.URL)
+		audit.Target(ctx, "", "", w.Host())
 
 		return &emptyOutput{}, nil
 	})
@@ -334,7 +334,7 @@ func registerWebhookActions(api huma.API, b Backend) {
 			"one stop at once.",
 		Tags:     []string{tagWebhooks},
 		Security: bearerAuth,
-	}, scope.FeatureSettings), "webhook.rotate", "webhook", "id"), func(
+	}, scope.Webhooks), "webhook.rotate", "webhook", "id"), func(
 		ctx context.Context, in *webhookIDInput,
 	) (*webhookOutput, error) {
 		id, err := parseWebhookID(in.ID)
@@ -347,7 +347,7 @@ func registerWebhookActions(api huma.API, b Backend) {
 			return nil, mapError("rotating webhook secret", err)
 		}
 
-		audit.Target(ctx, "", "", rotated.URL)
+		audit.Target(ctx, "", "", rotated.Host())
 
 		out := &webhookOutput{}
 		out.Body.Webhook = webhookFrom(rotated, true)
@@ -363,7 +363,7 @@ func registerWebhookActions(api huma.API, b Backend) {
 		Description: "Posts a test event now and reports the receiver's answer.",
 		Tags:        []string{tagWebhooks},
 		Security:    bearerAuth,
-	}, scope.FeatureSettings), "webhook.test", "webhook", "id"), func(
+	}, scope.Webhooks), "webhook.test", "webhook", "id"), func(
 		ctx context.Context, in *webhookIDInput,
 	) (*webhookTestOutput, error) {
 		id, err := parseWebhookID(in.ID)
@@ -378,7 +378,7 @@ func registerWebhookActions(api huma.API, b Backend) {
 			return nil, mapError("testing webhook", getErr)
 		}
 
-		audit.Target(ctx, "", "", w.URL)
+		audit.Target(ctx, "", "", w.Host())
 		audit.Detail(ctx, "status", w.LastDeliveryStatus)
 
 		out := &webhookTestOutput{}
@@ -399,7 +399,7 @@ func registerWebhookDeliveries(api huma.API, b Backend) {
 			strconv.Itoa(types.WebhookDeliveryHistory) + " per webhook.",
 		Tags:     []string{tagWebhooks},
 		Security: bearerAuth,
-	}, scope.FeatureSettingsRead), func(_ context.Context, in *webhookIDInput) (*webhookDeliveriesOutput, error) {
+	}, scope.WebhooksRead), func(_ context.Context, in *webhookIDInput) (*webhookDeliveriesOutput, error) {
 		id, err := parseWebhookID(in.ID)
 		if err != nil {
 			return nil, err

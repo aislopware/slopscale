@@ -69,7 +69,7 @@ export const navGroups: readonly NavGroup[] = [
         to: "/webhooks",
         label: "Webhooks",
         icon: WebhooksLogoIcon,
-        scope: "feature_settings:read",
+        scope: "webhooks:read",
       },
       { to: "/settings", label: "Settings", icon: GearSixIcon, scope: "feature_settings:read" },
       {
