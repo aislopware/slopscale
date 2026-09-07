@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 100,
+  "sortImports": true,
+  "sortPackageJson": true,
+  "sortTailwindcss": {
+    "stylesheet": "./src/app.css",
+    "functions": ["cn", "cva", "tv"]
+  },
+  "jsdoc": true,
+  "ignorePatterns": ["dist", "**/*.gen.ts", "bun.lock", "lint"]
+}

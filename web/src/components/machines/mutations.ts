@@ -1,0 +1,79 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
+
+import { api } from "~/api/client.ts";
+import type { Mutation } from "~/api/mutation.ts";
+import { invalidate } from "~/api/queries.ts";
+import { toast } from "~/components/ui/toast.ts";
+
+interface NodeMutations {
+  readonly approve: Mutation<"post", "/api/v1/node/{nodeId}/approve">;
+  readonly rename: Mutation<"post", "/api/v1/node/{nodeId}/rename/{newName}">;
+  readonly setTags: Mutation<"post", "/api/v1/node/{nodeId}/tags">;
+  readonly setRoutes: Mutation<"post", "/api/v1/node/{nodeId}/approve_routes">;
+  readonly setGlobalExitNode: Mutation<"post", "/api/v1/node/{nodeId}/global-exit-node">;
+  readonly expire: Mutation<"post", "/api/v1/node/{nodeId}/expire">;
+  readonly share: Mutation<"post", "/api/v1/node/{nodeId}/share">;
+  readonly unshare: Mutation<"delete", "/api/v1/node/{nodeId}/share/{userId}">;
+  readonly remove: Mutation<"delete", "/api/v1/node/{nodeId}">;
+}
+
+/**
+ * Every node mutation the console performs, each refreshing the node queries on success. Errors are
+ * left to the caller so dialogs can show them inline; use `toast.error` where there is no form.
+ */
+export function useNodeMutations(): NodeMutations {
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const refresh = async (): Promise<void> => {
+    await invalidate(queryClient, "/api/v1/node");
+  };
+
+  return {
+    approve: api.useMutation("post", "/api/v1/node/{nodeId}/approve", {
+      onSuccess: async () => {
+        toast.success("Machine approved");
+        await refresh();
+      },
+      onError: (error) => {
+        toast.error("Could not approve machine", error);
+      },
+    }),
+    rename: api.useMutation("post", "/api/v1/node/{nodeId}/rename/{newName}", {
+      onSuccess: refresh,
+    }),
+    setTags: api.useMutation("post", "/api/v1/node/{nodeId}/tags", { onSuccess: refresh }),
+    setRoutes: api.useMutation("post", "/api/v1/node/{nodeId}/approve_routes", {
+      onSuccess: refresh,
+    }),
+    setGlobalExitNode: api.useMutation("post", "/api/v1/node/{nodeId}/global-exit-node", {
+      onSuccess: async (node) => {
+        toast.success(
+          node.node.globalExitNode ? "Marked as global exit node" : "No longer a global exit node",
+        );
+        await refresh();
+      },
+      onError: (error) => {
+        toast.error("Could not change global exit node", error);
+      },
+    }),
+    expire: api.useMutation("post", "/api/v1/node/{nodeId}/expire", { onSuccess: refresh }),
+    share: api.useMutation("post", "/api/v1/node/{nodeId}/share", { onSuccess: refresh }),
+    unshare: api.useMutation("delete", "/api/v1/node/{nodeId}/share/{userId}", {
+      onSuccess: async () => {
+        toast.success("Sharing removed");
+        await refresh();
+      },
+      onError: (error) => {
+        toast.error("Could not remove sharing", error);
+      },
+    }),
+    remove: api.useMutation("delete", "/api/v1/node/{nodeId}", {
+      onSuccess: async () => {
+        toast.success("Machine removed");
+        await refresh();
+        await navigate({ to: "/machines" });
+      },
+    }),
+  };
+}

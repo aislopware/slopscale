@@ -1,0 +1,125 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "oxc", "unicorn", "import", "promise", "react", "jsx-a11y"],
+  "jsPlugins": [
+    { "name": "query", "specifier": "@tanstack/eslint-plugin-query" },
+    { "name": "router", "specifier": "@tanstack/eslint-plugin-router" },
+    { "name": "kumo", "specifier": "./lint/kumo-plugin.js" }
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "error",
+    "perf": "error",
+    "restriction": "error",
+    "style": "error",
+    "nursery": "off"
+  },
+  "env": { "browser": true, "es2024": true },
+  "settings": { "react": { "version": "19.2" } },
+  "ignorePatterns": ["dist", "**/*.gen.ts", "codegen", "lint"],
+  "rules": {
+    "query/exhaustive-deps": "error",
+    "query/infinite-query-property-order": "error",
+    "query/mutation-property-order": "error",
+    "query/no-rest-destructuring": "error",
+    "query/no-unstable-deps": "error",
+    "query/no-void-query-fn": "error",
+    "query/stable-query-client": "error",
+    "router/create-route-property-order": "error",
+    "kumo/no-primitive-colors": "error",
+    "kumo/no-tailwind-dark-variant": "error",
+
+    "func-style": ["error", "declaration", { "allowArrowFunctions": true }],
+    "id-length": ["error", { "min": 2, "exceptions": ["_", "q"] }],
+    "max-lines": ["error", { "max": 400, "skipBlankLines": true, "skipComments": true }],
+    "max-lines-per-function": [
+      "error",
+      { "max": 120, "skipBlankLines": true, "skipComments": true }
+    ],
+    "max-statements": ["error", 30],
+    "new-cap": ["error", { "capIsNewExceptions": ["GET", "POST", "PUT", "PATCH", "DELETE"] }],
+    "no-magic-numbers": [
+      "error",
+      {
+        "ignore": [-1, 0, 1, 2],
+        "ignoreArrayIndexes": true,
+        "ignoreDefaultValues": true,
+        "enforceConst": true
+      }
+    ],
+    "no-duplicate-imports": ["error", { "allowSeparateTypeImports": true }],
+    "no-use-before-define": ["error", { "functions": false, "classes": true, "variables": true }],
+    "import/max-dependencies": ["error", { "max": 24 }],
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+    "react/jsx-filename-extension": ["error", { "extensions": [".tsx"] }],
+    "unicorn/filename-case": [
+      "error",
+      { "case": "kebabCase", "ignore": ["^\\$", "^__root", "^_app"] }
+    ],
+
+    "capitalized-comments": "off",
+    "import/exports-last": "off",
+    "import/group-exports": "off",
+    "import/no-named-export": "off",
+    "import/prefer-default-export": "off",
+    "init-declarations": "off",
+    "no-inline-comments": "off",
+    "no-ternary": "off",
+    "no-undefined": "off",
+    "no-void": "off",
+    "one-var": "off",
+    "oxc/no-async-await": "off",
+    "oxc/no-optional-chaining": "off",
+    "oxc/no-rest-spread-properties": "off",
+    "promise/avoid-new": "off",
+    "promise/prefer-await-to-then": "off",
+    "react/forbid-component-props": "off",
+    "react/jsx-max-depth": "off",
+    "react/jsx-no-literals": "off",
+    "react/jsx-props-no-spreading": "off",
+    "react/no-multi-comp": "off",
+    "react/only-export-components": "off",
+    "react/react-in-jsx-scope": "off",
+    "sort-imports": "off",
+    "sort-keys": "off",
+    "typescript/explicit-member-accessibility": "off",
+    "typescript/prefer-readonly-parameter-types": "off",
+    "typescript/promise-function-async": "off",
+    "unicorn/no-array-for-each": "off",
+    "unicorn/no-array-reduce": "off",
+    "unicorn/no-null": "off",
+    "unicorn/prefer-global-this": "off"
+  },
+  "overrides": [
+    {
+      "files": ["vite.config.ts", "vitest.config.ts"],
+      "env": { "node": true },
+      "rules": {
+        "import/no-default-export": "off",
+        "import/no-nodejs-modules": "off",
+        "unicorn/no-anonymous-default-export": "off"
+      }
+    },
+    {
+      "files": ["src/routes/**/*.tsx"],
+      "rules": { "typescript/only-throw-error": "off" }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "plugins": ["vitest"],
+      "rules": {
+        "max-lines-per-function": "off",
+        "max-statements": "off",
+        "no-magic-numbers": "off",
+        "vitest/no-importing-vitest-globals": "off",
+        "vitest/prefer-called-times": "off",
+        "vitest/prefer-to-be-falsy": "off",
+        "vitest/prefer-to-be-truthy": "off",
+        "vitest/valid-title": ["error", { "ignoreTypeOfDescribeName": true }],
+        "vitest/prefer-expect-assertions": "off",
+        "vitest/require-test-timeout": "off"
+      }
+    }
+  ]
+}

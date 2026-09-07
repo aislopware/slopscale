@@ -1,0 +1,314 @@
+import { Button } from "@cloudflare/kumo/components/button";
+import { Input } from "@cloudflare/kumo/components/input";
+import { Select } from "@cloudflare/kumo/components/select";
+import { useState } from "react";
+import type { ReactElement, SubmitEvent } from "react";
+
+import { errorMessage } from "~/api/error.ts";
+import type { User } from "~/api/queries.ts";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import {
+  DialogClose,
+  DialogContent,
+  DialogError,
+  DialogFooter,
+  DialogRoot,
+} from "~/components/ui/dialog.tsx";
+import { toast } from "~/components/ui/toast.ts";
+import type { useUserMutations } from "~/components/users/mutations.ts";
+import { roleOptions, toRole } from "~/components/users/roles.ts";
+import type { UserRole } from "~/components/users/roles.ts";
+import { userLabel } from "~/lib/node.ts";
+
+type Mutations = ReturnType<typeof useUserMutations>;
+
+const nameHint = "Lowercase letters, digits and dashes; it must be unique.";
+
+export interface UserDialogProps {
+  readonly user: User;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly mutations: Mutations;
+}
+
+/** The dialog body only mounts while the dialog is open, so every form starts from the record. */
+export function CreateUserDialog({
+  open,
+  onOpenChange,
+  mutations,
+}: Omit<UserDialogProps, "user">): ReactElement {
+  return (
+    <DialogRoot open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        size="base"
+        title="Add user"
+        description="A local user that can register machines with a pre-auth key. Users who sign in through an identity provider appear on their own."
+      >
+        <CreateUserForm mutations={mutations} onOpenChange={onOpenChange} />
+      </DialogContent>
+    </DialogRoot>
+  );
+}
+
+function CreateUserForm({
+  mutations,
+  onOpenChange,
+}: {
+  readonly mutations: Mutations;
+  readonly onOpenChange: (open: boolean) => void;
+}): ReactElement {
+  const [name, setName] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const { create } = mutations;
+
+  function submit(event: SubmitEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    const label = displayName.trim();
+    const address = email.trim();
+    create.mutate(
+      {
+        body: {
+          name: name.trim(),
+          ...(label === "" ? {} : { displayName: label }),
+          ...(address === "" ? {} : { email: address }),
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success("User created");
+          onOpenChange(false);
+        },
+      },
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <Input
+        label="Username"
+        description={nameHint}
+        value={name}
+        spellCheck={false}
+        autoComplete="off"
+        placeholder="alice"
+        onChange={(event) => {
+          setName(event.target.value);
+        }}
+      />
+      <Input
+        label="Display name"
+        required={false}
+        value={displayName}
+        placeholder="Alice Nguyen"
+        onChange={(event) => {
+          setDisplayName(event.target.value);
+        }}
+      />
+      <Input
+        label="Email"
+        required={false}
+        type="email"
+        value={email}
+        spellCheck={false}
+        autoComplete="off"
+        placeholder="alice@example.com"
+        onChange={(event) => {
+          setEmail(event.target.value);
+        }}
+      />
+      <DialogError message={create.isError ? errorMessage(create.error) : undefined} />
+      <DialogFooter>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
+        <Button
+          type="submit"
+          variant="primary"
+          loading={create.isPending}
+          disabled={name.trim() === ""}
+        >
+          Add user
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+export function RenameUserDialog({
+  user,
+  open,
+  onOpenChange,
+  mutations,
+}: UserDialogProps): ReactElement {
+  return (
+    <DialogRoot open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        size="base"
+        title="Rename user"
+        description="The username is what the policy and the machine names refer to, so renaming changes both."
+      >
+        <RenameUserForm user={user} mutations={mutations} onOpenChange={onOpenChange} />
+      </DialogContent>
+    </DialogRoot>
+  );
+}
+
+function RenameUserForm({
+  user,
+  mutations,
+  onOpenChange,
+}: {
+  readonly user: User;
+  readonly mutations: Mutations;
+  readonly onOpenChange: (open: boolean) => void;
+}): ReactElement {
+  const [name, setName] = useState(user.name);
+  const { rename } = mutations;
+
+  function submit(event: SubmitEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    rename.mutate(
+      { params: { path: { oldId: user.id, newName: name.trim() } } },
+      {
+        onSuccess: () => {
+          toast.success("User renamed");
+          onOpenChange(false);
+        },
+      },
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <Input
+        label="Username"
+        description={nameHint}
+        value={name}
+        spellCheck={false}
+        autoComplete="off"
+        onChange={(event) => {
+          setName(event.target.value);
+        }}
+      />
+      <DialogError message={rename.isError ? errorMessage(rename.error) : undefined} />
+      <DialogFooter>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
+        <Button
+          type="submit"
+          variant="primary"
+          loading={rename.isPending}
+          disabled={name.trim() === "" || name.trim() === user.name}
+        >
+          Rename
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+export function RoleDialog({ user, open, onOpenChange, mutations }: UserDialogProps): ReactElement {
+  return (
+    <DialogRoot open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        size="base"
+        title={`Change role for ${userLabel(user)}`}
+        description="The role decides what this user may do in the console and through the API. There is exactly one owner, so picking owner transfers ownership."
+      >
+        <RoleForm user={user} mutations={mutations} onOpenChange={onOpenChange} />
+      </DialogContent>
+    </DialogRoot>
+  );
+}
+
+function RoleForm({
+  user,
+  mutations,
+  onOpenChange,
+}: {
+  readonly user: User;
+  readonly mutations: Mutations;
+  readonly onOpenChange: (open: boolean) => void;
+}): ReactElement {
+  const [role, setRole] = useState<UserRole>(toRole(user.role));
+  const { setRole: mutation } = mutations;
+
+  function submit(event: SubmitEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    mutation.mutate(
+      { params: { path: { id: user.id } }, body: { role } },
+      {
+        onSuccess: () => {
+          toast.success("Role changed");
+          onOpenChange(false);
+        },
+      },
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <Select
+        className="w-full"
+        label="Role"
+        value={role}
+        renderValue={(value) => value}
+        onValueChange={(value: UserRole | null) => {
+          if (value !== null) {
+            setRole(value);
+          }
+        }}
+        {...(mutation.isError ? { error: errorMessage(mutation.error) } : {})}
+      >
+        {roleOptions.map((option) => (
+          <Select.Option key={option.value} value={option.value}>
+            <span className="flex flex-col gap-0.5">
+              <span className="font-medium text-kumo-default">{option.label}</span>
+              <span className="text-sm text-kumo-subtle">{option.description}</span>
+            </span>
+          </Select.Option>
+        ))}
+      </Select>
+      <DialogFooter>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
+        <Button
+          type="submit"
+          variant="primary"
+          loading={mutation.isPending}
+          disabled={role === user.role}
+        >
+          Change role
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+export function DeleteUserDialog({
+  user,
+  open,
+  onOpenChange,
+  mutations,
+}: UserDialogProps): ReactElement {
+  const { remove } = mutations;
+
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Delete user?"
+      description={`${userLabel(user)} is deleted along with their machines, pre-auth keys and API keys. This cannot be undone.`}
+      confirmLabel="Delete"
+      loading={remove.isPending}
+      error={remove.isError ? errorMessage(remove.error) : undefined}
+      onConfirm={() => {
+        remove.mutate(
+          { params: { path: { id: user.id } } },
+          {
+            onSuccess: () => {
+              onOpenChange(false);
+            },
+          },
+        );
+      }}
+    />
+  );
+}

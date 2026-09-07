@@ -1,0 +1,7 @@
+node_modules/
+# Build output; only the placeholder that keeps the go:embed pattern valid is tracked.
+dist/*
+!dist/.gitkeep
+.vite/
+*.tsbuildinfo
+.vitest/

@@ -1,7 +1,8 @@
 ignored/
 tailscale/
 .vscode/
-.claude/
+.claude/*
+!.claude/skills/
 logs/
 
 *.prof
@@ -23,6 +24,11 @@ logs/
 vendor/
 
 dist/
+# The admin console bundle is built by `make web`; keep the directory so
+# the go:embed pattern in web/embed.go matches on a fresh checkout.
+!/web/dist/
+/web/dist/*
+!/web/dist/.gitkeep
 /headscale
 config.yaml
 config*.yaml
@@ -55,6 +61,7 @@ integration_test/etc/config.dump.yaml
 
 __debug_bin
 
+# Stray npm files at the repository root; the admin console's own live in web/.
 node_modules/
-package-lock.json
-package.json
+/package-lock.json
+/package.json
