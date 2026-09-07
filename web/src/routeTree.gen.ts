@@ -13,6 +13,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAuditRouteImport } from './routes/_app/audit'
+import { Route as AppDnsRouteImport } from './routes/_app/dns'
 import { Route as AppKeysRouteImport } from './routes/_app/keys'
 import { Route as AppPolicyRouteImport } from './routes/_app/policy'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
@@ -37,6 +38,11 @@ const AppIndexRoute = AppIndexRouteImport.update({
 const AppAuditRoute = AppAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDnsRoute = AppDnsRouteImport.update({
+  id: '/dns',
+  path: '/dns',
   getParentRoute: () => AppRoute,
 } as any)
 const AppKeysRoute = AppKeysRouteImport.update({
@@ -74,6 +80,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
   '/audit': typeof AppAuditRoute
+  '/dns': typeof AppDnsRoute
   '/keys': typeof AppKeysRoute
   '/policy': typeof AppPolicyRoute
   '/settings': typeof AppSettingsRoute
@@ -84,6 +91,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/audit': typeof AppAuditRoute
+  '/dns': typeof AppDnsRoute
   '/keys': typeof AppKeysRoute
   '/policy': typeof AppPolicyRoute
   '/settings': typeof AppSettingsRoute
@@ -97,6 +105,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/_app/audit': typeof AppAuditRoute
+  '/_app/dns': typeof AppDnsRoute
   '/_app/keys': typeof AppKeysRoute
   '/_app/policy': typeof AppPolicyRoute
   '/_app/settings': typeof AppSettingsRoute
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/audit'
+    | '/dns'
     | '/keys'
     | '/policy'
     | '/settings'
@@ -121,6 +131,7 @@ export interface FileRouteTypes {
   to:
     | '/login'
     | '/audit'
+    | '/dns'
     | '/keys'
     | '/policy'
     | '/settings'
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/login'
     | '/_app/audit'
+    | '/_app/dns'
     | '/_app/keys'
     | '/_app/policy'
     | '/_app/settings'
@@ -175,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/audit'
       fullPath: '/audit'
       preLoaderRoute: typeof AppAuditRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dns': {
+      id: '/_app/dns'
+      path: '/dns'
+      fullPath: '/dns'
+      preLoaderRoute: typeof AppDnsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/keys': {
@@ -224,6 +243,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
+  AppDnsRoute: typeof AppDnsRoute
   AppKeysRoute: typeof AppKeysRoute
   AppPolicyRoute: typeof AppPolicyRoute
   AppSettingsRoute: typeof AppSettingsRoute
@@ -235,6 +255,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAuditRoute: AppAuditRoute,
+  AppDnsRoute: AppDnsRoute,
   AppKeysRoute: AppKeysRoute,
   AppPolicyRoute: AppPolicyRoute,
   AppSettingsRoute: AppSettingsRoute,

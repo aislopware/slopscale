@@ -261,6 +261,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get DNS settings
+         * @description Returns the DNS configuration clients receive, the config file's values and whether settings set through the API replace them.
+         *
+         *     Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getDNS"];
+        /**
+         * Set DNS settings
+         * @description Replaces the runtime DNS settings and pushes them to every client. MagicDNS and the base domain stay in the config file. While dns.extra_records_path is set that file owns the extra records.
+         *
+         *     Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        put: operations["setDNS"];
+        post?: never;
+        /**
+         * Reset DNS settings
+         * @description Drops the runtime DNS settings so the config file is in force again.
+         *
+         *     Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["resetDNS"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/group": {
         parameters: {
             query?: never;
@@ -1040,6 +1074,41 @@ export interface components {
         DeleteNodeOutputBody: Record<string, unknown>;
         DeletePreAuthKeyOutputBody: Record<string, unknown>;
         DeleteUserOutputBody: Record<string, unknown>;
+        DNS: {
+            /** @description From the config file. */
+            baseDomain: string;
+            /** @description What clients receive. */
+            effective: components["schemas"]["DNSSettings"];
+            /** @description Set when a file owns the extra records. */
+            extraRecordsPath: string;
+            /** @description The config file's values. */
+            fromFile: components["schemas"]["DNSSettings"];
+            /** @description From the config file. */
+            magicDns: boolean;
+            /** @description Settings set through the API are in use. */
+            overridden: boolean;
+        };
+        DNSRecord: {
+            /** @description Fully qualified name, without trailing dot. */
+            name: string;
+            /**
+             * @description A, AAAA or TXT; empty picks A or AAAA from the value.
+             * @enum {string}
+             */
+            type: "" | "A" | "AAAA" | "TXT";
+            value: string;
+        };
+        DNSSettings: {
+            extraRecords: components["schemas"]["DNSRecord"][];
+            /** @description IP, IP:port, https or tls URL. */
+            nameservers: string[];
+            /** @description Used for every query. */
+            overrideLocalDns: boolean;
+            searchDomains: string[];
+            splitNameservers: {
+                [key: string]: string[] | null;
+            };
+        };
         EmptyOutputBody: Record<string, unknown>;
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
@@ -1246,6 +1315,15 @@ export interface components {
         SetApprovedRoutesRequestBody: {
             routes?: string[] | null;
         };
+        SetDNSRequestBody: {
+            extraRecords?: components["schemas"]["DNSRecord"][] | null;
+            nameservers?: string[] | null;
+            overrideLocalDns?: boolean;
+            searchDomains?: string[] | null;
+            splitNameservers?: {
+                [key: string]: string[] | null;
+            };
+        };
         SetGlobalExitNodeRequestBody: {
             /** @description false clears the mark. */
             enabled?: boolean;
@@ -1336,6 +1414,9 @@ export type DeleteApiKeyOutputBody = components['schemas']['DeleteAPIKeyOutputBo
 export type DeleteNodeOutputBody = components['schemas']['DeleteNodeOutputBody'];
 export type DeletePreAuthKeyOutputBody = components['schemas']['DeletePreAuthKeyOutputBody'];
 export type DeleteUserOutputBody = components['schemas']['DeleteUserOutputBody'];
+export type Dns = components['schemas']['DNS'];
+export type DnsRecord = components['schemas']['DNSRecord'];
+export type DnsSettings = components['schemas']['DNSSettings'];
 export type EmptyOutputBody = components['schemas']['EmptyOutputBody'];
 export type ErrorDetail = components['schemas']['ErrorDetail'];
 export type ErrorModel = components['schemas']['ErrorModel'];
@@ -1367,6 +1448,7 @@ export type RuleEnabledInputBody = components['schemas']['RuleEnabledInputBody']
 export type RuleOutputBody = components['schemas']['RuleOutputBody'];
 export type SetApprovalRequestBody = components['schemas']['SetApprovalRequestBody'];
 export type SetApprovedRoutesRequestBody = components['schemas']['SetApprovedRoutesRequestBody'];
+export type SetDnsRequestBody = components['schemas']['SetDNSRequestBody'];
 export type SetGlobalExitNodeRequestBody = components['schemas']['SetGlobalExitNodeRequestBody'];
 export type SetTagsRequestBody = components['schemas']['SetTagsRequestBody'];
 export type Settings = components['schemas']['Settings'];
@@ -1920,6 +2002,97 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NodeOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getDNS: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DNS"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    setDNS: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetDNSRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DNS"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    resetDNS: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DNS"];
                 };
             };
             /** @description Error */

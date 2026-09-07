@@ -3,6 +3,7 @@ import {
   ClockCounterClockwiseIcon,
   DesktopIcon,
   GearSixIcon,
+  GlobeIcon,
   KeyIcon,
   ShieldCheckIcon,
   SquaresFourIcon,
@@ -12,7 +13,15 @@ import {
 import type { Me, Scope } from "~/auth/me.ts";
 import { can } from "~/auth/me.ts";
 
-export type NavPath = "/" | "/machines" | "/users" | "/keys" | "/policy" | "/settings" | "/audit";
+export type NavPath =
+  | "/"
+  | "/machines"
+  | "/users"
+  | "/keys"
+  | "/policy"
+  | "/dns"
+  | "/settings"
+  | "/audit";
 
 export interface NavItem {
   readonly to: NavPath;
@@ -50,6 +59,7 @@ export const navGroups: readonly NavGroup[] = [
     label: "Control",
     items: [
       { to: "/policy", label: "Access controls", icon: ShieldCheckIcon, scope: "policy_file:read" },
+      { to: "/dns", label: "DNS", icon: GlobeIcon, scope: "dns:read" },
       { to: "/settings", label: "Settings", icon: GearSixIcon, scope: "feature_settings:read" },
       {
         to: "/audit",

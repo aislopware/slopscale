@@ -21,6 +21,8 @@ export type Scope =
   | "feature_settings:read"
   | "users"
   | "users:read"
+  | "dns"
+  | "dns:read"
   | "logs:configuration:read";
 
 export type Me = MethodResponse<typeof api, "get", "/api/v1/whoami">;
