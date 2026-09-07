@@ -122,6 +122,7 @@ var _NodeCloneNeedsRegeneration = Node(struct {
 	SuspendedAt    *time.Time
 	Posture        *PostureIdentity
 	Attributes     []NodeAttribute
+	SourceAddr     netip.Addr
 	SharedWith     []UserID
 	GlobalExitNode bool
 	CreatedAt      time.Time

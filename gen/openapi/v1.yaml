@@ -24,6 +24,10 @@ components:
         ports:
           description: Comma-separated ports and ranges, empty for every port.
           type: string
+        postureIds:
+          items:
+            type: string
+          type: array
         protocol:
           description: One of all, tcp, udp, icmp.
           type: string
@@ -44,6 +48,7 @@ components:
         - bidirectional
         - sourceGroupIds
         - destinationGroupIds
+        - postureIds
         - createdAt
         - updatedAt
       type: object
@@ -67,6 +72,13 @@ components:
           type: string
         ports:
           type: string
+        postureIds:
+          description: Postures a source must satisfy, any one of them.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
         protocol:
           description: One of all, tcp, udp, icmp.
           type: string
@@ -664,6 +676,19 @@ components:
       required:
         - nodes
       type: object
+    ListPosturesOutputBody:
+      additionalProperties: false
+      properties:
+        geoIpAvailable:
+          type: boolean
+        postures:
+          items:
+            $ref: "#/components/schemas/Posture"
+          type: array
+      required:
+        - postures
+        - geoIpAvailable
+      type: object
     ListPreAuthKeysOutputBody:
       additionalProperties: false
       properties:
@@ -975,6 +1000,16 @@ components:
         - custom
         - identityCollectionOn
       type: object
+    NodePosturesOutputBody:
+      additionalProperties: false
+      properties:
+        postures:
+          items:
+            $ref: "#/components/schemas/Posture"
+          type: array
+      required:
+        - postures
+      type: object
     NodePreAuthKey:
       additionalProperties: false
       properties:
@@ -1037,6 +1072,58 @@ components:
         - policy
         - updatedAt
       type: object
+    Posture:
+      additionalProperties: false
+      properties:
+        createdAt:
+          format: date-time
+          type: string
+        description:
+          type: string
+        expressions:
+          items:
+            type: string
+          type: array
+        id:
+          format: uint64
+          type: string
+        name:
+          type: string
+        schedule:
+          $ref: "#/components/schemas/PostureSchedule"
+        updatedAt:
+          format: date-time
+          type: string
+      required:
+        - id
+        - name
+        - description
+        - expressions
+        - createdAt
+        - updatedAt
+      type: object
+    PostureCheckInputBody:
+      additionalProperties: false
+      properties:
+        expressions:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - expressions
+      type: object
+    PostureCheckOutputBody:
+      additionalProperties: false
+      properties:
+        errors:
+          items:
+            type: string
+          type: array
+      required:
+        - errors
+      type: object
     PostureIdentity:
       additionalProperties: false
       properties:
@@ -1053,6 +1140,54 @@ components:
         - serialNumbers
         - disabled
         - collectedAt
+      type: object
+    PostureOutputBody:
+      additionalProperties: false
+      properties:
+        posture:
+          $ref: "#/components/schemas/Posture"
+      required:
+        - posture
+      type: object
+    PostureRequestBody:
+      additionalProperties: false
+      properties:
+        description:
+          type: string
+        expressions:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        name:
+          type: string
+        schedule:
+          $ref: "#/components/schemas/PostureSchedule"
+      required:
+        - name
+      type: object
+    PostureSchedule:
+      additionalProperties: false
+      properties:
+        days:
+          description: "Weekdays: mon, tue, wed, thu, fri, sat, sun."
+          items:
+            type: string
+          type: array
+        end:
+          description: HH:MM; before start wraps past midnight.
+          type: string
+        start:
+          description: HH:MM in the time zone.
+          type: string
+        timezone:
+          description: IANA zone name; empty means UTC.
+          type: string
+      required:
+        - days
+        - start
+        - end
       type: object
     PreAuthKey:
       additionalProperties: false
@@ -3154,6 +3289,36 @@ paths:
         - Nodes
       x-audit-action: node.posture.collect
       x-required-scope: devices:posture_attributes
+  /api/v1/node/{nodeId}/postures:
+    get:
+      description: Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listNodePostures
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodePosturesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List the postures a node satisfies
+      tags:
+        - Access control
+      x-required-scope: devices:posture_attributes:read
   /api/v1/node/{nodeId}/rename/{newName}:
     post:
       description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -3421,6 +3586,192 @@ paths:
       tags:
         - Policy
       x-required-scope: policy_file:read
+  /api/v1/posture:
+    get:
+      description: Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listPostures
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListPosturesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List postures
+      tags:
+        - Access control
+      x-required-scope: policy_file:read
+    post:
+      description: |-
+        A posture is a set of conditions a source machine must satisfy, checked by the access rules that name it. Every expression must hold; a schedule limits the posture to a weekly window.
+
+        Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createPosture
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostureRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostureOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create posture
+      tags:
+        - Access control
+      x-audit-action: posture.create
+      x-required-scope: policy_file
+  /api/v1/posture/check:
+    post:
+      description: |-
+        Parses expressions without storing anything, for an editor to show errors as they are typed.
+
+        Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: checkPostureExpressions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostureCheckInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostureCheckOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Check posture expressions
+      tags:
+        - Access control
+      x-required-scope: policy_file:read
+  /api/v1/posture/{id}:
+    delete:
+      description: |-
+        Refused while an access rule names the posture.
+
+        Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deletePosture
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmptyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete posture
+      tags:
+        - Access control
+      x-audit-action: posture.delete
+      x-required-scope: policy_file
+    get:
+      description: Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getPosture
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostureOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get posture
+      tags:
+        - Access control
+      x-required-scope: policy_file:read
+    put:
+      description: Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updatePosture
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostureRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostureOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Replace posture
+      tags:
+        - Access control
+      x-audit-action: posture.update
+      x-required-scope: policy_file
   /api/v1/preauthkey:
     delete:
       description: Requires the `auth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).

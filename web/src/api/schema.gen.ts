@@ -699,6 +699,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/node/{nodeId}/postures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the postures a node satisfies
+         * @description Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listNodePostures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/node/{nodeId}/rename/{newName}": {
         parameters: {
             query?: never;
@@ -878,6 +898,84 @@ export interface paths {
          *     Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         post: operations["checkPolicy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List postures
+         * @description Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listPostures"];
+        put?: never;
+        /**
+         * Create posture
+         * @description A posture is a set of conditions a source machine must satisfy, checked by the access rules that name it. Every expression must hold; a schedule limits the posture to a weekly window.
+         *
+         *     Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["createPosture"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get posture
+         * @description Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getPosture"];
+        /**
+         * Replace posture
+         * @description Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        put: operations["updatePosture"];
+        post?: never;
+        /**
+         * Delete posture
+         * @description Refused while an access rule names the posture.
+         *
+         *     Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["deletePosture"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check posture expressions
+         * @description Parses expressions without storing anything, for an editor to show errors as they are typed.
+         *
+         *     Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["checkPostureExpressions"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1268,6 +1366,7 @@ export interface components {
             name: string;
             /** @description Comma-separated ports and ranges, empty for every port. */
             ports: string;
+            postureIds: string[];
             /** @description One of all, tcp, udp, icmp. */
             protocol: string;
             sourceGroupIds: string[];
@@ -1282,6 +1381,8 @@ export interface components {
             enabled?: boolean;
             name: string;
             ports?: string;
+            /** @description Postures a source must satisfy, any one of them. */
+            postureIds?: string[] | null;
             /** @description One of all, tcp, udp, icmp. */
             protocol: string;
             sourceGroupIds: string[] | null;
@@ -1554,6 +1655,10 @@ export interface components {
         ListNodesOutputBody: {
             nodes: components["schemas"]["Node"][];
         };
+        ListPosturesOutputBody: {
+            geoIpAvailable: boolean;
+            postures: components["schemas"]["Posture"][];
+        };
         ListPreAuthKeysOutputBody: {
             preAuthKeys: components["schemas"]["PreAuthKey"][];
         };
@@ -1660,6 +1765,9 @@ export interface components {
             identity?: components["schemas"]["PostureIdentity"];
             identityCollectionOn: boolean;
         };
+        NodePosturesOutputBody: {
+            postures: components["schemas"]["Posture"][];
+        };
         NodePreAuthKey: {
             aclTags: string[];
             /** Format: date-time */
@@ -1683,11 +1791,48 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
+        Posture: {
+            /** Format: date-time */
+            createdAt: string;
+            description: string;
+            expressions: string[];
+            /** Format: uint64 */
+            id: string;
+            name: string;
+            schedule?: components["schemas"]["PostureSchedule"];
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        PostureCheckInputBody: {
+            expressions: string[] | null;
+        };
+        PostureCheckOutputBody: {
+            errors: string[];
+        };
         PostureIdentity: {
             /** Format: date-time */
             collectedAt: string;
             disabled: boolean;
             serialNumbers: string[];
+        };
+        PostureOutputBody: {
+            posture: components["schemas"]["Posture"];
+        };
+        PostureRequestBody: {
+            description?: string;
+            expressions?: string[] | null;
+            name: string;
+            schedule?: components["schemas"]["PostureSchedule"];
+        };
+        PostureSchedule: {
+            /** @description Weekdays: mon, tue, wed, thu, fri, sat, sun. */
+            days: string[];
+            /** @description HH:MM; before start wraps past midnight. */
+            end: string;
+            /** @description HH:MM in the time zone. */
+            start: string;
+            /** @description IANA zone name; empty means UTC. */
+            timezone?: string;
         };
         PreAuthKey: {
             aclTags: string[];
@@ -1941,6 +2086,7 @@ export type ListAuditOutputBody = components['schemas']['ListAuditOutputBody'];
 export type ListGroupsOutputBody = components['schemas']['ListGroupsOutputBody'];
 export type ListNetworksOutputBody = components['schemas']['ListNetworksOutputBody'];
 export type ListNodesOutputBody = components['schemas']['ListNodesOutputBody'];
+export type ListPosturesOutputBody = components['schemas']['ListPosturesOutputBody'];
 export type ListPreAuthKeysOutputBody = components['schemas']['ListPreAuthKeysOutputBody'];
 export type ListRulesOutputBody = components['schemas']['ListRulesOutputBody'];
 export type ListUsersOutputBody = components['schemas']['ListUsersOutputBody'];
@@ -1953,10 +2099,17 @@ export type NetworkRouter = components['schemas']['NetworkRouter'];
 export type Node = components['schemas']['Node'];
 export type NodeOutputBody = components['schemas']['NodeOutputBody'];
 export type NodePosture = components['schemas']['NodePosture'];
+export type NodePosturesOutputBody = components['schemas']['NodePosturesOutputBody'];
 export type NodePreAuthKey = components['schemas']['NodePreAuthKey'];
 export type PolicyRequestBody = components['schemas']['PolicyRequestBody'];
 export type PolicyResponseBody = components['schemas']['PolicyResponseBody'];
+export type Posture = components['schemas']['Posture'];
+export type PostureCheckInputBody = components['schemas']['PostureCheckInputBody'];
+export type PostureCheckOutputBody = components['schemas']['PostureCheckOutputBody'];
 export type PostureIdentity = components['schemas']['PostureIdentity'];
+export type PostureOutputBody = components['schemas']['PostureOutputBody'];
+export type PostureRequestBody = components['schemas']['PostureRequestBody'];
+export type PostureSchedule = components['schemas']['PostureSchedule'];
 export type PreAuthKey = components['schemas']['PreAuthKey'];
 export type PreAuthKeyOutputBody = components['schemas']['PreAuthKeyOutputBody'];
 export type RuleEnabledInputBody = components['schemas']['RuleEnabledInputBody'];
@@ -3475,6 +3628,37 @@ export interface operations {
             };
         };
     };
+    listNodePostures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodePosturesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     renameNode: {
         parameters: {
             query?: never;
@@ -3789,6 +3973,198 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckPolicyOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listPostures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListPosturesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createPosture: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostureRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostureOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getPosture: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostureOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updatePosture: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostureRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostureOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deletePosture: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmptyOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    checkPostureExpressions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostureCheckInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostureCheckOutputBody"];
                 };
             };
             /** @description Error */

@@ -11,6 +11,7 @@ package table
 // this method only once at the beginning of the program.
 func UseSchema(schema string) {
 	AccessRuleGroups = AccessRuleGroups.FromSchema(schema)
+	AccessRulePostures = AccessRulePostures.FromSchema(schema)
 	AccessRules = AccessRules.FromSchema(schema)
 	APIKeys = APIKeys.FromSchema(schema)
 	AuditEvents = AuditEvents.FromSchema(schema)
@@ -30,6 +31,7 @@ func UseSchema(schema string) {
 	OAuthAccessTokens = OAuthAccessTokens.FromSchema(schema)
 	OAuthClients = OAuthClients.FromSchema(schema)
 	Policies = Policies.FromSchema(schema)
+	Postures = Postures.FromSchema(schema)
 	PreAuthKeys = PreAuthKeys.FromSchema(schema)
 	Sessions = Sessions.FromSchema(schema)
 	Settings = Settings.FromSchema(schema)
