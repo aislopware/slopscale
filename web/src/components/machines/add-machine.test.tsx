@@ -120,6 +120,19 @@ describe(joinInstructions, () => {
     }
   });
 
+  it("starts the macOS daemon before joining", () => {
+    const { command } = joinInstructions("macos", "secret");
+
+    expect(command).toMatch(/brew services start tailscale .*tailscale up/u);
+  });
+
+  it("points the Docker container's state at the mounted volume", () => {
+    const { command } = joinInstructions("docker", "secret");
+
+    expect(command).toContain("-v tailscale-state:/var/lib/tailscale");
+    expect(command).toContain("TS_STATE_DIR=/var/lib/tailscale");
+  });
+
   it("hands the phone apps the server address instead of a command", () => {
     const { command, qr } = joinInstructions("mobile", "secret");
 

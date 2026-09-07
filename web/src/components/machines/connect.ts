@@ -50,12 +50,12 @@ const builders: Record<Platform, Builder> = {
     };
   },
   macos: (command) => {
-    const line = `brew install tailscale && sudo ${command}`;
+    const line = `brew install tailscale && sudo brew services start tailscale && sudo ${command}`;
 
     return {
       command: line,
       qr: line,
-      note: "For the Homebrew build. The Mac App Store app instead takes the server address under the menu bar icon: hold Option, choose Debug, then Custom Login Server.",
+      note: "For the Homebrew build: installs the formula, starts the tailscaled service, then joins. The Mac App Store app instead takes the server address under the menu bar icon: hold Option, choose Debug, then Custom Login Server.",
     };
   },
   windows: (command) => {
@@ -70,7 +70,8 @@ const builders: Record<Platform, Builder> = {
   docker: (_command, key, server) => {
     const parts = [
       "docker run -d --name tailscale --hostname my-container",
-      "-v tailscale-state:/var/lib/tailscale --cap-add NET_ADMIN --device /dev/net/tun",
+      "-v tailscale-state:/var/lib/tailscale -e TS_STATE_DIR=/var/lib/tailscale",
+      "--cap-add NET_ADMIN --device /dev/net/tun",
       `-e TS_AUTHKEY=${key} -e TS_EXTRA_ARGS=--login-server=${server}`,
       "tailscale/tailscale",
     ];
@@ -78,7 +79,7 @@ const builders: Record<Platform, Builder> = {
     return {
       command: parts.join(" \\\n  "),
       qr: parts.join(" "),
-      note: "Change the hostname to the name the container should have in the machine list; the volume keeps its identity across restarts.",
+      note: "Change the hostname to the name the container should have in the machine list. The volume, with TS_STATE_DIR pointing at it, keeps the identity across restarts; without the variable the container registers anew each time.",
     };
   },
   mobile: (_command, _key, server) => ({
