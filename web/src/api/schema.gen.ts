@@ -587,6 +587,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/node/{nodeId}/attributes/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set a custom posture attribute
+         * @description Stores a custom:... attribute on the node, replacing one with the same key. The value is a string, a number or a boolean; an expiry removes it at that time, which is how a temporary grant such as an on-call marker is made.
+         *
+         *     Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        put: operations["setNodeAttribute"];
+        post?: never;
+        /**
+         * Delete a custom posture attribute
+         * @description Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["deleteNodeAttribute"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/node/{nodeId}/expire": {
         parameters: {
             query?: never;
@@ -623,6 +649,50 @@ export interface paths {
          *     Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         post: operations["setGlobalExitNode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/node/{nodeId}/posture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get node posture
+         * @description Returns the attribute map the policy evaluates for the node, the identity the server collected and the custom attributes. See docs/ref/device-trust.md.
+         *
+         *     Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getNodePosture"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/node/{nodeId}/posture/collect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the node for its identity now
+         * @description Sends the connected node a control-to-node request for its hardware serial numbers and waits for the answer. Needs the postureIdentityOn setting; a client with posture checking off answers with an empty, disabled report.
+         *
+         *     Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["collectNodePosture"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1316,6 +1386,13 @@ export interface components {
             name?: string;
             pictureUrl?: string;
         };
+        CustomAttribute: {
+            comment?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            key: string;
+            value: unknown;
+        };
         DebugCreateNodeRequestBody: {
             key?: string;
             name?: string;
@@ -1575,6 +1652,14 @@ export interface components {
         NodeOutputBody: {
             node: components["schemas"]["Node"];
         };
+        NodePosture: {
+            attributes: {
+                [key: string]: unknown;
+            };
+            custom: components["schemas"]["CustomAttribute"][];
+            identity?: components["schemas"]["PostureIdentity"];
+            identityCollectionOn: boolean;
+        };
         NodePreAuthKey: {
             aclTags: string[];
             /** Format: date-time */
@@ -1597,6 +1682,12 @@ export interface components {
             policy: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        PostureIdentity: {
+            /** Format: date-time */
+            collectedAt: string;
+            disabled: boolean;
+            serialNumbers: string[];
         };
         PreAuthKey: {
             aclTags: string[];
@@ -1657,6 +1748,12 @@ export interface components {
         SetApprovedRoutesRequestBody: {
             routes?: string[] | null;
         };
+        SetAttributeRequestBody: {
+            comment?: string;
+            /** Format: date-time */
+            expiry?: string;
+            value: unknown;
+        };
         SetDNSRequestBody: {
             extraRecords?: components["schemas"]["DNSRecord"][] | null;
             nameservers?: string[] | null;
@@ -1684,6 +1781,7 @@ export interface components {
             devicesApprovalOn: boolean;
             /** Format: int64 */
             keyExpiryDays: number;
+            postureIdentityOn: boolean;
             /** @description Users created by OIDC login wait for an administrator before registering nodes. */
             usersApprovalOn: boolean;
         };
@@ -1702,6 +1800,7 @@ export interface components {
             devicesApprovalOn?: boolean;
             /** Format: int64 */
             keyExpiryDays?: number;
+            postureIdentityOn?: boolean;
             usersApprovalOn?: boolean;
         };
         User: {
@@ -1814,6 +1913,7 @@ export type CreateApiKeyOutputBody = components['schemas']['CreateAPIKeyOutputBo
 export type CreateApiKeyRequestBody = components['schemas']['CreateApiKeyRequestBody'];
 export type CreatePreAuthKeyRequestBody = components['schemas']['CreatePreAuthKeyRequestBody'];
 export type CreateUserRequestBody = components['schemas']['CreateUserRequestBody'];
+export type CustomAttribute = components['schemas']['CustomAttribute'];
 export type DebugCreateNodeRequestBody = components['schemas']['DebugCreateNodeRequestBody'];
 export type DeleteApiKeyOutputBody = components['schemas']['DeleteAPIKeyOutputBody'];
 export type DeleteNodeOutputBody = components['schemas']['DeleteNodeOutputBody'];
@@ -1852,9 +1952,11 @@ export type NetworkRequestBody = components['schemas']['NetworkRequestBody'];
 export type NetworkRouter = components['schemas']['NetworkRouter'];
 export type Node = components['schemas']['Node'];
 export type NodeOutputBody = components['schemas']['NodeOutputBody'];
+export type NodePosture = components['schemas']['NodePosture'];
 export type NodePreAuthKey = components['schemas']['NodePreAuthKey'];
 export type PolicyRequestBody = components['schemas']['PolicyRequestBody'];
 export type PolicyResponseBody = components['schemas']['PolicyResponseBody'];
+export type PostureIdentity = components['schemas']['PostureIdentity'];
 export type PreAuthKey = components['schemas']['PreAuthKey'];
 export type PreAuthKeyOutputBody = components['schemas']['PreAuthKeyOutputBody'];
 export type RuleEnabledInputBody = components['schemas']['RuleEnabledInputBody'];
@@ -1862,6 +1964,7 @@ export type RuleOutputBody = components['schemas']['RuleOutputBody'];
 export type ServerInfo = components['schemas']['ServerInfo'];
 export type SetApprovalRequestBody = components['schemas']['SetApprovalRequestBody'];
 export type SetApprovedRoutesRequestBody = components['schemas']['SetApprovedRoutesRequestBody'];
+export type SetAttributeRequestBody = components['schemas']['SetAttributeRequestBody'];
 export type SetDnsRequestBody = components['schemas']['SetDNSRequestBody'];
 export type SetGlobalExitNodeRequestBody = components['schemas']['SetGlobalExitNodeRequestBody'];
 export type SetSuspensionRequestBody = components['schemas']['SetSuspensionRequestBody'];
@@ -3172,6 +3275,74 @@ export interface operations {
             };
         };
     };
+    setNodeAttribute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetAttributeRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodePosture"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteNodeAttribute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodePosture"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     expireNode: {
         parameters: {
             query?: never;
@@ -3229,6 +3400,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NodeOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getNodePosture: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodePosture"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    collectNodePosture: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodePosture"];
                 };
             };
             /** @description Error */

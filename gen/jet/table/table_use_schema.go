@@ -24,6 +24,7 @@ func UseSchema(schema string) {
 	NetworkRouteApprovals = NetworkRouteApprovals.FromSchema(schema)
 	NetworkRouters = NetworkRouters.FromSchema(schema)
 	Networks = Networks.FromSchema(schema)
+	NodeAttributes = NodeAttributes.FromSchema(schema)
 	NodeShares = NodeShares.FromSchema(schema)
 	Nodes = Nodes.FromSchema(schema)
 	OAuthAccessTokens = OAuthAccessTokens.FromSchema(schema)

@@ -144,6 +144,11 @@ type Device struct {
 	User              string     `json:"user"`
 }
 
+// DeviceAttributes defines model for DeviceAttributes.
+type DeviceAttributes struct {
+	Attributes map[string]interface{} `json:"attributes"`
+}
+
 // DeviceRoutes defines model for DeviceRoutes.
 type DeviceRoutes struct {
 	AdvertisedRoutes []string `json:"advertisedRoutes"`
@@ -256,6 +261,13 @@ type SetAuthorizedRequest struct {
 	Authorized bool `json:"authorized"`
 }
 
+// SetDeviceAttribute defines model for SetDeviceAttribute.
+type SetDeviceAttribute struct {
+	Comment *string     `json:"comment,omitempty"`
+	Expiry  *time.Time  `json:"expiry,omitempty"`
+	Value   interface{} `json:"value"`
+}
+
 // SetKeyRequest defines model for SetKeyRequest.
 type SetKeyRequest struct {
 	KeyExpiryDisabled bool `json:"keyExpiryDisabled"`
@@ -302,8 +314,9 @@ type UpdateTailnetSettings struct {
 	DevicesApprovalOn *bool `json:"devicesApprovalOn,omitempty"`
 
 	// DevicesKeyDurationDays 0 leaves the config file and the client in charge.
-	DevicesKeyDurationDays *int64 `json:"devicesKeyDurationDays,omitempty"`
-	UsersApprovalOn        *bool  `json:"usersApprovalOn,omitempty"`
+	DevicesKeyDurationDays      *int64 `json:"devicesKeyDurationDays,omitempty"`
+	PostureIdentityCollectionOn *bool  `json:"postureIdentityCollectionOn,omitempty"`
+	UsersApprovalOn             *bool  `json:"usersApprovalOn,omitempty"`
 }
 
 // UpdateWebhookRequest defines model for UpdateWebhookRequest.
@@ -358,6 +371,12 @@ type GetDeviceParams struct {
 	Fields *string `form:"fields,omitempty" json:"fields,omitempty"`
 }
 
+// GetDeviceAttributesParams defines parameters for GetDeviceAttributes.
+type GetDeviceAttributesParams struct {
+	// Fields Set to "all" for route fields.
+	Fields *string `form:"fields,omitempty" json:"fields,omitempty"`
+}
+
 // GetDeviceRoutesParams defines parameters for GetDeviceRoutes.
 type GetDeviceRoutesParams struct {
 	// Fields Set to "all" for route fields.
@@ -405,6 +424,9 @@ type ListUsersParams struct {
 	// Role Filter by role: owner, admin, network-admin, it-admin, auditor, member.
 	Role *string `form:"role,omitempty" json:"role,omitempty"`
 }
+
+// SetDeviceAttributeJSONRequestBody defines body for SetDeviceAttribute for application/json ContentType.
+type SetDeviceAttributeJSONRequestBody = SetDeviceAttribute
 
 // AuthorizeDeviceJSONRequestBody defines body for AuthorizeDevice for application/json ContentType.
 type AuthorizeDeviceJSONRequestBody = SetAuthorizedRequest
@@ -538,6 +560,44 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v2/device/{id} (the `GetDevice` operationId).
 	GetDevice(ctx context.Context, id string, params *GetDeviceParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDeviceAttributes Get a device's posture attributes
+	//
+	// Returns every posture attribute of the device: the node:... attributes derived from what the client reports and the custom:... attributes set through this API, the way Tailscale's endpoint does.
+	//
+	// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v2/device/{id}/attributes (the `GetDeviceAttributes` operationId).
+	GetDeviceAttributes(ctx context.Context, id string, params *GetDeviceAttributesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteDeviceAttribute Delete a custom posture attribute
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v2/device/{id}/attributes/{attributeKey} (the `DeleteDeviceAttribute` operationId).
+	DeleteDeviceAttribute(ctx context.Context, id string, attributeKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetDeviceAttributeWithBody Set a custom posture attribute
+	//
+	// Stores a custom:... attribute with a string, number or boolean value and an optional expiry, replacing one with the same key.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v2/device/{id}/attributes/{attributeKey} (the `SetDeviceAttribute` operationId).
+	SetDeviceAttributeWithBody(ctx context.Context, id string, attributeKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetDeviceAttribute Set a custom posture attribute
+	//
+	// Stores a custom:... attribute with a string, number or boolean value and an optional expiry, replacing one with the same key.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v2/device/{id}/attributes/{attributeKey} (the `SetDeviceAttribute` operationId).
+	SetDeviceAttribute(ctx context.Context, id string, attributeKey string, body SetDeviceAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AuthorizeDeviceWithBody Authorize a device
 	//
@@ -1011,6 +1071,84 @@ func (c *Client) DeleteDevice(ctx context.Context, id string, params *DeleteDevi
 // Corresponds with GET /api/v2/device/{id} (the `GetDevice` operationId).
 func (c *Client) GetDevice(ctx context.Context, id string, params *GetDeviceParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetDeviceRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetDeviceAttributes Get a device's posture attributes
+//
+// Returns every posture attribute of the device: the node:... attributes derived from what the client reports and the custom:... attributes set through this API, the way Tailscale's endpoint does.
+//
+// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v2/device/{id}/attributes (the `GetDeviceAttributes` operationId).
+func (c *Client) GetDeviceAttributes(ctx context.Context, id string, params *GetDeviceAttributesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDeviceAttributesRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteDeviceAttribute Delete a custom posture attribute
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v2/device/{id}/attributes/{attributeKey} (the `DeleteDeviceAttribute` operationId).
+func (c *Client) DeleteDeviceAttribute(ctx context.Context, id string, attributeKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteDeviceAttributeRequest(c.Server, id, attributeKey)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetDeviceAttributeWithBody Set a custom posture attribute
+//
+// Stores a custom:... attribute with a string, number or boolean value and an optional expiry, replacing one with the same key.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v2/device/{id}/attributes/{attributeKey} (the `SetDeviceAttribute` operationId).
+func (c *Client) SetDeviceAttributeWithBody(ctx context.Context, id string, attributeKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetDeviceAttributeRequestWithBody(c.Server, id, attributeKey, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetDeviceAttribute Set a custom posture attribute
+//
+// Stores a custom:... attribute with a string, number or boolean value and an optional expiry, replacing one with the same key.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v2/device/{id}/attributes/{attributeKey} (the `SetDeviceAttribute` operationId).
+func (c *Client) SetDeviceAttribute(ctx context.Context, id string, attributeKey string, body SetDeviceAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetDeviceAttributeRequest(c.Server, id, attributeKey, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2096,6 +2234,162 @@ func NewGetDeviceRequest(server string, id string, params *GetDeviceParams) (*ht
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewGetDeviceAttributesRequest constructs an http.Request for the GetDeviceAttributes method
+func NewGetDeviceAttributesRequest(server string, id string, params *GetDeviceAttributesParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/device/%s/attributes", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Fields != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "fields", *params.Fields, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteDeviceAttributeRequest constructs an http.Request for the DeleteDeviceAttribute method
+func NewDeleteDeviceAttributeRequest(server string, id string, attributeKey string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "attributeKey", attributeKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/device/%s/attributes/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetDeviceAttributeRequest calls the generic SetDeviceAttribute builder with application/json body
+func NewSetDeviceAttributeRequest(server string, id string, attributeKey string, body SetDeviceAttributeJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetDeviceAttributeRequestWithBody(server, id, attributeKey, "application/json", bodyReader)
+}
+
+// NewSetDeviceAttributeRequestWithBody constructs an http.Request for the SetDeviceAttribute method, with any body, and a specified content type
+func NewSetDeviceAttributeRequestWithBody(server string, id string, attributeKey string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "attributeKey", attributeKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/device/%s/attributes/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -3783,6 +4077,48 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v2/device/{id} (the `GetDevice` operationId).
 	GetDeviceWithResponse(ctx context.Context, id string, params *GetDeviceParams, reqEditors ...RequestEditorFn) (*GetDeviceResponse, error)
 
+	// GetDeviceAttributesWithResponse Get a device's posture attributes
+	//
+	// Returns every posture attribute of the device: the node:... attributes derived from what the client reports and the custom:... attributes set through this API, the way Tailscale's endpoint does.
+	//
+	// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v2/device/{id}/attributes (the `GetDeviceAttributes` operationId).
+	GetDeviceAttributesWithResponse(ctx context.Context, id string, params *GetDeviceAttributesParams, reqEditors ...RequestEditorFn) (*GetDeviceAttributesResponse, error)
+
+	// DeleteDeviceAttributeWithResponse Delete a custom posture attribute
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v2/device/{id}/attributes/{attributeKey} (the `DeleteDeviceAttribute` operationId).
+	DeleteDeviceAttributeWithResponse(ctx context.Context, id string, attributeKey string, reqEditors ...RequestEditorFn) (*DeleteDeviceAttributeResponse, error)
+
+	// SetDeviceAttributeWithBodyWithResponse Set a custom posture attribute
+	//
+	// Stores a custom:... attribute with a string, number or boolean value and an optional expiry, replacing one with the same key.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/device/{id}/attributes/{attributeKey} (the `SetDeviceAttribute` operationId).
+	SetDeviceAttributeWithBodyWithResponse(ctx context.Context, id string, attributeKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetDeviceAttributeResponse, error)
+
+	// SetDeviceAttributeWithResponse Set a custom posture attribute
+	//
+	// Stores a custom:... attribute with a string, number or boolean value and an optional expiry, replacing one with the same key.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/device/{id}/attributes/{attributeKey} (the `SetDeviceAttribute` operationId).
+	SetDeviceAttributeWithResponse(ctx context.Context, id string, attributeKey string, body SetDeviceAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDeviceAttributeResponse, error)
+
 	// AuthorizeDeviceWithBodyWithResponse Authorize a device
 	//
 	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -4419,6 +4755,241 @@ func (r GetDeviceResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetDeviceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetDeviceAttributesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DeviceAttributes
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetDeviceAttributesResponse) GetJSON200() *DeviceAttributes {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetDeviceAttributesResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetDeviceAttributesResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetDeviceAttributesResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r GetDeviceAttributesResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r GetDeviceAttributesResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetDeviceAttributesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDeviceAttributesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDeviceAttributesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetDeviceAttributesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteDeviceAttributeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmptyOutputBody
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteDeviceAttributeResponse) GetJSON200() *EmptyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteDeviceAttributeResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteDeviceAttributeResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteDeviceAttributeResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r DeleteDeviceAttributeResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r DeleteDeviceAttributeResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteDeviceAttributeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteDeviceAttributeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteDeviceAttributeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteDeviceAttributeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetDeviceAttributeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmptyOutputBody
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *ErrorModel
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetDeviceAttributeResponse) GetJSON200() *EmptyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SetDeviceAttributeResponse) GetApplicationproblemJSON400() *ErrorModel {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SetDeviceAttributeResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SetDeviceAttributeResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SetDeviceAttributeResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r SetDeviceAttributeResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r SetDeviceAttributeResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r SetDeviceAttributeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetDeviceAttributeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetDeviceAttributeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetDeviceAttributeResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -7296,6 +7867,72 @@ func (c *ClientWithResponses) GetDeviceWithResponse(ctx context.Context, id stri
 	return ParseGetDeviceResponse(rsp)
 }
 
+// GetDeviceAttributesWithResponse Get a device's posture attributes
+//
+// Returns every posture attribute of the device: the node:... attributes derived from what the client reports and the custom:... attributes set through this API, the way Tailscale's endpoint does.
+//
+// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v2/device/{id}/attributes (the `GetDeviceAttributes` operationId).
+func (c *ClientWithResponses) GetDeviceAttributesWithResponse(ctx context.Context, id string, params *GetDeviceAttributesParams, reqEditors ...RequestEditorFn) (*GetDeviceAttributesResponse, error) {
+	rsp, err := c.GetDeviceAttributes(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDeviceAttributesResponse(rsp)
+}
+
+// DeleteDeviceAttributeWithResponse Delete a custom posture attribute
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v2/device/{id}/attributes/{attributeKey} (the `DeleteDeviceAttribute` operationId).
+func (c *ClientWithResponses) DeleteDeviceAttributeWithResponse(ctx context.Context, id string, attributeKey string, reqEditors ...RequestEditorFn) (*DeleteDeviceAttributeResponse, error) {
+	rsp, err := c.DeleteDeviceAttribute(ctx, id, attributeKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteDeviceAttributeResponse(rsp)
+}
+
+// SetDeviceAttributeWithBodyWithResponse Set a custom posture attribute
+//
+// Stores a custom:... attribute with a string, number or boolean value and an optional expiry, replacing one with the same key.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/device/{id}/attributes/{attributeKey} (the `SetDeviceAttribute` operationId).
+func (c *ClientWithResponses) SetDeviceAttributeWithBodyWithResponse(ctx context.Context, id string, attributeKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetDeviceAttributeResponse, error) {
+	rsp, err := c.SetDeviceAttributeWithBody(ctx, id, attributeKey, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetDeviceAttributeResponse(rsp)
+}
+
+// SetDeviceAttributeWithResponse Set a custom posture attribute
+//
+// Stores a custom:... attribute with a string, number or boolean value and an optional expiry, replacing one with the same key.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/device/{id}/attributes/{attributeKey} (the `SetDeviceAttribute` operationId).
+func (c *ClientWithResponses) SetDeviceAttributeWithResponse(ctx context.Context, id string, attributeKey string, body SetDeviceAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDeviceAttributeResponse, error) {
+	rsp, err := c.SetDeviceAttribute(ctx, id, attributeKey, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetDeviceAttributeResponse(rsp)
+}
+
 // AuthorizeDeviceWithBodyWithResponse Authorize a device
 //
 // Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -8172,6 +8809,196 @@ func ParseGetDeviceResponse(rsp *http.Response) (*GetDeviceResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDeviceAttributesResponse parses an HTTP response from a GetDeviceAttributesWithResponse call
+func ParseGetDeviceAttributesResponse(rsp *http.Response) (*GetDeviceAttributesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDeviceAttributesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeviceAttributes
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteDeviceAttributeResponse parses an HTTP response from a DeleteDeviceAttributeWithResponse call
+func ParseDeleteDeviceAttributeResponse(rsp *http.Response) (*DeleteDeviceAttributeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteDeviceAttributeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmptyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetDeviceAttributeResponse parses an HTTP response from a SetDeviceAttributeWithResponse call
+func ParseSetDeviceAttributeResponse(rsp *http.Response) (*SetDeviceAttributeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetDeviceAttributeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmptyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorModel

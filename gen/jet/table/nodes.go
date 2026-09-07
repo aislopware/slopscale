@@ -36,6 +36,7 @@ type nodesTable struct {
 	ApprovedRoutes sqlite.ColumnString
 	ApprovedAt     sqlite.ColumnTimestamp
 	SuspendedAt    sqlite.ColumnTimestamp
+	Posture        sqlite.ColumnString
 	GlobalExitNode sqlite.ColumnBool
 	CreatedAt      sqlite.ColumnTimestamp
 	UpdatedAt      sqlite.ColumnTimestamp
@@ -100,12 +101,13 @@ func newNodesTableImpl(schemaName, tableName, alias string) nodesTable {
 		ApprovedRoutesColumn = sqlite.StringColumn("approved_routes")
 		ApprovedAtColumn     = sqlite.TimestampColumn("approved_at")
 		SuspendedAtColumn    = sqlite.TimestampColumn("suspended_at")
+		PostureColumn        = sqlite.StringColumn("posture")
 		GlobalExitNodeColumn = sqlite.BoolColumn("global_exit_node")
 		CreatedAtColumn      = sqlite.TimestampColumn("created_at")
 		UpdatedAtColumn      = sqlite.TimestampColumn("updated_at")
 		DeletedAtColumn      = sqlite.TimestampColumn("deleted_at")
-		allColumns           = sqlite.ColumnList{IDColumn, MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, GlobalExitNodeColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
-		mutableColumns       = sqlite.ColumnList{MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, GlobalExitNodeColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
+		allColumns           = sqlite.ColumnList{IDColumn, MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, GlobalExitNodeColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
+		mutableColumns       = sqlite.ColumnList{MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, GlobalExitNodeColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
 		defaultColumns       = sqlite.ColumnList{GlobalExitNodeColumn}
 	)
 
@@ -132,6 +134,7 @@ func newNodesTableImpl(schemaName, tableName, alias string) nodesTable {
 		ApprovedRoutes: ApprovedRoutesColumn,
 		ApprovedAt:     ApprovedAtColumn,
 		SuspendedAt:    SuspendedAtColumn,
+		Posture:        PostureColumn,
 		GlobalExitNode: GlobalExitNodeColumn,
 		CreatedAt:      CreatedAtColumn,
 		UpdatedAt:      UpdatedAtColumn,

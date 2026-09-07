@@ -295,6 +295,21 @@ components:
         pictureUrl:
           type: string
       type: object
+    CustomAttribute:
+      additionalProperties: false
+      properties:
+        comment:
+          type: string
+        expiresAt:
+          format: date-time
+          type: string
+        key:
+          type: string
+        value: {}
+      required:
+        - key
+        - value
+      type: object
     DERPRegion:
       additionalProperties: false
       properties:
@@ -941,6 +956,25 @@ components:
       required:
         - node
       type: object
+    NodePosture:
+      additionalProperties: false
+      properties:
+        attributes:
+          additionalProperties: {}
+          type: object
+        custom:
+          items:
+            $ref: "#/components/schemas/CustomAttribute"
+          type: array
+        identity:
+          $ref: "#/components/schemas/PostureIdentity"
+        identityCollectionOn:
+          type: boolean
+      required:
+        - attributes
+        - custom
+        - identityCollectionOn
+      type: object
     NodePreAuthKey:
       additionalProperties: false
       properties:
@@ -1002,6 +1036,23 @@ components:
       required:
         - policy
         - updatedAt
+      type: object
+    PostureIdentity:
+      additionalProperties: false
+      properties:
+        collectedAt:
+          format: date-time
+          type: string
+        disabled:
+          type: boolean
+        serialNumbers:
+          items:
+            type: string
+          type: array
+      required:
+        - serialNumbers
+        - disabled
+        - collectedAt
       type: object
     PreAuthKey:
       additionalProperties: false
@@ -1167,6 +1218,19 @@ components:
             - array
             - "null"
       type: object
+    SetAttributeRequestBody:
+      additionalProperties: false
+      properties:
+        comment:
+          maxLength: 200
+          type: string
+        expiry:
+          format: date-time
+          type: string
+        value: {}
+      required:
+        - value
+      type: object
     SetDNSRequestBody:
       additionalProperties: false
       properties:
@@ -1244,12 +1308,15 @@ components:
         keyExpiryDays:
           format: int64
           type: integer
+        postureIdentityOn:
+          type: boolean
         usersApprovalOn:
           description: Users created by OIDC login wait for an administrator before registering nodes.
           type: boolean
       required:
         - devicesApprovalOn
         - usersApprovalOn
+        - postureIdentityOn
         - keyExpiryDays
         - defaultKeyExpiryDays
       type: object
@@ -1273,6 +1340,8 @@ components:
           maximum: 365
           minimum: 0
           type: integer
+        postureIdentityOn:
+          type: boolean
         usersApprovalOn:
           type: boolean
       type: object
@@ -2863,6 +2932,86 @@ paths:
         - Nodes
       x-audit-action: node.routes.set
       x-required-scope: devices:routes
+  /api/v1/node/{nodeId}/attributes/{key}:
+    delete:
+      description: Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteNodeAttribute
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+        - in: path
+          name: key
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodePosture"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete a custom posture attribute
+      tags:
+        - Nodes
+      x-audit-action: node.attribute.delete
+      x-required-scope: devices:posture_attributes
+    put:
+      description: |-
+        Stores a custom:... attribute on the node, replacing one with the same key. The value is a string, a number or a boolean; an expiry removes it at that time, which is how a temporary grant such as an on-call marker is made.
+
+        Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: setNodeAttribute
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+        - in: path
+          name: key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetAttributeRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodePosture"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Set a custom posture attribute
+      tags:
+        - Nodes
+      x-audit-action: node.attribute.set
+      x-required-scope: devices:posture_attributes
   /api/v1/node/{nodeId}/expire:
     post:
       description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -2938,6 +3087,73 @@ paths:
         - Nodes
       x-audit-action: node.global_exit_node.set
       x-required-scope: devices:routes
+  /api/v1/node/{nodeId}/posture:
+    get:
+      description: |-
+        Returns the attribute map the policy evaluates for the node, the identity the server collected and the custom attributes. See docs/ref/device-trust.md.
+
+        Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getNodePosture
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodePosture"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get node posture
+      tags:
+        - Nodes
+      x-required-scope: devices:posture_attributes:read
+  /api/v1/node/{nodeId}/posture/collect:
+    post:
+      description: |-
+        Sends the connected node a control-to-node request for its hardware serial numbers and waits for the answer. Needs the postureIdentityOn setting; a client with posture checking off answers with an empty, disabled report.
+
+        Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: collectNodePosture
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodePosture"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Ask the node for its identity now
+      tags:
+        - Nodes
+      x-audit-action: node.posture.collect
+      x-required-scope: devices:posture_attributes
   /api/v1/node/{nodeId}/rename/{newName}:
     post:
       description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).

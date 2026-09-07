@@ -245,6 +245,14 @@ type CreateUserRequestBody struct {
 	PictureUrl  *string `json:"pictureUrl,omitempty"`
 }
 
+// CustomAttribute defines model for CustomAttribute.
+type CustomAttribute struct {
+	Comment   *string     `json:"comment,omitempty"`
+	ExpiresAt *time.Time  `json:"expiresAt,omitempty"`
+	Key       string      `json:"key"`
+	Value     interface{} `json:"value"`
+}
+
 // DERPRegion defines model for DERPRegion.
 type DERPRegion struct {
 	Code string `json:"code"`
@@ -577,6 +585,14 @@ type NodeOutputBody struct {
 	Node Node `json:"node"`
 }
 
+// NodePosture defines model for NodePosture.
+type NodePosture struct {
+	Attributes           map[string]interface{} `json:"attributes"`
+	Custom               []CustomAttribute      `json:"custom"`
+	Identity             *PostureIdentity       `json:"identity,omitempty"`
+	IdentityCollectionOn bool                   `json:"identityCollectionOn"`
+}
+
 // NodePreAuthKey defines model for NodePreAuthKey.
 type NodePreAuthKey struct {
 	AclTags       []string   `json:"aclTags"`
@@ -600,6 +616,13 @@ type PolicyRequestBody struct {
 type PolicyResponseBody struct {
 	Policy    string    `json:"policy"`
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// PostureIdentity defines model for PostureIdentity.
+type PostureIdentity struct {
+	CollectedAt   time.Time `json:"collectedAt"`
+	Disabled      bool      `json:"disabled"`
+	SerialNumbers []string  `json:"serialNumbers"`
 }
 
 // PreAuthKey defines model for PreAuthKey.
@@ -673,6 +696,13 @@ type SetApprovedRoutesRequestBody struct {
 	Routes *[]string `json:"routes,omitempty"`
 }
 
+// SetAttributeRequestBody defines model for SetAttributeRequestBody.
+type SetAttributeRequestBody struct {
+	Comment *string     `json:"comment,omitempty"`
+	Expiry  *time.Time  `json:"expiry,omitempty"`
+	Value   interface{} `json:"value"`
+}
+
 // SetDNSRequestBody defines model for SetDNSRequestBody.
 type SetDNSRequestBody struct {
 	ExtraRecords     *[]DNSRecord          `json:"extraRecords,omitempty"`
@@ -712,6 +742,7 @@ type Settings struct {
 	// DevicesApprovalOn New nodes wait for an administrator unless they register with a preauthorized key.
 	DevicesApprovalOn bool  `json:"devicesApprovalOn"`
 	KeyExpiryDays     int64 `json:"keyExpiryDays"`
+	PostureIdentityOn bool  `json:"postureIdentityOn"`
 
 	// UsersApprovalOn Users created by OIDC login wait for an administrator before registering nodes.
 	UsersApprovalOn bool `json:"usersApprovalOn"`
@@ -727,6 +758,7 @@ type ShareNodeRequestBody struct {
 type UpdateSettingsRequestBody struct {
 	DevicesApprovalOn *bool  `json:"devicesApprovalOn,omitempty"`
 	KeyExpiryDays     *int64 `json:"keyExpiryDays,omitempty"`
+	PostureIdentityOn *bool  `json:"postureIdentityOn,omitempty"`
 	UsersApprovalOn   *bool  `json:"usersApprovalOn,omitempty"`
 }
 
@@ -934,6 +966,9 @@ type ApproveNodeJSONRequestBody = SetApprovalRequestBody
 
 // SetApprovedRoutesJSONRequestBody defines body for SetApprovedRoutes for application/json ContentType.
 type SetApprovedRoutesJSONRequestBody = SetApprovedRoutesRequestBody
+
+// SetNodeAttributeJSONRequestBody defines body for SetNodeAttribute for application/json ContentType.
+type SetNodeAttributeJSONRequestBody = SetAttributeRequestBody
 
 // ExpireNodeJSONRequestBody defines body for ExpireNode for application/json ContentType.
 type ExpireNodeJSONRequestBody = ExpireNodeRequestBody
@@ -1588,6 +1623,35 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/node/{nodeId}/approve_routes (the `SetApprovedRoutes` operationId).
 	SetApprovedRoutes(ctx context.Context, nodeId string, body SetApprovedRoutesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeleteNodeAttribute Delete a custom posture attribute
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v1/node/{nodeId}/attributes/{key} (the `DeleteNodeAttribute` operationId).
+	DeleteNodeAttribute(ctx context.Context, nodeId string, key string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetNodeAttributeWithBody Set a custom posture attribute
+	//
+	// Stores a custom:... attribute on the node, replacing one with the same key. The value is a string, a number or a boolean; an expiry removes it at that time, which is how a temporary grant such as an on-call marker is made.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/node/{nodeId}/attributes/{key} (the `SetNodeAttribute` operationId).
+	SetNodeAttributeWithBody(ctx context.Context, nodeId string, key string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetNodeAttribute Set a custom posture attribute
+	//
+	// Stores a custom:... attribute on the node, replacing one with the same key. The value is a string, a number or a boolean; an expiry removes it at that time, which is how a temporary grant such as an on-call marker is made.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/node/{nodeId}/attributes/{key} (the `SetNodeAttribute` operationId).
+	SetNodeAttribute(ctx context.Context, nodeId string, key string, body SetNodeAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ExpireNodeWithBody Expire node
 	//
 	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -1627,6 +1691,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/global-exit-node (the `SetGlobalExitNode` operationId).
 	SetGlobalExitNode(ctx context.Context, nodeId string, body SetGlobalExitNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetNodePosture Get node posture
+	//
+	// Returns the attribute map the policy evaluates for the node, the identity the server collected and the custom attributes. See docs/ref/device-trust.md.
+	//
+	// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/posture (the `GetNodePosture` operationId).
+	GetNodePosture(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CollectNodePosture Ask the node for its identity now
+	//
+	// Sends the connected node a control-to-node request for its hardware serial numbers and waits for the answer. Needs the postureIdentityOn setting; a client with posture checking off answers with an empty, disabled report.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/posture/collect (the `CollectNodePosture` operationId).
+	CollectNodePosture(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RenameNode Rename node
 	//
@@ -3159,6 +3241,65 @@ func (c *Client) SetApprovedRoutes(ctx context.Context, nodeId string, body SetA
 	return c.Client.Do(req)
 }
 
+// DeleteNodeAttribute Delete a custom posture attribute
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v1/node/{nodeId}/attributes/{key} (the `DeleteNodeAttribute` operationId).
+func (c *Client) DeleteNodeAttribute(ctx context.Context, nodeId string, key string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteNodeAttributeRequest(c.Server, nodeId, key)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetNodeAttributeWithBody Set a custom posture attribute
+//
+// Stores a custom:... attribute on the node, replacing one with the same key. The value is a string, a number or a boolean; an expiry removes it at that time, which is how a temporary grant such as an on-call marker is made.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/node/{nodeId}/attributes/{key} (the `SetNodeAttribute` operationId).
+func (c *Client) SetNodeAttributeWithBody(ctx context.Context, nodeId string, key string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetNodeAttributeRequestWithBody(c.Server, nodeId, key, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetNodeAttribute Set a custom posture attribute
+//
+// Stores a custom:... attribute on the node, replacing one with the same key. The value is a string, a number or a boolean; an expiry removes it at that time, which is how a temporary grant such as an on-call marker is made.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/node/{nodeId}/attributes/{key} (the `SetNodeAttribute` operationId).
+func (c *Client) SetNodeAttribute(ctx context.Context, nodeId string, key string, body SetNodeAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetNodeAttributeRequest(c.Server, nodeId, key, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ExpireNodeWithBody Expire node
 //
 // Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -3229,6 +3370,44 @@ func (c *Client) SetGlobalExitNodeWithBody(ctx context.Context, nodeId string, c
 // Corresponds with POST /api/v1/node/{nodeId}/global-exit-node (the `SetGlobalExitNode` operationId).
 func (c *Client) SetGlobalExitNode(ctx context.Context, nodeId string, body SetGlobalExitNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetGlobalExitNodeRequest(c.Server, nodeId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetNodePosture Get node posture
+//
+// Returns the attribute map the policy evaluates for the node, the identity the server collected and the custom attributes. See docs/ref/device-trust.md.
+//
+// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/posture (the `GetNodePosture` operationId).
+func (c *Client) GetNodePosture(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNodePostureRequest(c.Server, nodeId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CollectNodePosture Ask the node for its identity now
+//
+// Sends the connected node a control-to-node request for its hardware serial numbers and waits for the answer. Needs the postureIdentityOn setting; a client with posture checking off answers with an empty, disabled report.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/posture/collect (the `CollectNodePosture` operationId).
+func (c *Client) CollectNodePosture(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCollectNodePostureRequest(c.Server, nodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -5821,6 +6000,101 @@ func NewSetApprovedRoutesRequestWithBody(server string, nodeId string, contentTy
 	return req, nil
 }
 
+// NewDeleteNodeAttributeRequest constructs an http.Request for the DeleteNodeAttribute method
+func NewDeleteNodeAttributeRequest(server string, nodeId string, key string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "key", key, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/attributes/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetNodeAttributeRequest calls the generic SetNodeAttribute builder with application/json body
+func NewSetNodeAttributeRequest(server string, nodeId string, key string, body SetNodeAttributeJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetNodeAttributeRequestWithBody(server, nodeId, key, "application/json", bodyReader)
+}
+
+// NewSetNodeAttributeRequestWithBody constructs an http.Request for the SetNodeAttribute method, with any body, and a specified content type
+func NewSetNodeAttributeRequestWithBody(server string, nodeId string, key string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "key", key, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/attributes/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewExpireNodeRequest calls the generic ExpireNode builder with application/json body
 func NewExpireNodeRequest(server string, nodeId string, body ExpireNodeJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -5911,6 +6185,74 @@ func NewSetGlobalExitNodeRequestWithBody(server string, nodeId string, contentTy
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetNodePostureRequest constructs an http.Request for the GetNodePosture method
+func NewGetNodePostureRequest(server string, nodeId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/posture", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCollectNodePostureRequest constructs an http.Request for the CollectNodePosture method
+func NewCollectNodePostureRequest(server string, nodeId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/posture/collect", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -7751,6 +8093,37 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/node/{nodeId}/approve_routes (the `SetApprovedRoutes` operationId).
 	SetApprovedRoutesWithResponse(ctx context.Context, nodeId string, body SetApprovedRoutesJSONRequestBody, reqEditors ...RequestEditorFn) (*SetApprovedRoutesResponse, error)
 
+	// DeleteNodeAttributeWithResponse Delete a custom posture attribute
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/node/{nodeId}/attributes/{key} (the `DeleteNodeAttribute` operationId).
+	DeleteNodeAttributeWithResponse(ctx context.Context, nodeId string, key string, reqEditors ...RequestEditorFn) (*DeleteNodeAttributeResponse, error)
+
+	// SetNodeAttributeWithBodyWithResponse Set a custom posture attribute
+	//
+	// Stores a custom:... attribute on the node, replacing one with the same key. The value is a string, a number or a boolean; an expiry removes it at that time, which is how a temporary grant such as an on-call marker is made.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/node/{nodeId}/attributes/{key} (the `SetNodeAttribute` operationId).
+	SetNodeAttributeWithBodyWithResponse(ctx context.Context, nodeId string, key string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetNodeAttributeResponse, error)
+
+	// SetNodeAttributeWithResponse Set a custom posture attribute
+	//
+	// Stores a custom:... attribute on the node, replacing one with the same key. The value is a string, a number or a boolean; an expiry removes it at that time, which is how a temporary grant such as an on-call marker is made.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/node/{nodeId}/attributes/{key} (the `SetNodeAttribute` operationId).
+	SetNodeAttributeWithResponse(ctx context.Context, nodeId string, key string, body SetNodeAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetNodeAttributeResponse, error)
+
 	// ExpireNodeWithBodyWithResponse Expire node
 	//
 	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -7790,6 +8163,28 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/global-exit-node (the `SetGlobalExitNode` operationId).
 	SetGlobalExitNodeWithResponse(ctx context.Context, nodeId string, body SetGlobalExitNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetGlobalExitNodeResponse, error)
+
+	// GetNodePostureWithResponse Get node posture
+	//
+	// Returns the attribute map the policy evaluates for the node, the identity the server collected and the custom attributes. See docs/ref/device-trust.md.
+	//
+	// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/posture (the `GetNodePosture` operationId).
+	GetNodePostureWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodePostureResponse, error)
+
+	// CollectNodePostureWithResponse Ask the node for its identity now
+	//
+	// Sends the connected node a control-to-node request for its hardware serial numbers and waits for the answer. Needs the postureIdentityOn setting; a client with posture checking off answers with an empty, disabled report.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/posture/collect (the `CollectNodePosture` operationId).
+	CollectNodePostureWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*CollectNodePostureResponse, error)
 
 	// RenameNodeWithResponse Rename node
 	//
@@ -10240,6 +10635,102 @@ func (r SetApprovedRoutesResponse) ContentType() string {
 	return ""
 }
 
+type DeleteNodeAttributeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodePosture
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteNodeAttributeResponse) GetJSON200() *NodePosture {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeleteNodeAttributeResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteNodeAttributeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteNodeAttributeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteNodeAttributeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteNodeAttributeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetNodeAttributeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodePosture
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetNodeAttributeResponse) GetJSON200() *NodePosture {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r SetNodeAttributeResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetNodeAttributeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetNodeAttributeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetNodeAttributeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetNodeAttributeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ExpireNodeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -10330,6 +10821,102 @@ func (r SetGlobalExitNodeResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r SetGlobalExitNodeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetNodePostureResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodePosture
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetNodePostureResponse) GetJSON200() *NodePosture {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetNodePostureResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetNodePostureResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNodePostureResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNodePostureResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetNodePostureResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CollectNodePostureResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodePosture
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CollectNodePostureResponse) GetJSON200() *NodePosture {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CollectNodePostureResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CollectNodePostureResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CollectNodePostureResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CollectNodePostureResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CollectNodePostureResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -12766,6 +13353,55 @@ func (c *ClientWithResponses) SetApprovedRoutesWithResponse(ctx context.Context,
 	return ParseSetApprovedRoutesResponse(rsp)
 }
 
+// DeleteNodeAttributeWithResponse Delete a custom posture attribute
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/node/{nodeId}/attributes/{key} (the `DeleteNodeAttribute` operationId).
+func (c *ClientWithResponses) DeleteNodeAttributeWithResponse(ctx context.Context, nodeId string, key string, reqEditors ...RequestEditorFn) (*DeleteNodeAttributeResponse, error) {
+	rsp, err := c.DeleteNodeAttribute(ctx, nodeId, key, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteNodeAttributeResponse(rsp)
+}
+
+// SetNodeAttributeWithBodyWithResponse Set a custom posture attribute
+//
+// Stores a custom:... attribute on the node, replacing one with the same key. The value is a string, a number or a boolean; an expiry removes it at that time, which is how a temporary grant such as an on-call marker is made.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/node/{nodeId}/attributes/{key} (the `SetNodeAttribute` operationId).
+func (c *ClientWithResponses) SetNodeAttributeWithBodyWithResponse(ctx context.Context, nodeId string, key string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetNodeAttributeResponse, error) {
+	rsp, err := c.SetNodeAttributeWithBody(ctx, nodeId, key, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetNodeAttributeResponse(rsp)
+}
+
+// SetNodeAttributeWithResponse Set a custom posture attribute
+//
+// Stores a custom:... attribute on the node, replacing one with the same key. The value is a string, a number or a boolean; an expiry removes it at that time, which is how a temporary grant such as an on-call marker is made.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/node/{nodeId}/attributes/{key} (the `SetNodeAttribute` operationId).
+func (c *ClientWithResponses) SetNodeAttributeWithResponse(ctx context.Context, nodeId string, key string, body SetNodeAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetNodeAttributeResponse, error) {
+	rsp, err := c.SetNodeAttribute(ctx, nodeId, key, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetNodeAttributeResponse(rsp)
+}
+
 // ExpireNodeWithBodyWithResponse Expire node
 //
 // Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -12828,6 +13464,40 @@ func (c *ClientWithResponses) SetGlobalExitNodeWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseSetGlobalExitNodeResponse(rsp)
+}
+
+// GetNodePostureWithResponse Get node posture
+//
+// Returns the attribute map the policy evaluates for the node, the identity the server collected and the custom attributes. See docs/ref/device-trust.md.
+//
+// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/posture (the `GetNodePosture` operationId).
+func (c *ClientWithResponses) GetNodePostureWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodePostureResponse, error) {
+	rsp, err := c.GetNodePosture(ctx, nodeId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNodePostureResponse(rsp)
+}
+
+// CollectNodePostureWithResponse Ask the node for its identity now
+//
+// Sends the connected node a control-to-node request for its hardware serial numbers and waits for the answer. Needs the postureIdentityOn setting; a client with posture checking off answers with an empty, disabled report.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/posture/collect (the `CollectNodePosture` operationId).
+func (c *ClientWithResponses) CollectNodePostureWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*CollectNodePostureResponse, error) {
+	rsp, err := c.CollectNodePosture(ctx, nodeId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCollectNodePostureResponse(rsp)
 }
 
 // RenameNodeWithResponse Rename node
@@ -14921,6 +15591,72 @@ func ParseSetApprovedRoutesResponse(rsp *http.Response) (*SetApprovedRoutesRespo
 	return response, nil
 }
 
+// ParseDeleteNodeAttributeResponse parses an HTTP response from a DeleteNodeAttributeWithResponse call
+func ParseDeleteNodeAttributeResponse(rsp *http.Response) (*DeleteNodeAttributeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteNodeAttributeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodePosture
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetNodeAttributeResponse parses an HTTP response from a SetNodeAttributeWithResponse call
+func ParseSetNodeAttributeResponse(rsp *http.Response) (*SetNodeAttributeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetNodeAttributeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodePosture
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseExpireNodeResponse parses an HTTP response from a ExpireNodeWithResponse call
 func ParseExpireNodeResponse(rsp *http.Response) (*ExpireNodeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -14970,6 +15706,72 @@ func ParseSetGlobalExitNodeResponse(rsp *http.Response) (*SetGlobalExitNodeRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest NodeOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetNodePostureResponse parses an HTTP response from a GetNodePostureWithResponse call
+func ParseGetNodePostureResponse(rsp *http.Response) (*GetNodePostureResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNodePostureResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodePosture
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCollectNodePostureResponse parses an HTTP response from a CollectNodePostureWithResponse call
+func ParseCollectNodePostureResponse(rsp *http.Response) (*CollectNodePostureResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CollectNodePostureResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodePosture
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
