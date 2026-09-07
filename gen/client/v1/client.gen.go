@@ -17,6 +17,30 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for DNSRecordType.
+const (
+	A     DNSRecordType = "A"
+	AAAA  DNSRecordType = "AAAA"
+	Empty DNSRecordType = ""
+	TXT   DNSRecordType = "TXT"
+)
+
+// Valid indicates whether the value is a known member of the DNSRecordType enum.
+func (e DNSRecordType) Valid() bool {
+	switch e {
+	case A:
+		return true
+	case AAAA:
+		return true
+	case Empty:
+		return true
+	case TXT:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for NodeRegisterMethod.
 const (
 	REGISTERMETHODAUTHKEY     NodeRegisterMethod = "REGISTER_METHOD_AUTH_KEY"
@@ -195,6 +219,53 @@ type CreateUserRequestBody struct {
 	Email       *string `json:"email,omitempty"`
 	Name        *string `json:"name,omitempty"`
 	PictureUrl  *string `json:"pictureUrl,omitempty"`
+}
+
+// DNS defines model for DNS.
+type DNS struct {
+	// BaseDomain From the config file.
+	BaseDomain string `json:"baseDomain"`
+
+	// Effective What clients receive.
+	Effective DNSSettings `json:"effective"`
+
+	// ExtraRecordsPath Set when a file owns the extra records.
+	ExtraRecordsPath string `json:"extraRecordsPath"`
+
+	// FromFile The config file's values.
+	FromFile DNSSettings `json:"fromFile"`
+
+	// MagicDns From the config file.
+	MagicDns bool `json:"magicDns"`
+
+	// Overridden Settings set through the API are in use.
+	Overridden bool `json:"overridden"`
+}
+
+// DNSRecord defines model for DNSRecord.
+type DNSRecord struct {
+	// Name Fully qualified name, without trailing dot.
+	Name string `json:"name"`
+
+	// Type A, AAAA or TXT; empty picks A or AAAA from the value.
+	Type  DNSRecordType `json:"type"`
+	Value string        `json:"value"`
+}
+
+// DNSRecordType A, AAAA or TXT; empty picks A or AAAA from the value.
+type DNSRecordType string
+
+// DNSSettings defines model for DNSSettings.
+type DNSSettings struct {
+	ExtraRecords []DNSRecord `json:"extraRecords"`
+
+	// Nameservers IP, IP:port, https or tls URL.
+	Nameservers []string `json:"nameservers"`
+
+	// OverrideLocalDns Used for every query.
+	OverrideLocalDns bool                 `json:"overrideLocalDns"`
+	SearchDomains    []string             `json:"searchDomains"`
+	SplitNameservers map[string]*[]string `json:"splitNameservers"`
 }
 
 // DebugCreateNodeRequestBody defines model for DebugCreateNodeRequestBody.
@@ -469,6 +540,15 @@ type SetApprovedRoutesRequestBody struct {
 	Routes *[]string `json:"routes,omitempty"`
 }
 
+// SetDNSRequestBody defines model for SetDNSRequestBody.
+type SetDNSRequestBody struct {
+	ExtraRecords     *[]DNSRecord          `json:"extraRecords,omitempty"`
+	Nameservers      *[]string             `json:"nameservers,omitempty"`
+	OverrideLocalDns *bool                 `json:"overrideLocalDns,omitempty"`
+	SearchDomains    *[]string             `json:"searchDomains,omitempty"`
+	SplitNameservers *map[string]*[]string `json:"splitNameservers,omitempty"`
+}
+
 // SetGlobalExitNodeRequestBody defines model for SetGlobalExitNodeRequestBody.
 type SetGlobalExitNodeRequestBody struct {
 	// Enabled false clears the mark.
@@ -624,6 +704,9 @@ type AuthRejectJSONRequestBody = AuthRejectRequestBody
 
 // DebugCreateNodeJSONRequestBody defines body for DebugCreateNode for application/json ContentType.
 type DebugCreateNodeJSONRequestBody = DebugCreateNodeRequestBody
+
+// SetDNSJSONRequestBody defines body for SetDNS for application/json ContentType.
+type SetDNSJSONRequestBody = SetDNSRequestBody
 
 // CreateGroupJSONRequestBody defines body for CreateGroup for application/json ContentType.
 type CreateGroupJSONRequestBody = GroupRequestBody
@@ -969,6 +1052,46 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/debug/node (the `DebugCreateNode` operationId).
 	DebugCreateNode(ctx context.Context, body DebugCreateNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResetDNS Reset DNS settings
+	//
+	// Drops the runtime DNS settings so the config file is in force again.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v1/dns (the `ResetDNS` operationId).
+	ResetDNS(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDNS Get DNS settings
+	//
+	// Returns the DNS configuration clients receive, the config file's values and whether settings set through the API replace them.
+	//
+	// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/dns (the `GetDNS` operationId).
+	GetDNS(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetDNSWithBody Set DNS settings
+	//
+	// Replaces the runtime DNS settings and pushes them to every client. MagicDNS and the base domain stay in the config file. While dns.extra_records_path is set that file owns the extra records.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/dns (the `SetDNS` operationId).
+	SetDNSWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetDNS Set DNS settings
+	//
+	// Replaces the runtime DNS settings and pushes them to every client. MagicDNS and the base domain stay in the config file. While dns.extra_records_path is set that file owns the extra records.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/dns (the `SetDNS` operationId).
+	SetDNS(ctx context.Context, body SetDNSJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListGroups List groups
 	//
@@ -1932,6 +2055,86 @@ func (c *Client) DebugCreateNodeWithBody(ctx context.Context, contentType string
 // Corresponds with POST /api/v1/debug/node (the `DebugCreateNode` operationId).
 func (c *Client) DebugCreateNode(ctx context.Context, body DebugCreateNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDebugCreateNodeRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResetDNS Reset DNS settings
+//
+// Drops the runtime DNS settings so the config file is in force again.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v1/dns (the `ResetDNS` operationId).
+func (c *Client) ResetDNS(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResetDNSRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetDNS Get DNS settings
+//
+// Returns the DNS configuration clients receive, the config file's values and whether settings set through the API replace them.
+//
+// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/dns (the `GetDNS` operationId).
+func (c *Client) GetDNS(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDNSRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetDNSWithBody Set DNS settings
+//
+// Replaces the runtime DNS settings and pushes them to every client. MagicDNS and the base domain stay in the config file. While dns.extra_records_path is set that file owns the extra records.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/dns (the `SetDNS` operationId).
+func (c *Client) SetDNSWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetDNSRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetDNS Set DNS settings
+//
+// Replaces the runtime DNS settings and pushes them to every client. MagicDNS and the base domain stay in the config file. While dns.extra_records_path is set that file owns the extra records.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/dns (the `SetDNS` operationId).
+func (c *Client) SetDNS(ctx context.Context, body SetDNSJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetDNSRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3723,6 +3926,100 @@ func NewDebugCreateNodeRequestWithBody(server string, contentType string, body i
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewResetDNSRequest constructs an http.Request for the ResetDNS method
+func NewResetDNSRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dns")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetDNSRequest constructs an http.Request for the GetDNS method
+func NewGetDNSRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dns")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetDNSRequest calls the generic SetDNS builder with application/json body
+func NewSetDNSRequest(server string, body SetDNSJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetDNSRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSetDNSRequestWithBody constructs an http.Request for the SetDNS method, with any body, and a specified content type
+func NewSetDNSRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dns")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -5605,6 +5902,50 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/debug/node (the `DebugCreateNode` operationId).
 	DebugCreateNodeWithResponse(ctx context.Context, body DebugCreateNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*DebugCreateNodeResponse, error)
 
+	// ResetDNSWithResponse Reset DNS settings
+	//
+	// Drops the runtime DNS settings so the config file is in force again.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/dns (the `ResetDNS` operationId).
+	ResetDNSWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ResetDNSResponse, error)
+
+	// GetDNSWithResponse Get DNS settings
+	//
+	// Returns the DNS configuration clients receive, the config file's values and whether settings set through the API replace them.
+	//
+	// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/dns (the `GetDNS` operationId).
+	GetDNSWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDNSResponse, error)
+
+	// SetDNSWithBodyWithResponse Set DNS settings
+	//
+	// Replaces the runtime DNS settings and pushes them to every client. MagicDNS and the base domain stay in the config file. While dns.extra_records_path is set that file owns the extra records.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/dns (the `SetDNS` operationId).
+	SetDNSWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetDNSResponse, error)
+
+	// SetDNSWithResponse Set DNS settings
+	//
+	// Replaces the runtime DNS settings and pushes them to every client. MagicDNS and the base domain stay in the config file. While dns.extra_records_path is set that file owns the extra records.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/dns (the `SetDNS` operationId).
+	SetDNSWithResponse(ctx context.Context, body SetDNSJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDNSResponse, error)
+
 	// ListGroupsWithResponse List groups
 	//
 	// Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none.
@@ -6949,6 +7290,150 @@ func (r DebugCreateNodeResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r DebugCreateNodeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ResetDNSResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DNS
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ResetDNSResponse) GetJSON200() *DNS {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ResetDNSResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ResetDNSResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ResetDNSResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ResetDNSResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ResetDNSResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetDNSResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DNS
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetDNSResponse) GetJSON200() *DNS {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetDNSResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetDNSResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDNSResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDNSResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetDNSResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetDNSResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DNS
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetDNSResponse) GetJSON200() *DNS {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r SetDNSResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetDNSResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetDNSResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetDNSResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetDNSResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -9171,6 +9656,74 @@ func (c *ClientWithResponses) DebugCreateNodeWithResponse(ctx context.Context, b
 	return ParseDebugCreateNodeResponse(rsp)
 }
 
+// ResetDNSWithResponse Reset DNS settings
+//
+// Drops the runtime DNS settings so the config file is in force again.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/dns (the `ResetDNS` operationId).
+func (c *ClientWithResponses) ResetDNSWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ResetDNSResponse, error) {
+	rsp, err := c.ResetDNS(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResetDNSResponse(rsp)
+}
+
+// GetDNSWithResponse Get DNS settings
+//
+// Returns the DNS configuration clients receive, the config file's values and whether settings set through the API replace them.
+//
+// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/dns (the `GetDNS` operationId).
+func (c *ClientWithResponses) GetDNSWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDNSResponse, error) {
+	rsp, err := c.GetDNS(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDNSResponse(rsp)
+}
+
+// SetDNSWithBodyWithResponse Set DNS settings
+//
+// Replaces the runtime DNS settings and pushes them to every client. MagicDNS and the base domain stay in the config file. While dns.extra_records_path is set that file owns the extra records.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/dns (the `SetDNS` operationId).
+func (c *ClientWithResponses) SetDNSWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetDNSResponse, error) {
+	rsp, err := c.SetDNSWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetDNSResponse(rsp)
+}
+
+// SetDNSWithResponse Set DNS settings
+//
+// Replaces the runtime DNS settings and pushes them to every client. MagicDNS and the base domain stay in the config file. While dns.extra_records_path is set that file owns the extra records.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/dns (the `SetDNS` operationId).
+func (c *ClientWithResponses) SetDNSWithResponse(ctx context.Context, body SetDNSJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDNSResponse, error) {
+	rsp, err := c.SetDNS(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetDNSResponse(rsp)
+}
+
 // ListGroupsWithResponse List groups
 //
 // Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none.
@@ -10587,6 +11140,105 @@ func ParseDebugCreateNodeResponse(rsp *http.Response) (*DebugCreateNodeResponse,
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest NodeOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseResetDNSResponse parses an HTTP response from a ResetDNSWithResponse call
+func ParseResetDNSResponse(rsp *http.Response) (*ResetDNSResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ResetDNSResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DNS
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDNSResponse parses an HTTP response from a GetDNSWithResponse call
+func ParseGetDNSResponse(rsp *http.Response) (*GetDNSResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDNSResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DNS
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetDNSResponse parses an HTTP response from a SetDNSWithResponse call
+func ParseSetDNSResponse(rsp *http.Response) (*SetDNSResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetDNSResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DNS
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

@@ -295,6 +295,90 @@ components:
         pictureUrl:
           type: string
       type: object
+    DNS:
+      additionalProperties: false
+      properties:
+        baseDomain:
+          description: From the config file.
+          type: string
+        effective:
+          $ref: "#/components/schemas/DNSSettings"
+          description: What clients receive.
+        extraRecordsPath:
+          description: Set when a file owns the extra records.
+          type: string
+        fromFile:
+          $ref: "#/components/schemas/DNSSettings"
+          description: The config file's values.
+        magicDns:
+          description: From the config file.
+          type: boolean
+        overridden:
+          description: Settings set through the API are in use.
+          type: boolean
+      required:
+        - magicDns
+        - baseDomain
+        - effective
+        - fromFile
+        - overridden
+        - extraRecordsPath
+      type: object
+    DNSRecord:
+      additionalProperties: false
+      properties:
+        name:
+          description: Fully qualified name, without trailing dot.
+          type: string
+        type:
+          description: A, AAAA or TXT; empty picks A or AAAA from the value.
+          enum:
+            - ""
+            - A
+            - AAAA
+            - TXT
+          type: string
+        value:
+          type: string
+      required:
+        - name
+        - type
+        - value
+      type: object
+    DNSSettings:
+      additionalProperties: false
+      properties:
+        extraRecords:
+          items:
+            $ref: "#/components/schemas/DNSRecord"
+          type: array
+        nameservers:
+          description: IP, IP:port, https or tls URL.
+          items:
+            type: string
+          type: array
+        overrideLocalDns:
+          description: Used for every query.
+          type: boolean
+        searchDomains:
+          items:
+            type: string
+          type: array
+        splitNameservers:
+          additionalProperties:
+            items:
+              type: string
+            type:
+              - array
+              - "null"
+          type: object
+      required:
+        - nameservers
+        - overrideLocalDns
+        - splitNameservers
+        - searchDomains
+        - extraRecords
+      type: object
     DebugCreateNodeRequestBody:
       additionalProperties: false
       properties:
@@ -825,6 +909,38 @@ components:
           type:
             - array
             - "null"
+      type: object
+    SetDNSRequestBody:
+      additionalProperties: false
+      properties:
+        extraRecords:
+          items:
+            $ref: "#/components/schemas/DNSRecord"
+          type:
+            - array
+            - "null"
+        nameservers:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        overrideLocalDns:
+          type: boolean
+        searchDomains:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        splitNameservers:
+          additionalProperties:
+            items:
+              type: string
+            type:
+              - array
+              - "null"
+          type: object
       type: object
     SetGlobalExitNodeRequestBody:
       additionalProperties: false
@@ -1522,6 +1638,90 @@ paths:
         - Nodes
       x-audit-action: node.debug_create
       x-required-scope: devices:core
+  /api/v1/dns:
+    delete:
+      description: |-
+        Drops the runtime DNS settings so the config file is in force again.
+
+        Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: resetDNS
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DNS"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Reset DNS settings
+      tags:
+        - DNS
+      x-audit-action: dns.reset
+      x-required-scope: dns
+    get:
+      description: |-
+        Returns the DNS configuration clients receive, the config file's values and whether settings set through the API replace them.
+
+        Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getDNS
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DNS"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get DNS settings
+      tags:
+        - DNS
+      x-required-scope: dns:read
+    put:
+      description: |-
+        Replaces the runtime DNS settings and pushes them to every client. MagicDNS and the base domain stay in the config file. While dns.extra_records_path is set that file owns the extra records.
+
+        Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: setDNS
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetDNSRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DNS"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Set DNS settings
+      tags:
+        - DNS
+      x-audit-action: dns.set
+      x-required-scope: dns
   /api/v1/group:
     get:
       description: |-
