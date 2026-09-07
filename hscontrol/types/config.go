@@ -21,6 +21,7 @@ import (
 	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/dnstype"
+	"tailscale.com/util/dnsname"
 	"tailscale.com/util/set"
 )
 
@@ -150,8 +151,18 @@ type Config struct {
 	DNSConfig DNSConfig
 
 	// TailcfgDNSConfig is the tailcfg representation of the DNS configuration,
-	// it can be used directly when sending Netmaps to clients.
+	// it can be used directly when sending Netmaps to clients. Read it
+	// through [Config.CloneTailcfgDNSConfig]: the setters below rebuild it
+	// while the server runs.
 	TailcfgDNSConfig *tailcfg.DNSConfig
+
+	// dnsOverride is the DNS settings from the settings table, nil when
+	// the config file is in force; see [Config.SetDNSOverride].
+	dnsOverride *DNSSettings
+	// dnsFileRecords holds the records read from dns.extra_records_path
+	// once the watcher has read the file.
+	dnsFileRecords    []tailcfg.DNSRecord
+	dnsFileRecordsSet bool
 
 	UnixSocket           string
 	UnixSocketPermission fs.FileMode
@@ -1521,14 +1532,15 @@ func (d *deprecator) warnNoAlias(newKey, oldKey string) {
 	}
 }
 
-// tailcfgDNSMu guards concurrent access to the mutable ExtraRecords of
-// [Config.TailcfgDNSConfig] between the extra-records file watcher (writer)
-// and the per-client map builds that clone it (readers). It is a package-level
-// lock so [Config] stays freely copyable during construction.
+// tailcfgDNSMu guards the runtime DNS state of a [Config]: the override
+// from the settings table, the records from the extra-records file and the
+// [Config.TailcfgDNSConfig] rebuilt from them, between their writers and the
+// per-client map builds that clone the result. It is a package-level lock so
+// [Config] stays freely copyable during construction.
 var tailcfgDNSMu sync.RWMutex
 
 // CloneTailcfgDNSConfig returns a deep copy of [Config.TailcfgDNSConfig], or
-// nil if none is set. Safe for concurrent use with [Config.SetExtraRecords].
+// nil if none is set. Safe for concurrent use with the DNS setters.
 func (c *Config) CloneTailcfgDNSConfig() *tailcfg.DNSConfig {
 	tailcfgDNSMu.RLock()
 	defer tailcfgDNSMu.RUnlock()
@@ -1540,13 +1552,126 @@ func (c *Config) CloneTailcfgDNSConfig() *tailcfg.DNSConfig {
 	return c.TailcfgDNSConfig.Clone()
 }
 
-// SetExtraRecords replaces the ExtraRecords of [Config.TailcfgDNSConfig]. Safe
-// for concurrent use with [Config.CloneTailcfgDNSConfig].
+// SetExtraRecords replaces the extra records read from
+// dns.extra_records_path and rebuilds [Config.TailcfgDNSConfig]. Safe for
+// concurrent use with [Config.CloneTailcfgDNSConfig].
 func (c *Config) SetExtraRecords(records []tailcfg.DNSRecord) {
 	tailcfgDNSMu.Lock()
 	defer tailcfgDNSMu.Unlock()
 
-	if c.TailcfgDNSConfig != nil {
-		c.TailcfgDNSConfig.ExtraRecords = records
+	c.dnsFileRecords = records
+	c.dnsFileRecordsSet = true
+
+	c.rebuildTailcfgDNSLocked()
+}
+
+// SetDNSOverride replaces the DNS settings the tailnet runs with; nil
+// returns to the config file. It rebuilds [Config.TailcfgDNSConfig].
+func (c *Config) SetDNSOverride(settings *DNSSettings) {
+	tailcfgDNSMu.Lock()
+	defer tailcfgDNSMu.Unlock()
+
+	if settings == nil {
+		c.dnsOverride = nil
+	} else {
+		s := settings.Clone()
+		c.dnsOverride = &s
+	}
+
+	c.rebuildTailcfgDNSLocked()
+}
+
+// DNSOverride returns a copy of the override set with [Config.SetDNSOverride],
+// or nil when the config file is in force.
+func (c *Config) DNSOverride() *DNSSettings {
+	tailcfgDNSMu.RLock()
+	defer tailcfgDNSMu.RUnlock()
+
+	if c.dnsOverride == nil {
+		return nil
+	}
+
+	s := c.dnsOverride.Clone()
+
+	return &s
+}
+
+// EffectiveDNS returns the DNS configuration the tailnet runs with: the
+// file's values with the override and the extra-records file applied.
+func (c *Config) EffectiveDNS() DNSConfig {
+	tailcfgDNSMu.RLock()
+	defer tailcfgDNSMu.RUnlock()
+
+	return c.effectiveDNSLocked()
+}
+
+// RebuildTailcfgDNS recomputes [Config.TailcfgDNSConfig] from the file, the
+// override and the extra-records file, including the MagicDNS reverse
+// zones for the tailnet's prefixes.
+func (c *Config) RebuildTailcfgDNS() {
+	tailcfgDNSMu.Lock()
+	defer tailcfgDNSMu.Unlock()
+
+	c.rebuildTailcfgDNSLocked()
+}
+
+func (c *Config) effectiveDNSLocked() DNSConfig {
+	d := c.DNSConfig
+	if c.dnsOverride != nil {
+		d = c.dnsOverride.apply(d)
+	}
+
+	if c.dnsFileRecordsSet {
+		d.ExtraRecords = c.dnsFileRecords
+	}
+
+	return d
+}
+
+func (c *Config) rebuildTailcfgDNSLocked() {
+	if c.TailcfgDNSConfig == nil {
+		return
+	}
+
+	cfg := dnsToTailcfgDNS(c.effectiveDNSLocked())
+	c.addMagicDNSRoutes(cfg)
+	c.TailcfgDNSConfig = cfg
+}
+
+// addMagicDNSRoutes maps the IPv4/IPv6 reverse zones of the tailnet's
+// prefixes to an empty (non-nil) resolver slice so the client resolves
+// them itself. It is a no-op unless MagicDNS is on.
+func (c *Config) addMagicDNSRoutes(cfg *tailcfg.DNSConfig) {
+	if !cfg.Proxied {
+		return
+	}
+
+	var magicDNSDomains []dnsname.FQDN
+	if c.PrefixV4 != nil {
+		magicDNSDomains = append(magicDNSDomains, util.GenerateIPv4DNSRootDomain(*c.PrefixV4)...)
+	}
+
+	if c.PrefixV6 != nil {
+		magicDNSDomains = append(magicDNSDomains, util.GenerateIPv6DNSRootDomain(*c.PrefixV6)...)
+	}
+
+	if cfg.Routes == nil {
+		cfg.Routes = make(map[string][]*dnstype.Resolver)
+	}
+
+	for _, d := range magicDNSDomains {
+		// Empty non-nil slice rather than nil: tailcfg.DNSConfig.Clone
+		// and dns.Config.Clone in tailscale drop map entries whose
+		// value is nil (see tailscale.com/tailcfg/tailcfg_clone.go and
+		// tailscale.com/net/dns/dns_clone.go: `if sv == nil { continue }`).
+		// Sending nil here caused the client's wgengine LinkChange:major
+		// handler to clobber /etc/resolv.conf on every tunnel-IP rebind:
+		// the handler reapplies a Clone of lastDNSConfig and the magic
+		// DNS routes vanish, taking the resolver with them for ~6 min
+		// until the next route-changing netmap. Empty slice survives
+		// Clone and carries the same "resolve locally" semantics
+		// (tailscale.com/ipn/ipnlocal/node_backend.go:869 documents the
+		// empty-resolver Routes form for Issue 2706).
+		cfg.Routes[d.WithoutTrailingDot()] = []*dnstype.Resolver{}
 	}
 }

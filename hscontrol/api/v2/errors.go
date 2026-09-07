@@ -6,6 +6,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/state"
+	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 // apiError is the Tailscale API error body. The official Tailscale Go client
@@ -75,7 +76,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, state.ErrGivenNameTaken),
 		errors.Is(err, state.ErrNodeNameNotUnique),
 		errors.Is(err, state.ErrRequestedTagsInvalidOrNotPermitted),
-		errors.Is(err, state.ErrUnknownSetting):
+		errors.Is(err, state.ErrUnknownSetting),
+		errors.Is(err, types.ErrDNSSettingsInvalid):
 		return huma.Error400BadRequest(msg, err)
 
 	default:

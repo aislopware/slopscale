@@ -48,6 +48,11 @@ const (
 	Users     Scope = "users"
 	UsersRead Scope = "users:read"
 
+	// DNS gates the tailnet's DNS settings: nameservers, split DNS,
+	// search domains and extra records.
+	DNS     Scope = "dns"
+	DNSRead Scope = "dns:read"
+
 	// LogsConfigurationRead gates the audit log, which Tailscale calls the
 	// configuration log. There is no write scope: the log is append-only
 	// and written by the server.
@@ -68,6 +73,7 @@ func Known() []Scope {
 		PolicyFile, PolicyFileRead,
 		FeatureSettings, FeatureSettingsRead,
 		Users, UsersRead,
+		DNS, DNSRead,
 		LogsConfigurationRead,
 	}
 }
@@ -136,7 +142,7 @@ func RequiresTags(scopes []Scope) bool {
 // user (an API key with an owner, an OAuth client created by one) can never
 // do more than this, whatever scopes it was minted with. The table follows
 // Tailscale's role matrix: owner and admin do everything; a network admin
-// manages the policy and routes and reads the rest; an IT admin manages
+// manages the policy, routes and DNS and reads the rest; an IT admin manages
 // users, devices and keys and reads the policy; both read the audit log;
 // an auditor reads everything; a member has no admin access.
 func ForRole(role types.Role) []Scope {
@@ -145,14 +151,14 @@ func ForRole(role types.Role) []Scope {
 		return []Scope{All}
 	case types.RoleNetworkAdmin:
 		return []Scope{
-			PolicyFile, DevicesRoutes,
+			PolicyFile, DevicesRoutes, DNS,
 			UsersRead, DevicesCoreRead, AuthKeysRead, OAuthKeysRead, FeatureSettingsRead,
 			LogsConfigurationRead,
 		}
 	case types.RoleITAdmin:
 		return []Scope{
 			Users, DevicesCore, AuthKeys, OAuthKeys, FeatureSettings,
-			PolicyFileRead, DevicesRoutesRead,
+			PolicyFileRead, DevicesRoutesRead, DNSRead,
 			LogsConfigurationRead,
 		}
 	case types.RoleAuditor:

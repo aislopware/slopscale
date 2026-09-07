@@ -54,7 +54,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrRuleNoDestinations),
 		errors.Is(err, types.ErrRulePortsWithout),
 		errors.Is(err, types.ErrRulePortsInvalid),
-		errors.Is(err, types.ErrInvalidAccessProtocol):
+		errors.Is(err, types.ErrInvalidAccessProtocol),
+		errors.Is(err, types.ErrDNSSettingsInvalid):
 		return huma.Error400BadRequest(msg, err)
 
 	case errors.Is(err, state.ErrNodeKeyInUse),

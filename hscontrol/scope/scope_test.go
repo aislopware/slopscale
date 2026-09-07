@@ -227,8 +227,8 @@ func TestKnownIsComplete(t *testing.T) {
 		seen[s] = true
 	}
 
-	// 7 resources × 2 (write+read) + 2 super-scopes + the read-only audit log = 17.
-	if len(known) != 17 {
-		t.Errorf("Known() has %d scopes, want 17", len(known))
+	// 8 resources × 2 (write+read) + 2 super-scopes + the read-only audit log = 19.
+	if len(known) != 19 {
+		t.Errorf("Known() has %d scopes, want 19", len(known))
 	}
 }

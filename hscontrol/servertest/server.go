@@ -51,6 +51,7 @@ type serverConfig struct {
 	realListener     bool
 	nodeStoreBatch   time.Duration
 	oidc             *types.OIDCConfig
+	dns              *types.DNSConfig
 }
 
 func defaultServerConfig() *serverConfig {
@@ -121,6 +122,12 @@ func WithOIDC(cfg types.OIDCConfig) ServerOption {
 	return func(c *serverConfig) { c.oidc = &cfg }
 }
 
+// WithDNS gives the server a dns section, as the config file would.
+// Without it the server sends clients no DNS configuration at all.
+func WithDNS(cfg types.DNSConfig) ServerOption {
+	return func(c *serverConfig) { c.dns = &cfg }
+}
+
 // NewServer creates and starts a Headscale test server.
 // The server is fully functional and accepts real Tailscale control
 // protocol connections over Noise.
@@ -171,6 +178,13 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 	if sc.oidc != nil {
 		cfg.OIDC = *sc.oidc
 		cfg.OIDC.OnlyStartIfOIDCIsAvailable = true
+	}
+
+	if sc.dns != nil {
+		cfg.DNSConfig = *sc.dns
+		// NewHeadscale rebuilds the tailcfg form from DNSConfig, the
+		// stored override and the MagicDNS zones; nil would mean "no DNS".
+		cfg.TailcfgDNSConfig = &tailcfg.DNSConfig{}
 	}
 
 	app, err := hscontrol.NewHeadscale(&cfg)

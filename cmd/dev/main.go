@@ -85,6 +85,12 @@ dns:
   magic_dns: true
   base_domain: headscale.dev
   override_local_dns: false
+  nameservers:
+    global:
+      - 1.1.1.1
+      - 1.0.0.1
+  search_domains:
+    - corp.headscale.dev
 
 log:
   level: debug

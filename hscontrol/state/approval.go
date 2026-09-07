@@ -44,6 +44,8 @@ func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error)
 		settings.DevicesApprovalOn = on
 	case types.SettingUsersApprovalOn:
 		settings.UsersApprovalOn = on
+	case types.SettingDNS:
+		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see SetDNS", ErrUnknownSetting, key)
 	default:
 		return change.Change{}, fmt.Errorf("%w: %q", ErrUnknownSetting, key)
 	}
@@ -64,6 +66,8 @@ func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error)
 		return s.approvePendingNodes()
 	case types.SettingUsersApprovalOn:
 		return s.approvePendingUsers()
+	case types.SettingDNS:
+		return change.Change{}, nil
 	default:
 		return change.Change{}, nil
 	}

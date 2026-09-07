@@ -1,6 +1,7 @@
 package db
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -35,20 +36,86 @@ func (hsdb *HSDatabase) LoadSettings() (types.Settings, error) {
 	var settings types.Settings
 
 	for _, r := range records {
+		var target *bool
+
+		switch types.SettingKey(r.Setting.Key) {
+		case types.SettingDevicesApprovalOn:
+			target = &settings.DevicesApprovalOn
+		case types.SettingUsersApprovalOn:
+			target = &settings.UsersApprovalOn
+		case types.SettingDNS:
+			// Holds JSON and is read by LoadDNSSettings.
+			continue
+		default:
+			continue
+		}
+
 		on, err := strconv.ParseBool(r.Setting.Value)
 		if err != nil {
 			return types.Settings{}, fmt.Errorf("%w: %q holds %q", ErrSettingNotBoolean, r.Setting.Key, r.Setting.Value)
 		}
 
-		switch types.SettingKey(r.Setting.Key) {
-		case types.SettingDevicesApprovalOn:
-			settings.DevicesApprovalOn = on
-		case types.SettingUsersApprovalOn:
-			settings.UsersApprovalOn = on
-		}
+		*target = on
 	}
 
 	return settings, nil
+}
+
+// LoadDNSSettings reads the DNS override. It returns nil without error when
+// no override is stored and the config file is in force.
+func (hsdb *HSDatabase) LoadDNSSettings() (*types.DNSSettings, error) {
+	var records []settingRecord
+
+	err := hsdb.ex.query(
+		jet.SELECT(table.Settings.AllColumns).
+			FROM(table.Settings).
+			WHERE(table.Settings.Key.EQ(jet.String(string(types.SettingDNS)))),
+		&records,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("loading dns settings: %w", err)
+	}
+
+	if len(records) == 0 {
+		return nil, nil //nolint:nilnil // no row means no override, which is not an error
+	}
+
+	var settings types.DNSSettings
+
+	err = json.Unmarshal([]byte(records[0].Setting.Value), &settings)
+	if err != nil {
+		return nil, fmt.Errorf("decoding dns settings: %w", err)
+	}
+
+	return &settings, nil
+}
+
+// SaveDNSSettings writes the DNS override as JSON, inserting its row on
+// first use.
+func (hsdb *HSDatabase) SaveDNSSettings(settings types.DNSSettings) error {
+	value, err := json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("encoding dns settings: %w", err)
+	}
+
+	return hsdb.Write(func(tx *Tx) error {
+		return saveSettingValue(tx, types.SettingDNS, string(value))
+	})
+}
+
+// DeleteDNSSettings removes the DNS override so the config file is in
+// force again. Deleting a missing row is not an error.
+func (hsdb *HSDatabase) DeleteDNSSettings() error {
+	return hsdb.Write(func(tx *Tx) error {
+		_, err := tx.executor().exec(
+			table.Settings.DELETE().WHERE(table.Settings.Key.EQ(jet.String(string(types.SettingDNS)))),
+		)
+		if err != nil {
+			return fmt.Errorf("deleting dns settings: %w", err)
+		}
+
+		return nil
+	})
 }
 
 // SaveSetting writes one tailnet-wide switch, inserting its row on first use.
@@ -60,7 +127,11 @@ func (hsdb *HSDatabase) SaveSetting(key types.SettingKey, on bool) error {
 
 // SaveSetting writes one tailnet-wide switch, inserting its row on first use.
 func SaveSetting(q Querier, key types.SettingKey, on bool) error {
-	row := settingRow{Key: string(key), Value: strconv.FormatBool(on), UpdatedAt: time.Now().UTC()}
+	return saveSettingValue(q, key, strconv.FormatBool(on))
+}
+
+func saveSettingValue(q Querier, key types.SettingKey, value string) error {
+	row := settingRow{Key: string(key), Value: value, UpdatedAt: time.Now().UTC()}
 
 	updated, err := q.executor().exec(
 		table.Settings.UPDATE(table.Settings.Value, table.Settings.UpdatedAt).

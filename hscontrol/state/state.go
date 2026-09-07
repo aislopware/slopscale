@@ -259,6 +259,11 @@ func NewState(cfg *types.Config) (*State, error) {
 
 	s.settings.Store(&settings)
 
+	err = s.loadDNS()
+	if err != nil {
+		return nil, err
+	}
+
 	_, err = s.loadAccessModel()
 	if err != nil {
 		return nil, err
