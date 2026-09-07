@@ -43,6 +43,17 @@ func (hsdb *HSDatabase) LoadSettings() (types.Settings, error) {
 			target = &settings.DevicesApprovalOn
 		case types.SettingUsersApprovalOn:
 			target = &settings.UsersApprovalOn
+		case types.SettingKeyExpiry:
+			d, err := time.ParseDuration(r.Setting.Value)
+			if err != nil {
+				return types.Settings{}, fmt.Errorf(
+					"%w: %q holds %q", ErrSettingNotDuration, r.Setting.Key, r.Setting.Value,
+				)
+			}
+
+			settings.KeyExpiry = d
+
+			continue
 		case types.SettingDNS:
 			// Holds JSON and is read by LoadDNSSettings.
 			continue
@@ -130,6 +141,13 @@ func SaveSetting(q Querier, key types.SettingKey, on bool) error {
 	return saveSettingValue(q, key, strconv.FormatBool(on))
 }
 
+// SaveKeyExpiry writes the key expiry cap, inserting its row on first use.
+func (hsdb *HSDatabase) SaveKeyExpiry(d time.Duration) error {
+	return hsdb.Write(func(tx *Tx) error {
+		return saveSettingValue(tx, types.SettingKeyExpiry, d.String())
+	})
+}
+
 func saveSettingValue(q Querier, key types.SettingKey, value string) error {
 	row := settingRow{Key: string(key), Value: value, UpdatedAt: time.Now().UTC()}
 
@@ -160,4 +178,7 @@ var (
 	// ErrSettingNotBoolean is returned when a settings row holds something
 	// other than true or false.
 	ErrSettingNotBoolean = errors.New("setting is not a boolean")
+	// ErrSettingNotDuration is returned when the key expiry row holds
+	// something time.ParseDuration cannot read.
+	ErrSettingNotDuration = errors.New("setting is not a duration")
 )

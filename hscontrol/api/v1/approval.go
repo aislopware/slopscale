@@ -3,6 +3,7 @@ package apiv1
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/audit"
@@ -24,6 +25,12 @@ type SetApprovalRequestBody struct {
 type Settings struct {
 	DevicesApprovalOn bool `doc:"New nodes wait for an administrator unless they register with a preauthorized key." json:"devicesApprovalOn"` //nolint:lll // struct tag
 	UsersApprovalOn   bool `doc:"Users created by OIDC login wait for an administrator before registering nodes."    json:"usersApprovalOn"`   //nolint:lll // struct tag
+	// KeyExpiryDays caps how long a node key stays valid after a login;
+	// 0 leaves the config file's node.expiry and the client in charge.
+	KeyExpiryDays int `json:"keyExpiryDays"`
+	// DefaultKeyExpiryDays is the config file's node.expiry, applied when
+	// a client asks for nothing and no cap is set; 0 means never.
+	DefaultKeyExpiryDays int `json:"defaultKeyExpiryDays"`
 }
 
 // UpdateSettingsRequestBody carries the switches to change; absent ones
@@ -31,6 +38,8 @@ type Settings struct {
 type UpdateSettingsRequestBody struct {
 	DevicesApprovalOn *bool `json:"devicesApprovalOn,omitempty"`
 	UsersApprovalOn   *bool `json:"usersApprovalOn,omitempty"`
+	// KeyExpiryDays 0 switches the cap off.
+	KeyExpiryDays *int `json:"keyExpiryDays,omitempty" maximum:"365" minimum:"0"`
 }
 
 type (
@@ -57,8 +66,20 @@ func (b *SetApprovalRequestBody) approved() bool {
 	return b == nil || b.Approved == nil || *b.Approved
 }
 
-func settingsFrom(s types.Settings) Settings {
-	return Settings{DevicesApprovalOn: s.DevicesApprovalOn, UsersApprovalOn: s.UsersApprovalOn}
+const day = 24 * time.Hour
+
+func settingsFrom(s types.Settings, cfg *types.Config) Settings {
+	out := Settings{
+		DevicesApprovalOn: s.DevicesApprovalOn,
+		UsersApprovalOn:   s.UsersApprovalOn,
+		KeyExpiryDays:     int(s.KeyExpiry / day),
+	}
+
+	if cfg != nil {
+		out.DefaultKeyExpiryDays = int(cfg.Node.Expiry / day)
+	}
+
+	return out
 }
 
 func registerApproval(api huma.API, b Backend) {
@@ -141,7 +162,7 @@ func registerApproval(api huma.API, b Backend) {
 		Tags:        []string{"Settings"},
 		Security:    bearerAuth,
 	}, scope.FeatureSettingsRead), func(_ context.Context, _ *struct{}) (*settingsOutput, error) {
-		return &settingsOutput{Body: settingsFrom(b.State.Settings())}, nil
+		return &settingsOutput{Body: settingsFrom(b.State.Settings(), b.Cfg)}, nil
 	})
 
 	huma.Register(api, audited(withScope(huma.Operation{
@@ -179,6 +200,15 @@ func registerApproval(api huma.API, b Backend) {
 			b.Change(c)
 		}
 
-		return &settingsOutput{Body: settingsFrom(b.State.Settings())}, nil
+		if in.Body.KeyExpiryDays != nil {
+			err := b.State.SetKeyExpiry(time.Duration(*in.Body.KeyExpiryDays) * day)
+			if err != nil {
+				return nil, mapError("updating settings", err)
+			}
+
+			audit.Detail(ctx, string(types.SettingKeyExpiry), *in.Body.KeyExpiryDays)
+		}
+
+		return &settingsOutput{Body: settingsFrom(b.State.Settings(), b.Cfg)}, nil
 	})
 }

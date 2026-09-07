@@ -2067,15 +2067,12 @@ func (s *State) HandleNodeFromPreAuthKey(
 			// clear the expiry so the database holds NULL instead of
 			// a pointer to zero time.
 			if !node.IsTagged() {
-				switch {
-				case !regReq.Expiry.IsZero():
+				node.Expiry = nil
+				if !regReq.Expiry.IsZero() {
 					node.Expiry = &regReq.Expiry
-				case s.cfg.Node.Expiry > 0:
-					exp := time.Now().Add(s.cfg.Node.Expiry)
-					node.Expiry = &exp
-				default:
-					node.Expiry = nil
 				}
+
+				s.applyDefaultNodeExpiry(node)
 			} else if node.IsExpired() {
 				// #3371: a tagged node must never carry key expiry. Clear a
 				// stale PAST expiry left by a logout (older headscale) so
@@ -3181,16 +3178,27 @@ func (s *State) applyReauthExpiry(
 	s.applyDefaultNodeExpiry(node)
 }
 
-// applyDefaultNodeExpiry sets node.Expiry to now+configured default when the
-// node is not tagged and has no expiry of its own (e.g., CLI registration or
-// re-auth where the client did not request a specific expiry). Tagged nodes
-// are exempt — they never expire.
+// applyDefaultNodeExpiry gives a node without an expiry of its own (CLI
+// registration, or a re-auth where the client asked for none) the
+// tailnet's key expiry, and shortens a longer request to the runtime
+// cap when one is set. The config file's node.expiry is only a default,
+// so a client's own request wins over it. Tagged nodes never expire.
 func (s *State) applyDefaultNodeExpiry(node *types.Node) {
-	needsDefaultExpiry := !node.IsTagged() &&
-		(node.Expiry == nil || node.Expiry.IsZero()) &&
-		s.cfg.Node.Expiry > 0
-	if needsDefaultExpiry {
-		exp := time.Now().Add(s.cfg.Node.Expiry)
+	if node.IsTagged() {
+		return
+	}
+
+	capped := s.Settings().KeyExpiry
+	limit := cmp.Or(capped, s.cfg.Node.Expiry)
+
+	if limit <= 0 {
+		return
+	}
+
+	exp := time.Now().Add(limit)
+	unset := node.Expiry == nil || node.Expiry.IsZero()
+
+	if unset || (capped > 0 && node.Expiry.After(exp)) {
 		node.Expiry = &exp
 	}
 }

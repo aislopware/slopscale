@@ -32,6 +32,27 @@ func (s *State) Settings() types.Settings {
 	return types.Settings{}
 }
 
+// SetKeyExpiry writes the key expiry cap. It applies to the next login of
+// every node and touches nothing that is already registered, so no
+// change goes out.
+func (s *State) SetKeyExpiry(d time.Duration) error {
+	err := types.ValidateKeyExpiry(d)
+	if err != nil {
+		return err
+	}
+
+	err = s.db.SaveKeyExpiry(d)
+	if err != nil {
+		return err
+	}
+
+	settings := s.Settings()
+	settings.KeyExpiry = d
+	s.settings.Store(&settings)
+
+	return nil
+}
+
 // SetSetting writes one tailnet-wide switch. Switching an approval off
 // admits everything that was waiting, so nothing stays stuck behind a
 // requirement that no longer exists; the returned change carries that
@@ -46,6 +67,8 @@ func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error)
 		settings.UsersApprovalOn = on
 	case types.SettingDNS:
 		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see SetDNS", ErrUnknownSetting, key)
+	case types.SettingKeyExpiry:
+		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see SetKeyExpiry", ErrUnknownSetting, key)
 	default:
 		return change.Change{}, fmt.Errorf("%w: %q", ErrUnknownSetting, key)
 	}
@@ -66,7 +89,7 @@ func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error)
 		return s.approvePendingNodes()
 	case types.SettingUsersApprovalOn:
 		return s.approvePendingUsers()
-	case types.SettingDNS:
+	case types.SettingDNS, types.SettingKeyExpiry:
 		return change.Change{}, nil
 	default:
 		return change.Change{}, nil

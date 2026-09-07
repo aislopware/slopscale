@@ -1,6 +1,7 @@
 package apiv2
 
 import (
+	"cmp"
 	"context"
 	"net/http"
 	"time"
@@ -58,19 +59,21 @@ type (
 // that was waiting. The other Tailscale settings are file-based here and
 // are rejected.
 type UpdateTailnetSettings struct {
-	DevicesApprovalOn *bool `json:"devicesApprovalOn,omitempty"`
-	UsersApprovalOn   *bool `json:"usersApprovalOn,omitempty"`
+	DevicesApprovalOn      *bool `json:"devicesApprovalOn,omitempty"`
+	DevicesKeyDurationDays *int  `doc:"0 leaves the config file and the client in charge." json:"devicesKeyDurationDays,omitempty" maximum:"365" minimum:"0"` //nolint:lll // struct tag
+	UsersApprovalOn        *bool `json:"usersApprovalOn,omitempty"`
 }
 
 func tailnetSettings(b Backend) TailnetSettings {
 	cfg := b.Cfg
 	current := b.State.Settings()
+	keyDuration := cmp.Or(current.KeyExpiry, cfg.Node.Expiry)
 
 	return TailnetSettings{
 		// File-mode policy is genuinely externally managed (read-only via API).
 		ACLsExternallyManagedOn:                cfg.Policy.Mode == types.PolicyModeFile,
 		DevicesApprovalOn:                      current.DevicesApprovalOn,
-		DevicesKeyDurationDays:                 int(cfg.Node.Expiry / (hoursPerDay * time.Hour)),
+		DevicesKeyDurationDays:                 int(keyDuration / (hoursPerDay * time.Hour)),
 		HTTPSEnabled:                           cfg.TLS.CertPath != "" || cfg.TLS.LetsEncrypt.Hostname != "",
 		UsersApprovalOn:                        current.UsersApprovalOn,
 		UsersRoleAllowedToJoinExternalTailnets: "none",
@@ -102,8 +105,8 @@ func registerSettings(api huma.API, b Backend) {
 		Method:      http.MethodPatch,
 		Path:        "/api/v2/tailnet/{tailnet}/settings",
 		Summary:     "Update tailnet settings",
-		Description: "Changes devicesApprovalOn and usersApprovalOn; the other settings are " +
-			"file-based in Headscale and cannot be changed here.",
+		Description: "Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the " +
+			"other settings are file-based in Headscale and cannot be changed here.",
 		Tags:     settingsTags,
 		Security: security,
 		Errors:   []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
@@ -136,6 +139,15 @@ func registerSettings(api huma.API, b Backend) {
 			audit.Detail(ctx, string(u.key), *u.value)
 
 			b.Change(c)
+		}
+
+		if days := in.Body.DevicesKeyDurationDays; days != nil {
+			err := b.State.SetKeyExpiry(time.Duration(*days) * hoursPerDay * time.Hour)
+			if err != nil {
+				return nil, mapError("updating tailnet settings", err)
+			}
+
+			audit.Detail(ctx, string(types.SettingKeyExpiry), *days)
 		}
 
 		return &settingsOutput{Body: tailnetSettings(b)}, nil

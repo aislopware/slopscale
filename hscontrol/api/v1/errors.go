@@ -61,7 +61,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrNetworkNameTooLong),
 		errors.Is(err, types.ErrNetworkNoPrefixes),
 		errors.Is(err, types.ErrNetworkNoGroups),
-		errors.Is(err, types.ErrNetworkPrefixInvalid):
+		errors.Is(err, types.ErrNetworkPrefixInvalid),
+		errors.Is(err, types.ErrKeyExpiryOutOfRange):
 		return huma.Error400BadRequest(msg, err)
 
 	case errors.Is(err, state.ErrNodeKeyInUse),

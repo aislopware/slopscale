@@ -77,7 +77,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, state.ErrNodeNameNotUnique),
 		errors.Is(err, state.ErrRequestedTagsInvalidOrNotPermitted),
 		errors.Is(err, state.ErrUnknownSetting),
-		errors.Is(err, types.ErrDNSSettingsInvalid):
+		errors.Is(err, types.ErrDNSSettingsInvalid),
+		errors.Is(err, types.ErrKeyExpiryOutOfRange):
 		return huma.Error400BadRequest(msg, err)
 
 	default:
