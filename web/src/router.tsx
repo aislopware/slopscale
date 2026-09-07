@@ -1,7 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 
-import { session } from "~/auth/session.ts";
+import { onSignOut } from "~/auth/session.ts";
 import { routeTree } from "~/routeTree.gen.ts";
 
 const staleTime = 15_000;
@@ -29,8 +29,8 @@ export const router = createRouter({
   scrollRestoration: true,
 });
 
-// Signing in or out (or a 401 clearing the key) re-runs the guards.
-session.subscribe(() => {
+// Signing out drops everything the session could see and re-runs the guards.
+onSignOut(() => {
   queryClient.clear();
   void router.invalidate();
 });

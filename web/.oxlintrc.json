@@ -93,7 +93,7 @@
   },
   "overrides": [
     {
-      "files": ["vite.config.ts", "vitest.config.ts"],
+      "files": ["vite.config.ts", "vitest.config.ts", "playwright.config.ts"],
       "env": { "node": true },
       "rules": {
         "import/no-default-export": "off",
@@ -104,6 +104,11 @@
     {
       "files": ["src/routes/**/*.tsx"],
       "rules": { "typescript/only-throw-error": "off" }
+    },
+    {
+      "files": ["e2e/**/*.ts"],
+      "env": { "node": true },
+      "rules": { "max-lines-per-function": "off", "max-statements": "off" }
     },
     {
       "files": ["**/*.test.ts", "**/*.test.tsx"],

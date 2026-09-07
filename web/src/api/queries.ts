@@ -1,9 +1,14 @@
-import { queryOptions } from "@tanstack/react-query";
-import type { QueryClient } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions } from "@tanstack/react-query";
+import type {
+  InfiniteData,
+  QueryClient,
+  UnusedSkipTokenInfiniteOptions,
+} from "@tanstack/react-query";
 import type { MethodResponse } from "openapi-react-query";
 
 import { api, fetchClient } from "~/api/client.ts";
 import { ApiError } from "~/api/error.ts";
+import { hoursAgo } from "~/lib/time.ts";
 
 export type Node = MethodResponse<typeof api, "get", "/api/v1/node">["nodes"][number];
 export type User = MethodResponse<typeof api, "get", "/api/v1/user">["users"][number];
@@ -15,6 +20,8 @@ export type PreAuthKey = MethodResponse<
 export type ApiKey = MethodResponse<typeof api, "get", "/api/v1/apikey">["apiKeys"][number];
 export type Settings = MethodResponse<typeof api, "get", "/api/v1/settings">;
 export type Policy = MethodResponse<typeof api, "get", "/api/v1/policy">;
+export type AuditPage = MethodResponse<typeof api, "get", "/api/v1/audit">;
+export type AuditEvent = AuditPage["events"][number];
 
 export const nodesQuery = api.queryOptions("get", "/api/v1/node");
 export const usersQuery = api.queryOptions("get", "/api/v1/user");
@@ -41,6 +48,70 @@ export const policyQuery = queryOptions({
     }
   },
 });
+
+/** The time ranges the audit page offers; the preset, not an instant, keys the query. */
+export const auditRanges = ["1h", "24h", "7d", "30d", "all"] as const;
+
+export type AuditRange = (typeof auditRanges)[number];
+
+/** How far back each preset reaches, in hours; "all" sends no lower bound. */
+const rangeHours: Record<Exclude<AuditRange, "all">, number> = {
+  "1h": 1,
+  "24h": 24,
+  "7d": 168,
+  "30d": 720,
+};
+
+export interface AuditFilters {
+  /** One action (`node.delete`) or a prefix ending in a dot (`node.`); "" for every action. */
+  readonly action: string;
+  /** Keep events by this user id; "" for every actor. */
+  readonly actorUserId: string;
+  readonly range: AuditRange;
+}
+
+/** Page size: the server allows up to 500, and a screenful of audit rows is far less. */
+export const auditPageSize = 100;
+
+const emptyAuditPage: AuditPage = { events: [], nextBefore: "" };
+
+type AuditQueryKey = readonly ["get", "/api/v1/audit", AuditFilters];
+
+/**
+ * One page of audit events per fetch, newest first, paged with `before` (the last id of the page
+ * before). The filters key the query, so changing one starts its own list; the range is resolved to
+ * a timestamp only when the request goes out.
+ */
+export function auditQuery(
+  filters: AuditFilters,
+): UnusedSkipTokenInfiniteOptions<
+  AuditPage,
+  Error,
+  InfiniteData<AuditPage>,
+  AuditQueryKey,
+  string
+> {
+  return infiniteQueryOptions({
+    queryKey: ["get", "/api/v1/audit", filters] as const,
+    queryFn: async ({ pageParam }): Promise<AuditPage> => {
+      const { data } = await fetchClient.GET("/api/v1/audit", {
+        params: {
+          query: {
+            limit: auditPageSize,
+            ...(filters.action === "" ? {} : { action: filters.action }),
+            ...(filters.actorUserId === "" ? {} : { actorUserId: filters.actorUserId }),
+            ...(filters.range === "all" ? {} : { since: hoursAgo(rangeHours[filters.range]) }),
+            ...(pageParam === "" ? {} : { before: pageParam }),
+          },
+        },
+      });
+
+      return data ?? emptyAuditPage;
+    },
+    initialPageParam: "",
+    getNextPageParam: (page) => (page.nextBefore === "" ? undefined : page.nextBefore),
+  });
+}
 
 type Collection =
   | "/api/v1/node"

@@ -5,6 +5,7 @@ import { Text } from "@cloudflare/kumo/components/text";
 import { cn } from "@cloudflare/kumo/utils";
 import type { Icon } from "@phosphor-icons/react";
 import {
+  ClockCounterClockwiseIcon,
   DesktopIcon,
   GearSixIcon,
   KeyIcon,
@@ -20,11 +21,11 @@ import type { ReactElement, ReactNode } from "react";
 import { api } from "~/api/client.ts";
 import type { Me, Scope } from "~/auth/me.ts";
 import { can, displayName, roleLabel } from "~/auth/me.ts";
-import { session } from "~/auth/session.ts";
+import { signOut } from "~/auth/session.ts";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
 
 interface NavItem {
-  readonly to: "/" | "/machines" | "/users" | "/keys" | "/policy" | "/settings";
+  readonly to: "/" | "/machines" | "/users" | "/keys" | "/policy" | "/settings" | "/audit";
   readonly label: string;
   readonly icon: Icon;
   /** Hidden without this scope; members without any scope still get their machines. */
@@ -39,6 +40,12 @@ const nav: readonly NavItem[] = [
   { to: "/keys", label: "Keys", icon: KeyIcon },
   { to: "/policy", label: "Access controls", icon: ShieldCheckIcon, scope: "policy_file:read" },
   { to: "/settings", label: "Settings", icon: GearSixIcon, scope: "feature_settings:read" },
+  {
+    to: "/audit",
+    label: "Audit log",
+    icon: ClockCounterClockwiseIcon,
+    scope: "logs:configuration:read",
+  },
 ];
 
 function isActive(item: NavItem, pathname: string): boolean {
@@ -136,9 +143,10 @@ function healthState(pending: boolean, ok: boolean): { label: string; dot: strin
 }
 
 const kindLabels: Record<string, string> = {
-  oauth: "OAuth token",
   local: "Local socket",
   api_key: "API key",
+  oauth: "OAuth token",
+  session: "Signed in",
 };
 
 function AccountMenu({ me }: { readonly me: Me }): ReactElement {
@@ -168,7 +176,7 @@ function AccountMenu({ me }: { readonly me: Me }): ReactElement {
           <DropdownMenu.Item
             icon={SignOutIcon}
             onClick={() => {
-              session.clear();
+              void signOut();
             }}
           >
             Sign out

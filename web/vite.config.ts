@@ -6,7 +6,11 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 // The console is served by headscale under /admin/, so every asset URL is
-// rooted there. In development, API calls are proxied to a local server.
+// rooted there. In development, API calls and the sign-in flow are proxied
+// to a local server; start it with -server-url set to this origin so the
+// identity provider sends the browser back here (see cmd/dev).
+const backend = process.env["HEADSCALE_URL"] ?? "http://127.0.0.1:8080";
+
 export default defineConfig({
   base: "/admin/",
   plugins: [tanstackRouter({ target: "react", autoCodeSplitting: true }), react(), tailwindcss()],
@@ -21,10 +25,8 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": {
-        target: process.env["HEADSCALE_URL"] ?? "http://127.0.0.1:8080",
-        changeOrigin: true,
-      },
+      "/api": { target: backend, changeOrigin: true },
+      "/oidc": { target: backend, changeOrigin: true },
     },
   },
   build: {

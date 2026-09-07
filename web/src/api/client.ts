@@ -6,35 +6,21 @@ import { safeParse } from "valibot";
 import { ApiError, problemSchema } from "~/api/error.ts";
 import type { Problem } from "~/api/error.ts";
 import type { paths } from "~/api/schema.gen.ts";
-import { session } from "~/auth/session.ts";
 
-const auth: Middleware = {
-  onRequest({ request }) {
-    const apiKey = session.get();
-
-    if (apiKey !== null) {
-      request.headers.set("Authorization", `Bearer ${apiKey}`);
-    }
-
-    return request;
-  },
+/**
+ * The session cookie rides along on every same-origin request, so there is no credential to attach.
+ * Errors become `ApiError`; a 401 (the session ended or expired) is left to the route guards, which
+ * send the operator back to sign-in.
+ */
+const problems: Middleware = {
   async onResponse({ response }) {
     if (response.ok) {
       return response;
     }
 
     const problem = await readProblem(response);
-    const error = new ApiError(
-      response.status,
-      problem,
-      `${response.status} ${response.statusText}`,
-    );
 
-    if (error.unauthorized) {
-      session.clear();
-    }
-
-    throw error;
+    throw new ApiError(response.status, problem, `${response.status} ${response.statusText}`);
   },
 };
 
@@ -56,7 +42,7 @@ async function readProblem(response: Response): Promise<Problem | undefined> {
 
 /** Raw typed fetch client; use `api` for anything rendered by React. */
 export const fetchClient = createFetchClient<paths>({ baseUrl: "" });
-fetchClient.use(auth);
+fetchClient.use(problems);
 
 /**
  * TanStack Query bindings over the typed client. `api.queryOptions` feeds route loaders,

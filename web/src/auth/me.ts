@@ -19,11 +19,15 @@ export type Scope =
   | "feature_settings"
   | "feature_settings:read"
   | "users"
-  | "users:read";
+  | "users:read"
+  | "logs:configuration:read";
 
 export type Me = MethodResponse<typeof api, "get", "/api/v1/whoami">;
 
 export const meQuery = api.queryOptions("get", "/api/v1/whoami");
+
+/** What the sign-in page may offer; public, so it loads before any credential. */
+export const consoleAuthQuery = api.queryOptions("get", "/api/v1/auth/console");
 
 export function can(me: Me, scope: Scope): boolean {
   return me.permissions[scope] === true;

@@ -12,7 +12,7 @@ import type { Settings } from "~/api/queries.ts";
 import type { UpdateSettingsRequestBody } from "~/api/schema.gen.ts";
 import { can, displayName, roleLabel } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { session } from "~/auth/session.ts";
+import { signOut } from "~/auth/session.ts";
 import { Card, CardHeader, CardTitle } from "~/components/ui/card.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { toast } from "~/components/ui/toast.ts";
@@ -171,7 +171,7 @@ function ConsoleCard({ me }: { readonly me: Me }): ReactElement {
           variant="secondary"
           icon={SignOutIcon}
           onClick={() => {
-            session.clear();
+            void signOut();
           }}
         >
           Sign out

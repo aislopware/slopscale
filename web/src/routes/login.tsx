@@ -1,15 +1,13 @@
+import { Banner } from "@cloudflare/kumo/components/banner";
 import { Button } from "@cloudflare/kumo/components/button";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
-import { SensitiveInput } from "@cloudflare/kumo/components/sensitive-input";
-import { KeyIcon } from "@phosphor-icons/react";
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import type { ReactElement, SubmitEvent } from "react";
+import { SignInIcon, WaveformIcon } from "@phosphor-icons/react";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import type { ReactElement } from "react";
 import { object, optional, string } from "valibot";
 
-import { fetchClient } from "~/api/client.ts";
-import { errorMessage } from "~/api/error.ts";
-import { session } from "~/auth/session.ts";
+import { ApiError } from "~/api/error.ts";
+import { consoleAuthQuery, meQuery } from "~/auth/me.ts";
+import { consolePath } from "~/auth/session.ts";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
 
 const searchSchema = object({
@@ -18,48 +16,28 @@ const searchSchema = object({
 
 export const Route = createFileRoute("/login")({
   validateSearch: searchSchema,
-  beforeLoad: ({ search }) => {
-    if (session.get() !== null) {
-      throw redirect({ to: search.redirect ?? "/" });
+  // Whether the operator is already signed in is the server's answer: the session cookie is
+  // invisible to the console. A 401 means "show the page"; anything else is a real error.
+  beforeLoad: async ({ context, search }) => {
+    try {
+      await context.queryClient.query({ ...meQuery, staleTime: "static" });
+    } catch (error) {
+      if (error instanceof ApiError && error.unauthorized) {
+        return;
+      }
+
+      throw error;
     }
+
+    throw redirect({ to: search.redirect ?? "/" });
   },
+  loader: ({ context }) => context.queryClient.query(consoleAuthQuery),
   component: LoginPage,
 });
 
 function LoginPage(): ReactElement {
   const { redirect: target } = Route.useSearch();
-  const navigate = useNavigate();
-  const [apiKey, setApiKey] = useState("");
-  const [message, setMessage] = useState<string>();
-  const [busy, setBusy] = useState(false);
-
-  async function submit(event: SubmitEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    const key = apiKey.trim();
-
-    if (key === "") {
-      setMessage("Paste an API key first.");
-
-      return;
-    }
-
-    setBusy(true);
-    setMessage(undefined);
-    session.set(key);
-
-    try {
-      await fetchClient.GET("/api/v1/whoami");
-    } catch (error) {
-      session.clear();
-      setMessage(errorMessage(error));
-      setBusy(false);
-
-      return;
-    }
-
-    setBusy(false);
-    await navigate({ to: target ?? "/" });
-  }
+  const { oidc } = Route.useLoaderData();
 
   return (
     <div className="flex min-h-dvh flex-col bg-kumo-canvas">
@@ -70,43 +48,44 @@ function LoginPage(): ReactElement {
         <div className="flex w-full max-w-sm flex-col gap-6">
           <div className="flex flex-col items-center gap-3 text-center">
             <span className="flex size-11 items-center justify-center rounded-xl bg-kumo-contrast text-kumo-inverse">
-              <KeyIcon size={22} weight="bold" />
+              <WaveformIcon size={22} weight="bold" />
             </span>
             <div className="flex flex-col gap-1">
               <h1 className="text-xl font-semibold text-kumo-default">Sign in to headscale</h1>
               <p className="text-kumo-subtle">
-                Use an API key. The role of its owner decides what this console can show and change.
+                {oidc === undefined
+                  ? "This server has no identity provider configured, so the console cannot sign anyone in."
+                  : "Your role decides what this console can show and change."}
               </p>
             </div>
           </div>
-          <LayerCard className="px-5 py-4">
-            <form
-              onSubmit={(event) => {
-                void submit(event);
+          {oidc === undefined ? (
+            <Banner
+              variant="alert"
+              title="No identity provider"
+              description="Set the oidc section of the server configuration and restart it. The CLI and the API keep working with API keys."
+            />
+          ) : (
+            <Button
+              variant="primary"
+              size="lg"
+              className="w-full"
+              icon={SignInIcon}
+              onClick={() => {
+                // The provider flow is served by headscale, not routed by
+                // the console, so this is a full navigation.
+                globalThis.location.assign(
+                  `${oidc.loginPath}?redirect=${encodeURIComponent(consolePath(target ?? "/"))}`,
+                );
               }}
-              className="flex flex-col gap-4"
             >
-              <SensitiveInput
-                label="API key"
-                description={
-                  <>
-                    Create one with{" "}
-                    <span className="font-mono text-[0.9em]">headscale apikeys create</span>.
-                  </>
-                }
-                autoComplete="current-password"
-                spellCheck={false}
-                value={apiKey}
-                onValueChange={setApiKey}
-                {...(message === undefined ? {} : { error: message, variant: "error" as const })}
-              />
-              <Button type="submit" variant="primary" loading={busy} className="w-full">
-                Continue
-              </Button>
-            </form>
-          </LayerCard>
+              Continue with {oidc.provider}
+            </Button>
+          )}
           <p className="text-center text-xs text-kumo-subtle">
-            The key stays in this browser only and is sent as a bearer token to this server.
+            {oidc === undefined
+              ? "See the OpenID Connect page of the documentation."
+              : "A sign-in lasts seven days in this browser. Sign out from the account menu to end it sooner."}
           </p>
         </div>
       </main>

@@ -63,3 +63,7 @@ jobs:
       - name: Embedded console tests
         if: steps.changed-files.outputs.files == 'true'
         run: go test ./web/
+
+      - name: End-to-end sign-in
+        if: steps.changed-files.outputs.files == 'true'
+        run: make test-e2e

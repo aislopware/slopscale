@@ -32,12 +32,20 @@ server at `/admin/` (see `embed.go`, which embeds `dist/` into the binary).
 
 ```console
 $ bun install            # once; the lockfile pins everything
-$ bun run dev            # http://localhost:5173/admin/, proxies /api to $HEADSCALE_URL or 127.0.0.1:8080
+$ bun run dev            # http://localhost:5173/admin/, proxies /api and /oidc to $HEADSCALE_URL or 127.0.0.1:8080
 $ bun run check          # typecheck + lint + format check + tests
 $ bun run build          # writes dist/, which the Go build embeds
+$ bun run e2e            # builds, starts a real server (cmd/dev) and signs in through a browser
 ```
 
-`bunx playwright install chromium` once before `bun run test`.
+`bunx playwright install chromium` once before `bun run test` or `bun run e2e`.
+
+The console signs in only through an identity provider. For local work,
+`go run ./cmd/dev -server-url http://localhost:5173` (from the repository
+root) starts a headscale with a mock provider whose only user is an admin;
+`-server-url` makes the provider send the browser back to Vite. The e2e
+suite in `e2e/` uses the same `cmd/dev` on its own port, against the built
+console embedded in the binary, so it needs no running server.
 
 Conventions the linter enforces: explicit return types, named constants
 instead of magic numbers, no nested ternaries, functions under 120 lines,

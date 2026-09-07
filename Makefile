@@ -89,6 +89,13 @@ test-web: web-deps
 	@echo "Running console tests..."
 	cd web && bun run test
 
+# End-to-end: builds the console, starts a real server through cmd/dev
+# with its mock identity provider, and signs in through a browser.
+.PHONY: test-e2e
+test-e2e: web-deps
+	@echo "Running console end-to-end tests..."
+	cd web && bun run e2e
+
 # Test targets
 .PHONY: test
 test: check-deps $(GO_SOURCES) go.mod go.sum
@@ -208,6 +215,7 @@ help:
 	@echo "  web-generate - Regenerate the console's API types from the OpenAPI spec"
 	@echo "  lint-web     - Typecheck, lint and format-check the admin console"
 	@echo "  test-web     - Run the admin console's browser tests"
+	@echo "  test-e2e     - Sign in to a real server through the browser (mock identity provider)"
 	@echo ""
 	@echo "Dependencies:"
 	@echo "  check-deps   - Verify required tools are available"

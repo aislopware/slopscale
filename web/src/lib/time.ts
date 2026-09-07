@@ -69,6 +69,11 @@ export function isPast(date: Date | null, now: Date = new Date()): boolean {
   return date !== null && date.getTime() <= now.getTime();
 }
 
+/** Subtracts a whole number of hours from now, as the API's RFC 3339 string. */
+export function hoursAgo(hours: number): string {
+  return new Date(Date.now() - hours * hour).toISOString();
+}
+
 /** Adds a whole number of days to now, as the API's RFC 3339 string. */
 export function daysFromNow(days: number): string {
   return new Date(Date.now() + days * day).toISOString();

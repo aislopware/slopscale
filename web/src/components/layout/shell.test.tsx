@@ -59,5 +59,18 @@ describe(Shell, () => {
 
     await expect.element(screen.getByRole("link", { name: "Users" })).toBeVisible();
     await expect.element(screen.getByRole("link", { name: "Machines" })).not.toBeInTheDocument();
+    await expect.element(screen.getByRole("link", { name: "Audit log" })).not.toBeInTheDocument();
+  });
+
+  it("shows the audit log to a caller that may read it", async () => {
+    const screen = await render(
+      app({
+        ...allAccess,
+        allAccess: false,
+        permissions: { "logs:configuration:read": true },
+      }),
+    );
+
+    await expect.element(screen.getByRole("link", { name: "Audit log" })).toBeVisible();
   });
 });

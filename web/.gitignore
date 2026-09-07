@@ -5,3 +5,6 @@ dist/*
 .vite/
 *.tsbuildinfo
 .vitest/
+# Playwright e2e output
+test-results/
+playwright-report/
