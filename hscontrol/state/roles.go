@@ -81,12 +81,18 @@ func (s *State) SetUserRole(
 		return user, change.Change{}, fmt.Errorf("updating policy manager after role change: %w", err)
 	}
 
-	// autogroup:owner and friends resolve through the user list, and a
-	// node's is-admin capability follows its user's role, so every node's
-	// map must be rebuilt even when the filter text did not move.
+	// autogroup:owner and friends resolve through the user list, so every
+	// node's peers and filters must be rebuilt even when the filter text
+	// did not move. A node's is-admin and is-owner caps live on its self
+	// entry, which a broadcast policy change never carries; without
+	// IncludeSelf the user's devices only learn their new role when some
+	// unrelated self update happens to follow.
 	if c.IsEmpty() {
 		c = change.PolicyChange()
 	}
+
+	c.Reason = "user role change"
+	c.IncludeSelf = true
 
 	log.Info().Str(zf.UserName, user.Name).Str("role", role.String()).Msg("user role set")
 

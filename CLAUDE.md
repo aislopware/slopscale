@@ -115,7 +115,9 @@ each API package fails on an authenticated operation without one. Role rules
 (one owner, transfer only, nobody edits their own role) live in
 `State.SetUserRole`; the policy manager, not `Node.User`, is the source for
 role autogroups and the `is-admin`/`is-owner` caps because the node's user
-copy is loaded once and goes stale.
+copy is loaded once and goes stale. A role change is a `PolicyChange` with
+`IncludeSelf`, because those caps live on the self node, which a broadcast
+policy change never carries.
 
 Approval is a node property (`nodes.approved_at`; users have their own) and
 is enforced in exactly two places: the NodeStore's peer function drops
