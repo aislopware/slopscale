@@ -6,6 +6,7 @@ import (
 
 	"github.com/juanfont/headscale/hscontrol/types"
 	"go4.org/netipx"
+	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/views"
 )
@@ -155,9 +156,24 @@ func networkGrants(model types.AccessModel) []Grant {
 		}
 
 		destinations := make(Aliases, 0, len(network.Prefixes))
+		internet := false
+
 		for _, p := range network.Prefixes {
+			// An exit route as a literal 0.0.0.0/0 would also grant every
+			// tailnet address; autogroup:internet is the Internet alone.
+			if tsaddr.IsExitRoute(p) {
+				internet = true
+
+				continue
+			}
+
 			prefix := Prefix(p)
 			destinations = append(destinations, &prefix)
+		}
+
+		if internet {
+			autogroup := AutoGroupInternet
+			destinations = append(destinations, &autogroup)
 		}
 
 		grants = append(grants, Grant{

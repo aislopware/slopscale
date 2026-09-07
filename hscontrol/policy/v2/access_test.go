@@ -194,6 +194,32 @@ func TestNetworkGrants(t *testing.T) {
 	assert.Equal(t, []tailcfg.NetPortRange{{IP: "10.10.0.0/24", Ports: tailcfg.PortRangeAny}}, filter[1].DstPorts)
 	assert.Nil(t, filter[1].IPProto)
 
+	// An exit network grants the Internet, not every address: the tailnet's
+	// own range must stay out of the destinations.
+	model.Networks[0].Prefixes = []netip.Prefix{
+		netip.MustParsePrefix("0.0.0.0/0"),
+		netip.MustParsePrefix("::/0"),
+		netip.MustParsePrefix("10.10.0.0/24"),
+	}
+
+	_, err = pm.SetAccessModel(model)
+	require.NoError(t, err)
+
+	filter, _ = pm.Filter()
+	require.Len(t, filter, 2)
+
+	for _, dst := range filter[1].DstPorts {
+		assert.NotEqual(t, "0.0.0.0/0", dst.IP, "an exit network must not grant the whole address space")
+		assert.NotEqual(t, "::/0", dst.IP)
+		assert.NotEqual(t, "*", dst.IP)
+	}
+
+	assert.Contains(t, filter[1].DstPorts, tailcfg.NetPortRange{IP: "10.10.0.0/24", Ports: tailcfg.PortRangeAny})
+	assert.Contains(t, filter[1].DstPorts, tailcfg.NetPortRange{IP: "8.0.0.0/7", Ports: tailcfg.PortRangeAny},
+		"autogroup:internet is expanded into the public ranges")
+
+	model.Networks[0].Prefixes = []netip.Prefix{netip.MustParsePrefix("10.10.0.0/24")}
+
 	// A disabled network contributes nothing.
 	model.Networks[0].Enabled = false
 

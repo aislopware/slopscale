@@ -509,6 +509,12 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609091200-webhook-deliveries",
 			run: migrateWebhookDeliveries,
 		},
+		{
+			// Which route approvals networks made, so withdrawing a network
+			// leaves manual approvals alone.
+			id:  "202609091300-network-route-approvals",
+			run: migrateNetworkRouteApprovals,
+		},
 	}
 }
 
@@ -1502,6 +1508,33 @@ func migrateWebhookDeliveries(tx *Tx) error {
 )`,
 			indexes: []string{
 				`CREATE INDEX idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, id)`,
+			},
+		},
+	})
+}
+
+// migrateNetworkRouteApprovals (202609091300) creates the
+// network_route_approvals table.
+func migrateNetworkRouteApprovals(tx *Tx) error {
+	return createTables(tx, []tableDefinition{
+		{
+			name: "network_route_approvals",
+			sqlite: `CREATE TABLE network_route_approvals(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  node_id integer NOT NULL,
+  prefix text NOT NULL,
+  CONSTRAINT fk_network_route_approvals_node
+    FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+)`,
+			postgres: `CREATE TABLE network_route_approvals(
+  id bigserial PRIMARY KEY,
+  node_id bigint NOT NULL,
+  prefix text NOT NULL,
+  CONSTRAINT fk_network_route_approvals_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_network_route_approvals_node_prefix` +
+					` ON network_route_approvals(node_id, prefix)`,
 			},
 		},
 	})

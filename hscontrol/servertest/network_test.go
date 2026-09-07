@@ -266,4 +266,92 @@ func TestNetworksEndToEnd(t *testing.T) {
 		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/network/"+networkID, nil)
 		assert.Equal(t, http.StatusNotFound, status, body)
 	})
+
+	t.Run("a network over a manual approval leaves it when it goes", func(t *testing.T) {
+		status, body := apiCall(t, client, ownerKey, http.MethodPost, v1+"/network", map[string]any{
+			"name":          "Lab",
+			"prefixes":      []string{manual.String(), office.String()},
+			"routerNodeIds": []string{routerID.String()},
+			"groupIds":      []string{engGroupID},
+		})
+		require.Equal(t, http.StatusOK, status, body)
+
+		id, ok := field(t, body, "network", "id").(string)
+		require.True(t, ok)
+
+		node, ok := srv.State().GetNodeByID(routerID)
+		require.True(t, ok)
+		assert.Contains(t, node.ApprovedRoutes().AsSlice(), office, "the network approved the office prefix")
+
+		// The network now narrows the manual route to its group.
+		guestNode.WaitForCondition(t, "manual route narrowed", networkWait, func(nm *netmap.NetworkMap) bool {
+			return !routerHasRoute(nm, manual)
+		})
+
+		status, body = apiCall(t, client, ownerKey, http.MethodDelete, v1+"/network/"+id, nil)
+		require.Equal(t, http.StatusOK, status, body)
+
+		node, ok = srv.State().GetNodeByID(routerID)
+		require.True(t, ok)
+		assert.Contains(t, node.ApprovedRoutes().AsSlice(), manual, "the operator's approval survives the network")
+		assert.NotContains(t, node.ApprovedRoutes().AsSlice(), office, "the network's own approval goes with it")
+
+		guestNode.WaitForCondition(t, "manual route back for everyone", networkWait, func(nm *netmap.NetworkMap) bool {
+			return routerHasRoute(nm, manual)
+		})
+	})
+
+	t.Run("a router outside the network does not get its prefix through co-routing", func(t *testing.T) {
+		status, body := apiCall(t, client, ownerKey, http.MethodPost, v1+"/network", map[string]any{
+			"name":          "Office again",
+			"prefixes":      []string{office.String()},
+			"routerNodeIds": []string{routerID.String()},
+			"groupIds":      []string{engGroupID},
+		})
+		require.Equal(t, http.StatusOK, status, body)
+
+		engNode.WaitForCondition(t, "route reaches the engineer", networkWait, func(nm *netmap.NetworkMap) bool {
+			return routerHasRoute(nm, office)
+		})
+
+		// A second router for the same prefix, approved by hand and outside
+		// the network. It is an HA secondary, and the co-router exception
+		// would normally show it the primary's route.
+		outsider := servertest.NewClient(t, srv, "outside-router", servertest.WithUser(guest))
+		outsider.WaitForPeers(t, 3, networkWait)
+		outsiderID := findNodeID(t, srv, "outside-router")
+
+		advertise(t, outsider, "outside-router", office)
+
+		_, c, err := srv.State().SetApprovedRoutes(outsiderID, []netip.Prefix{office})
+		require.NoError(t, err)
+		srv.App.Change(c)
+
+		viewer, ok := srv.State().GetNodeByID(outsiderID)
+		require.True(t, ok)
+		peer, ok := srv.State().GetNodeByID(routerID)
+		require.True(t, ok)
+
+		matchers, err := srv.State().MatchersForNode(viewer)
+		require.NoError(t, err)
+		assert.NotContains(t, srv.State().RoutesForPeer(viewer, peer, matchers), office,
+			"the network keeps its prefix from a router outside it")
+
+		outsider.WaitForCondition(t, "the office router's route stays inside the network", networkWait,
+			func(nm *netmap.NetworkMap) bool {
+				return len(nm.Peers) == 3 && !peerHasRoute(nm, routerName, office)
+			})
+	})
+}
+
+// peerHasRoute reports whether the named peer carries the prefix in the
+// netmap.
+func peerHasRoute(nm *netmap.NetworkMap, name string, prefix netip.Prefix) bool {
+	for _, peer := range nm.Peers {
+		if peer.Hostinfo().Valid() && peer.Hostinfo().Hostname() == name {
+			return slices.Contains(peer.AllowedIPs().AsSlice(), prefix)
+		}
+	}
+
+	return false
 }

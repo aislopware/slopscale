@@ -24,6 +24,9 @@ func (s *State) GetNetwork(id types.NetworkID) (types.Network, error) {
 // CreateNetwork stores a network and approves its prefixes on its
 // routers when it is on.
 func (s *State) CreateNetwork(network types.Network) (types.Network, change.Change, error) {
+	s.networkMu.Lock()
+	defer s.networkMu.Unlock()
+
 	err := s.validateNetwork(network)
 	if err != nil {
 		return types.Network{}, change.Change{}, err
@@ -49,6 +52,9 @@ func (s *State) CreateNetwork(network types.Network) (types.Network, change.Chan
 // UpdateNetwork replaces every field of the network and moves the route
 // approvals along.
 func (s *State) UpdateNetwork(network types.Network) (types.Network, change.Change, error) {
+	s.networkMu.Lock()
+	defer s.networkMu.Unlock()
+
 	if _, ok := s.AccessModel().Network(network.ID); !ok {
 		return types.Network{}, change.Change{}, types.ErrNetworkNotFound
 	}
@@ -76,6 +82,9 @@ func (s *State) UpdateNetwork(network types.Network) (types.Network, change.Chan
 // SetNetworkEnabled switches the network on or off; off withdraws the
 // route approvals it made.
 func (s *State) SetNetworkEnabled(id types.NetworkID, enabled bool) (types.Network, change.Change, error) {
+	s.networkMu.Lock()
+	defer s.networkMu.Unlock()
+
 	before := s.networkAssignments()
 
 	updated, err := s.db.SetNetworkEnabled(id, enabled)
@@ -94,6 +103,9 @@ func (s *State) SetNetworkEnabled(id types.NetworkID, enabled bool) (types.Netwo
 // DeleteNetwork removes the network and withdraws the route approvals it
 // made.
 func (s *State) DeleteNetwork(id types.NetworkID) (change.Change, error) {
+	s.networkMu.Lock()
+	defer s.networkMu.Unlock()
+
 	network, ok := s.AccessModel().Network(id)
 	if !ok {
 		return change.Change{}, types.ErrNetworkNotFound
@@ -175,6 +187,13 @@ func (s *State) applyNetworkChange(before map[types.NodeID][]netip.Prefix) (chan
 
 	after := s.networkAssignments()
 
+	// made holds the approvals networks made, as opposed to an operator:
+	// only those are withdrawn when no network assigns them any more.
+	made, err := s.db.NetworkRouteApprovals()
+	if err != nil {
+		return change.Change{}, err
+	}
+
 	nodes := make([]types.NodeID, 0, len(before)+len(after))
 	for id := range before {
 		nodes = append(nodes, id)
@@ -189,35 +208,9 @@ func (s *State) applyNetworkChange(before map[types.NodeID][]netip.Prefix) (chan
 	slices.Sort(nodes)
 
 	for _, id := range nodes {
-		node, ok := s.nodeStore.GetNode(id)
-		if !ok {
-			continue
-		}
-
-		current := node.ApprovedRoutes().AsSlice()
-		desired := make([]netip.Prefix, 0, len(current)+len(after[id]))
-
-		for _, p := range current {
-			if slices.Contains(before[id], p) && !slices.Contains(after[id], p) {
-				continue
-			}
-
-			desired = append(desired, p)
-		}
-
-		for _, p := range after[id] {
-			if !slices.Contains(desired, p) {
-				desired = append(desired, p)
-			}
-		}
-
-		if slices.Equal(current, desired) {
-			continue
-		}
-
-		_, _, err := s.SetApprovedRoutes(id, desired)
+		err := s.reconcileNetworkRoutes(id, before[id], after[id], made[id])
 		if err != nil {
-			return change.Change{}, fmt.Errorf("moving route approvals of node %d: %w", id, err)
+			return change.Change{}, err
 		}
 	}
 
@@ -227,6 +220,64 @@ func (s *State) applyNetworkChange(before map[types.NodeID][]netip.Prefix) (chan
 	c.Reason = "network change"
 
 	return c, nil
+}
+
+// reconcileNetworkRoutes moves one router's approvals after a network
+// change: a prefix networks now assign is approved and remembered as the
+// network's doing, a prefix no enabled network assigns any more is
+// withdrawn only if a network approved it in the first place.
+func (s *State) reconcileNetworkRoutes(id types.NodeID, before, after, made []netip.Prefix) error {
+	node, ok := s.nodeStore.GetNode(id)
+	if !ok {
+		return nil
+	}
+
+	current := node.ApprovedRoutes().AsSlice()
+	desired := make([]netip.Prefix, 0, len(current)+len(after))
+
+	var added, removed []netip.Prefix
+
+	for _, p := range current {
+		withdrawn := slices.Contains(before, p) && !slices.Contains(after, p)
+		if withdrawn && slices.Contains(made, p) {
+			removed = append(removed, p)
+
+			continue
+		}
+
+		desired = append(desired, p)
+	}
+
+	for _, p := range after {
+		if !slices.Contains(desired, p) {
+			desired = append(desired, p)
+			added = append(added, p)
+		}
+	}
+
+	// A withdrawn prefix the operator had approved as well stays, but the
+	// network's claim on it ends.
+	for _, p := range made {
+		if slices.Contains(before, p) && !slices.Contains(after, p) && !slices.Contains(removed, p) {
+			removed = append(removed, p)
+		}
+	}
+
+	err := s.db.SetNetworkRouteApprovals(id, added, removed)
+	if err != nil {
+		return err
+	}
+
+	if slices.Equal(current, desired) {
+		return nil
+	}
+
+	_, _, err = s.SetApprovedRoutes(id, desired)
+	if err != nil {
+		return fmt.Errorf("moving route approvals of node %d: %w", id, err)
+	}
+
+	return nil
 }
 
 // networkRoutesFor keeps only the peer's routes the viewer should get:

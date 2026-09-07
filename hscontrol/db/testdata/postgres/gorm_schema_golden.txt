@@ -54,6 +54,9 @@ COL network_groups.group_id bigint null=NO
 COL network_prefixes.id bigint null=NO default=nextval('network_prefixes_id_seq'::regclass)
 COL network_prefixes.network_id bigint null=NO
 COL network_prefixes.prefix text null=NO
+COL network_route_approvals.id bigint null=NO default=nextval('network_route_approvals_id_seq'::regclass)
+COL network_route_approvals.node_id bigint null=NO
+COL network_route_approvals.prefix text null=NO
 COL network_routers.id bigint null=NO default=nextval('network_routers_id_seq'::regclass)
 COL network_routers.network_id bigint null=NO
 COL network_routers.node_id bigint null=NO
@@ -189,6 +192,7 @@ IDX CREATE UNIQUE INDEX idx_name_no_provider_identifier ON public.users USING bt
 IDX CREATE UNIQUE INDEX idx_name_provider_identifier ON public.users USING btree (name, provider_identifier)
 IDX CREATE UNIQUE INDEX idx_network_groups_network_group ON public.network_groups USING btree (network_id, group_id)
 IDX CREATE UNIQUE INDEX idx_network_prefixes_network_prefix ON public.network_prefixes USING btree (network_id, prefix)
+IDX CREATE UNIQUE INDEX idx_network_route_approvals_node_prefix ON public.network_route_approvals USING btree (node_id, prefix)
 IDX CREATE UNIQUE INDEX idx_network_routers_network_node ON public.network_routers USING btree (network_id, node_id)
 IDX CREATE UNIQUE INDEX idx_networks_name ON public.networks USING btree (name)
 IDX CREATE UNIQUE INDEX idx_node_shares_node_user ON public.node_shares USING btree (node_id, user_id)
@@ -200,6 +204,7 @@ IDX CREATE UNIQUE INDEX idx_sessions_token_hash ON public.sessions USING btree (
 IDX CREATE UNIQUE INDEX migrations_pkey ON public.migrations USING btree (id)
 IDX CREATE UNIQUE INDEX network_groups_pkey ON public.network_groups USING btree (id)
 IDX CREATE UNIQUE INDEX network_prefixes_pkey ON public.network_prefixes USING btree (id)
+IDX CREATE UNIQUE INDEX network_route_approvals_pkey ON public.network_route_approvals USING btree (id)
 IDX CREATE UNIQUE INDEX network_routers_pkey ON public.network_routers USING btree (id)
 IDX CREATE UNIQUE INDEX networks_pkey ON public.networks USING btree (id)
 IDX CREATE UNIQUE INDEX node_shares_pkey ON public.node_shares USING btree (id)
@@ -263,6 +268,11 @@ CON network_prefixes network_prefixes_id_not_null NOT NULL id
 CON network_prefixes network_prefixes_network_id_not_null NOT NULL network_id
 CON network_prefixes network_prefixes_pkey PRIMARY KEY (id)
 CON network_prefixes network_prefixes_prefix_not_null NOT NULL prefix
+CON network_route_approvals fk_network_route_approvals_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
+CON network_route_approvals network_route_approvals_id_not_null NOT NULL id
+CON network_route_approvals network_route_approvals_node_id_not_null NOT NULL node_id
+CON network_route_approvals network_route_approvals_pkey PRIMARY KEY (id)
+CON network_route_approvals network_route_approvals_prefix_not_null NOT NULL prefix
 CON network_routers fk_network_routers_network FOREIGN KEY (network_id) REFERENCES networks(id) ON DELETE CASCADE
 CON network_routers fk_network_routers_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
 CON network_routers network_routers_id_not_null NOT NULL id

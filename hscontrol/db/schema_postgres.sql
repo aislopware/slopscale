@@ -213,6 +213,14 @@ CREATE TABLE network_groups(
 );
 CREATE UNIQUE INDEX idx_network_groups_network_group ON network_groups(network_id, group_id);
 
+CREATE TABLE network_route_approvals(
+  id bigserial PRIMARY KEY,
+  node_id bigint NOT NULL,
+  prefix text NOT NULL,
+  CONSTRAINT fk_network_route_approvals_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_network_route_approvals_node_prefix ON network_route_approvals(node_id, prefix);
+
 CREATE TABLE policies(
   id bigserial PRIMARY KEY,
   created_at timestamptz,

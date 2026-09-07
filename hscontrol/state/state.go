@@ -161,6 +161,24 @@ type State struct {
 	// rather than being clobbered by a stale caller snapshot.
 	persistMu sync.Mutex
 
+	// settingsMu serialises the read-modify-write of the settings cache
+	// so that two setters cannot publish each other's stale copy.
+	settingsMu sync.Mutex
+
+	// networkMu serialises network writes with the route reconciliation
+	// that follows them, so a toggle cannot approve prefixes a concurrent
+	// change already withdrew.
+	networkMu sync.Mutex
+
+	// dnsMu serialises DNS writes with the publication of the new
+	// settings, so a reset cannot be overtaken by an older override.
+	dnsMu sync.Mutex
+
+	// webhookMu serialises webhook writes with the dispatcher reload, so
+	// a reload cannot publish a list that predates a delete or a
+	// rotation.
+	webhookMu sync.Mutex
+
 	// registerLocks serialises registration per machine key so concurrent
 	// registrations of the same machine resolve to a single node instead of
 	// racing the find-then-create section and each creating their own.
@@ -1257,10 +1275,6 @@ func (s *State) RoutesForPeer(
 		}
 	}
 
-	// A prefix a network assigns to the peer is only for the network's
-	// groups and routers.
-	reduced = s.networkRoutesFor(viewer, peer, reduced)
-
 	// Co-router visibility: when the viewer advertises the same prefix
 	// that the peer is HA primary for, the viewer must see that route
 	// regardless of matcher authorization. HA secondaries need this to
@@ -1274,7 +1288,10 @@ func (s *State) RoutesForPeer(
 		}
 	}
 
-	return reduced
+	// A prefix a network assigns to the peer is only for the network's
+	// groups and routers. This comes last so that the co-router exception
+	// cannot hand a network's prefix to a router outside it.
+	return s.networkRoutesFor(viewer, peer, reduced)
 }
 
 // PrimaryRoutesString renders the current prefix→primary assignment

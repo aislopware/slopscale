@@ -266,6 +266,17 @@ CREATE TABLE network_groups(
 );
 CREATE UNIQUE INDEX idx_network_groups_network_group ON network_groups(network_id, group_id);
 
+-- network_route_approvals records the route approvals networks made, so
+-- that withdrawing a network leaves approvals made by hand alone.
+CREATE TABLE network_route_approvals(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  node_id integer NOT NULL,
+  prefix text NOT NULL,
+
+  CONSTRAINT fk_network_route_approvals_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_network_route_approvals_node_prefix ON network_route_approvals(node_id, prefix);
+
 CREATE TABLE policies(
   id integer PRIMARY KEY AUTOINCREMENT,
   data text,
