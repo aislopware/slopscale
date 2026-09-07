@@ -235,23 +235,26 @@ type ListUsersOutputBody struct {
 // Node defines model for Node.
 type Node struct {
 	// Approved false while the node waits for an administrator.
-	Approved        bool               `json:"approved"`
-	ApprovedAt      *time.Time         `json:"approvedAt"`
-	ApprovedRoutes  []string           `json:"approvedRoutes"`
-	AvailableRoutes []string           `json:"availableRoutes"`
-	CreatedAt       time.Time          `json:"createdAt"`
-	DiscoKey        string             `json:"discoKey"`
-	Expiry          *time.Time         `json:"expiry"`
-	GivenName       string             `json:"givenName"`
-	Id              string             `json:"id"`
-	IpAddresses     []string           `json:"ipAddresses"`
-	LastSeen        *time.Time         `json:"lastSeen"`
-	MachineKey      string             `json:"machineKey"`
-	Name            string             `json:"name"`
-	NodeKey         string             `json:"nodeKey"`
-	Online          bool               `json:"online"`
-	PreAuthKey      NodePreAuthKey     `json:"preAuthKey"`
-	RegisterMethod  NodeRegisterMethod `json:"registerMethod"`
+	Approved        bool       `json:"approved"`
+	ApprovedAt      *time.Time `json:"approvedAt"`
+	ApprovedRoutes  []string   `json:"approvedRoutes"`
+	AvailableRoutes []string   `json:"availableRoutes"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	DiscoKey        string     `json:"discoKey"`
+	Expiry          *time.Time `json:"expiry"`
+	GivenName       string     `json:"givenName"`
+
+	// GlobalExitNode true when every client is told to prefer this exit node.
+	GlobalExitNode bool               `json:"globalExitNode"`
+	Id             string             `json:"id"`
+	IpAddresses    []string           `json:"ipAddresses"`
+	LastSeen       *time.Time         `json:"lastSeen"`
+	MachineKey     string             `json:"machineKey"`
+	Name           string             `json:"name"`
+	NodeKey        string             `json:"nodeKey"`
+	Online         bool               `json:"online"`
+	PreAuthKey     NodePreAuthKey     `json:"preAuthKey"`
+	RegisterMethod NodeRegisterMethod `json:"registerMethod"`
 
 	// SharedWith IDs of the users the node is shared with.
 	SharedWith   []string `json:"sharedWith"`
@@ -323,6 +326,12 @@ type SetApprovalRequestBody struct {
 // SetApprovedRoutesRequestBody defines model for SetApprovedRoutesRequestBody.
 type SetApprovedRoutesRequestBody struct {
 	Routes *[]string `json:"routes,omitempty"`
+}
+
+// SetGlobalExitNodeRequestBody defines model for SetGlobalExitNodeRequestBody.
+type SetGlobalExitNodeRequestBody struct {
+	// Enabled false clears the mark.
+	Enabled *bool `json:"enabled,omitempty"`
 }
 
 // SetTagsRequestBody defines model for SetTagsRequestBody.
@@ -451,6 +460,9 @@ type SetApprovedRoutesJSONRequestBody = SetApprovedRoutesRequestBody
 
 // ExpireNodeJSONRequestBody defines body for ExpireNode for application/json ContentType.
 type ExpireNodeJSONRequestBody = ExpireNodeRequestBody
+
+// SetGlobalExitNodeJSONRequestBody defines body for SetGlobalExitNode for application/json ContentType.
+type SetGlobalExitNodeJSONRequestBody = SetGlobalExitNodeRequestBody
 
 // ShareNodeJSONRequestBody defines body for ShareNode for application/json ContentType.
 type ShareNodeJSONRequestBody = ShareNodeRequestBody
@@ -769,6 +781,28 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
 	ExpireNode(ctx context.Context, nodeId string, body ExpireNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetGlobalExitNodeWithBody Mark node as global exit node
+	//
+	// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/global-exit-node (the `SetGlobalExitNode` operationId).
+	SetGlobalExitNodeWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetGlobalExitNode Mark node as global exit node
+	//
+	// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/global-exit-node (the `SetGlobalExitNode` operationId).
+	SetGlobalExitNode(ctx context.Context, nodeId string, body SetGlobalExitNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RenameNode Rename node
 	//
@@ -1499,6 +1533,48 @@ func (c *Client) ExpireNodeWithBody(ctx context.Context, nodeId string, contentT
 // Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
 func (c *Client) ExpireNode(ctx context.Context, nodeId string, body ExpireNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewExpireNodeRequest(c.Server, nodeId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetGlobalExitNodeWithBody Mark node as global exit node
+//
+// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/node/{nodeId}/global-exit-node (the `SetGlobalExitNode` operationId).
+func (c *Client) SetGlobalExitNodeWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetGlobalExitNodeRequestWithBody(c.Server, nodeId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetGlobalExitNode Mark node as global exit node
+//
+// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/node/{nodeId}/global-exit-node (the `SetGlobalExitNode` operationId).
+func (c *Client) SetGlobalExitNode(ctx context.Context, nodeId string, body SetGlobalExitNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetGlobalExitNodeRequest(c.Server, nodeId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2811,6 +2887,53 @@ func NewExpireNodeRequestWithBody(server string, nodeId string, contentType stri
 	return req, nil
 }
 
+// NewSetGlobalExitNodeRequest calls the generic SetGlobalExitNode builder with application/json body
+func NewSetGlobalExitNodeRequest(server string, nodeId string, body SetGlobalExitNodeJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetGlobalExitNodeRequestWithBody(server, nodeId, "application/json", bodyReader)
+}
+
+// NewSetGlobalExitNodeRequestWithBody constructs an http.Request for the SetGlobalExitNode method, with any body, and a specified content type
+func NewSetGlobalExitNodeRequestWithBody(server string, nodeId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/global-exit-node", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewRenameNodeRequest constructs an http.Request for the RenameNode method
 func NewRenameNodeRequest(server string, nodeId string, newName string) (*http.Request, error) {
 	var err error
@@ -3910,6 +4033,28 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/node/{nodeId}/expire (the `ExpireNode` operationId).
 	ExpireNodeWithResponse(ctx context.Context, nodeId string, body ExpireNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*ExpireNodeResponse, error)
 
+	// SetGlobalExitNodeWithBodyWithResponse Mark node as global exit node
+	//
+	// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/global-exit-node (the `SetGlobalExitNode` operationId).
+	SetGlobalExitNodeWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetGlobalExitNodeResponse, error)
+
+	// SetGlobalExitNodeWithResponse Mark node as global exit node
+	//
+	// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+	//
+	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/global-exit-node (the `SetGlobalExitNode` operationId).
+	SetGlobalExitNodeWithResponse(ctx context.Context, nodeId string, body SetGlobalExitNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetGlobalExitNodeResponse, error)
+
 	// RenameNodeWithResponse Rename node
 	//
 	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -5005,6 +5150,54 @@ func (r ExpireNodeResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ExpireNodeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetGlobalExitNodeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodeOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetGlobalExitNodeResponse) GetJSON200() *NodeOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r SetGlobalExitNodeResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetGlobalExitNodeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetGlobalExitNodeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetGlobalExitNodeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetGlobalExitNodeResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -6357,6 +6550,40 @@ func (c *ClientWithResponses) ExpireNodeWithResponse(ctx context.Context, nodeId
 	return ParseExpireNodeResponse(rsp)
 }
 
+// SetGlobalExitNodeWithBodyWithResponse Mark node as global exit node
+//
+// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/global-exit-node (the `SetGlobalExitNode` operationId).
+func (c *ClientWithResponses) SetGlobalExitNodeWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetGlobalExitNodeResponse, error) {
+	rsp, err := c.SetGlobalExitNodeWithBody(ctx, nodeId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetGlobalExitNodeResponse(rsp)
+}
+
+// SetGlobalExitNodeWithResponse Mark node as global exit node
+//
+// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+//
+// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/global-exit-node (the `SetGlobalExitNode` operationId).
+func (c *ClientWithResponses) SetGlobalExitNodeWithResponse(ctx context.Context, nodeId string, body SetGlobalExitNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetGlobalExitNodeResponse, error) {
+	rsp, err := c.SetGlobalExitNode(ctx, nodeId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetGlobalExitNodeResponse(rsp)
+}
+
 // RenameNodeWithResponse Rename node
 //
 // Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -7358,6 +7585,39 @@ func ParseExpireNodeResponse(rsp *http.Response) (*ExpireNodeResponse, error) {
 	}
 
 	response := &ExpireNodeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodeOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetGlobalExitNodeResponse parses an HTTP response from a SetGlobalExitNodeWithResponse call
+func ParseSetGlobalExitNodeResponse(rsp *http.Response) (*SetGlobalExitNodeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetGlobalExitNodeResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
