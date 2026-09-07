@@ -126,6 +126,8 @@ func generateDNSConfig(
 		return nil
 	}
 
+	dnsConfig.CertDomains = node.CertDomains(cfg)
+
 	profile := nextDNSProfileFromCapMap(capMap)
 	if profile != "" {
 		applyNextDNSProfile(dnsConfig.Resolvers, profile)

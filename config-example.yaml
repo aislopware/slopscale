@@ -300,6 +300,33 @@ policy:
 #     # none for a relay on localhost.
 #     encryption: starttls
 
+## HTTPS certificates
+#
+# Let machines get Let's Encrypt certificates for their MagicDNS names
+# with `tailscale cert`. The base domain must be a real zone the server
+# can publish TXT records in; see
+# https://headscale.net/development/ref/https-certificates/.
+# https_certificates:
+#   enabled: false
+#   # cloudflare, rfc2136 or command.
+#   provider: cloudflare
+#   ttl: 1m
+#   cloudflare:
+#     # Needs Zone:Read and DNS:Edit on the zone.
+#     api_token: ""
+#     # Empty finds the zone from the record's name.
+#     zone_id: ""
+#   rfc2136:
+#     server: 127.0.0.1:53
+#     # Empty uses dns.base_domain.
+#     zone: ""
+#     tsig_key_name: ""
+#     tsig_secret: ""
+#     tsig_algorithm: hmac-sha256
+#   command:
+#     # Run with the record name and value as its two arguments.
+#     path: /usr/local/bin/publish-txt
+
 ## SSH session recording
 #
 # Run a session recorder inside the server. It joins the tailnet as

@@ -23,6 +23,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/jagottsicher/termcolor v1.0.2
 	github.com/mattn/go-sqlite3 v1.14.52
+	github.com/miekg/dns v1.1.58
 	github.com/moby/moby/api v1.56.0
 	github.com/moby/moby/client v0.6.0
 	github.com/oapi-codegen/runtime v1.7.0

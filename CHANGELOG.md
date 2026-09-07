@@ -231,6 +231,19 @@ sessions_ page, `headscale ssh-recordings` and `/api/v1/ssh-recording`
 under the `logs:configuration` scopes. See [SSH session
 recording](https://headscale.net/development/ref/ssh-recording/).
 
+### HTTPS certificates
+
+Machines can get Let's Encrypt certificates for their MagicDNS names with
+`tailscale cert` and `tailscale serve`, the way they do on Tailscale. With
+`https_certificates.enabled`, every machine's name is announced as a cert
+domain and the server answers `/machine/set-dns` by publishing the DNS-01
+challenge record through the configured provider: `cloudflare` (API
+token), `rfc2136` (dynamic update, TSIG-signed) or `command` (a program
+given the record name and value). A machine may publish only its own
+name's challenge record, and each one lands in the audit log as
+`node.cert_challenge`. The base domain must be a public zone. See [HTTPS
+certificates](https://headscale.net/development/ref/https-certificates/).
+
 ### Networks
 
 Subnets and exit nodes can now be handed to groups as networks, the way

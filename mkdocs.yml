@@ -203,6 +203,7 @@ nav:
       - Webhooks: ref/webhooks.md
       - Log streaming: ref/log-streaming.md
       - SSH session recording: ref/ssh-recording.md
+      - HTTPS certificates: ref/https-certificates.md
       - Tags: ref/tags.md
       - Debug: ref/debug.md
       - Integration:

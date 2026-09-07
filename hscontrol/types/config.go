@@ -185,6 +185,9 @@ type Config struct {
 	// SSHRecording is the embedded session recorder.
 	SSHRecording SSHRecordingConfig
 
+	// HTTPSCerts is certificate assistance for machines' MagicDNS names.
+	HTTPSCerts HTTPSCertsConfig
+
 	Tuning Tuning
 }
 
@@ -413,6 +416,67 @@ func smtpConfig() (SMTPConfig, error) {
 
 var errSMTPFrom = errors.New("notifications.smtp.from is required when notifications.smtp.host is set")
 
+var (
+	errHTTPSCertsProvider = errors.New(
+		"https_certificates.provider must be cloudflare, rfc2136 or command when https_certificates.enabled is set",
+	)
+	errHTTPSCertsBaseDomain = errors.New("https_certificates.enabled needs dns.base_domain")
+	errCloudflareToken      = errors.New("https_certificates.cloudflare.api_token is required")
+	errRFC2136Server        = errors.New("https_certificates.rfc2136.server is required")
+	errCommandPath          = errors.New("https_certificates.command.path is required")
+)
+
+// httpsCertsConfig reads the certificate assistance settings and checks
+// that the chosen provider has what it needs.
+func httpsCertsConfig() (HTTPSCertsConfig, error) {
+	cfg := HTTPSCertsConfig{
+		Enabled:  viper.GetBool("https_certificates.enabled"),
+		Provider: DNSProviderKind(viper.GetString("https_certificates.provider")),
+		TTL:      viper.GetDuration("https_certificates.ttl"),
+		Cloudflare: CloudflareDNSConfig{
+			APIToken: viper.GetString("https_certificates.cloudflare.api_token"),
+			ZoneID:   viper.GetString("https_certificates.cloudflare.zone_id"),
+		},
+		RFC2136: RFC2136Config{
+			Server:        viper.GetString("https_certificates.rfc2136.server"),
+			Zone:          viper.GetString("https_certificates.rfc2136.zone"),
+			TSIGKeyName:   viper.GetString("https_certificates.rfc2136.tsig_key_name"),
+			TSIGSecret:    viper.GetString("https_certificates.rfc2136.tsig_secret"),
+			TSIGAlgorithm: viper.GetString("https_certificates.rfc2136.tsig_algorithm"),
+		},
+		Command: CommandDNSConfig{
+			Path: viper.GetString("https_certificates.command.path"),
+		},
+	}
+
+	if !cfg.Enabled {
+		return cfg, nil
+	}
+
+	if viper.GetString("dns.base_domain") == "" {
+		return cfg, errHTTPSCertsBaseDomain
+	}
+
+	switch cfg.Provider {
+	case DNSProviderCloudflare:
+		if cfg.Cloudflare.APIToken == "" {
+			return cfg, errCloudflareToken
+		}
+	case DNSProviderRFC2136:
+		if cfg.RFC2136.Server == "" {
+			return cfg, errRFC2136Server
+		}
+	case DNSProviderCommand:
+		if cfg.Command.Path == "" {
+			return cfg, errCommandPath
+		}
+	default:
+		return cfg, errHTTPSCertsProvider
+	}
+
+	return cfg, nil
+}
+
 func sshRecordingConfig() SSHRecordingConfig {
 	return SSHRecordingConfig{
 		Enabled:   viper.GetBool("ssh_recording.enabled"),
@@ -562,6 +626,9 @@ func LoadConfig(path string, isFile bool) error {
 
 	viper.SetDefault("notifications.smtp.port", 587)
 
+	viper.SetDefault("https_certificates.enabled", false)
+	viper.SetDefault("https_certificates.ttl", time.Minute)
+	viper.SetDefault("https_certificates.rfc2136.tsig_algorithm", "hmac-sha256")
 	viper.SetDefault("ssh_recording.enabled", false)
 	viper.SetDefault("ssh_recording.dir", "/var/lib/headscale/recordings")
 	viper.SetDefault("ssh_recording.state_dir", "/var/lib/headscale/recorder")
@@ -1389,6 +1456,11 @@ func LoadServerConfig() (*Config, error) {
 		return nil, err
 	}
 
+	httpsCerts, err := httpsCertsConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	serverURL := viper.GetString("server_url")
 
 	// BaseDomain cannot be the same as the server URL.
@@ -1472,6 +1544,8 @@ func LoadServerConfig() (*Config, error) {
 		SMTP: smtp,
 
 		SSHRecording: sshRecordingConfig(),
+
+		HTTPSCerts: httpsCerts,
 
 		CLI: CLIConfig{
 			Address:  viper.GetString("cli.address"),

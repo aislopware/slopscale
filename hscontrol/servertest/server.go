@@ -56,6 +56,7 @@ type serverConfig struct {
 	dns              *types.DNSConfig
 	smtp             *types.SMTPConfig
 	sshRecording     *types.SSHRecordingConfig
+	httpsCerts       *types.HTTPSCertsConfig
 }
 
 func defaultServerConfig() *serverConfig {
@@ -139,6 +140,12 @@ func WithSSHRecording(cfg types.SSHRecordingConfig) ServerOption {
 	return func(sc *serverConfig) { sc.sshRecording = &cfg }
 }
 
+// WithHTTPSCerts turns on certificate assistance with the given
+// provider; pair it with [WithDNS] for a base domain.
+func WithHTTPSCerts(cfg types.HTTPSCertsConfig) ServerOption {
+	return func(sc *serverConfig) { sc.httpsCerts = &cfg }
+}
+
 // WithSMTP gives the server a mail server, so email webhooks can be
 // created and delivered.
 func WithSMTP(cfg types.SMTPConfig) ServerOption {
@@ -196,6 +203,10 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 		cfg.SMTP = *sc.smtp
 	}
 
+	if sc.httpsCerts != nil {
+		cfg.HTTPSCerts = *sc.httpsCerts
+	}
+
 	if sc.sshRecording != nil {
 		cfg.SSHRecording = *sc.sshRecording
 	} else {
@@ -209,6 +220,7 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 
 	if sc.dns != nil {
 		cfg.DNSConfig = *sc.dns
+		cfg.BaseDomain = sc.dns.BaseDomain
 		// NewHeadscale rebuilds the tailcfg form from DNSConfig, the
 		// stored override and the MagicDNS zones; nil would mean "no DNS".
 		cfg.TailcfgDNSConfig = &tailcfg.DNSConfig{}

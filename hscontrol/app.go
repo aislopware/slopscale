@@ -30,6 +30,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/derp"
 	derpServer "github.com/juanfont/headscale/hscontrol/derp/server"
 	"github.com/juanfont/headscale/hscontrol/dns"
+	"github.com/juanfont/headscale/hscontrol/dnsprovider"
 	"github.com/juanfont/headscale/hscontrol/mapper"
 	"github.com/juanfont/headscale/hscontrol/recorder"
 	"github.com/juanfont/headscale/hscontrol/state"
@@ -88,6 +89,10 @@ type Headscale struct {
 	// recorder node feeds it when cfg.SSHRecording.Enabled.
 	recorder *recorder.Recorder
 
+	// dnsProvider publishes ACME challenge records for machines' HTTPS
+	// certificates; nil when cfg.HTTPSCerts is off.
+	dnsProvider dnsprovider.Provider
+
 	clientStreamsOpen sync.WaitGroup
 }
 
@@ -125,6 +130,11 @@ func NewHeadscale(cfg *types.Config) (*Headscale, error) {
 	}
 
 	app.recorder = newRecorder(cfg, s, s.NodeByIP)
+
+	app.dnsProvider, err = newDNSProvider(cfg)
+	if err != nil {
+		return nil, err
+	}
 
 	if len(cfg.TrustedProxies) > 0 {
 		app.realIPMiddleware, err = trustedProxyRealIP(cfg.TrustedProxies)
