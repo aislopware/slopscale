@@ -25,6 +25,7 @@ import {
   toChoice,
   toProvider,
   urlError,
+  urlField,
 } from "~/components/webhooks/model.ts";
 import type { ProviderChoice } from "~/components/webhooks/model.ts";
 import type { WebhookMutations } from "~/components/webhooks/mutations.ts";
@@ -54,7 +55,7 @@ export function WebhookDialog(props: WebhookDialogProps): ReactElement {
         title={secret === null ? title : "Webhook created"}
         description={
           secret === null
-            ? "An endpoint the server posts events to. Generic endpoints get the signed JSON array; chat providers get the message alone."
+            ? "An endpoint the server posts events to. Generic endpoints get the signed JSON array; chat, Telegram, ntfy and email endpoints get the message alone."
             : undefined
         }
       >
@@ -95,7 +96,7 @@ function draftIssue(draft: Draft): string | null {
     return "incomplete";
   }
 
-  return urlError(draft.url);
+  return urlError(draft.url, draft.provider);
 }
 
 function eventItems(eventTypes: readonly string[]): PickerItem[] {
@@ -114,7 +115,8 @@ function WebhookForm({
   const [draft, setDraft] = useState<Draft>(() => draftFrom(webhook));
   const [touched, setTouched] = useState(false);
   const mutation = webhook === undefined ? mutations.create : mutations.update;
-  const urlIssue = urlError(draft.url);
+  const urlIssue = urlError(draft.url, draft.provider);
+  const field = urlField(draft.provider);
   const update = (patch: Partial<Draft>): void => {
     setDraft((current) => ({ ...current, ...patch }));
   };
@@ -154,21 +156,6 @@ function WebhookForm({
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
       <Input
-        label="URL"
-        type="url"
-        value={draft.url}
-        spellCheck={false}
-        autoComplete="off"
-        placeholder="https://ops.example.com/headscale"
-        onChange={(event) => {
-          update({ url: event.target.value });
-        }}
-        onBlur={() => {
-          setTouched(true);
-        }}
-        {...(touched && urlIssue !== null ? { error: urlIssue } : {})}
-      />
-      <Input
         label="Description"
         required={false}
         value={draft.description}
@@ -199,6 +186,22 @@ function WebhookForm({
           </Select.Option>
         ))}
       </Select>
+      <Input
+        label={field.label}
+        type={draft.provider === "email" ? "text" : "url"}
+        value={draft.url}
+        spellCheck={false}
+        autoComplete="off"
+        placeholder={field.placeholder}
+        onChange={(event) => {
+          update({ url: event.target.value });
+        }}
+        onBlur={() => {
+          setTouched(true);
+        }}
+        {...(field.hint === "" ? {} : { description: field.hint })}
+        {...(touched && urlIssue !== null ? { error: urlIssue } : {})}
+      />
       <MultiPicker
         label="Events"
         description="Only these are delivered. A test delivery reaches the endpoint whatever it subscribes to."

@@ -33,9 +33,20 @@ func (s *State) DeleteExpiredSessions(cutoff time.Time) (int64, error) {
 	return s.db.DeleteExpiredSessions(cutoff)
 }
 
-// RecordAuditEvent appends one entry to the audit log.
+// RecordAuditEvent appends one entry to the audit log and hands it to
+// the log streams once it is stored, so a sink never sees an event the
+// log does not hold.
 func (s *State) RecordAuditEvent(e *types.AuditEvent) error {
-	return s.db.RecordAuditEvent(e)
+	err := s.db.RecordAuditEvent(e)
+	if err != nil {
+		return err
+	}
+
+	if s.logStreams != nil {
+		s.logStreams.Publish(*e)
+	}
+
+	return nil
 }
 
 // ListAuditEvents returns audit entries matching q, newest first.

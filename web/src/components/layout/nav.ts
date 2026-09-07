@@ -70,7 +70,7 @@ export const navGroups: readonly NavGroup[] = [
       { to: "/dns", label: "DNS", icon: GlobeIcon, scope: "dns:read" },
       {
         to: "/webhooks",
-        label: "Webhooks",
+        label: "Integrations",
         icon: WebhooksLogoIcon,
         scope: "webhooks:read",
       },

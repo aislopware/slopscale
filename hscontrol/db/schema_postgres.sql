@@ -353,3 +353,19 @@ CREATE TABLE webhook_deliveries(
   CONSTRAINT fk_webhook_deliveries_webhook FOREIGN KEY(webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE
 );
 CREATE INDEX idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, id);
+
+CREATE TABLE log_streams(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  destination text NOT NULL,
+  url text NOT NULL,
+  token text,
+  enabled boolean NOT NULL,
+  created_by bigint,
+  created_at timestamptz,
+  updated_at timestamptz,
+  last_delivery_at timestamptz,
+  last_delivery_status text,
+  delivered bigint NOT NULL DEFAULT 0,
+  dropped bigint NOT NULL DEFAULT 0
+);

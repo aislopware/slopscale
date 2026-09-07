@@ -66,6 +66,19 @@ COL groups.builtin text null=YES
 COL groups.requestable boolean null=YES default=false
 COL groups.created_at timestamp with time zone null=YES
 COL groups.updated_at timestamp with time zone null=YES
+COL log_streams.id bigint null=NO default=nextval('log_streams_id_seq'::regclass)
+COL log_streams.name text null=NO
+COL log_streams.destination text null=NO
+COL log_streams.url text null=NO
+COL log_streams.token text null=YES
+COL log_streams.enabled boolean null=NO
+COL log_streams.created_by bigint null=YES
+COL log_streams.created_at timestamp with time zone null=YES
+COL log_streams.updated_at timestamp with time zone null=YES
+COL log_streams.last_delivery_at timestamp with time zone null=YES
+COL log_streams.last_delivery_status text null=YES
+COL log_streams.delivered bigint null=NO default=0
+COL log_streams.dropped bigint null=NO default=0
 COL migrations.id character varying len=255 null=NO
 COL network_groups.id bigint null=NO default=nextval('network_groups_id_seq'::regclass)
 COL network_groups.network_id bigint null=NO
@@ -243,6 +256,7 @@ IDX CREATE UNIQUE INDEX idx_postures_name ON public.postures USING btree (name)
 IDX CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON public.pre_auth_keys USING btree (prefix) WHERE ((prefix IS NOT NULL) AND (prefix <> ''::text))
 IDX CREATE UNIQUE INDEX idx_provider_identifier ON public.users USING btree (provider_identifier) WHERE (provider_identifier IS NOT NULL)
 IDX CREATE UNIQUE INDEX idx_sessions_token_hash ON public.sessions USING btree (token_hash)
+IDX CREATE UNIQUE INDEX log_streams_pkey ON public.log_streams USING btree (id)
 IDX CREATE UNIQUE INDEX migrations_pkey ON public.migrations USING btree (id)
 IDX CREATE UNIQUE INDEX network_groups_pkey ON public.network_groups USING btree (id)
 IDX CREATE UNIQUE INDEX network_prefixes_pkey ON public.network_prefixes USING btree (id)
@@ -314,6 +328,14 @@ CON group_users group_users_user_id_not_null NOT NULL user_id
 CON groups groups_id_not_null NOT NULL id
 CON groups groups_name_not_null NOT NULL name
 CON groups groups_pkey PRIMARY KEY (id)
+CON log_streams log_streams_delivered_not_null NOT NULL delivered
+CON log_streams log_streams_destination_not_null NOT NULL destination
+CON log_streams log_streams_dropped_not_null NOT NULL dropped
+CON log_streams log_streams_enabled_not_null NOT NULL enabled
+CON log_streams log_streams_id_not_null NOT NULL id
+CON log_streams log_streams_name_not_null NOT NULL name
+CON log_streams log_streams_pkey PRIMARY KEY (id)
+CON log_streams log_streams_url_not_null NOT NULL url
 CON migrations migrations_id_not_null NOT NULL id
 CON migrations migrations_pkey PRIMARY KEY (id)
 CON network_groups fk_network_groups_group FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE

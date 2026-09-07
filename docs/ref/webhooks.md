@@ -9,7 +9,7 @@ work unchanged.
 
 ## Setting one up
 
-Create the endpoint from the console's _Webhooks_ page, with the CLI, or
+Create the endpoint from the console's _Integrations_ page, with the CLI, or
 through `/api/v1/webhook`:
 
 ```console
@@ -130,10 +130,74 @@ service's incoming webhook expects, instead of the signed array:
 | `slack`      | `{"text": "..."}`    |
 | `mattermost` | `{"text": "..."}`    |
 | `googlechat` | `{"text": "..."}`    |
+| `teams`      | `{"text": "..."}`    |
 | `discord`    | `{"content": "..."}` |
 
 Paste the incoming webhook URL the service gave you and pick the provider; the
-signature header is still sent but those services ignore it.
+signature header is still sent but those services ignore it. For Microsoft
+Teams, both the legacy incoming webhook connector and a Workflows "post to a
+channel when a webhook request is received" URL take the `text` body.
+
+## Notifications
+
+Three more providers reach people rather than services. They have no
+Tailscale counterpart.
+
+**Telegram.** Create a bot with BotFather, add it to the chat, and use the
+Bot API's `sendMessage` URL with the chat in a `chat_id` query parameter:
+
+```console
+$ headscale webhooks create --provider telegram \
+    --url 'https://api.telegram.org/bot<token>/sendMessage?chat_id=-1001234567890' \
+    --event nodeNeedsApproval --event userNeedsApproval
+```
+
+The server moves `chat_id` from the URL into the request body, where the Bot
+API expects it, and posts `{"chat_id": "...", "text": "..."}`. A group's chat
+ID is negative; `getUpdates` on the bot shows it after a message in the group.
+
+**ntfy.** Use the topic URL, on ntfy.sh or your own server. The message is
+posted as the notification with the tailnet as its title:
+
+```console
+$ headscale webhooks create --provider ntfy --url https://ntfy.sh/my-tailnet-ops \
+    --event nodeCreated --event nodeDeleted
+```
+
+**Email.** Set the mail server once in the configuration, then use `mailto:`
+and the recipients as the URL:
+
+```yaml
+notifications:
+  smtp:
+    host: smtp.example.com
+    port: 587
+    username: headscale
+    password: "..."
+    from: "Headscale <headscale@example.com>"
+    # starttls (default), tls for an implicit-TLS port such as 465, or
+    # none for a relay on localhost.
+    encryption: starttls
+```
+
+```console
+$ headscale webhooks create --provider email \
+    --url 'mailto:ops@example.com, security@example.com' \
+    --event nodeNeedsApproval --event userRoleUpdated
+```
+
+Each event is one message: the subject is the event's message with the
+tailnet in front, the body repeats it with the event type, the time and the
+event's data as JSON. Creating an email endpoint is refused while
+`notifications.smtp.host` is unset. Authentication is PLAIN over TLS, or
+CRAM-MD5 when the server offers only that; a server that only speaks LOGIN
+needs an unauthenticated relay in front. A mail server that rejects the
+sender, a recipient or the message is not retried; a connection or
+authentication failure is, like any other delivery. The delivery status for a
+sent mail is `sent`, since there is no HTTP status.
+
+Every kind of endpoint takes the same subscriptions and shows up in the same
+list with the same delivery history.
 
 ## Tailscale API
 

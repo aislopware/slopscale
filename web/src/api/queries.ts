@@ -57,6 +57,14 @@ export type AccessRequestOptions = MethodResponse<
 export const dnsQuery = api.queryOptions("get", "/api/v1/dns");
 export const networksQuery = api.queryOptions("get", "/api/v1/network");
 export const webhooksQuery = api.queryOptions("get", "/api/v1/webhook");
+
+export type LogStream = MethodResponse<
+  typeof api,
+  "get",
+  "/api/v1/log-stream"
+>["logStreams"][number];
+
+export const logStreamsQuery = api.queryOptions("get", "/api/v1/log-stream");
 export const webhookEventTypesQuery = api.queryOptions("get", "/api/v1/webhook/event-types");
 
 export type WebhookDelivery = MethodResponse<
@@ -163,7 +171,8 @@ type Collection =
   | "/api/v1/access-request"
   | "/api/v1/dns"
   | "/api/v1/network"
-  | "/api/v1/webhook";
+  | "/api/v1/webhook"
+  | "/api/v1/log-stream";
 
 /** Refetches every query under the given paths; a node change touches the node list and its detail. */
 export async function invalidate(

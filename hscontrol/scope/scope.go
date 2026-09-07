@@ -63,9 +63,11 @@ const (
 	Webhooks     Scope = "webhooks"
 	WebhooksRead Scope = "webhooks:read"
 
-	// LogsConfigurationRead gates the audit log, which Tailscale calls the
-	// configuration log. There is no write scope: the log is append-only
-	// and written by the server.
+	// LogsConfiguration gates the audit log, which Tailscale calls the
+	// configuration log: the read scope reads the log, the write scope
+	// manages where it is streamed to. The log itself is append-only and
+	// written by the server.
+	LogsConfiguration     Scope = "logs:configuration"
 	LogsConfigurationRead Scope = "logs:configuration:read"
 )
 
@@ -86,7 +88,7 @@ func Known() []Scope {
 		Users, UsersRead,
 		DNS, DNSRead,
 		Webhooks, WebhooksRead,
-		LogsConfigurationRead,
+		LogsConfiguration, LogsConfigurationRead,
 	}
 }
 
@@ -155,24 +157,23 @@ func RequiresTags(scopes []Scope) bool {
 // do more than this, whatever scopes it was minted with. The table follows
 // Tailscale's role matrix: owner and admin do everything; a network admin
 // manages the policy, routes and DNS and reads the rest; an IT admin manages
-// users, devices and keys and reads the policy; both manage webhooks and
-// posture attributes and read the audit log;
-// an auditor reads everything; a member has no admin access.
+// users, devices and keys and reads the policy; both manage webhooks,
+// posture attributes and log streaming; an auditor reads everything; a
+// member has no admin access.
 func ForRole(role types.Role) []Scope {
 	switch role {
 	case types.RoleOwner, types.RoleAdmin:
 		return []Scope{All}
 	case types.RoleNetworkAdmin:
 		return []Scope{
-			PolicyFile, DevicesRoutes, DevicesPostureAttributes, DNS, Webhooks,
+			PolicyFile, DevicesRoutes, DevicesPostureAttributes, DNS, Webhooks, LogsConfiguration,
 			UsersRead, DevicesCoreRead, AuthKeysRead, OAuthKeysRead, FeatureSettingsRead,
-			LogsConfigurationRead,
 		}
 	case types.RoleITAdmin:
 		return []Scope{
 			Users, DevicesCore, DevicesPostureAttributes, AuthKeys, OAuthKeys, FeatureSettings, Webhooks,
+			LogsConfiguration,
 			PolicyFileRead, DevicesRoutesRead, DNSRead,
-			LogsConfigurationRead,
 		}
 	case types.RoleAuditor:
 		return []Scope{AllRead}

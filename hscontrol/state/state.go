@@ -25,6 +25,7 @@ import (
 
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	hsdb "github.com/juanfont/headscale/hscontrol/db"
+	"github.com/juanfont/headscale/hscontrol/logstream"
 	"github.com/juanfont/headscale/hscontrol/policy"
 	"github.com/juanfont/headscale/hscontrol/policy/matcher"
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -122,6 +123,10 @@ type State struct {
 	settings atomic.Pointer[types.Settings]
 	// webhooks delivers events to the registered endpoints.
 	webhooks *webhook.Dispatcher
+	// logStreams ships the audit log to the registered sinks.
+	logStreams *logstream.Streamer
+	// logStreamMu orders writes to the log streams against reloads.
+	logStreamMu sync.Mutex
 
 	// access holds the groups and access rules; see [State.AccessModel].
 	access atomic.Pointer[types.AccessModel]
@@ -305,7 +310,18 @@ func NewState(cfg *types.Config) (*State, error) {
 	// Webhooks come after the first loads so that boot emits nothing.
 	s.webhooks = webhook.New(db, tailnetName(cfg))
 
+	if mailer := webhook.NewSMTPMailer(cfg.SMTP); mailer != nil {
+		s.webhooks.SetMailer(mailer)
+	}
+
 	err = s.loadWebhooks()
+	if err != nil {
+		return nil, err
+	}
+
+	s.logStreams = logstream.New(db, tailnetName(cfg))
+
+	err = s.loadLogStreams()
 	if err != nil {
 		return nil, err
 	}
@@ -322,6 +338,10 @@ func NewState(cfg *types.Config) (*State, error) {
 func (s *State) Close() error {
 	s.pings.drain()
 	s.nodeStore.Stop()
+
+	if s.logStreams != nil {
+		s.logStreams.Close()
+	}
 
 	if s.webhooks != nil {
 		s.webhooks.Close()

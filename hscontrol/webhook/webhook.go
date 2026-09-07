@@ -2,7 +2,8 @@
 // the way Tailscale's webhooks work: a JSON array of events, signed with
 // the endpoint's secret in a Tailscale-Webhook-Signature header, retried
 // a few times when the receiver is down. Chat providers get the message
-// in the shape their incoming webhooks expect instead.
+// in the shape their incoming webhooks expect instead, and email
+// endpoints get it as mail through the configured SMTP server.
 package webhook
 
 import (
@@ -40,6 +41,7 @@ type Dispatcher struct {
 	store   Store
 	tailnet string
 	client  *http.Client
+	mailer  Mailer
 	// backoff is the wait before each retry; tests shorten it.
 	backoff []time.Duration
 
@@ -121,6 +123,11 @@ func (d *Dispatcher) SetClient(client *http.Client) {
 // attempt.
 func (d *Dispatcher) SetBackoff(backoff []time.Duration) {
 	d.backoff = backoff
+}
+
+// SetMailer sets how email endpoints are delivered; with none, they fail.
+func (d *Dispatcher) SetMailer(m Mailer) {
+	d.mailer = m
 }
 
 // Reload replaces the endpoints the dispatcher delivers to.
@@ -322,10 +329,12 @@ func (d *Dispatcher) deliverWithRetry(ctx context.Context, endpoint types.Webhoo
 }
 
 // retryable reports whether another attempt may help: a network error
-// or a server-side status. A 4xx is the receiver's verdict.
+// or a server-side status. A 4xx is the receiver's verdict, and so is a
+// mail server's permanent rejection.
 func retryable(status int, err error) bool {
 	if status == 0 {
-		return !errors.Is(err, context.Canceled) && !errors.Is(err, ErrRedirected)
+		return !errors.Is(err, context.Canceled) && !errors.Is(err, ErrRedirected) &&
+			!errors.Is(err, ErrNoMailer) && !errors.Is(err, ErrMailRejected)
 	}
 
 	return status >= http.StatusInternalServerError || status == http.StatusTooManyRequests
@@ -334,23 +343,32 @@ func retryable(status int, err error) bool {
 // ErrDeliveryRejected is returned when the receiver answered outside 2xx.
 var ErrDeliveryRejected = errors.New("webhook receiver rejected the delivery")
 
-// deliver posts the event once and returns the HTTP status it got.
+// deliver sends the event once and returns the HTTP status it got; an
+// email delivery has no status and reports only the error.
 func (d *Dispatcher) deliver(ctx context.Context, endpoint types.Webhook, event types.WebhookEvent) (int, error) {
-	body, err := Payload(endpoint.ProviderType, event)
+	if endpoint.ProviderType == types.WebhookProviderEmail {
+		return 0, d.mail(ctx, endpoint, event)
+	}
+
+	payload, err := Payload(endpoint, event)
 	if err != nil {
 		return 0, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.URL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, payload.URL, bytes.NewReader(payload.Body))
 	if err != nil {
 		return 0, fmt.Errorf("building webhook request: %w", err)
 	}
 
 	now := time.Now()
 
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", payload.ContentType)
 	req.Header.Set("User-Agent", "headscale-webhook/1")
-	req.Header.Set(SignatureHeader, Sign(endpoint.Secret, now, body))
+	req.Header.Set(SignatureHeader, Sign(endpoint.Secret, now, payload.Body))
+
+	if endpoint.ProviderType == types.WebhookProviderNtfy {
+		req.Header.Set("Title", ntfyTitle(event))
+	}
 
 	resp, err := d.client.Do(req)
 	if err != nil {
@@ -381,8 +399,13 @@ func (d *Dispatcher) record(
 	}
 
 	text := strconv.Itoa(status)
-	if status == 0 && err != nil {
+
+	switch {
+	case status == 0 && err != nil:
 		text = err.Error()
+	case status == 0:
+		// Mail has no status; the delivery went through.
+		text = "sent"
 	}
 
 	recordErr := d.store.RecordWebhookDelivery(types.WebhookDelivery{
@@ -441,27 +464,66 @@ func mac(secret, ts string, body []byte) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// Payload renders the event for the provider: the signed JSON array for
-// the generic kind, and the message alone in the shape the chat service's
-// incoming webhook expects otherwise.
-func Payload(provider types.WebhookProvider, event types.WebhookEvent) ([]byte, error) {
+// Request is what one delivery posts: the URL, the body and its type.
+// The chat providers get the message alone in the shape their incoming
+// webhook expects; the generic kind gets the signed JSON array.
+type Request struct {
+	URL         string
+	ContentType string
+	Body        []byte
+}
+
+const (
+	contentTypeJSON = "application/json"
+	contentTypeText = "text/plain; charset=utf-8"
+)
+
+// Payload renders the event for the endpoint's provider. An email
+// endpoint has no HTTP payload; see [Mailer].
+func Payload(endpoint types.Webhook, event types.WebhookEvent) (Request, error) {
 	var body any
 
-	switch provider {
+	req := Request{URL: endpoint.URL, ContentType: contentTypeJSON}
+
+	switch endpoint.ProviderType {
 	case types.WebhookProviderGeneric:
 		body = []types.WebhookEvent{event}
-	case types.WebhookProviderSlack, types.WebhookProviderMattermost, types.WebhookProviderGoogleChat:
+	case types.WebhookProviderSlack, types.WebhookProviderMattermost, types.WebhookProviderGoogleChat,
+		types.WebhookProviderTeams:
 		body = map[string]string{"text": event.Message}
 	case types.WebhookProviderDiscord:
 		body = map[string]string{"content": event.Message}
+	case types.WebhookProviderTelegram:
+		// The chat lives in the URL's query, where the operator put it;
+		// the Bot API wants it in the body next to the text.
+		u, err := url.Parse(endpoint.URL)
+		if err != nil {
+			return Request{}, fmt.Errorf("parsing telegram URL: %w", err)
+		}
+
+		query := u.Query()
+		body = map[string]string{types.TelegramChatParam: query.Get(types.TelegramChatParam), "text": event.Message}
+
+		query.Del(types.TelegramChatParam)
+		u.RawQuery = query.Encode()
+		req.URL = u.String()
+	case types.WebhookProviderNtfy:
+		req.ContentType = contentTypeText
+		req.Body = []byte(event.Message)
+
+		return req, nil
+	case types.WebhookProviderEmail:
+		return Request{}, fmt.Errorf("%w: email endpoints are not posted", types.ErrWebhookProviderUnknown)
 	default:
-		return nil, fmt.Errorf("%w: %q", types.ErrWebhookProviderUnknown, provider)
+		return Request{}, fmt.Errorf("%w: %q", types.ErrWebhookProviderUnknown, endpoint.ProviderType)
 	}
 
 	out, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf("encoding webhook payload: %w", err)
+		return Request{}, fmt.Errorf("encoding webhook payload: %w", err)
 	}
 
-	return out, nil
+	req.Body = out
+
+	return req, nil
 }

@@ -25,8 +25,9 @@ type Webhook struct {
 	ID          string `format:"uint64"    json:"id"`
 	URL         string `json:"url"`
 	Description string `json:"description"`
-	// ProviderType is empty for the signed JSON payload, or slack,
-	// mattermost, googlechat or discord for a chat service's shape.
+	// ProviderType is empty for the signed JSON payload, a chat service
+	// (slack, mattermost, googlechat, discord, teams), telegram, ntfy or
+	// email; see docs/ref/webhooks.md for what each expects in the URL.
 	ProviderType  string   `json:"providerType"`
 	Subscriptions []string `json:"subscriptions" nullable:"false"`
 	// Secret signs every delivery; shown once, on create and rotate.
@@ -42,10 +43,13 @@ type Webhook struct {
 
 // WebhookRequestBody creates or replaces a webhook.
 type WebhookRequestBody struct {
-	URL         string `format:"uri"                 json:"url"`
+	URL         string `json:"url"`
 	Description string `json:"description,omitempty"`
-	// ProviderType shapes the payload for a chat service.
-	ProviderType  string   `enum:",slack,mattermost,googlechat,discord" json:"providerType,omitempty"`
+	// ProviderType shapes the payload and picks the transport: an
+	// email endpoint's URL is "mailto:" and the recipients, a telegram
+	// one is the Bot API's sendMessage URL with a chat_id query.
+	//nolint:lll // the enum tag lists every provider
+	ProviderType  string   `enum:",slack,mattermost,googlechat,discord,teams,telegram,ntfy,email" json:"providerType,omitempty"`
 	Subscriptions []string `json:"subscriptions"`
 }
 

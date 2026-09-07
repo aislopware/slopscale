@@ -189,6 +189,26 @@ rebuilds the policy. `--expires` on `headscale access-rules` and
 user and a _Requests_ tab under the console's access controls cover it.
 See [Temporary access](https://headscale.net/development/ref/temporary-access/).
 
+### Notifications and log streaming
+
+Webhooks reach people now, not only services. Four providers join the chat
+ones: `teams` posts to a Microsoft Teams incoming webhook or workflow,
+`telegram` posts to a bot's `sendMessage` URL with the chat taken from its
+`chat_id` query parameter, `ntfy` posts to a topic, and `email` sends each
+event as mail to the `mailto:` recipients through the server configured under
+`notifications.smtp` (host, port, username, password, from, and `starttls`,
+`tls` or `none`). Log streaming ships the audit log to a SIEM as it is
+written, the way Tailscale's log streaming does: a stream names a
+destination (`http`, `splunk`, `elastic`, `datadog`, `axiom` or `loki`), a
+URL and a credential, and every audit event is batched and posted in the
+shape that sink expects, with retries, counters of delivered and dropped
+entries and a test entry on demand. The `logs:configuration` scope, held by
+every admin role, manages streams; `logs:configuration:read` lists them
+without their tokens. `headscale log-streams`, `/api/v1/log-stream` and a
+_Log streams_ tab on the console's _Integrations_ page (formerly _Webhooks_)
+cover it. See [Log streaming](https://headscale.net/development/ref/log-streaming/)
+and [Webhooks](https://headscale.net/development/ref/webhooks/#notifications).
+
 ### Networks
 
 Subnets and exit nodes can now be handed to groups as networks, the way

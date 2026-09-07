@@ -69,7 +69,7 @@ func (s *State) CreateWebhook(w types.Webhook) (types.Webhook, error) {
 	w.URL = strings.TrimSpace(w.URL)
 	w.Secret = newWebhookSecret()
 
-	err := types.ValidateWebhook(w)
+	err := s.validateWebhook(w)
 	if err != nil {
 		return types.Webhook{}, err
 	}
@@ -85,6 +85,22 @@ func (s *State) CreateWebhook(w types.Webhook) (types.Webhook, error) {
 	return created, s.loadWebhooks()
 }
 
+// validateWebhook checks the endpoint and, for email, that the server
+// can send mail at all; refusing at creation beats a delivery that can
+// never work.
+func (s *State) validateWebhook(w types.Webhook) error {
+	err := types.ValidateWebhook(w)
+	if err != nil {
+		return err
+	}
+
+	if w.ProviderType == types.WebhookProviderEmail && !s.cfg.SMTP.Configured() {
+		return types.ErrWebhookMailUnavailable
+	}
+
+	return nil
+}
+
 // UpdateWebhook replaces the URL, description, provider and
 // subscriptions of an endpoint; the secret stays. The secret column is
 // not written, so an edit cannot undo a rotation.
@@ -93,7 +109,7 @@ func (s *State) UpdateWebhook(w types.Webhook) (types.Webhook, error) {
 	// Validation wants a secret; the stored one is not read here.
 	w.Secret = newWebhookSecret()
 
-	err := types.ValidateWebhook(w)
+	err := s.validateWebhook(w)
 	if err != nil {
 		return types.Webhook{}, err
 	}

@@ -543,6 +543,12 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609111000-temporary-access",
 			run: migrateTemporaryAccess,
 		},
+		{
+			// Log streaming: log_streams records the sinks the audit
+			// log is shipped to. See docs/ref/log-streaming.md.
+			id:  "202609120900-log-streams",
+			run: migrateLogStreams,
+		},
 	}
 }
 
@@ -1714,6 +1720,45 @@ func migrateTemporaryAccess(tx *Tx) error {
   CONSTRAINT fk_access_requests_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
 )`,
 			indexes: []string{`CREATE INDEX idx_access_requests_status ON access_requests(status, id)`},
+		},
+	})
+}
+
+// migrateLogStreams (202609120900) creates the log_streams table.
+func migrateLogStreams(tx *Tx) error {
+	return createTables(tx, []tableDefinition{
+		{
+			name: "log_streams",
+			sqlite: `CREATE TABLE log_streams(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  destination text NOT NULL,
+  url text NOT NULL,
+  token text,
+  enabled boolean NOT NULL,
+  created_by integer,
+  created_at datetime,
+  updated_at datetime,
+  last_delivery_at datetime,
+  last_delivery_status text,
+  delivered integer NOT NULL DEFAULT 0,
+  dropped integer NOT NULL DEFAULT 0
+)`,
+			postgres: `CREATE TABLE log_streams(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  destination text NOT NULL,
+  url text NOT NULL,
+  token text,
+  enabled boolean NOT NULL,
+  created_by bigint,
+  created_at timestamptz,
+  updated_at timestamptz,
+  last_delivery_at timestamptz,
+  last_delivery_status text,
+  delivered bigint NOT NULL DEFAULT 0,
+  dropped bigint NOT NULL DEFAULT 0
+)`,
 		},
 	})
 }

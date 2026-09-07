@@ -284,6 +284,22 @@ policy:
   # country of the address a node connects to the control server from.
   # geoip_database: /var/lib/headscale/GeoLite2-Country.mmdb
 
+## Notifications
+#
+# Email webhooks (provider "email", URL "mailto:...") send through this
+# server; see https://headscale.net/development/ref/webhooks/#notifications.
+# Leave host unset to refuse email endpoints.
+# notifications:
+#   smtp:
+#     host: smtp.example.com
+#     port: 587
+#     username: headscale
+#     password: ""
+#     from: "Headscale <headscale@example.com>"
+#     # starttls (default), tls for an implicit-TLS port such as 465, or
+#     # none for a relay on localhost.
+#     encryption: starttls
+
 ## DNS
 #
 # headscale supports Tailscale's DNS configuration and MagicDNS.

@@ -1,10 +1,14 @@
 package webhook
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/mail"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -62,25 +66,138 @@ func TestPayloadPerProvider(t *testing.T) {
 	t.Parallel()
 
 	event := types.WebhookEvent{Type: types.EventNodeCreated, Message: "Node laptop joined.", Version: 1}
+	endpoint := func(p types.WebhookProvider, url string) types.Webhook {
+		return types.Webhook{ProviderType: p, URL: url}
+	}
 
-	generic, err := Payload(types.WebhookProviderGeneric, event)
+	generic, err := Payload(endpoint(types.WebhookProviderGeneric, "https://x/hook"), event)
 	require.NoError(t, err)
 
 	var events []types.WebhookEvent
-	require.NoError(t, json.Unmarshal(generic, &events))
+	require.NoError(t, json.Unmarshal(generic.Body, &events))
 	require.Len(t, events, 1)
 	assert.Equal(t, types.EventNodeCreated, events[0].Type)
+	assert.Equal(t, "https://x/hook", generic.URL)
+	assert.Equal(t, "application/json", generic.ContentType)
 
-	slack, err := Payload(types.WebhookProviderSlack, event)
+	slack, err := Payload(endpoint(types.WebhookProviderSlack, "https://x/hook"), event)
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"text":"Node laptop joined."}`, string(slack))
+	assert.JSONEq(t, `{"text":"Node laptop joined."}`, string(slack.Body))
 
-	discord, err := Payload(types.WebhookProviderDiscord, event)
+	teams, err := Payload(endpoint(types.WebhookProviderTeams, "https://x/hook"), event)
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"content":"Node laptop joined."}`, string(discord))
+	assert.JSONEq(t, `{"text":"Node laptop joined."}`, string(teams.Body))
 
-	_, err = Payload("pager", event)
+	discord, err := Payload(endpoint(types.WebhookProviderDiscord, "https://x/hook"), event)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"content":"Node laptop joined."}`, string(discord.Body))
+
+	telegram, err := Payload(
+		endpoint(types.WebhookProviderTelegram, "https://api.telegram.org/bot123:abc/sendMessage?chat_id=-42"), event,
+	)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"chat_id":"-42","text":"Node laptop joined."}`, string(telegram.Body))
+	assert.Equal(t, "https://api.telegram.org/bot123:abc/sendMessage", telegram.URL, "the chat moved into the body")
+
+	ntfy, err := Payload(endpoint(types.WebhookProviderNtfy, "https://ntfy.sh/ops"), event)
+	require.NoError(t, err)
+	assert.Equal(t, "Node laptop joined.", string(ntfy.Body))
+	assert.Equal(t, "text/plain; charset=utf-8", ntfy.ContentType)
+
+	_, err = Payload(endpoint(types.WebhookProviderEmail, "mailto:ops@example.com"), event)
 	require.ErrorIs(t, err, types.ErrWebhookProviderUnknown)
+
+	_, err = Payload(endpoint("pager", "https://x"), event)
+	require.ErrorIs(t, err, types.ErrWebhookProviderUnknown)
+}
+
+type memMailer struct {
+	mu   sync.Mutex
+	sent []sentMail
+	err  error
+}
+
+type sentMail struct {
+	to      []string
+	subject string
+	body    string
+}
+
+func (m *memMailer) Send(_ context.Context, to []string, subject, body string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.err != nil {
+		return m.err
+	}
+
+	m.sent = append(m.sent, sentMail{to: to, subject: subject, body: body})
+
+	return nil
+}
+
+func (m *memMailer) count() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return len(m.sent)
+}
+
+func TestEmailEndpointGoesThroughTheMailer(t *testing.T) {
+	t.Parallel()
+
+	store := &memStore{}
+	d := New(store, "example.ts.net")
+	t.Cleanup(d.Close)
+
+	endpoint := types.Webhook{
+		ID: 7, ProviderType: types.WebhookProviderEmail, URL: "mailto:ops@example.com, sec@example.com",
+	}
+
+	err := d.Test(t.Context(), endpoint)
+	require.ErrorIs(t, err, ErrNoMailer, "no mail server configured")
+	assert.Equal(t, ErrNoMailer.Error(), store.status(7))
+
+	mailer := &memMailer{}
+	d.SetMailer(mailer)
+
+	require.NoError(t, d.Test(t.Context(), endpoint))
+	assert.Equal(t, "sent", store.status(7), "a sent mail has no HTTP status")
+	assert.True(t, store.record(7).OK)
+
+	require.Equal(t, 1, mailer.count())
+	assert.Equal(t, []string{"ops@example.com", "sec@example.com"}, mailer.sent[0].to)
+	assert.Equal(t, "[example.ts.net] This is a test event from headscale.", mailer.sent[0].subject)
+	assert.Contains(t, mailer.sent[0].body, "Event: test")
+
+	// A permanent rejection is not retried.
+	rejecting := &memMailer{err: fmt.Errorf("%w: 550 no such user", ErrMailRejected)}
+	d.SetMailer(rejecting)
+	d.SetBackoff([]time.Duration{time.Millisecond, time.Millisecond})
+
+	d.Reload([]types.Webhook{{
+		ID: 8, ProviderType: types.WebhookProviderEmail, URL: "mailto:nobody@example.com",
+		Subscriptions: []types.WebhookEventType{types.EventNodeCreated},
+	}})
+	d.Emit(types.EventNodeCreated, "Node laptop joined.", nil)
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.Equal(c, 1, store.record(8).Attempts)
+	}, 5*time.Second, 10*time.Millisecond)
+	assert.False(t, store.record(8).OK)
+	assert.Contains(t, store.status(8), "550 no such user")
+}
+
+func TestMailMessage(t *testing.T) {
+	t.Parallel()
+
+	from := &mail.Address{Name: "Headscale", Address: "hs@example.com"}
+	msg := message(from, []string{"a@example.com"}, "Đăng nhập", "body")
+
+	assert.Contains(t, msg, "From: \"Headscale\" <hs@example.com>\r\n")
+	assert.Contains(t, msg, "To: a@example.com\r\n")
+	assert.Contains(t, msg, "Subject: =?utf-8?q?")
+	assert.True(t, strings.HasSuffix(msg, "\r\n\r\nbody"))
 }
 
 func TestEmitDeliversToSubscribedWithRetry(t *testing.T) {

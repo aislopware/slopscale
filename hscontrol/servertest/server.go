@@ -52,6 +52,7 @@ type serverConfig struct {
 	nodeStoreBatch   time.Duration
 	oidc             *types.OIDCConfig
 	dns              *types.DNSConfig
+	smtp             *types.SMTPConfig
 }
 
 func defaultServerConfig() *serverConfig {
@@ -128,6 +129,12 @@ func WithDNS(cfg types.DNSConfig) ServerOption {
 	return func(c *serverConfig) { c.dns = &cfg }
 }
 
+// WithSMTP gives the server a mail server, so email webhooks can be
+// created and delivered.
+func WithSMTP(cfg types.SMTPConfig) ServerOption {
+	return func(c *serverConfig) { c.smtp = &cfg }
+}
+
 // NewServer creates and starts a Headscale test server.
 // The server is fully functional and accepts real Tailscale control
 // protocol connections over Noise.
@@ -173,6 +180,10 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 			NodeMapSessionBufferedChanSize: sc.bufferedChanSize,
 			NodeStoreBatchTimeout:          sc.nodeStoreBatch,
 		},
+	}
+
+	if sc.smtp != nil {
+		cfg.SMTP = *sc.smtp
 	}
 
 	if sc.oidc != nil {

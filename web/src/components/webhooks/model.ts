@@ -1,6 +1,15 @@
 import type { Webhook } from "~/api/queries.ts";
 
-export type ProviderType = "" | "slack" | "mattermost" | "googlechat" | "discord";
+export type ProviderType =
+  | ""
+  | "slack"
+  | "mattermost"
+  | "googlechat"
+  | "discord"
+  | "teams"
+  | "telegram"
+  | "ntfy"
+  | "email";
 
 /**
  * What the form picks from: the server's empty provider is "generic" here, since a select cannot
@@ -33,7 +42,54 @@ export const providerOptions: readonly ProviderOption[] = [
     description: "A space webhook; the message as text.",
   },
   { value: "discord", label: "Discord", description: "A channel webhook; the message as content." },
+  {
+    value: "teams",
+    label: "Microsoft Teams",
+    description: "An incoming webhook or workflow; the message as text.",
+  },
+  {
+    value: "telegram",
+    label: "Telegram",
+    description: "The Bot API's sendMessage URL with the chat in a chat_id query parameter.",
+  },
+  { value: "ntfy", label: "ntfy", description: "A topic URL; the message as the notification." },
+  {
+    value: "email",
+    label: "Email",
+    description: "mailto: and the recipients; sent through the server's SMTP settings.",
+  },
 ];
+
+/** What the URL field asks for, per provider. */
+export interface UrlField {
+  readonly label: string;
+  readonly placeholder: string;
+  readonly hint: string;
+}
+
+const defaultUrlField: UrlField = {
+  label: "URL",
+  placeholder: "https://ops.example.com/headscale",
+  hint: "",
+};
+
+const urlFields: Partial<Record<ProviderChoice, UrlField>> = {
+  telegram: {
+    label: "Bot URL",
+    placeholder: "https://api.telegram.org/bot<token>/sendMessage?chat_id=-100123",
+    hint: "The token is in the URL; the chat_id query parameter names the chat.",
+  },
+  email: {
+    label: "Recipients",
+    placeholder: "mailto:ops@example.com, security@example.com",
+    hint: "mailto: followed by one or more addresses. The server needs notifications.smtp configured.",
+  },
+  ntfy: { label: "Topic URL", placeholder: "https://ntfy.sh/headscale-ops", hint: "" },
+};
+
+export function urlField(choice: ProviderChoice): UrlField {
+  return urlFields[choice] ?? defaultUrlField;
+}
 
 /** The form's choice for a server value; anything unknown shows as generic. */
 export function toChoice(value: string): ProviderChoice {
@@ -64,6 +120,9 @@ const eventHints: Readonly<Record<string, string>> = {
   userApproved: "A user was approved",
   userRoleUpdated: "A user's role changed",
   userDeleted: "A user was deleted",
+  accessRequestCreated: "A member asked for temporary access",
+  accessRequestApproved: "An access request was approved",
+  accessRequestDenied: "An access request was denied",
 };
 
 export function eventHint(type: string): string {
@@ -107,8 +166,14 @@ export function deliveryLabel(webhook: Pick<Webhook, "lastDeliveryStatus">): str
   return status.length > maxLength ? `${status.slice(0, maxLength)}…` : status;
 }
 
-/** The host of the URL, the part an operator recognises at a glance. */
+const mailto = "mailto:";
+
+/** The host of the URL, the part an operator recognises at a glance; the recipients for email. */
 export function urlHost(url: string): string {
+  if (url.startsWith(mailto)) {
+    return url.slice(mailto.length).trim();
+  }
+
   try {
     return new URL(url).host;
   } catch {
@@ -116,19 +181,31 @@ export function urlHost(url: string): string {
   }
 }
 
-export function urlError(url: string): string | null {
+export function urlError(url: string, choice: ProviderChoice = "generic"): string | null {
   const trimmed = url.trim();
 
   if (trimmed === "") {
     return null;
   }
 
+  if (choice === "email") {
+    return trimmed.startsWith(mailto) && trimmed.length > mailto.length
+      ? null
+      : "Enter mailto: followed by the recipients";
+  }
+
   try {
     const parsed = new URL(trimmed);
 
-    return parsed.protocol === "http:" || parsed.protocol === "https:"
-      ? null
-      : "The URL must start with http:// or https://";
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return "The URL must start with http:// or https://";
+    }
+
+    if (choice === "telegram" && parsed.searchParams.get("chat_id") === null) {
+      return "Add the chat as a chat_id query parameter";
+    }
+
+    return null;
   } catch {
     return "Enter a full URL, like https://example.com/hook";
   }

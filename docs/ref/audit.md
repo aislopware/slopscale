@@ -51,7 +51,8 @@ page.
 
 Reading the log needs the `logs:configuration:read` scope, which every
 [role](roles.md) except member holds. The console shows it under *Audit
-log*.
+log*. To ship it to a SIEM as it is written, see [Log
+streaming](log-streaming.md).
 
 ## Retention
 

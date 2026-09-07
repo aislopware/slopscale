@@ -454,3 +454,24 @@ CREATE TABLE webhook_deliveries(
   CONSTRAINT fk_webhook_deliveries_webhook FOREIGN KEY(webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE
 );
 CREATE INDEX idx_webhook_deliveries_webhook ON webhook_deliveries(webhook_id, id);
+
+-- log_streams are the sinks the audit log is shipped to; see
+-- docs/ref/log-streaming.md. token is the sink's credential and is never
+-- listed. delivered and dropped count entries over the stream's life;
+-- last_delivery_status is the HTTP status of the newest batch, or the
+-- error text when no response came.
+CREATE TABLE log_streams(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  destination text NOT NULL,
+  url text NOT NULL,
+  token text,
+  enabled boolean NOT NULL,
+  created_by integer,
+  created_at datetime,
+  updated_at datetime,
+  last_delivery_at datetime,
+  last_delivery_status text,
+  delivered integer NOT NULL DEFAULT 0,
+  dropped integer NOT NULL DEFAULT 0
+);

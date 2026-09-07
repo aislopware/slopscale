@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"net/netip"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -177,6 +179,9 @@ type Config struct {
 
 	Policy PolicyConfig
 
+	// SMTP is the mail server email webhooks send through.
+	SMTP SMTPConfig
+
 	Tuning Tuning
 }
 
@@ -338,6 +343,73 @@ type LogConfig struct {
 	Level  zerolog.Level
 }
 
+// SMTPEncryption is how the SMTP connection is secured.
+type SMTPEncryption string
+
+// The encryptions notifications.smtp.encryption accepts.
+const (
+	// SMTPStartTLS connects in the clear and upgrades with STARTTLS; the
+	// upgrade is required, not opportunistic.
+	SMTPStartTLS SMTPEncryption = "starttls"
+	// SMTPImplicitTLS opens a TLS connection, the port 465 way.
+	SMTPImplicitTLS SMTPEncryption = "tls"
+	// SMTPNoEncryption sends in the clear; only for a relay on localhost.
+	SMTPNoEncryption SMTPEncryption = "none"
+)
+
+// SMTPConfig is the mail server email webhooks send through; see
+// docs/ref/webhooks.md. An empty Host means email endpoints are refused.
+type SMTPConfig struct {
+	Host     string
+	Port     int
+	Username string
+	Password string `json:"-"` // never serialise the mail password
+	// From is the sender address, with an optional display name.
+	From       string
+	Encryption SMTPEncryption
+}
+
+// Configured reports whether a mail server is set.
+func (c SMTPConfig) Configured() bool {
+	return c.Host != ""
+}
+
+// Addr is the host:port to dial.
+func (c SMTPConfig) Addr() string {
+	return net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
+}
+
+var errSMTPEncryption = errors.New("notifications.smtp.encryption must be starttls, tls or none")
+
+func smtpConfig() (SMTPConfig, error) {
+	cfg := SMTPConfig{
+		Host:       viper.GetString("notifications.smtp.host"),
+		Port:       viper.GetInt("notifications.smtp.port"),
+		Username:   viper.GetString("notifications.smtp.username"),
+		Password:   viper.GetString("notifications.smtp.password"),
+		From:       viper.GetString("notifications.smtp.from"),
+		Encryption: SMTPEncryption(viper.GetString("notifications.smtp.encryption")),
+	}
+
+	if !cfg.Configured() {
+		return cfg, nil
+	}
+
+	switch cfg.Encryption {
+	case SMTPStartTLS, SMTPImplicitTLS, SMTPNoEncryption:
+	default:
+		return SMTPConfig{}, fmt.Errorf("%w, not %q", errSMTPEncryption, cfg.Encryption)
+	}
+
+	if cfg.From == "" {
+		return SMTPConfig{}, errSMTPFrom
+	}
+
+	return cfg, nil
+}
+
+var errSMTPFrom = errors.New("notifications.smtp.from is required when notifications.smtp.host is set")
+
 // Tuning contains advanced performance tuning parameters for Headscale.
 // These settings control internal batching, timeouts, and resource allocation.
 // The defaults are carefully chosen for typical deployments and should rarely
@@ -475,6 +547,9 @@ func LoadConfig(path string, isFile bool) error {
 	viper.AutomaticEnv()
 
 	viper.SetDefault("policy.mode", "file")
+
+	viper.SetDefault("notifications.smtp.port", 587)
+	viper.SetDefault("notifications.smtp.encryption", string(SMTPStartTLS))
 
 	viper.SetDefault("tls_letsencrypt_cache_dir", "/var/www/.cache")
 	viper.SetDefault("tls_letsencrypt_challenge_type", HTTP01ChallengeType)
@@ -1245,6 +1320,11 @@ func LoadServerConfig() (*Config, error) {
 	derpConfig := derpConfig()
 	logTailConfig := logtailConfig()
 
+	smtp, err := smtpConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	oidcClientSecret := viper.GetString("oidc.client_secret")
 
 	oidcClientSecretPath := viper.GetString("oidc.client_secret_path")
@@ -1361,6 +1441,8 @@ func LoadServerConfig() (*Config, error) {
 		},
 
 		Policy: policyConfig(),
+
+		SMTP: smtp,
 
 		CLI: CLIConfig{
 			Address:  viper.GetString("cli.address"),

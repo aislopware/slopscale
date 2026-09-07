@@ -201,6 +201,7 @@ nav:
       - Groups and access rules: ref/access-control.md
       - Networks: ref/networks.md
       - Webhooks: ref/webhooks.md
+      - Log streaming: ref/log-streaming.md
       - Tags: ref/tags.md
       - Debug: ref/debug.md
       - Integration:

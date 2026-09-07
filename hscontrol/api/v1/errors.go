@@ -32,7 +32,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrNetworkNotFound),
 		errors.Is(err, types.ErrPostureNotFound),
 		errors.Is(err, types.ErrAccessRequestNotFound),
-		errors.Is(err, types.ErrWebhookNotFound):
+		errors.Is(err, types.ErrWebhookNotFound),
+		errors.Is(err, types.ErrLogStreamNotFound):
 		return huma.Error404NotFound(msg, err)
 
 	case errors.Is(err, state.ErrGivenNameInvalid),
@@ -72,6 +73,14 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrWebhookEventUnknown),
 		errors.Is(err, types.ErrWebhookProviderUnknown),
 		errors.Is(err, types.ErrWebhookDescriptionLong),
+		errors.Is(err, types.ErrWebhookMailtoInvalid),
+		errors.Is(err, types.ErrWebhookTelegramNoChat),
+		errors.Is(err, types.ErrWebhookMailUnavailable),
+		errors.Is(err, types.ErrLogStreamNameInvalid),
+		errors.Is(err, types.ErrLogStreamURLInvalid),
+		errors.Is(err, types.ErrLogStreamDestinationUnknown),
+		errors.Is(err, types.ErrLogStreamTokenRequired),
+		errors.Is(err, types.ErrLogStreamTokenLong),
 		errors.Is(err, types.ErrPostureNameEmpty),
 		errors.Is(err, types.ErrPostureNameTooLong),
 		errors.Is(err, types.ErrPostureNameInvalid),

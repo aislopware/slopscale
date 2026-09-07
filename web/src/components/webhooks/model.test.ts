@@ -62,6 +62,9 @@ describe("urls", () => {
   it("extracts the host", () => {
     expect(urlHost("https://hooks.example.com/a/b")).toBe("hooks.example.com");
     expect(urlHost("nonsense")).toBe("nonsense");
+    expect(urlHost("mailto:ops@example.com, sec@example.com")).toBe(
+      "ops@example.com, sec@example.com",
+    );
   });
 
   it("accepts http and https only", () => {
@@ -69,6 +72,20 @@ describe("urls", () => {
     expect(urlError("https://example.com/hook")).toBeNull();
     expect(urlError("ftp://example.com")).toBe("The URL must start with http:// or https://");
     expect(urlError("nope")).toBe("Enter a full URL, like https://example.com/hook");
+  });
+
+  it("asks telegram for a chat and email for recipients", () => {
+    expect(urlError("https://api.telegram.org/bot1:a/sendMessage", "telegram")).toBe(
+      "Add the chat as a chat_id query parameter",
+    );
+    expect(
+      urlError("https://api.telegram.org/bot1:a/sendMessage?chat_id=-1", "telegram"),
+    ).toBeNull();
+    expect(urlError("https://example.com", "email")).toBe(
+      "Enter mailto: followed by the recipients",
+    );
+    expect(urlError("mailto:", "email")).toBe("Enter mailto: followed by the recipients");
+    expect(urlError("mailto:ops@example.com", "email")).toBeNull();
   });
 });
 

@@ -15,15 +15,18 @@ import (
 )
 
 var (
-	errInvalidProvider = errors.New("invalid provider; must be one of: slack, mattermost, googlechat, discord")
-	errDeliveryFailed  = errors.New("delivery failed")
+	errInvalidProvider = errors.New(
+		"invalid provider; must be one of: slack, mattermost, googlechat, discord, teams, telegram, ntfy, email",
+	)
+	errDeliveryFailed = errors.New("delivery failed")
 )
 
 const (
 	secretNoteFormat = "Secret (shown once, store it now): %s"
 	defaultProvider  = "json"
-	providerUsage    = "Payload provider: slack, mattermost, googlechat, discord, or json for the signed array"
-	neverDelivered   = "never"
+	providerUsage    = "Provider: slack, mattermost, googlechat, discord, teams, telegram, ntfy, email, " +
+		"or json for the signed array"
+	neverDelivered = "never"
 )
 
 func init() {
@@ -42,7 +45,7 @@ func init() {
 	showWebhookCmd.Flags().Uint64P("identifier", "i", 0, "Webhook identifier (ID)")
 	mustMarkRequired(showWebhookCmd, "identifier")
 
-	createWebhookCmd.Flags().StringP("url", "u", "", "Webhook endpoint URL")
+	createWebhookCmd.Flags().StringP("url", "u", "", "Webhook endpoint URL (mailto:a@x,b@y for email)")
 	createWebhookCmd.Flags().StringP("description", "d", "", "Webhook description")
 	createWebhookCmd.Flags().
 		StringP("provider", "p", "", providerUsage)
@@ -370,11 +373,10 @@ func parseProviderFlag(cmd *cobra.Command) (*clientv1.WebhookRequestBodyProvider
 		return &empty, nil
 	}
 
-	if provider != "slack" && provider != "mattermost" && provider != "googlechat" && provider != "discord" {
+	p := clientv1.WebhookRequestBodyProviderType(provider)
+	if !p.Valid() {
 		return nil, errInvalidProvider
 	}
-
-	p := clientv1.WebhookRequestBodyProviderType(provider)
 
 	return &p, nil
 }

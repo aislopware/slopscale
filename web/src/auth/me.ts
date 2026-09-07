@@ -27,6 +27,7 @@ export type Scope =
   | "dns:read"
   | "webhooks"
   | "webhooks:read"
+  | "logs:configuration"
   | "logs:configuration:read";
 
 export type Me = MethodResponse<typeof api, "get", "/api/v1/whoami">;
