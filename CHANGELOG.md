@@ -84,10 +84,19 @@ set to `--exit-node=auto:any` pick it. See
 
 The server now serves a web console at `/admin/`: machines, users, pre-auth
 and API keys, the policy editor, device and user approval, node sharing and the
-global exit node, all from a browser. It signs in with an API key and shows
-exactly what that key's role allows. Release binaries and container images
+global exit node, all from a browser. It signs in only through the configured
+identity provider (Google, or any OIDC issuer) and shows exactly what that
+user's role allows. Release binaries and container images
 include it; when building from source, run `make web` before `make build`.
 See [Admin console](https://headscale.net/development/ref/console/).
+
+### Audit log
+
+Every writing API request, whether from the CLI, the console or a script, is
+recorded with who made it, what it touched and how it ended, alongside console
+sign-ins. Read it with `headscale audit list`, `GET /api/v1/audit` or the
+console's _Audit log_ page; bound it with `audit.retention`. See
+[Audit log](https://headscale.net/development/ref/audit/).
 
 ### BREAKING
 
@@ -123,6 +132,10 @@ See [Admin console](https://headscale.net/development/ref/console/).
 - The `is-admin` node capability, previously stamped on every node, is now stamped only on devices of the owner and admins; `is-owner` on the owner's. Clients use these for admin-console affordances in their UI only
 - `POST /api/v1/apikey` without an `expiration` now mints a key that never expires instead of one that was already expired
 - Admin console at `/admin/`, embedded in the binary; `make web` builds it from `web/`
+- Console sign-in through the identity provider only: `/oidc/login` opens a seven-day session cookie for the OIDC user, `GET /api/v1/auth/console` names the provider, `DELETE /api/v1/auth/session` signs out; `GET /api/v1/whoami` reports `kind: session`. The client ID and secret may be set as `HEADSCALE_OIDC_CLIENT_ID` and `HEADSCALE_OIDC_CLIENT_SECRET`
+- `oidc.admin_users` (`HEADSCALE_OIDC_ADMIN_USERS`): email addresses that become admins the moment they sign in, so a fresh server can be administered from the console without CLI role grants; the promotion is recorded in the audit log
+- `go run ./cmd/dev` starts a mock identity provider next to the development server and `make test-e2e` signs in through it from a browser, so the console's sign-in can be exercised without Google
+- Audit log: `audit_events` table, `GET /api/v1/audit` with `actorUserId`, `action`, `targetKind`, `targetId`, `since`, `until`, `before` and `limit`, `headscale audit list`, the `logs:configuration:read` scope (held by every role but member) and `audit.retention` in the configuration
 - Global exit node: `headscale nodes global-exit-node`, `POST /api/v1/node/{id}/global-exit-node` and `globalExitNode` on nodes
 - Node sharing: `headscale nodes share|unshare`, `POST /api/v1/node/{id}/share`, `DELETE /api/v1/node/{id}/share/{userId}`, `sharedWith` on nodes and the `autogroup:shared` policy source
 - Device and user approval: `headscale settings get|set`, `headscale nodes approve`, `headscale users approve`, `headscale preauthkeys create --preauthorized`, an `Approved` column in `headscale nodes list` and `headscale users list`, `GET|POST /api/v1/settings`, `POST /api/v1/node/{id}/approve`, `POST /api/v1/user/{id}/approve`, `approved`/`approvedAt` on nodes and users and `preauthorized` on pre-auth keys; the v2 API's `PATCH /api/v2/tailnet/{tailnet}/settings` now updates `devicesApprovalOn` and `usersApprovalOn` instead of returning 501, `POST /api/v2/device/{id}/authorized` accepts `false`, and `POST /api/v2/users/{id}/approve|suspend|restore` exist

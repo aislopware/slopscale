@@ -192,6 +192,7 @@ nav:
       - DERP: ref/derp.md
       - API: ref/api.md
       - Admin console: ref/console.md
+      - Audit log: ref/audit.md
       - User roles: ref/roles.md
       - Device and user approval: ref/approval.md
       - Node sharing: ref/sharing.md

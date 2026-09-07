@@ -6,6 +6,7 @@ Headscale supports authentication via external identity providers using OpenID C
 - [Proof Key for Code Exchange (PKCE) code verification](#enable-pkce-recommended)
 - [Authorization based on a user's domain, email address or group membership](#authorize-users-with-filters)
 - Synchronization of [standard OIDC claims](#supported-oidc-claims)
+- Sign-in to the [admin console](console.md#signing-in) with the same provider and redirect URI
 
 Please see [limitations](#limitations) for known issues and limitations.
 
@@ -106,6 +107,23 @@ are configured, a user needs to pass all of them.
       allowed_users:
         - "alice@example.com"
         - "bob@example.net"
+    ```
+
+=== "Administrators"
+
+    - Users whose email address is in `admin_users` hold the `admin` [role](roles.md) from their first sign-in, so the
+      [admin console](console.md#signing-in) can be administered without granting roles over the CLI first.
+    - The list is checked on every sign-in and only promotes members; the owner and users who already hold a role are
+      left alone, and removing an address does not demote anyone.
+    - A verified email address is required [unless email verification is disabled](#control-email-verification).
+
+    ```yaml hl_lines="5-6"
+    oidc:
+      issuer: "https://sso.example.com"
+      client_id: "headscale"
+      client_secret: "generated-secret"
+      admin_users:
+        - "alice@example.com"
     ```
 
 === "Allowed groups"
@@ -310,7 +328,11 @@ Console.
 1. Click `Save` at the bottom of the form
 1. Take note of the `Client ID` and `Client secret`, you can also download it for reference if you need it.
 1. [Configure Headscale following the "Basic configuration" steps](#basic-configuration). The issuer URL for Google
-   OAuth is: `https://accounts.google.com`.
+   OAuth is: `https://accounts.google.com`. The client ID and secret may also come from the environment as
+   `HEADSCALE_OIDC_CLIENT_ID` and `HEADSCALE_OIDC_CLIENT_SECRET`.
+1. The same client signs operators in to the [admin console](console.md#signing-in); no further redirect URI is needed.
+   List the addresses that should administer it in `admin_users` (or `HEADSCALE_OIDC_ADMIN_USERS`) so they sign in as
+   admins right away.
 
 ### Kanidm
 

@@ -11,24 +11,70 @@ open `https://<your server>/admin/` and it loads.
 
 ## Signing in
 
-The console authenticates with an API key. Create one:
+The console signs in only through the [identity provider](oidc.md): the
+sign-in page has one button, *Continue with Google* (or the provider's name),
+and nothing else. The browser is sent through the provider and comes back
+signed in as the matching headscale user, holding a session cookie that lasts
+seven days; *Sign out* in the account menu ends it. The provider's redirect
+URI is the same `/oidc/callback` as for device logins, so nothing more has to
+be registered.
 
-```console
-$ headscale apikeys create --expiration 90d
+The client ID and secret go either in the configuration file or in the
+environment, whichever suits the deployment:
+
+```yaml
+oidc:
+  issuer: https://accounts.google.com
+  client_id: 1234567890-abc.apps.googleusercontent.com
+  client_secret: GOCSPX-...
 ```
 
-Paste it on the sign-in page. The key stays in that browser's local storage
-and is sent as a bearer token to `/api/v1`; sign out from the account menu to
-forget it.
+```console
+$ export HEADSCALE_OIDC_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
+$ export HEADSCALE_OIDC_CLIENT_SECRET=GOCSPX-...
+```
 
-What the console can show and change is decided by the key, not the console:
+Every key of the configuration can be set this way: `HEADSCALE_` followed by
+the key path with dots replaced by underscores.
 
-- A key without a user (the command above) is all-access.
-- A key created with `--user` is bounded by the user's current
-  [role](roles.md). An auditor sees everything and can change nothing, an
-  `it-admin` cannot approve routes, and so on. Pages the key cannot read are
-  hidden; actions it cannot take are disabled.
-- A member's key shows only the overview and their own API keys.
+A user who signs in for the first time is created the same way as on a device
+login, including [user approval](approval.md) when it is on: until an
+administrator approves them, the sign-in page says so and opens no session.
+The first user of an empty server becomes its owner. Anyone else who should
+administer the server from day one is named in `oidc.admin_users`: an
+address on that list is made an admin the moment it signs in, so nobody has
+to hand out roles over the CLI first.
+
+```yaml
+oidc:
+  admin_users:
+    - alice@example.com
+```
+
+```console
+$ export HEADSCALE_OIDC_ADMIN_USERS="alice@example.com bob@example.com"
+```
+
+The list is checked on every sign-in and only ever promotes a member; the
+owner and users who already hold a role keep it, and removing an address
+does not demote anyone (use `headscale users set-role` for that). The
+promotion is written to the audit log as a system `user.role.set`.
+
+Without an identity provider the console cannot sign anyone in and says so;
+the CLI and the API keep working with API keys.
+
+What the console can show and change is decided by the signed-in user's
+current [role](roles.md), read on every request:
+
+- A role change takes effect at once, and deleting the user ends their
+  sessions.
+- An auditor sees everything and can change nothing, an `it-admin` cannot
+  approve routes, and so on. Pages the user cannot read are hidden; actions
+  they cannot take are disabled.
+- A member sees only the overview, their own machines and their own API keys.
+
+Everything the console changes is written to the [audit log](audit.md) with
+the signed-in user as the actor.
 
 ## Pages
 
@@ -46,8 +92,10 @@ What the console can show and change is decided by the key, not the console:
 - **Access controls**: the [policy](policy.md) in an editor with syntax
   highlighting. *Check* validates the draft against the server without saving;
   *Save* applies it. Leaving the page with unsaved changes asks first.
+- **Audit log**: who changed what, newest first, with filters by action, user
+  and time; see [Audit log](audit.md).
 - **Settings**: the [device and user approval](approval.md) switches, the
-  signed-in key's role and scopes, and the server's database health.
+  signed-in credential's role and scopes, and the server's database health.
 
 ## Building from source
 
@@ -67,8 +115,32 @@ The console lives in `web/`: React with the TanStack router, query and table
 libraries, [Base UI](https://base-ui.com) components and Tailwind CSS, checked
 by TypeScript, oxlint and oxfmt. Its API types are generated from the server's
 OpenAPI document by `make web-generate` and committed. `bun run dev` in `web/`
-starts a development server that proxies `/api` to a headscale on
+starts a development server that proxies `/api` and `/oidc` to a headscale on
 `http://127.0.0.1:8080` (set `HEADSCALE_URL` to point elsewhere).
+
+### Signing in without Google
+
+The console only signs in through an identity provider, so development and
+tests need one that asks no questions. `go run ./cmd/dev` starts a headscale
+with a mock OpenID Connect provider running inside the same process: every
+sign-in comes back as `jane.doe@example.com`, who is listed in that server's
+`oidc.admin_users` and therefore opens the console as an admin.
+
+```console
+$ go run ./cmd/dev                       # server on :8080, provider on :9100
+$ open http://127.0.0.1:8080/admin/      # Continue with single sign-on
+```
+
+To sign in from the Vite development server instead, start headscale with
+its public URL set to Vite's origin, so the provider sends the browser back
+there: `go run ./cmd/dev -server-url http://localhost:5173`, then
+`bun run dev` in `web/` and open `http://localhost:5173/admin/`.
+
+`make test-e2e` runs the same flow in a browser: it builds the console,
+starts `cmd/dev`, signs in through the mock provider, checks the audit log
+and signs out (Playwright, `web/e2e/`). The Go side is covered by the
+`TestConsoleLogin*` tests in `hscontrol/servertest`, which drive a mock
+provider without a browser.
 
 ## Serving behind a reverse proxy
 
