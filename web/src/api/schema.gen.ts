@@ -59,6 +59,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List audit events
+         * @description Newest first. Every writing API request and the server's own sign-in events are recorded; page with before=<last id>.
+         *
+         *     Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listAuditEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/approve": {
         parameters: {
             query?: never;
@@ -73,6 +95,26 @@ export interface paths {
          * @description Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         post: operations["authApprove"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/console": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Describe console sign-in
+         * @description Public: the admin console asks before showing its sign-in page which methods the server offers. Signing in with an API key is always possible.
+         */
+        get: operations["getConsoleAuth"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -114,6 +156,26 @@ export interface paths {
          */
         post: operations["authReject"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Sign out of the console
+         * @description Ends the console session the request was authenticated with and clears its cookie. Only a session may call it; an API key has nothing to end.
+         */
+        delete: operations["endSession"];
         options?: never;
         head?: never;
         patch?: never;
@@ -672,6 +734,33 @@ export interface components {
              */
             userId: string | null;
         };
+        AuditEvent: {
+            /** @description What happened, dotted and object first: user.role.set, node.delete. */
+            action: string;
+            /** @description local, api_key, oauth, session or system. */
+            actorKind: string;
+            /** @description The actor's user name, or the credential's prefix. */
+            actorName: string;
+            /** @description The user behind the actor; empty for a credential without one. */
+            actorUserId: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description Action-specific fields. */
+            detail: {
+                [key: string]: unknown;
+            };
+            /** Format: uint64 */
+            id: string;
+            /**
+             * Format: int64
+             * @description The HTTP status the request ended with.
+             */
+            outcome: number;
+            remoteAddr: string;
+            targetId: string;
+            targetKind: string;
+            targetName: string;
+        };
         AuthApproveOutputBody: Record<string, unknown>;
         AuthApproveRequestBody: {
             authId?: string;
@@ -691,6 +780,13 @@ export interface components {
             changes: string[];
         };
         CheckPolicyOutputBody: Record<string, unknown>;
+        ConsoleAuth: {
+            oidc?: components["schemas"]["ConsoleOIDC"];
+        };
+        ConsoleOIDC: {
+            loginPath: string;
+            provider: string;
+        };
         CreateAPIKeyOutputBody: {
             apiKey: string;
         };
@@ -792,6 +888,10 @@ export interface components {
         };
         ListAPIKeysOutputBody: {
             apiKeys: components["schemas"]["ApiKey"][];
+        };
+        ListAuditOutputBody: {
+            events: components["schemas"]["AuditEvent"][];
+            nextBefore: string;
         };
         ListNodesOutputBody: {
             nodes: components["schemas"]["Node"][];
@@ -938,7 +1038,7 @@ export interface components {
         };
         Whoami: {
             allAccess: boolean;
-            /** @description How the caller authenticated: local (socket), api_key or oauth. */
+            /** @description How the caller authenticated: local, api_key, oauth or session. */
             kind: string;
             permissions: {
                 [key: string]: boolean;
@@ -955,6 +1055,7 @@ export interface components {
     pathItems: never;
 }
 export type ApiKey = components['schemas']['ApiKey'];
+export type AuditEvent = components['schemas']['AuditEvent'];
 export type AuthApproveOutputBody = components['schemas']['AuthApproveOutputBody'];
 export type AuthApproveRequestBody = components['schemas']['AuthApproveRequestBody'];
 export type AuthRegisterOutputBody = components['schemas']['AuthRegisterOutputBody'];
@@ -963,6 +1064,8 @@ export type AuthRejectOutputBody = components['schemas']['AuthRejectOutputBody']
 export type AuthRejectRequestBody = components['schemas']['AuthRejectRequestBody'];
 export type BackfillNodeIPsOutputBody = components['schemas']['BackfillNodeIPsOutputBody'];
 export type CheckPolicyOutputBody = components['schemas']['CheckPolicyOutputBody'];
+export type ConsoleAuth = components['schemas']['ConsoleAuth'];
+export type ConsoleOidc = components['schemas']['ConsoleOIDC'];
 export type CreateApiKeyOutputBody = components['schemas']['CreateAPIKeyOutputBody'];
 export type CreateApiKeyRequestBody = components['schemas']['CreateApiKeyRequestBody'];
 export type CreatePreAuthKeyRequestBody = components['schemas']['CreatePreAuthKeyRequestBody'];
@@ -981,6 +1084,7 @@ export type ExpirePreAuthKeyOutputBody = components['schemas']['ExpirePreAuthKey
 export type ExpirePreAuthKeyRequestBody = components['schemas']['ExpirePreAuthKeyRequestBody'];
 export type HealthResponseBody = components['schemas']['HealthResponseBody'];
 export type ListApiKeysOutputBody = components['schemas']['ListAPIKeysOutputBody'];
+export type ListAuditOutputBody = components['schemas']['ListAuditOutputBody'];
 export type ListNodesOutputBody = components['schemas']['ListNodesOutputBody'];
 export type ListPreAuthKeysOutputBody = components['schemas']['ListPreAuthKeysOutputBody'];
 export type ListUsersOutputBody = components['schemas']['ListUsersOutputBody'];
@@ -1132,6 +1236,50 @@ export interface operations {
             };
         };
     };
+    listAuditEvents: {
+        parameters: {
+            query?: {
+                /** @description One action, or a prefix ending in a dot. */
+                action?: string;
+                /** @description Keep events by this user. */
+                actorUserId?: string;
+                /** @description Page: events with an ID below this one. */
+                before?: string;
+                /** @description Page size, at most 500. */
+                limit?: number;
+                /** @description RFC 3339; events at or after this time. */
+                since?: string;
+                targetId?: string;
+                targetKind?: string;
+                /** @description RFC 3339; events before this time. */
+                until?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAuditOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     authApprove: {
         parameters: {
             query?: never;
@@ -1152,6 +1300,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthApproveOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getConsoleAuth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsoleAuth"];
                 };
             };
             /** @description Error */
@@ -1219,6 +1396,34 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AuthRejectOutputBody"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    endSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

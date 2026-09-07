@@ -37,6 +37,57 @@ components:
         - lastSeen
         - userId
       type: object
+    AuditEvent:
+      additionalProperties: false
+      properties:
+        action:
+          description: "What happened, dotted and object first: user.role.set, node.delete."
+          type: string
+        actorKind:
+          description: local, api_key, oauth, session or system.
+          type: string
+        actorName:
+          description: The actor's user name, or the credential's prefix.
+          type: string
+        actorUserId:
+          description: The user behind the actor; empty for a credential without one.
+          type: string
+        createdAt:
+          format: date-time
+          type: string
+        detail:
+          additionalProperties: {}
+          description: Action-specific fields.
+          type: object
+        id:
+          format: uint64
+          type: string
+        outcome:
+          description: The HTTP status the request ended with.
+          format: int64
+          type: integer
+        remoteAddr:
+          type: string
+        targetId:
+          type: string
+        targetKind:
+          type: string
+        targetName:
+          type: string
+      required:
+        - id
+        - createdAt
+        - actorKind
+        - actorUserId
+        - actorName
+        - action
+        - targetKind
+        - targetId
+        - targetName
+        - outcome
+        - detail
+        - remoteAddr
+      type: object
     AuthApproveOutputBody:
       additionalProperties: false
       type: object
@@ -83,6 +134,23 @@ components:
       type: object
     CheckPolicyOutputBody:
       additionalProperties: false
+      type: object
+    ConsoleAuth:
+      additionalProperties: false
+      properties:
+        oidc:
+          $ref: "#/components/schemas/ConsoleOIDC"
+      type: object
+    ConsoleOIDC:
+      additionalProperties: false
+      properties:
+        loginPath:
+          type: string
+        provider:
+          type: string
+      required:
+        - provider
+        - loginPath
       type: object
     CreateAPIKeyOutputBody:
       additionalProperties: false
@@ -266,6 +334,19 @@ components:
           type: array
       required:
         - apiKeys
+      type: object
+    ListAuditOutputBody:
+      additionalProperties: false
+      properties:
+        events:
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+          type: array
+        nextBefore:
+          type: string
+      required:
+        - events
+        - nextBefore
       type: object
     ListNodesOutputBody:
       additionalProperties: false
@@ -651,7 +732,7 @@ components:
         allAccess:
           type: boolean
         kind:
-          description: "How the caller authenticated: local (socket), api_key or oauth."
+          description: "How the caller authenticated: local, api_key, oauth or session."
           type: string
         permissions:
           additionalProperties:
@@ -730,6 +811,7 @@ paths:
       summary: Create API key
       tags:
         - ApiKeys
+      x-audit-action: apikey.create
   /api/v1/apikey/expire:
     post:
       operationId: expireApiKey
@@ -757,6 +839,7 @@ paths:
       summary: Expire API key
       tags:
         - ApiKeys
+      x-audit-action: apikey.expire
   /api/v1/apikey/{prefix}:
     delete:
       operationId: deleteApiKey
@@ -790,6 +873,92 @@ paths:
       summary: Delete API key
       tags:
         - ApiKeys
+      x-audit-action: apikey.delete
+  /api/v1/audit:
+    get:
+      description: |-
+        Newest first. Every writing API request and the server's own sign-in events are recorded; page with before=<last id>.
+
+        Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listAuditEvents
+      parameters:
+        - description: Keep events by this user.
+          explode: false
+          in: query
+          name: actorUserId
+          schema:
+            description: Keep events by this user.
+            type: string
+        - description: One action, or a prefix ending in a dot.
+          explode: false
+          in: query
+          name: action
+          schema:
+            description: One action, or a prefix ending in a dot.
+            type: string
+        - explode: false
+          in: query
+          name: targetKind
+          schema:
+            type: string
+        - explode: false
+          in: query
+          name: targetId
+          schema:
+            type: string
+        - description: RFC 3339; events at or after this time.
+          explode: false
+          in: query
+          name: since
+          schema:
+            description: RFC 3339; events at or after this time.
+            format: date-time
+            type: string
+        - description: RFC 3339; events before this time.
+          explode: false
+          in: query
+          name: until
+          schema:
+            description: RFC 3339; events before this time.
+            format: date-time
+            type: string
+        - description: "Page: events with an ID below this one."
+          explode: false
+          in: query
+          name: before
+          schema:
+            description: "Page: events with an ID below this one."
+            format: uint64
+            type: string
+        - description: Page size, at most 500.
+          explode: false
+          in: query
+          name: limit
+          schema:
+            description: Page size, at most 500.
+            format: int64
+            maximum: 500
+            minimum: 1
+            type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAuditOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List audit events
+      tags:
+        - Audit
+      x-required-scope: logs:configuration:read
   /api/v1/auth/approve:
     post:
       description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -818,7 +987,28 @@ paths:
       summary: Approve a pending auth session
       tags:
         - Auth
+      x-audit-action: auth.approve
       x-required-scope: devices:core
+  /api/v1/auth/console:
+    get:
+      description: "Public: the admin console asks before showing its sign-in page which methods the server offers. Signing in with an API key is always possible."
+      operationId: getConsoleAuth
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConsoleAuth"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Describe console sign-in
+      tags:
+        - Auth
   /api/v1/auth/register:
     post:
       description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -847,6 +1037,7 @@ paths:
       summary: Register node via auth flow
       tags:
         - Auth
+      x-audit-action: node.register
       x-required-scope: devices:core
   /api/v1/auth/reject:
     post:
@@ -876,7 +1067,31 @@ paths:
       summary: Reject a pending auth session
       tags:
         - Auth
+      x-audit-action: auth.reject
       x-required-scope: devices:core
+  /api/v1/auth/session:
+    delete:
+      description: Ends the console session the request was authenticated with and clears its cookie. Only a session may call it; an API key has nothing to end.
+      operationId: endSession
+      responses:
+        "204":
+          description: No Content
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Sign out of the console
+      tags:
+        - Auth
+      x-audit-action: console.logout
   /api/v1/debug/node:
     post:
       description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -905,6 +1120,7 @@ paths:
       summary: Debug create node
       tags:
         - Nodes
+      x-audit-action: node.debug_create
       x-required-scope: devices:core
   /api/v1/health:
     get:
@@ -985,6 +1201,7 @@ paths:
       summary: Backfill node IPs
       tags:
         - Nodes
+      x-audit-action: node.backfill_ips
       x-required-scope: devices:core
   /api/v1/node/register:
     post:
@@ -1019,6 +1236,7 @@ paths:
       summary: Register node
       tags:
         - Nodes
+      x-audit-action: node.register
       x-required-scope: devices:core
   /api/v1/node/{nodeId}:
     delete:
@@ -1049,6 +1267,7 @@ paths:
       summary: Delete node
       tags:
         - Nodes
+      x-audit-action: node.delete
       x-required-scope: devices:core
     get:
       description: Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -1116,6 +1335,7 @@ paths:
       summary: Approve node
       tags:
         - Nodes
+      x-audit-action: node.approval.set
       x-required-scope: devices:core
   /api/v1/node/{nodeId}/approve_routes:
     post:
@@ -1152,6 +1372,7 @@ paths:
       summary: Set approved routes
       tags:
         - Nodes
+      x-audit-action: node.routes.set
       x-required-scope: devices:routes
   /api/v1/node/{nodeId}/expire:
     post:
@@ -1187,6 +1408,7 @@ paths:
       summary: Expire node
       tags:
         - Nodes
+      x-audit-action: node.expire
       x-required-scope: devices:core
   /api/v1/node/{nodeId}/global-exit-node:
     post:
@@ -1225,6 +1447,7 @@ paths:
       summary: Mark node as global exit node
       tags:
         - Nodes
+      x-audit-action: node.global_exit_node.set
       x-required-scope: devices:routes
   /api/v1/node/{nodeId}/rename/{newName}:
     post:
@@ -1260,6 +1483,7 @@ paths:
       summary: Rename node
       tags:
         - Nodes
+      x-audit-action: node.rename
       x-required-scope: devices:core
   /api/v1/node/{nodeId}/share:
     post:
@@ -1296,6 +1520,7 @@ paths:
       summary: Share node with a user
       tags:
         - Nodes
+      x-audit-action: node.share
   /api/v1/node/{nodeId}/share/{userId}:
     delete:
       operationId: unshareNode
@@ -1330,6 +1555,7 @@ paths:
       summary: Stop sharing node with a user
       tags:
         - Nodes
+      x-audit-action: node.unshare
   /api/v1/node/{nodeId}/tags:
     post:
       description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -1365,6 +1591,7 @@ paths:
       summary: Set tags
       tags:
         - Nodes
+      x-audit-action: node.tags.set
       x-required-scope: devices:core
   /api/v1/policy:
     get:
@@ -1416,6 +1643,7 @@ paths:
       summary: Set policy
       tags:
         - Policy
+      x-audit-action: policy.set
       x-required-scope: policy_file
   /api/v1/policy/check:
     post:
@@ -1478,6 +1706,7 @@ paths:
       summary: Delete pre-auth key
       tags:
         - PreAuthKeys
+      x-audit-action: preauthkey.delete
       x-required-scope: auth_keys
     get:
       description: Requires the `auth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -1528,6 +1757,7 @@ paths:
       summary: Create pre-auth key
       tags:
         - PreAuthKeys
+      x-audit-action: preauthkey.create
       x-required-scope: auth_keys
   /api/v1/preauthkey/expire:
     post:
@@ -1557,6 +1787,7 @@ paths:
       summary: Expire pre-auth key
       tags:
         - PreAuthKeys
+      x-audit-action: preauthkey.expire
       x-required-scope: auth_keys
   /api/v1/settings:
     get:
@@ -1611,6 +1842,7 @@ paths:
       summary: Update settings
       tags:
         - Settings
+      x-audit-action: settings.set
       x-required-scope: feature_settings
   /api/v1/user:
     get:
@@ -1679,6 +1911,7 @@ paths:
       summary: Create user
       tags:
         - Users
+      x-audit-action: user.create
       x-required-scope: users
   /api/v1/user/{id}:
     delete:
@@ -1709,6 +1942,7 @@ paths:
       summary: Delete user
       tags:
         - Users
+      x-audit-action: user.delete
       x-required-scope: users
   /api/v1/user/{id}/approve:
     post:
@@ -1747,6 +1981,7 @@ paths:
       summary: Approve user
       tags:
         - Users
+      x-audit-action: user.approval.set
       x-required-scope: users
   /api/v1/user/{id}/role:
     post:
@@ -1786,6 +2021,7 @@ paths:
       summary: Set user role
       tags:
         - Users
+      x-audit-action: user.role.set
       x-required-scope: users
   /api/v1/user/{oldId}/rename/{newName}:
     post:
@@ -1821,6 +2057,7 @@ paths:
       summary: Rename user
       tags:
         - Users
+      x-audit-action: user.rename
       x-required-scope: users
   /api/v1/whoami:
     get:

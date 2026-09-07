@@ -53,6 +53,33 @@ type ApiKey struct {
 	UserId *string `json:"userId"`
 }
 
+// AuditEvent defines model for AuditEvent.
+type AuditEvent struct {
+	// Action What happened, dotted and object first: user.role.set, node.delete.
+	Action string `json:"action"`
+
+	// ActorKind local, api_key, oauth, session or system.
+	ActorKind string `json:"actorKind"`
+
+	// ActorName The actor's user name, or the credential's prefix.
+	ActorName string `json:"actorName"`
+
+	// ActorUserId The user behind the actor; empty for a credential without one.
+	ActorUserId string    `json:"actorUserId"`
+	CreatedAt   time.Time `json:"createdAt"`
+
+	// Detail Action-specific fields.
+	Detail map[string]interface{} `json:"detail"`
+	Id     string                 `json:"id"`
+
+	// Outcome The HTTP status the request ended with.
+	Outcome    int64  `json:"outcome"`
+	RemoteAddr string `json:"remoteAddr"`
+	TargetId   string `json:"targetId"`
+	TargetKind string `json:"targetKind"`
+	TargetName string `json:"targetName"`
+}
+
 // AuthApproveOutputBody defines model for AuthApproveOutputBody.
 type AuthApproveOutputBody = map[string]interface{}
 
@@ -87,6 +114,17 @@ type BackfillNodeIPsOutputBody struct {
 
 // CheckPolicyOutputBody defines model for CheckPolicyOutputBody.
 type CheckPolicyOutputBody = map[string]interface{}
+
+// ConsoleAuth defines model for ConsoleAuth.
+type ConsoleAuth struct {
+	Oidc *ConsoleOIDC `json:"oidc,omitempty"`
+}
+
+// ConsoleOIDC defines model for ConsoleOIDC.
+type ConsoleOIDC struct {
+	LoginPath string `json:"loginPath"`
+	Provider  string `json:"provider"`
+}
 
 // CreateAPIKeyOutputBody defines model for CreateAPIKeyOutputBody.
 type CreateAPIKeyOutputBody struct {
@@ -215,6 +253,12 @@ type HealthResponseBody struct {
 // ListAPIKeysOutputBody defines model for ListAPIKeysOutputBody.
 type ListAPIKeysOutputBody struct {
 	ApiKeys []ApiKey `json:"apiKeys"`
+}
+
+// ListAuditOutputBody defines model for ListAuditOutputBody.
+type ListAuditOutputBody struct {
+	Events     []AuditEvent `json:"events"`
+	NextBefore string       `json:"nextBefore"`
 }
 
 // ListNodesOutputBody defines model for ListNodesOutputBody.
@@ -393,7 +437,7 @@ type UserOutputBody struct {
 type Whoami struct {
 	AllAccess bool `json:"allAccess"`
 
-	// Kind How the caller authenticated: local (socket), api_key or oauth.
+	// Kind How the caller authenticated: local, api_key, oauth or session.
 	Kind        string          `json:"kind"`
 	Permissions map[string]bool `json:"permissions"`
 	Role        string          `json:"role"`
@@ -404,6 +448,29 @@ type Whoami struct {
 // DeleteApiKeyParams defines parameters for DeleteApiKey.
 type DeleteApiKeyParams struct {
 	Id *string `form:"id,omitempty" json:"id,omitempty"`
+}
+
+// ListAuditEventsParams defines parameters for ListAuditEvents.
+type ListAuditEventsParams struct {
+	// ActorUserId Keep events by this user.
+	ActorUserId *string `form:"actorUserId,omitempty" json:"actorUserId,omitempty"`
+
+	// Action One action, or a prefix ending in a dot.
+	Action     *string `form:"action,omitempty" json:"action,omitempty"`
+	TargetKind *string `form:"targetKind,omitempty" json:"targetKind,omitempty"`
+	TargetId   *string `form:"targetId,omitempty" json:"targetId,omitempty"`
+
+	// Since RFC 3339; events at or after this time.
+	Since *time.Time `form:"since,omitempty" json:"since,omitempty"`
+
+	// Until RFC 3339; events before this time.
+	Until *time.Time `form:"until,omitempty" json:"until,omitempty"`
+
+	// Before Page: events with an ID below this one.
+	Before *string `form:"before,omitempty" json:"before,omitempty"`
+
+	// Limit Page size, at most 500.
+	Limit *int64 `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // ListNodesParams defines parameters for ListNodes.
@@ -610,6 +677,15 @@ type ClientInterface interface {
 	// Corresponds with DELETE /api/v1/apikey/{prefix} (the `DeleteApiKey` operationId).
 	DeleteApiKey(ctx context.Context, prefix string, params *DeleteApiKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListAuditEvents List audit events
+	//
+	// Newest first. Every writing API request and the server's own sign-in events are recorded; page with before=<last id>.
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/audit (the `ListAuditEvents` operationId).
+	ListAuditEvents(ctx context.Context, params *ListAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// AuthApproveWithBody Approve a pending auth session
 	//
 	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -627,6 +703,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/auth/approve (the `AuthApprove` operationId).
 	AuthApprove(ctx context.Context, body AuthApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetConsoleAuth Describe console sign-in
+	//
+	// Public: the admin console asks before showing its sign-in page which methods the server offers. Signing in with an API key is always possible.
+	//
+	// Corresponds with GET /api/v1/auth/console (the `GetConsoleAuth` operationId).
+	GetConsoleAuth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AuthRegisterWithBody Register node via auth flow
 	//
@@ -663,6 +746,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/auth/reject (the `AuthReject` operationId).
 	AuthReject(ctx context.Context, body AuthRejectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EndSession Sign out of the console
+	//
+	// Ends the console session the request was authenticated with and clears its cookie. Only a session may call it; an API key has nothing to end.
+	//
+	// Corresponds with DELETE /api/v1/auth/session (the `EndSession` operationId).
+	EndSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DebugCreateNodeWithBody Debug create node
 	//
@@ -1171,6 +1261,25 @@ func (c *Client) DeleteApiKey(ctx context.Context, prefix string, params *Delete
 	return c.Client.Do(req)
 }
 
+// ListAuditEvents List audit events
+//
+// Newest first. Every writing API request and the server's own sign-in events are recorded; page with before=<last id>.
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/audit (the `ListAuditEvents` operationId).
+func (c *Client) ListAuditEvents(ctx context.Context, params *ListAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAuditEventsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // AuthApproveWithBody Approve a pending auth session
 //
 // Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -1199,6 +1308,23 @@ func (c *Client) AuthApproveWithBody(ctx context.Context, contentType string, bo
 // Corresponds with POST /api/v1/auth/approve (the `AuthApprove` operationId).
 func (c *Client) AuthApprove(ctx context.Context, body AuthApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAuthApproveRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetConsoleAuth Describe console sign-in
+//
+// Public: the admin console asks before showing its sign-in page which methods the server offers. Signing in with an API key is always possible.
+//
+// Corresponds with GET /api/v1/auth/console (the `GetConsoleAuth` operationId).
+func (c *Client) GetConsoleAuth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetConsoleAuthRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -1275,6 +1401,23 @@ func (c *Client) AuthRejectWithBody(ctx context.Context, contentType string, bod
 // Corresponds with POST /api/v1/auth/reject (the `AuthReject` operationId).
 func (c *Client) AuthReject(ctx context.Context, body AuthRejectJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewAuthRejectRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EndSession Sign out of the console
+//
+// Ends the console session the request was authenticated with and clears its cookie. Only a session may call it; an API key has nothing to end.
+//
+// Corresponds with DELETE /api/v1/auth/session (the `EndSession` operationId).
+func (c *Client) EndSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEndSessionRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -2317,6 +2460,144 @@ func NewDeleteApiKeyRequest(server string, prefix string, params *DeleteApiKeyPa
 	return req, nil
 }
 
+// NewListAuditEventsRequest constructs an http.Request for the ListAuditEvents method
+func NewListAuditEventsRequest(server string, params *ListAuditEventsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/audit")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.ActorUserId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "actorUserId", *params.ActorUserId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Action != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "action", *params.Action, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.TargetKind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "targetKind", *params.TargetKind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.TargetId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "targetId", *params.TargetId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Until != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "until", *params.Until, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Before != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "before", *params.Before, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uint64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewAuthApproveRequest calls the generic AuthApprove builder with application/json body
 func NewAuthApproveRequest(server string, body AuthApproveJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -2353,6 +2634,33 @@ func NewAuthApproveRequestWithBody(server string, contentType string, body io.Re
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetConsoleAuthRequest constructs an http.Request for the GetConsoleAuth method
+func NewGetConsoleAuthRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/auth/console")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -2433,6 +2741,33 @@ func NewAuthRejectRequestWithBody(server string, contentType string, body io.Rea
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewEndSessionRequest constructs an http.Request for the EndSession method
+func NewEndSessionRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/auth/session")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -3849,6 +4184,17 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with DELETE /api/v1/apikey/{prefix} (the `DeleteApiKey` operationId).
 	DeleteApiKeyWithResponse(ctx context.Context, prefix string, params *DeleteApiKeyParams, reqEditors ...RequestEditorFn) (*DeleteApiKeyResponse, error)
 
+	// ListAuditEventsWithResponse List audit events
+	//
+	// Newest first. Every writing API request and the server's own sign-in events are recorded; page with before=<last id>.
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/audit (the `ListAuditEvents` operationId).
+	ListAuditEventsWithResponse(ctx context.Context, params *ListAuditEventsParams, reqEditors ...RequestEditorFn) (*ListAuditEventsResponse, error)
+
 	// AuthApproveWithBodyWithResponse Approve a pending auth session
 	//
 	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -3866,6 +4212,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/auth/approve (the `AuthApprove` operationId).
 	AuthApproveWithResponse(ctx context.Context, body AuthApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*AuthApproveResponse, error)
+
+	// GetConsoleAuthWithResponse Describe console sign-in
+	//
+	// Public: the admin console asks before showing its sign-in page which methods the server offers. Signing in with an API key is always possible.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/auth/console (the `GetConsoleAuth` operationId).
+	GetConsoleAuthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetConsoleAuthResponse, error)
 
 	// AuthRegisterWithBodyWithResponse Register node via auth flow
 	//
@@ -3902,6 +4257,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/auth/reject (the `AuthReject` operationId).
 	AuthRejectWithResponse(ctx context.Context, body AuthRejectJSONRequestBody, reqEditors ...RequestEditorFn) (*AuthRejectResponse, error)
+
+	// EndSessionWithResponse Sign out of the console
+	//
+	// Ends the console session the request was authenticated with and clears its cookie. Only a session may call it; an API key has nothing to end.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/auth/session (the `EndSession` operationId).
+	EndSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*EndSessionResponse, error)
 
 	// DebugCreateNodeWithBodyWithResponse Debug create node
 	//
@@ -4532,6 +4896,54 @@ func (r DeleteApiKeyResponse) ContentType() string {
 	return ""
 }
 
+type ListAuditEventsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListAuditOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAuditEventsResponse) GetJSON200() *ListAuditOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListAuditEventsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAuditEventsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAuditEventsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAuditEventsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAuditEventsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type AuthApproveResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4574,6 +4986,54 @@ func (r AuthApproveResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r AuthApproveResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetConsoleAuthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ConsoleAuth
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetConsoleAuthResponse) GetJSON200() *ConsoleAuth {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetConsoleAuthResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetConsoleAuthResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetConsoleAuthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetConsoleAuthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetConsoleAuthResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -4670,6 +5130,54 @@ func (r AuthRejectResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r AuthRejectResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// EndSessionResponse204Headers the declared response headers of an HTTP 204 response for EndSession
+type EndSessionResponse204Headers struct {
+	SetCookie *string
+}
+
+type EndSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *EndSessionResponse204Headers
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r EndSessionResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r EndSessionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EndSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EndSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EndSessionResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -6246,6 +6754,23 @@ func (c *ClientWithResponses) DeleteApiKeyWithResponse(ctx context.Context, pref
 	return ParseDeleteApiKeyResponse(rsp)
 }
 
+// ListAuditEventsWithResponse List audit events
+//
+// Newest first. Every writing API request and the server's own sign-in events are recorded; page with before=<last id>.
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/audit (the `ListAuditEvents` operationId).
+func (c *ClientWithResponses) ListAuditEventsWithResponse(ctx context.Context, params *ListAuditEventsParams, reqEditors ...RequestEditorFn) (*ListAuditEventsResponse, error) {
+	rsp, err := c.ListAuditEvents(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAuditEventsResponse(rsp)
+}
+
 // AuthApproveWithBodyWithResponse Approve a pending auth session
 //
 // Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -6274,6 +6799,21 @@ func (c *ClientWithResponses) AuthApproveWithResponse(ctx context.Context, body 
 		return nil, err
 	}
 	return ParseAuthApproveResponse(rsp)
+}
+
+// GetConsoleAuthWithResponse Describe console sign-in
+//
+// Public: the admin console asks before showing its sign-in page which methods the server offers. Signing in with an API key is always possible.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/auth/console (the `GetConsoleAuth` operationId).
+func (c *ClientWithResponses) GetConsoleAuthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetConsoleAuthResponse, error) {
+	rsp, err := c.GetConsoleAuth(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetConsoleAuthResponse(rsp)
 }
 
 // AuthRegisterWithBodyWithResponse Register node via auth flow
@@ -6334,6 +6874,21 @@ func (c *ClientWithResponses) AuthRejectWithResponse(ctx context.Context, body A
 		return nil, err
 	}
 	return ParseAuthRejectResponse(rsp)
+}
+
+// EndSessionWithResponse Sign out of the console
+//
+// Ends the console session the request was authenticated with and clears its cookie. Only a session may call it; an API key has nothing to end.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/auth/session (the `EndSession` operationId).
+func (c *ClientWithResponses) EndSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*EndSessionResponse, error) {
+	rsp, err := c.EndSession(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEndSessionResponse(rsp)
 }
 
 // DebugCreateNodeWithBodyWithResponse Debug create node
@@ -7180,6 +7735,39 @@ func ParseDeleteApiKeyResponse(rsp *http.Response) (*DeleteApiKeyResponse, error
 	return response, nil
 }
 
+// ParseListAuditEventsResponse parses an HTTP response from a ListAuditEventsWithResponse call
+func ParseListAuditEventsResponse(rsp *http.Response) (*ListAuditEventsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAuditEventsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListAuditOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseAuthApproveResponse parses an HTTP response from a AuthApproveWithResponse call
 func ParseAuthApproveResponse(rsp *http.Response) (*AuthApproveResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -7196,6 +7784,39 @@ func ParseAuthApproveResponse(rsp *http.Response) (*AuthApproveResponse, error) 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest AuthApproveOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetConsoleAuthResponse parses an HTTP response from a GetConsoleAuthWithResponse call
+func ParseGetConsoleAuthResponse(rsp *http.Response) (*GetConsoleAuthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetConsoleAuthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ConsoleAuth
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -7274,6 +7895,48 @@ func ParseAuthRejectResponse(rsp *http.Response) (*AuthRejectResponse, error) {
 		}
 		response.ApplicationproblemJSONDefault = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseEndSessionResponse parses an HTTP response from a EndSessionWithResponse call
+func ParseEndSessionResponse(rsp *http.Response) (*EndSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EndSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		var headers EndSessionResponse204Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers204 = &headers
 	}
 
 	return response, nil
