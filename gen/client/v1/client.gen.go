@@ -761,6 +761,22 @@ type Webhook struct {
 	Url                string     `json:"url"`
 }
 
+// WebhookDeliveriesOutputBody defines model for WebhookDeliveriesOutputBody.
+type WebhookDeliveriesOutputBody struct {
+	Deliveries []WebhookDelivery `json:"deliveries"`
+}
+
+// WebhookDelivery defines model for WebhookDelivery.
+type WebhookDelivery struct {
+	At         time.Time `json:"at"`
+	Attempts   int64     `json:"attempts"`
+	DurationMs int64     `json:"durationMs"`
+	EventType  string    `json:"eventType"`
+	Id         string    `json:"id"`
+	Ok         bool      `json:"ok"`
+	Status     string    `json:"status"`
+}
+
 // WebhookEventTypes defines model for WebhookEventTypes.
 type WebhookEventTypes struct {
 	Types []string `json:"types"`
@@ -1941,6 +1957,15 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /api/v1/webhook/{id} (the `UpdateWebhook` operationId).
 	UpdateWebhook(ctx context.Context, id string, body UpdateWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListWebhookDeliveries List webhook deliveries
+	//
+	// The newest deliveries to the webhook, most recent first; the server keeps the last 100 per webhook.
+	//
+	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/webhook/{id}/deliveries (the `ListWebhookDeliveries` operationId).
+	ListWebhookDeliveries(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RotateWebhookSecret Rotate webhook secret
 	//
@@ -3892,6 +3917,25 @@ func (c *Client) UpdateWebhookWithBody(ctx context.Context, id string, contentTy
 // Corresponds with PUT /api/v1/webhook/{id} (the `UpdateWebhook` operationId).
 func (c *Client) UpdateWebhook(ctx context.Context, id string, body UpdateWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateWebhookRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListWebhookDeliveries List webhook deliveries
+//
+// The newest deliveries to the webhook, most recent first; the server keeps the last 100 per webhook.
+//
+// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/webhook/{id}/deliveries (the `ListWebhookDeliveries` operationId).
+func (c *Client) ListWebhookDeliveries(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListWebhookDeliveriesRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -6831,6 +6875,40 @@ func NewUpdateWebhookRequestWithBody(server string, id string, contentType strin
 	return req, nil
 }
 
+// NewListWebhookDeliveriesRequest constructs an http.Request for the ListWebhookDeliveries method
+func NewListWebhookDeliveriesRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/webhook/%s/deliveries", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewRotateWebhookSecretRequest constructs an http.Request for the RotateWebhookSecret method
 func NewRotateWebhookSecretRequest(server string, id string) (*http.Request, error) {
 	var err error
@@ -7959,6 +8037,17 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PUT /api/v1/webhook/{id} (the `UpdateWebhook` operationId).
 	UpdateWebhookWithResponse(ctx context.Context, id string, body UpdateWebhookJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateWebhookResponse, error)
+
+	// ListWebhookDeliveriesWithResponse List webhook deliveries
+	//
+	// The newest deliveries to the webhook, most recent first; the server keeps the last 100 per webhook.
+	//
+	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/webhook/{id}/deliveries (the `ListWebhookDeliveries` operationId).
+	ListWebhookDeliveriesWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*ListWebhookDeliveriesResponse, error)
 
 	// RotateWebhookSecretWithResponse Rotate webhook secret
 	//
@@ -11352,6 +11441,54 @@ func (r UpdateWebhookResponse) ContentType() string {
 	return ""
 }
 
+type ListWebhookDeliveriesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *WebhookDeliveriesOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListWebhookDeliveriesResponse) GetJSON200() *WebhookDeliveriesOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListWebhookDeliveriesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListWebhookDeliveriesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListWebhookDeliveriesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListWebhookDeliveriesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListWebhookDeliveriesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type RotateWebhookSecretResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -13096,6 +13233,23 @@ func (c *ClientWithResponses) UpdateWebhookWithResponse(ctx context.Context, id 
 		return nil, err
 	}
 	return ParseUpdateWebhookResponse(rsp)
+}
+
+// ListWebhookDeliveriesWithResponse List webhook deliveries
+//
+// The newest deliveries to the webhook, most recent first; the server keeps the last 100 per webhook.
+//
+// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/webhook/{id}/deliveries (the `ListWebhookDeliveries` operationId).
+func (c *ClientWithResponses) ListWebhookDeliveriesWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*ListWebhookDeliveriesResponse, error) {
+	rsp, err := c.ListWebhookDeliveries(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListWebhookDeliveriesResponse(rsp)
 }
 
 // RotateWebhookSecretWithResponse Rotate webhook secret
@@ -15449,6 +15603,39 @@ func ParseUpdateWebhookResponse(rsp *http.Response) (*UpdateWebhookResponse, err
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest WebhookOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListWebhookDeliveriesResponse parses an HTTP response from a ListWebhookDeliveriesWithResponse call
+func ParseListWebhookDeliveriesResponse(rsp *http.Response) (*ListWebhookDeliveriesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListWebhookDeliveriesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest WebhookDeliveriesOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

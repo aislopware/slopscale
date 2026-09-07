@@ -1359,6 +1359,46 @@ components:
         - lastDeliveryAt
         - lastDeliveryStatus
       type: object
+    WebhookDeliveriesOutputBody:
+      additionalProperties: false
+      properties:
+        deliveries:
+          items:
+            $ref: "#/components/schemas/WebhookDelivery"
+          type: array
+      required:
+        - deliveries
+      type: object
+    WebhookDelivery:
+      additionalProperties: false
+      properties:
+        at:
+          format: date-time
+          type: string
+        attempts:
+          format: int64
+          type: integer
+        durationMs:
+          format: int64
+          type: integer
+        eventType:
+          type: string
+        id:
+          format: uint64
+          type: string
+        ok:
+          type: boolean
+        status:
+          type: string
+      required:
+        - id
+        - eventType
+        - status
+        - ok
+        - attempts
+        - durationMs
+        - at
+      type: object
     WebhookEventTypes:
       additionalProperties: false
       properties:
@@ -3698,6 +3738,39 @@ paths:
         - Webhooks
       x-audit-action: webhook.update
       x-required-scope: feature_settings
+  /api/v1/webhook/{id}/deliveries:
+    get:
+      description: |-
+        The newest deliveries to the webhook, most recent first; the server keeps the last 100 per webhook.
+
+        Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listWebhookDeliveries
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDeliveriesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List webhook deliveries
+      tags:
+        - Webhooks
+      x-required-scope: feature_settings:read
   /api/v1/webhook/{id}/rotate:
     post:
       description: |-

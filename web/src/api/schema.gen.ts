@@ -1054,6 +1054,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/webhook/{id}/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List webhook deliveries
+         * @description The newest deliveries to the webhook, most recent first; the server keeps the last 100 per webhook.
+         *
+         *     Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listWebhookDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/webhook/{id}/rotate": {
         parameters: {
             query?: never;
@@ -1691,6 +1713,22 @@ export interface components {
             updatedAt: string;
             url: string;
         };
+        WebhookDeliveriesOutputBody: {
+            deliveries: components["schemas"]["WebhookDelivery"][];
+        };
+        WebhookDelivery: {
+            /** Format: date-time */
+            at: string;
+            /** Format: int64 */
+            attempts: number;
+            /** Format: int64 */
+            durationMs: number;
+            eventType: string;
+            /** Format: uint64 */
+            id: string;
+            ok: boolean;
+            status: string;
+        };
         WebhookEventTypes: {
             types: string[];
         };
@@ -1804,6 +1842,8 @@ export type UpdateSettingsRequestBody = components['schemas']['UpdateSettingsReq
 export type User = components['schemas']['User'];
 export type UserOutputBody = components['schemas']['UserOutputBody'];
 export type Webhook = components['schemas']['Webhook'];
+export type WebhookDeliveriesOutputBody = components['schemas']['WebhookDeliveriesOutputBody'];
+export type WebhookDelivery = components['schemas']['WebhookDelivery'];
 export type WebhookEventTypes = components['schemas']['WebhookEventTypes'];
 export type WebhookOutputBody = components['schemas']['WebhookOutputBody'];
 export type WebhookRequestBody = components['schemas']['WebhookRequestBody'];
@@ -4025,6 +4065,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmptyOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listWebhookDeliveries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDeliveriesOutputBody"];
                 };
             };
             /** @description Error */
