@@ -736,6 +736,42 @@ func TestAuthenticationFlows(t *testing.T) {
 		// INPUT: Followup request with short timeout, no auth completion
 		// EXPECTED: Request times out with unauthorized error
 		// WHY: Prevents indefinite waiting; nodes must retry if auth takes too long
+		// TEST: Followup arriving after the registration completed
+		// WHAT: The auth completed (cache entry gone, node registered) before the followup got in
+		// INPUT: Followup request for an unknown registration id, node already registered under the request's keys
+		// EXPECTED: The registered node's response, not a key-extension refusal or a fresh AuthURL
+		// WHY: A retried or slow followup must not strand a node that just logged in
+		{
+			name: "followup_after_registration_completed",
+			setupFunc: func(_ *testing.T, app *Headscale) (string, error) {
+				regID, err := types.NewAuthID()
+				if err != nil {
+					return "", err
+				}
+
+				user := app.state.CreateUserForTest("late-followup-user")
+				node := app.state.CreateNodeForTest(user, "late-followup-node")
+				node.MachineKey = machineKey1.Public()
+				node.NodeKey = nodeKey1.Public()
+				app.state.PutNodeInStoreForTest(*node)
+
+				return fmt.Sprintf("http://localhost:8080/register/%s", regID), nil
+			},
+			request: func(followupURL string) tailcfg.RegisterRequest {
+				return tailcfg.RegisterRequest{
+					Followup: followupURL,
+					NodeKey:  nodeKey1.Public(),
+					Hostinfo: &tailcfg.Hostinfo{Hostname: "late-followup-node"},
+					Expiry:   time.Now().Add(24 * time.Hour),
+				}
+			},
+			machineKey: machineKey1.Public,
+			wantAuth:   true,
+			validate: func(t *testing.T, resp *tailcfg.RegisterResponse, _ *Headscale) {
+				assert.Empty(t, resp.AuthURL, "a completed registration needs no new login")
+				assert.False(t, resp.NodeKeyExpired)
+			},
+		},
 		{
 			name: "followup_registration_timeout",
 			setupFunc: func(_ *testing.T, app *Headscale) (string, error) {

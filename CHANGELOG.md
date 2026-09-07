@@ -98,6 +98,7 @@ back, and a policy that never names `autogroup:shared` ignores shares. See
 - Headscale now requires Go 1.27 to build
 - Fix `headscale policy set --bypass-server-and-access-database-directly` storing the policy with its comments blanked out; the file is now saved as written
 - Fix the OIDC success page always saying "Node registered"; a node logging in again now sees "Node reauthenticated"
+- Fix a registration followup that arrives after the login completed being refused with "extending key is not allowed"; the client now gets its registered node
 - User roles: `headscale users set-role`, a `Role` column in `headscale users list`, `POST /api/v1/user/{id}/role`, `GET /api/v1/whoami`, a `userId` on API keys and `headscale apikeys create --user`; the v2 user object's `role` field and `?role=` filter now reflect the real role
 - The `is-admin` node capability, previously stamped on every node, is now stamped only on devices of the owner and admins; `is-owner` on the owner's. Clients use these for admin-console affordances in their UI only
 - `POST /api/v1/apikey` without an `expiration` now mints a key that never expires instead of one that was already expired

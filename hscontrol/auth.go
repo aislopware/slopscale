@@ -54,6 +54,16 @@ func (h *Headscale) handleRegister(
 		}
 	}
 
+	// If the [tailcfg.RegisterRequest] has a Followup URL, it means that the
+	// node has already started the registration process and we should wait for
+	// it to finish the original registration. Clients send followups without
+	// an Auth struct, so this must come before the nil-auth logout path: a
+	// followup that arrives after the registration completed would otherwise
+	// find the new node and be refused as a key extension.
+	if req.Followup != "" {
+		return h.waitForFollowup(ctx, req, machineKey)
+	}
+
 	// If the register request does not contain a Auth struct, it means we are logging
 	// out an existing node (legacy logout path for clients that send Auth=nil).
 	if req.Auth == nil {
@@ -65,13 +75,6 @@ func (h *Headscale) handleRegister(
 		if resp != nil {
 			return resp, nil
 		}
-	}
-
-	// If the [tailcfg.RegisterRequest] has a Followup URL, it means that the
-	// node has already started the registration process and we should wait for
-	// it to finish the original registration.
-	if req.Followup != "" {
-		return h.waitForFollowup(ctx, req, machineKey)
 	}
 
 	// Pre authenticated keys are handled slightly different than interactive
@@ -387,6 +390,16 @@ func (h *Headscale) waitForFollowup(
 			}
 
 			return nodeToRegisterResponse(verdict.Node), nil
+		}
+	}
+
+	// The registration may have completed, and its cache entry gone, while
+	// this followup was in flight (a retried or slow request). The node is
+	// then registered under the request's keys and gets its response as if
+	// it had waited for the verdict.
+	if node, ok := h.state.GetNodeByNodeKey(req.NodeKey); ok && !node.IsExpired() {
+		if machineKeyMismatch(node, machineKey) == nil {
+			return nodeToRegisterResponse(node), nil
 		}
 	}
 
