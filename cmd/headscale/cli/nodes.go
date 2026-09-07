@@ -76,6 +76,11 @@ func init() {
 	mustMarkRequired(unshareNodeCmd, "user")
 	nodeCmd.AddCommand(unshareNodeCmd)
 
+	globalExitNodeCmd.Flags().Uint64P("identifier", "i", 0, "Node identifier (ID)")
+	mustMarkRequired(globalExitNodeCmd, "identifier")
+	globalExitNodeCmd.Flags().Bool("revoke", false, "Clear the mark instead of setting it")
+	nodeCmd.AddCommand(globalExitNodeCmd)
+
 	nodeCmd.AddCommand(backfillNodeIPsCmd)
 }
 
@@ -203,33 +208,89 @@ var approveNodeCmd = &cobra.Command{
 for approval stays registered but has no peers and is not visible to any.
 
 Use --revoke to withdraw the approval again.`,
-	RunE: clientRunE(
+	RunE: toggleNodeRunE(
+		"approving node",
+		"Node approved",
+		"Node approval revoked",
+		func(ctx context.Context, client *clientv1.ClientWithResponses, id string, on bool) (
+			*nodeToggleResponse, error,
+		) {
+			resp, err := client.ApproveNodeWithResponse(ctx, id, clientv1.ApproveNodeJSONRequestBody{Approved: &on})
+			if err != nil {
+				return nil, err
+			}
+
+			return &nodeToggleResponse{resp.StatusCode(), resp.ApplicationproblemJSONDefault, resp.JSON200}, nil
+		},
+	),
+}
+
+var globalExitNodeCmd = &cobra.Command{
+	Use:   "global-exit-node",
+	Short: "Mark a node as the exit node every client is told to prefer",
+	Long: `Marks an exit node every client is told to prefer. Marking approves the node's
+exit routes; the node then carries suggest-exit-node and every node
+auto-exit-node, so clients that use an exit node automatically
+(tailscale set --exit-node=auto:any) pick it.
+
+Use --revoke to clear the mark again.`,
+	RunE: toggleNodeRunE(
+		"setting global exit node",
+		"Node marked as global exit node",
+		"Global exit node mark cleared",
+		func(ctx context.Context, client *clientv1.ClientWithResponses, id string, on bool) (
+			*nodeToggleResponse, error,
+		) {
+			resp, err := client.SetGlobalExitNodeWithResponse(
+				ctx, id, clientv1.SetGlobalExitNodeJSONRequestBody{Enabled: &on},
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			return &nodeToggleResponse{resp.StatusCode(), resp.ApplicationproblemJSONDefault, resp.JSON200}, nil
+		},
+	),
+}
+
+// nodeToggleCall invokes a node on/off endpoint for the node id.
+type nodeToggleCall func(context.Context, *clientv1.ClientWithResponses, string, bool) (*nodeToggleResponse, error)
+
+// nodeToggleResponse is what a node on/off endpoint answers.
+type nodeToggleResponse struct {
+	status  int
+	problem *clientv1.ErrorModel
+	node    *clientv1.NodeOutputBody
+}
+
+// toggleNodeRunE runs a node on/off command: --identifier names the node
+// and --revoke turns the setting off instead of on.
+func toggleNodeRunE(
+	what, onMsg, offMsg string,
+	call nodeToggleCall,
+) func(*cobra.Command, []string) error {
+	return clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
 			identifier, _ := cmd.Flags().GetUint64("identifier")
 			revoke, _ := cmd.Flags().GetBool("revoke")
-			approved := !revoke
 
-			resp, err := client.ApproveNodeWithResponse(
-				ctx,
-				strconv.FormatUint(identifier, util.Base10),
-				clientv1.ApproveNodeJSONRequestBody{Approved: &approved},
-			)
+			resp, err := call(ctx, client, strconv.FormatUint(identifier, util.Base10), !revoke)
 			if err != nil {
-				return fmt.Errorf("approving node: %w", err)
+				return fmt.Errorf("%s: %w", what, err)
 			}
 
-			if resp.StatusCode() != http.StatusOK {
-				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			if resp.status != http.StatusOK {
+				return apiError(resp.status, resp.problem)
 			}
 
-			msg := "Node approved"
+			msg := onMsg
 			if revoke {
-				msg = "Node approval revoked"
+				msg = offMsg
 			}
 
-			return printOutput(cmd, resp.JSON200.Node, msg)
+			return printOutput(cmd, resp.node.Node, msg)
 		},
-	),
+	)
 }
 
 var shareNodeCmd = &cobra.Command{

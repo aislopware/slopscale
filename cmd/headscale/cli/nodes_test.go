@@ -224,6 +224,51 @@ func TestNodeCommands(t *testing.T) {
 			want: "Node approval revoked\n",
 		},
 		{
+			name:  "global-exit-node posts enabled=true",
+			src:   globalExitNodeCmd,
+			flags: map[string]string{"identifier": "7"},
+			routes: map[string]apiHandler{
+				"POST /api/v1/node/{id}/global-exit-node": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+					assert.Equal(t, "7", r.PathValue("id"))
+
+					var body clientv1.SetGlobalExitNodeRequestBody
+
+					decodeBody(t, r, &body)
+
+					if assert.NotNil(t, body.Enabled) {
+						assert.True(t, *body.Enabled)
+					}
+
+					marked := laptop
+					marked.GlobalExitNode = true
+					writeJSON(t, w, clientv1.NodeOutputBody{Node: marked})
+				},
+			},
+			want: "Node marked as global exit node\n",
+		},
+		{
+			name:  "global-exit-node --revoke posts enabled=false",
+			src:   globalExitNodeCmd,
+			flags: map[string]string{"identifier": "7", "revoke": "true"},
+			routes: map[string]apiHandler{
+				"POST /api/v1/node/{id}/global-exit-node": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+
+					var body clientv1.SetGlobalExitNodeRequestBody
+
+					decodeBody(t, r, &body)
+
+					if assert.NotNil(t, body.Enabled) {
+						assert.False(t, *body.Enabled)
+					}
+
+					writeJSON(t, w, clientv1.NodeOutputBody{Node: laptop})
+				},
+			},
+			want: "Global exit node mark cleared\n",
+		},
+		{
 			name:  "share posts the user id",
 			src:   shareNodeCmd,
 			flags: map[string]string{"identifier": "7", "user": "3"},
