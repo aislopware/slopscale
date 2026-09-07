@@ -883,7 +883,7 @@ type ClientInterface interface {
 
 	// ListWebhooks List webhooks
 	//
-	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with GET /api/v2/tailnet/{tailnet}/webhooks (the `ListWebhooks` operationId).
 	ListWebhooks(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -892,7 +892,7 @@ type ClientInterface interface {
 	//
 	// The response carries the signing secret; it is not shown again.
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -903,7 +903,7 @@ type ClientInterface interface {
 	//
 	// The response carries the signing secret; it is not shown again.
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -940,21 +940,21 @@ type ClientInterface interface {
 
 	// DeleteWebhook Delete webhook
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with DELETE /api/v2/webhooks/{endpointId} (the `DeleteWebhook` operationId).
 	DeleteWebhook(ctx context.Context, endpointId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetWebhook Get webhook
 	//
-	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with GET /api/v2/webhooks/{endpointId} (the `GetWebhook` operationId).
 	GetWebhook(ctx context.Context, endpointId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateWebhookWithBody Update webhook
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -963,7 +963,7 @@ type ClientInterface interface {
 
 	// UpdateWebhook Update webhook
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -972,7 +972,7 @@ type ClientInterface interface {
 
 	// RotateWebhookSecret Rotate webhook secret
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with POST /api/v2/webhooks/{endpointId}/rotate (the `RotateWebhookSecret` operationId).
 	RotateWebhookSecret(ctx context.Context, endpointId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -981,7 +981,7 @@ type ClientInterface interface {
 	//
 	// Posts a test event now. Tailscale queues it; Headscale delivers it before answering, so a failing receiver shows as a 502.
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with POST /api/v2/webhooks/{endpointId}/test (the `TestWebhook` operationId).
 	TestWebhook(ctx context.Context, endpointId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1745,7 +1745,7 @@ func (c *Client) ListUsers(ctx context.Context, tailnet string, params *ListUser
 
 // ListWebhooks List webhooks
 //
-// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with GET /api/v2/tailnet/{tailnet}/webhooks (the `ListWebhooks` operationId).
 func (c *Client) ListWebhooks(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1764,7 +1764,7 @@ func (c *Client) ListWebhooks(ctx context.Context, tailnet string, reqEditors ..
 //
 // The response carries the signing secret; it is not shown again.
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -1785,7 +1785,7 @@ func (c *Client) CreateWebhookWithBody(ctx context.Context, tailnet string, cont
 //
 // The response carries the signing secret; it is not shown again.
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1872,7 +1872,7 @@ func (c *Client) SuspendUser(ctx context.Context, id string, reqEditors ...Reque
 
 // DeleteWebhook Delete webhook
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with DELETE /api/v2/webhooks/{endpointId} (the `DeleteWebhook` operationId).
 func (c *Client) DeleteWebhook(ctx context.Context, endpointId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1889,7 +1889,7 @@ func (c *Client) DeleteWebhook(ctx context.Context, endpointId string, reqEditor
 
 // GetWebhook Get webhook
 //
-// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with GET /api/v2/webhooks/{endpointId} (the `GetWebhook` operationId).
 func (c *Client) GetWebhook(ctx context.Context, endpointId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1906,7 +1906,7 @@ func (c *Client) GetWebhook(ctx context.Context, endpointId string, reqEditors .
 
 // UpdateWebhookWithBody Update webhook
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
@@ -1925,7 +1925,7 @@ func (c *Client) UpdateWebhookWithBody(ctx context.Context, endpointId string, c
 
 // UpdateWebhook Update webhook
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1944,7 +1944,7 @@ func (c *Client) UpdateWebhook(ctx context.Context, endpointId string, body Upda
 
 // RotateWebhookSecret Rotate webhook secret
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with POST /api/v2/webhooks/{endpointId}/rotate (the `RotateWebhookSecret` operationId).
 func (c *Client) RotateWebhookSecret(ctx context.Context, endpointId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1963,7 +1963,7 @@ func (c *Client) RotateWebhookSecret(ctx context.Context, endpointId string, req
 //
 // Posts a test event now. Tailscale queues it; Headscale delivers it before answering, so a failing receiver shows as a 502.
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Corresponds with POST /api/v2/webhooks/{endpointId}/test (the `TestWebhook` operationId).
 func (c *Client) TestWebhook(ctx context.Context, endpointId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -4151,7 +4151,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListWebhooksWithResponse List webhooks
 	//
-	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -4162,7 +4162,7 @@ type ClientWithResponsesInterface interface {
 	//
 	// The response carries the signing secret; it is not shown again.
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -4173,7 +4173,7 @@ type ClientWithResponsesInterface interface {
 	//
 	// The response carries the signing secret; it is not shown again.
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -4218,7 +4218,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteWebhookWithResponse Delete webhook
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -4227,7 +4227,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetWebhookWithResponse Get webhook
 	//
-	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -4236,7 +4236,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateWebhookWithBodyWithResponse Update webhook
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -4245,7 +4245,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateWebhookWithResponse Update webhook
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -4254,7 +4254,7 @@ type ClientWithResponsesInterface interface {
 
 	// RotateWebhookSecretWithResponse Rotate webhook secret
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -4265,7 +4265,7 @@ type ClientWithResponsesInterface interface {
 	//
 	// Posts a test event now. Tailscale queues it; Headscale delivers it before answering, so a failing receiver shows as a 502.
 	//
-	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7892,7 +7892,7 @@ func (c *ClientWithResponses) ListUsersWithResponse(ctx context.Context, tailnet
 
 // ListWebhooksWithResponse List webhooks
 //
-// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -7909,7 +7909,7 @@ func (c *ClientWithResponses) ListWebhooksWithResponse(ctx context.Context, tail
 //
 // The response carries the signing secret; it is not shown again.
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -7926,7 +7926,7 @@ func (c *ClientWithResponses) CreateWebhookWithBodyWithResponse(ctx context.Cont
 //
 // The response carries the signing secret; it is not shown again.
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -8001,7 +8001,7 @@ func (c *ClientWithResponses) SuspendUserWithResponse(ctx context.Context, id st
 
 // DeleteWebhookWithResponse Delete webhook
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -8016,7 +8016,7 @@ func (c *ClientWithResponses) DeleteWebhookWithResponse(ctx context.Context, end
 
 // GetWebhookWithResponse Get webhook
 //
-// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -8031,7 +8031,7 @@ func (c *ClientWithResponses) GetWebhookWithResponse(ctx context.Context, endpoi
 
 // UpdateWebhookWithBodyWithResponse Update webhook
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -8046,7 +8046,7 @@ func (c *ClientWithResponses) UpdateWebhookWithBodyWithResponse(ctx context.Cont
 
 // UpdateWebhookWithResponse Update webhook
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -8061,7 +8061,7 @@ func (c *ClientWithResponses) UpdateWebhookWithResponse(ctx context.Context, end
 
 // RotateWebhookSecretWithResponse Rotate webhook secret
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -8078,7 +8078,7 @@ func (c *ClientWithResponses) RotateWebhookSecretWithResponse(ctx context.Contex
 //
 // Posts a test event now. Tailscale queues it; Headscale delivers it before answering, so a failing receiver shows as a 502.
 //
-// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Returns a wrapper object for the known response body format(s).
 //

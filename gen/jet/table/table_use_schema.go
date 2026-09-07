@@ -21,6 +21,7 @@ func UseSchema(schema string) {
 	Migrations = Migrations.FromSchema(schema)
 	NetworkGroups = NetworkGroups.FromSchema(schema)
 	NetworkPrefixes = NetworkPrefixes.FromSchema(schema)
+	NetworkRouteApprovals = NetworkRouteApprovals.FromSchema(schema)
 	NetworkRouters = NetworkRouters.FromSchema(schema)
 	Networks = Networks.FromSchema(schema)
 	NodeShares = NodeShares.FromSchema(schema)

@@ -354,12 +354,11 @@ components:
           description: Fully qualified name, without trailing dot.
           type: string
         type:
-          description: A, AAAA or TXT; empty picks A or AAAA from the value.
+          description: A or AAAA; empty picks one from the value.
           enum:
             - ""
             - A
             - AAAA
-            - TXT
           type: string
         value:
           type: string
@@ -3563,7 +3562,7 @@ paths:
       description: |-
         Endpoints the server posts events to, signed with each endpoint's secret in the Tailscale-Webhook-Signature header. Secrets are not listed.
 
-        Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+        Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: listWebhooks
       responses:
         "200":
@@ -3583,12 +3582,12 @@ paths:
       summary: List webhooks
       tags:
         - Webhooks
-      x-required-scope: feature_settings:read
+      x-required-scope: webhooks:read
     post:
       description: |-
         The response carries the signing secret; it is not shown again.
 
-        Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+        Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: createWebhook
       requestBody:
         content:
@@ -3615,10 +3614,10 @@ paths:
       tags:
         - Webhooks
       x-audit-action: webhook.create
-      x-required-scope: feature_settings
+      x-required-scope: webhooks
   /api/v1/webhook/event-types:
     get:
-      description: Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      description: Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: listWebhookEventTypes
       responses:
         "200":
@@ -3638,10 +3637,10 @@ paths:
       summary: List webhook event types
       tags:
         - Webhooks
-      x-required-scope: feature_settings:read
+      x-required-scope: webhooks:read
   /api/v1/webhook/{id}:
     delete:
-      description: Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      description: Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: deleteWebhook
       parameters:
         - in: path
@@ -3669,9 +3668,9 @@ paths:
       tags:
         - Webhooks
       x-audit-action: webhook.delete
-      x-required-scope: feature_settings
+      x-required-scope: webhooks
     get:
-      description: Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      description: Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: getWebhook
       parameters:
         - in: path
@@ -3698,12 +3697,12 @@ paths:
       summary: Get webhook
       tags:
         - Webhooks
-      x-required-scope: feature_settings:read
+      x-required-scope: webhooks:read
     put:
       description: |-
         The secret stays; rotate it separately.
 
-        Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+        Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: updateWebhook
       parameters:
         - in: path
@@ -3737,13 +3736,13 @@ paths:
       tags:
         - Webhooks
       x-audit-action: webhook.update
-      x-required-scope: feature_settings
+      x-required-scope: webhooks
   /api/v1/webhook/{id}/deliveries:
     get:
       description: |-
         The newest deliveries to the webhook, most recent first; the server keeps the last 100 per webhook.
 
-        Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+        Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: listWebhookDeliveries
       parameters:
         - in: path
@@ -3770,13 +3769,13 @@ paths:
       summary: List webhook deliveries
       tags:
         - Webhooks
-      x-required-scope: feature_settings:read
+      x-required-scope: webhooks:read
   /api/v1/webhook/{id}/rotate:
     post:
       description: |-
         Replaces the signing secret and returns it; deliveries signed with the old one stop at once.
 
-        Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+        Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: rotateWebhookSecret
       parameters:
         - in: path
@@ -3804,13 +3803,13 @@ paths:
       tags:
         - Webhooks
       x-audit-action: webhook.rotate
-      x-required-scope: feature_settings
+      x-required-scope: webhooks
   /api/v1/webhook/{id}/test:
     post:
       description: |-
         Posts a test event now and reports the receiver's answer.
 
-        Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+        Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: testWebhook
       parameters:
         - in: path
@@ -3838,7 +3837,7 @@ paths:
       tags:
         - Webhooks
       x-audit-action: webhook.test
-      x-required-scope: feature_settings
+      x-required-scope: webhooks
   /api/v1/whoami:
     get:
       description: Any authenticated caller may ask who it is; no scope is required.

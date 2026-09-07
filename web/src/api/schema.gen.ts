@@ -1007,7 +1007,7 @@ export interface paths {
          * List webhooks
          * @description Endpoints the server posts events to, signed with each endpoint's secret in the Tailscale-Webhook-Signature header. Secrets are not listed.
          *
-         *     Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         *     Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         get: operations["listWebhooks"];
         put?: never;
@@ -1015,7 +1015,7 @@ export interface paths {
          * Create webhook
          * @description The response carries the signing secret; it is not shown again.
          *
-         *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         *     Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         post: operations["createWebhook"];
         delete?: never;
@@ -1033,20 +1033,20 @@ export interface paths {
         };
         /**
          * Get webhook
-         * @description Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         * @description Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         get: operations["getWebhook"];
         /**
          * Replace webhook
          * @description The secret stays; rotate it separately.
          *
-         *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         *     Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         put: operations["updateWebhook"];
         post?: never;
         /**
          * Delete webhook
-         * @description Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         * @description Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         delete: operations["deleteWebhook"];
         options?: never;
@@ -1065,7 +1065,7 @@ export interface paths {
          * List webhook deliveries
          * @description The newest deliveries to the webhook, most recent first; the server keeps the last 100 per webhook.
          *
-         *     Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         *     Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         get: operations["listWebhookDeliveries"];
         put?: never;
@@ -1089,7 +1089,7 @@ export interface paths {
          * Rotate webhook secret
          * @description Replaces the signing secret and returns it; deliveries signed with the old one stop at once.
          *
-         *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         *     Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         post: operations["rotateWebhookSecret"];
         delete?: never;
@@ -1111,7 +1111,7 @@ export interface paths {
          * Test webhook
          * @description Posts a test event now and reports the receiver's answer.
          *
-         *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         *     Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         post: operations["testWebhook"];
         delete?: never;
@@ -1129,7 +1129,7 @@ export interface paths {
         };
         /**
          * List webhook event types
-         * @description Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         * @description Requires the `webhooks:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         get: operations["listWebhookEventTypes"];
         put?: never;
@@ -1332,10 +1332,10 @@ export interface components {
             /** @description Fully qualified name, without trailing dot. */
             name: string;
             /**
-             * @description A, AAAA or TXT; empty picks A or AAAA from the value.
+             * @description A or AAAA; empty picks one from the value.
              * @enum {string}
              */
-            type: "" | "A" | "AAAA" | "TXT";
+            type: "" | "A" | "AAAA";
             value: string;
         };
         DNSSettings: {
