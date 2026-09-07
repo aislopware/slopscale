@@ -923,12 +923,16 @@ components:
     ListNetworksOutputBody:
       additionalProperties: false
       properties:
+        enforcing:
+          description: Whether the tailnet has a packet filter, so the networks' protocol and ports take effect.
+          type: boolean
         networks:
           items:
             $ref: "#/components/schemas/Network"
           type: array
       required:
         - networks
+        - enforcing
       type: object
     ListNodesOutputBody:
       additionalProperties: false

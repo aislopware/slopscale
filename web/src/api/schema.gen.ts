@@ -2075,6 +2075,8 @@ export interface components {
             logStreams: components["schemas"]["LogStream"][];
         };
         ListNetworksOutputBody: {
+            /** @description Whether the tailnet has a packet filter, so the networks' protocol and ports take effect. */
+            enforcing: boolean;
             networks: components["schemas"]["Network"][];
         };
         ListNodesOutputBody: {

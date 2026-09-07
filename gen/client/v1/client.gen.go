@@ -622,7 +622,9 @@ type ListLogStreamsOutputBody struct {
 
 // ListNetworksOutputBody defines model for ListNetworksOutputBody.
 type ListNetworksOutputBody struct {
-	Networks []Network `json:"networks"`
+	// Enforcing Whether the tailnet has a packet filter, so the networks' protocol and ports take effect.
+	Enforcing bool      `json:"enforcing"`
+	Networks  []Network `json:"networks"`
 }
 
 // ListNodesOutputBody defines model for ListNodesOutputBody.
