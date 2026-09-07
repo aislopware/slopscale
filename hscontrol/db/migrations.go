@@ -472,7 +472,107 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 				return nil
 			},
 		},
+		{
+			// Console sign-in through the identity provider: sessions maps
+			// a browser's cookie token to a user until it expires.
+			id:  "202609080900-sessions",
+			run: migrateSessions,
+		},
+		{
+			// Audit log: audit_events records every writing API request
+			// and the server's own sign-in events, by value, so the
+			// history outlives the users and objects it names.
+			id:  "202609080930-audit-events",
+			run: migrateAuditEvents,
+		},
 	}
+}
+
+// migrateSessions (202609080900) creates the sessions table.
+func migrateSessions(tx *Tx) error {
+	hasSessions, err := tx.ex.hasTable("sessions")
+	if err != nil {
+		return err
+	}
+
+	if hasSessions {
+		return nil
+	}
+
+	ddl := `CREATE TABLE sessions(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  token_hash blob NOT NULL,
+  user_id integer NOT NULL,
+  created_at datetime,
+  expires_at datetime,
+  last_seen_at datetime,
+  CONSTRAINT fk_sessions_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+)`
+	if tx.ex.dialect == dialectPostgres {
+		ddl = `CREATE TABLE sessions(
+  id bigserial PRIMARY KEY,
+  token_hash bytea NOT NULL,
+  user_id bigint NOT NULL,
+  created_at timestamptz,
+  expires_at timestamptz,
+  last_seen_at timestamptz,
+  CONSTRAINT fk_sessions_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+)`
+	}
+
+	return tx.ex.execAll("creating sessions table", []string{
+		ddl,
+		`CREATE UNIQUE INDEX idx_sessions_token_hash ON sessions(token_hash)`,
+	})
+}
+
+// migrateAuditEvents (202609080930) creates the audit_events table.
+func migrateAuditEvents(tx *Tx) error {
+	hasEvents, err := tx.ex.hasTable("audit_events")
+	if err != nil {
+		return err
+	}
+
+	if hasEvents {
+		return nil
+	}
+
+	ddl := `CREATE TABLE audit_events(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  created_at datetime NOT NULL,
+  actor_kind text NOT NULL,
+  actor_user_id integer,
+  actor_name text,
+  action text NOT NULL,
+  target_kind text,
+  target_id text,
+  target_name text,
+  outcome integer NOT NULL,
+  detail text,
+  remote_addr text
+)`
+	if tx.ex.dialect == dialectPostgres {
+		ddl = `CREATE TABLE audit_events(
+  id bigserial PRIMARY KEY,
+  created_at timestamptz NOT NULL,
+  actor_kind text NOT NULL,
+  actor_user_id bigint,
+  actor_name text,
+  action text NOT NULL,
+  target_kind text,
+  target_id text,
+  target_name text,
+  outcome bigint NOT NULL,
+  detail text,
+  remote_addr text
+)`
+	}
+
+	return tx.ex.execAll("creating audit_events table", []string{
+		ddl,
+		`CREATE INDEX idx_audit_events_created_at ON audit_events(created_at)`,
+		`CREATE INDEX idx_audit_events_actor_user_id ON audit_events(actor_user_id)`,
+	})
 }
 
 // migrateNodeShares (202609071200) creates the node_shares table.

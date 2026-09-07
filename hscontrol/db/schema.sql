@@ -181,3 +181,40 @@ CREATE TABLE settings(
   value text,
   updated_at datetime
 );
+
+-- sessions are the admin console's browser sign-ins: a user who signed in
+-- through the identity provider holds a random token in a cookie, and the
+-- row maps its hash to the user until expires_at. Deleting the user
+-- deletes its sessions.
+CREATE TABLE sessions(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  token_hash blob NOT NULL,
+  user_id integer NOT NULL,
+  created_at datetime,
+  expires_at datetime,
+  last_seen_at datetime,
+
+  CONSTRAINT fk_sessions_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_sessions_token_hash ON sessions(token_hash);
+
+-- audit_events is the append-only record of who changed what: every
+-- writing API request and the sign-in events the server performs itself.
+-- Actor and target are recorded by value, without foreign keys, so the
+-- history survives the deletion of the user or object it names.
+CREATE TABLE audit_events(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  created_at datetime NOT NULL,
+  actor_kind text NOT NULL,
+  actor_user_id integer,
+  actor_name text,
+  action text NOT NULL,
+  target_kind text,
+  target_id text,
+  target_name text,
+  outcome integer NOT NULL,
+  detail text,
+  remote_addr text
+);
+CREATE INDEX idx_audit_events_created_at ON audit_events(created_at);
+CREATE INDEX idx_audit_events_actor_user_id ON audit_events(actor_user_id);

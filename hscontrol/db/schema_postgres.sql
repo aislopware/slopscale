@@ -136,3 +136,31 @@ CREATE TABLE settings(
   value text,
   updated_at timestamptz
 );
+
+CREATE TABLE sessions(
+  id bigserial PRIMARY KEY,
+  token_hash bytea NOT NULL,
+  user_id bigint NOT NULL,
+  created_at timestamptz,
+  expires_at timestamptz,
+  last_seen_at timestamptz,
+  CONSTRAINT fk_sessions_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_sessions_token_hash ON sessions(token_hash);
+
+CREATE TABLE audit_events(
+  id bigserial PRIMARY KEY,
+  created_at timestamptz NOT NULL,
+  actor_kind text NOT NULL,
+  actor_user_id bigint,
+  actor_name text,
+  action text NOT NULL,
+  target_kind text,
+  target_id text,
+  target_name text,
+  outcome bigint NOT NULL,
+  detail text,
+  remote_addr text
+);
+CREATE INDEX idx_audit_events_created_at ON audit_events(created_at);
+CREATE INDEX idx_audit_events_actor_user_id ON audit_events(actor_user_id);

@@ -5,6 +5,18 @@ COL api_keys.user_id bigint null=YES
 COL api_keys.created_at timestamp with time zone null=YES
 COL api_keys.expiration timestamp with time zone null=YES
 COL api_keys.last_seen timestamp with time zone null=YES
+COL audit_events.id bigint null=NO default=nextval('audit_events_id_seq'::regclass)
+COL audit_events.created_at timestamp with time zone null=NO
+COL audit_events.actor_kind text null=NO
+COL audit_events.actor_user_id bigint null=YES
+COL audit_events.actor_name text null=YES
+COL audit_events.action text null=NO
+COL audit_events.target_kind text null=YES
+COL audit_events.target_id text null=YES
+COL audit_events.target_name text null=YES
+COL audit_events.outcome bigint null=NO
+COL audit_events.detail text null=YES
+COL audit_events.remote_addr text null=YES
 COL database_versions.id bigint null=NO default=nextval('database_versions_id_seq'::regclass)
 COL database_versions.version text null=NO
 COL database_versions.updated_at timestamp with time zone null=YES
@@ -72,6 +84,12 @@ COL pre_auth_keys.created_at timestamp with time zone null=YES
 COL pre_auth_keys.expiration timestamp with time zone null=YES
 COL pre_auth_keys.revoked timestamp with time zone null=YES
 COL pre_auth_keys.preauthorized boolean null=YES default=true
+COL sessions.id bigint null=NO default=nextval('sessions_id_seq'::regclass)
+COL sessions.token_hash bytea null=NO
+COL sessions.user_id bigint null=NO
+COL sessions.created_at timestamp with time zone null=YES
+COL sessions.expires_at timestamp with time zone null=YES
+COL sessions.last_seen_at timestamp with time zone null=YES
 COL settings.key text null=NO
 COL settings.value text null=YES
 COL settings.updated_at timestamp with time zone null=YES
@@ -87,9 +105,12 @@ COL users.provider text null=YES
 COL users.profile_pic_url text null=YES
 COL users.role text null=YES
 COL users.approved_at timestamp with time zone null=YES
+IDX CREATE INDEX idx_audit_events_actor_user_id ON public.audit_events USING btree (actor_user_id)
+IDX CREATE INDEX idx_audit_events_created_at ON public.audit_events USING btree (created_at)
 IDX CREATE INDEX idx_policies_deleted_at ON public.policies USING btree (deleted_at)
 IDX CREATE INDEX idx_users_deleted_at ON public.users USING btree (deleted_at)
 IDX CREATE UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)
+IDX CREATE UNIQUE INDEX audit_events_pkey ON public.audit_events USING btree (id)
 IDX CREATE UNIQUE INDEX database_versions_pkey ON public.database_versions USING btree (id)
 IDX CREATE UNIQUE INDEX idx_api_keys_prefix ON public.api_keys USING btree (prefix)
 IDX CREATE UNIQUE INDEX idx_name_no_provider_identifier ON public.users USING btree (name) WHERE (provider_identifier IS NULL)
@@ -99,6 +120,7 @@ IDX CREATE UNIQUE INDEX idx_oauth_access_tokens_prefix ON public.oauth_access_to
 IDX CREATE UNIQUE INDEX idx_oauth_clients_client_id ON public.oauth_clients USING btree (client_id)
 IDX CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON public.pre_auth_keys USING btree (prefix) WHERE ((prefix IS NOT NULL) AND (prefix <> ''::text))
 IDX CREATE UNIQUE INDEX idx_provider_identifier ON public.users USING btree (provider_identifier) WHERE (provider_identifier IS NOT NULL)
+IDX CREATE UNIQUE INDEX idx_sessions_token_hash ON public.sessions USING btree (token_hash)
 IDX CREATE UNIQUE INDEX migrations_pkey ON public.migrations USING btree (id)
 IDX CREATE UNIQUE INDEX node_shares_pkey ON public.node_shares USING btree (id)
 IDX CREATE UNIQUE INDEX nodes_pkey ON public.nodes USING btree (id)
@@ -106,10 +128,17 @@ IDX CREATE UNIQUE INDEX oauth_access_tokens_pkey ON public.oauth_access_tokens U
 IDX CREATE UNIQUE INDEX oauth_clients_pkey ON public.oauth_clients USING btree (id)
 IDX CREATE UNIQUE INDEX policies_pkey ON public.policies USING btree (id)
 IDX CREATE UNIQUE INDEX pre_auth_keys_pkey ON public.pre_auth_keys USING btree (id)
+IDX CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (id)
 IDX CREATE UNIQUE INDEX settings_pkey ON public.settings USING btree (key)
 IDX CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)
 CON api_keys api_keys_id_not_null NOT NULL id
 CON api_keys api_keys_pkey PRIMARY KEY (id)
+CON audit_events audit_events_action_not_null NOT NULL action
+CON audit_events audit_events_actor_kind_not_null NOT NULL actor_kind
+CON audit_events audit_events_created_at_not_null NOT NULL created_at
+CON audit_events audit_events_id_not_null NOT NULL id
+CON audit_events audit_events_outcome_not_null NOT NULL outcome
+CON audit_events audit_events_pkey PRIMARY KEY (id)
 CON database_versions database_versions_id_not_null NOT NULL id
 CON database_versions database_versions_pkey PRIMARY KEY (id)
 CON database_versions database_versions_version_not_null NOT NULL version
@@ -134,6 +163,11 @@ CON policies policies_pkey PRIMARY KEY (id)
 CON pre_auth_keys fk_pre_auth_keys_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 CON pre_auth_keys pre_auth_keys_id_not_null NOT NULL id
 CON pre_auth_keys pre_auth_keys_pkey PRIMARY KEY (id)
+CON sessions fk_sessions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+CON sessions sessions_id_not_null NOT NULL id
+CON sessions sessions_pkey PRIMARY KEY (id)
+CON sessions sessions_token_hash_not_null NOT NULL token_hash
+CON sessions sessions_user_id_not_null NOT NULL user_id
 CON settings settings_key_not_null NOT NULL key
 CON settings settings_pkey PRIMARY KEY (key)
 CON users users_id_not_null NOT NULL id
