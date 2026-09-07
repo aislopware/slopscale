@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,6 +18,8 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/oauth2-proxy/mockoidc"
 )
 
 const (
@@ -25,13 +28,23 @@ const (
 	// metricsPortOffset is added to --port to derive the metrics listen
 	// port, so the default lands on 9090.
 	metricsPortOffset = 1010
+	// oidcPortOffset is added to --port to derive the mock identity
+	// provider's port, so the default lands on 9100.
+	oidcPortOffset = 1020
+	// oidcUser is the identity the mock provider signs everyone in as:
+	// mockoidc's default user. It is listed in oidc.admin_users, so the
+	// console opens as an admin.
+	oidcUser = "jane.doe@example.com"
 	// healthTimeout bounds how long we wait for the server to come up.
 	healthTimeout = 30 * time.Second
 )
 
 var (
-	port = flag.Int("port", defaultPort, "headscale listen port")
-	keep = flag.Bool("keep", false, "keep state directory on exit")
+	port      = flag.Int("port", defaultPort, "headscale listen port")
+	keep      = flag.Bool("keep", false, "keep state directory on exit")
+	serverURL = flag.String("server-url", "",
+		"public URL of the server (default http://127.0.0.1:<port>); "+
+			"point it at the Vite dev server (http://localhost:5173) to sign in to the console from `bun run dev`")
 )
 
 var errHealthTimeout = errors.New("health check timed out")
@@ -39,11 +52,11 @@ var errHealthTimeout = errors.New("health check timed out")
 var errEmptyAuthKey = errors.New("empty auth key in response")
 
 // maxDevPort is the highest --port value that keeps the derived metrics
-// port (port+metricsPortOffset) inside the valid 1..65535 TCP range.
-const maxDevPort = 65535 - metricsPortOffset
+// and OIDC ports inside the valid 1..65535 TCP range.
+const maxDevPort = 65535 - oidcPortOffset
 
 const devConfig = `---
-server_url: http://127.0.0.1:%d
+server_url: %s
 listen_addr: 127.0.0.1:%d
 metrics_listen_addr: 127.0.0.1:%d
 
@@ -82,6 +95,15 @@ policy:
 
 unix_socket: %s/headscale.sock
 unix_socket_permission: "0770"
+
+# A mock identity provider runs inside cmd/dev; the console signs in
+# through it and the user below comes out an admin.
+oidc:
+  issuer: %s
+  client_id: %s
+  client_secret: %s
+  admin_users:
+    - %s
 `
 
 func main() {
@@ -109,6 +131,11 @@ func main() {
 func run() error {
 	metricsPort := *port + metricsPortOffset
 
+	publicURL := *serverURL
+	if publicURL == "" {
+		publicURL = fmt.Sprintf("http://127.0.0.1:%d", *port)
+	}
+
 	tmpDir, err := os.MkdirTemp("", "headscale-dev-")
 	if err != nil {
 		return fmt.Errorf("creating temp dir: %w", err)
@@ -118,12 +145,24 @@ func run() error {
 		defer os.RemoveAll(tmpDir)
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// Start the mock identity provider first: its issuer goes in the config.
+	provider, err := startMockOIDC(ctx, *port+oidcPortOffset)
+	if err != nil {
+		return err
+	}
+
+	defer provider.Shutdown() //nolint:errcheck // best effort on the way out
+
 	// Write config.
 	configPath := filepath.Join(tmpDir, "config.yaml")
 	configContent := fmt.Sprintf(
 		devConfig,
-		*port, *port, metricsPort,
+		publicURL, *port, metricsPort,
 		tmpDir, tmpDir, tmpDir,
+		provider.Issuer(), provider.ClientID, provider.ClientSecret, oidcUser,
 	)
 
 	err = os.WriteFile(configPath, []byte(configContent), 0o600)
@@ -135,9 +174,6 @@ func run() error {
 	fmt.Println("Building headscale...")
 
 	hsBin := filepath.Join(tmpDir, "headscale")
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 
 	build := exec.CommandContext(ctx, "go", "build", "-o", hsBin, "./cmd/headscale")
 	build.Stdout = os.Stdout
@@ -204,6 +240,8 @@ func run() error {
 		`
 === Headscale Dev Environment ===
   Server:  http://127.0.0.1:%d
+  Console: %s/admin/  (sign in through the mock provider as %s, an admin)
+  OIDC:    %s
   Metrics: http://127.0.0.1:%d
   Debug:   http://127.0.0.1:%d/debug/ping
   Config:  %s
@@ -223,7 +261,7 @@ Manage headscale:
 
 Press Ctrl+C to stop.
 `,
-		*port, metricsPort, metricsPort,
+		*port, publicURL, oidcUser, provider.Issuer(), metricsPort, metricsPort,
 		configPath, tmpDir,
 		authKey,
 		*port, authKey,
@@ -330,4 +368,28 @@ func extractAuthKey(data []byte) (string, error) {
 	}
 
 	return key.Key, nil
+}
+
+// startMockOIDC serves a mock OpenID Connect provider on the loopback port.
+// Every authorization request signs in as oidcUser without a login page,
+// which is what the console's e2e test and local development want.
+func startMockOIDC(ctx context.Context, port int) (*mockoidc.MockOIDC, error) {
+	provider, err := mockoidc.NewServer(nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating mock OIDC provider: %w", err)
+	}
+
+	// With nothing queued every login is mockoidc.DefaultUser, whose
+	// email is oidcUser.
+	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+	if err != nil {
+		return nil, fmt.Errorf("listening for the mock OIDC provider: %w", err)
+	}
+
+	err = provider.Start(listener, nil)
+	if err != nil {
+		return nil, fmt.Errorf("starting the mock OIDC provider: %w", err)
+	}
+
+	return provider, nil
 }
