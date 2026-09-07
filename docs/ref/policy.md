@@ -142,6 +142,25 @@ Include the personal (untagged) devices of every user holding that
 }
 ```
 
+### [`autogroup:shared`](https://tailscale.com/docs/reference/targets-and-selectors#autogroupshared)
+
+For each destination node, the personal devices of the users the node has been
+[shared](sharing.md) with. Can only be used in policy sources. The destination
+is narrowed to the shared node itself, so the rule below lets sharees reach the
+nodes shared with them and nothing else.
+
+```json title="policy.json"
+{
+  "grants": [
+    {
+      "src": ["autogroup:shared"],
+      "dst": ["autogroup:member"],
+      "ip": ["*"]
+    }
+  ]
+}
+```
+
 ### [`autogroup:self`](https://tailscale.com/docs/reference/targets-and-selectors#autogroupself)
 
 Includes devices where the same user is authenticated on both the source and destination. Does not include tagged

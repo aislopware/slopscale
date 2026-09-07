@@ -193,6 +193,7 @@ nav:
       - API: ref/api.md
       - User roles: ref/roles.md
       - Device and user approval: ref/approval.md
+      - Node sharing: ref/sharing.md
       - Tags: ref/tags.md
       - Debug: ref/debug.md
       - Integration:

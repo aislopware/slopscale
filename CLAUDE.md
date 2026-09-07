@@ -125,6 +125,18 @@ that wants a pending node must ask for it (`PreAuthKeySpec` with
 down with the `testing.TB` it was created for, so create clients on the
 parent test, not inside a subtest that later subtests depend on.
 
+Sharing lives on the node: `nodes.SharedWith` (from `node_shares`, attached
+by every production node read in `hscontrol/db/node.go`) is written only by
+`State.ShareNode`/`UnshareNode` and takes effect only through the policy.
+`autogroup:shared` is a source that resolves per destination node
+(`grantCategoryShared` in `policy/v2/compiled.go`, `resolveSSHSources` for
+SSH), narrowed to that node, so shares never open other nodes; the mapper
+stamps `Sharer` on the peer view for sharees. `HasPolicyChange` compares
+`SharedWith`, so `SetNodes` recompiles after a share, and every share is a
+`PolicyChange` because the sharer marker changes even when the policy does
+not. Deleting a user cascades the rows in the database and
+`dropSharesWithUser` mirrors that in the NodeStore.
+
 API responses read through `NodeView`, `UserView`, and `PreAuthKeyView`.
 `AsStruct()` clones the whole record and is only for write/merge copies.
 

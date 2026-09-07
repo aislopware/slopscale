@@ -57,6 +57,19 @@ status, `preauthorized` key capability and tailnet settings `PATCH` now carry
 real meaning, so Tailscale tooling can drive approval. See
 [Device and user approval](https://headscale.net/development/ref/approval/).
 
+### Node sharing
+
+A user can share one of their nodes with another user, following Tailscale's
+node sharing: `headscale nodes share --identifier <node> --user <user id>` (or
+`POST /api/v1/node/{id}/share`), which a member may do for the nodes they own.
+The policy decides what a share allows through the new `autogroup:shared`
+source, which stands, per destination node, for the personal devices of the
+users that node is shared with; the destination is always narrowed to the
+shared node, so a share never opens anything else. The sharee's devices see the
+node as a peer marked with the owner as sharer, the shared node gets no access
+back, and a policy that never names `autogroup:shared` ignores shares. See
+[Node sharing](https://headscale.net/development/ref/sharing/).
+
 ### BREAKING
 
 #### API
@@ -88,6 +101,7 @@ real meaning, so Tailscale tooling can drive approval. See
 - User roles: `headscale users set-role`, a `Role` column in `headscale users list`, `POST /api/v1/user/{id}/role`, `GET /api/v1/whoami`, a `userId` on API keys and `headscale apikeys create --user`; the v2 user object's `role` field and `?role=` filter now reflect the real role
 - The `is-admin` node capability, previously stamped on every node, is now stamped only on devices of the owner and admins; `is-owner` on the owner's. Clients use these for admin-console affordances in their UI only
 - `POST /api/v1/apikey` without an `expiration` now mints a key that never expires instead of one that was already expired
+- Node sharing: `headscale nodes share|unshare`, `POST /api/v1/node/{id}/share`, `DELETE /api/v1/node/{id}/share/{userId}`, `sharedWith` on nodes and the `autogroup:shared` policy source
 - Device and user approval: `headscale settings get|set`, `headscale nodes approve`, `headscale users approve`, `headscale preauthkeys create --preauthorized`, an `Approved` column in `headscale nodes list` and `headscale users list`, `GET|POST /api/v1/settings`, `POST /api/v1/node/{id}/approve`, `POST /api/v1/user/{id}/approve`, `approved`/`approvedAt` on nodes and users and `preauthorized` on pre-auth keys; the v2 API's `PATCH /api/v2/tailnet/{tailnet}/settings` now updates `devicesApprovalOn` and `usersApprovalOn` instead of returning 501, `POST /api/v2/device/{id}/authorized` accepts `false`, and `POST /api/v2/users/{id}/approve|suspend|restore` exist
 
 ## 0.29.4 (unreleased)
