@@ -417,6 +417,8 @@ func (s *State) DeleteUser(userID types.UserID) (change.Change, error) {
 		return change.Change{}, err
 	}
 
+	s.dropSharesWithUser(userID)
+
 	// Update policy manager with the new user list (without the deleted user)
 	// This ensures that if the policy references the deleted user, it gets
 	// re-evaluated immediately rather than when some other operation triggers it.

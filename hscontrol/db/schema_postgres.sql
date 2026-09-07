@@ -105,6 +105,17 @@ CREATE TABLE nodes(
   CONSTRAINT fk_nodes_auth_key FOREIGN KEY(auth_key_id) REFERENCES pre_auth_keys(id)
 );
 
+CREATE TABLE node_shares(
+  id bigserial PRIMARY KEY,
+  node_id bigint NOT NULL,
+  user_id bigint NOT NULL,
+  created_by bigint,
+  created_at timestamptz,
+  CONSTRAINT fk_node_shares_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_node_shares_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_node_shares_node_user ON node_shares(node_id, user_id);
+
 CREATE TABLE policies(
   id bigserial PRIMARY KEY,
   created_at timestamptz,

@@ -31,6 +31,10 @@ const (
 	// grantCategoryVia has Via tags that route rules to specific
 	// nodes based on their tags and advertised routes.
 	grantCategoryVia
+
+	// grantCategoryShared has an autogroup:shared source that expands
+	// per node to the devices of the users the node is shared with.
+	grantCategoryShared
 )
 
 // compiledGrant is a grant with its sources already resolved to IP
@@ -58,6 +62,21 @@ type compiledGrant struct {
 
 	// via is non-nil when the grant has Via tags.
 	via *viaGrantData
+
+	// shared is non-nil when the grant has an autogroup:shared source.
+	shared *sharedGrantData
+}
+
+// sharedGrantData holds what [compileAutogroupShared] needs: the
+// destinations already resolved so the per-node step only has to test
+// whether the node is among them.
+type sharedGrantData struct {
+	// dstIPs is the union of the resolved non-wildcard destinations.
+	dstIPs *netipx.IPSet
+	// hasWildcardDst is set when a destination is "*".
+	hasWildcardDst    bool
+	internetProtocols []ProtocolPort
+	app               tailcfg.PeerCapMap
 }
 
 // selfGrantData holds data needed for per-node autogroup:self
@@ -302,6 +321,22 @@ func (pol *Policy) compileGrants(
 	compiled := make([]compiledGrant, 0, len(grants))
 
 	for _, grant := range grants {
+		// autogroup:shared is one source among the grant's sources; it
+		// compiles to its own per-node grant while the other sources
+		// compile as usual.
+		rest, hasShared := withoutSharedSource(grant)
+		if hasShared {
+			if cg := pol.compileOneSharedGrant(grant, users, nodes); cg != nil {
+				compiled = append(compiled, *cg)
+			}
+
+			if len(rest.Sources) == 0 {
+				continue
+			}
+
+			grant = rest
+		}
+
 		cg, err := pol.compileOneGrant(grant, users, nodes)
 		if err != nil {
 			log.Trace().Err(err).Msg("compiling grant")
@@ -315,6 +350,85 @@ func (pol *Policy) compileGrants(
 	}
 
 	return compiled
+}
+
+// withoutSharedSource returns the grant with autogroup:shared removed
+// from its sources and whether it was there.
+func withoutSharedSource(grant Grant) (Grant, bool) {
+	if !sourcesHaveShared(grant.Sources) {
+		return grant, false
+	}
+
+	rest := grant
+	rest.Sources = make(Aliases, 0, len(grant.Sources)-1)
+
+	for _, src := range grant.Sources {
+		if ag, ok := src.(*AutoGroup); ok && ag.Is(AutoGroupShared) {
+			continue
+		}
+
+		rest.Sources = append(rest.Sources, src)
+	}
+
+	return rest, true
+}
+
+// compileOneSharedGrant resolves the destinations of a grant whose
+// sources include autogroup:shared. The sources are the sharees of
+// each destination node, so they are resolved in
+// [compileAutogroupShared]. Via grants and autogroup:self destinations
+// are rejected at validation and skipped here.
+func (pol *Policy) compileOneSharedGrant(
+	grant Grant,
+	users types.Users,
+	nodes views.Slice[types.NodeView],
+) *compiledGrant {
+	if len(grant.Via) > 0 || len(grant.Destinations) == 0 {
+		return nil
+	}
+
+	if len(grant.InternetProtocols) == 0 && grant.App == nil {
+		return nil
+	}
+
+	data := &sharedGrantData{
+		internetProtocols: grant.InternetProtocols,
+		app:               grant.App,
+	}
+
+	var b netipx.IPSetBuilder
+
+	for _, dst := range grant.Destinations {
+		if _, isWildcard := dst.(Asterix); isWildcard {
+			data.hasWildcardDst = true
+
+			continue
+		}
+
+		if ag, ok := dst.(*AutoGroup); ok && ag.Is(AutoGroupSelf) {
+			continue
+		}
+
+		ips, err := dst.Resolve(pol, users, nodes)
+		if err != nil {
+			log.Trace().Caller().Err(err).Msg("resolving shared grant destination")
+		}
+
+		if ips != nil {
+			for _, pref := range ips.Prefixes() {
+				b.AddPrefix(pref)
+			}
+		}
+	}
+
+	dstIPs, err := b.IPSet()
+	if err != nil {
+		return nil
+	}
+
+	data.dstIPs = dstIPs
+
+	return &compiledGrant{category: grantCategoryShared, shared: data}
 }
 
 // compileOneGrant resolves a single grant into a [compiledGrant].
@@ -750,10 +864,101 @@ func filterRulesForNode(
 				rules,
 				compileViaForNode(cg, node)...,
 			)
+
+		case grantCategoryShared:
+			rules = append(
+				rules,
+				compileAutogroupShared(cg, node, userIdx)...,
+			)
 		}
 	}
 
 	return mergeFilterRules(rules)
+}
+
+// compileAutogroupShared produces the filter rules of an autogroup:shared
+// source for one destination node: the personal devices of the users
+// the node is shared with may reach the node on the grant's ports. The
+// destination is narrowed to the node itself, so a share never opens
+// anything but the shared node, and the node gets no rule back to the
+// sharees' devices.
+func compileAutogroupShared(
+	cg *compiledGrant,
+	node types.NodeView,
+	userIdx userNodeIndex,
+) []tailcfg.FilterRule {
+	if cg.shared == nil || node.SharedWith().Len() == 0 {
+		return nil
+	}
+
+	if !cg.shared.hasWildcardDst && !node.InIPSet(cg.shared.dstIPs) {
+		return nil
+	}
+
+	srcResolved := sharedSources(node, userIdx)
+	if srcResolved == nil || srcResolved.Empty() {
+		return nil
+	}
+
+	var rules []tailcfg.FilterRule
+
+	for _, ipp := range cg.shared.internetProtocols {
+		var destPorts []tailcfg.NetPortRange
+
+		for _, port := range ipp.Ports {
+			for _, ip := range node.IPs() {
+				destPorts = append(destPorts, tailcfg.NetPortRange{IP: ip.String(), Ports: port})
+			}
+		}
+
+		if len(destPorts) > 0 {
+			rules = append(rules, tailcfg.FilterRule{
+				SrcIPs:   srcResolved.Strings(),
+				DstPorts: destPorts,
+				IPProto:  ipp.Protocol.toIANAProtocolNumbers(),
+			})
+		}
+	}
+
+	if cg.shared.app != nil {
+		dsts := node.Prefixes()
+
+		dstIPStrings := make([]string, 0, len(dsts))
+		for _, ip := range node.IPs() {
+			dstIPStrings = append(dstIPStrings, ip.String())
+		}
+
+		rules = append(rules, tailcfg.FilterRule{
+			SrcIPs:   srcResolved.Strings(),
+			CapGrant: []tailcfg.CapGrant{{Dsts: dsts, CapMap: cg.shared.app}},
+		})
+
+		rules = append(
+			rules,
+			companionCapGrantRules(dstIPStrings, srcResolved.Prefixes(), cg.shared.app)...,
+		)
+	}
+
+	return rules
+}
+
+// sharedSources resolves autogroup:shared for one node: the addresses of
+// the personal devices of every user the node is shared with.
+func sharedSources(node types.NodeView, userIdx userNodeIndex) ResolvedAddresses {
+	var b netipx.IPSetBuilder
+
+	for _, uid := range node.SharedWith().All() {
+		for _, n := range userIdx[uint(uid)] {
+			n.AppendToIPSet(&b)
+		}
+	}
+
+	srcResolved, err := newResolved(&b)
+	if err != nil {
+		return nil
+	}
+
+	return srcResolved
 }
 
 // compileAutogroupSelf produces filter rules for autogroup:self

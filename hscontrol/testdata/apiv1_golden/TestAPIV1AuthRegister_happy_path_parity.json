@@ -19,6 +19,7 @@
       "online": false,
       "preAuthKey": null,
       "registerMethod": "REGISTER_METHOD_CLI",
+      "sharedWith": [],
       "subnetRoutes": [],
       "tags": [],
       "user": {

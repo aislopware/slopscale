@@ -20,6 +20,10 @@ var selfEnforcedOps = map[string]bool{
 	"POST /api/v1/apikey/expire":     true,
 	"GET /api/v1/apikey":             true,
 	"DELETE /api/v1/apikey/{prefix}": true,
+
+	// Sharing lets a member act on the nodes they own (requireShareAccess).
+	"POST /api/v1/node/{nodeId}/share":            true,
+	"DELETE /api/v1/node/{nodeId}/share/{userId}": true,
 }
 
 // TestEveryAuthenticatedOperationDeclaresScope guarantees no v1 operation

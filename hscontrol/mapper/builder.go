@@ -329,6 +329,10 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 		tn, err := peer.PeerTailNode(b.capVer, func(_ types.NodeID) []netip.Prefix {
 			return b.mapper.state.RoutesForPeer(node, peer, matchers)
 		}, b.mapper.cfg, allCapMaps[peer.ID()])
+		if err == nil {
+			markShared(tn, node, peer)
+		}
+
 		if err != nil {
 			// One peer with invalid data (e.g. an empty or over-long
 			// GivenName that fails GetFQDN) must not blank out the map for
@@ -369,4 +373,20 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 	})
 
 	return tailPeers, nil
+}
+
+// markShared stamps [tailcfg.Node.Sharer] on a peer that has been shared
+// with the viewer's user, the way Tailscale marks a node shared into a
+// tailnet: the client then lists it under the sharing user rather than
+// as a foreign device.
+func markShared(tn *tailcfg.Node, viewer, peer types.NodeView) {
+	if viewer.IsTagged() || !viewer.User().Valid() {
+		return
+	}
+
+	if !peer.IsSharedWith(types.UserID(viewer.User().ID())) {
+		return
+	}
+
+	tn.Sharer = peer.TailscaleUserID()
 }

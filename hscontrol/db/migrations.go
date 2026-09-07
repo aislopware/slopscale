@@ -447,7 +447,52 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609070900-approval",
 			run: migrateApproval,
 		},
+		{
+			// Node sharing: node_shares records the users a node is
+			// shared with, so members can give each other access to
+			// a device without an administrator editing the policy.
+			id:  "202609071200-node-shares",
+			run: migrateNodeShares,
+		},
 	}
+}
+
+// migrateNodeShares (202609071200) creates the node_shares table.
+func migrateNodeShares(tx *Tx) error {
+	hasShares, err := tx.ex.hasTable("node_shares")
+	if err != nil {
+		return err
+	}
+
+	if hasShares {
+		return nil
+	}
+
+	ddl := `CREATE TABLE node_shares(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  node_id integer NOT NULL,
+  user_id integer NOT NULL,
+  created_by integer,
+  created_at datetime,
+  CONSTRAINT fk_node_shares_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_node_shares_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+)`
+	if tx.ex.dialect == dialectPostgres {
+		ddl = `CREATE TABLE node_shares(
+  id bigserial PRIMARY KEY,
+  node_id bigint NOT NULL,
+  user_id bigint NOT NULL,
+  created_by bigint,
+  created_at timestamptz,
+  CONSTRAINT fk_node_shares_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_node_shares_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+)`
+	}
+
+	return tx.ex.execAll("creating node_shares table", []string{
+		ddl,
+		`CREATE UNIQUE INDEX idx_node_shares_node_user ON node_shares(node_id, user_id)`,
+	})
 }
 
 // migrateApproval (202609070900) adds the approval columns and the

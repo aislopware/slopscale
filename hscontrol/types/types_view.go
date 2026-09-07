@@ -284,8 +284,13 @@ func (v NodeView) ApprovedAt() views.ValuePointer[time.Time] {
 	return views.ValuePointerOf(v.ж.ApprovedAt)
 }
 
-func (v NodeView) CreatedAt() time.Time { return v.ж.CreatedAt }
-func (v NodeView) UpdatedAt() time.Time { return v.ж.UpdatedAt }
+// SharedWith lists the users the node has been shared with, in
+// ascending id order. The policy resolves autogroup:shared from it
+// and the map response marks the node as shared to those users'
+// nodes. Only [State.ShareNode] and [State.UnshareNode] write it.
+func (v NodeView) SharedWith() views.Slice[UserID] { return views.SliceOf(v.ж.SharedWith) }
+func (v NodeView) CreatedAt() time.Time            { return v.ж.CreatedAt }
+func (v NodeView) UpdatedAt() time.Time            { return v.ж.UpdatedAt }
 func (v NodeView) DeletedAt() views.ValuePointer[time.Time] {
 	return views.ValuePointerOf(v.ж.DeletedAt)
 }
@@ -336,6 +341,7 @@ var _NodeViewNeedsRegeneration = Node(struct {
 	LastSeen       *time.Time
 	ApprovedRoutes Prefixes
 	ApprovedAt     *time.Time
+	SharedWith     []UserID
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	DeletedAt      *time.Time

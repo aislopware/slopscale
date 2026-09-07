@@ -141,6 +141,20 @@ CREATE TABLE nodes(
   CONSTRAINT fk_nodes_auth_key FOREIGN KEY(auth_key_id) REFERENCES pre_auth_keys(id)
 );
 
+-- node_shares records the users a node has been shared with. The policy
+-- resolves autogroup:shared per node from it; see docs/ref/sharing.md.
+CREATE TABLE node_shares(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  node_id integer NOT NULL,
+  user_id integer NOT NULL,
+  created_by integer,
+  created_at datetime,
+
+  CONSTRAINT fk_node_shares_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_node_shares_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_node_shares_node_user ON node_shares(node_id, user_id);
+
 CREATE TABLE policies(
   id integer PRIMARY KEY AUTOINCREMENT,
   data text,

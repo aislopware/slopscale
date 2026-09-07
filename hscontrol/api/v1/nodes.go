@@ -60,6 +60,9 @@ type Node struct {
 	AvailableRoutes []string `json:"availableRoutes" nullable:"false"`
 	SubnetRoutes    []string `json:"subnetRoutes"    nullable:"false"`
 	Tags            []string `json:"tags"            nullable:"false"`
+
+	// SharedWith lists the ids of the users the node is shared with.
+	SharedWith []string `doc:"IDs of the users the node is shared with." json:"sharedWith" nullable:"false"`
 }
 
 // NodePreAuthKey is the PreAuthKey shape embedded in a Node response. The
@@ -628,6 +631,7 @@ func nodeFromView(view types.NodeView) Node {
 		SubnetRoutes:    []string{},
 		Tags:            nonNilStrings(view.Tags().AsSlice()),
 		Approved:        view.IsApproved(),
+		SharedWith:      sharedWithIDs(view),
 	}
 
 	if view.ApprovedAt().Valid() {
@@ -721,6 +725,16 @@ func cmpNodeID(a, b string) int {
 	default:
 		return 0
 	}
+}
+
+// sharedWithIDs renders the node's sharees as decimal user ids.
+func sharedWithIDs(view types.NodeView) []string {
+	out := make([]string, 0, view.SharedWith().Len())
+	for _, uid := range view.SharedWith().All() {
+		out = append(out, strconv.FormatUint(uint64(uid), 10))
+	}
+
+	return out
 }
 
 func parseNodeID(s string) (types.NodeID, error) {

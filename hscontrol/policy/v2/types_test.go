@@ -507,7 +507,8 @@ func TestUnmarshalPolicy(t *testing.T) {
 `,
 			wantErr: `invalid autogroup: got "autogroup:invalid", must be one of ` +
 				`[autogroup:internet autogroup:member autogroup:nonroot ` +
-				`autogroup:tagged autogroup:self autogroup:danger-all autogroup:owner autogroup:admin ` +
+				`autogroup:tagged autogroup:self autogroup:danger-all autogroup:shared ` +
+				`autogroup:owner autogroup:admin ` +
 				`autogroup:network-admin autogroup:it-admin autogroup:auditor]`,
 		},
 		{

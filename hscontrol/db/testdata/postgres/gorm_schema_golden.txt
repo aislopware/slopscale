@@ -9,6 +9,11 @@ COL database_versions.id bigint null=NO default=nextval('database_versions_id_se
 COL database_versions.version text null=NO
 COL database_versions.updated_at timestamp with time zone null=YES
 COL migrations.id character varying len=255 null=NO
+COL node_shares.id bigint null=NO default=nextval('node_shares_id_seq'::regclass)
+COL node_shares.node_id bigint null=NO
+COL node_shares.user_id bigint null=NO
+COL node_shares.created_by bigint null=YES
+COL node_shares.created_at timestamp with time zone null=YES
 COL nodes.id bigint null=NO default=nextval('nodes_id_seq'::regclass)
 COL nodes.machine_key text null=YES
 COL nodes.node_key text null=YES
@@ -88,11 +93,13 @@ IDX CREATE UNIQUE INDEX database_versions_pkey ON public.database_versions USING
 IDX CREATE UNIQUE INDEX idx_api_keys_prefix ON public.api_keys USING btree (prefix)
 IDX CREATE UNIQUE INDEX idx_name_no_provider_identifier ON public.users USING btree (name) WHERE (provider_identifier IS NULL)
 IDX CREATE UNIQUE INDEX idx_name_provider_identifier ON public.users USING btree (name, provider_identifier)
+IDX CREATE UNIQUE INDEX idx_node_shares_node_user ON public.node_shares USING btree (node_id, user_id)
 IDX CREATE UNIQUE INDEX idx_oauth_access_tokens_prefix ON public.oauth_access_tokens USING btree (prefix)
 IDX CREATE UNIQUE INDEX idx_oauth_clients_client_id ON public.oauth_clients USING btree (client_id)
 IDX CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON public.pre_auth_keys USING btree (prefix) WHERE ((prefix IS NOT NULL) AND (prefix <> ''::text))
 IDX CREATE UNIQUE INDEX idx_provider_identifier ON public.users USING btree (provider_identifier) WHERE (provider_identifier IS NOT NULL)
 IDX CREATE UNIQUE INDEX migrations_pkey ON public.migrations USING btree (id)
+IDX CREATE UNIQUE INDEX node_shares_pkey ON public.node_shares USING btree (id)
 IDX CREATE UNIQUE INDEX nodes_pkey ON public.nodes USING btree (id)
 IDX CREATE UNIQUE INDEX oauth_access_tokens_pkey ON public.oauth_access_tokens USING btree (id)
 IDX CREATE UNIQUE INDEX oauth_clients_pkey ON public.oauth_clients USING btree (id)
@@ -107,6 +114,12 @@ CON database_versions database_versions_pkey PRIMARY KEY (id)
 CON database_versions database_versions_version_not_null NOT NULL version
 CON migrations migrations_id_not_null NOT NULL id
 CON migrations migrations_pkey PRIMARY KEY (id)
+CON node_shares fk_node_shares_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
+CON node_shares fk_node_shares_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+CON node_shares node_shares_id_not_null NOT NULL id
+CON node_shares node_shares_node_id_not_null NOT NULL node_id
+CON node_shares node_shares_pkey PRIMARY KEY (id)
+CON node_shares node_shares_user_id_not_null NOT NULL user_id
 CON nodes fk_nodes_auth_key FOREIGN KEY (auth_key_id) REFERENCES pre_auth_keys(id)
 CON nodes fk_nodes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 CON nodes nodes_id_not_null NOT NULL id

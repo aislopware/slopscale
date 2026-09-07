@@ -174,6 +174,12 @@ type Node struct {
 	// approval: it then gets no peers and no peer sees it.
 	ApprovedAt *time.Time
 
+	// SharedWith lists the users the node has been shared with, in
+	// ascending id order. The policy resolves autogroup:shared from it
+	// and the map response marks the node as shared to those users'
+	// nodes. Only [State.ShareNode] and [State.UnshareNode] write it.
+	SharedWith []UserID
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time
@@ -239,6 +245,12 @@ func (node *Node) IsExpired() bool {
 // See [Node.ApprovedAt].
 func (node *Node) IsApproved() bool {
 	return node.ApprovedAt != nil && !node.ApprovedAt.IsZero()
+}
+
+// IsSharedWith reports whether the node has been shared with the user.
+// The owner is never a sharee; see [Node.SharedWith].
+func (node *Node) IsSharedWith(uid UserID) bool {
+	return slices.Contains(node.SharedWith, uid)
 }
 
 // IsEphemeral returns if the node is registered as an Ephemeral node.
@@ -944,6 +956,15 @@ func (nv NodeView) IsApproved() bool {
 	return nv.ж.IsApproved()
 }
 
+// IsSharedWith reports whether the node has been shared with the user.
+func (nv NodeView) IsSharedWith(uid UserID) bool {
+	if !nv.Valid() {
+		return false
+	}
+
+	return nv.ж.IsSharedWith(uid)
+}
+
 // IsEphemeral returns if the node is registered as an Ephemeral node.
 // https://tailscale.com/docs/features/ephemeral-nodes
 func (nv NodeView) IsEphemeral() bool {
@@ -1135,6 +1156,10 @@ func (nv NodeView) HasPolicyChange(other NodeView) bool {
 	}
 
 	if !equalPrefixesUnordered(nv.SubnetRoutes(), other.SubnetRoutes()) {
+		return true
+	}
+
+	if !views.SliceEqual(nv.SharedWith(), other.SharedWith()) {
 		return true
 	}
 

@@ -38,12 +38,15 @@ func mapError(msg string, err error) error {
 		errors.Is(err, db.ErrPreAuthKeyNotTaggedOrOwned),
 		errors.Is(err, db.ErrSingleUseAuthKeyHasBeenUsed),
 		errors.Is(err, types.ErrInvalidRole),
-		errors.Is(err, state.ErrUnknownSetting):
+		errors.Is(err, state.ErrUnknownSetting),
+		errors.Is(err, state.ErrShareWithOwner),
+		errors.Is(err, db.ErrNodeNotShared):
 		return huma.Error400BadRequest(msg, err)
 
 	case errors.Is(err, state.ErrNodeKeyInUse),
 		errors.Is(err, state.ErrAmbiguousNodeOwnership),
-		errors.Is(err, state.ErrOwnerExists):
+		errors.Is(err, state.ErrOwnerExists),
+		errors.Is(err, db.ErrNodeAlreadyShared):
 		return huma.Error409Conflict(msg, err)
 
 	case errors.Is(err, state.ErrCannotChangeOwnRole),

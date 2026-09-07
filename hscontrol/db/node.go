@@ -114,7 +114,7 @@ func queryNodes(q Querier, stmt jet.SelectStatement) (types.Nodes, error) {
 		return nil, err
 	}
 
-	return nodeRecordsToNodes(records)
+	return nodesWithShares(q, records)
 }
 
 func queryNode(q Querier, stmt jet.SelectStatement) (*types.Node, error) {
@@ -125,7 +125,7 @@ func queryNode(q Querier, stmt jet.SelectStatement) (*types.Node, error) {
 		return nil, err
 	}
 
-	return record.node()
+	return nodeWithShares(q, &record)
 }
 
 // Node statements on the map request and registration paths, rendered once;
@@ -159,7 +159,7 @@ func fixedNodes(q Querier, stmt *fixedSQL, args ...any) (types.Nodes, error) {
 		return nil, err
 	}
 
-	return nodeRecordsToNodes(records)
+	return nodesWithShares(q, records)
 }
 
 func fixedNode(q Querier, stmt *fixedSQL, args ...any) (*types.Node, error) {
@@ -170,7 +170,37 @@ func fixedNode(q Querier, stmt *fixedSQL, args ...any) (*types.Node, error) {
 		return nil, err
 	}
 
-	return record.node()
+	return nodeWithShares(q, &record)
+}
+
+// nodesWithShares converts the records and attaches their shares; every
+// production node read goes through it or [nodeWithShares].
+func nodesWithShares(q Querier, records []nodeRecord) (types.Nodes, error) {
+	nodes, err := nodeRecordsToNodes(records)
+	if err != nil {
+		return nil, err
+	}
+
+	err = attachShares(q, nodes)
+	if err != nil {
+		return nil, err
+	}
+
+	return nodes, nil
+}
+
+func nodeWithShares(q Querier, record *nodeRecord) (*types.Node, error) {
+	node, err := record.node()
+	if err != nil {
+		return nil, err
+	}
+
+	err = attachSharesToNode(q, node)
+	if err != nil {
+		return nil, err
+	}
+
+	return node, nil
 }
 
 func nodeIDList(ids []types.NodeID) []jet.Expression {

@@ -103,6 +103,13 @@ func fixedCases(t *testing.T) []fixedCase {
 			args:  []any{"p", limitOne},
 			jet:   selectPreAuthKeys().WHERE(table.PreAuthKeys.Prefix.EQ(jet.String("p"))).LIMIT(1),
 		},
+		{
+			name:  "shares of node",
+			fixed: sharesOfNode,
+			args:  []any{uint64(7)},
+			jet:   selectNodeShares().WHERE(table.NodeShares.NodeID.EQ(jet.Uint64(7))),
+		},
+		{name: "all shares", fixed: allShares, jet: selectNodeShares()},
 	}
 
 	return slices.Concat(static, nodeUpdateCases(&row))

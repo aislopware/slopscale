@@ -40,6 +40,10 @@ var ErrAutogroupSelfRequiresPerNodeResolution = errors.New(
 	"autogroup:self requires per-node resolution and cannot be resolved in this context",
 )
 
+var ErrAutogroupSharedRequiresPerNodeResolution = errors.New(
+	"autogroup:shared requires per-node resolution and cannot be resolved in this context",
+)
+
 var ErrUndefinedTagReference = errors.New("references undefined tag")
 
 // SSH validation errors.
@@ -122,35 +126,40 @@ var nodeAttrUnsupportedCaps = map[nodecap.Cap]string{
 
 // Policy validation errors.
 var (
-	ErrInvalidUsername             = errors.New("username must contain @")
-	ErrUserNotFound                = errors.New("user not found")
-	ErrMultipleUsersFound          = errors.New("multiple users found")
-	ErrInvalidGroupFormat          = errors.New("group must start with 'group:'")
-	ErrInvalidTagFormat            = errors.New("tag must start with 'tag:'")
-	ErrInvalidHostname             = errors.New("invalid hostname")
-	ErrHostResolve                 = errors.New("error resolving host")
-	ErrInvalidPrefix               = errors.New("invalid prefix")
-	ErrInvalidAutogroup            = errors.New("invalid autogroup")
-	ErrUnknownAutogroup            = errors.New("unknown autogroup")
-	ErrHostportMissingColon        = errors.New("hostport must contain a colon")
-	ErrTypeNotSupported            = errors.New("type not supported")
-	ErrInvalidAlias                = errors.New("invalid alias format")
-	ErrInvalidAutoApprover         = errors.New("invalid auto approver format")
-	ErrInvalidOwner                = errors.New("invalid owner format")
-	ErrGroupNotDefined             = errors.New("group not defined in policy")
-	ErrInvalidGroupMember          = errors.New("invalid group member type")
-	ErrGroupValueNotArray          = errors.New("group value must be an array of users")
-	ErrInvalidHostIP               = errors.New("hostname contains invalid IP address")
-	ErrTagNotDefined               = errors.New("tag not found")
-	ErrAutoApproverNotAlias        = errors.New("auto approver is not an alias")
-	ErrInvalidACLAction            = errors.New("invalid ACL action")
-	ErrInvalidSSHAction            = errors.New("invalid SSH action")
-	ErrInvalidProtocolNumber       = errors.New("invalid protocol number")
-	ErrProtocolLeadingZero         = errors.New("leading 0 not permitted in protocol number")
-	ErrProtocolOutOfRange          = errors.New("protocol number out of range (0-255)")
-	ErrAutogroupNotSupported       = errors.New("autogroup not supported in headscale")
-	ErrAutogroupInternetSrc        = errors.New("autogroup:internet can only be used in ACL destinations")
-	ErrAutogroupSelfSrc            = errors.New("\"autogroup:self\" not valid on the src side of a rule")
+	ErrInvalidUsername       = errors.New("username must contain @")
+	ErrUserNotFound          = errors.New("user not found")
+	ErrMultipleUsersFound    = errors.New("multiple users found")
+	ErrInvalidGroupFormat    = errors.New("group must start with 'group:'")
+	ErrInvalidTagFormat      = errors.New("tag must start with 'tag:'")
+	ErrInvalidHostname       = errors.New("invalid hostname")
+	ErrHostResolve           = errors.New("error resolving host")
+	ErrInvalidPrefix         = errors.New("invalid prefix")
+	ErrInvalidAutogroup      = errors.New("invalid autogroup")
+	ErrUnknownAutogroup      = errors.New("unknown autogroup")
+	ErrHostportMissingColon  = errors.New("hostport must contain a colon")
+	ErrTypeNotSupported      = errors.New("type not supported")
+	ErrInvalidAlias          = errors.New("invalid alias format")
+	ErrInvalidAutoApprover   = errors.New("invalid auto approver format")
+	ErrInvalidOwner          = errors.New("invalid owner format")
+	ErrGroupNotDefined       = errors.New("group not defined in policy")
+	ErrInvalidGroupMember    = errors.New("invalid group member type")
+	ErrGroupValueNotArray    = errors.New("group value must be an array of users")
+	ErrInvalidHostIP         = errors.New("hostname contains invalid IP address")
+	ErrTagNotDefined         = errors.New("tag not found")
+	ErrAutoApproverNotAlias  = errors.New("auto approver is not an alias")
+	ErrInvalidACLAction      = errors.New("invalid ACL action")
+	ErrInvalidSSHAction      = errors.New("invalid SSH action")
+	ErrInvalidProtocolNumber = errors.New("invalid protocol number")
+	ErrProtocolLeadingZero   = errors.New("leading 0 not permitted in protocol number")
+	ErrProtocolOutOfRange    = errors.New("protocol number out of range (0-255)")
+	ErrAutogroupNotSupported = errors.New("autogroup not supported in headscale")
+	ErrAutogroupInternetSrc  = errors.New("autogroup:internet can only be used in ACL destinations")
+	ErrAutogroupSelfSrc      = errors.New("\"autogroup:self\" not valid on the src side of a rule")
+	ErrAutogroupSharedDst    = errors.New("\"autogroup:shared\" not valid on the dst side of a rule")
+	ErrAutogroupSharedSelf   = errors.New(
+		"\"autogroup:shared\" cannot be used with an autogroup:self destination",
+	)
+	ErrAutogroupSharedVia          = errors.New("\"autogroup:shared\" cannot be used in a via grant")
 	ErrAutogroupNotSupportedACLSrc = errors.New("autogroup not supported for ACL sources")
 	ErrAutogroupNotSupportedACLDst = errors.New("autogroup not supported for ACL destinations")
 	ErrAutogroupDangerAllDst       = errors.New("cannot use autogroup:danger-all as a dst")
@@ -803,6 +812,10 @@ const (
 	AutoGroupTagged    AutoGroup = "autogroup:tagged"
 	AutoGroupSelf      AutoGroup = "autogroup:self"
 	AutoGroupDangerAll AutoGroup = "autogroup:danger-all"
+	// AutoGroupShared is, for a destination node, the personal devices of
+	// the users the node has been shared with. It is only valid as a
+	// source and resolves per node; see [compileAutogroupShared].
+	AutoGroupShared AutoGroup = "autogroup:shared"
 
 	// AutoGroupOwner is the personal (untagged) devices of the owner. The
 	// role autogroups behave like autogroup:member wherever the policy
@@ -825,6 +838,7 @@ var autogroups = []AutoGroup{
 	AutoGroupTagged,
 	AutoGroupSelf,
 	AutoGroupDangerAll,
+	AutoGroupShared,
 	AutoGroupOwner,
 	AutoGroupAdmin,
 	AutoGroupNetworkAdmin,
@@ -953,6 +967,11 @@ func (ag *AutoGroup) resolve(_ *Policy, users types.Users, nodes views.Slice[typ
 		// This cannot be resolved in the general context and should be handled
 		// specially during policy compilation per-node for security.
 		return nil, ErrAutogroupSelfRequiresPerNodeResolution
+
+	case AutoGroupShared:
+		// autogroup:shared is the sharees of the destination node and,
+		// like autogroup:self, only has a meaning per node.
+		return nil, ErrAutogroupSharedRequiresPerNodeResolution
 
 	case AutoGroupDangerAll:
 		// autogroup:danger-all matches ALL IP addresses, including
@@ -2246,12 +2265,12 @@ var (
 		AutoGroupOwner, AutoGroupAdmin, AutoGroupNetworkAdmin, AutoGroupITAdmin, AutoGroupAuditor,
 	}
 	autogroupForSrc = slices.Concat(
-		[]AutoGroup{AutoGroupMember, AutoGroupTagged, AutoGroupDangerAll}, roleGroups,
+		[]AutoGroup{AutoGroupMember, AutoGroupTagged, AutoGroupDangerAll, AutoGroupShared}, roleGroups,
 	)
 	autogroupForDst = slices.Concat(
 		[]AutoGroup{AutoGroupInternet, AutoGroupMember, AutoGroupTagged, AutoGroupSelf}, roleGroups,
 	)
-	autogroupForSSHSrc = slices.Concat([]AutoGroup{AutoGroupMember, AutoGroupTagged}, roleGroups)
+	autogroupForSSHSrc = slices.Concat([]AutoGroup{AutoGroupMember, AutoGroupTagged, AutoGroupShared}, roleGroups)
 	autogroupForSSHDst = slices.Concat(
 		[]AutoGroup{AutoGroupMember, AutoGroupTagged, AutoGroupSelf}, roleGroups,
 	)
@@ -2314,6 +2333,10 @@ func validateAutogroupForDst(dst *AutoGroup) error {
 
 	if dst.Is(AutoGroupDangerAll) {
 		return ErrAutogroupDangerAllDst
+	}
+
+	if dst.Is(AutoGroupShared) {
+		return ErrAutogroupSharedDst
 	}
 
 	if !slices.Contains(autogroupForDst, *dst) {
@@ -2458,6 +2481,18 @@ func validateSSHSrcDstCombination(sources SSHSrcAliases, destinations SSHDstAlia
 //   - autogroup:self destinations require ALL sources to be users, groups, autogroup:member, or wildcard (*)
 //   - Tags, autogroup:tagged, hosts, and raw IPs are NOT valid sources for autogroup:self
 //   - Wildcard (*) is allowed because autogroup:self evaluation narrows it per-node to the node's own IPs.
+//
+// sourcesHaveShared reports whether autogroup:shared is among the sources.
+func sourcesHaveShared(sources Aliases) bool {
+	for _, src := range sources {
+		if ag, ok := src.(*AutoGroup); ok && ag.Is(AutoGroupShared) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func validateACLSrcDstCombination(sources Aliases, destinations []AliasWithPorts) error {
 	// Check if any destination is autogroup:self
 	hasAutogroupSelf := false
@@ -2471,6 +2506,10 @@ func validateACLSrcDstCombination(sources Aliases, destinations []AliasWithPorts
 
 	if !hasAutogroupSelf {
 		return nil // No autogroup:self, no validation needed
+	}
+
+	if sourcesHaveShared(sources) {
+		return ErrAutogroupSharedSelf
 	}
 
 	// Validate all sources are valid for autogroup:self
@@ -2554,6 +2593,10 @@ func validateGrantSrcDstCombination(sources, destinations Aliases) error {
 
 	if !hasAutogroupSelf {
 		return nil
+	}
+
+	if sourcesHaveShared(sources) {
+		return ErrAutogroupSharedSelf
 	}
 
 	for _, src := range sources {
@@ -2923,6 +2966,10 @@ func (pol *Policy) validate() error {
 		err := validateGrantSrcDstCombination(grant.Sources, grant.Destinations)
 		if err != nil {
 			errs = append(errs, err)
+		}
+
+		if len(grant.Via) > 0 && sourcesHaveShared(grant.Sources) {
+			errs = append(errs, ErrAutogroupSharedVia)
 		}
 	}
 

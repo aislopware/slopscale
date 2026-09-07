@@ -280,7 +280,7 @@ func (pol *Policy) compileSSHPolicy(
 			}
 		}
 
-		srcIPs, err := rule.Sources.Resolve(pol, users, nodes)
+		srcIPs, err := pol.resolveSSHSources(rule.Sources, users, node, nodes)
 		if err != nil {
 			log.Trace().Caller().Err(err).Msgf(
 				"ssh policy compilation failed resolving source ips for rule %+v", rule,
@@ -470,6 +470,46 @@ func (pol *Policy) compileSSHPolicy(
 }
 
 // ipSetToPrincipals converts an [netipx.IPSet] into SSH principals, one per address.
+// resolveSSHSources resolves an SSH rule's sources for one destination
+// node. autogroup:shared stands for the devices of the users the node is
+// shared with and is resolved here; everything else resolves as usual.
+func (pol *Policy) resolveSSHSources(
+	sources SSHSrcAliases,
+	users types.Users,
+	node types.NodeView,
+	nodes views.Slice[types.NodeView],
+) (ResolvedAddresses, error) {
+	if !sourcesHaveShared(Aliases(sources)) {
+		return sources.Resolve(pol, users, nodes)
+	}
+
+	var (
+		b    netipx.IPSetBuilder
+		errs []error
+	)
+
+	for _, src := range sources {
+		if ag, ok := src.(*AutoGroup); ok && ag.Is(AutoGroupShared) {
+			for _, n := range nodes.All() {
+				if !n.IsTagged() && n.User().Valid() && node.IsSharedWith(types.UserID(n.User().ID())) {
+					n.AppendToIPSet(&b)
+				}
+			}
+
+			continue
+		}
+
+		ips, err := src.resolve(pol, users, nodes)
+		if err != nil {
+			errs = append(errs, err)
+		}
+
+		b.AddSet(ips)
+	}
+
+	return newResolvedAddresses(buildIPSetMultiErr(&b, errs))
+}
+
 func ipSetToPrincipals(ipSet *netipx.IPSet) []*tailcfg.SSHPrincipal {
 	if ipSet == nil {
 		return nil
