@@ -76,6 +76,8 @@ func (s *State) SetUserRole(
 		return nil, change.Change{}, err
 	}
 
+	s.emitUserRoleUpdated(user)
+
 	c, err := s.updatePolicyManagerUsers()
 	if err != nil {
 		return user, change.Change{}, fmt.Errorf("updating policy manager after role change: %w", err)

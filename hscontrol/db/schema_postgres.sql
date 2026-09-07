@@ -260,3 +260,17 @@ CREATE TABLE audit_events(
 );
 CREATE INDEX idx_audit_events_created_at ON audit_events(created_at);
 CREATE INDEX idx_audit_events_actor_user_id ON audit_events(actor_user_id);
+
+CREATE TABLE webhooks(
+  id bigserial PRIMARY KEY,
+  url text NOT NULL,
+  description text,
+  provider_type text,
+  secret text NOT NULL,
+  subscriptions text NOT NULL,
+  created_by bigint,
+  created_at timestamptz,
+  updated_at timestamptz,
+  last_delivery_at timestamptz,
+  last_delivery_status text
+);

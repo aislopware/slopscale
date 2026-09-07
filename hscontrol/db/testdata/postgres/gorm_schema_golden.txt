@@ -148,6 +148,17 @@ COL users.provider text null=YES
 COL users.profile_pic_url text null=YES
 COL users.role text null=YES
 COL users.approved_at timestamp with time zone null=YES
+COL webhooks.id bigint null=NO default=nextval('webhooks_id_seq'::regclass)
+COL webhooks.url text null=NO
+COL webhooks.description text null=YES
+COL webhooks.provider_type text null=YES
+COL webhooks.secret text null=NO
+COL webhooks.subscriptions text null=NO
+COL webhooks.created_by bigint null=YES
+COL webhooks.created_at timestamp with time zone null=YES
+COL webhooks.updated_at timestamp with time zone null=YES
+COL webhooks.last_delivery_at timestamp with time zone null=YES
+COL webhooks.last_delivery_status text null=YES
 IDX CREATE INDEX idx_audit_events_actor_user_id ON public.audit_events USING btree (actor_user_id)
 IDX CREATE INDEX idx_audit_events_created_at ON public.audit_events USING btree (created_at)
 IDX CREATE INDEX idx_policies_deleted_at ON public.policies USING btree (deleted_at)
@@ -191,6 +202,7 @@ IDX CREATE UNIQUE INDEX pre_auth_keys_pkey ON public.pre_auth_keys USING btree (
 IDX CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (id)
 IDX CREATE UNIQUE INDEX settings_pkey ON public.settings USING btree (key)
 IDX CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)
+IDX CREATE UNIQUE INDEX webhooks_pkey ON public.webhooks USING btree (id)
 CON access_rule_groups access_rule_groups_group_id_not_null NOT NULL group_id
 CON access_rule_groups access_rule_groups_id_not_null NOT NULL id
 CON access_rule_groups access_rule_groups_pkey PRIMARY KEY (id)
@@ -278,3 +290,8 @@ CON settings settings_key_not_null NOT NULL key
 CON settings settings_pkey PRIMARY KEY (key)
 CON users users_id_not_null NOT NULL id
 CON users users_pkey PRIMARY KEY (id)
+CON webhooks webhooks_id_not_null NOT NULL id
+CON webhooks webhooks_pkey PRIMARY KEY (id)
+CON webhooks webhooks_secret_not_null NOT NULL secret
+CON webhooks webhooks_subscriptions_not_null NOT NULL subscriptions
+CON webhooks webhooks_url_not_null NOT NULL url

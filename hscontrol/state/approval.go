@@ -148,7 +148,10 @@ func (s *State) SetNodeApproval(nodeID types.NodeID, approved bool) (types.NodeV
 		approvedAt = new(time.Now().UTC())
 	}
 
+	var wasApproved bool
+
 	n, ok := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
+		wasApproved = node.IsApproved()
 		node.ApprovedAt = approvedAt
 	})
 	if !ok {
@@ -159,6 +162,10 @@ func (s *State) SetNodeApproval(nodeID types.NodeID, approved bool) (types.NodeV
 	err := s.db.NodeSetApproval(nodeID, approvedAt)
 	if err != nil {
 		return types.NodeView{}, change.Change{}, fmt.Errorf("setting node approval in database: %w", err)
+	}
+
+	if approved && !wasApproved {
+		s.emitNodeApproved(n)
 	}
 
 	c, err := s.policyChangeAfterApproval()
@@ -208,6 +215,10 @@ func (s *State) SetUserApproval(userID types.UserID, approved bool) (*types.User
 	user, err := s.db.GetUserByID(userID)
 	if err != nil {
 		return nil, change.Change{}, fmt.Errorf("reloading user after approval change: %w", err)
+	}
+
+	if approved {
+		s.emitUserApproved(user)
 	}
 
 	c, err := s.updatePolicyManagerUsers()

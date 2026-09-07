@@ -326,3 +326,20 @@ CREATE TABLE audit_events(
 );
 CREATE INDEX idx_audit_events_created_at ON audit_events(created_at);
 CREATE INDEX idx_audit_events_actor_user_id ON audit_events(actor_user_id);
+
+-- webhooks are the endpoints the server posts events to; see
+-- docs/ref/webhooks.md. subscriptions is a JSON array of event type
+-- names and secret signs every delivery.
+CREATE TABLE webhooks(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  url text NOT NULL,
+  description text,
+  provider_type text,
+  secret text NOT NULL,
+  subscriptions text NOT NULL,
+  created_by integer,
+  created_at datetime,
+  updated_at datetime,
+  last_delivery_at datetime,
+  last_delivery_status text
+);

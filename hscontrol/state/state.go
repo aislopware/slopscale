@@ -31,6 +31,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/types/change"
 	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/juanfont/headscale/hscontrol/webhook"
 	"github.com/puzpuzpuz/xsync/v4"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -118,6 +119,8 @@ type State struct {
 	derpMap atomic.Pointer[tailcfg.DERPMap]
 	// settings holds the tailnet-wide switches; see [State.Settings].
 	settings atomic.Pointer[types.Settings]
+	// webhooks delivers events to the registered endpoints.
+	webhooks *webhook.Dispatcher
 
 	// access holds the groups and access rules; see [State.AccessModel].
 	access atomic.Pointer[types.AccessModel]
@@ -264,6 +267,13 @@ func NewState(cfg *types.Config) (*State, error) {
 		return nil, err
 	}
 
+	s.webhooks = webhook.New(db, tailnetName(cfg))
+
+	err = s.loadWebhooks()
+	if err != nil {
+		return nil, err
+	}
+
 	_, err = s.loadAccessModel()
 	if err != nil {
 		return nil, err
@@ -281,6 +291,10 @@ func NewState(cfg *types.Config) (*State, error) {
 func (s *State) Close() error {
 	s.pings.drain()
 	s.nodeStore.Stop()
+
+	if s.webhooks != nil {
+		s.webhooks.Close()
+	}
 
 	err := s.db.Close()
 	if err != nil {
@@ -311,6 +325,10 @@ func (s *State) ReloadPolicy() ([]change.Change, error) {
 	policyChanged, err := s.polMan.SetPolicy(pol)
 	if err != nil {
 		return nil, fmt.Errorf("setting policy: %w", err)
+	}
+
+	if policyChanged {
+		s.emitPolicyUpdate()
 	}
 
 	// Clear SSH check auth times when policy changes to ensure stale
@@ -425,10 +443,17 @@ func (s *State) UpdateUser(userID types.UserID, updateFn func(*types.User) error
 // It also updates the policy manager to ensure ACL policies referencing the deleted
 // user are re-evaluated immediately, fixing issue #2967.
 func (s *State) DeleteUser(userID types.UserID) (change.Change, error) {
-	err := s.db.DestroyUser(userID)
+	user, err := s.db.GetUserByID(userID)
 	if err != nil {
 		return change.Change{}, err
 	}
+
+	err = s.db.DestroyUser(userID)
+	if err != nil {
+		return change.Change{}, err
+	}
+
+	s.emitUserDeleted(user)
 
 	s.dropSharesWithUser(userID)
 
@@ -508,6 +533,8 @@ func (s *State) DeleteNode(node types.NodeView) (change.Change, error) {
 	if err != nil {
 		return change.Change{}, err
 	}
+
+	s.emitNodeDeleted(node)
 
 	s.ipAlloc.FreeIPs(node.IPs())
 
@@ -1042,6 +1069,7 @@ func (s *State) ExpireExpiredNodes(lastCheck time.Time) (time.Time, []change.Cha
 		// expired since the last check to avoid duplicate notifications
 		if node.IsExpired() && node.Expiry().Valid() && node.Expiry().Get().After(lastCheck) {
 			updates = append(updates, change.KeyExpiryFor(node.ID(), node.Expiry().Get()))
+			s.emitNodeKeyExpired(node)
 		}
 	}
 
@@ -3528,7 +3556,10 @@ func (s *State) saveNewNode(nodeToRegister *types.Node, params newNodeParams) (t
 	}
 
 	// Add to [NodeStore] after database creates the ID
-	return s.nodeStore.PutNode(*savedNode), nil
+	view := s.nodeStore.PutNode(*savedNode)
+	s.emitNodeCreated(view)
+
+	return view, nil
 }
 
 func hostinfoEqual(oldNode types.NodeView, newHI *tailcfg.Hostinfo) bool {
@@ -3619,6 +3650,8 @@ func (s *State) createUser(user types.User) (*types.User, change.Change, error) 
 	}
 
 	log.Info().Str(zf.UserName, user.Name).Msg("user created")
+
+	s.emitUserCreated(&user)
 
 	return &user, c, nil
 }

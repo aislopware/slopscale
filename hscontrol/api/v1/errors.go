@@ -28,7 +28,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrGroupNotFound),
 		errors.Is(err, types.ErrRuleNotFound),
 		errors.Is(err, types.ErrGroupMemberMissing),
-		errors.Is(err, types.ErrNetworkNotFound):
+		errors.Is(err, types.ErrNetworkNotFound),
+		errors.Is(err, types.ErrWebhookNotFound):
 		return huma.Error404NotFound(msg, err)
 
 	case errors.Is(err, state.ErrGivenNameInvalid),
@@ -62,7 +63,12 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrNetworkNoPrefixes),
 		errors.Is(err, types.ErrNetworkNoGroups),
 		errors.Is(err, types.ErrNetworkPrefixInvalid),
-		errors.Is(err, types.ErrKeyExpiryOutOfRange):
+		errors.Is(err, types.ErrKeyExpiryOutOfRange),
+		errors.Is(err, types.ErrWebhookURLInvalid),
+		errors.Is(err, types.ErrWebhookNoSubscriptions),
+		errors.Is(err, types.ErrWebhookEventUnknown),
+		errors.Is(err, types.ErrWebhookProviderUnknown),
+		errors.Is(err, types.ErrWebhookDescriptionLong):
 		return huma.Error400BadRequest(msg, err)
 
 	case errors.Is(err, state.ErrNodeKeyInUse),

@@ -498,6 +498,12 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609091000-networks",
 			run: migrateNetworks,
 		},
+		{
+			// Webhooks: endpoints the server posts events to. See
+			// docs/ref/webhooks.md.
+			id:  "202609091100-webhooks",
+			run: migrateWebhooks,
+		},
 	}
 }
 
@@ -745,6 +751,41 @@ func migrateNetworks(tx *Tx) error {
 	}
 
 	return createTables(tx, tables)
+}
+
+// migrateWebhooks (202609091100) creates the webhooks table.
+func migrateWebhooks(tx *Tx) error {
+	return createTables(tx, []tableDefinition{
+		{
+			name: "webhooks",
+			sqlite: `CREATE TABLE webhooks(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  url text NOT NULL,
+  description text,
+  provider_type text,
+  secret text NOT NULL,
+  subscriptions text NOT NULL,
+  created_by integer,
+  created_at datetime,
+  updated_at datetime,
+  last_delivery_at datetime,
+  last_delivery_status text
+)`,
+			postgres: `CREATE TABLE webhooks(
+  id bigserial PRIMARY KEY,
+  url text NOT NULL,
+  description text,
+  provider_type text,
+  secret text NOT NULL,
+  subscriptions text NOT NULL,
+  created_by bigint,
+  created_at timestamptz,
+  updated_at timestamptz,
+  last_delivery_at timestamptz,
+  last_delivery_status text
+)`,
+		},
+	})
 }
 
 // migrateSessions (202609080900) creates the sessions table.

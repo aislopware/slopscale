@@ -42,6 +42,11 @@ headscale's own conventions. The headscale-native admin API stays at `/api/v1`
   `GetAPIKeyByID`, `GetPreAuthKeyByID`); add one to state/db if it is missing
   rather than scanning a `List`. Build responses from the view accessors
   (`NodeView`/`UserView`/`PreAuthKeyView`), never `AsStruct()`.
+- Webhooks (`/tailnet/{tailnet}/webhooks`, `/webhooks/{endpointId}` with
+  `/test` and `/rotate`) use Tailscale's field names (`endpointId`,
+  `endpointUrl`, `created`, `lastModified`, `creatorLoginName`) so the Go
+  client's `WebhooksResource` works unchanged; the secret appears only in the
+  create and rotate responses.
 - Reuse upstream wire shapes, but declare the request/response structs here:
   Huma reflects these to build the OpenAPI schema, and the upstream `Key`'s
   `ExpirySeconds *time.Duration` marshals as nanoseconds, which the spec and
