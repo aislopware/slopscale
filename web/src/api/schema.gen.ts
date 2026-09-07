@@ -402,6 +402,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dns/rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List group DNS rules
+         * @description A rule is split DNS for the machines of some groups only: queries for its domains go to its nameservers on those machines.
+         *
+         *     Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listDNSRules"];
+        put?: never;
+        /**
+         * Create group DNS rule
+         * @description The machines in the groups receive the rule at once.
+         *
+         *     Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["createDNSRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dns/rule/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get group DNS rule
+         * @description Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getDNSRule"];
+        /**
+         * Replace group DNS rule
+         * @description Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        put: operations["updateDNSRule"];
+        post?: never;
+        /**
+         * Delete group DNS rule
+         * @description Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["deleteDNSRule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/group": {
         parameters: {
             query?: never;
@@ -1844,6 +1900,38 @@ export interface components {
             type: "" | "A" | "AAAA";
             value: string;
         };
+        DNSRule: {
+            /** Format: date-time */
+            createdAt: string;
+            description: string;
+            /** @description Zones the nameservers answer for. */
+            domains: string[];
+            enabled: boolean;
+            /** @description Groups whose machines receive the rule. */
+            groupIds: string[];
+            /** Format: uint64 */
+            id: string;
+            name: string;
+            /** @description Resolvers, as IP, IP:port or a provider's DoH URL. */
+            nameservers: string[];
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        DnsRuleOutputBody: {
+            rule: components["schemas"]["DNSRule"];
+        };
+        DNSRuleRequestBody: {
+            description?: string;
+            /** @description Zones the nameservers answer for. */
+            domains: string[] | null;
+            /** @description Defaults to true. */
+            enabled?: boolean;
+            /** @description Groups whose machines receive the rule. */
+            groupIds: string[] | null;
+            name: string;
+            /** @description Resolvers, as IP, IP:port or a provider's DoH URL. */
+            nameservers: string[] | null;
+        };
         DNSSettings: {
             extraRecords: components["schemas"]["DNSRecord"][];
             /** @description IP, IP:port, https or tls URL. */
@@ -1969,6 +2057,9 @@ export interface components {
         ListAuditOutputBody: {
             events: components["schemas"]["AuditEvent"][];
             nextBefore: string;
+        };
+        ListDNSRulesOutputBody: {
+            rules: components["schemas"]["DNSRule"][];
         };
         ListGroupsOutputBody: {
             groups: components["schemas"]["Group"][];
@@ -2486,6 +2577,9 @@ export type DeleteUserOutputBody = components['schemas']['DeleteUserOutputBody']
 export type DerpRegion = components['schemas']['DERPRegion'];
 export type Dns = components['schemas']['DNS'];
 export type DnsRecord = components['schemas']['DNSRecord'];
+export type DnsRule = components['schemas']['DNSRule'];
+export type DnsRuleOutputBody = components['schemas']['DnsRuleOutputBody'];
+export type DnsRuleRequestBody = components['schemas']['DNSRuleRequestBody'];
 export type DnsSettings = components['schemas']['DNSSettings'];
 export type EmptyOutputBody = components['schemas']['EmptyOutputBody'];
 export type ErrorDetail = components['schemas']['ErrorDetail'];
@@ -2503,6 +2597,7 @@ export type GroupRequestBody = components['schemas']['GroupRequestBody'];
 export type HealthResponseBody = components['schemas']['HealthResponseBody'];
 export type ListApiKeysOutputBody = components['schemas']['ListAPIKeysOutputBody'];
 export type ListAuditOutputBody = components['schemas']['ListAuditOutputBody'];
+export type ListDnsRulesOutputBody = components['schemas']['ListDNSRulesOutputBody'];
 export type ListGroupsOutputBody = components['schemas']['ListGroupsOutputBody'];
 export type ListLogStreamsOutputBody = components['schemas']['ListLogStreamsOutputBody'];
 export type ListNetworksOutputBody = components['schemas']['ListNetworksOutputBody'];
@@ -3430,6 +3525,165 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DNS"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listDNSRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListDNSRulesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createDNSRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DNSRuleRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DnsRuleOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getDNSRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DnsRuleOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updateDNSRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DNSRuleRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DnsRuleOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteDNSRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmptyOutputBody"];
                 };
             };
             /** @description Error */

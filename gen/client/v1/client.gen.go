@@ -388,6 +388,43 @@ type DNSRecord struct {
 // DNSRecordType A or AAAA; empty picks one from the value.
 type DNSRecordType string
 
+// DNSRule defines model for DNSRule.
+type DNSRule struct {
+	CreatedAt   time.Time `json:"createdAt"`
+	Description string    `json:"description"`
+
+	// Domains Zones the nameservers answer for.
+	Domains []string `json:"domains"`
+	Enabled bool     `json:"enabled"`
+
+	// GroupIds Groups whose machines receive the rule.
+	GroupIds []string `json:"groupIds"`
+	Id       string   `json:"id"`
+	Name     string   `json:"name"`
+
+	// Nameservers Resolvers, as IP, IP:port or a provider's DoH URL.
+	Nameservers []string  `json:"nameservers"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+// DNSRuleRequestBody defines model for DNSRuleRequestBody.
+type DNSRuleRequestBody struct {
+	Description *string `json:"description,omitempty"`
+
+	// Domains Zones the nameservers answer for.
+	Domains *[]string `json:"domains"`
+
+	// Enabled Defaults to true.
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// GroupIds Groups whose machines receive the rule.
+	GroupIds *[]string `json:"groupIds"`
+	Name     string    `json:"name"`
+
+	// Nameservers Resolvers, as IP, IP:port or a provider's DoH URL.
+	Nameservers *[]string `json:"nameservers"`
+}
+
 // DNSSettings defines model for DNSSettings.
 type DNSSettings struct {
 	ExtraRecords []DNSRecord `json:"extraRecords"`
@@ -420,6 +457,11 @@ type DeletePreAuthKeyOutputBody = map[string]interface{}
 
 // DeleteUserOutputBody defines model for DeleteUserOutputBody.
 type DeleteUserOutputBody = map[string]interface{}
+
+// DnsRuleOutputBody defines model for DnsRuleOutputBody.
+type DnsRuleOutputBody struct {
+	Rule DNSRule `json:"rule"`
+}
 
 // EmptyOutputBody defines model for EmptyOutputBody.
 type EmptyOutputBody = map[string]interface{}
@@ -552,6 +594,11 @@ type ListAPIKeysOutputBody struct {
 type ListAuditOutputBody struct {
 	Events     []AuditEvent `json:"events"`
 	NextBefore string       `json:"nextBefore"`
+}
+
+// ListDNSRulesOutputBody defines model for ListDNSRulesOutputBody.
+type ListDNSRulesOutputBody struct {
+	Rules []DNSRule `json:"rules"`
 }
 
 // ListGroupsOutputBody defines model for ListGroupsOutputBody.
@@ -1245,6 +1292,12 @@ type DebugCreateNodeJSONRequestBody = DebugCreateNodeRequestBody
 // SetDNSJSONRequestBody defines body for SetDNS for application/json ContentType.
 type SetDNSJSONRequestBody = SetDNSRequestBody
 
+// CreateDNSRuleJSONRequestBody defines body for CreateDNSRule for application/json ContentType.
+type CreateDNSRuleJSONRequestBody = DNSRuleRequestBody
+
+// UpdateDNSRuleJSONRequestBody defines body for UpdateDNSRule for application/json ContentType.
+type UpdateDNSRuleJSONRequestBody = DNSRuleRequestBody
+
 // CreateGroupJSONRequestBody defines body for CreateGroup for application/json ContentType.
 type CreateGroupJSONRequestBody = GroupRequestBody
 
@@ -1749,6 +1802,69 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /api/v1/dns (the `SetDNS` operationId).
 	SetDNS(ctx context.Context, body SetDNSJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListDNSRules List group DNS rules
+	//
+	// A rule is split DNS for the machines of some groups only: queries for its domains go to its nameservers on those machines.
+	//
+	// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/dns/rule (the `ListDNSRules` operationId).
+	ListDNSRules(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateDNSRuleWithBody Create group DNS rule
+	//
+	// The machines in the groups receive the rule at once.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/dns/rule (the `CreateDNSRule` operationId).
+	CreateDNSRuleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateDNSRule Create group DNS rule
+	//
+	// The machines in the groups receive the rule at once.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/dns/rule (the `CreateDNSRule` operationId).
+	CreateDNSRule(ctx context.Context, body CreateDNSRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteDNSRule Delete group DNS rule
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v1/dns/rule/{id} (the `DeleteDNSRule` operationId).
+	DeleteDNSRule(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDNSRule Get group DNS rule
+	//
+	// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/dns/rule/{id} (the `GetDNSRule` operationId).
+	GetDNSRule(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateDNSRuleWithBody Replace group DNS rule
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/dns/rule/{id} (the `UpdateDNSRule` operationId).
+	UpdateDNSRuleWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateDNSRule Replace group DNS rule
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/dns/rule/{id} (the `UpdateDNSRule` operationId).
+	UpdateDNSRule(ctx context.Context, id string, body UpdateDNSRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListGroups List groups
 	//
@@ -3440,6 +3556,139 @@ func (c *Client) SetDNSWithBody(ctx context.Context, contentType string, body io
 // Corresponds with PUT /api/v1/dns (the `SetDNS` operationId).
 func (c *Client) SetDNS(ctx context.Context, body SetDNSJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetDNSRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListDNSRules List group DNS rules
+//
+// A rule is split DNS for the machines of some groups only: queries for its domains go to its nameservers on those machines.
+//
+// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/dns/rule (the `ListDNSRules` operationId).
+func (c *Client) ListDNSRules(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListDNSRulesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateDNSRuleWithBody Create group DNS rule
+//
+// The machines in the groups receive the rule at once.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/dns/rule (the `CreateDNSRule` operationId).
+func (c *Client) CreateDNSRuleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDNSRuleRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateDNSRule Create group DNS rule
+//
+// The machines in the groups receive the rule at once.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/dns/rule (the `CreateDNSRule` operationId).
+func (c *Client) CreateDNSRule(ctx context.Context, body CreateDNSRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateDNSRuleRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteDNSRule Delete group DNS rule
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v1/dns/rule/{id} (the `DeleteDNSRule` operationId).
+func (c *Client) DeleteDNSRule(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteDNSRuleRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetDNSRule Get group DNS rule
+//
+// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/dns/rule/{id} (the `GetDNSRule` operationId).
+func (c *Client) GetDNSRule(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDNSRuleRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateDNSRuleWithBody Replace group DNS rule
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/dns/rule/{id} (the `UpdateDNSRule` operationId).
+func (c *Client) UpdateDNSRuleWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDNSRuleRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateDNSRule Replace group DNS rule
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/dns/rule/{id} (the `UpdateDNSRule` operationId).
+func (c *Client) UpdateDNSRule(ctx context.Context, id string, body UpdateDNSRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateDNSRuleRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -6574,6 +6823,188 @@ func NewSetDNSRequestWithBody(server string, contentType string, body io.Reader)
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/dns")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListDNSRulesRequest constructs an http.Request for the ListDNSRules method
+func NewListDNSRulesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dns/rule")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateDNSRuleRequest calls the generic CreateDNSRule builder with application/json body
+func NewCreateDNSRuleRequest(server string, body CreateDNSRuleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateDNSRuleRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateDNSRuleRequestWithBody constructs an http.Request for the CreateDNSRule method, with any body, and a specified content type
+func NewCreateDNSRuleRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dns/rule")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteDNSRuleRequest constructs an http.Request for the DeleteDNSRule method
+func NewDeleteDNSRuleRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dns/rule/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetDNSRuleRequest constructs an http.Request for the GetDNSRule method
+func NewGetDNSRuleRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dns/rule/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateDNSRuleRequest calls the generic UpdateDNSRule builder with application/json body
+func NewUpdateDNSRuleRequest(server string, id string, body UpdateDNSRuleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateDNSRuleRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdateDNSRuleRequestWithBody constructs an http.Request for the UpdateDNSRule method, with any body, and a specified content type
+func NewUpdateDNSRuleRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/dns/rule/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -10019,6 +10450,75 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /api/v1/dns (the `SetDNS` operationId).
 	SetDNSWithResponse(ctx context.Context, body SetDNSJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDNSResponse, error)
 
+	// ListDNSRulesWithResponse List group DNS rules
+	//
+	// A rule is split DNS for the machines of some groups only: queries for its domains go to its nameservers on those machines.
+	//
+	// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/dns/rule (the `ListDNSRules` operationId).
+	ListDNSRulesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListDNSRulesResponse, error)
+
+	// CreateDNSRuleWithBodyWithResponse Create group DNS rule
+	//
+	// The machines in the groups receive the rule at once.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/dns/rule (the `CreateDNSRule` operationId).
+	CreateDNSRuleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDNSRuleResponse, error)
+
+	// CreateDNSRuleWithResponse Create group DNS rule
+	//
+	// The machines in the groups receive the rule at once.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/dns/rule (the `CreateDNSRule` operationId).
+	CreateDNSRuleWithResponse(ctx context.Context, body CreateDNSRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDNSRuleResponse, error)
+
+	// DeleteDNSRuleWithResponse Delete group DNS rule
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/dns/rule/{id} (the `DeleteDNSRule` operationId).
+	DeleteDNSRuleWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteDNSRuleResponse, error)
+
+	// GetDNSRuleWithResponse Get group DNS rule
+	//
+	// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/dns/rule/{id} (the `GetDNSRule` operationId).
+	GetDNSRuleWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetDNSRuleResponse, error)
+
+	// UpdateDNSRuleWithBodyWithResponse Replace group DNS rule
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/dns/rule/{id} (the `UpdateDNSRule` operationId).
+	UpdateDNSRuleWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDNSRuleResponse, error)
+
+	// UpdateDNSRuleWithResponse Replace group DNS rule
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/dns/rule/{id} (the `UpdateDNSRule` operationId).
+	UpdateDNSRuleWithResponse(ctx context.Context, id string, body UpdateDNSRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDNSRuleResponse, error)
+
 	// ListGroupsWithResponse List groups
 	//
 	// Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none.
@@ -12359,6 +12859,246 @@ func (r SetDNSResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r SetDNSResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListDNSRulesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListDNSRulesOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListDNSRulesResponse) GetJSON200() *ListDNSRulesOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListDNSRulesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListDNSRulesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListDNSRulesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListDNSRulesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListDNSRulesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateDNSRuleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DnsRuleOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CreateDNSRuleResponse) GetJSON200() *DnsRuleOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CreateDNSRuleResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateDNSRuleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateDNSRuleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateDNSRuleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateDNSRuleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteDNSRuleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmptyOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteDNSRuleResponse) GetJSON200() *EmptyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeleteDNSRuleResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteDNSRuleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteDNSRuleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteDNSRuleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteDNSRuleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetDNSRuleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DnsRuleOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetDNSRuleResponse) GetJSON200() *DnsRuleOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetDNSRuleResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetDNSRuleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDNSRuleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDNSRuleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetDNSRuleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateDNSRuleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DnsRuleOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateDNSRuleResponse) GetJSON200() *DnsRuleOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateDNSRuleResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateDNSRuleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateDNSRuleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateDNSRuleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateDNSRuleResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -16618,6 +17358,117 @@ func (c *ClientWithResponses) SetDNSWithResponse(ctx context.Context, body SetDN
 	return ParseSetDNSResponse(rsp)
 }
 
+// ListDNSRulesWithResponse List group DNS rules
+//
+// A rule is split DNS for the machines of some groups only: queries for its domains go to its nameservers on those machines.
+//
+// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/dns/rule (the `ListDNSRules` operationId).
+func (c *ClientWithResponses) ListDNSRulesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListDNSRulesResponse, error) {
+	rsp, err := c.ListDNSRules(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListDNSRulesResponse(rsp)
+}
+
+// CreateDNSRuleWithBodyWithResponse Create group DNS rule
+//
+// The machines in the groups receive the rule at once.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/dns/rule (the `CreateDNSRule` operationId).
+func (c *ClientWithResponses) CreateDNSRuleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDNSRuleResponse, error) {
+	rsp, err := c.CreateDNSRuleWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateDNSRuleResponse(rsp)
+}
+
+// CreateDNSRuleWithResponse Create group DNS rule
+//
+// The machines in the groups receive the rule at once.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/dns/rule (the `CreateDNSRule` operationId).
+func (c *ClientWithResponses) CreateDNSRuleWithResponse(ctx context.Context, body CreateDNSRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDNSRuleResponse, error) {
+	rsp, err := c.CreateDNSRule(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateDNSRuleResponse(rsp)
+}
+
+// DeleteDNSRuleWithResponse Delete group DNS rule
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/dns/rule/{id} (the `DeleteDNSRule` operationId).
+func (c *ClientWithResponses) DeleteDNSRuleWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteDNSRuleResponse, error) {
+	rsp, err := c.DeleteDNSRule(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteDNSRuleResponse(rsp)
+}
+
+// GetDNSRuleWithResponse Get group DNS rule
+//
+// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/dns/rule/{id} (the `GetDNSRule` operationId).
+func (c *ClientWithResponses) GetDNSRuleWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetDNSRuleResponse, error) {
+	rsp, err := c.GetDNSRule(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDNSRuleResponse(rsp)
+}
+
+// UpdateDNSRuleWithBodyWithResponse Replace group DNS rule
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/dns/rule/{id} (the `UpdateDNSRule` operationId).
+func (c *ClientWithResponses) UpdateDNSRuleWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateDNSRuleResponse, error) {
+	rsp, err := c.UpdateDNSRuleWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDNSRuleResponse(rsp)
+}
+
+// UpdateDNSRuleWithResponse Replace group DNS rule
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/dns/rule/{id} (the `UpdateDNSRule` operationId).
+func (c *ClientWithResponses) UpdateDNSRuleWithResponse(ctx context.Context, id string, body UpdateDNSRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateDNSRuleResponse, error) {
+	rsp, err := c.UpdateDNSRule(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateDNSRuleResponse(rsp)
+}
+
 // ListGroupsWithResponse List groups
 //
 // Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none.
@@ -19180,6 +20031,171 @@ func ParseSetDNSResponse(rsp *http.Response) (*SetDNSResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest DNS
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListDNSRulesResponse parses an HTTP response from a ListDNSRulesWithResponse call
+func ParseListDNSRulesResponse(rsp *http.Response) (*ListDNSRulesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListDNSRulesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListDNSRulesOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateDNSRuleResponse parses an HTTP response from a CreateDNSRuleWithResponse call
+func ParseCreateDNSRuleResponse(rsp *http.Response) (*CreateDNSRuleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateDNSRuleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DnsRuleOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteDNSRuleResponse parses an HTTP response from a DeleteDNSRuleWithResponse call
+func ParseDeleteDNSRuleResponse(rsp *http.Response) (*DeleteDNSRuleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteDNSRuleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmptyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDNSRuleResponse parses an HTTP response from a GetDNSRuleWithResponse call
+func ParseGetDNSRuleResponse(rsp *http.Response) (*GetDNSRuleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDNSRuleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DnsRuleOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateDNSRuleResponse parses an HTTP response from a UpdateDNSRuleWithResponse call
+func ParseUpdateDNSRuleResponse(rsp *http.Response) (*UpdateDNSRuleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateDNSRuleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DnsRuleOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

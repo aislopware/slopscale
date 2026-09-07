@@ -499,6 +499,87 @@ components:
         - type
         - value
       type: object
+    DNSRule:
+      additionalProperties: false
+      properties:
+        createdAt:
+          format: date-time
+          type: string
+        description:
+          type: string
+        domains:
+          description: Zones the nameservers answer for.
+          items:
+            type: string
+          type: array
+        enabled:
+          type: boolean
+        groupIds:
+          description: Groups whose machines receive the rule.
+          items:
+            type: string
+          type: array
+        id:
+          format: uint64
+          type: string
+        name:
+          type: string
+        nameservers:
+          description: Resolvers, as IP, IP:port or a provider's DoH URL.
+          items:
+            type: string
+          type: array
+        updatedAt:
+          format: date-time
+          type: string
+      required:
+        - id
+        - name
+        - description
+        - enabled
+        - domains
+        - nameservers
+        - groupIds
+        - createdAt
+        - updatedAt
+      type: object
+    DNSRuleRequestBody:
+      additionalProperties: false
+      properties:
+        description:
+          type: string
+        domains:
+          description: Zones the nameservers answer for.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        enabled:
+          description: Defaults to true.
+          type: boolean
+        groupIds:
+          description: Groups whose machines receive the rule.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        name:
+          type: string
+        nameservers:
+          description: Resolvers, as IP, IP:port or a provider's DoH URL.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - name
+        - domains
+        - nameservers
+        - groupIds
+      type: object
     DNSSettings:
       additionalProperties: false
       properties:
@@ -560,6 +641,14 @@ components:
       type: object
     DeleteUserOutputBody:
       additionalProperties: false
+      type: object
+    DnsRuleOutputBody:
+      additionalProperties: false
+      properties:
+        rule:
+          $ref: "#/components/schemas/DNSRule"
+      required:
+        - rule
       type: object
     EmptyOutputBody:
       additionalProperties: false
@@ -781,6 +870,16 @@ components:
       required:
         - events
         - nextBefore
+      type: object
+    ListDNSRulesOutputBody:
+      additionalProperties: false
+      properties:
+        rules:
+          items:
+            $ref: "#/components/schemas/DNSRule"
+          type: array
+      required:
+        - rules
       type: object
     ListGroupsOutputBody:
       additionalProperties: false
@@ -2956,6 +3055,160 @@ paths:
       tags:
         - DNS
       x-audit-action: dns.set
+      x-required-scope: dns
+  /api/v1/dns/rule:
+    get:
+      description: |-
+        A rule is split DNS for the machines of some groups only: queries for its domains go to its nameservers on those machines.
+
+        Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listDNSRules
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListDNSRulesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List group DNS rules
+      tags:
+        - DNS
+      x-required-scope: dns:read
+    post:
+      description: |-
+        The machines in the groups receive the rule at once.
+
+        Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createDNSRule
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DNSRuleRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DnsRuleOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create group DNS rule
+      tags:
+        - DNS
+      x-audit-action: dns.rule.create
+      x-required-scope: dns
+  /api/v1/dns/rule/{id}:
+    delete:
+      description: Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteDNSRule
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmptyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete group DNS rule
+      tags:
+        - DNS
+      x-audit-action: dns.rule.delete
+      x-required-scope: dns
+    get:
+      description: Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getDNSRule
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DnsRuleOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get group DNS rule
+      tags:
+        - DNS
+      x-required-scope: dns:read
+    put:
+      description: Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateDNSRule
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DNSRuleRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DnsRuleOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Replace group DNS rule
+      tags:
+        - DNS
+      x-audit-action: dns.rule.update
       x-required-scope: dns
   /api/v1/group:
     get:

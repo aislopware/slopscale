@@ -17,6 +17,8 @@ func UseSchema(schema string) {
 	APIKeys = APIKeys.FromSchema(schema)
 	AuditEvents = AuditEvents.FromSchema(schema)
 	DatabaseVersions = DatabaseVersions.FromSchema(schema)
+	GroupDNSRuleGroups = GroupDNSRuleGroups.FromSchema(schema)
+	GroupDNSRules = GroupDNSRules.FromSchema(schema)
 	GroupNodes = GroupNodes.FromSchema(schema)
 	GroupUsers = GroupUsers.FromSchema(schema)
 	Groups = Groups.FromSchema(schema)
