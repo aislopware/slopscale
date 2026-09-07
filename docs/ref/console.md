@@ -109,6 +109,9 @@ account menu with *Sign out*.
   the ones no network owns.
 - **DNS**: nameservers, split DNS, search domains and extra records, changed
   at runtime; see [DNS](dns.md).
+- **Webhooks**: endpoints that receive signed event notifications, with
+  their subscriptions and last delivery; create, edit, test, rotate the
+  secret and delete; see [Webhooks](webhooks.md).
 - **Audit log**: who changed what, newest first, with filters by action, user
   and time; see [Audit log](audit.md).
 - **Settings**: the [device and user approval](approval.md) switches, the

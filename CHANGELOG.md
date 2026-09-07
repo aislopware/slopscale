@@ -107,6 +107,20 @@ build, addresses, DERP regions and config file values of the running server,
 and the console's _Settings_ page shows both. See
 [Device and user approval](https://headscale.net/development/ref/approval/#key-expiry).
 
+### Webhooks
+
+Headscale can now post events to your own endpoints or to a Slack,
+Mattermost, Google Chat or Discord incoming webhook: a machine joining,
+needing approval, being approved, expiring or being removed, a user being
+created, approved, changing role or being deleted, and policy changes. The
+delivery format and the `Tailscale-Webhook-Signature` header are Tailscale's,
+so a receiver written for Tailscale works unchanged, and the v2 API exposes
+the same endpoints as Tailscale's `webhooks` resource. Each endpoint has a
+secret shown once, a test button, a rotate action and its last delivery
+status. Manage them from the console's _Webhooks_ page, with
+`headscale webhooks`, or through `/api/v1/webhook`. See
+[Webhooks](https://headscale.net/development/ref/webhooks/).
+
 ### Networks
 
 Subnets and exit nodes can now be handed to groups as networks, the way

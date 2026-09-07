@@ -198,6 +198,7 @@ nav:
       - Node sharing: ref/sharing.md
       - Groups and access rules: ref/access-control.md
       - Networks: ref/networks.md
+      - Webhooks: ref/webhooks.md
       - Tags: ref/tags.md
       - Debug: ref/debug.md
       - Integration:
