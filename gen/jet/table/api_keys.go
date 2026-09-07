@@ -17,13 +17,15 @@ type aPIKeysTable struct {
 	sqlite.Table
 
 	// Columns
-	ID         sqlite.ColumnInteger
-	Prefix     sqlite.ColumnString
-	Hash       sqlite.ColumnBlob
-	UserID     sqlite.ColumnInteger
-	Expiration sqlite.ColumnTimestamp
-	LastSeen   sqlite.ColumnTimestamp
-	CreatedAt  sqlite.ColumnTimestamp
+	ID          sqlite.ColumnInteger
+	Prefix      sqlite.ColumnString
+	Hash        sqlite.ColumnBlob
+	UserID      sqlite.ColumnInteger
+	Expiration  sqlite.ColumnTimestamp
+	LastSeen    sqlite.ColumnTimestamp
+	Scopes      sqlite.ColumnString
+	Description sqlite.ColumnString
+	CreatedAt   sqlite.ColumnTimestamp
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -65,29 +67,33 @@ func newAPIKeysTable(schemaName, tableName, alias string) *APIKeysTable {
 
 func newAPIKeysTableImpl(schemaName, tableName, alias string) aPIKeysTable {
 	var (
-		IDColumn         = sqlite.IntegerColumn("id")
-		PrefixColumn     = sqlite.StringColumn("prefix")
-		HashColumn       = sqlite.BlobColumn("hash")
-		UserIDColumn     = sqlite.IntegerColumn("user_id")
-		ExpirationColumn = sqlite.TimestampColumn("expiration")
-		LastSeenColumn   = sqlite.TimestampColumn("last_seen")
-		CreatedAtColumn  = sqlite.TimestampColumn("created_at")
-		allColumns       = sqlite.ColumnList{IDColumn, PrefixColumn, HashColumn, UserIDColumn, ExpirationColumn, LastSeenColumn, CreatedAtColumn}
-		mutableColumns   = sqlite.ColumnList{PrefixColumn, HashColumn, UserIDColumn, ExpirationColumn, LastSeenColumn, CreatedAtColumn}
-		defaultColumns   = sqlite.ColumnList{}
+		IDColumn          = sqlite.IntegerColumn("id")
+		PrefixColumn      = sqlite.StringColumn("prefix")
+		HashColumn        = sqlite.BlobColumn("hash")
+		UserIDColumn      = sqlite.IntegerColumn("user_id")
+		ExpirationColumn  = sqlite.TimestampColumn("expiration")
+		LastSeenColumn    = sqlite.TimestampColumn("last_seen")
+		ScopesColumn      = sqlite.StringColumn("scopes")
+		DescriptionColumn = sqlite.StringColumn("description")
+		CreatedAtColumn   = sqlite.TimestampColumn("created_at")
+		allColumns        = sqlite.ColumnList{IDColumn, PrefixColumn, HashColumn, UserIDColumn, ExpirationColumn, LastSeenColumn, ScopesColumn, DescriptionColumn, CreatedAtColumn}
+		mutableColumns    = sqlite.ColumnList{PrefixColumn, HashColumn, UserIDColumn, ExpirationColumn, LastSeenColumn, ScopesColumn, DescriptionColumn, CreatedAtColumn}
+		defaultColumns    = sqlite.ColumnList{}
 	)
 
 	return aPIKeysTable{
 		Table: sqlite.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		ID:         IDColumn,
-		Prefix:     PrefixColumn,
-		Hash:       HashColumn,
-		UserID:     UserIDColumn,
-		Expiration: ExpirationColumn,
-		LastSeen:   LastSeenColumn,
-		CreatedAt:  CreatedAtColumn,
+		ID:          IDColumn,
+		Prefix:      PrefixColumn,
+		Hash:        HashColumn,
+		UserID:      UserIDColumn,
+		Expiration:  ExpirationColumn,
+		LastSeen:    LastSeenColumn,
+		Scopes:      ScopesColumn,
+		Description: DescriptionColumn,
+		CreatedAt:   CreatedAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

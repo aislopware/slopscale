@@ -216,11 +216,15 @@ type AccessRuleRequestBody struct {
 
 // ApiKey defines model for ApiKey.
 type ApiKey struct {
-	CreatedAt  *time.Time `json:"createdAt"`
-	Expiration *time.Time `json:"expiration"`
-	Id         string     `json:"id"`
-	LastSeen   *time.Time `json:"lastSeen"`
-	Prefix     string     `json:"prefix"`
+	CreatedAt   *time.Time `json:"createdAt"`
+	Description string     `json:"description"`
+	Expiration  *time.Time `json:"expiration"`
+	Id          string     `json:"id"`
+	LastSeen    *time.Time `json:"lastSeen"`
+	Prefix      string     `json:"prefix"`
+
+	// Scopes Scopes the key is limited to; empty means its owner's whole role.
+	Scopes []string `json:"scopes"`
 
 	// UserId Owning user id; null for a legacy key.
 	UserId *string `json:"userId"`
@@ -306,7 +310,12 @@ type CreateAPIKeyOutputBody struct {
 
 // CreateApiKeyRequestBody defines model for CreateApiKeyRequestBody.
 type CreateApiKeyRequestBody struct {
-	Expiration *time.Time `json:"expiration,omitempty"`
+	// Description What the key is for.
+	Description *string    `json:"description,omitempty"`
+	Expiration  *time.Time `json:"expiration,omitempty"`
+
+	// Scopes Scopes to limit the key to; empty keeps the owner's whole role.
+	Scopes *[]string `json:"scopes,omitempty"`
 
 	// UserId Owning user id; empty for a legacy all-access key.
 	UserId *string `json:"userId,omitempty"`

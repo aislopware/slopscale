@@ -1752,6 +1752,7 @@ export interface components {
         ApiKey: {
             /** Format: date-time */
             createdAt: string | null;
+            description: string;
             /** Format: date-time */
             expiration: string | null;
             /** Format: uint64 */
@@ -1759,6 +1760,8 @@ export interface components {
             /** Format: date-time */
             lastSeen: string | null;
             prefix: string;
+            /** @description Scopes the key is limited to; empty means its owner's whole role. */
+            scopes: string[];
             /**
              * Format: uint64
              * @description Owning user id; null for a legacy key.
@@ -1822,8 +1825,12 @@ export interface components {
             apiKey: string;
         };
         CreateApiKeyRequestBody: {
+            /** @description What the key is for. */
+            description?: string;
             /** Format: date-time */
             expiration?: string;
+            /** @description Scopes to limit the key to; empty keeps the owner's whole role. */
+            scopes?: string[] | null;
             /**
              * Format: uint64
              * @description Owning user id; empty for a legacy all-access key.

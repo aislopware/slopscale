@@ -207,6 +207,8 @@ components:
           type:
             - string
             - "null"
+        description:
+          type: string
         expiration:
           format: date-time
           type:
@@ -222,6 +224,11 @@ components:
             - "null"
         prefix:
           type: string
+        scopes:
+          description: Scopes the key is limited to; empty means its owner's whole role.
+          items:
+            type: string
+          type: array
         userId:
           description: Owning user id; null for a legacy key.
           format: uint64
@@ -235,6 +242,8 @@ components:
         - createdAt
         - lastSeen
         - userId
+        - scopes
+        - description
       type: object
     AuditEvent:
       additionalProperties: false
@@ -362,9 +371,19 @@ components:
     CreateApiKeyRequestBody:
       additionalProperties: false
       properties:
+        description:
+          description: What the key is for.
+          type: string
         expiration:
           format: date-time
           type: string
+        scopes:
+          description: Scopes to limit the key to; empty keeps the owner's whole role.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
         userId:
           description: Owning user id; empty for a legacy all-access key.
           format: uint64
