@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -66,15 +67,17 @@ func registerPolicy(api huma.API, b Backend) {
 		return handleGetPolicy(b)
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "setPolicy",
 		Method:      http.MethodPut,
 		Path:        "/api/v1/policy",
 		Summary:     "Set policy",
 		Tags:        []string{"Policy"},
 		Security:    bearerAuth,
-	}, scope.PolicyFile), func(_ context.Context, in *setPolicyInput) (*setPolicyOutput, error) {
-		return handleSetPolicy(b, in)
+	}, scope.PolicyFile), "policy.set", "policy", ""), func(
+		ctx context.Context, in *setPolicyInput,
+	) (*setPolicyOutput, error) {
+		return handleSetPolicy(ctx, b, in)
 	})
 
 	huma.Register(api, withScope(huma.Operation{
@@ -139,7 +142,7 @@ func getPolicyFromFile(b Backend) (*getPolicyOutput, error) {
 	return out, nil
 }
 
-func handleSetPolicy(b Backend, in *setPolicyInput) (*setPolicyOutput, error) {
+func handleSetPolicy(ctx context.Context, b Backend, in *setPolicyInput) (*setPolicyOutput, error) {
 	if b.Cfg.Policy.Mode != types.PolicyModeDB {
 		// Policy updates are only valid in DB mode; otherwise 400.
 		return nil, huma.Error400BadRequest(
@@ -148,6 +151,9 @@ func handleSetPolicy(b Backend, in *setPolicyInput) (*setPolicyOutput, error) {
 	}
 
 	p := in.Body.Policy
+
+	// The policy body itself is never audited, only its size.
+	audit.Detail(ctx, "bytes", len(p))
 
 	// Reject policy that would fail when building a map response. SSH rule
 	// validation needs a node, so a server with no nodes can't catch every

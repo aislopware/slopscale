@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 )
 
@@ -28,7 +29,7 @@ func (b *SetGlobalExitNodeRequestBody) enabled() bool {
 }
 
 func registerGlobalExitNode(api huma.API, b Backend) {
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "setGlobalExitNode",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/{nodeId}/global-exit-node",
@@ -39,16 +40,23 @@ func registerGlobalExitNode(api huma.API, b Backend) {
 			"(`tailscale set --exit-node=auto:any`) pick it.",
 		Tags:     []string{"Nodes"},
 		Security: bearerAuth,
-	}, scope.DevicesRoutes), func(_ context.Context, in *setGlobalExitNodeInput) (*nodeOutput, error) {
+	}, scope.DevicesRoutes), "node.global_exit_node.set", "node", "nodeId"), func(
+		ctx context.Context, in *setGlobalExitNodeInput,
+	) (*nodeOutput, error) {
 		nodeID, err := parseNodeID(in.NodeID)
 		if err != nil {
 			return nil, err
 		}
 
-		node, nodeChange, err := b.State.SetGlobalExitNode(nodeID, in.Body.enabled())
+		enabled := in.Body.enabled()
+		audit.Detail(ctx, "enabled", enabled)
+
+		node, nodeChange, err := b.State.SetGlobalExitNode(nodeID, enabled)
 		if err != nil {
 			return nil, mapError("setting global exit node", err)
 		}
+
+		audit.Target(ctx, "", "", node.GivenName())
 
 		b.Change(nodeChange)
 

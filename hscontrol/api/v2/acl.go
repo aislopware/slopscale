@@ -11,6 +11,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/api/principal"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
@@ -81,7 +82,7 @@ func registerACL(api huma.API, b Backend) {
 		return streamPolicy(data, aclContentType(in.Accept)), nil
 	})
 
-	huma.Register(api, principal.RequireScope(huma.Operation{
+	huma.Register(api, audit.Declare(principal.RequireScope(huma.Operation{
 		OperationID:   "setACL",
 		Method:        http.MethodPost,
 		Path:          "/api/v2/tailnet/{tailnet}/acl",
@@ -96,7 +97,9 @@ func registerACL(api huma.API, b Backend) {
 			http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden,
 			http.StatusNotFound, http.StatusPreconditionFailed, http.StatusInternalServerError,
 		},
-	}, scope.PolicyFile), func(_ context.Context, in *setACLInput) (*huma.StreamResponse, error) {
+	}, scope.PolicyFile), "policy.set", "policy", ""), func(
+		ctx context.Context, in *setACLInput,
+	) (*huma.StreamResponse, error) {
 		err := requireDefaultTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
@@ -118,6 +121,9 @@ func registerACL(api huma.API, b Backend) {
 				return nil, huma.Error412PreconditionFailed("precondition failed, invalid old hash")
 			}
 		}
+
+		// The policy body itself is never audited, only its size.
+		audit.Detail(ctx, "bytes", len(in.RawBody))
 
 		// Mirror the v1 setPolicy flow: validate, SSH-check, persist, reload.
 		nodes := b.State.ListNodes()

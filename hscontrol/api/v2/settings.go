@@ -7,6 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/api/principal"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
@@ -96,7 +97,7 @@ func registerSettings(api huma.API, b Backend) {
 		return &settingsOutput{Body: tailnetSettings(b)}, nil
 	})
 
-	huma.Register(api, principal.RequireScope(huma.Operation{
+	huma.Register(api, audit.Declare(principal.RequireScope(huma.Operation{
 		OperationID: "updateTailnetSettings",
 		Method:      http.MethodPatch,
 		Path:        "/api/v2/tailnet/{tailnet}/settings",
@@ -106,7 +107,9 @@ func registerSettings(api huma.API, b Backend) {
 		Tags:     settingsTags,
 		Security: security,
 		Errors:   []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.FeatureSettings), func(_ context.Context, in *patchSettingsInput) (*settingsOutput, error) {
+	}, scope.FeatureSettings), "settings.set", "", ""), func(
+		ctx context.Context, in *patchSettingsInput,
+	) (*settingsOutput, error) {
 		err := requireDefaultTailnet(in.Tailnet)
 		if err != nil {
 			return nil, err
@@ -129,6 +132,8 @@ func registerSettings(api huma.API, b Backend) {
 			if err != nil {
 				return nil, mapError("updating tailnet settings", err)
 			}
+
+			audit.Detail(ctx, string(u.key), *u.value)
 
 			b.Change(c)
 		}

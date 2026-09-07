@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
@@ -61,7 +62,7 @@ func settingsFrom(s types.Settings) Settings {
 }
 
 func registerApproval(api huma.API, b Backend) {
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "approveNode",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/{nodeId}/approve",
@@ -71,16 +72,23 @@ func registerApproval(api huma.API, b Backend) {
 			"and is not visible to any.",
 		Tags:     []string{"Nodes"},
 		Security: bearerAuth,
-	}, scope.DevicesCore), func(_ context.Context, in *approveNodeInput) (*nodeOutput, error) {
+	}, scope.DevicesCore), "node.approval.set", "node", "nodeId"), func(
+		ctx context.Context, in *approveNodeInput,
+	) (*nodeOutput, error) {
 		nodeID, err := parseNodeID(in.NodeID)
 		if err != nil {
 			return nil, err
 		}
 
-		node, nodeChange, err := b.State.SetNodeApproval(nodeID, in.Body.approved())
+		approved := in.Body.approved()
+		audit.Detail(ctx, "approved", approved)
+
+		node, nodeChange, err := b.State.SetNodeApproval(nodeID, approved)
 		if err != nil {
 			return nil, mapError("approving node", err)
 		}
+
+		audit.Target(ctx, "", "", node.GivenName())
 
 		b.Change(nodeChange)
 
@@ -90,7 +98,7 @@ func registerApproval(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "approveUser",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/user/{id}/approve",
@@ -99,16 +107,23 @@ func registerApproval(api huma.API, b Backend) {
 			"withdraws the approval again, which also withdraws every node the user owns.",
 		Tags:     []string{"Users"},
 		Security: bearerAuth,
-	}, scope.Users), func(_ context.Context, in *approveUserInput) (*userOutput, error) {
+	}, scope.Users), "user.approval.set", "user", "id"), func(
+		ctx context.Context, in *approveUserInput,
+	) (*userOutput, error) {
 		id, err := parseUserID(in.ID)
 		if err != nil {
 			return nil, err
 		}
 
-		user, userChange, err := b.State.SetUserApproval(id, in.Body.approved())
+		approved := in.Body.approved()
+		audit.Detail(ctx, "approved", approved)
+
+		user, userChange, err := b.State.SetUserApproval(id, approved)
 		if err != nil {
 			return nil, mapError("approving user", err)
 		}
+
+		audit.Target(ctx, "", "", user.Name)
 
 		b.Change(userChange)
 
@@ -129,7 +144,7 @@ func registerApproval(api huma.API, b Backend) {
 		return &settingsOutput{Body: settingsFrom(b.State.Settings())}, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "updateSettings",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/settings",
@@ -138,7 +153,9 @@ func registerApproval(api huma.API, b Backend) {
 			"approves every node or user that was waiting.",
 		Tags:     []string{"Settings"},
 		Security: bearerAuth,
-	}, scope.FeatureSettings), func(_ context.Context, in *updateSettingsInput) (*settingsOutput, error) {
+	}, scope.FeatureSettings), "settings.set", "", ""), func(
+		ctx context.Context, in *updateSettingsInput,
+	) (*settingsOutput, error) {
 		updates := []struct {
 			key   types.SettingKey
 			value *bool
@@ -156,6 +173,8 @@ func registerApproval(api huma.API, b Backend) {
 			if err != nil {
 				return nil, mapError("updating settings", err)
 			}
+
+			audit.Detail(ctx, string(u.key), *u.value)
 
 			b.Change(c)
 		}

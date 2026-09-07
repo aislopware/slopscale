@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
@@ -74,14 +75,14 @@ type (
 )
 
 func registerUsers(api huma.API, b Backend) {
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "createUser",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/user",
 		Summary:     "Create user",
 		Tags:        []string{"Users"},
 		Security:    bearerAuth,
-	}, scope.Users), func(_ context.Context, in *createUserInput) (*userOutput, error) {
+	}, scope.Users), "user.create", "user", ""), func(ctx context.Context, in *createUserInput) (*userOutput, error) {
 		// Pre-check yields a 409 for the common case; the DB unique constraint
 		// is the real guard.
 		if in.Body.Name != "" {
@@ -101,6 +102,8 @@ func registerUsers(api huma.API, b Backend) {
 			return nil, mapError("creating user", err)
 		}
 
+		audit.Target(ctx, "", formatID(user.ID), user.Name)
+
 		b.Change(policyChanged)
 
 		out := &userOutput{}
@@ -109,14 +112,16 @@ func registerUsers(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "renameUser",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/user/{oldId}/rename/{newName}",
 		Summary:     "Rename user",
 		Tags:        []string{"Users"},
 		Security:    bearerAuth,
-	}, scope.Users), func(_ context.Context, in *renameUserInput) (*userOutput, error) {
+	}, scope.Users), "user.rename", "user", "oldId"), func(
+		ctx context.Context, in *renameUserInput,
+	) (*userOutput, error) {
 		oldID, err := parseUserID(in.OldID)
 		if err != nil {
 			return nil, err
@@ -126,6 +131,11 @@ func registerUsers(api huma.API, b Backend) {
 		if err != nil {
 			return nil, mapError("renaming user", err)
 		}
+
+		// The name the caller addressed, so the entry still names the user
+		// as it was; newName carries the result.
+		audit.Target(ctx, "", "", oldUser.Name)
+		audit.Detail(ctx, "newName", in.NewName)
 
 		_, c, err := b.State.RenameUser(types.UserID(oldUser.ID), in.NewName)
 		if err != nil {
@@ -145,14 +155,16 @@ func registerUsers(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "deleteUser",
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/user/{id}",
 		Summary:     "Delete user",
 		Tags:        []string{"Users"},
 		Security:    bearerAuth,
-	}, scope.Users), func(_ context.Context, in *deleteUserInput) (*deleteUserOutput, error) {
+	}, scope.Users), "user.delete", "user", "id"), func(
+		ctx context.Context, in *deleteUserInput,
+	) (*deleteUserOutput, error) {
 		id, err := parseUserID(in.ID)
 		if err != nil {
 			return nil, err
@@ -162,6 +174,8 @@ func registerUsers(api huma.API, b Backend) {
 		if err != nil {
 			return nil, mapError("deleting user", err)
 		}
+
+		audit.Target(ctx, "", "", user.Name)
 
 		policyChanged, err := b.State.DeleteUser(types.UserID(user.ID))
 		if err != nil {
@@ -244,7 +258,7 @@ func parseUserID(s string) (types.UserID, error) {
 }
 
 func registerUserRole(api huma.API, b Backend) {
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "setUserRole",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/user/{id}/role",
@@ -254,7 +268,9 @@ func registerUserRole(api huma.API, b Backend) {
 			"becomes an admin. The owner's role changes only by such a transfer.",
 		Tags:     []string{"Users"},
 		Security: bearerAuth,
-	}, scope.Users), func(ctx context.Context, in *setUserRoleInput) (*userOutput, error) {
+	}, scope.Users), "user.role.set", "user", "id"), func(
+		ctx context.Context, in *setUserRoleInput,
+	) (*userOutput, error) {
 		id, err := parseUserID(in.ID)
 		if err != nil {
 			return nil, err
@@ -265,10 +281,14 @@ func registerUserRole(api huma.API, b Backend) {
 			return nil, huma.Error400BadRequest("invalid role", err)
 		}
 
+		audit.Detail(ctx, "role", role.String())
+
 		user, policyChanged, err := b.State.SetUserRole(roleActor(ctx), id, role)
 		if err != nil {
 			return nil, mapError("setting user role", err)
 		}
+
+		audit.Target(ctx, "", "", user.Name)
 
 		b.Change(policyChanged)
 

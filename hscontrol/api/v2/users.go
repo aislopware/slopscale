@@ -8,6 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/api/principal"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
@@ -140,7 +141,7 @@ func registerUserApproval(api huma.API, b Backend, usersTags []string) {
 	}
 
 	for _, action := range actions {
-		huma.Register(api, principal.RequireScope(huma.Operation{
+		huma.Register(api, audit.Declare(principal.RequireScope(huma.Operation{
 			OperationID:   action.id,
 			Method:        http.MethodPost,
 			Path:          "/api/v2/users/{id}/" + action.path,
@@ -149,11 +150,16 @@ func registerUserApproval(api huma.API, b Backend, usersTags []string) {
 			Security:      security,
 			DefaultStatus: http.StatusOK,
 			Errors:        []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-		}, scope.Users), func(_ context.Context, in *userByIDInput) (*emptyOutput, error) {
+		}, scope.Users), "user.approval.set", "user", "id"), func(
+			ctx context.Context, in *userByIDInput,
+		) (*emptyOutput, error) {
 			view, err := lookupUser(b, in.UserID)
 			if err != nil {
 				return nil, err
 			}
+
+			audit.Target(ctx, "", "", view.Name())
+			audit.Detail(ctx, "approved", action.approved)
 
 			_, userChange, err := b.State.SetUserApproval(types.UserID(view.ID()), action.approved)
 			if err != nil {

@@ -6,6 +6,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/juanfont/headscale/hscontrol/api/principal"
+	"github.com/juanfont/headscale/hscontrol/audit"
 )
 
 // selfEnforcedOps are the authenticated operations that intentionally declare
@@ -16,6 +17,7 @@ import (
 var selfEnforcedOps = map[string]bool{
 	"GET /api/v1/health":             true,
 	"GET /api/v1/whoami":             true,
+	"DELETE /api/v1/auth/session":    true,
 	"POST /api/v1/apikey":            true,
 	"POST /api/v1/apikey/expire":     true,
 	"GET /api/v1/apikey":             true,
@@ -62,5 +64,38 @@ func humaOperations(item *huma.PathItem) map[string]*huma.Operation {
 		"PUT":    item.Put,
 		"DELETE": item.Delete,
 		"PATCH":  item.Patch,
+	}
+}
+
+// unauditedOps are the writing operations that change nothing: they
+// validate input and answer.
+var unauditedOps = map[string]bool{
+	"POST /api/v1/policy/check": true,
+}
+
+// TestEveryWritingOperationIsAudited guarantees no v1 operation that changes
+// state ships without an audit action: every non-GET operation must declare
+// one via audited, or be listed as unaudited because it changes nothing.
+func TestEveryWritingOperationIsAudited(t *testing.T) {
+	t.Parallel()
+
+	api := NewAPI(chi.NewMux(), Backend{})
+
+	for path, item := range api.OpenAPI().Paths {
+		for method, op := range humaOperations(item) {
+			if op == nil || method == "GET" {
+				continue
+			}
+
+			key := method + " " + path
+			if unauditedOps[key] {
+				continue
+			}
+
+			if _, ok := audit.Action(op); !ok {
+				t.Errorf("operation %q writes but declares no audit action; wrap it in audited, "+
+					"or add it to unauditedOps if it changes nothing", key)
+			}
+		}
 	}
 }

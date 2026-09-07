@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
 
@@ -91,7 +92,7 @@ type (
 )
 
 func registerAPIKeys(api huma.API, b Backend) {
-	huma.Register(api, huma.Operation{
+	huma.Register(api, audited(huma.Operation{
 		OperationID: "createApiKey",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/apikey",
@@ -100,7 +101,7 @@ func registerAPIKeys(api huma.API, b Backend) {
 			"a legacy key without a user, needs the owner, an admin or the socket.",
 		Tags:     []string{"ApiKeys"},
 		Security: bearerAuth,
-	}, func(ctx context.Context, in *createAPIKeyInput) (*createAPIKeyOutput, error) {
+	}, "apikey.create", "apikey", ""), func(ctx context.Context, in *createAPIKeyInput) (*createAPIKeyOutput, error) {
 		// A missing expiration is a key that never expires. The gRPC handler
 		// defaulted it to the zero time, which minted a key that was expired
 		// before it was printed; the CLI always sends one, so nothing relied
@@ -110,9 +111,20 @@ func registerAPIKeys(api huma.API, b Backend) {
 			return nil, err
 		}
 
-		keyStr, _, err := b.State.CreateAPIKeyForUser(in.Body.Expiration, userID)
+		keyStr, apiKey, err := b.State.CreateAPIKeyForUser(in.Body.Expiration, userID)
 		if err != nil {
 			return nil, huma.Error500InternalServerError("creating api key", err)
+		}
+
+		// The prefix names the key; the key itself is a secret.
+		audit.Target(ctx, "", apiKey.Prefix, "")
+
+		if userID != nil {
+			audit.Detail(ctx, "userId", formatID(uint64(*userID)))
+		}
+
+		if in.Body.Expiration != nil {
+			audit.Detail(ctx, "expiration", in.Body.Expiration.Format(time.RFC3339))
 		}
 
 		out := &createAPIKeyOutput{}
@@ -121,14 +133,14 @@ func registerAPIKeys(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, audited(huma.Operation{
 		OperationID: "expireApiKey",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/apikey/expire",
 		Summary:     "Expire API key",
 		Tags:        []string{"ApiKeys"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *expireAPIKeyInput) (*expireAPIKeyOutput, error) {
+	}, "apikey.expire", "apikey", ""), func(ctx context.Context, in *expireAPIKeyInput) (*expireAPIKeyOutput, error) {
 		key, err := lookupAPIKey(b, in.Body.ID, in.Body.Prefix)
 		if err != nil {
 			return nil, err
@@ -138,6 +150,8 @@ func registerAPIKeys(api huma.API, b Backend) {
 		if err != nil {
 			return nil, err
 		}
+
+		audit.Target(ctx, "", key.Prefix, "")
 
 		err = b.State.ExpireAPIKey(key)
 		if err != nil {
@@ -182,14 +196,16 @@ func registerAPIKeys(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, audited(huma.Operation{
 		OperationID: "deleteApiKey",
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/apikey/{prefix}",
 		Summary:     "Delete API key",
 		Tags:        []string{"ApiKeys"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *deleteAPIKeyInput) (*deleteAPIKeyOutput, error) {
+	}, "apikey.delete", "apikey", "prefix"), func(
+		ctx context.Context, in *deleteAPIKeyInput,
+	) (*deleteAPIKeyOutput, error) {
 		key, err := lookupAPIKey(b, in.ID, in.Prefix)
 		if err != nil {
 			return nil, err
@@ -199,6 +215,10 @@ func registerAPIKeys(api huma.API, b Backend) {
 		if err != nil {
 			return nil, err
 		}
+
+		// The path may carry a placeholder prefix when the key is addressed
+		// by id; name the key that was actually deleted.
+		audit.Target(ctx, "", key.Prefix, "")
 
 		err = b.State.DestroyAPIKey(*key)
 		if err != nil {

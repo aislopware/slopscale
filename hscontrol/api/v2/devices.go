@@ -9,6 +9,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/api/principal"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
@@ -143,7 +144,7 @@ func registerDevices(api huma.API, b Backend) {
 		return handleListDevices(b, in)
 	})
 
-	huma.Register(api, principal.RequireScope(huma.Operation{
+	huma.Register(api, audit.Declare(principal.RequireScope(huma.Operation{
 		OperationID:   "deleteDevice",
 		Method:        http.MethodDelete,
 		Path:          "/api/v2/device/{id}",
@@ -152,11 +153,13 @@ func registerDevices(api huma.API, b Backend) {
 		Security:      security,
 		DefaultStatus: http.StatusOK,
 		Errors:        []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesCore), func(_ context.Context, in *deviceByIDInput) (*emptyOutput, error) {
-		return handleDeleteDevice(b, in)
+	}, scope.DevicesCore), "node.delete", "node", "id"), func(
+		ctx context.Context, in *deviceByIDInput,
+	) (*emptyOutput, error) {
+		return handleDeleteDevice(ctx, b, in)
 	})
 
-	huma.Register(api, principal.RequireScope(huma.Operation{
+	huma.Register(api, audit.Declare(principal.RequireScope(huma.Operation{
 		OperationID:   "authorizeDevice",
 		Method:        http.MethodPost,
 		Path:          "/api/v2/device/{id}/authorized",
@@ -165,11 +168,13 @@ func registerDevices(api huma.API, b Backend) {
 		Security:      security,
 		DefaultStatus: http.StatusOK,
 		Errors:        []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesCore), func(_ context.Context, in *setAuthorizedInput) (*emptyOutput, error) {
-		return handleAuthorizeDevice(b, in)
+	}, scope.DevicesCore), "node.approval.set", "node", "id"), func(
+		ctx context.Context, in *setAuthorizedInput,
+	) (*emptyOutput, error) {
+		return handleAuthorizeDevice(ctx, b, in)
 	})
 
-	huma.Register(api, principal.RequireScope(huma.Operation{
+	huma.Register(api, audit.Declare(principal.RequireScope(huma.Operation{
 		OperationID:   "setDeviceName",
 		Method:        http.MethodPost,
 		Path:          "/api/v2/device/{id}/name",
@@ -178,11 +183,13 @@ func registerDevices(api huma.API, b Backend) {
 		Security:      security,
 		DefaultStatus: http.StatusOK,
 		Errors:        []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesCore), func(_ context.Context, in *setNameInput) (*emptyOutput, error) {
-		return handleSetDeviceName(b, in)
+	}, scope.DevicesCore), "node.rename", "node", "id"), func(
+		ctx context.Context, in *setNameInput,
+	) (*emptyOutput, error) {
+		return handleSetDeviceName(ctx, b, in)
 	})
 
-	huma.Register(api, principal.RequireScope(huma.Operation{
+	huma.Register(api, audit.Declare(principal.RequireScope(huma.Operation{
 		OperationID:   "setDeviceTags",
 		Method:        http.MethodPost,
 		Path:          "/api/v2/device/{id}/tags",
@@ -191,11 +198,13 @@ func registerDevices(api huma.API, b Backend) {
 		Security:      security,
 		DefaultStatus: http.StatusOK,
 		Errors:        []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesCore), func(ctx context.Context, in *setTagsInput) (*emptyOutput, error) {
+	}, scope.DevicesCore), "node.tags.set", "node", "id"), func(
+		ctx context.Context, in *setTagsInput,
+	) (*emptyOutput, error) {
 		return handleSetDeviceTags(ctx, b, in)
 	})
 
-	huma.Register(api, principal.RequireScope(huma.Operation{
+	huma.Register(api, audit.Declare(principal.RequireScope(huma.Operation{
 		OperationID:   "setDeviceKey",
 		Method:        http.MethodPost,
 		Path:          "/api/v2/device/{id}/key",
@@ -204,11 +213,13 @@ func registerDevices(api huma.API, b Backend) {
 		Security:      security,
 		DefaultStatus: http.StatusOK,
 		Errors:        []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesCore), func(_ context.Context, in *setKeyInput) (*emptyOutput, error) {
-		return handleSetDeviceKey(b, in)
+	}, scope.DevicesCore), "node.key_expiry.set", "node", "id"), func(
+		ctx context.Context, in *setKeyInput,
+	) (*emptyOutput, error) {
+		return handleSetDeviceKey(ctx, b, in)
 	})
 
-	huma.Register(api, principal.RequireScope(huma.Operation{
+	huma.Register(api, audit.Declare(principal.RequireScope(huma.Operation{
 		OperationID:   "setDeviceRoutes",
 		Method:        http.MethodPost,
 		Path:          "/api/v2/device/{id}/routes",
@@ -217,8 +228,10 @@ func registerDevices(api huma.API, b Backend) {
 		Security:      security,
 		DefaultStatus: http.StatusOK,
 		Errors:        []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
-	}, scope.DevicesRoutes), func(_ context.Context, in *setSubnetRoutesInput) (*deviceRoutesOutput, error) {
-		return handleSetDeviceRoutes(b, in)
+	}, scope.DevicesRoutes), "node.routes.set", "node", "id"), func(
+		ctx context.Context, in *setSubnetRoutesInput,
+	) (*deviceRoutesOutput, error) {
+		return handleSetDeviceRoutes(ctx, b, in)
 	})
 
 	huma.Register(api, principal.RequireScope(huma.Operation{
@@ -262,11 +275,13 @@ func handleListDevices(b Backend, in *listDevicesInput) (*listDevicesOutput, err
 	return out, nil
 }
 
-func handleDeleteDevice(b Backend, in *deviceByIDInput) (*emptyOutput, error) {
+func handleDeleteDevice(ctx context.Context, b Backend, in *deviceByIDInput) (*emptyOutput, error) {
 	node, err := lookupNode(b, in.DeviceID)
 	if err != nil {
 		return nil, err
 	}
+
+	audit.Target(ctx, "", "", node.GivenName())
 
 	nodeChange, err := b.State.DeleteNode(node)
 	if err != nil {
@@ -282,11 +297,14 @@ func handleDeleteDevice(b Backend, in *deviceByIDInput) (*emptyOutput, error) {
 // are authorized the moment they register, so there is no de-authorize state.
 // authorized=false is rejected so callers are not misled into thinking the
 // device is fenced off.
-func handleAuthorizeDevice(b Backend, in *setAuthorizedInput) (*emptyOutput, error) {
+func handleAuthorizeDevice(ctx context.Context, b Backend, in *setAuthorizedInput) (*emptyOutput, error) {
 	node, err := lookupNode(b, in.DeviceID)
 	if err != nil {
 		return nil, err
 	}
+
+	audit.Target(ctx, "", "", node.GivenName())
+	audit.Detail(ctx, "approved", in.Body.Authorized)
 
 	if node.IsApproved() == in.Body.Authorized {
 		return &emptyOutput{}, nil
@@ -302,11 +320,14 @@ func handleAuthorizeDevice(b Backend, in *setAuthorizedInput) (*emptyOutput, err
 	return &emptyOutput{}, nil
 }
 
-func handleSetDeviceName(b Backend, in *setNameInput) (*emptyOutput, error) {
+func handleSetDeviceName(ctx context.Context, b Backend, in *setNameInput) (*emptyOutput, error) {
 	node, err := lookupNode(b, in.DeviceID)
 	if err != nil {
 		return nil, err
 	}
+
+	audit.Target(ctx, "", "", node.GivenName())
+	audit.Detail(ctx, "newName", in.Body.Name)
 
 	_, nodeChange, err := b.State.RenameNode(node.ID(), in.Body.Name)
 	if err != nil {
@@ -328,9 +349,13 @@ func handleSetDeviceTags(ctx context.Context, b Backend, in *setTagsInput) (*emp
 		return nil, err
 	}
 
+	audit.Target(ctx, "", "", node.GivenName())
+
 	if len(in.Body.Tags) == 0 {
 		return &emptyOutput{}, nil
 	}
+
+	audit.Detail(ctx, "tags", in.Body.Tags)
 
 	// An OAuth token may only assign tags within its grant (held directly or
 	// owned by a held tag per policy); an admin API key is unrestricted. The
@@ -359,11 +384,14 @@ func handleSetDeviceTags(ctx context.Context, b Backend, in *setTagsInput) (*emp
 // expires). Re-enabling has no target expiry in the Tailscale request and
 // Headscale stores no original, so it is accepted as a no-op (keeps Terraform
 // destroy working) rather than guessing a lifetime.
-func handleSetDeviceKey(b Backend, in *setKeyInput) (*emptyOutput, error) {
+func handleSetDeviceKey(ctx context.Context, b Backend, in *setKeyInput) (*emptyOutput, error) {
 	node, err := lookupNode(b, in.DeviceID)
 	if err != nil {
 		return nil, err
 	}
+
+	audit.Target(ctx, "", "", node.GivenName())
+	audit.Detail(ctx, "keyExpiryDisabled", in.Body.KeyExpiryDisabled)
 
 	if !in.Body.KeyExpiryDisabled {
 		return &emptyOutput{}, nil
@@ -379,16 +407,20 @@ func handleSetDeviceKey(b Backend, in *setKeyInput) (*emptyOutput, error) {
 	return &emptyOutput{}, nil
 }
 
-func handleSetDeviceRoutes(b Backend, in *setSubnetRoutesInput) (*deviceRoutesOutput, error) {
+func handleSetDeviceRoutes(ctx context.Context, b Backend, in *setSubnetRoutesInput) (*deviceRoutesOutput, error) {
 	node, err := lookupNode(b, in.DeviceID)
 	if err != nil {
 		return nil, err
 	}
 
+	audit.Target(ctx, "", "", node.GivenName())
+
 	approved, err := parseRoutes(in.Body.Routes)
 	if err != nil {
 		return nil, err
 	}
+
+	audit.Detail(ctx, "routes", emptyIfNil(util.PrefixesToString(approved)))
 
 	updated, nodeChange, err := b.State.SetApprovedRoutes(node.ID(), approved)
 	if err != nil {

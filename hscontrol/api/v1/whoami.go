@@ -16,8 +16,8 @@ func init() {
 // Whoami describes the caller: how it authenticated, who it is and what it
 // may do. The admin console reads it once after login to shape its menus.
 type Whoami struct {
-	// Kind is "local", "api_key" or "oauth".
-	Kind string `doc:"How the caller authenticated: local (socket), api_key or oauth." json:"kind"`
+	// Kind is "local", "api_key", "oauth" or "session".
+	Kind string `doc:"How the caller authenticated: local, api_key, oauth or session." json:"kind"`
 	// User is the credential's owner; absent for a legacy key, a token or the socket.
 	User *User `json:"user,omitempty"`
 	// Role is the owner's role; "member" for a credential without a user.
@@ -76,6 +76,8 @@ func whoamiFromPrincipal(p principal.Principal) Whoami {
 		w.Kind = "api_key"
 	case principal.AccessToken:
 		w.Kind = "oauth"
+	case principal.Session:
+		w.Kind = "session"
 	}
 
 	if p.Bounded {

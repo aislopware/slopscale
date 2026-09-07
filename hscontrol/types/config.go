@@ -88,6 +88,13 @@ type RouteConfig struct {
 	HA HARouteConfig
 }
 
+// AuditConfig configures the audit log.
+type AuditConfig struct {
+	// Retention is how long audit events are kept before the background
+	// collector deletes them. Zero keeps them forever.
+	Retention time.Duration
+}
+
 // PreAuthKeysConfig contains configuration for pre-auth key lifecycle.
 type PreAuthKeysConfig struct {
 	// RevokedRetention is how long a soft-revoked pre-auth key (revoked via the
@@ -119,6 +126,7 @@ type Config struct {
 	TrustedProxies      []netip.Prefix
 	Node                NodeConfig
 	PreAuthKeys         PreAuthKeysConfig
+	Audit               AuditConfig
 	PrefixV4            *netip.Prefix
 	PrefixV6            *netip.Prefix
 	IPAllocation        IPAllocationStrategy
@@ -248,9 +256,15 @@ type OIDCConfig struct {
 	AllowedDomains             []string
 	AllowedUsers               []string
 	AllowedGroups              []string
-	EmailVerifiedRequired      bool
-	UseExpiryFromToken         bool
-	PKCE                       PKCEConfig
+	// AdminUsers are email addresses that hold the admin role: a user
+	// signing in with one of them is promoted from member to admin on
+	// every login, so a fresh deployment can name its administrators in
+	// configuration. The owner and users who already hold a higher role
+	// are left alone.
+	AdminUsers            []string
+	EmailVerifiedRequired bool
+	UseExpiryFromToken    bool
+	PKCE                  PKCEConfig
 }
 
 type DERPConfig struct {
@@ -494,6 +508,7 @@ func LoadConfig(path string, isFile bool) error {
 	viper.SetDefault("node.expiry", "0")
 	viper.SetDefault("node.ephemeral.inactivity_timeout", "120s")
 	viper.SetDefault("preauth_keys.revoked_retention", "168h")
+	viper.SetDefault("audit.retention", "0")
 	viper.SetDefault("node.routes.ha.probe_interval", "10s")
 	viper.SetDefault("node.routes.ha.probe_timeout", "5s")
 
@@ -1295,6 +1310,10 @@ func LoadServerConfig() (*Config, error) {
 			RevokedRetention: viper.GetDuration("preauth_keys.revoked_retention"),
 		},
 
+		Audit: AuditConfig{
+			Retention: viper.GetDuration("audit.retention"),
+		},
+
 		Database: databaseConfig(),
 
 		TLS: tlsConfig(),
@@ -1320,6 +1339,7 @@ func LoadServerConfig() (*Config, error) {
 			AllowedDomains:        viper.GetStringSlice("oidc.allowed_domains"),
 			AllowedUsers:          viper.GetStringSlice("oidc.allowed_users"),
 			AllowedGroups:         viper.GetStringSlice("oidc.allowed_groups"),
+			AdminUsers:            viper.GetStringSlice("oidc.admin_users"),
 			EmailVerifiedRequired: viper.GetBool("oidc.email_verified_required"),
 			UseExpiryFromToken:    viper.GetBool("oidc.use_expiry_from_token"),
 			PKCE: PKCEConfig{

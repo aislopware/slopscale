@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
@@ -65,20 +66,25 @@ type (
 )
 
 func registerAuth(api huma.API, b Backend) {
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "authRegister",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/auth/register",
 		Summary:     "Register node via auth flow",
 		Tags:        []string{"Auth"},
 		Security:    bearerAuth,
-	}, scope.DevicesCore), func(_ context.Context, in *authRegisterInput) (*authRegisterOutput, error) {
+	}, scope.DevicesCore), "node.register", "", ""), func(
+		ctx context.Context, in *authRegisterInput,
+	) (*authRegisterOutput, error) {
 		// Malformed auth_id is 400; unknown user and missing pending session are
 		// 404 via mapError, matching the Approve/Reject handlers.
 		registrationID, err := types.AuthIDFromString(in.Body.AuthID)
 		if err != nil {
 			return nil, huma.Error400BadRequest("registering node", err)
 		}
+
+		audit.Detail(ctx, "authId", in.Body.AuthID)
+		audit.Detail(ctx, "user", in.Body.User)
 
 		user, err := b.State.GetUserByName(in.Body.User)
 		if err != nil {
@@ -100,6 +106,8 @@ func registerAuth(api huma.API, b Backend) {
 			return nil, huma.Error500InternalServerError("auto approving routes", err)
 		}
 
+		audit.Target(ctx, "node", node.StringID(), node.GivenName())
+
 		b.Change(nodeChange, routeChange)
 
 		out := &authRegisterOutput{}
@@ -108,36 +116,44 @@ func registerAuth(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "authApprove",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/auth/approve",
 		Summary:     "Approve a pending auth session",
 		Tags:        []string{"Auth"},
 		Security:    bearerAuth,
-	}, scope.DevicesCore), func(_ context.Context, in *authApproveInput) (*authApproveOutput, error) {
+	}, scope.DevicesCore), "auth.approve", "", ""), func(
+		ctx context.Context, in *authApproveInput,
+	) (*authApproveOutput, error) {
 		authReq, err := pendingAuthRequest(b, in.Body.AuthID)
 		if err != nil {
 			return nil, err
 		}
+
+		audit.Detail(ctx, "authId", in.Body.AuthID)
 
 		authReq.FinishAuth(types.AuthVerdict{})
 
 		return &authApproveOutput{}, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "authReject",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/auth/reject",
 		Summary:     "Reject a pending auth session",
 		Tags:        []string{"Auth"},
 		Security:    bearerAuth,
-	}, scope.DevicesCore), func(_ context.Context, in *authRejectInput) (*authRejectOutput, error) {
+	}, scope.DevicesCore), "auth.reject", "", ""), func(
+		ctx context.Context, in *authRejectInput,
+	) (*authRejectOutput, error) {
 		authReq, err := pendingAuthRequest(b, in.Body.AuthID)
 		if err != nil {
 			return nil, err
 		}
+
+		audit.Detail(ctx, "authId", in.Body.AuthID)
 
 		authReq.FinishAuth(types.AuthVerdict{
 			Err: errAuthRejected,

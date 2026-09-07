@@ -24,6 +24,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 	"github.com/juanfont/headscale/hscontrol/api/principal"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
@@ -96,6 +97,8 @@ func NewAPI(router chi.Router, backend Backend) huma.API {
 	// Must run before Register: Huma snapshots the middleware chain at operation
 	// registration, so a middleware added afterwards would silently never run.
 	api.UseMiddleware(authMiddleware(api, backend))
+	// After authentication, so the audit sees the principal.
+	api.UseMiddleware(audit.Middleware(backend.State))
 
 	Register(api, backend)
 

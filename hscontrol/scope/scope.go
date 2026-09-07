@@ -47,6 +47,11 @@ const (
 
 	Users     Scope = "users"
 	UsersRead Scope = "users:read"
+
+	// LogsConfigurationRead gates the audit log, which Tailscale calls the
+	// configuration log. There is no write scope: the log is append-only
+	// and written by the server.
+	LogsConfigurationRead Scope = "logs:configuration:read"
 )
 
 const readSuffix = ":read"
@@ -63,6 +68,7 @@ func Known() []Scope {
 		PolicyFile, PolicyFileRead,
 		FeatureSettings, FeatureSettingsRead,
 		Users, UsersRead,
+		LogsConfigurationRead,
 	}
 }
 
@@ -131,8 +137,8 @@ func RequiresTags(scopes []Scope) bool {
 // do more than this, whatever scopes it was minted with. The table follows
 // Tailscale's role matrix: owner and admin do everything; a network admin
 // manages the policy and routes and reads the rest; an IT admin manages
-// users, devices and keys and reads the policy; an auditor reads
-// everything; a member has no admin access.
+// users, devices and keys and reads the policy; both read the audit log;
+// an auditor reads everything; a member has no admin access.
 func ForRole(role types.Role) []Scope {
 	switch role {
 	case types.RoleOwner, types.RoleAdmin:
@@ -141,11 +147,13 @@ func ForRole(role types.Role) []Scope {
 		return []Scope{
 			PolicyFile, DevicesRoutes,
 			UsersRead, DevicesCoreRead, AuthKeysRead, OAuthKeysRead, FeatureSettingsRead,
+			LogsConfigurationRead,
 		}
 	case types.RoleITAdmin:
 		return []Scope{
 			Users, DevicesCore, AuthKeys, OAuthKeys, FeatureSettings,
 			PolicyFileRead, DevicesRoutesRead,
+			LogsConfigurationRead,
 		}
 	case types.RoleAuditor:
 		return []Scope{AllRead}

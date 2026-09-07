@@ -6,6 +6,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/juanfont/headscale/hscontrol/api/principal"
+	"github.com/juanfont/headscale/hscontrol/audit"
 )
 
 // selfEnforcedKeyOps are the authenticated operations that intentionally declare
@@ -54,5 +55,24 @@ func humaOperations(item *huma.PathItem) map[string]*huma.Operation {
 		"PUT":    item.Put,
 		"DELETE": item.Delete,
 		"PATCH":  item.Patch,
+	}
+}
+
+// TestEveryWritingOperationIsAudited guarantees no v2 operation that changes
+// state ships without an audit action (audit.Declare).
+func TestEveryWritingOperationIsAudited(t *testing.T) {
+	api := NewAPI(chi.NewMux(), Backend{})
+
+	for path, item := range api.OpenAPI().Paths {
+		for method, op := range humaOperations(item) {
+			if op == nil || method == "GET" {
+				continue
+			}
+
+			if _, ok := audit.Action(op); !ok {
+				t.Errorf("operation %q writes but declares no audit action; wrap it in audit.Declare",
+					method+" "+path)
+			}
+		}
 	}
 }

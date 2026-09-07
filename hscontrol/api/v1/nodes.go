@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
@@ -258,14 +259,16 @@ func registerNodeReadOps(api huma.API, b Backend) {
 }
 
 func registerNodeWriteOps(api huma.API, b Backend) {
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "deleteNode",
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/node/{nodeId}",
 		Summary:     "Delete node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, scope.DevicesCore), func(_ context.Context, in *deleteNodeInput) (*deleteNodeOutput, error) {
+	}, scope.DevicesCore), "node.delete", "node", "nodeId"), func(
+		ctx context.Context, in *deleteNodeInput,
+	) (*deleteNodeOutput, error) {
 		nodeID, err := parseNodeID(in.NodeID)
 		if err != nil {
 			return nil, err
@@ -275,6 +278,8 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		if !ok {
 			return nil, huma.Error404NotFound("node not found")
 		}
+
+		audit.Target(ctx, "", "", node.GivenName())
 
 		nodeChange, err := b.State.DeleteNode(node)
 		if err != nil {
@@ -286,34 +291,42 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		return &deleteNodeOutput{}, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "expireNode",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/{nodeId}/expire",
 		Summary:     "Expire node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, scope.DevicesCore), func(_ context.Context, in *expireNodeInput) (*nodeOutput, error) {
-		return handleExpireNode(b, in)
+	}, scope.DevicesCore), "node.expire", "node", "nodeId"), func(
+		ctx context.Context, in *expireNodeInput,
+	) (*nodeOutput, error) {
+		return handleExpireNode(ctx, b, in)
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "renameNode",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/{nodeId}/rename/{newName}",
 		Summary:     "Rename node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, scope.DevicesCore), func(_ context.Context, in *renameNodeInput) (*nodeOutput, error) {
+	}, scope.DevicesCore), "node.rename", "node", "nodeId"), func(
+		ctx context.Context, in *renameNodeInput,
+	) (*nodeOutput, error) {
 		nodeID, err := parseNodeID(in.NodeID)
 		if err != nil {
 			return nil, err
 		}
 
+		audit.Detail(ctx, "newName", in.NewName)
+
 		node, nodeChange, err := b.State.RenameNode(nodeID, in.NewName)
 		if err != nil {
 			return nil, mapError("renaming node", err)
 		}
+
+		audit.Target(ctx, "", "", node.GivenName())
 
 		b.Change(nodeChange)
 
@@ -323,22 +336,24 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "setTags",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/{nodeId}/tags",
 		Summary:     "Set tags",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, scope.DevicesCore), func(_ context.Context, in *setTagsInput) (*nodeOutput, error) {
-		return handleSetTags(b, in)
+	}, scope.DevicesCore), "node.tags.set", "node", "nodeId"), func(
+		ctx context.Context, in *setTagsInput,
+	) (*nodeOutput, error) {
+		return handleSetTags(ctx, b, in)
 	})
 }
 
 // handleExpireNode applies gRPC parity: disableExpiry => nil expiry (never
 // expires); explicit expiry honoured; absent/zero body expires now. Both set
 // is a 400.
-func handleExpireNode(b Backend, in *expireNodeInput) (*nodeOutput, error) {
+func handleExpireNode(ctx context.Context, b Backend, in *expireNodeInput) (*nodeOutput, error) {
 	nodeID, err := parseNodeID(in.NodeID)
 	if err != nil {
 		return nil, err
@@ -359,10 +374,14 @@ func handleExpireNode(b Backend, in *expireNodeInput) (*nodeOutput, error) {
 	}
 
 	if disableExpiry {
+		audit.Detail(ctx, "disableExpiry", true)
+
 		node, nodeChange, expErr := b.State.SetNodeExpiry(nodeID, nil)
 		if expErr != nil {
 			return nil, mapError("expiring node", expErr)
 		}
+
+		audit.Target(ctx, "", "", node.GivenName())
 
 		b.Change(nodeChange)
 
@@ -375,12 +394,16 @@ func handleExpireNode(b Backend, in *expireNodeInput) (*nodeOutput, error) {
 	expiry := time.Now()
 	if customExpiry != nil {
 		expiry = *customExpiry
+
+		audit.Detail(ctx, "expiry", expiry.Format(time.RFC3339))
 	}
 
 	node, nodeChange, err := b.State.SetNodeExpiry(nodeID, &expiry)
 	if err != nil {
 		return nil, mapError("expiring node", err)
 	}
+
+	audit.Target(ctx, "", "", node.GivenName())
 
 	b.Change(nodeChange)
 
@@ -390,7 +413,7 @@ func handleExpireNode(b Backend, in *expireNodeInput) (*nodeOutput, error) {
 	return out, nil
 }
 
-func handleSetTags(b Backend, in *setTagsInput) (*nodeOutput, error) {
+func handleSetTags(ctx context.Context, b Backend, in *setTagsInput) (*nodeOutput, error) {
 	nodeID, err := parseNodeID(in.NodeID)
 	if err != nil {
 		return nil, err
@@ -416,10 +439,14 @@ func handleSetTags(b Backend, in *setTagsInput) (*nodeOutput, error) {
 		return nil, huma.Error404NotFound("node not found")
 	}
 
+	audit.Detail(ctx, "tags", in.Body.Tags)
+
 	node, nodeChange, err := b.State.SetNodeTags(nodeID, in.Body.Tags)
 	if err != nil {
 		return nil, huma.Error400BadRequest("setting tags", err)
 	}
+
+	audit.Target(ctx, "", "", node.GivenName())
 
 	b.Change(nodeChange)
 
@@ -430,29 +457,36 @@ func handleSetTags(b Backend, in *setTagsInput) (*nodeOutput, error) {
 }
 
 func registerNodeAdminOps(api huma.API, b Backend) {
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "setApprovedRoutes",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/{nodeId}/approve_routes",
 		Summary:     "Set approved routes",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, scope.DevicesRoutes), func(_ context.Context, in *setApprovedRoutesInput) (*nodeOutput, error) {
-		return handleSetApprovedRoutes(b, in)
+	}, scope.DevicesRoutes), "node.routes.set", "node", "nodeId"), func(
+		ctx context.Context, in *setApprovedRoutesInput,
+	) (*nodeOutput, error) {
+		return handleSetApprovedRoutes(ctx, b, in)
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "registerNode",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/register",
 		Summary:     "Register node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, scope.DevicesCore), func(_ context.Context, in *registerNodeInput) (*nodeOutput, error) {
+	}, scope.DevicesCore), "node.register", "", ""), func(
+		ctx context.Context, in *registerNodeInput,
+	) (*nodeOutput, error) {
 		registrationID, err := types.AuthIDFromString(in.Key)
 		if err != nil {
 			return nil, huma.Error400BadRequest("registering node", err)
 		}
+
+		audit.Detail(ctx, "key", in.Key)
+		audit.Detail(ctx, "user", in.User)
 
 		user, err := b.State.GetUserByName(in.User)
 		if err != nil {
@@ -474,6 +508,8 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 			return nil, huma.Error500InternalServerError("auto approving routes", err)
 		}
 
+		audit.Target(ctx, "node", node.StringID(), node.GivenName())
+
 		// Empty changes are ignored by the change sink.
 		b.Change(nodeChange, routeChange)
 
@@ -483,14 +519,16 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "backfillNodeIPs",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/backfillips",
 		Summary:     "Backfill node IPs",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, scope.DevicesCore), func(_ context.Context, in *backfillNodeIPsInput) (*backfillNodeIPsOutput, error) {
+	}, scope.DevicesCore), "node.backfill_ips", "", ""), func(
+		ctx context.Context, in *backfillNodeIPsInput,
+	) (*backfillNodeIPsOutput, error) {
 		if !in.Confirmed {
 			return nil, huma.Error400BadRequest("backfilling node IPs", errBackfillNotConfirmed)
 		}
@@ -499,6 +537,8 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 		if err != nil {
 			return nil, huma.Error500InternalServerError("backfilling node IPs", err)
 		}
+
+		audit.Detail(ctx, "changes", len(changes))
 
 		out := &backfillNodeIPsOutput{}
 		out.Body.Changes = changes
@@ -510,19 +550,21 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "debugCreateNode",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/debug/node",
 		Summary:     "Debug create node",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, scope.DevicesCore), func(_ context.Context, in *debugCreateNodeInput) (*nodeOutput, error) {
-		return handleDebugCreateNode(b, in)
+	}, scope.DevicesCore), "node.debug_create", "", ""), func(
+		ctx context.Context, in *debugCreateNodeInput,
+	) (*nodeOutput, error) {
+		return handleDebugCreateNode(ctx, b, in)
 	})
 }
 
-func handleSetApprovedRoutes(b Backend, in *setApprovedRoutesInput) (*nodeOutput, error) {
+func handleSetApprovedRoutes(ctx context.Context, b Backend, in *setApprovedRoutesInput) (*nodeOutput, error) {
 	nodeID, err := parseNodeID(in.NodeID)
 	if err != nil {
 		return nil, err
@@ -548,10 +590,14 @@ func handleSetApprovedRoutes(b Backend, in *setApprovedRoutesInput) (*nodeOutput
 	slices.SortFunc(newApproved, netip.Prefix.Compare)
 	newApproved = slices.Compact(newApproved)
 
+	audit.Detail(ctx, "routes", nonNilStrings(util.PrefixesToString(newApproved)))
+
 	node, nodeChange, err := b.State.SetApprovedRoutes(nodeID, newApproved)
 	if err != nil {
 		return nil, mapError("setting approved routes", err)
 	}
+
+	audit.Target(ctx, "", "", node.GivenName())
 
 	b.Change(nodeChange)
 
@@ -565,7 +611,10 @@ func handleSetApprovedRoutes(b Backend, in *setApprovedRoutesInput) (*nodeOutput
 	return out, nil
 }
 
-func handleDebugCreateNode(b Backend, in *debugCreateNodeInput) (*nodeOutput, error) {
+func handleDebugCreateNode(ctx context.Context, b Backend, in *debugCreateNodeInput) (*nodeOutput, error) {
+	audit.Target(ctx, "node", "", in.Body.Name)
+	audit.Detail(ctx, "user", in.Body.User)
+
 	user, err := b.State.GetUserByName(in.Body.User)
 	if err != nil {
 		return nil, mapError("looking up user", err)

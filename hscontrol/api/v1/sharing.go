@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
@@ -53,7 +54,7 @@ func requireShareAccess(ctx context.Context, b Backend, nodeID types.NodeID) err
 }
 
 func registerSharing(api huma.API, b Backend) {
-	huma.Register(api, huma.Operation{
+	huma.Register(api, audited(huma.Operation{
 		OperationID: "shareNode",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/{nodeId}/share",
@@ -64,7 +65,7 @@ func registerSharing(api huma.API, b Backend) {
 			"needs the devices scope.",
 		Tags:     []string{"Nodes"},
 		Security: bearerAuth,
-	}, func(ctx context.Context, in *shareNodeInput) (*nodeOutput, error) {
+	}, "node.share", "node", "nodeId"), func(ctx context.Context, in *shareNodeInput) (*nodeOutput, error) {
 		nodeID, err := parseNodeID(in.NodeID)
 		if err != nil {
 			return nil, err
@@ -92,6 +93,9 @@ func registerSharing(api huma.API, b Backend) {
 			return nil, mapError("sharing node", err)
 		}
 
+		audit.Target(ctx, "", "", node.GivenName())
+		audit.Detail(ctx, "userId", in.Body.UserID)
+
 		b.Change(nodeChange)
 
 		out := &nodeOutput{}
@@ -100,14 +104,14 @@ func registerSharing(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, audited(huma.Operation{
 		OperationID: "unshareNode",
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/node/{nodeId}/share/{userId}",
 		Summary:     "Stop sharing node with a user",
 		Tags:        []string{"Nodes"},
 		Security:    bearerAuth,
-	}, func(ctx context.Context, in *unshareNodeInput) (*nodeOutput, error) {
+	}, "node.unshare", "node", "nodeId"), func(ctx context.Context, in *unshareNodeInput) (*nodeOutput, error) {
 		nodeID, err := parseNodeID(in.NodeID)
 		if err != nil {
 			return nil, err
@@ -127,6 +131,9 @@ func registerSharing(api huma.API, b Backend) {
 		if err != nil {
 			return nil, mapError("unsharing node", err)
 		}
+
+		audit.Target(ctx, "", "", node.GivenName())
+		audit.Detail(ctx, "userId", in.UserID)
 
 		b.Change(nodeChange)
 

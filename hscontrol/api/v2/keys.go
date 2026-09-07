@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
@@ -124,7 +125,7 @@ type (
 func registerKeys(api huma.API, b Backend) {
 	keysTags := []string{"Keys", "Tailscale compat"}
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, audit.Declare(huma.Operation{
 		OperationID: "createKey",
 		Method:      http.MethodPost,
 		Path:        "/api/v2/tailnet/{tailnet}/keys",
@@ -139,7 +140,7 @@ func registerKeys(api huma.API, b Backend) {
 			http.StatusForbidden,
 			http.StatusNotFound,
 		},
-	}, func(ctx context.Context, in *createKeyInput) (*keyOutput, error) {
+	}, "key.create", "", ""), func(ctx context.Context, in *createKeyInput) (*keyOutput, error) {
 		return handleCreateKey(ctx, b, in)
 	})
 
@@ -179,7 +180,7 @@ func registerKeys(api huma.API, b Backend) {
 		return handleGetKey(ctx, b, in)
 	})
 
-	huma.Register(api, huma.Operation{
+	huma.Register(api, audit.Declare(huma.Operation{
 		OperationID: "deleteKey",
 		Method:      http.MethodDelete,
 		Path:        "/api/v2/tailnet/{tailnet}/keys/{keyId}",
@@ -194,7 +195,7 @@ func registerKeys(api huma.API, b Backend) {
 			http.StatusForbidden,
 			http.StatusNotFound,
 		},
-	}, func(ctx context.Context, in *keyByIDInput) (*deleteKeyOutput, error) {
+	}, "key.delete", "key", "keyId"), func(ctx context.Context, in *keyByIDInput) (*deleteKeyOutput, error) {
 		return handleDeleteKey(ctx, b, in)
 	})
 }
@@ -292,6 +293,8 @@ func handleDeleteKey(ctx context.Context, b Backend, in *keyByIDInput) (*deleteK
 	if requireKeyScope(ctx, scope.OAuthKeys) == nil {
 		_, clientErr := b.State.GetOAuthClientByClientID(in.KeyID)
 		if clientErr == nil {
+			audit.Detail(ctx, "keyType", keyTypeClient)
+
 			revokeErr := b.State.RevokeOAuthClient(in.KeyID)
 			if revokeErr != nil {
 				return nil, mapError("deleting oauth client", revokeErr)
@@ -310,6 +313,8 @@ func handleDeleteKey(ctx context.Context, b Backend, in *keyByIDInput) (*deleteK
 	if err != nil {
 		return nil, err
 	}
+
+	audit.Detail(ctx, "keyType", keyTypeAuth)
 
 	// Tailscale's DELETE revokes the key but keeps it retrievable (invalid)
 	// rather than destroying it; the collector reaps it after the retention
@@ -389,6 +394,17 @@ func createAuthKey(ctx context.Context, b Backend, body CreateKeyRequest) (*keyO
 
 	expiration := time.Now().Add(expiryDuration(body.ExpirySeconds))
 
+	audit.Detail(ctx, "keyType", keyTypeAuth)
+	audit.Detail(ctx, "reusable", create.Reusable)
+	audit.Detail(ctx, "ephemeral", create.Ephemeral)
+	audit.Detail(ctx, "preauthorized", create.Preauthorized)
+	audit.Detail(ctx, "tags", emptyIfNil(create.Tags))
+	audit.Detail(ctx, "expiration", expiration.Format(time.RFC3339))
+
+	if userID != nil {
+		audit.Detail(ctx, "userId", strconv.FormatUint(uint64(*userID), util.Base10))
+	}
+
 	pak, err := b.State.CreatePreAuthKeyFromSpec(types.PreAuthKeySpec{
 		UserID:        userID,
 		Reusable:      create.Reusable,
@@ -400,6 +416,9 @@ func createAuthKey(ctx context.Context, b Backend, body CreateKeyRequest) (*keyO
 	if err != nil {
 		return nil, mapError("creating auth key", err)
 	}
+
+	// The key itself is a secret; the event names it by its id.
+	audit.Target(ctx, "key", pak.StringID(), "")
 
 	if body.Description != "" {
 		err := b.State.SetPreAuthKeyDescription(pak.ID, body.Description)
@@ -469,10 +488,17 @@ func createOAuthClient(ctx context.Context, b Backend, body CreateKeyRequest) (*
 		creator = &u
 	}
 
+	audit.Detail(ctx, "keyType", keyTypeClient)
+	audit.Detail(ctx, "scopes", emptyIfNil(body.Scopes))
+	audit.Detail(ctx, "tags", emptyIfNil(body.Tags))
+
 	secret, client, err := b.State.CreateOAuthClient(body.Scopes, body.Tags, body.Description, creator)
 	if err != nil {
 		return nil, mapError("creating oauth client", err)
 	}
+
+	// The client secret is never audited; the client id names the object.
+	audit.Target(ctx, "key", client.ClientID, "")
 
 	return &keyOutput{Body: oauthClientToKey(client, secret)}, nil
 }

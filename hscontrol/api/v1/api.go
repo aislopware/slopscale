@@ -16,6 +16,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 	"github.com/juanfont/headscale/hscontrol/api/principal"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -29,6 +30,20 @@ type Backend struct {
 	State  *state.State
 	Change func(...change.Change)
 	Cfg    *types.Config
+
+	// ConsoleLogin describes sign-in through the identity provider for
+	// the admin console; nil when the server has no OIDC provider.
+	ConsoleLogin *ConsoleLogin
+}
+
+// ConsoleLogin is how the console starts a sign-in through the identity
+// provider.
+type ConsoleLogin struct {
+	// Provider is the display name for the sign-in button ("Google").
+	Provider string
+	// Path is where the browser is sent, relative to the server URL; it
+	// takes ?redirect=<console path>.
+	Path string
 }
 
 // NewAPI builds the v1 Huma API on the given chi router and registers every
@@ -64,6 +79,8 @@ func NewAPI(router chi.Router, backend Backend) huma.API {
 	// Must run before register: Huma snapshots the middleware chain at operation
 	// registration, so a middleware added afterwards would silently never run.
 	api.UseMiddleware(authMiddleware(api, backend))
+	// After authentication, so the audit sees the principal.
+	api.UseMiddleware(audit.Middleware(backend.State))
 
 	register(api, backend)
 
@@ -163,4 +180,11 @@ func roleActor(ctx context.Context) *state.RoleActor {
 // withScope declares the scope op requires; see [principal.RequireScope].
 func withScope(op huma.Operation, s scope.Scope) huma.Operation {
 	return principal.RequireScope(op, s)
+}
+
+// audited declares the audit action op records and, when the path names
+// its object, the target kind and the path parameter carrying its ID; see
+// [audit.Declare].
+func audited(op huma.Operation, action, targetKind, targetParam string) huma.Operation {
+	return audit.Declare(op, action, targetKind, targetParam)
 }

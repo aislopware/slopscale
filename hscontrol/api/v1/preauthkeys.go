@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
@@ -87,14 +88,16 @@ type listPreAuthKeysOutput struct {
 }
 
 func registerPreAuthKeys(api huma.API, b Backend) {
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "createPreAuthKey",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/preauthkey",
 		Summary:     "Create pre-auth key",
 		Tags:        []string{"PreAuthKeys"},
 		Security:    bearerAuth,
-	}, scope.AuthKeys), func(_ context.Context, in *createPreAuthKeyInput) (*preAuthKeyOutput, error) {
+	}, scope.AuthKeys), "preauthkey.create", "preauthkey", ""), func(
+		ctx context.Context, in *createPreAuthKeyInput,
+	) (*preAuthKeyOutput, error) {
 		user, err := parsePreAuthKeyUser(in.Body.User)
 		if err != nil {
 			return nil, err
@@ -111,6 +114,8 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 		var expiration time.Time
 		if in.Body.Expiration != nil {
 			expiration = *in.Body.Expiration
+
+			audit.Detail(ctx, "expiration", expiration.Format(time.RFC3339))
 		}
 
 		var userID *types.UserID
@@ -122,13 +127,22 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 			}
 
 			userID = u.TypedID()
+
+			audit.Detail(ctx, "userId", formatID(u.ID))
 		}
+
+		preauthorized := in.Body.Preauthorized == nil || *in.Body.Preauthorized
+
+		audit.Detail(ctx, "reusable", in.Body.Reusable)
+		audit.Detail(ctx, "ephemeral", in.Body.Ephemeral)
+		audit.Detail(ctx, "preauthorized", preauthorized)
+		audit.Detail(ctx, "tags", nonNilTags(in.Body.ACLTags))
 
 		preAuthKey, err := b.State.CreatePreAuthKeyFromSpec(types.PreAuthKeySpec{
 			UserID:        userID,
 			Reusable:      in.Body.Reusable,
 			Ephemeral:     in.Body.Ephemeral,
-			Preauthorized: in.Body.Preauthorized == nil || *in.Body.Preauthorized,
+			Preauthorized: preauthorized,
 			Expiration:    &expiration,
 			Tags:          in.Body.ACLTags,
 		})
@@ -137,24 +151,32 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 			return nil, mapError("creating pre-auth key", err)
 		}
 
+		// The created key has no prefix on hand, so it is named by its id;
+		// the key itself is a secret and never audited.
+		audit.Target(ctx, "", preAuthKey.StringID(), "")
+
 		out := &preAuthKeyOutput{}
 		out.Body.PreAuthKey = preAuthKeyNewToResponse(preAuthKey)
 
 		return out, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "expirePreAuthKey",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/preauthkey/expire",
 		Summary:     "Expire pre-auth key",
 		Tags:        []string{"PreAuthKeys"},
 		Security:    bearerAuth,
-	}, scope.AuthKeys), func(_ context.Context, in *expirePreAuthKeyInput) (*expirePreAuthKeyOutput, error) {
+	}, scope.AuthKeys), "preauthkey.expire", "preauthkey", ""), func(
+		ctx context.Context, in *expirePreAuthKeyInput,
+	) (*expirePreAuthKeyOutput, error) {
 		id, err := parsePreAuthKeyID(in.Body.ID)
 		if err != nil {
 			return nil, err
 		}
+
+		audit.Target(ctx, "", formatID(id), "")
 
 		err = b.State.ExpirePreAuthKey(id)
 		if err != nil {
@@ -165,19 +187,23 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 		return &expirePreAuthKeyOutput{}, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "deletePreAuthKey",
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/preauthkey",
 		Summary:     "Delete pre-auth key",
 		Tags:        []string{"PreAuthKeys"},
 		Security:    bearerAuth,
-	}, scope.AuthKeys), func(_ context.Context, in *deletePreAuthKeyInput) (*deletePreAuthKeyOutput, error) {
+	}, scope.AuthKeys), "preauthkey.delete", "preauthkey", ""), func(
+		ctx context.Context, in *deletePreAuthKeyInput,
+	) (*deletePreAuthKeyOutput, error) {
 		// DELETE has no body: id is bound from the query string.
 		id, err := parsePreAuthKeyID(in.ID)
 		if err != nil {
 			return nil, err
 		}
+
+		audit.Target(ctx, "", formatID(id), "")
 
 		err = b.State.DeletePreAuthKey(id)
 		if err != nil {
