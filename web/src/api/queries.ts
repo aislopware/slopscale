@@ -33,6 +33,7 @@ export type AccessRequest = MethodResponse<
 >["requests"][number];
 export type Dns = MethodResponse<typeof api, "get", "/api/v1/dns">;
 export type Network = MethodResponse<typeof api, "get", "/api/v1/network">["networks"][number];
+export type DnsRule = MethodResponse<typeof api, "get", "/api/v1/dns/rule">["rules"][number];
 export type Webhook = MethodResponse<typeof api, "get", "/api/v1/webhook">["webhooks"][number];
 
 export const nodesQuery = api.queryOptions("get", "/api/v1/node");
@@ -55,6 +56,7 @@ export type AccessRequestOptions = MethodResponse<
   "/api/v1/access-request/options"
 >;
 export const dnsQuery = api.queryOptions("get", "/api/v1/dns");
+export const dnsRulesQuery = api.queryOptions("get", "/api/v1/dns/rule");
 export const networksQuery = api.queryOptions("get", "/api/v1/network");
 export const webhooksQuery = api.queryOptions("get", "/api/v1/webhook");
 
@@ -210,6 +212,7 @@ type Collection =
   | "/api/v1/posture"
   | "/api/v1/access-request"
   | "/api/v1/dns"
+  | "/api/v1/dns/rule"
   | "/api/v1/network"
   | "/api/v1/webhook"
   | "/api/v1/log-stream"

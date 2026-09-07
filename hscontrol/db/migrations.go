@@ -562,6 +562,13 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609140900-network-ports",
 			run: migrateNetworkPorts,
 		},
+		{
+			// Split DNS per group: group_dns_rules hands domains and
+			// nameservers to the machines of some groups. See
+			// docs/ref/dns.md.
+			id:  "202609141000-group-dns-rules",
+			run: migrateGroupDNSRules,
+		},
 	}
 }
 
@@ -1837,4 +1844,57 @@ func migrateNetworkPorts(tx *Tx) error {
 	}
 
 	return nil
+}
+
+// migrateGroupDNSRules (202609141000) creates the group_dns_rules and
+// group_dns_rule_groups tables.
+func migrateGroupDNSRules(tx *Tx) error {
+	return createTables(tx, []tableDefinition{
+		{
+			name: "group_dns_rules",
+			sqlite: `CREATE TABLE group_dns_rules(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  description text,
+  enabled numeric DEFAULT true,
+  domains text NOT NULL,
+  nameservers text NOT NULL,
+  created_at datetime,
+  updated_at datetime
+)`,
+			postgres: `CREATE TABLE group_dns_rules(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  enabled boolean DEFAULT true,
+  domains text NOT NULL,
+  nameservers text NOT NULL,
+  created_at timestamptz,
+  updated_at timestamptz
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_group_dns_rules_name ON group_dns_rules(name)`,
+			},
+		},
+		{
+			name: "group_dns_rule_groups",
+			sqlite: `CREATE TABLE group_dns_rule_groups(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  rule_id integer NOT NULL,
+  group_id integer NOT NULL,
+  CONSTRAINT fk_group_dns_rule_groups_rule FOREIGN KEY(rule_id) REFERENCES group_dns_rules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_dns_rule_groups_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+)`,
+			postgres: `CREATE TABLE group_dns_rule_groups(
+  id bigserial PRIMARY KEY,
+  rule_id bigint NOT NULL,
+  group_id bigint NOT NULL,
+  CONSTRAINT fk_group_dns_rule_groups_rule FOREIGN KEY(rule_id) REFERENCES group_dns_rules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_dns_rule_groups_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_group_dns_rule_groups_rule_group ON group_dns_rule_groups(rule_id, group_id)`,
+			},
+		},
+	})
 }

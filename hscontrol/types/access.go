@@ -209,6 +209,7 @@ type AccessModel struct {
 	Rules    []AccessRule
 	Networks []Network
 	Postures []Posture
+	DNSRules []GroupDNSRule
 }
 
 // NextExpiry returns the earliest rule or membership expiry after the

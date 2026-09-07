@@ -154,6 +154,10 @@ func (s *State) DeleteGroup(id types.GroupID) (change.Change, error) {
 		return change.Change{}, fmt.Errorf("%w: network %s", types.ErrGroupInUse, networkNames(networks))
 	}
 
+	if rules := model.DNSRulesUsingGroup(id); len(rules) > 0 {
+		return change.Change{}, fmt.Errorf("%w: dns rule %s", types.ErrGroupInUse, dnsRuleNames(rules))
+	}
+
 	err := s.db.DeleteGroup(id)
 	if err != nil {
 		return change.Change{}, err

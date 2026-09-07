@@ -85,7 +85,10 @@ client can use is accepted: a nameserver is an IP, an IP with port, or the
 DNS over HTTPS URL of a provider the client knows (Cloudflare, Google, Quad9,
 NextDNS and the like), and extra records are A or AAAA. An extra-records file
 (`dns.extra_records_path`) keeps owning the records while the rest is edited.
-See [DNS](https://headscale.net/development/ref/dns/).
+Split DNS can also be handed to some groups only: a group DNS rule names
+domains, nameservers and the groups whose machines receive them, from the
+console's _DNS_ page, `headscale dns rules` or `/api/v1/dns/rule`. See
+[DNS](https://headscale.net/development/ref/dns/).
 
 ### Groups and access rules
 

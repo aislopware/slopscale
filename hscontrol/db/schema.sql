@@ -351,6 +351,31 @@ CREATE TABLE network_groups(
 );
 CREATE UNIQUE INDEX idx_network_groups_network_group ON network_groups(network_id, group_id);
 
+-- group_dns_rules are split DNS for the machines of some groups only:
+-- queries for the domains go to the nameservers on those machines. See
+-- docs/ref/dns.md. domains and nameservers are JSON arrays of strings.
+CREATE TABLE group_dns_rules(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  description text,
+  enabled numeric DEFAULT true,
+  domains text NOT NULL,
+  nameservers text NOT NULL,
+  created_at datetime,
+  updated_at datetime
+);
+CREATE UNIQUE INDEX idx_group_dns_rules_name ON group_dns_rules(name);
+
+CREATE TABLE group_dns_rule_groups(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  rule_id integer NOT NULL,
+  group_id integer NOT NULL,
+
+  CONSTRAINT fk_group_dns_rule_groups_rule FOREIGN KEY(rule_id) REFERENCES group_dns_rules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_dns_rule_groups_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_group_dns_rule_groups_rule_group ON group_dns_rule_groups(rule_id, group_id);
+
 -- network_route_approvals records the route approvals networks made, so
 -- that withdrawing a network leaves approvals made by hand alone.
 CREATE TABLE network_route_approvals(

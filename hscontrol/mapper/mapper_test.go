@@ -79,6 +79,7 @@ func TestDNSConfigMapResponse(t *testing.T) {
 				},
 				nodeInShared1.View(),
 				nil,
+				nil,
 			)
 
 			if diff := cmp.Diff(tt.want, got, cmpopts.EquateEmpty()); diff != "" {
@@ -137,6 +138,7 @@ func TestNextDNSCapMapRendering(t *testing.T) {
 			mkConfig("https://dns.nextdns.io/abc"),
 			mkNode(),
 			nil,
+			nil,
 		)
 
 		want := "https://dns.nextdns.io/abc?device_ip=100.64.0.1&device_model=linux&device_name=node1"
@@ -156,6 +158,7 @@ func TestNextDNSCapMapRendering(t *testing.T) {
 			mkConfig("https://dns.nextdns.io/global"),
 			mkNode(),
 			capMap,
+			nil,
 		)
 
 		want := "https://dns.nextdns.io/override?device_ip=100.64.0.1&device_model=linux&device_name=node1"
@@ -176,6 +179,7 @@ func TestNextDNSCapMapRendering(t *testing.T) {
 			mkConfig("https://dns.nextdns.io/global"),
 			mkNode(),
 			capMap,
+			nil,
 		)
 
 		want := "https://dns.nextdns.io/abc"
@@ -195,6 +199,7 @@ func TestNextDNSCapMapRendering(t *testing.T) {
 			mkConfig("https://dns.example.org/dns-query"),
 			mkNode(),
 			capMap,
+			nil,
 		)
 
 		want := "https://dns.example.org/dns-query"
@@ -664,6 +669,6 @@ func TestGenerateDNSConfigNilHostinfoNoPanic(t *testing.T) {
 	}
 
 	require.NotPanics(t, func() {
-		generateDNSConfig(cfg, node, nil)
+		generateDNSConfig(cfg, node, nil, nil)
 	}, "generateDNSConfig must not panic when a node has nil Hostinfo")
 }

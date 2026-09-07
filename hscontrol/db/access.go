@@ -230,11 +230,17 @@ func LoadAccessModel(q Querier) (types.AccessModel, error) {
 		return types.AccessModel{}, err
 	}
 
+	dnsRules, err := loadGroupDNSRules(q)
+	if err != nil {
+		return types.AccessModel{}, err
+	}
+
 	model := types.AccessModel{
 		Groups:   make([]types.AccessGroup, 0, len(groups)),
 		Rules:    make([]types.AccessRule, 0, len(rules)),
 		Networks: networks,
 		Postures: postures,
+		DNSRules: dnsRules,
 	}
 
 	groupIdx := make(map[uint64]int, len(groups))

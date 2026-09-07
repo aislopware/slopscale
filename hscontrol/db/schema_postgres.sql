@@ -273,6 +273,28 @@ CREATE TABLE network_groups(
 );
 CREATE UNIQUE INDEX idx_network_groups_network_group ON network_groups(network_id, group_id);
 
+CREATE TABLE group_dns_rules(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  enabled boolean DEFAULT true,
+  domains text NOT NULL,
+  nameservers text NOT NULL,
+  created_at timestamptz,
+  updated_at timestamptz
+);
+CREATE UNIQUE INDEX idx_group_dns_rules_name ON group_dns_rules(name);
+
+CREATE TABLE group_dns_rule_groups(
+  id bigserial PRIMARY KEY,
+  rule_id bigint NOT NULL,
+  group_id bigint NOT NULL,
+
+  CONSTRAINT fk_group_dns_rule_groups_rule FOREIGN KEY(rule_id) REFERENCES group_dns_rules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_dns_rule_groups_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_group_dns_rule_groups_rule_group ON group_dns_rule_groups(rule_id, group_id);
+
 CREATE TABLE network_route_approvals(
   id bigserial PRIMARY KEY,
   node_id bigint NOT NULL,

@@ -180,7 +180,9 @@ func (b *MapResponseBuilder) WithDNSConfig() *MapResponseBuilder {
 		return b
 	}
 
-	b.resp.DNSConfig = generateDNSConfig(b.mapper.cfg, node, b.mapper.state.NodeCapMap(node.ID()))
+	b.resp.DNSConfig = generateDNSConfig(
+		b.mapper.cfg, node, b.mapper.state.NodeCapMap(node.ID()), b.mapper.state.GroupDNSRoutes(node),
+	)
 
 	return b
 }

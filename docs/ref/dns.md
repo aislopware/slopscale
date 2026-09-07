@@ -45,6 +45,23 @@ ControlD and the other entries of Tailscale's `publicdns` list); the client does
 to an arbitrary host, so `tls://` URLs and unknown `https://` URLs are refused. Extra records are `A` or `AAAA`; the
 client serves nothing else.
 
+## Split DNS per group
+
+The split DNS above reaches every machine. A group DNS rule hands domains and nameservers to the machines of some
+[groups](access-control.md) only: a rule names the zones, the resolvers that answer for them and the groups that
+receive it, and the machines in those groups send queries for the zones there, on top of the split DNS everyone
+gets. A machine joining or leaving a group picks the rule up or loses it at once. A domain the tailnet also splits
+keeps the global resolvers first and adds the rule's after them. The nameservers take the same forms as everywhere
+else, and a group a rule names cannot be deleted until the rule drops it.
+
+Rules live on the console's _DNS_ page under _Split DNS per group_, in `headscale dns rules` (`list`, `create`,
+`update`, `delete`) and at `/api/v1/dns/rule` (`GET`, `POST`, `PUT /{id}`, `DELETE /{id}`), gated by the `dns` and
+`dns:read` scopes and logged as `dns.rule.create`, `dns.rule.update` and `dns.rule.delete`:
+
+```console
+$ headscale dns rules create --name "Corp DNS" --domain corp.example.com --nameserver 10.0.0.53 --group 2
+```
+
 ## Setting extra DNS records
 
 Headscale allows to set extra DNS records which are made available via

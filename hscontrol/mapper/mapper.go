@@ -120,6 +120,7 @@ func generateDNSConfig(
 	cfg *types.Config,
 	node types.NodeView,
 	capMap tailcfg.NodeCapMap,
+	groupRoutes map[string][]*dnstype.Resolver,
 ) *tailcfg.DNSConfig {
 	dnsConfig := cfg.CloneTailcfgDNSConfig()
 	if dnsConfig == nil {
@@ -127,6 +128,16 @@ func generateDNSConfig(
 	}
 
 	dnsConfig.CertDomains = node.CertDomains(cfg)
+
+	// The node's groups add split DNS on top of the tailnet's: a domain
+	// both name gets the group's resolvers after the global ones.
+	if len(groupRoutes) > 0 && dnsConfig.Routes == nil {
+		dnsConfig.Routes = make(map[string][]*dnstype.Resolver, len(groupRoutes))
+	}
+
+	for domain, rs := range groupRoutes {
+		dnsConfig.Routes[domain] = append(dnsConfig.Routes[domain], rs...)
+	}
 
 	profile := nextDNSProfileFromCapMap(capMap)
 	if profile != "" {
