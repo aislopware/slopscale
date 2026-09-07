@@ -76,10 +76,21 @@ current [role](roles.md), read on every request:
 Everything the console changes is written to the [audit log](audit.md) with
 the signed-in user as the actor.
 
+## Getting around
+
+The sidebar has two groups. *Network* holds machines, users and keys, and
+*Control* holds access controls, settings and the audit log. A count next
+to _Machines_ and _Users_ says how many are waiting for approval. The arrow
+in the sidebar footer collapses it to an icon rail. *Quick search*, or
+++cmd+k++ / ++ctrl+k++, jumps to any page, machine or user by name. The
+top bar shows breadcrumbs for where you are, the light/dark switch and the
+account menu with *Sign out*.
+
 ## Pages
 
 - **Overview**: counts, machines and users waiting for approval (approve them
-  in place), recently active machines and the approval settings.
+  in place), the machines seen most recently, and a getting-started
+  checklist while the tailnet is empty.
 - **Machines**: every node with its owner or tags, addresses, status and
   routes. Search by name, address, user or tag and filter by status or user.
   Each machine has a detail page with its keys, routes (approve with a switch),
@@ -112,7 +123,8 @@ A binary built without it still serves `/admin/`, with a page saying the
 console is missing, and the API works as usual.
 
 The console lives in `web/`: React with the TanStack router, query and table
-libraries, [Base UI](https://base-ui.com) components and Tailwind CSS, checked
+libraries and Cloudflare's [Kumo](https://kumo-ui.com) design system (Base UI
+components and Tailwind CSS), checked
 by TypeScript, oxlint and oxfmt. Its API types are generated from the server's
 OpenAPI document by `make web-generate` and committed. `bun run dev` in `web/`
 starts a development server that proxies `/api` and `/oidc` to a headscale on

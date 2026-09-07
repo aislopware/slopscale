@@ -8,16 +8,16 @@ it.
 
 ## What an event holds
 
-| Field                         | Meaning                                                                                                                                                                     |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `createdAt`                   | When the request finished.                                                                                                                                                  |
-| `actorKind`                   | How the caller authenticated: `local` (the unix socket, so the CLI on the server), `api_key`, `oauth`, `session` (a console sign-in) or `system` (the server on its own). |
-| `actorUserId`, `actorName`    | The user behind the credential, by ID and by the name it had then. A key without a user records its prefix as the name.                                                     |
-| `action`                      | What happened, dotted and object first: `user.role.set`, `node.delete`, `preauthkey.create`, `policy.set`, `console.login`. A `system` `user.role.set` with `source: oidc.admin_users` is a promotion by configuration. |
-| `targetKind`, `targetId`, `targetName` | The object acted on, copied by value so the entry stays readable after the object is gone.                                                                       |
-| `outcome`                     | The HTTP status the request ended with. A refused request (403, 404, 409) is recorded too; an unauthenticated one (401) is not, since it has no actor.                       |
-| `detail`                      | Action-specific fields: the new role, the routes approved, the tags set, a key's expiry. Never a secret: keys appear as their prefix, the policy as its size.                 |
-| `remoteAddr`                  | The caller's IP address.                                                                                                                                                    |
+| Field                                  | Meaning                                                                                                                                                                                                                 |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `createdAt`                            | When the request finished.                                                                                                                                                                                              |
+| `actorKind`                            | How the caller authenticated: `local` (the unix socket, so the CLI on the server), `api_key`, `oauth`, `session` (a console sign-in) or `system` (the server on its own).                                               |
+| `actorUserId`, `actorName`             | The user behind the credential, by ID and by the name it had then. A key without a user records its prefix as the name.                                                                                                 |
+| `action`                               | What happened, dotted and object first: `user.role.set`, `node.delete`, `preauthkey.create`, `policy.set`, `console.login`. A `system` `user.role.set` with `source: oidc.admin_users` is a promotion by configuration. |
+| `targetKind`, `targetId`, `targetName` | The object acted on, copied by value so the entry stays readable after the object is gone.                                                                                                                              |
+| `outcome`                              | The HTTP status the request ended with. A refused request (403, 404, 409) is recorded too; an unauthenticated one (401) is not, since it has no actor.                                                                  |
+| `detail`                               | Action-specific fields: the new role, the routes approved, the tags set, a key's expiry. Never a secret: keys appear as their prefix, the policy as its size.                                                           |
+| `remoteAddr`                           | The caller's IP address.                                                                                                                                                                                                |
 
 Actions are listed in the OpenAPI document: each writing operation carries
 `x-audit-action`.
