@@ -45,6 +45,20 @@ func (hsdb *HSDatabase) LoadSettings() (types.Settings, error) {
 			target = &settings.UsersApprovalOn
 		case types.SettingPostureIdentityOn:
 			target = &settings.PostureIdentityOn
+		case types.SettingSSHRecorders:
+			err := json.Unmarshal([]byte(r.Setting.Value), &settings.SSHRecorders)
+			if err != nil {
+				return types.Settings{}, fmt.Errorf(
+					"%w: %q holds %q",
+					ErrSettingNotList,
+					r.Setting.Key,
+					r.Setting.Value,
+				)
+			}
+
+			continue
+		case types.SettingSSHRecordingEnforce:
+			target = &settings.SSHRecordingEnforce
 		case types.SettingKeyExpiry:
 			d, err := time.ParseDuration(r.Setting.Value)
 			if err != nil {
@@ -143,6 +157,28 @@ func SaveSetting(q Querier, key types.SettingKey, on bool) error {
 	return saveSettingValue(q, key, strconv.FormatBool(on))
 }
 
+// SaveSSHRecording writes the default session recorders and whether they
+// are enforced.
+func (hsdb *HSDatabase) SaveSSHRecording(recorders []string, enforce bool) error {
+	if recorders == nil {
+		recorders = []string{}
+	}
+
+	list, err := json.Marshal(recorders)
+	if err != nil {
+		return fmt.Errorf("encoding SSH recorders: %w", err)
+	}
+
+	return hsdb.Write(func(tx *Tx) error {
+		err := saveSettingValue(tx, types.SettingSSHRecorders, string(list))
+		if err != nil {
+			return err
+		}
+
+		return SaveSetting(tx, types.SettingSSHRecordingEnforce, enforce)
+	})
+}
+
 // SaveKeyExpiry writes the key expiry cap, inserting its row on first use.
 func (hsdb *HSDatabase) SaveKeyExpiry(d time.Duration) error {
 	return hsdb.Write(func(tx *Tx) error {
@@ -183,4 +219,5 @@ var (
 	// ErrSettingNotDuration is returned when the key expiry row holds
 	// something time.ParseDuration cannot read.
 	ErrSettingNotDuration = errors.New("setting is not a duration")
+	ErrSettingNotList     = errors.New("setting is not a JSON list")
 )

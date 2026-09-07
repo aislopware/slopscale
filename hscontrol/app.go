@@ -31,6 +31,7 @@ import (
 	derpServer "github.com/juanfont/headscale/hscontrol/derp/server"
 	"github.com/juanfont/headscale/hscontrol/dns"
 	"github.com/juanfont/headscale/hscontrol/mapper"
+	"github.com/juanfont/headscale/hscontrol/recorder"
 	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
@@ -83,6 +84,10 @@ type Headscale struct {
 	authProvider   AuthProvider
 	mapBatcher     *mapper.Batcher
 
+	// recorder indexes and serves SSH session recordings; the embedded
+	// recorder node feeds it when cfg.SSHRecording.Enabled.
+	recorder *recorder.Recorder
+
 	clientStreamsOpen sync.WaitGroup
 }
 
@@ -118,6 +123,8 @@ func NewHeadscale(cfg *types.Config) (*Headscale, error) {
 		clientStreamsOpen: sync.WaitGroup{},
 		state:             s,
 	}
+
+	app.recorder = newRecorder(cfg, s, s.NodeByIP)
 
 	if len(cfg.TrustedProxies) > 0 {
 		app.realIPMiddleware, err = trustedProxyRealIP(cfg.TrustedProxies)
@@ -525,6 +532,10 @@ func (h *Headscale) Serve() error {
 		})
 	}
 
+	if h.cfg.SSHRecording.Enabled {
+		errorGroup.Go(func() error { return h.runSSHRecorder(ctx) })
+	}
+
 	// Handle common process-killing signals so we can gracefully shut down:
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc,
@@ -792,9 +803,10 @@ func (h *Headscale) SetExtraRecordsForTest(records []tailcfg.DNSRecord) {
 // console can sign in through the identity provider.
 func (h *Headscale) apiV1Backend() apiv1.Backend {
 	b := apiv1.Backend{
-		State:  h.state,
-		Change: h.Change,
-		Cfg:    h.cfg,
+		State:    h.state,
+		Change:   h.Change,
+		Cfg:      h.cfg,
+		Recorder: h.recorder,
 	}
 
 	if provider, ok := h.authProvider.(*AuthProviderOIDC); ok {

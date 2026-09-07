@@ -577,7 +577,7 @@ func compiledSSHPolicy(
 		return sshPol, nil
 	}
 
-	sshPol, err := pol.compileSSHPolicy("", users, node, nodes)
+	sshPol, err := pol.compileSSHPolicy("", users, node, nodes, SSHRecording{})
 	if err != nil {
 		return nil, err
 	}

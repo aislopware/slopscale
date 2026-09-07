@@ -2283,6 +2283,10 @@ type Policy struct {
 	// country resolves a source address to a country code for the
 	// ip:country posture attribute; nil without a GeoIP database.
 	country func(netip.Addr) string
+
+	// recording is the tailnet's default session recording, attached by
+	// the policy manager; its recorders get a grant of their own.
+	recording SSHRecording
 }
 
 // postureContext is what this compile evaluates postures with.
@@ -3241,6 +3245,65 @@ type SSH struct {
 	Users        SSHUsers        `json:"users"`
 	CheckPeriod  *SSHCheckPeriod `json:"checkPeriod,omitempty"`
 	AcceptEnv    []string        `json:"acceptEnv,omitempty"`
+	// Recorder names the session recorders the sessions this rule admits
+	// are streamed to; empty means the tailnet's default recorders. See
+	// docs/ref/ssh-recording.md.
+	Recorder SSHRecorderAliases `json:"recorder,omitempty"`
+	// EnforceRecorder rejects the session when no recorder is reachable
+	// and ends it when the recording breaks; otherwise the session goes
+	// on unrecorded and the failure is logged.
+	EnforceRecorder bool `json:"enforceRecorder,omitempty"`
+}
+
+// SSHRecorderAliases is what an [SSH] rule's recorder may name: tags,
+// hosts and addresses, since a recorder is a node or something reachable
+// through one.
+type SSHRecorderAliases []Alias
+
+// ErrSSHRecorderAliasNotSupported is returned for a recorder that is
+// not a tag, a host or an address.
+var ErrSSHRecorderAliasNotSupported = errors.New("SSH recorder must be a tag, a host or an address")
+
+// UnmarshalJSON parses the aliases and refuses the kinds a recorder
+// cannot be.
+func (a *SSHRecorderAliases) UnmarshalJSON(b []byte) error {
+	var aliases []AliasEnc
+
+	err := json.Unmarshal(b, &aliases, policyJSONOpts...)
+	if err != nil {
+		return fmt.Errorf("unmarshaling SSH recorder aliases: %w", err)
+	}
+
+	*a = make([]Alias, len(aliases))
+	for i, alias := range aliases {
+		switch alias.Alias.(type) {
+		case *Tag, *Host, *Prefix:
+			(*a)[i] = alias.Alias
+		default:
+			return fmt.Errorf("%w: %q", ErrSSHRecorderAliasNotSupported, alias.String())
+		}
+	}
+
+	return nil
+}
+
+// MarshalJSON renders the aliases as strings.
+func (a SSHRecorderAliases) MarshalJSON() ([]byte, error) {
+	if a == nil {
+		return []byte("[]"), nil
+	}
+
+	aliases := make([]string, len(a))
+	for i, alias := range a {
+		aliases[i] = alias.String()
+	}
+
+	b, err := json.Marshal(aliases)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling SSH recorder aliases: %w", err)
+	}
+
+	return b, nil
 }
 
 // SSHSrcAliases is a list of aliases that can be used as sources in an [SSH] rule.

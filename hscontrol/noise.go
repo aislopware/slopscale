@@ -174,6 +174,10 @@ func (h *Headscale) NoiseUpgradeHandler(
 		// SSH Check mode endpoint, consulted to validate if a given SSH connection should be accepted or rejected.
 		r.Get("/ssh/action/{src_node_id}/to/{dst_node_id}", ns.SSHActionHandler)
 
+		// A [tailcfg.SSHEventNotifyRequest]: the client reports that a
+		// session recording could not start or broke off.
+		r.Post("/ssh/event", ns.SSHEventHandler)
+
 		// Not implemented yet
 		//
 		// /whoami is a debug endpoint to validate that the client can communicate over the connection,
@@ -626,6 +630,10 @@ func (ns *noiseServer) sshAction(
 		AllowLocalPortForwarding:  true,
 		AllowRemotePortForwarding: true,
 	}
+
+	// The final action replaces the rule's, so it carries the
+	// recorders the rule would have.
+	action.Recorders, action.OnRecordingFailure = ns.headscale.state.SSHRecordingFor(srcNodeID, dstNodeID)
 
 	// Look up check params from the server's own policy rather than
 	// trusting URL parameters, which the client could tamper with.

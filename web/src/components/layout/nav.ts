@@ -10,6 +10,7 @@ import {
   PathIcon,
   ShieldCheckIcon,
   SquaresFourIcon,
+  TerminalWindowIcon,
   UsersIcon,
 } from "@phosphor-icons/react";
 
@@ -27,7 +28,8 @@ export type NavPath =
   | "/networks"
   | "/webhooks"
   | "/settings"
-  | "/audit";
+  | "/audit"
+  | "/sessions";
 
 export interface NavItem {
   readonly to: NavPath;
@@ -79,6 +81,12 @@ export const navGroups: readonly NavGroup[] = [
         to: "/audit",
         label: "Audit log",
         icon: ClockCounterClockwiseIcon,
+        scope: "logs:configuration:read",
+      },
+      {
+        to: "/sessions",
+        label: "SSH sessions",
+        icon: TerminalWindowIcon,
         scope: "logs:configuration:read",
       },
     ],

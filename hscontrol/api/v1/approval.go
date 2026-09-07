@@ -34,6 +34,15 @@ type Settings struct {
 	// DefaultKeyExpiryDays is the config file's node.expiry, applied when
 	// a client asks for nothing and no cap is set; 0 means never.
 	DefaultKeyExpiryDays int `json:"defaultKeyExpiryDays"`
+	// SSHRecorders are the session recorders every SSH rule without its
+	// own streams to, as policy aliases: tags, hosts or addresses.
+	SSHRecorders []string `json:"sshRecorders" nullable:"false"`
+	// SSHRecordingEnforce refuses a session no default recorder can take.
+	SSHRecordingEnforce bool `json:"sshRecordingEnforce"`
+	// EmbeddedRecorder reports whether the server runs its own recorder
+	// node, which is always a default recorder; see ssh_recording in the
+	// configuration.
+	EmbeddedRecorder bool `json:"embeddedRecorder"`
 }
 
 // UpdateSettingsRequestBody carries the switches to change; absent ones
@@ -44,6 +53,10 @@ type UpdateSettingsRequestBody struct {
 	PostureIdentityOn *bool `json:"postureIdentityOn,omitempty"`
 	// KeyExpiryDays 0 switches the cap off.
 	KeyExpiryDays *int `json:"keyExpiryDays,omitempty" maximum:"365" minimum:"0"`
+	// SSHRecorders replaces the default recorders; an empty list clears
+	// them. SSHRecordingEnforce is applied alongside when given.
+	SSHRecorders        *[]string `json:"sshRecorders,omitempty"`
+	SSHRecordingEnforce *bool     `json:"sshRecordingEnforce,omitempty"`
 }
 
 type (
@@ -74,14 +87,17 @@ const day = 24 * time.Hour
 
 func settingsFrom(s types.Settings, cfg *types.Config) Settings {
 	out := Settings{
-		DevicesApprovalOn: s.DevicesApprovalOn,
-		UsersApprovalOn:   s.UsersApprovalOn,
-		PostureIdentityOn: s.PostureIdentityOn,
-		KeyExpiryDays:     int(s.KeyExpiry / day),
+		DevicesApprovalOn:   s.DevicesApprovalOn,
+		UsersApprovalOn:     s.UsersApprovalOn,
+		PostureIdentityOn:   s.PostureIdentityOn,
+		KeyExpiryDays:       int(s.KeyExpiry / day),
+		SSHRecorders:        append([]string{}, s.SSHRecorders...),
+		SSHRecordingEnforce: s.SSHRecordingEnforce,
 	}
 
 	if cfg != nil {
 		out.DefaultKeyExpiryDays = int(cfg.Node.Expiry / day)
+		out.EmbeddedRecorder = cfg.SSHRecording.Enabled
 	}
 
 	return out
@@ -194,6 +210,30 @@ func registerApproval(api huma.API, b Backend) {
 			}
 
 			audit.Detail(ctx, string(types.SettingKeyExpiry), *in.Body.KeyExpiryDays)
+		}
+
+		if in.Body.SSHRecorders != nil || in.Body.SSHRecordingEnforce != nil {
+			current := b.State.Settings()
+			recorders := current.SSHRecorders
+
+			if in.Body.SSHRecorders != nil {
+				recorders = *in.Body.SSHRecorders
+			}
+
+			enforce := current.SSHRecordingEnforce
+			if in.Body.SSHRecordingEnforce != nil {
+				enforce = *in.Body.SSHRecordingEnforce
+			}
+
+			c, err := b.State.SetSSHRecording(recorders, enforce)
+			if err != nil {
+				return nil, mapError("updating settings", err)
+			}
+
+			audit.Detail(ctx, string(types.SettingSSHRecorders), recorders)
+			audit.Detail(ctx, string(types.SettingSSHRecordingEnforce), enforce)
+
+			b.Change(c)
 		}
 
 		return &settingsOutput{Body: settingsFrom(b.State.Settings(), b.Cfg)}, nil

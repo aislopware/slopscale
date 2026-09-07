@@ -73,6 +73,10 @@ type PolicyManager struct {
 	// Lazy map of SSH policies
 	sshPolicyMap *xsync.Map[types.NodeID, *tailcfg.SSHPolicy]
 
+	// sshRecording is the tailnet's default session recording; see
+	// [PolicyManager.SetSSHRecording].
+	sshRecording SSHRecording
+
 	// compiledGrants are the grants with sources pre-resolved.
 	// The single source of truth for filter compilation. Both
 	// global and per-node filter rules are derived from these.
@@ -330,7 +334,7 @@ func (pm *PolicyManager) SSHPolicy(baseURL string, node types.NodeView) (*tailcf
 		return sshPol, nil
 	}
 
-	sshPol, err := pm.pol.compileSSHPolicy(baseURL, pm.users, node, pm.nodes)
+	sshPol, err := pm.pol.compileSSHPolicy(baseURL, pm.users, node, pm.nodes, pm.sshRecording)
 	if err != nil {
 		return nil, fmt.Errorf("compiling SSH policy: %w", err)
 	}
@@ -371,6 +375,59 @@ func (pm *PolicyManager) SSHCheckParams(
 	}
 
 	return 0, false
+}
+
+// SetSSHRecording replaces the tailnet's default session recording and
+// drops the cached SSH policies so the next map carries it.
+func (pm *PolicyManager) SetSSHRecording(recording SSHRecording) (bool, error) {
+	if pm == nil {
+		return false, nil
+	}
+
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	pm.sshRecording = recording
+	pm.sshPolicyMap.Clear()
+
+	// The filter changes too: every node may reach a recorder on its
+	// port, so the recorders' grant is part of the compile.
+	return pm.updateLocked()
+}
+
+// SSHRecordingFor returns the recorders and failure action for the
+// session a check-mode rule admits between src and dst, so the final
+// action control returns carries them like the accept action would. Nil
+// when no rule matches or the rule records nothing.
+func (pm *PolicyManager) SSHRecordingFor(
+	baseURL string, srcNodeID, dstNodeID types.NodeID,
+) ([]netip.AddrPort, *tailcfg.SSHRecorderFailureAction) {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	if pm.pol == nil || len(pm.pol.SSHs) == 0 {
+		return nil, nil
+	}
+
+	srcNode, dstNode := pm.findNodePairLocked(srcNodeID, dstNodeID)
+	if !srcNode.Valid() || !dstNode.Valid() {
+		return nil, nil
+	}
+
+	for _, rule := range pm.pol.SSHs {
+		if _, ok := pm.sshCheckPeriodForRule(rule, srcNode, dstNode); !ok {
+			continue
+		}
+
+		recorders, enforce := pm.pol.recordersFor(rule, pm.sshRecording, pm.users, pm.nodes)
+		if len(recorders) == 0 {
+			return nil, nil
+		}
+
+		return recorders, recordingFailure(baseURL, enforce)
+	}
+
+	return nil, nil
 }
 
 func (pm *PolicyManager) SetPolicy(polB []byte) (bool, error) {
@@ -1564,6 +1621,7 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 	if pm.pol != nil {
 		pm.pol.access = pm.access
 		pm.pol.country = pm.country
+		pm.pol.recording = pm.sshRecording
 	}
 
 	pm.usesSourceAddress = pm.pol.usesSourceAddress()

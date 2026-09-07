@@ -475,3 +475,25 @@ CREATE TABLE log_streams(
   delivered integer NOT NULL DEFAULT 0,
   dropped integer NOT NULL DEFAULT 0
 );
+
+-- ssh_recordings are the sessions the embedded recorder took; see
+-- docs/ref/ssh-recording.md. path is the asciinema file relative to
+-- ssh_recording.dir; dst_node_id has no foreign key so a recording
+-- outlives its node.
+CREATE TABLE ssh_recordings(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  started_at datetime NOT NULL,
+  ended_at datetime,
+  src_node text,
+  src_node_id text,
+  src_user text,
+  dst_node_id integer,
+  dst_node text,
+  ssh_user text,
+  local_user text,
+  command text,
+  size integer NOT NULL DEFAULT 0,
+  path text NOT NULL,
+  complete boolean NOT NULL DEFAULT false
+);
+CREATE INDEX idx_ssh_recordings_started ON ssh_recordings(started_at);

@@ -182,6 +182,9 @@ type Config struct {
 	// SMTP is the mail server email webhooks send through.
 	SMTP SMTPConfig
 
+	// SSHRecording is the embedded session recorder.
+	SSHRecording SSHRecordingConfig
+
 	Tuning Tuning
 }
 
@@ -410,6 +413,15 @@ func smtpConfig() (SMTPConfig, error) {
 
 var errSMTPFrom = errors.New("notifications.smtp.from is required when notifications.smtp.host is set")
 
+func sshRecordingConfig() SSHRecordingConfig {
+	return SSHRecordingConfig{
+		Enabled:   viper.GetBool("ssh_recording.enabled"),
+		Dir:       util.AbsolutePathFromConfigPath(viper.GetString("ssh_recording.dir")),
+		StateDir:  util.AbsolutePathFromConfigPath(viper.GetString("ssh_recording.state_dir")),
+		Retention: viper.GetDuration("ssh_recording.retention"),
+	}
+}
+
 // Tuning contains advanced performance tuning parameters for Headscale.
 // These settings control internal batching, timeouts, and resource allocation.
 // The defaults are carefully chosen for typical deployments and should rarely
@@ -549,6 +561,10 @@ func LoadConfig(path string, isFile bool) error {
 	viper.SetDefault("policy.mode", "file")
 
 	viper.SetDefault("notifications.smtp.port", 587)
+
+	viper.SetDefault("ssh_recording.enabled", false)
+	viper.SetDefault("ssh_recording.dir", "/var/lib/headscale/recordings")
+	viper.SetDefault("ssh_recording.state_dir", "/var/lib/headscale/recorder")
 	viper.SetDefault("notifications.smtp.encryption", string(SMTPStartTLS))
 
 	viper.SetDefault("tls_letsencrypt_cache_dir", "/var/www/.cache")
@@ -1240,6 +1256,49 @@ func LoadCLIConfig() (*Config, error) {
 	}, nil
 }
 
+// oidcConfig reads the identity provider settings; the client secret
+// comes from the file at oidc.client_secret_path when one is set.
+func oidcConfig() (OIDCConfig, error) {
+	clientSecret := viper.GetString("oidc.client_secret")
+
+	clientSecretPath := viper.GetString("oidc.client_secret_path")
+	if clientSecretPath != "" && clientSecret != "" {
+		return OIDCConfig{}, errOidcMutuallyExclusive
+	}
+
+	if clientSecretPath != "" {
+		secretPath := os.ExpandEnv(clientSecretPath)
+
+		secretBytes, err := os.ReadFile(secretPath)
+		if err != nil {
+			return OIDCConfig{}, fmt.Errorf("reading OIDC client secret from %q: %w", secretPath, err)
+		}
+
+		clientSecret = strings.TrimSpace(string(secretBytes))
+	}
+
+	return OIDCConfig{
+		OnlyStartIfOIDCIsAvailable: viper.GetBool(
+			"oidc.only_start_if_oidc_is_available",
+		),
+		Issuer:                viper.GetString("oidc.issuer"),
+		ClientID:              viper.GetString("oidc.client_id"),
+		ClientSecret:          clientSecret,
+		Scope:                 viper.GetStringSlice("oidc.scope"),
+		ExtraParams:           viper.GetStringMapString("oidc.extra_params"),
+		AllowedDomains:        viper.GetStringSlice("oidc.allowed_domains"),
+		AllowedUsers:          viper.GetStringSlice("oidc.allowed_users"),
+		AllowedGroups:         viper.GetStringSlice("oidc.allowed_groups"),
+		AdminUsers:            viper.GetStringSlice("oidc.admin_users"),
+		EmailVerifiedRequired: viper.GetBool("oidc.email_verified_required"),
+		UseExpiryFromToken:    viper.GetBool("oidc.use_expiry_from_token"),
+		PKCE: PKCEConfig{
+			Enabled: viper.GetBool("oidc.pkce.enabled"),
+			Method:  viper.GetString("oidc.pkce.method"),
+		},
+	}, nil
+}
+
 // LoadServerConfig returns the full Headscale configuration to
 // host a Headscale server. This is called as part of `headscale serve`.
 //
@@ -1325,22 +1384,9 @@ func LoadServerConfig() (*Config, error) {
 		return nil, err
 	}
 
-	oidcClientSecret := viper.GetString("oidc.client_secret")
-
-	oidcClientSecretPath := viper.GetString("oidc.client_secret_path")
-	if oidcClientSecretPath != "" && oidcClientSecret != "" {
-		return nil, errOidcMutuallyExclusive
-	}
-
-	if oidcClientSecretPath != "" {
-		secretPath := os.ExpandEnv(oidcClientSecretPath)
-
-		secretBytes, err := os.ReadFile(secretPath)
-		if err != nil {
-			return nil, fmt.Errorf("reading OIDC client secret from %q: %w", secretPath, err)
-		}
-
-		oidcClientSecret = strings.TrimSpace(string(secretBytes))
+	oidcCfg, err := oidcConfig()
+	if err != nil {
+		return nil, err
 	}
 
 	serverURL := viper.GetString("server_url")
@@ -1411,26 +1457,7 @@ func LoadServerConfig() (*Config, error) {
 		UnixSocket:           viper.GetString("unix_socket"),
 		UnixSocketPermission: util.GetFileMode("unix_socket_permission"),
 
-		OIDC: OIDCConfig{
-			OnlyStartIfOIDCIsAvailable: viper.GetBool(
-				"oidc.only_start_if_oidc_is_available",
-			),
-			Issuer:                viper.GetString("oidc.issuer"),
-			ClientID:              viper.GetString("oidc.client_id"),
-			ClientSecret:          oidcClientSecret,
-			Scope:                 viper.GetStringSlice("oidc.scope"),
-			ExtraParams:           viper.GetStringMapString("oidc.extra_params"),
-			AllowedDomains:        viper.GetStringSlice("oidc.allowed_domains"),
-			AllowedUsers:          viper.GetStringSlice("oidc.allowed_users"),
-			AllowedGroups:         viper.GetStringSlice("oidc.allowed_groups"),
-			AdminUsers:            viper.GetStringSlice("oidc.admin_users"),
-			EmailVerifiedRequired: viper.GetBool("oidc.email_verified_required"),
-			UseExpiryFromToken:    viper.GetBool("oidc.use_expiry_from_token"),
-			PKCE: PKCEConfig{
-				Enabled: viper.GetBool("oidc.pkce.enabled"),
-				Method:  viper.GetString("oidc.pkce.method"),
-			},
-		},
+		OIDC: oidcCfg,
 
 		LogTail: logTailConfig,
 		Taildrop: TaildropConfig{
@@ -1443,6 +1470,8 @@ func LoadServerConfig() (*Config, error) {
 		Policy: policyConfig(),
 
 		SMTP: smtp,
+
+		SSHRecording: sshRecordingConfig(),
 
 		CLI: CLIConfig{
 			Address:  viper.GetString("cli.address"),

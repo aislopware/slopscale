@@ -300,6 +300,21 @@ policy:
 #     # none for a relay on localhost.
 #     encryption: starttls
 
+## SSH session recording
+#
+# Run a session recorder inside the server. It joins the tailnet as
+# `headscale-recorder` (tag:headscale-recorder) and records every session
+# that Tailscale SSH admits, unless a rule names another recorder; see
+# https://headscale.net/development/ref/ssh-recording/.
+# ssh_recording:
+#   enabled: false
+#   # One asciinema file per session.
+#   dir: /var/lib/headscale/recordings
+#   # The recorder node's keys.
+#   state_dir: /var/lib/headscale/recorder
+#   # Delete recordings older than this; unset keeps them.
+#   retention: 2160h
+
 ## DNS
 #
 # headscale supports Tailscale's DNS configuration and MagicDNS.

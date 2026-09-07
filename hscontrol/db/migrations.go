@@ -549,6 +549,13 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609120900-log-streams",
 			run: migrateLogStreams,
 		},
+		{
+			// SSH session recording: ssh_recordings records the
+			// sessions the embedded recorder took. See
+			// docs/ref/ssh-recording.md.
+			id:  "202609130900-ssh-recordings",
+			run: migrateSSHRecordings,
+		},
 	}
 }
 
@@ -1759,6 +1766,50 @@ func migrateLogStreams(tx *Tx) error {
   delivered bigint NOT NULL DEFAULT 0,
   dropped bigint NOT NULL DEFAULT 0
 )`,
+		},
+	})
+}
+
+// migrateSSHRecordings (202609130900) creates the ssh_recordings table.
+func migrateSSHRecordings(tx *Tx) error {
+	return createTables(tx, []tableDefinition{
+		{
+			name: "ssh_recordings",
+			sqlite: `CREATE TABLE ssh_recordings(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  started_at datetime NOT NULL,
+  ended_at datetime,
+  src_node text,
+  src_node_id text,
+  src_user text,
+  dst_node_id integer,
+  dst_node text,
+  ssh_user text,
+  local_user text,
+  command text,
+  size integer NOT NULL DEFAULT 0,
+  path text NOT NULL,
+  complete boolean NOT NULL DEFAULT false
+)`,
+			postgres: `CREATE TABLE ssh_recordings(
+  id bigserial PRIMARY KEY,
+  started_at timestamptz NOT NULL,
+  ended_at timestamptz,
+  src_node text,
+  src_node_id text,
+  src_user text,
+  dst_node_id bigint,
+  dst_node text,
+  ssh_user text,
+  local_user text,
+  command text,
+  size bigint NOT NULL DEFAULT 0,
+  path text NOT NULL,
+  complete boolean NOT NULL DEFAULT false
+)`,
+			indexes: []string{
+				`CREATE INDEX idx_ssh_recordings_started ON ssh_recordings(started_at)`,
+			},
 		},
 	})
 }

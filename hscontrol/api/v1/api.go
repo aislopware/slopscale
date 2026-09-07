@@ -17,6 +17,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/juanfont/headscale/hscontrol/api/principal"
 	"github.com/juanfont/headscale/hscontrol/audit"
+	"github.com/juanfont/headscale/hscontrol/recorder"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -34,6 +35,9 @@ type Backend struct {
 	// ConsoleLogin describes sign-in through the identity provider for
 	// the admin console; nil when the server has no OIDC provider.
 	ConsoleLogin *ConsoleLogin
+
+	// Recorder indexes and serves SSH session recordings.
+	Recorder *recorder.Recorder
 }
 
 // ConsoleLogin is how the console starts a sign-in through the identity

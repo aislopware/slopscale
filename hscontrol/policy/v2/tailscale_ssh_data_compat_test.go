@@ -183,6 +183,7 @@ func TestSSHDataCompat(t *testing.T) {
 						users,
 						node.View(),
 						nodes.ViewSlice(),
+						SSHRecording{},
 					)
 					require.NoError(
 						t,

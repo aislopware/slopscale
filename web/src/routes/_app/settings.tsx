@@ -8,6 +8,7 @@ import { ApprovalSection, DeviceTrustSection } from "~/components/settings/appro
 import { KeyExpirySection } from "~/components/settings/key-expiry-section.tsx";
 import { ServerSection } from "~/components/settings/server-section.tsx";
 import { SessionSection } from "~/components/settings/session-section.tsx";
+import { SSHRecordingSection } from "~/components/settings/ssh-recording-section.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/settings")({
@@ -36,6 +37,7 @@ function SettingsPage(): ReactElement {
         <ApprovalSection settings={settings} canEdit={canEdit} />
         <DeviceTrustSection settings={settings} canEdit={canEdit} />
         <KeyExpirySection settings={settings} canEdit={canEdit} />
+        <SSHRecordingSection settings={settings} canEdit={canEdit} />
         <SessionSection me={me} />
         <ServerSection info={info} />
       </div>

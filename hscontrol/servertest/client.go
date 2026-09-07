@@ -186,8 +186,11 @@ func newTestClient(tb testing.TB, server *TestServer, name, hostname, authKey st
 	dialer.SetBus(bus)
 
 	// Route all connections through the server's in-memory network
-	// so that no real TCP sockets are used.
-	dialer.SetSystemDialerForTest(server.MemNet().Dial)
+	// so that no real TCP sockets are used, unless the server listens
+	// on a real port.
+	if !server.realListener {
+		dialer.SetSystemDialerForTest(server.MemNet().Dial)
+	}
 
 	machineKey := key.NewMachine()
 

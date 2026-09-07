@@ -30,6 +30,14 @@ type PolicyManager interface {
 	// SSHCheckParams resolves the SSH check period for a (src, dst) pair
 	// from the current policy, avoiding trust of client-provided URL params.
 	SSHCheckParams(srcNodeID, dstNodeID types.NodeID) (time.Duration, bool)
+	// SSHRecordingFor returns the recorders and failure action for the
+	// check-mode session between src and dst; nil when none records.
+	SSHRecordingFor(
+		baseURL string,
+		srcNodeID, dstNodeID types.NodeID,
+	) ([]netip.AddrPort, *tailcfg.SSHRecorderFailureAction)
+	// SetSSHRecording replaces the tailnet's default session recording.
+	SetSSHRecording(recording policyv2.SSHRecording) (bool, error)
 	SetPolicy(pol []byte) (bool, error)
 	// SetCountryLookup installs the GeoIP lookup for ip:country postures.
 	SetCountryLookup(lookup func(netip.Addr) string) (bool, error)

@@ -27,6 +27,14 @@ const (
 	// Tailscale's postureIdentityCollectionOn does. Off, nothing is
 	// asked and node:serialNumber is never set.
 	SettingPostureIdentityOn SettingKey = "posture_identity_on"
+	// SettingSSHRecorders is the JSON list of recorder aliases every SSH
+	// rule without its own recorder streams sessions to; see
+	// docs/ref/ssh-recording.md.
+	SettingSSHRecorders SettingKey = "ssh_recorders"
+	// SettingSSHRecordingEnforce rejects a session when none of the
+	// default recorders is reachable, instead of letting it go on
+	// unrecorded.
+	SettingSSHRecordingEnforce SettingKey = "ssh_recording_enforce"
 )
 
 // Key expiry bounds: a cap shorter than an hour would log nodes out
@@ -57,4 +65,10 @@ type Settings struct {
 	PostureIdentityOn bool
 	// KeyExpiry is the tailnet's key expiry cap; zero means off.
 	KeyExpiry time.Duration
+	// SSHRecorders is the tailnet's default session recorders, as
+	// policy aliases (tags, hosts, addresses).
+	SSHRecorders []string
+	// SSHRecordingEnforce refuses SSH sessions no default recorder can
+	// take.
+	SSHRecordingEnforce bool
 }

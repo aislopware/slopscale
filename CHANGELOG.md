@@ -209,6 +209,28 @@ _Log streams_ tab on the console's _Integrations_ page (formerly _Webhooks_)
 cover it. See [Log streaming](https://headscale.net/development/ref/log-streaming/)
 and [Webhooks](https://headscale.net/development/ref/webhooks/#notifications).
 
+### SSH session recording
+
+Tailscale SSH sessions can be recorded, the way Tailscale's session
+recording works. `ssh_recording.enabled` in the config file runs a recorder
+inside the server: it joins the tailnet as `headscale-recorder`
+(`tag:headscale-recorder`), takes the upload every machine's client sends
+when a session starts, stores one asciinema file per session under
+`ssh_recording.dir`, and deletes them after `ssh_recording.retention`. The
+tailnet default recorders are a setting (`headscale settings set
+--ssh-recorders tag:recorder`, `sshRecorders` in `/api/v1/settings`, the
+_SSH session recording_ section of the console's _Settings_ page), an SSH
+rule may name its own with `recorder` and require it with
+`enforceRecorder`, and the tailnet-wide `sshRecordingEnforce` switch
+rejects sessions that cannot be recorded. The policy needs no rule for a
+recorder: the server adds a grant to every recorder's port. A client
+reports a failed recording to `/machine/ssh/event`, which lands in the
+audit log as `ssh.recording.*` and fires the `sshRecordingFailed` webhook
+event. Recordings are listed, downloaded and deleted from the console's _SSH
+sessions_ page, `headscale ssh-recordings` and `/api/v1/ssh-recording`
+under the `logs:configuration` scopes. See [SSH session
+recording](https://headscale.net/development/ref/ssh-recording/).
+
 ### Networks
 
 Subnets and exit nodes can now be handed to groups as networks, the way

@@ -48,6 +48,7 @@ show the rest, newest first.
 | `accessRequestCreated`  | A user asked to join a group for a while; see [Temporary access](temporary-access.md). |
 | `accessRequestApproved` | An approver granted the request and the membership was added.                          |
 | `accessRequestDenied`   | An approver turned the request down.                                                   |
+| `sshRecordingFailed`    | An SSH session could not be recorded; see [SSH session recording](ssh-recording.md).   |
 
 `GET /api/v1/webhook/event-types` and `headscale webhooks event-types` list
 them. The `test` event goes to every endpoint on request and needs no
@@ -86,6 +87,9 @@ or `tagged-devices`), `url` (the console page) and, when the key expires,
 `expiration`; `addresses` and `tags` are extra. User events carry `user`,
 `url` and `userID`, plus `displayName` when set; `userRoleUpdated` adds
 `oldRoles`, `newRoles` and `actor`. `policyUpdate` has no data.
+`sshRecordingFailed` carries the node fields of the machine logged into
+plus `event` (`rejected`, `terminated` or `failed`), `srcNode`, `sshUser`,
+`localUser` and the recorders tried as `attempts`.
 
 A failed delivery is retried three times, after 2, 10 and 30 seconds, when
 the receiver answered with a 5xx or 429 or did not answer at all. A 4xx is

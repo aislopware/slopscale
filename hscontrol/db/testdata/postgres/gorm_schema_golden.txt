@@ -188,6 +188,20 @@ COL sessions.last_seen_at timestamp with time zone null=YES
 COL settings.key text null=NO
 COL settings.value text null=YES
 COL settings.updated_at timestamp with time zone null=YES
+COL ssh_recordings.id bigint null=NO default=nextval('ssh_recordings_id_seq'::regclass)
+COL ssh_recordings.started_at timestamp with time zone null=NO
+COL ssh_recordings.ended_at timestamp with time zone null=YES
+COL ssh_recordings.src_node text null=YES
+COL ssh_recordings.src_node_id text null=YES
+COL ssh_recordings.src_user text null=YES
+COL ssh_recordings.dst_node_id bigint null=YES
+COL ssh_recordings.dst_node text null=YES
+COL ssh_recordings.ssh_user text null=YES
+COL ssh_recordings.local_user text null=YES
+COL ssh_recordings.command text null=YES
+COL ssh_recordings.size bigint null=NO default=0
+COL ssh_recordings.path text null=NO
+COL ssh_recordings.complete boolean null=NO default=false
 COL users.id bigint null=NO default=nextval('users_id_seq'::regclass)
 COL users.created_at timestamp with time zone null=YES
 COL users.updated_at timestamp with time zone null=YES
@@ -223,6 +237,7 @@ IDX CREATE INDEX idx_access_requests_status ON public.access_requests USING btre
 IDX CREATE INDEX idx_audit_events_actor_user_id ON public.audit_events USING btree (actor_user_id)
 IDX CREATE INDEX idx_audit_events_created_at ON public.audit_events USING btree (created_at)
 IDX CREATE INDEX idx_policies_deleted_at ON public.policies USING btree (deleted_at)
+IDX CREATE INDEX idx_ssh_recordings_started ON public.ssh_recordings USING btree (started_at)
 IDX CREATE INDEX idx_users_deleted_at ON public.users USING btree (deleted_at)
 IDX CREATE INDEX idx_webhook_deliveries_webhook ON public.webhook_deliveries USING btree (webhook_id, id)
 IDX CREATE UNIQUE INDEX access_requests_pkey ON public.access_requests USING btree (id)
@@ -273,6 +288,7 @@ IDX CREATE UNIQUE INDEX postures_pkey ON public.postures USING btree (id)
 IDX CREATE UNIQUE INDEX pre_auth_keys_pkey ON public.pre_auth_keys USING btree (id)
 IDX CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (id)
 IDX CREATE UNIQUE INDEX settings_pkey ON public.settings USING btree (key)
+IDX CREATE UNIQUE INDEX ssh_recordings_pkey ON public.ssh_recordings USING btree (id)
 IDX CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)
 IDX CREATE UNIQUE INDEX webhook_deliveries_pkey ON public.webhook_deliveries USING btree (id)
 IDX CREATE UNIQUE INDEX webhooks_pkey ON public.webhooks USING btree (id)
@@ -399,6 +415,12 @@ CON sessions sessions_token_hash_not_null NOT NULL token_hash
 CON sessions sessions_user_id_not_null NOT NULL user_id
 CON settings settings_key_not_null NOT NULL key
 CON settings settings_pkey PRIMARY KEY (key)
+CON ssh_recordings ssh_recordings_complete_not_null NOT NULL complete
+CON ssh_recordings ssh_recordings_id_not_null NOT NULL id
+CON ssh_recordings ssh_recordings_path_not_null NOT NULL path
+CON ssh_recordings ssh_recordings_pkey PRIMARY KEY (id)
+CON ssh_recordings ssh_recordings_size_not_null NOT NULL size
+CON ssh_recordings ssh_recordings_started_at_not_null NOT NULL started_at
 CON users users_id_not_null NOT NULL id
 CON users users_pkey PRIMARY KEY (id)
 CON webhook_deliveries fk_webhook_deliveries_webhook FOREIGN KEY (webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE

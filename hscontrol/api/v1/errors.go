@@ -33,7 +33,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrPostureNotFound),
 		errors.Is(err, types.ErrAccessRequestNotFound),
 		errors.Is(err, types.ErrWebhookNotFound),
-		errors.Is(err, types.ErrLogStreamNotFound):
+		errors.Is(err, types.ErrLogStreamNotFound),
+		errors.Is(err, types.ErrSSHRecordingNotFound):
 		return huma.Error404NotFound(msg, err)
 
 	case errors.Is(err, state.ErrGivenNameInvalid),
@@ -81,6 +82,7 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrLogStreamDestinationUnknown),
 		errors.Is(err, types.ErrLogStreamTokenRequired),
 		errors.Is(err, types.ErrLogStreamTokenLong),
+		errors.Is(err, types.ErrSSHRecorderInvalid),
 		errors.Is(err, types.ErrPostureNameEmpty),
 		errors.Is(err, types.ErrPostureNameTooLong),
 		errors.Is(err, types.ErrPostureNameInvalid),

@@ -158,6 +158,46 @@ export function auditQuery(
   });
 }
 
+export type SSHRecordingPage = MethodResponse<typeof api, "get", "/api/v1/ssh-recording">;
+export type SSHRecording = SSHRecordingPage["recordings"][number];
+
+/** Page size for recorded sessions; the server allows up to 500. */
+export const sshRecordingPageSize = 50;
+
+const emptySSHRecordingPage: SSHRecordingPage = { recordings: [], nextBefore: "" };
+
+type SSHRecordingQueryKey = readonly ["get", "/api/v1/ssh-recording"];
+
+/** Recorded SSH sessions, newest first, paged with `before` like the audit log. */
+export const sshRecordingsQuery: UnusedSkipTokenInfiniteOptions<
+  SSHRecordingPage,
+  Error,
+  InfiniteData<SSHRecordingPage>,
+  SSHRecordingQueryKey,
+  string
+> = infiniteQueryOptions({
+  queryKey: ["get", "/api/v1/ssh-recording"] as const,
+  queryFn: async ({ pageParam }): Promise<SSHRecordingPage> => {
+    const { data } = await fetchClient.GET("/api/v1/ssh-recording", {
+      params: {
+        query: {
+          limit: sshRecordingPageSize,
+          ...(pageParam === "" ? {} : { before: pageParam }),
+        },
+      },
+    });
+
+    return data ?? emptySSHRecordingPage;
+  },
+  initialPageParam: "",
+  getNextPageParam: (page) => (page.nextBefore === "" ? undefined : page.nextBefore),
+});
+
+/** Where the browser fetches a recording's asciinema file; the session cookie authorises it. */
+export function sshRecordingCastUrl(id: string): string {
+  return `/api/v1/ssh-recording/${encodeURIComponent(id)}/cast`;
+}
+
 type Collection =
   | "/api/v1/node"
   | "/api/v1/user"
@@ -172,7 +212,8 @@ type Collection =
   | "/api/v1/dns"
   | "/api/v1/network"
   | "/api/v1/webhook"
-  | "/api/v1/log-stream";
+  | "/api/v1/log-stream"
+  | "/api/v1/ssh-recording";
 
 /** Refetches every query under the given paths; a node change touches the node list and its detail. */
 export async function invalidate(

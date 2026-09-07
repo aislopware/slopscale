@@ -260,6 +260,7 @@ func (pol *Policy) compileSSHPolicy(
 	users types.Users,
 	node types.NodeView,
 	nodes views.Slice[types.NodeView],
+	recording SSHRecording,
 ) (*tailcfg.SSHPolicy, error) {
 	if pol == nil || pol.SSHs == nil || len(pol.SSHs) == 0 {
 		return nil, nil //nolint:nilnil // intentional: no SSH policy when none configured
@@ -304,6 +305,9 @@ func (pol *Policy) compileSSHPolicy(
 				rule.Action, index, err,
 			)
 		}
+
+		recorders, enforce := pol.recordersFor(rule, recording, users, nodes)
+		action = withRecording(action, baseURL, recorders, enforce)
 
 		acceptEnv := rule.AcceptEnv
 

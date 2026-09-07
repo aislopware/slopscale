@@ -654,7 +654,13 @@ func TestCompileSSHPolicy_UserMapping(t *testing.T) {
 
 			require.NoError(t, tt.policy.validate())
 
-			got, err := tt.policy.compileSSHPolicy("unused-server-url", users, tt.targetNode.View(), nodes.ViewSlice())
+			got, err := tt.policy.compileSSHPolicy(
+				"unused-server-url",
+				users,
+				tt.targetNode.View(),
+				nodes.ViewSlice(),
+				SSHRecording{},
+			)
 			require.NoError(t, err)
 
 			if diff := cmp.Diff(tt.want, got); diff != "" {
@@ -1024,7 +1030,7 @@ func TestCompileSSHPolicy_LocalpartMapping(t *testing.T) {
 			require.NoError(t, tt.policy.validate())
 
 			got, err := tt.policy.compileSSHPolicy(
-				"unused-server-url", testUsers, tt.targetNode.View(), testNodes.ViewSlice(),
+				"unused-server-url", testUsers, tt.targetNode.View(), testNodes.ViewSlice(), SSHRecording{},
 			)
 			require.NoError(t, err)
 
@@ -1080,7 +1086,13 @@ func TestCompileSSHPolicy_CheckAction(t *testing.T) {
 
 	require.NoError(t, policy.validate())
 
-	sshPolicy, err := policy.compileSSHPolicy("unused-server-url", users, nodeTaggedServer.View(), nodes.ViewSlice())
+	sshPolicy, err := policy.compileSSHPolicy(
+		"unused-server-url",
+		users,
+		nodeTaggedServer.View(),
+		nodes.ViewSlice(),
+		SSHRecording{},
+	)
 	require.NoError(t, err)
 	require.NotNil(t, sshPolicy)
 	require.Len(t, sshPolicy.Rules, 1)
@@ -1165,7 +1177,7 @@ func TestCompileSSHPolicy_CheckBeforeAcceptOrdering(t *testing.T) {
 		"unused-server-url",
 		users,
 		nodeTaggedServer.View(),
-		nodes.ViewSlice(),
+		nodes.ViewSlice(), SSHRecording{},
 	)
 	require.NoError(t, err)
 	require.NotNil(t, sshPolicy)
@@ -1231,7 +1243,7 @@ func TestSSHIntegrationReproduction(t *testing.T) {
 	require.NoError(t, policy.validate())
 
 	// Test SSH policy compilation for node2 (owned by user2, who is in the group)
-	got, err := policy.compileSSHPolicy("unused-server-url", users, node2.View(), nodes.ViewSlice())
+	got, err := policy.compileSSHPolicy("unused-server-url", users, node2.View(), nodes.ViewSlice(), SSHRecording{})
 	require.NoError(t, err)
 
 	want := &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
@@ -1284,7 +1296,7 @@ func TestSSHJSONSerialization(t *testing.T) {
 
 	require.NoError(t, policy.validate())
 
-	got, err := policy.compileSSHPolicy("unused-server-url", users, node.View(), nodes.ViewSlice())
+	got, err := policy.compileSSHPolicy("unused-server-url", users, node.View(), nodes.ViewSlice(), SSHRecording{})
 	require.NoError(t, err)
 
 	want := &tailcfg.SSHPolicy{Rules: []*tailcfg.SSHRule{
@@ -2008,7 +2020,7 @@ func TestSSHWithAutogroupSelfInDestination(t *testing.T) {
 
 	// Test for user1's first node
 	node1 := nodes[0].View()
-	sshPolicy, err := policy.compileSSHPolicy("unused-server-url", users, node1, nodes.ViewSlice())
+	sshPolicy, err := policy.compileSSHPolicy("unused-server-url", users, node1, nodes.ViewSlice(), SSHRecording{})
 	require.NoError(t, err)
 	require.NotNil(t, sshPolicy)
 	require.Len(t, sshPolicy.Rules, 1)
@@ -2027,7 +2039,7 @@ func TestSSHWithAutogroupSelfInDestination(t *testing.T) {
 
 	// Test for user2's first node
 	node3 := nodes[2].View()
-	sshPolicy2, err := policy.compileSSHPolicy("unused-server-url", users, node3, nodes.ViewSlice())
+	sshPolicy2, err := policy.compileSSHPolicy("unused-server-url", users, node3, nodes.ViewSlice(), SSHRecording{})
 	require.NoError(t, err)
 	require.NotNil(t, sshPolicy2)
 	require.Len(t, sshPolicy2.Rules, 1)
@@ -2046,7 +2058,7 @@ func TestSSHWithAutogroupSelfInDestination(t *testing.T) {
 
 	// Test for tagged node (should have no SSH rules)
 	node5 := nodes[4].View()
-	sshPolicy3, err := policy.compileSSHPolicy("unused-server-url", users, node5, nodes.ViewSlice())
+	sshPolicy3, err := policy.compileSSHPolicy("unused-server-url", users, node5, nodes.ViewSlice(), SSHRecording{})
 	require.NoError(t, err)
 
 	if sshPolicy3 != nil {
@@ -2088,7 +2100,7 @@ func TestSSHWithAutogroupSelfAndSpecificUser(t *testing.T) {
 
 	// For user1's node: should allow SSH from user1's devices
 	node1 := nodes[0].View()
-	sshPolicy, err := policy.compileSSHPolicy("unused-server-url", users, node1, nodes.ViewSlice())
+	sshPolicy, err := policy.compileSSHPolicy("unused-server-url", users, node1, nodes.ViewSlice(), SSHRecording{})
 	require.NoError(t, err)
 	require.NotNil(t, sshPolicy)
 	require.Len(t, sshPolicy.Rules, 1)
@@ -2105,7 +2117,7 @@ func TestSSHWithAutogroupSelfAndSpecificUser(t *testing.T) {
 
 	// For user2's node: should have no rules (user1's devices can't match user2's self)
 	node3 := nodes[2].View()
-	sshPolicy2, err := policy.compileSSHPolicy("unused-server-url", users, node3, nodes.ViewSlice())
+	sshPolicy2, err := policy.compileSSHPolicy("unused-server-url", users, node3, nodes.ViewSlice(), SSHRecording{})
 	require.NoError(t, err)
 
 	if sshPolicy2 != nil {
@@ -2150,7 +2162,7 @@ func TestSSHWithAutogroupSelfAndGroup(t *testing.T) {
 
 	// For user1's node: should allow SSH from user1's devices only (not user2's)
 	node1 := nodes[0].View()
-	sshPolicy, err := policy.compileSSHPolicy("unused-server-url", users, node1, nodes.ViewSlice())
+	sshPolicy, err := policy.compileSSHPolicy("unused-server-url", users, node1, nodes.ViewSlice(), SSHRecording{})
 	require.NoError(t, err)
 	require.NotNil(t, sshPolicy)
 	require.Len(t, sshPolicy.Rules, 1)
@@ -2167,7 +2179,7 @@ func TestSSHWithAutogroupSelfAndGroup(t *testing.T) {
 
 	// For user3's node: should have no rules (not in group:admins)
 	node5 := nodes[4].View()
-	sshPolicy2, err := policy.compileSSHPolicy("unused-server-url", users, node5, nodes.ViewSlice())
+	sshPolicy2, err := policy.compileSSHPolicy("unused-server-url", users, node5, nodes.ViewSlice(), SSHRecording{})
 	require.NoError(t, err)
 
 	if sshPolicy2 != nil {
@@ -2211,7 +2223,7 @@ func TestSSHWithAutogroupSelfExcludesTaggedDevices(t *testing.T) {
 
 	// For untagged node: should only get principals from other untagged nodes
 	node1 := nodes[0].View()
-	sshPolicy, err := policy.compileSSHPolicy("unused-server-url", users, node1, nodes.ViewSlice())
+	sshPolicy, err := policy.compileSSHPolicy("unused-server-url", users, node1, nodes.ViewSlice(), SSHRecording{})
 	require.NoError(t, err)
 	require.NotNil(t, sshPolicy)
 	require.Len(t, sshPolicy.Rules, 1)
@@ -2229,7 +2241,7 @@ func TestSSHWithAutogroupSelfExcludesTaggedDevices(t *testing.T) {
 
 	// For tagged node: should get no SSH rules
 	node3 := nodes[2].View()
-	sshPolicy2, err := policy.compileSSHPolicy("unused-server-url", users, node3, nodes.ViewSlice())
+	sshPolicy2, err := policy.compileSSHPolicy("unused-server-url", users, node3, nodes.ViewSlice(), SSHRecording{})
 	require.NoError(t, err)
 
 	if sshPolicy2 != nil {
@@ -2274,7 +2286,7 @@ func TestSSHWithAutogroupSelfAndMixedDestinations(t *testing.T) {
 
 	// Test 1: Compile for user1's device (should only match autogroup:self destination)
 	node1 := nodes[0].View()
-	sshPolicy1, err := policy.compileSSHPolicy("unused-server-url", users, node1, nodes.ViewSlice())
+	sshPolicy1, err := policy.compileSSHPolicy("unused-server-url", users, node1, nodes.ViewSlice(), SSHRecording{})
 	require.NoError(t, err)
 	require.NotNil(t, sshPolicy1)
 	require.Len(t, sshPolicy1.Rules, 1, "user1's device should have 1 SSH rule (autogroup:self)")
@@ -2293,7 +2305,13 @@ func TestSSHWithAutogroupSelfAndMixedDestinations(t *testing.T) {
 
 	// Test 2: Compile for router (should only match tag:router destination)
 	routerNode := nodes[3].View() // user2-router
-	sshPolicyRouter, err := policy.compileSSHPolicy("unused-server-url", users, routerNode, nodes.ViewSlice())
+	sshPolicyRouter, err := policy.compileSSHPolicy(
+		"unused-server-url",
+		users,
+		routerNode,
+		nodes.ViewSlice(),
+		SSHRecording{},
+	)
 	require.NoError(t, err)
 	require.NotNil(t, sshPolicyRouter)
 	require.Len(t, sshPolicyRouter.Rules, 1, "router should have 1 SSH rule (tag:router)")
@@ -2750,7 +2768,7 @@ func TestCompileSSHPolicy_CheckPeriodVariants(t *testing.T) {
 				"http://test",
 				users,
 				node.View(),
-				nodes.ViewSlice(),
+				nodes.ViewSlice(), SSHRecording{},
 			)
 			require.NoError(t, err)
 			require.NotNil(t, sshPolicy)

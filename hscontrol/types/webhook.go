@@ -180,6 +180,10 @@ const (
 	EventAccessRequestCreated  WebhookEventType = "accessRequestCreated"
 	EventAccessRequestApproved WebhookEventType = "accessRequestApproved"
 	EventAccessRequestDenied   WebhookEventType = "accessRequestDenied"
+	// EventSSHRecordingFailed has no Tailscale counterpart; a client
+	// reports that a session recording could not start or broke off. See
+	// docs/ref/ssh-recording.md.
+	EventSSHRecordingFailed WebhookEventType = "sshRecordingFailed"
 	// EventTest is what the test endpoint sends; every webhook gets it.
 	EventTest WebhookEventType = "test"
 )
@@ -202,6 +206,7 @@ var WebhookEventTypes = []WebhookEventType{
 	EventAccessRequestCreated,
 	EventAccessRequestApproved,
 	EventAccessRequestDenied,
+	EventSSHRecordingFailed,
 }
 
 // WebhookEvent is one delivery's payload, in Tailscale's shape.

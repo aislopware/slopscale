@@ -202,6 +202,7 @@ nav:
       - Networks: ref/networks.md
       - Webhooks: ref/webhooks.md
       - Log streaming: ref/log-streaming.md
+      - SSH session recording: ref/ssh-recording.md
       - Tags: ref/tags.md
       - Debug: ref/debug.md
       - Integration:

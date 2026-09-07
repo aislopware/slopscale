@@ -292,6 +292,11 @@ func NewState(cfg *types.Config) (*State, error) {
 
 	s.settings.Store(&settings)
 
+	err = s.applySSHRecording()
+	if err != nil {
+		return nil, err
+	}
+
 	err = s.loadDNS()
 	if err != nil {
 		return nil, err

@@ -369,3 +369,21 @@ CREATE TABLE log_streams(
   delivered bigint NOT NULL DEFAULT 0,
   dropped bigint NOT NULL DEFAULT 0
 );
+
+CREATE TABLE ssh_recordings(
+  id bigserial PRIMARY KEY,
+  started_at timestamptz NOT NULL,
+  ended_at timestamptz,
+  src_node text,
+  src_node_id text,
+  src_user text,
+  dst_node_id bigint,
+  dst_node text,
+  ssh_user text,
+  local_user text,
+  command text,
+  size bigint NOT NULL DEFAULT 0,
+  path text NOT NULL,
+  complete boolean NOT NULL DEFAULT false
+);
+CREATE INDEX idx_ssh_recordings_started ON ssh_recordings(started_at);

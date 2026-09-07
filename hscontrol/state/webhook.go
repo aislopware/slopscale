@@ -194,6 +194,36 @@ func (s *State) emit(t types.WebhookEventType, message string, data any) {
 	s.webhooks.Emit(t, message, data)
 }
 
+// webhookSSHRecordingData is what a recording failure carries: the node
+// the session ran on, where it came from and what was tried.
+type webhookSSHRecordingData struct {
+	webhookNodeData
+
+	Event    string              `json:"event"`
+	SrcNode  string              `json:"srcNode,omitempty"`
+	SSHUser  string              `json:"sshUser,omitempty"`
+	Attempts []map[string]string `json:"attempts"`
+}
+
+// EmitSSHRecordingFailed raises the webhook event for a recording that
+// could not start (rejected or failed) or broke off (terminated).
+func (s *State) EmitSSHRecordingFailed(
+	node types.NodeView, srcNode, sshUser, event string, attempts []map[string]string,
+) {
+	message := fmt.Sprintf("SSH session recording on %s %s", nodeLabel(node), event)
+	if srcNode != "" {
+		message += " for a session from " + srcNode
+	}
+
+	s.emit(types.EventSSHRecordingFailed, message+".", webhookSSHRecordingData{
+		webhookNodeData: s.nodeEventData(node),
+		Event:           event,
+		SrcNode:         srcNode,
+		SSHUser:         sshUser,
+		Attempts:        attempts,
+	})
+}
+
 // webhookNodeData is the data an event about a node carries, named as
 // Tailscale names it so a receiver written for Tailscale reads it as is.
 // addresses and tags are extra.

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 
 	clientv1 "github.com/juanfont/headscale/gen/client/v1"
 	"github.com/spf13/cobra"
@@ -22,10 +24,15 @@ func init() {
 		"Ask clients for their hardware serial numbers, for node:serialNumber posture checks")
 	setSettingsCmd.Flags().Int64("key-expiry-days", 0,
 		"Cap node key expiry at this many days after a login; 0 leaves the config file and the client in charge")
+	setSettingsCmd.Flags().StringSlice("ssh-recorders", nil,
+		"Default SSH session recorders, tags or addresses, for rules that name none; an empty string clears them")
+	setSettingsCmd.Flags().Bool("ssh-recording-enforce", false,
+		"Reject SSH sessions that cannot reach a default recorder")
 }
 
 var errNoSettingGiven = errors.New(
-	"give at least one of --devices-approval, --users-approval, --posture-identity or --key-expiry-days",
+	"give at least one of --devices-approval, --users-approval, --posture-identity, --key-expiry-days, " +
+		"--ssh-recorders or --ssh-recording-enforce",
 )
 
 var settingsCmd = &cobra.Command{
@@ -82,8 +89,19 @@ users approval off approves every node or user that was waiting.`,
 				body.KeyExpiryDays = &days
 			}
 
+			if cmd.Flags().Changed("ssh-recorders") {
+				recorders, _ := cmd.Flags().GetStringSlice("ssh-recorders")
+				recorders = slices.DeleteFunc(recorders, func(r string) bool { return r == "" })
+				body.SshRecorders = &recorders
+			}
+
+			if cmd.Flags().Changed("ssh-recording-enforce") {
+				on, _ := cmd.Flags().GetBool("ssh-recording-enforce")
+				body.SshRecordingEnforce = &on
+			}
+
 			if body.DevicesApprovalOn == nil && body.UsersApprovalOn == nil && body.KeyExpiryDays == nil &&
-				body.PostureIdentityOn == nil {
+				body.PostureIdentityOn == nil && body.SshRecorders == nil && body.SshRecordingEnforce == nil {
 				return errNoSettingGiven
 			}
 
@@ -110,6 +128,8 @@ func printSettings(cmd *cobra.Command, settings *clientv1.Settings) error {
 				{"Users approval", onOff(settings.UsersApprovalOn)},
 				{"Posture identity", onOff(settings.PostureIdentityOn)},
 				{"Key expiry", keyExpiryLabel(settings)},
+				{"SSH recorders", sshRecordersLabel(settings)},
+				{"SSH recording enforced", onOff(settings.SshRecordingEnforce)},
 			},
 		)
 	})
@@ -126,6 +146,21 @@ func keyExpiryLabel(settings *clientv1.Settings) string {
 	default:
 		return "client's choice, never by default (config file)"
 	}
+}
+
+// sshRecordersLabel lists the default recorders, and the embedded one
+// when the server runs it.
+func sshRecordersLabel(settings *clientv1.Settings) string {
+	recorders := slices.Clone(settings.SshRecorders)
+	if settings.EmbeddedRecorder {
+		recorders = append(recorders, "embedded recorder")
+	}
+
+	if len(recorders) == 0 {
+		return "none"
+	}
+
+	return strings.Join(recorders, ", ")
 }
 
 func onOff(on bool) string {

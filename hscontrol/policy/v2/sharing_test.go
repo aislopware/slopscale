@@ -115,14 +115,26 @@ func TestAutogroupSharedSSH(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, pol.validate())
 
-	sshPol, err := pol.compileSSHPolicy("https://headscale.test", users, nodes[0].View(), nodes.ViewSlice())
+	sshPol, err := pol.compileSSHPolicy(
+		"https://headscale.test",
+		users,
+		nodes[0].View(),
+		nodes.ViewSlice(),
+		SSHRecording{},
+	)
 	require.NoError(t, err)
 	require.NotNil(t, sshPol)
 	require.Len(t, sshPol.Rules, 1)
 	require.Len(t, sshPol.Rules[0].Principals, 1)
 	assert.Equal(t, "100.64.0.2", sshPol.Rules[0].Principals[0].NodeIP)
 
-	sshPol, err = pol.compileSSHPolicy("https://headscale.test", users, nodes[1].View(), nodes.ViewSlice())
+	sshPol, err = pol.compileSSHPolicy(
+		"https://headscale.test",
+		users,
+		nodes[1].View(),
+		nodes.ViewSlice(),
+		SSHRecording{},
+	)
 	require.NoError(t, err)
 	assert.Empty(t, sshPol.Rules, "a node that is not shared gets no SSH rule from autogroup:shared")
 }

@@ -30,12 +30,14 @@ type TestServer struct {
 	App *hscontrol.Headscale
 	URL string
 
-	memNet     *memnet.Network
-	ln         net.Listener
-	httpServer *http.Server
-	st         *state.State
-	tb         testing.TB
-	serveErr   chan error
+	memNet *memnet.Network
+	ln     net.Listener
+	// realListener is whether ln is a loopback port rather than memnet.
+	realListener bool
+	httpServer   *http.Server
+	st           *state.State
+	tb           testing.TB
+	serveErr     chan error
 }
 
 // ServerOption configures a [TestServer].
@@ -53,6 +55,7 @@ type serverConfig struct {
 	oidc             *types.OIDCConfig
 	dns              *types.DNSConfig
 	smtp             *types.SMTPConfig
+	sshRecording     *types.SSHRecordingConfig
 }
 
 func defaultServerConfig() *serverConfig {
@@ -129,6 +132,13 @@ func WithDNS(cfg types.DNSConfig) ServerOption {
 	return func(c *serverConfig) { c.dns = &cfg }
 }
 
+// WithSSHRecording configures the SSH session recorder. Enabled also needs
+// [WithRealListener] and [hscontrol.Headscale.StartSSHRecorderForTest] for
+// the embedded node to join.
+func WithSSHRecording(cfg types.SSHRecordingConfig) ServerOption {
+	return func(sc *serverConfig) { sc.sshRecording = &cfg }
+}
+
 // WithSMTP gives the server a mail server, so email webhooks can be
 // created and delivered.
 func WithSMTP(cfg types.SMTPConfig) ServerOption {
@@ -184,6 +194,12 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 
 	if sc.smtp != nil {
 		cfg.SMTP = *sc.smtp
+	}
+
+	if sc.sshRecording != nil {
+		cfg.SSHRecording = *sc.sshRecording
+	} else {
+		cfg.SSHRecording.Dir = tmpDir + "/recordings"
 	}
 
 	if sc.oidc != nil {
@@ -259,14 +275,15 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 	serverURL := "http://" + ln.Addr().String()
 
 	ts := &TestServer{
-		App:        app,
-		URL:        serverURL,
-		memNet:     &memNetwork,
-		ln:         ln,
-		httpServer: httpServer,
-		st:         app.GetState(),
-		tb:         tb,
-		serveErr:   serveErr,
+		App:          app,
+		URL:          serverURL,
+		memNet:       &memNetwork,
+		ln:           ln,
+		realListener: sc.realListener,
+		httpServer:   httpServer,
+		st:           app.GetState(),
+		tb:           tb,
+		serveErr:     serveErr,
 	}
 
 	tb.Cleanup(ts.Close)
@@ -329,7 +346,7 @@ func (s *TestServer) HTTPClient(tb testing.TB) *http.Client {
 
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			if addr == serverAddr {
+			if addr == serverAddr && !s.realListener {
 				return s.memNet.Dial(ctx, network, addr)
 			}
 
