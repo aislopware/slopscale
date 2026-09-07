@@ -131,3 +131,29 @@ export function urlError(url: string): string | null {
     return "Enter a full URL, like https://example.com/hook";
   }
 }
+
+const msPerSecond = 1000;
+const secondsPerMinute = 60;
+
+/** "120 ms", "2.5 s", "1m 12s": the time a delivery took, retries included. */
+export function formatDuration(ms: number): string {
+  if (ms < msPerSecond) {
+    return `${ms} ms`;
+  }
+
+  const seconds = ms / msPerSecond;
+
+  if (seconds < secondsPerMinute) {
+    return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)} s`;
+  }
+
+  const minutes = Math.floor(seconds / secondsPerMinute);
+  const rest = Math.round(seconds - minutes * secondsPerMinute);
+
+  return `${minutes}m ${rest}s`;
+}
+
+/** "3 events" for the compact list, where the chips have no room. */
+export function countEvents(total: number): string {
+  return total === 1 ? "1 event" : `${total} events`;
+}

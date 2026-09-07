@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  countEvents,
   deliveryLabel,
   deliveryState,
+  formatDuration,
   providerLabel,
   toChoice,
   toProvider,
@@ -67,5 +69,21 @@ describe("urls", () => {
     expect(urlError("https://example.com/hook")).toBeNull();
     expect(urlError("ftp://example.com")).toBe("The URL must start with http:// or https://");
     expect(urlError("nope")).toBe("Enter a full URL, like https://example.com/hook");
+  });
+});
+
+describe(formatDuration, () => {
+  it("picks the unit by size", () => {
+    expect(formatDuration(120)).toBe("120 ms");
+    expect(formatDuration(2500)).toBe("2.5 s");
+    expect(formatDuration(4000)).toBe("4 s");
+    expect(formatDuration(72_000)).toBe("1m 12s");
+  });
+});
+
+describe(countEvents, () => {
+  it("pluralises", () => {
+    expect(countEvents(1)).toBe("1 event");
+    expect(countEvents(3)).toBe("3 events");
   });
 });

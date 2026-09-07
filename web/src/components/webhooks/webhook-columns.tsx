@@ -6,6 +6,7 @@ import type { Webhook } from "~/api/queries.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import {
+  countEvents,
   deliveryLabel,
   deliveryState,
   providerLabel,
@@ -36,7 +37,7 @@ export const webhookColumns = helper.columns([
     header: "Events",
     enableSorting: false,
     cell: ({ row }) => <SubscriptionsCell webhook={row.original} />,
-    meta: { className: "min-w-40" },
+    meta: { className: "hidden min-w-40 md:table-cell" },
   }),
   helper.accessor((webhook) => webhook.lastDeliveryAt ?? "", {
     id: "delivery",
@@ -44,7 +45,8 @@ export const webhookColumns = helper.columns([
     enableSorting: true,
     enableGlobalFilter: false,
     cell: ({ row }) => <DeliveryCell webhook={row.original} />,
-    meta: { className: "whitespace-nowrap" },
+    // The header stays on one line; the cell may wrap its badge and time on a phone.
+    meta: { className: "w-[22%] [&>button]:whitespace-nowrap" },
   }),
   helper.display({
     id: "actions",
@@ -68,6 +70,10 @@ function EndpointCell({ webhook }: { readonly webhook: Webhook }): ReactElement 
       </Tooltip>
       <span className="truncate text-xs text-kumo-subtle">
         {webhook.description === "" ? webhook.url : webhook.description}
+      </span>
+      {/* The provider and events columns are hidden on small screens, so the endpoint carries them there. */}
+      <span className="truncate text-xs text-kumo-subtle md:hidden">
+        {`${providerLabel(webhook.providerType)} · ${countEvents(webhook.subscriptions.length)}`}
       </span>
     </div>
   );
@@ -102,11 +108,11 @@ function DeliveryCell({ webhook }: { readonly webhook: Webhook }): ReactElement 
   }
 
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
       <Tooltip content={webhook.lastDeliveryStatus}>
         <Badge variant={state === "ok" ? "success" : "error"}>{deliveryLabel(webhook)}</Badge>
       </Tooltip>
-      <span className="text-kumo-subtle">
+      <span className="whitespace-nowrap text-kumo-subtle">
         <RelativeTime value={webhook.lastDeliveryAt} />
       </span>
     </span>

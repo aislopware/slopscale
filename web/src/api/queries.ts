@@ -41,6 +41,13 @@ export const dnsQuery = api.queryOptions("get", "/api/v1/dns");
 export const networksQuery = api.queryOptions("get", "/api/v1/network");
 export const webhooksQuery = api.queryOptions("get", "/api/v1/webhook");
 export const webhookEventTypesQuery = api.queryOptions("get", "/api/v1/webhook/event-types");
+
+export type WebhookDelivery = MethodResponse<
+  typeof api,
+  "get",
+  "/api/v1/webhook/{id}/deliveries"
+>["deliveries"][number];
+
 /** What the server reports before any policy has been stored. */
 export const emptyPolicy: Policy = { policy: "", updatedAt: "" };
 

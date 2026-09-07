@@ -2,6 +2,7 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import {
   ArrowsClockwiseIcon,
+  ClockCounterClockwiseIcon,
   DotsThreeIcon,
   PaperPlaneTiltIcon,
   PencilSimpleIcon,
@@ -15,6 +16,7 @@ import type { Webhook } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { toast } from "~/components/ui/toast.ts";
+import { DeliveriesDialog } from "~/components/webhooks/deliveries-dialog.tsx";
 import { useWebhookMutations } from "~/components/webhooks/mutations.ts";
 import {
   DeleteWebhookDialog,
@@ -24,7 +26,7 @@ import {
 
 const actionsIconSize = 18;
 
-type Dialog = "edit" | "rotate" | "delete";
+type Dialog = "deliveries" | "edit" | "rotate" | "delete";
 
 /** Test, edit, rotate and delete for one webhook, gated by the settings scope. */
 export function WebhookMenu({
@@ -85,6 +87,15 @@ export function WebhookMenu({
             Send test event
           </DropdownMenu.Item>
           <DropdownMenu.Item
+            icon={ClockCounterClockwiseIcon}
+            onClick={() => {
+              setDialog("deliveries");
+            }}
+          >
+            Deliveries…
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item
             icon={PencilSimpleIcon}
             disabled={!writable}
             onClick={() => {
@@ -115,6 +126,7 @@ export function WebhookMenu({
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu>
+      <DeliveriesDialog webhook={webhook} open={dialog === "deliveries"} onOpenChange={close} />
       <WebhookDialog
         webhook={webhook}
         eventTypes={eventTypes}
