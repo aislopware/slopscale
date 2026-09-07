@@ -21,6 +21,7 @@ type groupNodesTable struct {
 	GroupID   sqlite.ColumnInteger
 	NodeID    sqlite.ColumnInteger
 	CreatedAt sqlite.ColumnTimestamp
+	ExpiresAt sqlite.ColumnTimestamp
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -66,8 +67,9 @@ func newGroupNodesTableImpl(schemaName, tableName, alias string) groupNodesTable
 		GroupIDColumn   = sqlite.IntegerColumn("group_id")
 		NodeIDColumn    = sqlite.IntegerColumn("node_id")
 		CreatedAtColumn = sqlite.TimestampColumn("created_at")
-		allColumns      = sqlite.ColumnList{IDColumn, GroupIDColumn, NodeIDColumn, CreatedAtColumn}
-		mutableColumns  = sqlite.ColumnList{GroupIDColumn, NodeIDColumn, CreatedAtColumn}
+		ExpiresAtColumn = sqlite.TimestampColumn("expires_at")
+		allColumns      = sqlite.ColumnList{IDColumn, GroupIDColumn, NodeIDColumn, CreatedAtColumn, ExpiresAtColumn}
+		mutableColumns  = sqlite.ColumnList{GroupIDColumn, NodeIDColumn, CreatedAtColumn, ExpiresAtColumn}
 		defaultColumns  = sqlite.ColumnList{}
 	)
 
@@ -79,6 +81,7 @@ func newGroupNodesTableImpl(schemaName, tableName, alias string) groupNodesTable
 		GroupID:   GroupIDColumn,
 		NodeID:    NodeIDColumn,
 		CreatedAt: CreatedAtColumn,
+		ExpiresAt: ExpiresAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

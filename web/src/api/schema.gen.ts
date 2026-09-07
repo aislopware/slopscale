@@ -4,6 +4,113 @@
  */
 
 export interface paths {
+    "/api/v1/access-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List access requests
+         * @description Every request, newest first, for a caller with policy_file:read; a caller without it sees its own.
+         */
+        get: operations["listAccessRequests"];
+        put?: never;
+        /**
+         * Request access
+         * @description Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+         */
+        post: operations["createAccessRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/access-request/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get access request */
+        get: operations["getAccessRequest"];
+        put?: never;
+        post?: never;
+        /**
+         * Cancel or delete access request
+         * @description The requester withdraws a pending request. A caller with policy_file withdraws any pending request, or deletes a decided one from the record.
+         */
+        delete: operations["cancelAccessRequest"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/access-request/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve access request
+         * @description Adds the membership for the requested duration, or the one given, and rebuilds the policy. Nobody approves their own request.
+         *
+         *     Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["approveAccessRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/access-request/{id}/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deny access request
+         * @description Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["denyAccessRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/access-request/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the caller may request
+         * @description The groups that take access requests and the caller's own machines. Any authenticated caller may ask; a credential without a user gets no machines.
+         */
+        get: operations["listAccessRequestOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/access-rule": {
         parameters: {
             query?: never;
@@ -366,7 +473,7 @@ export interface paths {
         put?: never;
         /**
          * Add group member
-         * @description Adds a machine (nodeId) or a user (userId) to the group.
+         * @description Adds a machine (nodeId) or a user (userId) to the group, for good or until expiresAt.
          *
          *     Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -1354,6 +1461,53 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccessDecisionBody: {
+            /** Format: int64 */
+            durationSeconds?: number;
+            note?: string;
+        };
+        AccessRequest: {
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            decidedAt: string | null;
+            decidedBy: string;
+            /** Format: int64 */
+            durationSeconds: number;
+            /** Format: date-time */
+            expiresAt: string | null;
+            /** Format: uint64 */
+            groupId: string;
+            /** Format: uint64 */
+            id: string;
+            /** Format: uint64 */
+            nodeId?: string;
+            /** @description What the approver said. */
+            note: string;
+            reason: string;
+            /** @description One of pending, approved, denied, cancelled. */
+            status: string;
+            /** Format: uint64 */
+            userId: string;
+        };
+        AccessRequestBody: {
+            /**
+             * Format: int64
+             * @description Between 300 (five minutes) and 2592000 (thirty days).
+             */
+            durationSeconds: number;
+            /** Format: uint64 */
+            groupId: string;
+            /** Format: uint64 */
+            nodeId?: string;
+            reason?: string;
+        };
+        AccessRequestOption: {
+            description?: string;
+            /** Format: uint64 */
+            id: string;
+            name: string;
+        };
         AccessRule: {
             bidirectional: boolean;
             /** Format: date-time */
@@ -1361,6 +1515,8 @@ export interface components {
             description: string;
             destinationGroupIds: string[];
             enabled: boolean;
+            /** Format: date-time */
+            expiresAt: string | null;
             /** Format: uint64 */
             id: string;
             name: string;
@@ -1379,6 +1535,8 @@ export interface components {
             destinationGroupIds: string[] | null;
             /** @description Defaults to true. */
             enabled?: boolean;
+            /** Format: date-time */
+            expiresAt?: string;
             name: string;
             ports?: string;
             /** @description Postures a source must satisfy, any one of them. */
@@ -1613,15 +1771,31 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             description: string;
+            expiries: components["schemas"]["GroupMemberExpiry"][];
             /** Format: uint64 */
             id: string;
             name: string;
             nodeIds: string[];
+            /** @description Whether members may request to join the group for a while. */
+            requestable: boolean;
             /** Format: date-time */
             updatedAt: string;
             userIds: string[];
         };
+        GroupMemberExpiry: {
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: uint64 */
+            nodeId?: string;
+            /** Format: uint64 */
+            userId?: string;
+        };
         GroupMemberRequestBody: {
+            /**
+             * Format: date-time
+             * @description When the membership ends; omitted means for good.
+             */
+            expiresAt?: string;
             /** Format: uint64 */
             nodeId?: string;
             /** Format: uint64 */
@@ -1634,6 +1808,8 @@ export interface components {
             description?: string;
             name: string;
             nodeIds?: string[];
+            /** @description Whether members may request to join the group for a while. */
+            requestable?: boolean;
             userIds?: string[];
         };
         HealthResponseBody: {
@@ -1661,6 +1837,10 @@ export interface components {
         };
         ListPreAuthKeysOutputBody: {
             preAuthKeys: components["schemas"]["PreAuthKey"][];
+        };
+        ListRequestsOutputBody: {
+            canDecide: boolean;
+            requests: components["schemas"]["AccessRequest"][];
         };
         ListRulesOutputBody: {
             policyFileEnforces: boolean;
@@ -1855,6 +2035,13 @@ export interface components {
         PreAuthKeyOutputBody: {
             preAuthKey: components["schemas"]["PreAuthKey"];
         };
+        RequestOptionsOutputBody: {
+            groups: components["schemas"]["AccessRequestOption"][];
+            nodes: components["schemas"]["AccessRequestOption"][];
+        };
+        RequestOutputBody: {
+            request: components["schemas"]["AccessRequest"];
+        };
         RuleEnabledInputBody: {
             enabled: boolean;
         };
@@ -2040,6 +2227,10 @@ export interface components {
     headers: never;
     pathItems: never;
 }
+export type AccessDecisionBody = components['schemas']['AccessDecisionBody'];
+export type AccessRequest = components['schemas']['AccessRequest'];
+export type AccessRequestBody = components['schemas']['AccessRequestBody'];
+export type AccessRequestOption = components['schemas']['AccessRequestOption'];
 export type AccessRule = components['schemas']['AccessRule'];
 export type AccessRuleRequestBody = components['schemas']['AccessRuleRequestBody'];
 export type ApiKey = components['schemas']['ApiKey'];
@@ -2077,6 +2268,7 @@ export type ExpireNodeRequestBody = components['schemas']['ExpireNodeRequestBody
 export type ExpirePreAuthKeyOutputBody = components['schemas']['ExpirePreAuthKeyOutputBody'];
 export type ExpirePreAuthKeyRequestBody = components['schemas']['ExpirePreAuthKeyRequestBody'];
 export type Group = components['schemas']['Group'];
+export type GroupMemberExpiry = components['schemas']['GroupMemberExpiry'];
 export type GroupMemberRequestBody = components['schemas']['GroupMemberRequestBody'];
 export type GroupOutputBody = components['schemas']['GroupOutputBody'];
 export type GroupRequestBody = components['schemas']['GroupRequestBody'];
@@ -2088,6 +2280,7 @@ export type ListNetworksOutputBody = components['schemas']['ListNetworksOutputBo
 export type ListNodesOutputBody = components['schemas']['ListNodesOutputBody'];
 export type ListPosturesOutputBody = components['schemas']['ListPosturesOutputBody'];
 export type ListPreAuthKeysOutputBody = components['schemas']['ListPreAuthKeysOutputBody'];
+export type ListRequestsOutputBody = components['schemas']['ListRequestsOutputBody'];
 export type ListRulesOutputBody = components['schemas']['ListRulesOutputBody'];
 export type ListUsersOutputBody = components['schemas']['ListUsersOutputBody'];
 export type ListWebhooksOutputBody = components['schemas']['ListWebhooksOutputBody'];
@@ -2112,6 +2305,8 @@ export type PostureRequestBody = components['schemas']['PostureRequestBody'];
 export type PostureSchedule = components['schemas']['PostureSchedule'];
 export type PreAuthKey = components['schemas']['PreAuthKey'];
 export type PreAuthKeyOutputBody = components['schemas']['PreAuthKeyOutputBody'];
+export type RequestOptionsOutputBody = components['schemas']['RequestOptionsOutputBody'];
+export type RequestOutputBody = components['schemas']['RequestOutputBody'];
 export type RuleEnabledInputBody = components['schemas']['RuleEnabledInputBody'];
 export type RuleOutputBody = components['schemas']['RuleOutputBody'];
 export type ServerInfo = components['schemas']['ServerInfo'];
@@ -2138,6 +2333,234 @@ export type WebhookTestOutputBody = components['schemas']['WebhookTestOutputBody
 export type Whoami = components['schemas']['Whoami'];
 export type $defs = Record<string, never>;
 export interface operations {
+    listAccessRequests: {
+        parameters: {
+            query?: {
+                /** @description Only the caller's own requests, whatever the scope. */
+                mine?: boolean;
+                /** @description Only requests in this status. */
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListRequestsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createAccessRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getAccessRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    cancelAccessRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmptyOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    approveAccessRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessDecisionBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    denyAccessRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessDecisionBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listAccessRequestOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestOptionsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     listAccessRules: {
         parameters: {
             query?: never;

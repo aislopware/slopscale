@@ -21,6 +21,7 @@ type groupUsersTable struct {
 	GroupID   sqlite.ColumnInteger
 	UserID    sqlite.ColumnInteger
 	CreatedAt sqlite.ColumnTimestamp
+	ExpiresAt sqlite.ColumnTimestamp
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -66,8 +67,9 @@ func newGroupUsersTableImpl(schemaName, tableName, alias string) groupUsersTable
 		GroupIDColumn   = sqlite.IntegerColumn("group_id")
 		UserIDColumn    = sqlite.IntegerColumn("user_id")
 		CreatedAtColumn = sqlite.TimestampColumn("created_at")
-		allColumns      = sqlite.ColumnList{IDColumn, GroupIDColumn, UserIDColumn, CreatedAtColumn}
-		mutableColumns  = sqlite.ColumnList{GroupIDColumn, UserIDColumn, CreatedAtColumn}
+		ExpiresAtColumn = sqlite.TimestampColumn("expires_at")
+		allColumns      = sqlite.ColumnList{IDColumn, GroupIDColumn, UserIDColumn, CreatedAtColumn, ExpiresAtColumn}
+		mutableColumns  = sqlite.ColumnList{GroupIDColumn, UserIDColumn, CreatedAtColumn, ExpiresAtColumn}
 		defaultColumns  = sqlite.ColumnList{}
 	)
 
@@ -79,6 +81,7 @@ func newGroupUsersTableImpl(schemaName, tableName, alias string) groupUsersTable
 		GroupID:   GroupIDColumn,
 		UserID:    UserIDColumn,
 		CreatedAt: CreatedAtColumn,
+		ExpiresAt: ExpiresAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

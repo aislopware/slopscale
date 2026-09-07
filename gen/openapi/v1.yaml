@@ -1,5 +1,101 @@
 components:
   schemas:
+    AccessDecisionBody:
+      additionalProperties: false
+      properties:
+        durationSeconds:
+          format: int64
+          type: integer
+        note:
+          type: string
+      type: object
+    AccessRequest:
+      additionalProperties: false
+      properties:
+        createdAt:
+          format: date-time
+          type: string
+        decidedAt:
+          format: date-time
+          type:
+            - string
+            - "null"
+        decidedBy:
+          type: string
+        durationSeconds:
+          format: int64
+          type: integer
+        expiresAt:
+          format: date-time
+          type:
+            - string
+            - "null"
+        groupId:
+          format: uint64
+          type: string
+        id:
+          format: uint64
+          type: string
+        nodeId:
+          format: uint64
+          type: string
+        note:
+          description: What the approver said.
+          type: string
+        reason:
+          type: string
+        status:
+          description: One of pending, approved, denied, cancelled.
+          type: string
+        userId:
+          format: uint64
+          type: string
+      required:
+        - id
+        - userId
+        - groupId
+        - reason
+        - durationSeconds
+        - status
+        - decidedBy
+        - note
+        - createdAt
+        - decidedAt
+        - expiresAt
+      type: object
+    AccessRequestBody:
+      additionalProperties: false
+      properties:
+        durationSeconds:
+          description: Between 300 (five minutes) and 2592000 (thirty days).
+          format: int64
+          type: integer
+        groupId:
+          format: uint64
+          type: string
+        nodeId:
+          format: uint64
+          type: string
+        reason:
+          type: string
+      required:
+        - groupId
+        - durationSeconds
+      type: object
+    AccessRequestOption:
+      additionalProperties: false
+      properties:
+        description:
+          type: string
+        id:
+          format: uint64
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - name
+      type: object
     AccessRule:
       additionalProperties: false
       properties:
@@ -16,6 +112,11 @@ components:
           type: array
         enabled:
           type: boolean
+        expiresAt:
+          format: date-time
+          type:
+            - string
+            - "null"
         id:
           format: uint64
           type: string
@@ -49,6 +150,7 @@ components:
         - sourceGroupIds
         - destinationGroupIds
         - postureIds
+        - expiresAt
         - createdAt
         - updatedAt
       type: object
@@ -68,6 +170,9 @@ components:
         enabled:
           description: Defaults to true.
           type: boolean
+        expiresAt:
+          format: date-time
+          type: string
         name:
           type: string
         ports:
@@ -553,6 +658,10 @@ components:
           type: string
         description:
           type: string
+        expiries:
+          items:
+            $ref: "#/components/schemas/GroupMemberExpiry"
+          type: array
         id:
           format: uint64
           type: string
@@ -562,6 +671,9 @@ components:
           items:
             type: string
           type: array
+        requestable:
+          description: Whether members may request to join the group for a while.
+          type: boolean
         updatedAt:
           format: date-time
           type: string
@@ -574,14 +686,35 @@ components:
         - name
         - description
         - builtin
+        - requestable
         - nodeIds
         - userIds
+        - expiries
         - createdAt
         - updatedAt
+      type: object
+    GroupMemberExpiry:
+      additionalProperties: false
+      properties:
+        expiresAt:
+          format: date-time
+          type: string
+        nodeId:
+          format: uint64
+          type: string
+        userId:
+          format: uint64
+          type: string
+      required:
+        - expiresAt
       type: object
     GroupMemberRequestBody:
       additionalProperties: false
       properties:
+        expiresAt:
+          description: When the membership ends; omitted means for good.
+          format: date-time
+          type: string
         nodeId:
           format: uint64
           type: string
@@ -608,6 +741,9 @@ components:
           items:
             type: string
           type: array
+        requestable:
+          description: Whether members may request to join the group for a while.
+          type: boolean
         userIds:
           items:
             type: string
@@ -698,6 +834,19 @@ components:
           type: array
       required:
         - preAuthKeys
+      type: object
+    ListRequestsOutputBody:
+      additionalProperties: false
+      properties:
+        canDecide:
+          type: boolean
+        requests:
+          items:
+            $ref: "#/components/schemas/AccessRequest"
+          type: array
+      required:
+        - requests
+        - canDecide
       type: object
     ListRulesOutputBody:
       additionalProperties: false
@@ -1244,6 +1393,29 @@ components:
       required:
         - preAuthKey
       type: object
+    RequestOptionsOutputBody:
+      additionalProperties: false
+      properties:
+        groups:
+          items:
+            $ref: "#/components/schemas/AccessRequestOption"
+          type: array
+        nodes:
+          items:
+            $ref: "#/components/schemas/AccessRequestOption"
+          type: array
+      required:
+        - groups
+        - nodes
+      type: object
+    RequestOutputBody:
+      additionalProperties: false
+      properties:
+        request:
+          $ref: "#/components/schemas/AccessRequest"
+      required:
+        - request
+      type: object
     RuleEnabledInputBody:
       additionalProperties: false
       properties:
@@ -1712,6 +1884,227 @@ info:
   version: v1
 openapi: 3.1.0
 paths:
+  /api/v1/access-request:
+    get:
+      description: Every request, newest first, for a caller with policy_file:read; a caller without it sees its own.
+      operationId: listAccessRequests
+      parameters:
+        - description: Only requests in this status.
+          explode: false
+          in: query
+          name: status
+          schema:
+            description: Only requests in this status.
+            type: string
+        - description: Only the caller's own requests, whatever the scope.
+          explode: false
+          in: query
+          name: mine
+          schema:
+            description: Only the caller's own requests, whatever the scope.
+            type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListRequestsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List access requests
+      tags:
+        - Access control
+    post:
+      description: Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+      operationId: createAccessRequest
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Request access
+      tags:
+        - Access control
+      x-audit-action: access_request.create
+  /api/v1/access-request/options:
+    get:
+      description: The groups that take access requests and the caller's own machines. Any authenticated caller may ask; a credential without a user gets no machines.
+      operationId: listAccessRequestOptions
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestOptionsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: What the caller may request
+      tags:
+        - Access control
+  /api/v1/access-request/{id}:
+    delete:
+      description: The requester withdraws a pending request. A caller with policy_file withdraws any pending request, or deletes a decided one from the record.
+      operationId: cancelAccessRequest
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmptyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Cancel or delete access request
+      tags:
+        - Access control
+      x-audit-action: access_request.cancel
+    get:
+      operationId: getAccessRequest
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get access request
+      tags:
+        - Access control
+  /api/v1/access-request/{id}/approve:
+    post:
+      description: |-
+        Adds the membership for the requested duration, or the one given, and rebuilds the policy. Nobody approves their own request.
+
+        Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: approveAccessRequest
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessDecisionBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Approve access request
+      tags:
+        - Access control
+      x-audit-action: access_request.approve
+      x-required-scope: policy_file
+  /api/v1/access-request/{id}/deny:
+    post:
+      description: Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: denyAccessRequest
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessDecisionBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Deny access request
+      tags:
+        - Access control
+      x-audit-action: access_request.deny
+      x-required-scope: policy_file
   /api/v1/access-rule:
     get:
       description: Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -2508,7 +2901,7 @@ paths:
   /api/v1/group/{id}/member:
     post:
       description: |-
-        Adds a machine (nodeId) or a user (userId) to the group.
+        Adds a machine (nodeId) or a user (userId) to the group, for good or until expiresAt.
 
         Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: addGroupMember

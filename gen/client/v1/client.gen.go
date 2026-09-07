@@ -89,15 +89,58 @@ func (e WebhookRequestBodyProviderType) Valid() bool {
 	}
 }
 
+// AccessDecisionBody defines model for AccessDecisionBody.
+type AccessDecisionBody struct {
+	DurationSeconds *int64  `json:"durationSeconds,omitempty"`
+	Note            *string `json:"note,omitempty"`
+}
+
+// AccessRequest defines model for AccessRequest.
+type AccessRequest struct {
+	CreatedAt       time.Time  `json:"createdAt"`
+	DecidedAt       *time.Time `json:"decidedAt"`
+	DecidedBy       string     `json:"decidedBy"`
+	DurationSeconds int64      `json:"durationSeconds"`
+	ExpiresAt       *time.Time `json:"expiresAt"`
+	GroupId         string     `json:"groupId"`
+	Id              string     `json:"id"`
+	NodeId          *string    `json:"nodeId,omitempty"`
+
+	// Note What the approver said.
+	Note   string `json:"note"`
+	Reason string `json:"reason"`
+
+	// Status One of pending, approved, denied, cancelled.
+	Status string `json:"status"`
+	UserId string `json:"userId"`
+}
+
+// AccessRequestBody defines model for AccessRequestBody.
+type AccessRequestBody struct {
+	// DurationSeconds Between 300 (five minutes) and 2592000 (thirty days).
+	DurationSeconds int64   `json:"durationSeconds"`
+	GroupId         string  `json:"groupId"`
+	NodeId          *string `json:"nodeId,omitempty"`
+	Reason          *string `json:"reason,omitempty"`
+}
+
+// AccessRequestOption defines model for AccessRequestOption.
+type AccessRequestOption struct {
+	Description *string `json:"description,omitempty"`
+	Id          string  `json:"id"`
+	Name        string  `json:"name"`
+}
+
 // AccessRule defines model for AccessRule.
 type AccessRule struct {
-	Bidirectional       bool      `json:"bidirectional"`
-	CreatedAt           time.Time `json:"createdAt"`
-	Description         string    `json:"description"`
-	DestinationGroupIds []string  `json:"destinationGroupIds"`
-	Enabled             bool      `json:"enabled"`
-	Id                  string    `json:"id"`
-	Name                string    `json:"name"`
+	Bidirectional       bool       `json:"bidirectional"`
+	CreatedAt           time.Time  `json:"createdAt"`
+	Description         string     `json:"description"`
+	DestinationGroupIds []string   `json:"destinationGroupIds"`
+	Enabled             bool       `json:"enabled"`
+	ExpiresAt           *time.Time `json:"expiresAt"`
+	Id                  string     `json:"id"`
+	Name                string     `json:"name"`
 
 	// Ports Comma-separated ports and ranges, empty for every port.
 	Ports      string   `json:"ports"`
@@ -116,9 +159,10 @@ type AccessRuleRequestBody struct {
 	DestinationGroupIds *[]string `json:"destinationGroupIds"`
 
 	// Enabled Defaults to true.
-	Enabled *bool   `json:"enabled,omitempty"`
-	Name    string  `json:"name"`
-	Ports   *string `json:"ports,omitempty"`
+	Enabled   *bool      `json:"enabled,omitempty"`
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+	Name      string     `json:"name"`
+	Ports     *string    `json:"ports,omitempty"`
 
 	// PostureIds Postures a source must satisfy, any one of them.
 	PostureIds *[]string `json:"postureIds,omitempty"`
@@ -407,20 +451,33 @@ type ExpirePreAuthKeyRequestBody struct {
 // Group defines model for Group.
 type Group struct {
 	// Builtin Empty for operator-made groups, "all" for the builtin group.
-	Builtin     string    `json:"builtin"`
-	CreatedAt   time.Time `json:"createdAt"`
-	Description string    `json:"description"`
-	Id          string    `json:"id"`
-	Name        string    `json:"name"`
-	NodeIds     []string  `json:"nodeIds"`
+	Builtin     string              `json:"builtin"`
+	CreatedAt   time.Time           `json:"createdAt"`
+	Description string              `json:"description"`
+	Expiries    []GroupMemberExpiry `json:"expiries"`
+	Id          string              `json:"id"`
+	Name        string              `json:"name"`
+	NodeIds     []string            `json:"nodeIds"`
+
+	// Requestable Whether members may request to join the group for a while.
+	Requestable bool      `json:"requestable"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 	UserIds     []string  `json:"userIds"`
 }
 
+// GroupMemberExpiry defines model for GroupMemberExpiry.
+type GroupMemberExpiry struct {
+	ExpiresAt time.Time `json:"expiresAt"`
+	NodeId    *string   `json:"nodeId,omitempty"`
+	UserId    *string   `json:"userId,omitempty"`
+}
+
 // GroupMemberRequestBody defines model for GroupMemberRequestBody.
 type GroupMemberRequestBody struct {
-	NodeId *string `json:"nodeId,omitempty"`
-	UserId *string `json:"userId,omitempty"`
+	// ExpiresAt When the membership ends; omitted means for good.
+	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
+	NodeId    *string    `json:"nodeId,omitempty"`
+	UserId    *string    `json:"userId,omitempty"`
 }
 
 // GroupOutputBody defines model for GroupOutputBody.
@@ -433,6 +490,9 @@ type GroupRequestBody struct {
 	Description *string   `json:"description,omitempty"`
 	Name        string    `json:"name"`
 	NodeIds     *[]string `json:"nodeIds,omitempty"`
+
+	// Requestable Whether members may request to join the group for a while.
+	Requestable *bool     `json:"requestable,omitempty"`
 	UserIds     *[]string `json:"userIds,omitempty"`
 }
 
@@ -476,6 +536,12 @@ type ListPosturesOutputBody struct {
 // ListPreAuthKeysOutputBody defines model for ListPreAuthKeysOutputBody.
 type ListPreAuthKeysOutputBody struct {
 	PreAuthKeys []PreAuthKey `json:"preAuthKeys"`
+}
+
+// ListRequestsOutputBody defines model for ListRequestsOutputBody.
+type ListRequestsOutputBody struct {
+	CanDecide bool            `json:"canDecide"`
+	Requests  []AccessRequest `json:"requests"`
 }
 
 // ListRulesOutputBody defines model for ListRulesOutputBody.
@@ -713,6 +779,17 @@ type PreAuthKeyOutputBody struct {
 	PreAuthKey PreAuthKey `json:"preAuthKey"`
 }
 
+// RequestOptionsOutputBody defines model for RequestOptionsOutputBody.
+type RequestOptionsOutputBody struct {
+	Groups []AccessRequestOption `json:"groups"`
+	Nodes  []AccessRequestOption `json:"nodes"`
+}
+
+// RequestOutputBody defines model for RequestOutputBody.
+type RequestOutputBody struct {
+	Request AccessRequest `json:"request"`
+}
+
 // RuleEnabledInputBody defines model for RuleEnabledInputBody.
 type RuleEnabledInputBody struct {
 	Enabled bool `json:"enabled"`
@@ -921,6 +998,15 @@ type Whoami struct {
 	User        *User           `json:"user,omitempty"`
 }
 
+// ListAccessRequestsParams defines parameters for ListAccessRequests.
+type ListAccessRequestsParams struct {
+	// Status Only requests in this status.
+	Status *string `form:"status,omitempty" json:"status,omitempty"`
+
+	// Mine Only the caller's own requests, whatever the scope.
+	Mine *bool `form:"mine,omitempty" json:"mine,omitempty"`
+}
+
 // DeleteApiKeyParams defines parameters for DeleteApiKey.
 type DeleteApiKeyParams struct {
 	Id *string `form:"id,omitempty" json:"id,omitempty"`
@@ -976,6 +1062,15 @@ type ListUsersParams struct {
 	Name  *string `form:"name,omitempty" json:"name,omitempty"`
 	Email *string `form:"email,omitempty" json:"email,omitempty"`
 }
+
+// CreateAccessRequestJSONRequestBody defines body for CreateAccessRequest for application/json ContentType.
+type CreateAccessRequestJSONRequestBody = AccessRequestBody
+
+// ApproveAccessRequestJSONRequestBody defines body for ApproveAccessRequest for application/json ContentType.
+type ApproveAccessRequestJSONRequestBody = AccessDecisionBody
+
+// DenyAccessRequestJSONRequestBody defines body for DenyAccessRequest for application/json ContentType.
+type DenyAccessRequestJSONRequestBody = AccessDecisionBody
 
 // CreateAccessRuleJSONRequestBody defines body for CreateAccessRule for application/json ContentType.
 type CreateAccessRuleJSONRequestBody = AccessRuleRequestBody
@@ -1161,6 +1256,90 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+
+	// ListAccessRequests List access requests
+	//
+	// Every request, newest first, for a caller with policy_file:read; a caller without it sees its own.
+	//
+	// Corresponds with GET /api/v1/access-request (the `ListAccessRequests` operationId).
+	ListAccessRequests(ctx context.Context, params *ListAccessRequestsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAccessRequestWithBody Request access
+	//
+	// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/access-request (the `CreateAccessRequest` operationId).
+	CreateAccessRequestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateAccessRequest Request access
+	//
+	// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/access-request (the `CreateAccessRequest` operationId).
+	CreateAccessRequest(ctx context.Context, body CreateAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListAccessRequestOptions What the caller may request
+	//
+	// The groups that take access requests and the caller's own machines. Any authenticated caller may ask; a credential without a user gets no machines.
+	//
+	// Corresponds with GET /api/v1/access-request/options (the `ListAccessRequestOptions` operationId).
+	ListAccessRequestOptions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CancelAccessRequest Cancel or delete access request
+	//
+	// The requester withdraws a pending request. A caller with policy_file withdraws any pending request, or deletes a decided one from the record.
+	//
+	// Corresponds with DELETE /api/v1/access-request/{id} (the `CancelAccessRequest` operationId).
+	CancelAccessRequest(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAccessRequest Get access request
+	//
+	// Corresponds with GET /api/v1/access-request/{id} (the `GetAccessRequest` operationId).
+	GetAccessRequest(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveAccessRequestWithBody Approve access request
+	//
+	// Adds the membership for the requested duration, or the one given, and rebuilds the policy. Nobody approves their own request.
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/access-request/{id}/approve (the `ApproveAccessRequest` operationId).
+	ApproveAccessRequestWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ApproveAccessRequest Approve access request
+	//
+	// Adds the membership for the requested duration, or the one given, and rebuilds the policy. Nobody approves their own request.
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/access-request/{id}/approve (the `ApproveAccessRequest` operationId).
+	ApproveAccessRequest(ctx context.Context, id string, body ApproveAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DenyAccessRequestWithBody Deny access request
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/access-request/{id}/deny (the `DenyAccessRequest` operationId).
+	DenyAccessRequestWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DenyAccessRequest Deny access request
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/access-request/{id}/deny (the `DenyAccessRequest` operationId).
+	DenyAccessRequest(ctx context.Context, id string, body DenyAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListAccessRules List access rules
 	//
@@ -1493,7 +1672,7 @@ type ClientInterface interface {
 
 	// AddGroupMemberWithBody Add group member
 	//
-	// Adds a machine (nodeId) or a user (userId) to the group.
+	// Adds a machine (nodeId) or a user (userId) to the group, for good or until expiresAt.
 	//
 	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -1504,7 +1683,7 @@ type ClientInterface interface {
 
 	// AddGroupMember Add group member
 	//
-	// Adds a machine (nodeId) or a user (userId) to the group.
+	// Adds a machine (nodeId) or a user (userId) to the group, for good or until expiresAt.
 	//
 	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -2272,6 +2451,190 @@ type ClientInterface interface {
 	Whoami(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
+// ListAccessRequests List access requests
+//
+// Every request, newest first, for a caller with policy_file:read; a caller without it sees its own.
+//
+// Corresponds with GET /api/v1/access-request (the `ListAccessRequests` operationId).
+func (c *Client) ListAccessRequests(ctx context.Context, params *ListAccessRequestsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAccessRequestsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateAccessRequestWithBody Request access
+//
+// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/access-request (the `CreateAccessRequest` operationId).
+func (c *Client) CreateAccessRequestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAccessRequestRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateAccessRequest Request access
+//
+// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/access-request (the `CreateAccessRequest` operationId).
+func (c *Client) CreateAccessRequest(ctx context.Context, body CreateAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAccessRequestRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListAccessRequestOptions What the caller may request
+//
+// The groups that take access requests and the caller's own machines. Any authenticated caller may ask; a credential without a user gets no machines.
+//
+// Corresponds with GET /api/v1/access-request/options (the `ListAccessRequestOptions` operationId).
+func (c *Client) ListAccessRequestOptions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAccessRequestOptionsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CancelAccessRequest Cancel or delete access request
+//
+// The requester withdraws a pending request. A caller with policy_file withdraws any pending request, or deletes a decided one from the record.
+//
+// Corresponds with DELETE /api/v1/access-request/{id} (the `CancelAccessRequest` operationId).
+func (c *Client) CancelAccessRequest(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCancelAccessRequestRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAccessRequest Get access request
+//
+// Corresponds with GET /api/v1/access-request/{id} (the `GetAccessRequest` operationId).
+func (c *Client) GetAccessRequest(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAccessRequestRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveAccessRequestWithBody Approve access request
+//
+// Adds the membership for the requested duration, or the one given, and rebuilds the policy. Nobody approves their own request.
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/access-request/{id}/approve (the `ApproveAccessRequest` operationId).
+func (c *Client) ApproveAccessRequestWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveAccessRequestRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ApproveAccessRequest Approve access request
+//
+// Adds the membership for the requested duration, or the one given, and rebuilds the policy. Nobody approves their own request.
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/access-request/{id}/approve (the `ApproveAccessRequest` operationId).
+func (c *Client) ApproveAccessRequest(ctx context.Context, id string, body ApproveAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewApproveAccessRequestRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DenyAccessRequestWithBody Deny access request
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/access-request/{id}/deny (the `DenyAccessRequest` operationId).
+func (c *Client) DenyAccessRequestWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDenyAccessRequestRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DenyAccessRequest Deny access request
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/access-request/{id}/deny (the `DenyAccessRequest` operationId).
+func (c *Client) DenyAccessRequest(ctx context.Context, id string, body DenyAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDenyAccessRequestRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListAccessRules List access rules
 //
 // Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -2973,7 +3336,7 @@ func (c *Client) UpdateGroup(ctx context.Context, id string, body UpdateGroupJSO
 
 // AddGroupMemberWithBody Add group member
 //
-// Adds a machine (nodeId) or a user (userId) to the group.
+// Adds a machine (nodeId) or a user (userId) to the group, for good or until expiresAt.
 //
 // Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -2994,7 +3357,7 @@ func (c *Client) AddGroupMemberWithBody(ctx context.Context, id string, contentT
 
 // AddGroupMember Add group member
 //
-// Adds a machine (nodeId) or a user (userId) to the group.
+// Adds a machine (nodeId) or a user (userId) to the group, for good or until expiresAt.
 //
 // Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -4609,6 +4972,301 @@ func (c *Client) Whoami(ctx context.Context, reqEditors ...RequestEditorFn) (*ht
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewListAccessRequestsRequest constructs an http.Request for the ListAccessRequests method
+func NewListAccessRequestsRequest(server string, params *ListAccessRequestsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/access-request")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Mine != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "mine", *params.Mine, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateAccessRequestRequest calls the generic CreateAccessRequest builder with application/json body
+func NewCreateAccessRequestRequest(server string, body CreateAccessRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateAccessRequestRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateAccessRequestRequestWithBody constructs an http.Request for the CreateAccessRequest method, with any body, and a specified content type
+func NewCreateAccessRequestRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/access-request")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListAccessRequestOptionsRequest constructs an http.Request for the ListAccessRequestOptions method
+func NewListAccessRequestOptionsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/access-request/options")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCancelAccessRequestRequest constructs an http.Request for the CancelAccessRequest method
+func NewCancelAccessRequestRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/access-request/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAccessRequestRequest constructs an http.Request for the GetAccessRequest method
+func NewGetAccessRequestRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/access-request/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewApproveAccessRequestRequest calls the generic ApproveAccessRequest builder with application/json body
+func NewApproveAccessRequestRequest(server string, id string, body ApproveAccessRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewApproveAccessRequestRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewApproveAccessRequestRequestWithBody constructs an http.Request for the ApproveAccessRequest method, with any body, and a specified content type
+func NewApproveAccessRequestRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/access-request/%s/approve", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDenyAccessRequestRequest calls the generic DenyAccessRequest builder with application/json body
+func NewDenyAccessRequestRequest(server string, id string, body DenyAccessRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDenyAccessRequestRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewDenyAccessRequestRequestWithBody constructs an http.Request for the DenyAccessRequest method, with any body, and a specified content type
+func NewDenyAccessRequestRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/access-request/%s/deny", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
 }
 
 // NewListAccessRulesRequest constructs an http.Request for the ListAccessRules method
@@ -8124,6 +8782,98 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// ListAccessRequestsWithResponse List access requests
+	//
+	// Every request, newest first, for a caller with policy_file:read; a caller without it sees its own.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/access-request (the `ListAccessRequests` operationId).
+	ListAccessRequestsWithResponse(ctx context.Context, params *ListAccessRequestsParams, reqEditors ...RequestEditorFn) (*ListAccessRequestsResponse, error)
+
+	// CreateAccessRequestWithBodyWithResponse Request access
+	//
+	// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/access-request (the `CreateAccessRequest` operationId).
+	CreateAccessRequestWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAccessRequestResponse, error)
+
+	// CreateAccessRequestWithResponse Request access
+	//
+	// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/access-request (the `CreateAccessRequest` operationId).
+	CreateAccessRequestWithResponse(ctx context.Context, body CreateAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAccessRequestResponse, error)
+
+	// ListAccessRequestOptionsWithResponse What the caller may request
+	//
+	// The groups that take access requests and the caller's own machines. Any authenticated caller may ask; a credential without a user gets no machines.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/access-request/options (the `ListAccessRequestOptions` operationId).
+	ListAccessRequestOptionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAccessRequestOptionsResponse, error)
+
+	// CancelAccessRequestWithResponse Cancel or delete access request
+	//
+	// The requester withdraws a pending request. A caller with policy_file withdraws any pending request, or deletes a decided one from the record.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/access-request/{id} (the `CancelAccessRequest` operationId).
+	CancelAccessRequestWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*CancelAccessRequestResponse, error)
+
+	// GetAccessRequestWithResponse Get access request
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/access-request/{id} (the `GetAccessRequest` operationId).
+	GetAccessRequestWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetAccessRequestResponse, error)
+
+	// ApproveAccessRequestWithBodyWithResponse Approve access request
+	//
+	// Adds the membership for the requested duration, or the one given, and rebuilds the policy. Nobody approves their own request.
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/access-request/{id}/approve (the `ApproveAccessRequest` operationId).
+	ApproveAccessRequestWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveAccessRequestResponse, error)
+
+	// ApproveAccessRequestWithResponse Approve access request
+	//
+	// Adds the membership for the requested duration, or the one given, and rebuilds the policy. Nobody approves their own request.
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/access-request/{id}/approve (the `ApproveAccessRequest` operationId).
+	ApproveAccessRequestWithResponse(ctx context.Context, id string, body ApproveAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveAccessRequestResponse, error)
+
+	// DenyAccessRequestWithBodyWithResponse Deny access request
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/access-request/{id}/deny (the `DenyAccessRequest` operationId).
+	DenyAccessRequestWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DenyAccessRequestResponse, error)
+
+	// DenyAccessRequestWithResponse Deny access request
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/access-request/{id}/deny (the `DenyAccessRequest` operationId).
+	DenyAccessRequestWithResponse(ctx context.Context, id string, body DenyAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*DenyAccessRequestResponse, error)
+
 	// ListAccessRulesWithResponse List access rules
 	//
 	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -8481,7 +9231,7 @@ type ClientWithResponsesInterface interface {
 
 	// AddGroupMemberWithBodyWithResponse Add group member
 	//
-	// Adds a machine (nodeId) or a user (userId) to the group.
+	// Adds a machine (nodeId) or a user (userId) to the group, for good or until expiresAt.
 	//
 	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -8492,7 +9242,7 @@ type ClientWithResponsesInterface interface {
 
 	// AddGroupMemberWithResponse Add group member
 	//
-	// Adds a machine (nodeId) or a user (userId) to the group.
+	// Adds a machine (nodeId) or a user (userId) to the group, for good or until expiresAt.
 	//
 	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -9330,6 +10080,342 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/whoami (the `Whoami` operationId).
 	WhoamiWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*WhoamiResponse, error)
+}
+
+type ListAccessRequestsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListRequestsOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAccessRequestsResponse) GetJSON200() *ListRequestsOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListAccessRequestsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAccessRequestsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAccessRequestsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAccessRequestsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAccessRequestsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateAccessRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RequestOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CreateAccessRequestResponse) GetJSON200() *RequestOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CreateAccessRequestResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateAccessRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateAccessRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAccessRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateAccessRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListAccessRequestOptionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RequestOptionsOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListAccessRequestOptionsResponse) GetJSON200() *RequestOptionsOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListAccessRequestOptionsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListAccessRequestOptionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListAccessRequestOptionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListAccessRequestOptionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListAccessRequestOptionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CancelAccessRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmptyOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CancelAccessRequestResponse) GetJSON200() *EmptyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CancelAccessRequestResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CancelAccessRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CancelAccessRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CancelAccessRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CancelAccessRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAccessRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RequestOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAccessRequestResponse) GetJSON200() *RequestOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetAccessRequestResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAccessRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAccessRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAccessRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAccessRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ApproveAccessRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RequestOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ApproveAccessRequestResponse) GetJSON200() *RequestOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ApproveAccessRequestResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ApproveAccessRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ApproveAccessRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ApproveAccessRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ApproveAccessRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DenyAccessRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RequestOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DenyAccessRequestResponse) GetJSON200() *RequestOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DenyAccessRequestResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DenyAccessRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DenyAccessRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DenyAccessRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DenyAccessRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 type ListAccessRulesResponse struct {
@@ -13460,6 +14546,158 @@ func (r WhoamiResponse) ContentType() string {
 	return ""
 }
 
+// ListAccessRequestsWithResponse List access requests
+//
+// Every request, newest first, for a caller with policy_file:read; a caller without it sees its own.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/access-request (the `ListAccessRequests` operationId).
+func (c *ClientWithResponses) ListAccessRequestsWithResponse(ctx context.Context, params *ListAccessRequestsParams, reqEditors ...RequestEditorFn) (*ListAccessRequestsResponse, error) {
+	rsp, err := c.ListAccessRequests(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAccessRequestsResponse(rsp)
+}
+
+// CreateAccessRequestWithBodyWithResponse Request access
+//
+// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/access-request (the `CreateAccessRequest` operationId).
+func (c *ClientWithResponses) CreateAccessRequestWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAccessRequestResponse, error) {
+	rsp, err := c.CreateAccessRequestWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAccessRequestResponse(rsp)
+}
+
+// CreateAccessRequestWithResponse Request access
+//
+// Files the caller's ask to join a requestable group for a while, for one of their machines or for every machine they own. The credential must belong to a user.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/access-request (the `CreateAccessRequest` operationId).
+func (c *ClientWithResponses) CreateAccessRequestWithResponse(ctx context.Context, body CreateAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAccessRequestResponse, error) {
+	rsp, err := c.CreateAccessRequest(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAccessRequestResponse(rsp)
+}
+
+// ListAccessRequestOptionsWithResponse What the caller may request
+//
+// The groups that take access requests and the caller's own machines. Any authenticated caller may ask; a credential without a user gets no machines.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/access-request/options (the `ListAccessRequestOptions` operationId).
+func (c *ClientWithResponses) ListAccessRequestOptionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAccessRequestOptionsResponse, error) {
+	rsp, err := c.ListAccessRequestOptions(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListAccessRequestOptionsResponse(rsp)
+}
+
+// CancelAccessRequestWithResponse Cancel or delete access request
+//
+// The requester withdraws a pending request. A caller with policy_file withdraws any pending request, or deletes a decided one from the record.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/access-request/{id} (the `CancelAccessRequest` operationId).
+func (c *ClientWithResponses) CancelAccessRequestWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*CancelAccessRequestResponse, error) {
+	rsp, err := c.CancelAccessRequest(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCancelAccessRequestResponse(rsp)
+}
+
+// GetAccessRequestWithResponse Get access request
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/access-request/{id} (the `GetAccessRequest` operationId).
+func (c *ClientWithResponses) GetAccessRequestWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetAccessRequestResponse, error) {
+	rsp, err := c.GetAccessRequest(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAccessRequestResponse(rsp)
+}
+
+// ApproveAccessRequestWithBodyWithResponse Approve access request
+//
+// Adds the membership for the requested duration, or the one given, and rebuilds the policy. Nobody approves their own request.
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/access-request/{id}/approve (the `ApproveAccessRequest` operationId).
+func (c *ClientWithResponses) ApproveAccessRequestWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ApproveAccessRequestResponse, error) {
+	rsp, err := c.ApproveAccessRequestWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveAccessRequestResponse(rsp)
+}
+
+// ApproveAccessRequestWithResponse Approve access request
+//
+// Adds the membership for the requested duration, or the one given, and rebuilds the policy. Nobody approves their own request.
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/access-request/{id}/approve (the `ApproveAccessRequest` operationId).
+func (c *ClientWithResponses) ApproveAccessRequestWithResponse(ctx context.Context, id string, body ApproveAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*ApproveAccessRequestResponse, error) {
+	rsp, err := c.ApproveAccessRequest(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseApproveAccessRequestResponse(rsp)
+}
+
+// DenyAccessRequestWithBodyWithResponse Deny access request
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/access-request/{id}/deny (the `DenyAccessRequest` operationId).
+func (c *ClientWithResponses) DenyAccessRequestWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DenyAccessRequestResponse, error) {
+	rsp, err := c.DenyAccessRequestWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDenyAccessRequestResponse(rsp)
+}
+
+// DenyAccessRequestWithResponse Deny access request
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/access-request/{id}/deny (the `DenyAccessRequest` operationId).
+func (c *ClientWithResponses) DenyAccessRequestWithResponse(ctx context.Context, id string, body DenyAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*DenyAccessRequestResponse, error) {
+	rsp, err := c.DenyAccessRequest(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDenyAccessRequestResponse(rsp)
+}
+
 // ListAccessRulesWithResponse List access rules
 //
 // Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -14039,7 +15277,7 @@ func (c *ClientWithResponses) UpdateGroupWithResponse(ctx context.Context, id st
 
 // AddGroupMemberWithBodyWithResponse Add group member
 //
-// Adds a machine (nodeId) or a user (userId) to the group.
+// Adds a machine (nodeId) or a user (userId) to the group, for good or until expiresAt.
 //
 // Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -14056,7 +15294,7 @@ func (c *ClientWithResponses) AddGroupMemberWithBodyWithResponse(ctx context.Con
 
 // AddGroupMemberWithResponse Add group member
 //
-// Adds a machine (nodeId) or a user (userId) to the group.
+// Adds a machine (nodeId) or a user (userId) to the group, for good or until expiresAt.
 //
 // Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -15403,6 +16641,237 @@ func (c *ClientWithResponses) WhoamiWithResponse(ctx context.Context, reqEditors
 		return nil, err
 	}
 	return ParseWhoamiResponse(rsp)
+}
+
+// ParseListAccessRequestsResponse parses an HTTP response from a ListAccessRequestsWithResponse call
+func ParseListAccessRequestsResponse(rsp *http.Response) (*ListAccessRequestsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAccessRequestsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListRequestsOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateAccessRequestResponse parses an HTTP response from a CreateAccessRequestWithResponse call
+func ParseCreateAccessRequestResponse(rsp *http.Response) (*CreateAccessRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAccessRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RequestOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListAccessRequestOptionsResponse parses an HTTP response from a ListAccessRequestOptionsWithResponse call
+func ParseListAccessRequestOptionsResponse(rsp *http.Response) (*ListAccessRequestOptionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListAccessRequestOptionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RequestOptionsOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCancelAccessRequestResponse parses an HTTP response from a CancelAccessRequestWithResponse call
+func ParseCancelAccessRequestResponse(rsp *http.Response) (*CancelAccessRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CancelAccessRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmptyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAccessRequestResponse parses an HTTP response from a GetAccessRequestWithResponse call
+func ParseGetAccessRequestResponse(rsp *http.Response) (*GetAccessRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAccessRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RequestOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseApproveAccessRequestResponse parses an HTTP response from a ApproveAccessRequestWithResponse call
+func ParseApproveAccessRequestResponse(rsp *http.Response) (*ApproveAccessRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ApproveAccessRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RequestOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDenyAccessRequestResponse parses an HTTP response from a DenyAccessRequestWithResponse call
+func ParseDenyAccessRequestResponse(rsp *http.Response) (*DenyAccessRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DenyAccessRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RequestOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseListAccessRulesResponse parses an HTTP response from a ListAccessRulesWithResponse call
