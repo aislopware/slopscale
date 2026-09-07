@@ -546,12 +546,15 @@ components:
     ListRulesOutputBody:
       additionalProperties: false
       properties:
+        policyFileEnforces:
+          type: boolean
         rules:
           items:
             $ref: "#/components/schemas/AccessRule"
           type: array
       required:
         - rules
+        - policyFileEnforces
       type: object
     ListUsersOutputBody:
       additionalProperties: false
@@ -789,6 +792,14 @@ components:
           $ref: "#/components/schemas/PreAuthKey"
       required:
         - preAuthKey
+      type: object
+    RuleEnabledInputBody:
+      additionalProperties: false
+      properties:
+        enabled:
+          type: boolean
+      required:
+        - enabled
       type: object
     RuleOutputBody:
       additionalProperties: false
@@ -1077,6 +1088,45 @@ paths:
       tags:
         - Access control
       x-required-scope: policy_file:read
+    patch:
+      description: |-
+        Changes only the switch; the rest of the rule is read from the server, not the request.
+
+        Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: setAccessRuleEnabled
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleEnabledInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Enable or disable access rule
+      tags:
+        - Access control
+      x-audit-action: access_rule.update
+      x-required-scope: policy_file
     put:
       description: Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: updateAccessRule

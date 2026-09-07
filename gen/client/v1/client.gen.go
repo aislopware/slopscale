@@ -351,7 +351,8 @@ type ListPreAuthKeysOutputBody struct {
 
 // ListRulesOutputBody defines model for ListRulesOutputBody.
 type ListRulesOutputBody struct {
-	Rules []AccessRule `json:"rules"`
+	PolicyFileEnforces bool         `json:"policyFileEnforces"`
+	Rules              []AccessRule `json:"rules"`
 }
 
 // ListUsersOutputBody defines model for ListUsersOutputBody.
@@ -445,6 +446,11 @@ type PreAuthKey struct {
 // PreAuthKeyOutputBody defines model for PreAuthKeyOutputBody.
 type PreAuthKeyOutputBody struct {
 	PreAuthKey PreAuthKey `json:"preAuthKey"`
+}
+
+// RuleEnabledInputBody defines model for RuleEnabledInputBody.
+type RuleEnabledInputBody struct {
+	Enabled bool `json:"enabled"`
 }
 
 // RuleOutputBody defines model for RuleOutputBody.
@@ -594,6 +600,9 @@ type ListUsersParams struct {
 
 // CreateAccessRuleJSONRequestBody defines body for CreateAccessRule for application/json ContentType.
 type CreateAccessRuleJSONRequestBody = AccessRuleRequestBody
+
+// SetAccessRuleEnabledJSONRequestBody defines body for SetAccessRuleEnabled for application/json ContentType.
+type SetAccessRuleEnabledJSONRequestBody = RuleEnabledInputBody
 
 // UpdateAccessRuleJSONRequestBody defines body for UpdateAccessRule for application/json ContentType.
 type UpdateAccessRuleJSONRequestBody = AccessRuleRequestBody
@@ -783,6 +792,28 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/access-rule/{id} (the `GetAccessRule` operationId).
 	GetAccessRule(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAccessRuleEnabledWithBody Enable or disable access rule
+	//
+	// Changes only the switch; the rest of the rule is read from the server, not the request.
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/access-rule/{id} (the `SetAccessRuleEnabled` operationId).
+	SetAccessRuleEnabledWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetAccessRuleEnabled Enable or disable access rule
+	//
+	// Changes only the switch; the rest of the rule is read from the server, not the request.
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/access-rule/{id} (the `SetAccessRuleEnabled` operationId).
+	SetAccessRuleEnabled(ctx context.Context, id string, body SetAccessRuleEnabledJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateAccessRuleWithBody Replace access rule
 	//
@@ -1514,6 +1545,48 @@ func (c *Client) DeleteAccessRule(ctx context.Context, id string, reqEditors ...
 // Corresponds with GET /api/v1/access-rule/{id} (the `GetAccessRule` operationId).
 func (c *Client) GetAccessRule(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetAccessRuleRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetAccessRuleEnabledWithBody Enable or disable access rule
+//
+// Changes only the switch; the rest of the rule is read from the server, not the request.
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/access-rule/{id} (the `SetAccessRuleEnabled` operationId).
+func (c *Client) SetAccessRuleEnabledWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetAccessRuleEnabledRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetAccessRuleEnabled Enable or disable access rule
+//
+// Changes only the switch; the rest of the rule is read from the server, not the request.
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/access-rule/{id} (the `SetAccessRuleEnabled` operationId).
+func (c *Client) SetAccessRuleEnabled(ctx context.Context, id string, body SetAccessRuleEnabledJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetAccessRuleEnabledRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3041,6 +3114,53 @@ func NewGetAccessRuleRequest(server string, id string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewSetAccessRuleEnabledRequest calls the generic SetAccessRuleEnabled builder with application/json body
+func NewSetAccessRuleEnabledRequest(server string, id string, body SetAccessRuleEnabledJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetAccessRuleEnabledRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewSetAccessRuleEnabledRequestWithBody constructs an http.Request for the SetAccessRuleEnabled method, with any body, and a specified content type
+func NewSetAccessRuleEnabledRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/access-rule/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -5298,6 +5418,28 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/access-rule/{id} (the `GetAccessRule` operationId).
 	GetAccessRuleWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetAccessRuleResponse, error)
 
+	// SetAccessRuleEnabledWithBodyWithResponse Enable or disable access rule
+	//
+	// Changes only the switch; the rest of the rule is read from the server, not the request.
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/access-rule/{id} (the `SetAccessRuleEnabled` operationId).
+	SetAccessRuleEnabledWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAccessRuleEnabledResponse, error)
+
+	// SetAccessRuleEnabledWithResponse Enable or disable access rule
+	//
+	// Changes only the switch; the rest of the rule is read from the server, not the request.
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/access-rule/{id} (the `SetAccessRuleEnabled` operationId).
+	SetAccessRuleEnabledWithResponse(ctx context.Context, id string, body SetAccessRuleEnabledJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAccessRuleEnabledResponse, error)
+
 	// UpdateAccessRuleWithBodyWithResponse Replace access rule
 	//
 	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -6183,6 +6325,54 @@ func (r GetAccessRuleResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetAccessRuleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetAccessRuleEnabledResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RuleOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetAccessRuleEnabledResponse) GetJSON200() *RuleOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r SetAccessRuleEnabledResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetAccessRuleEnabledResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetAccessRuleEnabledResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetAccessRuleEnabledResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetAccessRuleEnabledResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -8668,6 +8858,40 @@ func (c *ClientWithResponses) GetAccessRuleWithResponse(ctx context.Context, id 
 	return ParseGetAccessRuleResponse(rsp)
 }
 
+// SetAccessRuleEnabledWithBodyWithResponse Enable or disable access rule
+//
+// Changes only the switch; the rest of the rule is read from the server, not the request.
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/access-rule/{id} (the `SetAccessRuleEnabled` operationId).
+func (c *ClientWithResponses) SetAccessRuleEnabledWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAccessRuleEnabledResponse, error) {
+	rsp, err := c.SetAccessRuleEnabledWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetAccessRuleEnabledResponse(rsp)
+}
+
+// SetAccessRuleEnabledWithResponse Enable or disable access rule
+//
+// Changes only the switch; the rest of the rule is read from the server, not the request.
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/access-rule/{id} (the `SetAccessRuleEnabled` operationId).
+func (c *ClientWithResponses) SetAccessRuleEnabledWithResponse(ctx context.Context, id string, body SetAccessRuleEnabledJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAccessRuleEnabledResponse, error) {
+	rsp, err := c.SetAccessRuleEnabled(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetAccessRuleEnabledResponse(rsp)
+}
+
 // UpdateAccessRuleWithBodyWithResponse Replace access rule
 //
 // Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -9918,6 +10142,39 @@ func ParseGetAccessRuleResponse(rsp *http.Response) (*GetAccessRuleResponse, err
 	}
 
 	response := &GetAccessRuleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RuleOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetAccessRuleEnabledResponse parses an HTTP response from a SetAccessRuleEnabledWithResponse call
+func ParseSetAccessRuleEnabledResponse(rsp *http.Response) (*SetAccessRuleEnabledResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetAccessRuleEnabledResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
