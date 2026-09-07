@@ -24,7 +24,10 @@ func mapError(msg string, err error) error {
 		errors.Is(err, state.ErrNodeNotInNodeStore),
 		errors.Is(err, db.ErrUserNotFound),
 		errors.Is(err, db.ErrNodeNotFoundRegistrationCache),
-		errors.Is(err, state.ErrRegistrationExpired):
+		errors.Is(err, state.ErrRegistrationExpired),
+		errors.Is(err, types.ErrGroupNotFound),
+		errors.Is(err, types.ErrRuleNotFound),
+		errors.Is(err, types.ErrGroupMemberMissing):
 		return huma.Error404NotFound(msg, err)
 
 	case errors.Is(err, state.ErrGivenNameInvalid),
@@ -40,13 +43,27 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrInvalidRole),
 		errors.Is(err, state.ErrUnknownSetting),
 		errors.Is(err, state.ErrShareWithOwner),
-		errors.Is(err, db.ErrNodeNotShared):
+		errors.Is(err, db.ErrNodeNotShared),
+		errors.Is(err, types.ErrGroupNameEmpty),
+		errors.Is(err, types.ErrGroupNameInvalid),
+		errors.Is(err, types.ErrGroupNameTooLong),
+		errors.Is(err, types.ErrGroupBuiltin),
+		errors.Is(err, types.ErrRuleNameEmpty),
+		errors.Is(err, types.ErrRuleNameTooLong),
+		errors.Is(err, types.ErrRuleNoSources),
+		errors.Is(err, types.ErrRuleNoDestinations),
+		errors.Is(err, types.ErrRulePortsWithout),
+		errors.Is(err, types.ErrRulePortsInvalid),
+		errors.Is(err, types.ErrInvalidAccessProtocol):
 		return huma.Error400BadRequest(msg, err)
 
 	case errors.Is(err, state.ErrNodeKeyInUse),
 		errors.Is(err, state.ErrAmbiguousNodeOwnership),
 		errors.Is(err, state.ErrOwnerExists),
-		errors.Is(err, db.ErrNodeAlreadyShared):
+		errors.Is(err, db.ErrNodeAlreadyShared),
+		errors.Is(err, types.ErrGroupNameTaken),
+		errors.Is(err, types.ErrGroupInUse),
+		errors.Is(err, types.ErrGroupMemberExists):
 		return huma.Error409Conflict(msg, err)
 
 	case errors.Is(err, state.ErrCannotChangeOwnRole),

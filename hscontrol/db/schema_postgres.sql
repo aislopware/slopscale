@@ -39,6 +39,7 @@ CREATE TABLE pre_auth_keys(
   expiration timestamptz,
   revoked timestamptz,
   preauthorized boolean DEFAULT true,
+  groups text,
   CONSTRAINT fk_pre_auth_keys_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON pre_auth_keys(prefix) WHERE prefix IS NOT NULL AND prefix != '';
@@ -116,6 +117,58 @@ CREATE TABLE node_shares(
   CONSTRAINT fk_node_shares_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE UNIQUE INDEX idx_node_shares_node_user ON node_shares(node_id, user_id);
+
+CREATE TABLE groups(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  builtin text,
+  created_at timestamptz,
+  updated_at timestamptz
+);
+CREATE UNIQUE INDEX idx_groups_name ON groups(name);
+
+CREATE TABLE group_nodes(
+  id bigserial PRIMARY KEY,
+  group_id bigint NOT NULL,
+  node_id bigint NOT NULL,
+  created_at timestamptz,
+  CONSTRAINT fk_group_nodes_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_nodes_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_group_nodes_group_node ON group_nodes(group_id, node_id);
+
+CREATE TABLE group_users(
+  id bigserial PRIMARY KEY,
+  group_id bigint NOT NULL,
+  user_id bigint NOT NULL,
+  created_at timestamptz,
+  CONSTRAINT fk_group_users_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_users_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_group_users_group_user ON group_users(group_id, user_id);
+
+CREATE TABLE access_rules(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  enabled boolean DEFAULT true,
+  protocol text NOT NULL,
+  ports text,
+  bidirectional boolean DEFAULT false,
+  created_at timestamptz,
+  updated_at timestamptz
+);
+
+CREATE TABLE access_rule_groups(
+  id bigserial PRIMARY KEY,
+  rule_id bigint NOT NULL,
+  group_id bigint NOT NULL,
+  side text NOT NULL,
+  CONSTRAINT fk_access_rule_groups_rule FOREIGN KEY(rule_id) REFERENCES access_rules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_rule_groups_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_access_rule_groups_rule_group_side ON access_rule_groups(rule_id, group_id, side);
 
 CREATE TABLE policies(
   id bigserial PRIMARY KEY,

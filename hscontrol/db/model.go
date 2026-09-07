@@ -223,6 +223,7 @@ type preAuthKeyRow struct {
 	Used          bool
 	Tags          string
 	Preauthorized bool
+	Groups        string
 	Expiration    *time.Time
 	Revoked       *time.Time
 	CreatedAt     *time.Time
@@ -283,6 +284,11 @@ func (r *preAuthKeyRow) preAuthKey() (*types.PreAuthKey, error) {
 		return nil, fmt.Errorf("pre-auth key %d tags: %w", r.ID, err)
 	}
 
+	err = unmarshalJSONColumn(r.Groups, &key.Groups)
+	if err != nil {
+		return nil, fmt.Errorf("pre-auth key %d groups: %w", r.ID, err)
+	}
+
 	return key, nil
 }
 
@@ -290,6 +296,11 @@ func preAuthKeyRowFrom(key *types.PreAuthKey) (preAuthKeyRow, error) {
 	tags, err := marshalJSONColumn(key.Tags)
 	if err != nil {
 		return preAuthKeyRow{}, fmt.Errorf("tags: %w", err)
+	}
+
+	groups, err := marshalJSONColumn(key.Groups)
+	if err != nil {
+		return preAuthKeyRow{}, fmt.Errorf("groups: %w", err)
 	}
 
 	return preAuthKeyRow{
@@ -304,6 +315,7 @@ func preAuthKeyRowFrom(key *types.PreAuthKey) (preAuthKeyRow, error) {
 		Used:          key.Used,
 		Tags:          tags,
 		Preauthorized: key.Preauthorized,
+		Groups:        groups,
 		Expiration:    key.Expiration,
 		Revoked:       key.Revoked,
 		CreatedAt:     key.CreatedAt,

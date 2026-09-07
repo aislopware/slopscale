@@ -345,14 +345,16 @@ func (pol *Policy) compileGrants(
 	users types.Users,
 	nodes views.Slice[types.NodeView],
 ) []compiledGrant {
-	if pol == nil || (pol.ACLs == nil && pol.Grants == nil) {
+	if !pol.enforces() {
 		return nil
 	}
 
-	grants := pol.Grants
+	grants := slices.Clone(pol.Grants)
 	for _, acl := range pol.ACLs {
 		grants = append(grants, aclToGrants(acl)...)
 	}
+
+	grants = append(grants, accessGrants(pol.access)...)
 
 	compiled := make([]compiledGrant, 0, len(grants))
 

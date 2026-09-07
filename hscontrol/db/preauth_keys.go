@@ -235,8 +235,9 @@ func CreatePreAuthKeyFromSpec(q Querier, spec types.PreAuthKeySpec) (*types.PreA
 		CreatedAt:     &now,
 		Expiration:    expiration,
 		Tags:          aclTags, // empty for user-owned keys
-		Prefix:        prefix,  // Store prefix
-		Hash:          hash,    // Store hash
+		Groups:        spec.Groups,
+		Prefix:        prefix, // Store prefix
+		Hash:          hash,   // Store hash
 	}
 
 	err = insertPreAuthKey(q, &key)
@@ -251,6 +252,7 @@ func CreatePreAuthKeyFromSpec(q Querier, spec types.PreAuthKeySpec) (*types.PreA
 		Ephemeral:     key.Ephemeral,
 		Preauthorized: key.Preauthorized,
 		Tags:          key.Tags,
+		Groups:        key.Groups,
 		Expiration:    key.Expiration,
 		CreatedAt:     key.CreatedAt,
 		User:          key.User,

@@ -49,6 +49,10 @@ type PreAuthKey struct {
 	// If non-empty, this creates tagged nodes (not user-owned).
 	Tags []string
 
+	// Groups are the access groups a node registered with this key joins.
+	// Deleted groups are skipped at registration.
+	Groups []GroupID
+
 	CreatedAt  *time.Time
 	Expiration *time.Time
 
@@ -68,6 +72,7 @@ type PreAuthKeySpec struct {
 	Preauthorized bool
 	Expiration    *time.Time
 	Tags          []string
+	Groups        []GroupID
 }
 
 // PreAuthKeyNew is returned once when the key is created.
@@ -78,6 +83,7 @@ type PreAuthKeyNew struct {
 	Ephemeral     bool
 	Preauthorized bool
 	Tags          []string
+	Groups        []GroupID
 	Expiration    *time.Time
 	CreatedAt     *time.Time
 	User          *User // Can be nil for system-created tagged keys

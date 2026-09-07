@@ -70,6 +70,20 @@ node as a peer marked with the owner as sharer, the shared node gets no access
 back, and a policy that never names `autogroup:shared` ignores shares. See
 [Node sharing](https://headscale.net/development/ref/sharing/).
 
+### Groups and access rules
+
+Access can now be managed without a policy file, the way NetBird does it.
+Machines and users go into named groups (a user's machines follow the user,
+tagged machines join directly, the builtin _All_ group holds every machine),
+and access rules let source groups reach destination groups on a protocol and
+ports, one way or both ways. Rules only allow; the first enabled rule makes
+everything else unreachable, and rules combine with the policy file when
+there is one. Pre-auth keys can carry groups so the machines they register
+join them. Manage it all from the console's _Access controls_ page, with
+`headscale groups` and `headscale access-rules`, or through `/api/v1/group`
+and `/api/v1/access-rule`. See
+[Groups and access rules](https://headscale.net/development/ref/access-control/).
+
 ### Global exit node
 
 `headscale nodes global-exit-node --identifier <node>` (or

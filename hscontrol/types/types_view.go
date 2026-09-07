@@ -459,6 +459,10 @@ func (v PreAuthKeyView) Used() bool          { return v.ж.Used }
 // Tags are copied to the node during registration.
 // If non-empty, this creates tagged nodes (not user-owned).
 func (v PreAuthKeyView) Tags() views.Slice[string] { return views.SliceOf(v.ж.Tags) }
+
+// Groups are the access groups a node registered with this key joins.
+// Deleted groups are skipped at registration.
+func (v PreAuthKeyView) Groups() views.Slice[GroupID] { return views.SliceOf(v.ж.Groups) }
 func (v PreAuthKeyView) CreatedAt() views.ValuePointer[time.Time] {
 	return views.ValuePointerOf(v.ж.CreatedAt)
 }
@@ -488,6 +492,7 @@ var _PreAuthKeyViewNeedsRegeneration = PreAuthKey(struct {
 	Ephemeral     bool
 	Used          bool
 	Tags          []string
+	Groups        []GroupID
 	CreatedAt     *time.Time
 	Expiration    *time.Time
 	Revoked       *time.Time

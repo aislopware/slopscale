@@ -31,6 +31,9 @@ type PolicyManager interface {
 	// from the current policy, avoiding trust of client-provided URL params.
 	SSHCheckParams(srcNodeID, dstNodeID types.NodeID) (time.Duration, bool)
 	SetPolicy(pol []byte) (bool, error)
+	// SetAccessModel replaces the database's groups and access rules,
+	// which compile into grants next to the policy file's.
+	SetAccessModel(model types.AccessModel) (bool, error)
 	SetUsers(users []types.User) (bool, error)
 	SetNodes(nodes views.Slice[types.NodeView]) (bool, error)
 	// NodeCanHaveTag reports whether the given node can have the given tag.

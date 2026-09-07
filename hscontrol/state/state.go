@@ -118,6 +118,9 @@ type State struct {
 	derpMap atomic.Pointer[tailcfg.DERPMap]
 	// settings holds the tailnet-wide switches; see [State.Settings].
 	settings atomic.Pointer[types.Settings]
+
+	// access holds the groups and access rules; see [State.AccessModel].
+	access atomic.Pointer[types.AccessModel]
 	// polMan handles policy evaluation and management
 	polMan policy.PolicyManager
 
@@ -255,6 +258,11 @@ func NewState(cfg *types.Config) (*State, error) {
 	}
 
 	s.settings.Store(&settings)
+
+	_, err = s.loadAccessModel()
+	if err != nil {
+		return nil, err
+	}
 
 	// Surface nodes whose stored data would break map generation (e.g. an
 	// invalid given name from a legacy row) so an operator can fix them. This
@@ -419,6 +427,13 @@ func (s *State) DeleteUser(userID types.UserID) (change.Change, error) {
 
 	s.dropSharesWithUser(userID)
 
+	// The database dropped the user's group memberships by cascade; the
+	// policy manager's copy follows.
+	_, err = s.loadAccessModel()
+	if err != nil {
+		return change.Change{}, err
+	}
+
 	// Update policy manager with the new user list (without the deleted user)
 	// This ensures that if the policy references the deleted user, it gets
 	// re-evaluated immediately rather than when some other operation triggers it.
@@ -490,6 +505,13 @@ func (s *State) DeleteNode(node types.NodeView) (change.Change, error) {
 	}
 
 	s.ipAlloc.FreeIPs(node.IPs())
+
+	// The database dropped the node's group memberships by cascade; the
+	// policy manager's copy follows.
+	_, err = s.loadAccessModel()
+	if err != nil {
+		return change.Change{}, err
+	}
 
 	c := change.NodeRemoved(node.ID())
 
@@ -2191,6 +2213,12 @@ func (s *State) HandleNodeFromPreAuthKey(
 		}
 	}
 
+	// A key that carries groups enrols the node in them.
+	err = s.enrolNodeInKeyGroups(finalNode.ID(), pak.Groups)
+	if err != nil {
+		return finalNode, change.NodeAdded(finalNode.ID()), err
+	}
+
 	// Update policy managers
 	usersChange, err := s.updatePolicyManagerUsers()
 	if err != nil {
@@ -2202,7 +2230,7 @@ func (s *State) HandleNodeFromPreAuthKey(
 		return finalNode, change.NodeAdded(finalNode.ID()), fmt.Errorf("updating policy manager nodes: %w", err)
 	}
 
-	policyChanged := !usersChange.IsEmpty() || !nodesChange.IsEmpty()
+	policyChanged := !usersChange.IsEmpty() || !nodesChange.IsEmpty() || len(pak.Groups) > 0
 
 	return finalNode, reauthChange(finalNode, existsSameUser, policyChanged), nil
 }

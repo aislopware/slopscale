@@ -32,7 +32,8 @@ type PreAuthKey struct {
 	CreatedAt  time.Time `json:"createdAt"`
 	ACLTags    []string  `json:"aclTags"    nullable:"false"`
 
-	Preauthorized bool `doc:"Nodes registered with the key skip device approval." json:"preauthorized"`
+	Preauthorized bool     `doc:"Registered nodes skip device approval." json:"preauthorized"`
+	GroupIDs      []string `doc:"Groups the registered node joins."      json:"groupIds"      nullable:"false"`
 }
 
 // CreatePreAuthKeyRequestBody is the v1.CreatePreAuthKeyRequest body. Every
@@ -44,7 +45,8 @@ type CreatePreAuthKeyRequestBody struct {
 	Expiration *time.Time `json:"expiration,omitempty"`
 	ACLTags    []string   `json:"aclTags,omitempty"`
 
-	Preauthorized *bool `doc:"Defaults to true." json:"preauthorized,omitempty"`
+	Preauthorized *bool    `doc:"Defaults to true."                            json:"preauthorized,omitempty"`
+	GroupIDs      []string `doc:"Groups a node registered with the key joins." json:"groupIds,omitempty"`
 }
 
 // ExpirePreAuthKeyRequestBody is the v1.ExpirePreAuthKeyRequest body.
@@ -133,6 +135,22 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 
 		preauthorized := in.Body.Preauthorized == nil || *in.Body.Preauthorized
 
+		groupIDs, err := parseGroupIDs("groupIds", in.Body.GroupIDs)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, gid := range groupIDs {
+			_, getErr := b.State.GetGroup(gid)
+			if getErr != nil {
+				return nil, mapError("creating pre-auth key", getErr)
+			}
+		}
+
+		if len(groupIDs) > 0 {
+			audit.Detail(ctx, "groupIds", in.Body.GroupIDs)
+		}
+
 		audit.Detail(ctx, "reusable", in.Body.Reusable)
 		audit.Detail(ctx, "ephemeral", in.Body.Ephemeral)
 		audit.Detail(ctx, "preauthorized", preauthorized)
@@ -145,6 +163,7 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 			Preauthorized: preauthorized,
 			Expiration:    &expiration,
 			Tags:          in.Body.ACLTags,
+			Groups:        groupIDs,
 		})
 		if err != nil {
 			// A key that is neither tagged nor user-owned is invalid input (400).
@@ -254,6 +273,7 @@ func preAuthKeyNewToResponse(key *types.PreAuthKeyNew) PreAuthKey {
 		ACLTags:   nonNilTags(key.Tags),
 
 		Preauthorized: key.Preauthorized,
+		GroupIDs:      groupIDStrings(key.Groups),
 	}
 
 	if key.User != nil {
@@ -272,6 +292,16 @@ func preAuthKeyNewToResponse(key *types.PreAuthKeyNew) PreAuthKey {
 	return out
 }
 
+// groupIDStrings renders group ids for a response, never null.
+func groupIDStrings(ids []types.GroupID) []string {
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, formatID(uint64(id)))
+	}
+
+	return out
+}
+
 // preAuthKeyToResponse builds the v1 response for a stored key, with its key
 // field masked (see maskedPreAuthKey).
 func preAuthKeyToResponse(key *types.PreAuthKey) PreAuthKey {
@@ -284,6 +314,7 @@ func preAuthKeyToResponse(key *types.PreAuthKey) PreAuthKey {
 		ACLTags:   nonNilTags(key.Tags),
 
 		Preauthorized: key.Preauthorized,
+		GroupIDs:      groupIDStrings(key.Groups),
 	}
 
 	if key.User != nil {

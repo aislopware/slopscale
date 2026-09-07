@@ -2254,6 +2254,22 @@ type Policy struct {
 	Tests               []PolicyTest       `json:"tests,omitempty"`
 	SSHTests            []SSHPolicyTest    `json:"sshTests,omitempty"`
 	RandomizeClientPort bool               `json:"randomizeClientPort,omitempty"`
+
+	// access is the database's groups and rules, attached by the policy
+	// manager before every compile so their grants compile next to the
+	// file's. It is never part of the file.
+	access types.AccessModel
+}
+
+// enforces reports whether compiling the policy yields a filter instead
+// of allow-all: the file has acls or grants, or the access model has an
+// enabled rule.
+func (pol *Policy) enforces() bool {
+	if pol == nil {
+		return false
+	}
+
+	return pol.ACLs != nil || pol.Grants != nil || hasAccessGrants(pol.access)
 }
 
 // MarshalJSON is deliberately not implemented for [Policy].

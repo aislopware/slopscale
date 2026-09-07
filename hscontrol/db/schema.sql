@@ -57,6 +57,9 @@ CREATE TABLE pre_auth_keys(
   -- preauthorized keys register nodes as approved even while device
   -- approval is on.
   preauthorized numeric DEFAULT true,
+  -- groups is a JSON array of group ids; nodes registered with the key
+  -- join those groups. See docs/ref/access-control.md.
+  groups text,
   expiration datetime,
   revoked datetime,
 
@@ -157,6 +160,68 @@ CREATE TABLE node_shares(
   CONSTRAINT fk_node_shares_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE UNIQUE INDEX idx_node_shares_node_user ON node_shares(node_id, user_id);
+
+-- groups are named sets of nodes for access rules; see
+-- docs/ref/access-control.md. A node belongs directly (group_nodes) or
+-- through its owner (group_users). The builtin "all" group holds every
+-- node and has no rows in either.
+CREATE TABLE groups(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  description text,
+  builtin text,
+  created_at datetime,
+  updated_at datetime
+);
+CREATE UNIQUE INDEX idx_groups_name ON groups(name);
+
+CREATE TABLE group_nodes(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  group_id integer NOT NULL,
+  node_id integer NOT NULL,
+  created_at datetime,
+
+  CONSTRAINT fk_group_nodes_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_nodes_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_group_nodes_group_node ON group_nodes(group_id, node_id);
+
+CREATE TABLE group_users(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  group_id integer NOT NULL,
+  user_id integer NOT NULL,
+  created_at datetime,
+
+  CONSTRAINT fk_group_users_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_users_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_group_users_group_user ON group_users(group_id, user_id);
+
+-- access_rules let source groups reach destination groups on a protocol
+-- and ports. Rules only allow. The policy compiles them next to the
+-- policy file's grants.
+CREATE TABLE access_rules(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  description text,
+  enabled numeric DEFAULT true,
+  protocol text NOT NULL,
+  ports text,
+  bidirectional numeric DEFAULT false,
+  created_at datetime,
+  updated_at datetime
+);
+
+CREATE TABLE access_rule_groups(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  rule_id integer NOT NULL,
+  group_id integer NOT NULL,
+  side text NOT NULL,
+
+  CONSTRAINT fk_access_rule_groups_rule FOREIGN KEY(rule_id) REFERENCES access_rules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_rule_groups_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX idx_access_rule_groups_rule_group_side ON access_rule_groups(rule_id, group_id, side);
 
 CREATE TABLE policies(
   id integer PRIMARY KEY AUTOINCREMENT,

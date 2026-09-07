@@ -139,6 +139,7 @@ func (src *PreAuthKey) Clone() *PreAuthKey {
 	}
 	dst.User = src.User.Clone()
 	dst.Tags = append(src.Tags[:0:0], src.Tags...)
+	dst.Groups = append(src.Groups[:0:0], src.Groups...)
 	if dst.CreatedAt != nil {
 		dst.CreatedAt = new(*src.CreatedAt)
 	}
@@ -165,6 +166,7 @@ var _PreAuthKeyCloneNeedsRegeneration = PreAuthKey(struct {
 	Ephemeral     bool
 	Used          bool
 	Tags          []string
+	Groups        []GroupID
 	CreatedAt     *time.Time
 	Expiration    *time.Time
 	Revoked       *time.Time

@@ -1,3 +1,16 @@
+COL access_rule_groups.id bigint null=NO default=nextval('access_rule_groups_id_seq'::regclass)
+COL access_rule_groups.rule_id bigint null=NO
+COL access_rule_groups.group_id bigint null=NO
+COL access_rule_groups.side text null=NO
+COL access_rules.id bigint null=NO default=nextval('access_rules_id_seq'::regclass)
+COL access_rules.name text null=NO
+COL access_rules.description text null=YES
+COL access_rules.enabled boolean null=YES default=true
+COL access_rules.protocol text null=NO
+COL access_rules.ports text null=YES
+COL access_rules.bidirectional boolean null=YES default=false
+COL access_rules.created_at timestamp with time zone null=YES
+COL access_rules.updated_at timestamp with time zone null=YES
 COL api_keys.id bigint null=NO default=nextval('api_keys_id_seq'::regclass)
 COL api_keys.prefix text null=YES
 COL api_keys.hash bytea null=YES
@@ -20,6 +33,20 @@ COL audit_events.remote_addr text null=YES
 COL database_versions.id bigint null=NO default=nextval('database_versions_id_seq'::regclass)
 COL database_versions.version text null=NO
 COL database_versions.updated_at timestamp with time zone null=YES
+COL group_nodes.id bigint null=NO default=nextval('group_nodes_id_seq'::regclass)
+COL group_nodes.group_id bigint null=NO
+COL group_nodes.node_id bigint null=NO
+COL group_nodes.created_at timestamp with time zone null=YES
+COL group_users.id bigint null=NO default=nextval('group_users_id_seq'::regclass)
+COL group_users.group_id bigint null=NO
+COL group_users.user_id bigint null=NO
+COL group_users.created_at timestamp with time zone null=YES
+COL groups.id bigint null=NO default=nextval('groups_id_seq'::regclass)
+COL groups.name text null=NO
+COL groups.description text null=YES
+COL groups.builtin text null=YES
+COL groups.created_at timestamp with time zone null=YES
+COL groups.updated_at timestamp with time zone null=YES
 COL migrations.id character varying len=255 null=NO
 COL node_shares.id bigint null=NO default=nextval('node_shares_id_seq'::regclass)
 COL node_shares.node_id bigint null=NO
@@ -84,6 +111,7 @@ COL pre_auth_keys.created_at timestamp with time zone null=YES
 COL pre_auth_keys.expiration timestamp with time zone null=YES
 COL pre_auth_keys.revoked timestamp with time zone null=YES
 COL pre_auth_keys.preauthorized boolean null=YES default=true
+COL pre_auth_keys.groups text null=YES
 COL sessions.id bigint null=NO default=nextval('sessions_id_seq'::regclass)
 COL sessions.token_hash bytea null=NO
 COL sessions.user_id bigint null=NO
@@ -109,10 +137,19 @@ IDX CREATE INDEX idx_audit_events_actor_user_id ON public.audit_events USING btr
 IDX CREATE INDEX idx_audit_events_created_at ON public.audit_events USING btree (created_at)
 IDX CREATE INDEX idx_policies_deleted_at ON public.policies USING btree (deleted_at)
 IDX CREATE INDEX idx_users_deleted_at ON public.users USING btree (deleted_at)
+IDX CREATE UNIQUE INDEX access_rule_groups_pkey ON public.access_rule_groups USING btree (id)
+IDX CREATE UNIQUE INDEX access_rules_pkey ON public.access_rules USING btree (id)
 IDX CREATE UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)
 IDX CREATE UNIQUE INDEX audit_events_pkey ON public.audit_events USING btree (id)
 IDX CREATE UNIQUE INDEX database_versions_pkey ON public.database_versions USING btree (id)
+IDX CREATE UNIQUE INDEX group_nodes_pkey ON public.group_nodes USING btree (id)
+IDX CREATE UNIQUE INDEX group_users_pkey ON public.group_users USING btree (id)
+IDX CREATE UNIQUE INDEX groups_pkey ON public.groups USING btree (id)
+IDX CREATE UNIQUE INDEX idx_access_rule_groups_rule_group_side ON public.access_rule_groups USING btree (rule_id, group_id, side)
 IDX CREATE UNIQUE INDEX idx_api_keys_prefix ON public.api_keys USING btree (prefix)
+IDX CREATE UNIQUE INDEX idx_group_nodes_group_node ON public.group_nodes USING btree (group_id, node_id)
+IDX CREATE UNIQUE INDEX idx_group_users_group_user ON public.group_users USING btree (group_id, user_id)
+IDX CREATE UNIQUE INDEX idx_groups_name ON public.groups USING btree (name)
 IDX CREATE UNIQUE INDEX idx_name_no_provider_identifier ON public.users USING btree (name) WHERE (provider_identifier IS NULL)
 IDX CREATE UNIQUE INDEX idx_name_provider_identifier ON public.users USING btree (name, provider_identifier)
 IDX CREATE UNIQUE INDEX idx_node_shares_node_user ON public.node_shares USING btree (node_id, user_id)
@@ -131,6 +168,17 @@ IDX CREATE UNIQUE INDEX pre_auth_keys_pkey ON public.pre_auth_keys USING btree (
 IDX CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (id)
 IDX CREATE UNIQUE INDEX settings_pkey ON public.settings USING btree (key)
 IDX CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)
+CON access_rule_groups access_rule_groups_group_id_not_null NOT NULL group_id
+CON access_rule_groups access_rule_groups_id_not_null NOT NULL id
+CON access_rule_groups access_rule_groups_pkey PRIMARY KEY (id)
+CON access_rule_groups access_rule_groups_rule_id_not_null NOT NULL rule_id
+CON access_rule_groups access_rule_groups_side_not_null NOT NULL side
+CON access_rule_groups fk_access_rule_groups_group FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+CON access_rule_groups fk_access_rule_groups_rule FOREIGN KEY (rule_id) REFERENCES access_rules(id) ON DELETE CASCADE
+CON access_rules access_rules_id_not_null NOT NULL id
+CON access_rules access_rules_name_not_null NOT NULL name
+CON access_rules access_rules_pkey PRIMARY KEY (id)
+CON access_rules access_rules_protocol_not_null NOT NULL protocol
 CON api_keys api_keys_id_not_null NOT NULL id
 CON api_keys api_keys_pkey PRIMARY KEY (id)
 CON audit_events audit_events_action_not_null NOT NULL action
@@ -142,6 +190,21 @@ CON audit_events audit_events_pkey PRIMARY KEY (id)
 CON database_versions database_versions_id_not_null NOT NULL id
 CON database_versions database_versions_pkey PRIMARY KEY (id)
 CON database_versions database_versions_version_not_null NOT NULL version
+CON group_nodes fk_group_nodes_group FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+CON group_nodes fk_group_nodes_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE
+CON group_nodes group_nodes_group_id_not_null NOT NULL group_id
+CON group_nodes group_nodes_id_not_null NOT NULL id
+CON group_nodes group_nodes_node_id_not_null NOT NULL node_id
+CON group_nodes group_nodes_pkey PRIMARY KEY (id)
+CON group_users fk_group_users_group FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
+CON group_users fk_group_users_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+CON group_users group_users_group_id_not_null NOT NULL group_id
+CON group_users group_users_id_not_null NOT NULL id
+CON group_users group_users_pkey PRIMARY KEY (id)
+CON group_users group_users_user_id_not_null NOT NULL user_id
+CON groups groups_id_not_null NOT NULL id
+CON groups groups_name_not_null NOT NULL name
+CON groups groups_pkey PRIMARY KEY (id)
 CON migrations migrations_id_not_null NOT NULL id
 CON migrations migrations_pkey PRIMARY KEY (id)
 CON node_shares fk_node_shares_node FOREIGN KEY (node_id) REFERENCES nodes(id) ON DELETE CASCADE

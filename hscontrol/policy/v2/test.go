@@ -234,7 +234,7 @@ func evaluateTests(pol *Policy, users []types.User, nodes views.Slice[types.Node
 	grants := pol.compileGrants(users, nodes)
 
 	var filter []tailcfg.FilterRule
-	if pol.ACLs == nil && pol.Grants == nil {
+	if !pol.enforces() {
 		filter = tailcfg.FilterAllowAll
 	} else {
 		filter = globalFilterRules(grants)

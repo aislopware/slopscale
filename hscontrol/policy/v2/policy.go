@@ -37,6 +37,9 @@ type PolicyManager struct {
 	users []types.User
 	nodes views.Slice[types.NodeView]
 
+	// access is the database's groups and rules; see [Policy.access].
+	access types.AccessModel
+
 	filterHash deephash.Sum
 	filter     []tailcfg.FilterRule
 	matchers   []matcher.Match
@@ -103,6 +106,7 @@ type PolicyManager struct {
 type filterAndPolicy struct {
 	Filter []tailcfg.FilterRule
 	Policy *Policy
+	Access types.AccessModel
 }
 
 // checkUsernameRef resolves a single user@ token and records an error in
@@ -378,6 +382,8 @@ func (pm *PolicyManager) SetPolicy(polB []byte) (bool, error) {
 		return false, fmt.Errorf("validating policy user references: %w", err)
 	}
 
+	pol.access = pm.access
+
 	// SetPolicy is the user-write boundary. Tests evaluate against a
 	// sandbox compiled from the new policy + current users/nodes; if
 	// they fail, return without mutating the live PolicyManager so the
@@ -407,6 +413,21 @@ func (pm *PolicyManager) SetPolicy(polB []byte) (bool, error) {
 		Msg("Policy parsed successfully")
 
 	pm.pol = pol
+
+	return pm.updateLocked()
+}
+
+// SetAccessModel replaces the database's groups and rules and recompiles.
+// It reports whether the compiled output changed.
+func (pm *PolicyManager) SetAccessModel(model types.AccessModel) (bool, error) {
+	if pm == nil {
+		return false, nil
+	}
+
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	pm.access = model
 
 	return pm.updateLocked()
 }
@@ -1427,6 +1448,17 @@ func (pm *PolicyManager) NodesWithChangedCapMap() []types.NodeID {
 // updateLocked updates the filter rules based on the current policy and nodes.
 // It must be called with the lock held.
 func (pm *PolicyManager) updateLocked() (bool, error) {
+	// The access model compiles next to the file's grants, so it is
+	// attached before every compile; rules without a file still need a
+	// policy to hang off.
+	if pm.pol == nil && hasAccessGrants(pm.access) {
+		pm.pol = &Policy{}
+	}
+
+	if pm.pol != nil {
+		pm.pol.access = pm.access
+	}
+
 	// Compile all grants once. Both global and per-node filter
 	// rules are derived from these compiled grants.
 	pm.compiledGrants = pm.pol.compileGrants(pm.users, pm.nodes)
@@ -1443,7 +1475,7 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 	pm.relayTargetIPs = relayTargetIPs
 
 	var filter []tailcfg.FilterRule
-	if pm.pol == nil || (pm.pol.ACLs == nil && pm.pol.Grants == nil) {
+	if !pm.pol.enforces() {
 		filter = tailcfg.FilterAllowAll
 	} else {
 		filter = globalFilterRules(pm.compiledGrants)
@@ -1456,6 +1488,7 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 	filterHash := deephash.Hash(&filterAndPolicy{
 		Filter: filter,
 		Policy: pm.pol,
+		Access: pm.access,
 	})
 
 	filterChanged := filterHash != pm.filterHash

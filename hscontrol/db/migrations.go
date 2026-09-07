@@ -485,7 +485,162 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609080930-audit-events",
 			run: migrateAuditEvents,
 		},
+		{
+			// Access control: groups of nodes and users, access rules
+			// between groups, and the groups a pre-auth key enrols
+			// nodes into. See docs/ref/access-control.md.
+			id:  "202609081000-access-groups",
+			run: migrateAccessGroups,
+		},
 	}
+}
+
+// migrateAccessGroups (202609081000) creates the groups, group_nodes,
+// group_users, access_rules and access_rule_groups tables and adds
+// pre_auth_keys.groups.
+func migrateAccessGroups(tx *Tx) error {
+	err := tx.ex.addColumnIfMissing("pre_auth_keys", "groups", typeText)
+	if err != nil {
+		return err
+	}
+
+	tables := []struct {
+		name             string
+		sqlite, postgres string
+		indexes          []string
+	}{
+		{
+			name: "groups",
+			sqlite: `CREATE TABLE groups(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  description text,
+  builtin text,
+  created_at datetime,
+  updated_at datetime
+)`,
+			postgres: `CREATE TABLE groups(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  builtin text,
+  created_at timestamptz,
+  updated_at timestamptz
+)`,
+			indexes: []string{`CREATE UNIQUE INDEX idx_groups_name ON groups(name)`},
+		},
+		{
+			name: "group_nodes",
+			sqlite: `CREATE TABLE group_nodes(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  group_id integer NOT NULL,
+  node_id integer NOT NULL,
+  created_at datetime,
+  CONSTRAINT fk_group_nodes_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_nodes_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+)`,
+			postgres: `CREATE TABLE group_nodes(
+  id bigserial PRIMARY KEY,
+  group_id bigint NOT NULL,
+  node_id bigint NOT NULL,
+  created_at timestamptz,
+  CONSTRAINT fk_group_nodes_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_nodes_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+)`,
+			indexes: []string{`CREATE UNIQUE INDEX idx_group_nodes_group_node ON group_nodes(group_id, node_id)`},
+		},
+		{
+			name: "group_users",
+			sqlite: `CREATE TABLE group_users(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  group_id integer NOT NULL,
+  user_id integer NOT NULL,
+  created_at datetime,
+  CONSTRAINT fk_group_users_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_users_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+)`,
+			postgres: `CREATE TABLE group_users(
+  id bigserial PRIMARY KEY,
+  group_id bigint NOT NULL,
+  user_id bigint NOT NULL,
+  created_at timestamptz,
+  CONSTRAINT fk_group_users_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE,
+  CONSTRAINT fk_group_users_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+)`,
+			indexes: []string{`CREATE UNIQUE INDEX idx_group_users_group_user ON group_users(group_id, user_id)`},
+		},
+		{
+			name: "access_rules",
+			sqlite: `CREATE TABLE access_rules(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  description text,
+  enabled numeric DEFAULT true,
+  protocol text NOT NULL,
+  ports text,
+  bidirectional numeric DEFAULT false,
+  created_at datetime,
+  updated_at datetime
+)`,
+			postgres: `CREATE TABLE access_rules(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  enabled boolean DEFAULT true,
+  protocol text NOT NULL,
+  ports text,
+  bidirectional boolean DEFAULT false,
+  created_at timestamptz,
+  updated_at timestamptz
+)`,
+		},
+		{
+			name: "access_rule_groups",
+			sqlite: `CREATE TABLE access_rule_groups(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  rule_id integer NOT NULL,
+  group_id integer NOT NULL,
+  side text NOT NULL,
+  CONSTRAINT fk_access_rule_groups_rule FOREIGN KEY(rule_id) REFERENCES access_rules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_rule_groups_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+)`,
+			postgres: `CREATE TABLE access_rule_groups(
+  id bigserial PRIMARY KEY,
+  rule_id bigint NOT NULL,
+  group_id bigint NOT NULL,
+  side text NOT NULL,
+  CONSTRAINT fk_access_rule_groups_rule FOREIGN KEY(rule_id) REFERENCES access_rules(id) ON DELETE CASCADE,
+  CONSTRAINT fk_access_rule_groups_group FOREIGN KEY(group_id) REFERENCES groups(id) ON DELETE CASCADE
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_access_rule_groups_rule_group_side
+  ON access_rule_groups(rule_id, group_id, side)`,
+			},
+		},
+	}
+
+	for _, t := range tables {
+		exists, err := tx.ex.hasTable(t.name)
+		if err != nil {
+			return err
+		}
+
+		if exists {
+			continue
+		}
+
+		ddl := t.sqlite
+		if tx.ex.dialect == dialectPostgres {
+			ddl = t.postgres
+		}
+
+		err = tx.ex.execAll("creating "+t.name+" table", append([]string{ddl}, t.indexes...))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // migrateSessions (202609080900) creates the sessions table.
