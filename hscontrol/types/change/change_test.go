@@ -385,8 +385,8 @@ func TestDedupePolicyChanges(t *testing.T) {
 		},
 		{
 			name:    "changes without any recompute are unchanged",
-			changes: []Change{NodeOnline(1, time.Now()), DERPMap()},
-			want:    []Change{NodeOnline(1, time.Now()), DERPMap()},
+			changes: []Change{NodeOnline(1, seen), DERPMap()},
+			want:    []Change{NodeOnline(1, seen), DERPMap()},
 		},
 	}
 
