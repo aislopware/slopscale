@@ -151,7 +151,6 @@
             # oxfmt, TypeScript and Vite from web/bun.lock.
             bun
             golines
-            prettier
             nixpkgs-fmt
             goreleaser
             nfpm
@@ -239,15 +238,14 @@
           # golangci-lint built against the pinned Go.
           golangci-lint = fc.goLint common;
 
-          # nixpkgs-fmt + prettier, excluding generated output. goFmt = "off":
-          # Go formatting (golines, gofumpt) is enforced by the golangci-lint
-          # check, not treefmt. prettierExts matches the old prettier-lint glob
-          # (no json: testdata fixtures are hand-formatted).
+          # nixpkgs-fmt only. goFmt = "off": Go formatting (golines, gofumpt)
+          # is enforced by the golangci-lint check, not treefmt. Markup and
+          # config files are formatted by oxfmt from the console toolchain
+          # (`make lint-markup`, run by the admin console workflow), which
+          # the sandboxed check cannot fetch.
           formatting = fc.goFormat (common // {
             goFmt = "off";
-            prettier = true;
-            prettierExts = [ "ts" "js" "md" "yaml" "yml" "sass" "css" "scss" "html" ];
-            # Mirror .prettierignore (docs/ are mkdocs-flavoured; gen/ generated).
+            prettier = false;
             fmtExclude = [ ./gen ./docs ./web ];
           });
         };

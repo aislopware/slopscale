@@ -86,7 +86,8 @@ jobs:
       # cgo cross build: zigcc (Nix devShell) maps GOOS/GOARCH to a zig
       # target and the binary links statically against musl.
       - name: Run go cross compile
-        run: env ${{ matrix.env }} CC=zigcc go build -trimpath -tags netgo,osusergo
+        run:
+          env ${{ matrix.env }} CC=zigcc go build -trimpath -tags netgo,osusergo
           -ldflags '-s -w -linkmode=external -extldflags=-static' -o "headscale"
           ./cmd/headscale
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

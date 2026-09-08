@@ -26,7 +26,10 @@ endef
 
 # Source file collections using shell find for better performance
 GO_SOURCES := $(shell find . -name '*.go' -not -path './gen/*' -not -path './vendor/*')
-PRETTIER_SOURCES := $(shell find . \( -name '*.md' -o -name '*.yaml' -o -name '*.yml' -o -name '*.ts' -o -name '*.js' -o -name '*.html' -o -name '*.css' -o -name '*.scss' -o -name '*.sass' \) -not -path './gen/*' -not -path './vendor/*' -not -path './node_modules/*' -not -path './web/*')
+MARKUP_SOURCES := $(shell find . \( -name '*.md' -o -name '*.yaml' -o -name '*.yml' -o -name '*.ts' -o -name '*.js' -o -name '*.html' -o -name '*.css' -o -name '*.scss' -o -name '*.sass' \) -not -path './gen/*' -not -path './vendor/*' -not -path './node_modules/*' -not -path './web/*' -not -path './docs/*' -not -path './.claude/*')
+# oxfmt is pinned in web/bun.lock and formats the repo's markup and config
+# files as well as the console (see .oxfmtrc.json for the root scope).
+OXFMT := web/node_modules/.bin/oxfmt
 WEB_SOURCES := $(shell find web -type f -not -path 'web/node_modules/*' -not -path 'web/codegen/node_modules/*' -not -path 'web/dist/*')
 
 # Default target
@@ -39,7 +42,6 @@ check-deps:
 	$(call check_tool,go)
 	$(call check_tool,golangci-lint)
 	$(call check_tool,mdformat)
-	$(call check_tool,prettier)
 
 .PHONY: check-web-deps
 check-web-deps:
@@ -105,7 +107,7 @@ test: check-deps $(GO_SOURCES) go.mod go.sum
 
 # Formatting targets
 .PHONY: fmt
-fmt: fmt-go fmt-mdformat fmt-prettier fmt-web
+fmt: fmt-go fmt-mdformat fmt-markup fmt-web
 
 .PHONY: fmt-go
 fmt-go: check-deps $(GO_SOURCES)
@@ -119,16 +121,21 @@ fmt-mdformat: check-deps
 	@echo "Formatting documentation..."
 	mdformat docs/
 
-.PHONY: fmt-prettier
-fmt-prettier: check-deps $(PRETTIER_SOURCES)
+.PHONY: fmt-markup
+fmt-markup: web-deps $(MARKUP_SOURCES)
 	@echo "Formatting markup and config files..."
-	prettier --write '**/*.{ts,js,md,yaml,yml,sass,css,scss,html}'
+	$(OXFMT) --config .oxfmtrc.json .
 
 # Linting targets. `lint` is the full gate: every golangci-lint linter and
 # formatter (see .golangci.yaml), go vet, a tidy/verified module graph, and a
 # vulnerability scan of the dependency tree.
 .PHONY: lint
-lint: lint-go lint-mod lint-vuln lint-web
+lint: lint-go lint-mod lint-vuln lint-web lint-markup
+
+.PHONY: lint-markup
+lint-markup: web-deps $(MARKUP_SOURCES)
+	@echo "Checking markup and config formatting..."
+	$(OXFMT) --config .oxfmtrc.json --check .
 
 .PHONY: lint-go
 lint-go: check-deps $(GO_SOURCES) go.mod go.sum
@@ -209,7 +216,7 @@ help:
 	@echo "Specific targets:"
 	@echo "  fmt-go       - Format Go code only"
 	@echo "  fmt-mdformat - Format documentation only"
-	@echo "  fmt-prettier - Format markup and config files only"
+	@echo "  fmt-markup   - Format markup and config files only (oxfmt)"
 	@echo "  lint-go      - Lint Go code only"
 	@echo "  web          - Build the admin console into web/dist (embedded by build)"
 	@echo "  web-generate - Regenerate the console's API types from the OpenAPI spec"

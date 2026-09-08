@@ -1,0 +1,15 @@
+{
+  "$schema": "./web/node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 80,
+  "ignorePatterns": [
+    "gen",
+    "docs",
+    "web",
+    ".claude",
+    "vendor",
+    "**/testdata",
+    "**/*.json",
+    "**/*.jsonc",
+    ".github/workflows/test-integration-v2*"
+  ]
+}

@@ -54,3 +54,7 @@ jobs:
       - uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
       - name: formatting
         run: nix build -L .#checks.x86_64-linux.formatting
+      # oxfmt comes from web/bun.lock, which the sandboxed check cannot
+      # fetch, so the markup and config files are checked here instead.
+      - name: markup and config formatting
+        run: nix develop --fallback --command make lint-markup

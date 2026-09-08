@@ -39,13 +39,18 @@ repos:
         language: system
         files: \.nix$
 
-      # Prettier for formatting
-      - id: prettier
-        name: prettier
-        entry: prettier --write --list-different
+      # oxfmt for the repo's markup and config files, from the console's
+      # pinned toolchain (make web-deps installs it); .oxfmtrc.json at the
+      # root scopes it. Once per commit: prek batches files across
+      # processes, which would otherwise install concurrently.
+      - id: oxfmt
+        name: oxfmt
+        entry: make --silent fmt-markup
         language: system
         exclude: ^(docs|web|\.claude)/
-        types_or: [javascript, jsx, ts, tsx, yaml, json, html, css, scss, sass, markdown]
+        types_or:
+          [javascript, jsx, ts, tsx, yaml, html, css, scss, sass, markdown]
+        pass_filenames: false
 
       # The admin console has its own toolchain (oxfmt, oxlint, tsc); run it
       # once per commit that touches web/ instead of per file.

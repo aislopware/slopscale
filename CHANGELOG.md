@@ -508,7 +508,10 @@ tags, hosts, prefixes, `autogroup:member`, `autogroup:tagged`, and `*`.
 {
   "randomizeClientPort": true,
   "nodeAttrs": [
-    { "target": ["autogroup:tagged"], "attr": ["disable-captive-portal-detection"] },
+    {
+      "target": ["autogroup:tagged"],
+      "attr": ["disable-captive-portal-detection"],
+    },
     { "target": ["alice@example.com"], "attr": ["nextdns:abc123"] },
   ],
 }
@@ -832,13 +835,23 @@ sequentially through each stable release, selecting the latest patch version ava
   **Before:**
 
   ```json
-  { "action": "accept", "src": ["group:admins"], "dst": ["*"], "users": ["root"] }
+  {
+    "action": "accept",
+    "src": ["group:admins"],
+    "dst": ["*"],
+    "users": ["root"]
+  }
   ```
 
   **After:**
 
   ```json
-  { "action": "accept", "src": ["group:admins"], "dst": ["autogroup:member", "autogroup:tagged"], "users": ["root"] }
+  {
+    "action": "accept",
+    "src": ["group:admins"],
+    "dst": ["autogroup:member", "autogroup:tagged"],
+    "users": ["root"]
+  }
   ```
 
 - **SSH Policy**: SSH source/destination validation now enforces Tailscale's security model [#3010](https://github.com/juanfont/headscale/issues/3010)

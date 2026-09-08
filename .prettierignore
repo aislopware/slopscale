@@ -1,4 +1,0 @@
-.github/workflows/test-integration-v2*
-docs/
-# The admin console is formatted by oxfmt (see web/.oxfmtrc.json).
-web/
