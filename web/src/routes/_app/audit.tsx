@@ -121,7 +121,6 @@ function AuditPage(): ReactElement {
           <SearchInput
             value={search.action}
             placeholder="Filter by action"
-            hint="An action ending in a dot matches a prefix: node. keeps every node action."
             onValueChange={(value) => {
               void navigate({
                 search: (previous) => ({ ...previous, action: value }),
