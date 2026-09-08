@@ -51,6 +51,10 @@ const (
 	// whole working set of a control server fits in this cache, so reads
 	// stop touching the file at all once warm.
 	DefaultCacheSize = 64 * 1024
+	// DefaultMmapSize maps up to 256 MiB of the file. A database smaller
+	// than that is mapped whole; the mapping costs no memory beyond the
+	// page cache the OS keeps anyway.
+	DefaultMmapSize int64 = 256 << 20
 )
 
 // JournalMode represents SQLite journal_mode pragma values.
@@ -307,6 +311,13 @@ type Config struct {
 	// CacheSize is the page cache size per connection in KiB; 0 leaves
 	// SQLite's default (2 MiB).
 	CacheSize int
+	// MmapSize is the size in bytes of the memory map SQLite reads the
+	// file through; 0 leaves it off. Mapped pages are served from the OS
+	// page cache without a copy into the connection's cache.
+	MmapSize int64
+	// TempStoreMemory keeps temporary tables and sort files in memory
+	// rather than on disk.
+	TempStoreMemory bool
 }
 
 // Default returns the production configuration optimized for Headscale's usage patterns.
@@ -328,6 +339,8 @@ func Default(path string) *Config {
 		ForeignKeys:       true,
 		TxLock:            TxLockImmediate,
 		CacheSize:         DefaultCacheSize,
+		MmapSize:          DefaultMmapSize,
+		TempStoreMemory:   true,
 	}
 }
 
@@ -421,6 +434,14 @@ func (c *Config) Pragmas() []string {
 	// A negative cache_size is a size in KiB rather than a page count.
 	if c.CacheSize > 0 {
 		pragmas = append(pragmas, "PRAGMA cache_size = -"+strconv.Itoa(c.CacheSize))
+	}
+
+	if c.MmapSize > 0 {
+		pragmas = append(pragmas, "PRAGMA mmap_size = "+strconv.FormatInt(c.MmapSize, 10))
+	}
+
+	if c.TempStoreMemory {
+		pragmas = append(pragmas, "PRAGMA temp_store = MEMORY")
 	}
 
 	if c.ForeignKeys {

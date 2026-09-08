@@ -217,6 +217,8 @@ func TestConfigPragmas(t *testing.T) {
 				"PRAGMA wal_autocheckpoint = 1000",
 				"PRAGMA synchronous = NORMAL",
 				"PRAGMA cache_size = -65536",
+				"PRAGMA mmap_size = 268435456",
+				"PRAGMA temp_store = MEMORY",
 				"PRAGMA foreign_keys = ON",
 			},
 		},
