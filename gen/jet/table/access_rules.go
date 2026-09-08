@@ -27,6 +27,7 @@ type accessRulesTable struct {
 	ExpiresAt     sqlite.ColumnTimestamp
 	CreatedAt     sqlite.ColumnTimestamp
 	UpdatedAt     sqlite.ColumnTimestamp
+	Builtin       sqlite.ColumnString
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -78,8 +79,9 @@ func newAccessRulesTableImpl(schemaName, tableName, alias string) accessRulesTab
 		ExpiresAtColumn     = sqlite.TimestampColumn("expires_at")
 		CreatedAtColumn     = sqlite.TimestampColumn("created_at")
 		UpdatedAtColumn     = sqlite.TimestampColumn("updated_at")
-		allColumns          = sqlite.ColumnList{IDColumn, NameColumn, DescriptionColumn, EnabledColumn, ProtocolColumn, PortsColumn, BidirectionalColumn, ExpiresAtColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns      = sqlite.ColumnList{NameColumn, DescriptionColumn, EnabledColumn, ProtocolColumn, PortsColumn, BidirectionalColumn, ExpiresAtColumn, CreatedAtColumn, UpdatedAtColumn}
+		BuiltinColumn       = sqlite.StringColumn("builtin")
+		allColumns          = sqlite.ColumnList{IDColumn, NameColumn, DescriptionColumn, EnabledColumn, ProtocolColumn, PortsColumn, BidirectionalColumn, ExpiresAtColumn, CreatedAtColumn, UpdatedAtColumn, BuiltinColumn}
+		mutableColumns      = sqlite.ColumnList{NameColumn, DescriptionColumn, EnabledColumn, ProtocolColumn, PortsColumn, BidirectionalColumn, ExpiresAtColumn, CreatedAtColumn, UpdatedAtColumn, BuiltinColumn}
 		defaultColumns      = sqlite.ColumnList{EnabledColumn, BidirectionalColumn}
 	)
 
@@ -97,6 +99,7 @@ func newAccessRulesTableImpl(schemaName, tableName, alias string) accessRulesTab
 		ExpiresAt:     ExpiresAtColumn,
 		CreatedAt:     CreatedAtColumn,
 		UpdatedAt:     UpdatedAtColumn,
+		Builtin:       BuiltinColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

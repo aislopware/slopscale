@@ -101,6 +101,8 @@ components:
       properties:
         bidirectional:
           type: boolean
+        builtin:
+          type: string
         createdAt:
           format: date-time
           type: string
@@ -151,6 +153,7 @@ components:
         - destinationGroupIds
         - postureIds
         - expiresAt
+        - builtin
         - createdAt
         - updatedAt
       type: object

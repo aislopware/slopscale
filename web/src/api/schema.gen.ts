@@ -1764,6 +1764,7 @@ export interface components {
         };
         AccessRule: {
             bidirectional: boolean;
+            builtin: string;
             /** Format: date-time */
             createdAt: string;
             description: string;
