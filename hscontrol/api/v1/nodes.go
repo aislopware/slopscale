@@ -76,7 +76,7 @@ type Node struct {
 	// ClientWarnings are what the client itself reports as broken, taken
 	// from the warn-* flags of its last map request.
 	//nolint:lll // doc tag
-	ClientWarnings []string `doc:"Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup. Empty while the client reports none, and after a restart of the server until the client polls again." json:"clientWarnings" nullable:"false"`
+	ClientWarnings []string `doc:"Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup, etc-apt-source-disabled when the Tailscale apt source is commented out. A newer client may report flags not listed here. Empty while the client reports none, while it is offline, and after a restart of the server until it polls again." json:"clientWarnings" nullable:"false"`
 }
 
 // NodePreAuthKey is the PreAuthKey shape embedded in a Node response. The

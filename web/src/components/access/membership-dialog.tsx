@@ -106,7 +106,7 @@ function MembershipForm({
           label="Until"
           required={false}
           type="datetime-local"
-          description="The groups being added are left again at this time. Leave empty to keep them for good."
+          description="The selected groups are removed again at this time. Leave empty to keep them for good."
           value={expires}
           onChange={(event) => {
             setExpires(event.target.value);

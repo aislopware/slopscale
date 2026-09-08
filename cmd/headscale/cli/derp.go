@@ -38,28 +38,30 @@ func init() {
 	setDERPCmd.Flags().Bool("server", true, "Run the embedded relay")
 	setDERPCmd.Flags().Int64("region-id", defaultDERPRegionID, "Region the embedded relay is published as")
 	setDERPCmd.Flags().String("region-code", "headscale", "Short code of the embedded relay's region")
-	setDERPCmd.Flags().String("region-name", "", "Name of the embedded relay's region, the code when empty")
+	setDERPCmd.Flags().String("region-name", "", "Name of the embedded relay's region. If empty, the code is used")
 	setDERPCmd.Flags().Bool("verify-clients", true, "Admit only this tailnet's machines to the embedded relay")
 	setDERPCmd.Flags().String("stun", "0.0.0.0:3478", "UDP host:port the embedded relay's STUN listens on")
-	setDERPCmd.Flags().String("ipv4", "", "Public IPv4 published for the embedded relay, DNS when empty")
-	setDERPCmd.Flags().String("ipv6", "", "Public IPv6 published for the embedded relay, DNS when empty")
+	setDERPCmd.Flags().
+		String("ipv4", "", "Public IPv4 published for the embedded relay. If empty, machines rely on DNS")
+	setDERPCmd.Flags().
+		String("ipv6", "", "Public IPv6 published for the embedded relay. If empty, machines rely on DNS")
 
 	addDERPRelayCmd.Flags().Int64("region", 0, "Region ID the relay belongs to; a new ID creates the region")
 	addDERPRelayCmd.Flags().String("code", "", "Region code, needed for a new region")
-	addDERPRelayCmd.Flags().String("name", "", "Region name, the code when empty")
+	addDERPRelayCmd.Flags().String("name", "", "Region name. If empty, the code is used")
 	addDERPRelayCmd.Flags().String("host", "", "DNS name the relay's certificate matches")
-	addDERPRelayCmd.Flags().String("relay-name", "", "Name unique within the region; empty takes the host")
+	addDERPRelayCmd.Flags().String("relay-name", "", "Name unique within the region. If empty, the host is used")
 	addDERPRelayCmd.Flags().String("ipv4", "", "Fixed IPv4, or none")
 	addDERPRelayCmd.Flags().String("ipv6", "", "Fixed IPv6, or none")
-	addDERPRelayCmd.Flags().Int64("derp-port", 0, "HTTPS port; 0 means 443")
-	addDERPRelayCmd.Flags().Int64("stun-port", 0, "UDP STUN port; 0 means 3478")
+	addDERPRelayCmd.Flags().Int64("derp-port", 0, "HTTPS port. 0 selects 443")
+	addDERPRelayCmd.Flags().Int64("stun-port", 0, "UDP STUN port. 0 selects 3478")
 	addDERPRelayCmd.Flags().Bool("stun-only", false, "The relay answers STUN but never relays")
 	addDERPRelayCmd.Flags().Bool("can-port80", false, "The relay also serves plain HTTP on port 80")
 	_ = addDERPRelayCmd.MarkFlagRequired("region")
 	_ = addDERPRelayCmd.MarkFlagRequired("host")
 
 	removeDERPRelayCmd.Flags().Int64("region", 0, "Region ID")
-	removeDERPRelayCmd.Flags().String("host", "", "Relay to remove; without it the whole region goes")
+	removeDERPRelayCmd.Flags().String("host", "", "Relay to remove. Without it the whole region is removed")
 	_ = removeDERPRelayCmd.MarkFlagRequired("region")
 }
 

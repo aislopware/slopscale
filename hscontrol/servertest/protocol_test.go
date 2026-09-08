@@ -302,13 +302,43 @@ func TestClientWarningsReachTheAPI(t *testing.T) {
 	srv := servertest.NewServer(t)
 	owner := srv.CreateUser(t, "owner")
 
-	servertest.NewClient(t, srv, "router", servertest.WithUser(owner),
+	router := servertest.NewClient(t, srv, "router", servertest.WithUser(owner),
 		servertest.WithDebugFlags("warn-ip-forwarding-off", "warn-router-unhealthy", "warn-ip-forwarding-off"))
 	servertest.NewClient(t, srv, "quiet", servertest.WithUser(owner))
 
+	apiKey := srv.CreateAPIKey(t, owner)
+
+	nodes := listNodes(t, srv, apiKey)
+	require.Len(t, nodes, 2)
+	assert.Equal(t, []string{"ip-forwarding-off", "router-unhealthy"}, nodes["router"].ClientWarnings)
+	assert.Equal(t, []string{}, nodes["quiet"].ClientWarnings)
+
+	// The warnings describe a running client: once it goes offline, after
+	// the disconnect grace period, they are gone, and its next map request
+	// brings the current set.
+	router.Disconnect(t)
+
+	require.Eventually(t, func() bool {
+		router := listNodes(t, srv, apiKey)["router"]
+
+		return !router.Online && len(router.ClientWarnings) == 0
+	}, 20*time.Second, 200*time.Millisecond, "warnings linger after the client went offline")
+}
+
+// apiNode is the part of a v1 node these tests read.
+type apiNode struct {
+	GivenName      string   `json:"givenName"`
+	Online         bool     `json:"online"`
+	ClientWarnings []string `json:"clientWarnings"`
+}
+
+// listNodes reads every node from the v1 API, keyed by given name.
+func listNodes(t *testing.T, srv *servertest.TestServer, apiKey string) map[string]apiNode {
+	t.Helper()
+
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, srv.URL+"/api/v1/node", http.NoBody)
 	require.NoError(t, err)
-	req.Header.Set("Authorization", "Bearer "+srv.CreateAPIKey(t, owner))
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	resp, err := srv.HTTPClient(t).Do(req)
 	require.NoError(t, err)
@@ -316,23 +346,17 @@ func TestClientWarningsReachTheAPI(t *testing.T) {
 	defer resp.Body.Close()
 
 	var body struct {
-		Nodes []struct {
-			GivenName      string   `json:"givenName"`
-			ClientWarnings []string `json:"clientWarnings"`
-		} `json:"nodes"`
+		Nodes []apiNode `json:"nodes"`
 	}
 
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
-	require.Len(t, body.Nodes, 2)
 
+	out := make(map[string]apiNode, len(body.Nodes))
 	for _, n := range body.Nodes {
-		switch n.GivenName {
-		case "router":
-			assert.Equal(t, []string{"ip-forwarding-off", "router-unhealthy"}, n.ClientWarnings)
-		case "quiet":
-			assert.Equal(t, []string{}, n.ClientWarnings)
-		}
+		out[n.GivenName] = n
 	}
+
+	return out
 }
 
 // TestExpiredKeyReachesTheNodeItself pins the natural key expiry: the
