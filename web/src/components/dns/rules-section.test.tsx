@@ -15,6 +15,7 @@ const groups: Group[] = [
     name: "Engineering",
     description: "",
     builtin: "",
+    source: "",
     requestable: false,
     expiries: [],
     nodeIds: [],

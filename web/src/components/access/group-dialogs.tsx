@@ -8,7 +8,7 @@ import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { AccessRule, Group, Node, User } from "~/api/queries.ts";
-import { rulesUsingGroup } from "~/components/access/model.ts";
+import { isSynced, rulesUsingGroup } from "~/components/access/model.ts";
 import type { AccessMutations } from "~/components/access/mutations.ts";
 import { nodeItems, userItems } from "~/components/access/pickers.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
@@ -62,6 +62,7 @@ function GroupForm({
   const [description, setDescription] = useState(group?.description ?? "");
   const [nodeIds, setNodeIds] = useState<string[]>(group?.nodeIds ?? []);
   const [userIds, setUserIds] = useState<string[]>(group?.userIds ?? []);
+  const synced = group !== undefined && isSynced(group);
   const [requestable, setRequestable] = useState(group?.requestable ?? false);
   const mutation = group === undefined ? mutations.createGroup : mutations.updateGroup;
   const body = {
@@ -113,11 +114,16 @@ function GroupForm({
       />
       <MultiPicker
         label="Users"
-        description="Every machine these users own is a member, including ones they register later."
-        placeholder="Add users…"
+        description={
+          synced
+            ? "Synced from the identity provider: users follow its groups claim at each sign-in."
+            : "Every machine these users own is a member, including ones they register later."
+        }
+        placeholder={synced ? "Managed by the identity provider" : "Add users…"}
         items={userItems(users)}
         value={userIds}
         onValueChange={setUserIds}
+        disabled={synced}
         empty="No user matches."
       />
       <MultiPicker

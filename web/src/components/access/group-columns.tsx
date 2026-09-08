@@ -3,7 +3,13 @@ import type { ReactElement } from "react";
 
 import type { Group, Node } from "~/api/queries.ts";
 import { GroupMenu } from "~/components/access/group-menu.tsx";
-import { isBuiltin, isSelf, machineCount, rulesUsingGroup } from "~/components/access/model.ts";
+import {
+  isBuiltin,
+  isSelf,
+  isSynced,
+  machineCount,
+  rulesUsingGroup,
+} from "~/components/access/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
@@ -105,6 +111,11 @@ function NameCell({ group }: { readonly group: Group }): ReactElement {
       <span className="flex min-w-0 items-center gap-2">
         <span className="truncate font-medium text-kumo-default">{group.name}</span>
         {isBuiltin(group) ? <Badge variant="outline">Built in</Badge> : null}
+        {isSynced(group) ? (
+          <span title="Users follow the identity provider's groups claim">
+            <Badge variant="outline">Synced</Badge>
+          </span>
+        ) : null}
       </span>
       {description === "" ? null : (
         <span className="truncate text-xs text-kumo-subtle">{description}</span>

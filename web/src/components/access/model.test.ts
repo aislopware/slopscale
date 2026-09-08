@@ -77,6 +77,7 @@ function node(id: string, owner: User, tags: string[] = []): Node {
 function group(id: string, overrides: Partial<Group> = {}): Group {
   return {
     builtin: "",
+    source: "",
     createdAt: stamp,
     description: "",
     expiries: [],

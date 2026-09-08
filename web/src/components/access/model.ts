@@ -15,6 +15,11 @@ export function isBuiltin(group: Group): boolean {
   return group.builtin !== "";
 }
 
+/** Whether the group mirrors the identity provider's groups claim; its users follow the claim. */
+export function isSynced(group: Group): boolean {
+  return group.source === "oidc";
+}
+
 export function isSelf(group: Group): boolean {
   return group.builtin === builtinSelf;
 }
