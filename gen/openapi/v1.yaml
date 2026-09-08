@@ -832,6 +832,9 @@ components:
         requestable:
           description: Whether members may ask to join the group for a while.
           type: boolean
+        source:
+          description: Empty for operator-made groups, else "oidc".
+          type: string
         updatedAt:
           format: date-time
           type: string
@@ -845,6 +848,7 @@ components:
         - description
         - builtin
         - requestable
+        - source
         - nodeIds
         - userIds
         - expiries

@@ -2094,6 +2094,8 @@ export interface components {
             nodeIds: string[];
             /** @description Whether members may ask to join the group for a while. */
             requestable: boolean;
+            /** @description Empty for operator-made groups, else "oidc". */
+            source: string;
             /** Format: date-time */
             updatedAt: string;
             userIds: string[];

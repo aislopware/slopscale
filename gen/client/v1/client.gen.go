@@ -574,9 +574,12 @@ type Group struct {
 	NodeIds     []string            `json:"nodeIds"`
 
 	// Requestable Whether members may ask to join the group for a while.
-	Requestable bool      `json:"requestable"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-	UserIds     []string  `json:"userIds"`
+	Requestable bool `json:"requestable"`
+
+	// Source Empty for operator-made groups, else "oidc".
+	Source    string    `json:"source"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	UserIds   []string  `json:"userIds"`
 }
 
 // GroupMemberExpiry defines model for GroupMemberExpiry.
