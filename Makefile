@@ -51,7 +51,7 @@ check-web-deps:
 .PHONY: build
 build: check-deps $(GO_SOURCES) go.mod go.sum
 	@echo "Building headscale..."
-	go build $(PIE_FLAGS) -ldflags "-X main.version=$(VERSION)" -o headscale ./cmd/headscale
+	go build $(PIE_FLAGS) -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o headscale ./cmd/headscale
 
 # Admin console. The React app in web/ is built by bun and embedded into
 # the binary by web/embed.go, so `make web` must run before `make build`
