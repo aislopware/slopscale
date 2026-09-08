@@ -15,6 +15,7 @@ import { MatchedPostures } from "~/components/machines/matched-postures.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
+import { AttributeText } from "~/components/ui/expression-text.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
@@ -139,7 +140,7 @@ function IdentityText({ posture }: { readonly posture: NodePosture }): ReactElem
   if (!posture.identityCollectionOn) {
     return (
       <span className="text-xs text-kumo-subtle">
-        Collection is off. Turn on &quot;Collect device identity&quot; under Settings.
+        Collection is off. Turn on &quot;Collect device identity&quot; under Settings → Tailnet.
       </span>
     );
   }
@@ -233,9 +234,7 @@ function CustomAttributes({
               setEditing(attribute);
             }}
           >
-            <span className="font-mono text-kumo-strong">
-              {attribute.key} = {attributeText(attribute.value)}
-            </span>
+            <AttributeText name={attribute.key} value={attribute.value} />
             <span className="text-xs text-kumo-subtle">
               {attribute.expiresAt === undefined ? (
                 "Does not expire"

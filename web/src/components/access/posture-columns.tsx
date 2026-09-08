@@ -5,6 +5,7 @@ import type { Posture } from "~/api/queries.ts";
 import { PostureMenu } from "~/components/access/posture-menu.tsx";
 import { rulesUsingPosture, scheduleSummary } from "~/components/access/posture-model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { ExpressionText } from "~/components/ui/expression-text.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
 const helper = createAppColumnHelper<Posture>();
@@ -107,7 +108,7 @@ function Expressions({ posture }: { readonly posture: Posture }): ReactElement {
     <div className="flex flex-wrap gap-1">
       {posture.expressions.map((expression) => (
         <Badge key={expression} variant="secondary" className="max-w-72">
-          <span className="truncate font-mono">{expression}</span>
+          <ExpressionText text={expression} className="truncate" />
         </Badge>
       ))}
     </div>

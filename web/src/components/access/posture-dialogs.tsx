@@ -1,7 +1,7 @@
 import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Checkbox } from "@cloudflare/kumo/components/checkbox";
-import { Input, Textarea } from "@cloudflare/kumo/components/input";
+import { Input } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -11,6 +11,7 @@ import type { ReactElement, SubmitEvent } from "react";
 import { api } from "~/api/client.ts";
 import { errorMessage } from "~/api/error.ts";
 import type { AccessRule, Posture } from "~/api/queries.ts";
+import { ExpressionEditor, firstExpressionError } from "~/components/access/expression-editor.tsx";
 import type { AccessMutations } from "~/components/access/mutations.ts";
 import {
   expressionExamples,
@@ -31,8 +32,14 @@ import {
   DialogRoot,
 } from "~/components/ui/dialog.tsx";
 import { toast } from "~/components/ui/toast.ts";
+import { useDebounced } from "~/lib/use-debounced.ts";
 
 type PostureBody = Parameters<AccessMutations["createPosture"]["mutate"]>[0]["body"];
+
+/** How long typing pauses before the draft goes to the server; the editor checks syntax itself. */
+const checkDelayMs = 400;
+
+const noErrors: readonly string[] = [];
 
 export interface PostureDialogProps {
   /** The posture to edit; absent when creating one. */
@@ -149,13 +156,19 @@ function PostureForm({
   };
 
   const expressions = parseExpressions(draft.expressions);
+  const settled = parseExpressions(useDebounced(draft.expressions, checkDelayMs));
   const check = useQuery({
-    ...api.queryOptions("post", "/api/v1/posture/check", { body: { expressions } }),
-    enabled: expressions.length > 0,
+    ...api.queryOptions("post", "/api/v1/posture/check", { body: { expressions: settled } }),
+    enabled: settled.length > 0,
     placeholderData: keepPreviousData,
   });
-  const errors = check.data?.errors ?? [];
-  const firstError = errors.findIndex((message) => message !== "");
+  // The server's answer is about the draft it was sent, so it stands only while that is the draft.
+  const errors =
+    settled.length === expressions.length &&
+    settled.every((line, index) => line === expressions[index])
+      ? (check.data?.errors ?? noErrors)
+      : noErrors;
+  const firstError = firstExpressionError(draft.expressions, errors);
   const issue = draftIssue(draft);
 
   function submit(event: SubmitEvent<HTMLFormElement>): void {
@@ -197,21 +210,15 @@ function PostureForm({
           update({ description: event.target.value });
         }}
       />
-      <Textarea
+      <ExpressionEditor
         label="Expressions"
         description="One per line. Attributes are node:… from what the client reports, custom:… set on the machine, and ip:… from where it connects."
         value={draft.expressions}
         placeholder={"node:tsVersion >= '1.80'\nnode:os IN ['macos', 'windows']"}
-        spellCheck={false}
-        autoResize
-        minRows={3}
-        maxRows={10}
-        onChange={(event) => {
-          update({ expressions: event.target.value });
+        serverErrors={errors}
+        onChange={(next) => {
+          update({ expressions: next });
         }}
-        {...(firstError === -1
-          ? {}
-          : { error: `Line ${firstError + 1}: ${errors[firstError] ?? ""}` })}
       />
       <Examples
         geoIpAvailable={geoIpAvailable}
@@ -246,7 +253,7 @@ function PostureForm({
       <FormFooter
         label={posture === undefined ? "Create posture" : "Save"}
         pending={mutation.isPending}
-        disabled={issue !== null || firstError !== -1}
+        disabled={issue !== null || firstError !== null}
       />
     </form>
   );

@@ -154,8 +154,10 @@ counts once it has connected; a posture that uses one of the `ip:`
 attributes recomputes the policy for a machine when its address changes.
 
 `POST /api/v1/posture/check` and `headscale postures check --expr ...`
-parse expressions without storing them, and the console's posture editor
-checks each line as it is typed.
+parse expressions without storing them. The console's posture editor
+colours each line, underlines a parse error where it is as it is typed,
+warns about an attribute the server never reports or a value `node:os`
+never takes, and completes attributes, operators and known values.
 
 ### Schedules
 
