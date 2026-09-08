@@ -163,7 +163,8 @@ func TestTailNode(t *testing.T) {
 						netip.MustParsePrefix("172.0.0.0/10"),
 					},
 				}),
-				Created: created,
+				Created:  created,
+				LastSeen: &lastSeen,
 
 				Tags: []string{},
 

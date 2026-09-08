@@ -397,27 +397,33 @@ func DNSConfig() Change {
 	}
 }
 
-// NodeOnline creates a patch response for a node coming online.
-func NodeOnline(nodeID types.NodeID) Change {
+// NodeOnline creates a patch response for a node coming online. seen is
+// when it connected: tailcfg carries LastSeen next to Online in a
+// [tailcfg.PeerChange], and a client on the peer-delta path (Tailscale
+// 1.102 on Apple platforms) reads a peer without one as never seen.
+func NodeOnline(nodeID types.NodeID, seen time.Time) Change {
 	return Change{
 		Reason: "node online",
 		PeerPatches: []*tailcfg.PeerChange{
 			{
-				NodeID: nodeID.NodeID(),
-				Online: new(true),
+				NodeID:   nodeID.NodeID(),
+				Online:   new(true),
+				LastSeen: &seen,
 			},
 		},
 	}
 }
 
-// NodeOffline creates a patch response for a node going offline.
-func NodeOffline(nodeID types.NodeID) Change {
+// NodeOffline creates a patch response for a node going offline. seen is
+// when it disconnected, the last time it was seen.
+func NodeOffline(nodeID types.NodeID, seen time.Time) Change {
 	return Change{
 		Reason: "node offline",
 		PeerPatches: []*tailcfg.PeerChange{
 			{
-				NodeID: nodeID.NodeID(),
-				Online: new(false),
+				NodeID:   nodeID.NodeID(),
+				Online:   new(false),
+				LastSeen: &seen,
 			},
 		},
 	}

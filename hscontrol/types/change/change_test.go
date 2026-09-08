@@ -315,7 +315,7 @@ func TestChange_IsBroadcastPolicyChange(t *testing.T) {
 		{name: "policy change", c: PolicyChange(), want: true},
 		{name: "self-update recompute", c: originUpdate, want: false},
 		{name: "targeted recompute", c: targeted, want: false},
-		{name: "online patch", c: NodeOnline(1), want: false},
+		{name: "online patch", c: NodeOnline(1, time.Now()), want: false},
 		{name: "full update", c: FullUpdate(), want: false},
 		{name: "derp map", c: DERPMap(), want: false},
 	}
@@ -328,6 +328,7 @@ func TestChange_IsBroadcastPolicyChange(t *testing.T) {
 }
 
 func TestDedupePolicyChanges(t *testing.T) {
+	seen := time.Now()
 	// originRecompute is a runtime recompute carrying node-specific payload
 	// (OriginNode), so it is not the canonical broadcast PolicyChange and must
 	// never be coalesced away.
@@ -357,10 +358,14 @@ func TestDedupePolicyChanges(t *testing.T) {
 		{
 			name: "peer patches survive between collapsed policy changes",
 			changes: []Change{
-				NodeOnline(1), PolicyChange(), NodeOnline(2), PolicyChange(), NodeOffline(3),
+				NodeOnline(1, seen),
+				PolicyChange(),
+				NodeOnline(2, seen),
+				PolicyChange(),
+				NodeOffline(3, seen),
 			},
 			want: []Change{
-				NodeOnline(1), PolicyChange(), NodeOnline(2), NodeOffline(3),
+				NodeOnline(1, seen), PolicyChange(), NodeOnline(2, seen), NodeOffline(3, seen),
 			},
 		},
 		{
@@ -380,8 +385,8 @@ func TestDedupePolicyChanges(t *testing.T) {
 		},
 		{
 			name:    "changes without any recompute are unchanged",
-			changes: []Change{NodeOnline(1), DERPMap()},
-			want:    []Change{NodeOnline(1), DERPMap()},
+			changes: []Change{NodeOnline(1, time.Now()), DERPMap()},
+			want:    []Change{NodeOnline(1, time.Now()), DERPMap()},
 		},
 	}
 
@@ -632,8 +637,8 @@ func TestNodeOnlineOfflineForSubnetRouter(t *testing.T) {
 		got        Change
 		wantOnline bool
 	}{
-		{name: "online", got: NodeOnline(view.ID()), wantOnline: true},
-		{name: "offline", got: NodeOffline(view.ID()), wantOnline: false},
+		{name: "online", got: NodeOnline(view.ID(), time.Now()), wantOnline: true},
+		{name: "offline", got: NodeOffline(view.ID(), time.Now()), wantOnline: false},
 	}
 
 	for _, tt := range tests {

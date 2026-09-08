@@ -50,6 +50,39 @@ func TestIssuesMapContent(t *testing.T) {
 		}
 	})
 
+	// An online peer carries LastSeen too. Tailscale's control plane
+	// sets it whenever the node has ever been seen, and a client on the
+	// peer-delta path treats a peer without it as never seen
+	// (juanfont/headscale#3420), so the online patch and the full map both
+	// stamp it.
+	t.Run("online_peers_carry_last_seen", func(t *testing.T) {
+		t.Parallel()
+		h := servertest.NewHarness(t, 2)
+
+		for _, c := range h.Clients() {
+			c.WaitForCondition(t, "every online peer has LastSeen",
+				10*time.Second,
+				func(nm *netmap.NetworkMap) bool {
+					if len(nm.Peers) < 1 {
+						return false
+					}
+
+					for _, peer := range nm.Peers {
+						online, known := peer.Online().GetOk()
+						if !known || !online {
+							return false
+						}
+
+						if !peer.LastSeen().Valid() {
+							return false
+						}
+					}
+
+					return true
+				})
+		}
+	})
+
 	// DiscoPublicKey set by the client should be visible to peers.
 	t.Run("disco_key_should_propagate_to_peers", func(t *testing.T) {
 		t.Parallel()

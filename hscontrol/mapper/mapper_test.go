@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -268,7 +269,7 @@ func TestBuildFromChangeFiltersPeerPatchesByVisibility(t *testing.T) {
 	m := &mapper{state: s, cfg: cfg}
 
 	// n2 (user2) comes online; n1 (user1) must NOT receive its patch.
-	leakChange := change.NodeOnline(n2.ID)
+	leakChange := change.NodeOnline(n2.ID, time.Now())
 	resp, err := m.buildFromChange(n1.ID, tailcfg.CurrentCapabilityVersion, &leakChange)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
@@ -279,7 +280,7 @@ func TestBuildFromChangeFiltersPeerPatchesByVisibility(t *testing.T) {
 	}
 
 	// Control: n1b (same user) coming online IS visible to n1.
-	okChange := change.NodeOnline(n1b.ID)
+	okChange := change.NodeOnline(n1b.ID, time.Now())
 	resp2, err := m.buildFromChange(n1.ID, tailcfg.CurrentCapabilityVersion, &okChange)
 	require.NoError(t, err)
 	require.NotNil(t, resp2)
@@ -442,7 +443,7 @@ func TestBuildFromChangeVisibilityMatchesFullMap(t *testing.T) {
 	patchReaches := func(t *testing.T, id types.NodeID) bool {
 		t.Helper()
 
-		c := change.NodeOnline(id)
+		c := change.NodeOnline(id, time.Now())
 		resp, err := m.buildFromChange(n1.ID, capVer, &c)
 		require.NoError(t, err)
 
