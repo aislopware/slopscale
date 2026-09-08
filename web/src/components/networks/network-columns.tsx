@@ -96,7 +96,7 @@ export const networkColumns = helper.columns([
         />
       );
     },
-    meta: { className: "w-12 text-right" },
+    meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
 
@@ -150,7 +150,7 @@ function PrefixesCell({
 /** Each router with its liveness; one that stopped advertising a prefix gets a warning. */
 function RoutersCell({ network }: { readonly network: Network }): ReactElement {
   if (network.routers.length === 0) {
-    return <span className="text-kumo-inactive">No routers</span>;
+    return <span className="text-kumo-subtle">No routers</span>;
   }
 
   return (

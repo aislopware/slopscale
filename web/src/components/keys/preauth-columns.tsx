@@ -104,7 +104,7 @@ export const preAuthKeyColumns = helper.columns([
 
       return me === undefined ? null : <PreAuthKeyMenu authKey={row.original} me={me} />;
     },
-    meta: { className: "w-12 text-right" },
+    meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
 

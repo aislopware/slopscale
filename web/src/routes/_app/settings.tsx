@@ -34,7 +34,7 @@ function SettingsPage(): ReactElement {
         title="Settings"
         description="Tailnet-wide switches, the session this browser holds and the server it talks to."
       />
-      <div className="flex max-w-3xl flex-col gap-6">
+      <div className="flex flex-col gap-6">
         <ApprovalSection settings={settings} canEdit={canEdit} />
         <DeviceTrustSection settings={settings} canEdit={canEdit} />
         <KeyExpirySection settings={settings} canEdit={canEdit} />

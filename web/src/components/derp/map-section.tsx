@@ -5,6 +5,8 @@ import type { ReactElement } from "react";
 import type { Derp } from "~/api/queries.ts";
 import { sourceLabels } from "~/components/derp/model.ts";
 import type { RegionSource } from "~/components/derp/model.ts";
+import { TableScroll } from "~/components/table/scroll-panel.tsx";
+import { frameTableClass, frameTableRowClass } from "~/components/ui/frame.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 
 const sourceVariants: Record<RegionSource, "secondary" | "info" | "success" | "neutral"> = {
@@ -29,34 +31,36 @@ export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
           <p className="text-kumo-subtle">No regions. Machines must connect directly.</p>
         </SectionRow>
       ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <Table.Header variant="compact">
-              <Table.Row>
-                <Table.Head className="w-16">Id</Table.Head>
-                <Table.Head>Code</Table.Head>
-                <Table.Head>Name</Table.Head>
-                <Table.Head className="text-right">Relays</Table.Head>
-                <Table.Head className="text-right">From</Table.Head>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {derp.regions.map((region) => (
-                <Table.Row key={region.id}>
-                  <Table.Cell className="font-mono tabular-nums">{region.id}</Table.Cell>
-                  <Table.Cell className="font-mono">{region.code}</Table.Cell>
-                  <Table.Cell className="text-kumo-subtle">{region.name}</Table.Cell>
-                  <Table.Cell className="text-right tabular-nums">{region.nodes}</Table.Cell>
-                  <Table.Cell className="text-right">
-                    <Badge variant={sourceVariants[region.source]}>
-                      {sourceLabels[region.source]}
-                    </Badge>
-                  </Table.Cell>
+        <TableScroll>
+          {() => (
+            <Table className={frameTableClass}>
+              <Table.Header variant="compact" sticky>
+                <Table.Row>
+                  <Table.Head className="w-16">Id</Table.Head>
+                  <Table.Head>Code</Table.Head>
+                  <Table.Head>Name</Table.Head>
+                  <Table.Head className="text-right">Relays</Table.Head>
+                  <Table.Head className="text-right">From</Table.Head>
                 </Table.Row>
-              ))}
-            </Table.Body>
-          </Table>
-        </div>
+              </Table.Header>
+              <Table.Body>
+                {derp.regions.map((region) => (
+                  <Table.Row key={region.id} className={frameTableRowClass}>
+                    <Table.Cell className="font-mono tabular-nums">{region.id}</Table.Cell>
+                    <Table.Cell className="font-mono">{region.code}</Table.Cell>
+                    <Table.Cell className="text-kumo-subtle">{region.name}</Table.Cell>
+                    <Table.Cell className="text-right tabular-nums">{region.nodes}</Table.Cell>
+                    <Table.Cell className="text-right">
+                      <Badge variant={sourceVariants[region.source]}>
+                        {sourceLabels[region.source]}
+                      </Badge>
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table>
+          )}
+        </TableScroll>
       )}
     </Section>
   );

@@ -1,8 +1,6 @@
 import { DeleteResource } from "@cloudflare/kumo";
-import { Banner } from "@cloudflare/kumo/components/banner";
 import { Input, Textarea } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
-import { InfoIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
 
@@ -17,6 +15,8 @@ import { parseList } from "~/components/dns/model.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { prefixesError } from "~/components/networks/model.ts";
 import type { NetworkMutations } from "~/components/networks/mutations.ts";
+import { Callout } from "~/components/ui/callout.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import type { PickerItem } from "~/components/ui/multi-picker.tsx";
@@ -198,7 +198,12 @@ function NetworkForm({
       />
       <MultiPicker
         label="Routers"
-        description="Machines that route the prefixes. Each must advertise them with tailscale set --advertise-routes. Two or more make a failover pair."
+        description={
+          <>
+            Machines that route the prefixes. Each must advertise them with{" "}
+            <Code>tailscale set --advertise-routes</Code>. Two or more make a failover pair.
+          </>
+        }
         placeholder="Machines that route the prefixes…"
         items={routerItems(nodes)}
         value={draft.routers}
@@ -257,10 +262,8 @@ function NarrowingNotice({
   }
 
   return (
-    <Banner
-      size="sm"
-      variant="alert"
-      icon={<InfoIcon />}
+    <Callout
+      tone="warning"
       title="The narrowing is not in force yet"
       description="The tailnet is open. There is no enabled access rule and no restricting policy file, so the groups reach every port behind the routers. The protocol and ports take effect once a rule is enabled."
     />

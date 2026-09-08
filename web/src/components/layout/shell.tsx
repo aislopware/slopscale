@@ -1,6 +1,7 @@
 import { Breadcrumbs } from "@cloudflare/kumo/components/breadcrumbs";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Sidebar } from "@cloudflare/kumo/components/sidebar";
+import { cn } from "@cloudflare/kumo/utils";
 import { MagnifyingGlassIcon, SignOutIcon, WaveformIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
@@ -17,6 +18,18 @@ import { QuickSearch } from "~/components/layout/quick-search.tsx";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { BreadcrumbProvider, useBreadcrumbLeaf } from "~/lib/breadcrumbs.tsx";
+
+/**
+ * Every page gets the same content width, so navigating never moves the first column sideways.
+ * Cards and tables fill it; the forms inside them keep their own narrower measures.
+ */
+const contentWidthClass = "max-w-[1400px]";
+
+/**
+ * The drawer is reached with a thumb, so its rows meet the 44px touch target. The desktop rail
+ * keeps its compact rows, which are aimed with a pointer.
+ */
+const touchRowClass = "max-md:min-h-11";
 
 export function Shell({
   me,
@@ -38,6 +51,8 @@ export function Shell({
         <Sidebar className="md:sticky md:top-0 md:h-svh">
           <Sidebar.Header className="h-12">
             <Brand />
+            {/* The drawer has no chrome of its own, so it carries the way out. */}
+            <Sidebar.Close className="md:hidden" />
           </Sidebar.Header>
           <Sidebar.Content>
             <Sidebar.Group className="pb-4">
@@ -45,7 +60,10 @@ export function Shell({
                 <Sidebar.MenuButton
                   icon={MagnifyingGlassIcon}
                   tooltip="Quick search (⌘K)"
-                  className="bg-kumo-base font-normal text-kumo-subtle ring ring-kumo-line group-data-[state=collapsed]/sidebar:bg-transparent group-data-[state=collapsed]/sidebar:ring-transparent"
+                  className={cn(
+                    touchRowClass,
+                    "bg-kumo-base font-normal text-kumo-subtle ring ring-kumo-line group-data-[state=collapsed]/sidebar:bg-transparent group-data-[state=collapsed]/sidebar:ring-transparent",
+                  )}
                   onClick={() => {
                     setSearchOpen(true);
                   }}
@@ -72,6 +90,7 @@ export function Shell({
                       icon={item.icon}
                       active={isActive(item, pathname)}
                       tooltip={item.label}
+                      className={touchRowClass}
                     >
                       {item.label}
                       <PendingBadge item={item} counts={counts} />
@@ -81,7 +100,8 @@ export function Shell({
               </Sidebar.Group>
             ))}
           </Sidebar.Content>
-          <Sidebar.Footer className="justify-end">
+          {/* Collapsing to the icon rail is a desktop idea; the drawer is either open or gone. */}
+          <Sidebar.Footer className="justify-end max-md:hidden">
             <Sidebar.Trigger />
           </Sidebar.Footer>
         </Sidebar>
@@ -94,7 +114,9 @@ export function Shell({
             </div>
           </header>
           <main className="flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-            <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-6">{children}</div>
+            <div className={cn("mx-auto flex w-full flex-col gap-6", contentWidthClass)}>
+              {children}
+            </div>
           </main>
         </div>
         <QuickSearch me={me} pages={pages} open={searchOpen} onOpenChange={setSearchOpen} />
@@ -138,7 +160,7 @@ function PendingBadge({
 
 function Brand(): ReactElement {
   return (
-    <div className="flex w-full min-w-0 items-center gap-2 px-2 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0">
+    <div className="flex min-w-0 flex-1 items-center gap-2 px-2 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0">
       <WaveformIcon className="size-5 shrink-0 text-kumo-brand" weight="duotone" />
       <span className="flex-1 truncate font-semibold text-kumo-strong group-data-[state=collapsed]/sidebar:hidden">
         headscale
@@ -153,7 +175,7 @@ function Trail({ current }: { readonly current: NavItem | undefined }): ReactEle
 
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <Sidebar.Trigger className="md:hidden" />
+      <Sidebar.Trigger className="md:hidden" aria-label="Open navigation" />
       <Breadcrumbs>
         {current === undefined || leaf === null ? (
           <Breadcrumbs.Current>{current?.label ?? leaf ?? "headscale"}</Breadcrumbs.Current>

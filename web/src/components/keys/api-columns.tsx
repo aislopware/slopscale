@@ -81,7 +81,7 @@ export const apiKeyColumns = helper.columns([
     id: "actions",
     header: "",
     cell: ({ row }) => <ApiKeyMenu apiKey={row.original} />,
-    meta: { className: "w-12 text-right" },
+    meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
 

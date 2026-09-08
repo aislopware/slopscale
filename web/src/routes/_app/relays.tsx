@@ -31,7 +31,7 @@ function RelaysPage(): ReactElement {
         title="Relays"
         description="DERP relays carry traffic between machines that cannot connect directly and help them find each other. Changes fetch the maps and reach the machines at once."
       />
-      <div className="flex max-w-3xl flex-col gap-6">
+      <div className="flex flex-col gap-6">
         <SourceBanner derp={derp.data} canEdit={canEdit} mutations={mutations} />
         <FetchErrorBanner derp={derp.data} />
         <EmbeddedSection derp={derp.data} canEdit={canEdit} mutations={mutations} />

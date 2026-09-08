@@ -12,6 +12,7 @@ import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { AttributeDialog, attributeText } from "~/components/machines/attribute-dialog.tsx";
 import { MatchedPostures } from "~/components/machines/matched-postures.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
@@ -156,8 +157,8 @@ function IdentityText({ posture }: { readonly posture: NodePosture }): ReactElem
   if (identity.disabled) {
     return (
       <span className="text-xs text-kumo-subtle">
-        The client has posture checking off (tailscale set --posture-checking=true), asked{" "}
-        <RelativeTime value={identity.collectedAt} />.
+        The client has posture checking off (<Code>tailscale set --posture-checking=true</Code>),
+        asked <RelativeTime value={identity.collectedAt} />.
       </span>
     );
   }

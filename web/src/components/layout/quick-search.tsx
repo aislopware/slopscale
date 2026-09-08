@@ -15,7 +15,7 @@ import type { NavItem } from "~/components/layout/nav.ts";
 interface Command {
   readonly id: string;
   readonly title: string;
-  readonly hint?: string;
+  readonly hint?: string | undefined;
   readonly icon: Icon;
   readonly go: () => void;
 }
@@ -24,9 +24,12 @@ interface CommandGroup {
   readonly id: string;
   readonly label: string;
   readonly items: Command[];
+  /** How many rows the group shows; a group without one shows all of them. */
+  readonly limit?: number;
 }
 
-const maxPerGroup = 8;
+/** Machines and users are a list of unknown length, so only the closest matches are worth a row. */
+const maxResources = 8;
 
 function matches(command: Command, query: string): boolean {
   const needle = query.trim().toLowerCase();
@@ -40,10 +43,11 @@ function matches(command: Command, query: string): boolean {
 
 function filterGroups(groups: readonly CommandGroup[], query: string): CommandGroup[] {
   return groups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => matches(item, query)).slice(0, maxPerGroup),
-    }))
+    .map((group) => {
+      const found = group.items.filter((item) => matches(item, query));
+
+      return { ...group, items: group.limit === undefined ? found : found.slice(0, group.limit) };
+    })
     .filter((group) => group.items.length > 0);
 }
 
@@ -179,6 +183,8 @@ function buildGroups(
 ): CommandGroup[] {
   return [
     {
+      // Every page the caller may see, straight from the sidebar's nav groups and never truncated,
+      // so a page added there cannot go missing here.
       id: "pages",
       label: "Pages",
       items: pages.map((page) => ({
@@ -193,6 +199,7 @@ function buildGroups(
     {
       id: "machines",
       label: "Machines",
+      limit: maxResources,
       items: nodes.map((node) => ({
         id: `node:${node.id}`,
         title: node.givenName,
@@ -206,10 +213,13 @@ function buildGroups(
     {
       id: "users",
       label: "Users",
+      limit: maxResources,
       items: users.map((user) => ({
         id: `user:${user.id}`,
         title: user.displayName === "" ? user.name : user.displayName,
-        hint: user.email === "" ? user.name : user.email,
+        // The second line says something the first does not: an email, or the account name behind a
+        // display name. A user with neither is one line.
+        hint: userHint(user),
         icon: UserIcon,
         go: () => {
           void navigate({ to: "/users", search: { q: user.name } });
@@ -217,6 +227,16 @@ function buildGroups(
       })),
     },
   ];
+}
+
+function userHint(user: User): string | undefined {
+  const title = user.displayName === "" ? user.name : user.displayName;
+
+  if (user.email !== "" && user.email !== title) {
+    return user.email;
+  }
+
+  return user.name === title ? undefined : user.name;
 }
 
 function Key({ children }: { readonly children: string }): ReactElement {

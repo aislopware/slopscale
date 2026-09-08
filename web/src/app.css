@@ -38,3 +38,16 @@
     line-height: var(--text-base--line-height);
   }
 }
+
+@layer components {
+  /*
+   * Kumo halves the opacity of a disabled button and leaves its colour alone, so a disabled primary
+   * or destructive action keeps the accent gradient and still reads as the thing to press. Drain the
+   * colour instead: the label stays where it was, and the button reads as unavailable in both
+   * themes. Kumo sets the accent through inline custom properties, so this greys the painted result
+   * rather than the tokens behind it.
+   */
+  button[data-kumo-component="Button"]:disabled {
+    filter: grayscale(1);
+  }
+}

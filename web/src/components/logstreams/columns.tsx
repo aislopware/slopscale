@@ -57,7 +57,7 @@ export const logStreamColumns = helper.columns([
 
       return me === undefined ? null : <LogStreamMenu stream={row.original} me={me} />;
     },
-    meta: { className: "w-12 text-right" },
+    meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
 
@@ -84,7 +84,7 @@ function DeliveryCell({ stream }: { readonly stream: LogStream }): ReactElement 
   }
 
   if (state === "never") {
-    return <span className="text-kumo-inactive">Never</span>;
+    return <span className="text-kumo-subtle">Never</span>;
   }
 
   return (

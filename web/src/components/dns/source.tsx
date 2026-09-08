@@ -7,6 +7,8 @@ import type { ReactElement } from "react";
 import { errorMessage } from "~/api/error.ts";
 import type { Dns } from "~/api/queries.ts";
 import type { DnsMutations } from "~/components/dns/mutations.ts";
+import { Callout } from "~/components/ui/callout.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 
 /** Where the settings come from, and the way back to the file once they were edited here. */
@@ -23,24 +25,31 @@ export function SourceBanner({
 
   if (!dns.overridden) {
     return (
-      <Banner
-        size="sm"
-        variant="default"
-        icon={<FileTextIcon />}
+      <Callout
+        icon={FileTextIcon}
         title="Settings come from the config file"
-        description="Changes made here are stored in the database and replace the file's dns section until you reset. MagicDNS and the base domain always come from the file."
+        description={
+          <>
+            Changes made here are stored in the database and replace the file&rsquo;s{" "}
+            <Code>dns</Code> section until you reset. MagicDNS and the base domain always come from
+            the file.
+          </>
+        }
       />
     );
   }
 
   return (
     <>
-      <Banner
-        size="sm"
-        variant="default"
-        icon={<ArrowCounterClockwiseIcon />}
+      <Callout
+        icon={ArrowCounterClockwiseIcon}
         title="Settings were changed in the console"
-        description="They replace the config file's dns section. Reset to go back to what the file says."
+        description={
+          <>
+            They replace the config file&rsquo;s <Code>dns</Code> section. Reset to go back to what
+            the file says.
+          </>
+        }
         {...(canEdit
           ? {
               action: (

@@ -15,7 +15,7 @@ export function GroupChips({
   readonly emptyLabel?: string;
 }): ReactElement {
   if (ids.length === 0) {
-    return <span className="text-kumo-inactive">{emptyLabel}</span>;
+    return <span className="text-kumo-subtle">{emptyLabel}</span>;
   }
 
   return (

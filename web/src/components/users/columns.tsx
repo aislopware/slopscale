@@ -96,7 +96,7 @@ export const columns = helper.columns([
 
       return me === undefined ? null : <UserMenu user={row.original} me={me} />;
     },
-    meta: { className: "w-12 text-right" },
+    meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
 
@@ -120,13 +120,13 @@ function EmailCell({ user }: { readonly user: User }): ReactElement {
   const provider = externalProvider(user);
 
   if (user.email === "" && provider === null) {
-    return <span className="text-kumo-inactive">—</span>;
+    return <span className="text-kumo-subtle">—</span>;
   }
 
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       {user.email === "" ? (
-        <span className="text-kumo-inactive">—</span>
+        <span className="text-kumo-subtle">—</span>
       ) : (
         <span className="truncate text-kumo-subtle">{user.email}</span>
       )}

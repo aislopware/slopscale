@@ -73,7 +73,7 @@ const base: Omit<EventsTableProps, "events"> = {
 
 /**
  * The target cells link into the app, so the table needs a router around it. The padding stands in
- * for the console's sticky `h-12` top bar, which the sticky column header parks under.
+ * for the console's sticky `h-12` top bar, which the page scrolls under.
  */
 function app(props: EventsTableProps): ReactElement {
   const rootRoute = createRootRoute({

@@ -1,12 +1,14 @@
 import {
   columnFilteringFeature,
   createFilteredRowModel,
+  createPaginatedRowModel,
   createSortedRowModel,
   createTableHook,
   filterFn_arrIncludesSome,
   filterFn_equalsString,
   filterFn_includesString,
   globalFilteringFeature,
+  rowPaginationFeature,
   rowSortingFeature,
   sortFn_alphanumeric,
   sortFn_basic,
@@ -14,7 +16,13 @@ import {
   sortFn_text,
   tableFeatures,
 } from "@tanstack/react-table";
-import type { CellData, RowData, TableFeatures } from "@tanstack/react-table";
+import type {
+  CellData,
+  RowData,
+  TableFeatures,
+  TableOptions,
+  TableState,
+} from "@tanstack/react-table";
 
 import type { AccessRule, Group, Network, Node, Posture, User } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
@@ -40,13 +48,56 @@ export const appTableFeatures = tableFeatures({
     equalsString: filterFn_equalsString,
     arrIncludesSome: filterFn_arrIncludesSome,
   },
+  rowPaginationFeature,
+  paginatedRowModel: createPaginatedRowModel(),
 });
 
-export const { createAppColumnHelper, useAppTable, useTableContext } = createTableHook({
+/** How many rows one page holds. Fewer rows than this and a table never pages at all. */
+export const tablePageSize = 50;
+
+const {
+  createAppColumnHelper,
+  useAppTable: usePagedTable,
+  useTableContext,
+} = createTableHook({
   features: appTableFeatures,
   globalFilterFn: "includesString",
   enableSortingRemoval: false,
+  // Pages narrow their collection inline (`nodes.filter(...)`), so the table is handed a new array on
+  // every render and the row model would read that as new data and go back to page one, which would
+  // make paging impossible. `DataTable` returns to the first page itself, on the state a page's rows
+  // actually depend on.
+  autoResetPageIndex: false,
 });
+
+export { createAppColumnHelper, useTableContext };
+
+/**
+ * A table of one collection. Every table pages at {@link tablePageSize}, because the console renders
+ * whole collections and a tailnet's machine list is the one that grows without an operator
+ * noticing; `DataTable` puts the paging controls on the band below the panel once there is a second
+ * page. A caller that wants every row at once passes `initialState.pagination.pageSize: Infinity`,
+ * which the pagination feature reads as a single page.
+ */
+export function useAppTable<TData extends RowData, TSelected = TableState<typeof appTableFeatures>>(
+  tableOptions: Omit<TableOptions<typeof appTableFeatures, TData>, "features">,
+  selector?: (state: TableState<typeof appTableFeatures>) => TSelected,
+): ReturnType<typeof usePagedTable<TData, TSelected>> {
+  return usePagedTable(
+    {
+      ...tableOptions,
+      initialState: {
+        ...tableOptions.initialState,
+        pagination: {
+          pageIndex: 0,
+          pageSize: tablePageSize,
+          ...tableOptions.initialState?.pagination,
+        },
+      },
+    },
+    selector,
+  );
+}
 
 declare module "@tanstack/react-table" {
   // Rows render actions and names of related records, so the table carries the caller and the
@@ -78,5 +129,16 @@ declare module "@tanstack/react-table" {
   > {
     /** Applied to both the header and body cells of the column by DataTable. */
     className?: string;
+    /**
+     * A column of numbers: right aligned with tabular figures, so the digits line up down the
+     * column.
+     */
+    numeric?: boolean;
+    /**
+     * Pins the column to that edge of the table's scroll container, with the row's background under
+     * it and a hairline on its inner edge. The row action menu carries this, so it stays reachable
+     * on a phone.
+     */
+    sticky?: "left" | "right";
   }
 }

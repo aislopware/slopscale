@@ -77,7 +77,7 @@ export const oauthClientColumns = helper.columns([
         disabled={table.options.meta?.me === undefined || !can(table.options.meta.me, "oauth_keys")}
       />
     ),
-    meta: { className: "w-12 text-right" },
+    meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
 

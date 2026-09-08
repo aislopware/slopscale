@@ -1,4 +1,3 @@
-import { Input } from "@cloudflare/kumo/components/input";
 import { useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
 
@@ -7,6 +6,7 @@ import type { Group } from "~/api/queries.ts";
 import type { AccessMutations } from "~/components/access/mutations.ts";
 import { groupItems } from "~/components/access/pickers.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
+import { DateTimeField } from "~/components/ui/date-time-field.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { toast } from "~/components/ui/toast.ts";
@@ -102,15 +102,13 @@ function MembershipForm({
         empty="No group matches. Create one under Access controls."
       />
       {added.length === 0 ? null : (
-        <Input
+        <DateTimeField
           label="Until"
           required={false}
-          type="datetime-local"
-          description="The selected groups are removed again at this time. Leave empty to keep them for good."
+          emptyLabel="No end"
+          description="The selected groups are removed again at this time. With no time they are kept for good."
           value={expires}
-          onChange={(event) => {
-            setExpires(event.target.value);
-          }}
+          onChange={setExpires}
         />
       )}
       <DialogError message={error} />

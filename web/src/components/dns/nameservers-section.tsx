@@ -16,6 +16,7 @@ import {
 } from "~/components/dns/model.ts";
 import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { ValueDialog } from "~/components/dns/value-dialog.tsx";
+import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 
 /** The id of the override paragraph, which explains why a disabled toggle is disabled. */
@@ -68,6 +69,11 @@ export function NameserversSection({
               checked={keptWithExitNode(settings, ns)}
               disabled={!canEdit || pending || !settings.overrideLocalDns}
               describedBy={settings.overrideLocalDns ? undefined : overrideHelpId}
+              reason={
+                settings.overrideLocalDns
+                  ? undefined
+                  : "Turn on Override local DNS to mark a nameserver"
+              }
               pending={pending}
               onChange={(on) => {
                 mutations.apply(
@@ -141,6 +147,7 @@ export function ExitNodeToggle({
   checked,
   disabled,
   describedBy,
+  reason,
   pending,
   onChange,
 }: {
@@ -148,20 +155,24 @@ export function ExitNodeToggle({
   readonly checked: boolean;
   readonly disabled: boolean;
   readonly describedBy?: string | undefined;
+  /** Why the toggle is off limits, shown on hover while it is disabled. */
+  readonly reason?: string | undefined;
   readonly pending: boolean;
   readonly onChange: (on: boolean) => void;
 }): ReactElement {
   return (
-    <Switch
-      size="sm"
-      label={<span className="text-sm text-kumo-subtle">Use with exit node</span>}
-      controlFirst={false}
-      aria-label={name}
-      {...(describedBy === undefined ? {} : { "aria-describedby": describedBy })}
-      checked={checked}
-      disabled={disabled}
-      transitioning={pending}
-      onCheckedChange={onChange}
-    />
+    <DisabledReason reason={disabled ? reason : undefined}>
+      <Switch
+        size="sm"
+        label={<span className="text-sm text-kumo-subtle">Use with exit node</span>}
+        controlFirst={false}
+        aria-label={name}
+        {...(describedBy === undefined ? {} : { "aria-describedby": describedBy })}
+        checked={checked}
+        disabled={disabled}
+        transitioning={pending}
+        onCheckedChange={onChange}
+      />
+    </DisabledReason>
   );
 }

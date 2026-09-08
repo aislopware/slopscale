@@ -42,7 +42,7 @@ function DnsPage(): ReactElement {
         title="DNS"
         description="Nameservers, split DNS, search domains and extra records every machine receives, plus split DNS only some groups get. Changes reach the machines at once."
       />
-      <div className="flex max-w-3xl flex-col gap-6">
+      <div className="flex flex-col gap-6">
         <SourceBanner dns={dns.data} canEdit={canEdit} mutations={mutations} />
         <MagicDnsSection dns={dns.data} />
         <NameserversSection

@@ -7,6 +7,7 @@ import type { ReactElement, SubmitEvent } from "react";
 import type { Settings } from "~/api/queries.ts";
 import { useSettingsMutation } from "~/components/settings/mutations.ts";
 import { SettingRow } from "~/components/settings/setting-row.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
@@ -47,9 +48,14 @@ export function SSHRecordingSection({
     );
   };
 
-  const embedded = settings.embeddedRecorder
-    ? "The server runs the embedded recorder, which is always a default. These are added to it."
-    : "The server does not run the embedded recorder (ssh_recording.enabled in the config file).";
+  const embedded = settings.embeddedRecorder ? (
+    "The server runs the embedded recorder, which is always a default. These are added to it."
+  ) : (
+    <>
+      The server does not run the embedded recorder (<Code>ssh_recording.enabled</Code> in the
+      config file).
+    </>
+  );
 
   return (
     <Section
@@ -59,7 +65,7 @@ export function SSHRecordingSection({
     >
       <SettingRow
         title="Default recorders"
-        description={`Tags or tailnet addresses of recorder nodes, comma separated. ${embedded}`}
+        description={<>Tags or tailnet addresses of recorder nodes, comma separated. {embedded}</>}
         control={
           <form onSubmit={save} className="flex items-center gap-2">
             <Input

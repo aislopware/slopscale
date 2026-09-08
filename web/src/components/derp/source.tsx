@@ -6,6 +6,8 @@ import type { ReactElement } from "react";
 import { errorMessage } from "~/api/error.ts";
 import type { Derp } from "~/api/queries.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
+import { Callout } from "~/components/ui/callout.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 
 /** Where the settings come from, and the way back to the file once they were edited here. */
@@ -22,24 +24,31 @@ export function SourceBanner({
 
   if (!derp.overridden) {
     return (
-      <Banner
-        size="sm"
-        variant="default"
-        icon={<FileTextIcon />}
+      <Callout
+        icon={FileTextIcon}
         title="Settings come from the config file"
-        description="Changes made here are stored in the database and replace the file's derp section until you reset. Map files, the relay's key and automatically_add_embedded_derp_region always come from the file."
+        description={
+          <>
+            Changes made here are stored in the database and replace the file&rsquo;s{" "}
+            <Code>derp</Code> section until you reset. Map files, the relay&rsquo;s key and{" "}
+            <Code>automatically_add_embedded_derp_region</Code> always come from the file.
+          </>
+        }
       />
     );
   }
 
   return (
     <>
-      <Banner
-        size="sm"
-        variant="default"
-        icon={<ArrowCounterClockwiseIcon />}
+      <Callout
+        icon={ArrowCounterClockwiseIcon}
         title="Settings were changed in the console"
-        description="They replace the config file's derp section. Reset to go back to what the file says."
+        description={
+          <>
+            They replace the config file&rsquo;s <Code>derp</Code> section. Reset to go back to what
+            the file says.
+          </>
+        }
         {...(canEdit
           ? {
               action: (

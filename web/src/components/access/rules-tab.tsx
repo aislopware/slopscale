@@ -1,7 +1,6 @@
-import { Banner } from "@cloudflare/kumo/components/banner";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { InfoIcon, PlusIcon, ShieldCheckIcon } from "@phosphor-icons/react";
+import { PlusIcon, ShieldCheckIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
@@ -16,6 +15,7 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
+import { Callout } from "~/components/ui/callout.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
 
 export interface RulesTabProps {
@@ -161,10 +161,7 @@ function StateBanner({
 }): ReactElement | null {
   if (policyFileEnforces) {
     return (
-      <Banner
-        size="sm"
-        variant="default"
-        icon={<InfoIcon />}
+      <Callout
         title="The policy file restricts access"
         description="Rules add to what the file allows and cannot take any of it away. Its tags, SSH rules and autogroups still apply."
       />
@@ -173,10 +170,8 @@ function StateBanner({
 
   if (enabled === 0) {
     return (
-      <Banner
-        size="sm"
-        variant="alert"
-        icon={<InfoIcon />}
+      <Callout
+        tone="warning"
         title="The tailnet is open"
         description="With no enabled rule and no restricting policy file, every machine can reach every other machine."
       />

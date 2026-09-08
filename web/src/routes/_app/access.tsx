@@ -15,6 +15,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
+import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
@@ -27,6 +28,15 @@ export const Route = createFileRoute("/_app/access")({
   },
   component: MyAccessPage,
 });
+
+/** Why asking is not possible, or nothing when it is. */
+function askReason(hasUser: boolean, hasGroups: boolean): string | undefined {
+  if (!hasUser) {
+    return "Requests belong to a user, and these credentials are not one";
+  }
+
+  return hasGroups ? undefined : "No group takes requests right now";
+}
 
 /** Why the list is empty, and what would fill it. */
 function emptyText(hasUser: boolean, hasGroups: boolean): string {
@@ -76,16 +86,18 @@ function MyAccessPage(): ReactElement {
         description="Ask to join a group for a while. An approver decides, and the access ends on its own when the time is up."
         meta={active === 0 ? undefined : `${active} active ${active === 1 ? "grant" : "grants"}`}
         actions={
-          <Button
-            variant="primary"
-            icon={PlusIcon}
-            disabled={!canAsk}
-            onClick={() => {
-              setRequesting(true);
-            }}
-          >
-            Request access
-          </Button>
+          <DisabledReason reason={askReason(me.user !== undefined, options.groups.length > 0)}>
+            <Button
+              variant="primary"
+              icon={PlusIcon}
+              disabled={!canAsk}
+              onClick={() => {
+                setRequesting(true);
+              }}
+            >
+              Request access
+            </Button>
+          </DisabledReason>
         }
       />
       <Frame>

@@ -6,6 +6,7 @@ import type { ReactElement } from "react";
 
 import type { Node } from "~/api/queries.ts";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
+import { Code } from "~/components/ui/code.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { advertisesExit, isExitRoute } from "~/lib/node.ts";
 
@@ -33,9 +34,8 @@ export function RoutesSection({
     <Section title="Routes" description="Only approved routes reach the rest of the tailnet.">
       {routes.length === 0 ? (
         <SectionRow className="text-kumo-subtle">
-          Nothing advertised. Run{" "}
-          <span className="font-mono text-[0.9em]">tailscale set --advertise-routes=…</span> or{" "}
-          <span className="font-mono text-[0.9em]">--advertise-exit-node</span> on the machine.
+          Nothing advertised. Run <Code>tailscale set --advertise-routes=…</Code> or{" "}
+          <Code>--advertise-exit-node</Code> on the machine.
         </SectionRow>
       ) : (
         routes.map((route) => (

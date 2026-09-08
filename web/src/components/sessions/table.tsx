@@ -22,14 +22,12 @@ import {
 import type { RecordingState } from "~/components/sessions/model.ts";
 import { useDeleteRecording } from "~/components/sessions/mutations.ts";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { TableScrollPanel } from "~/components/table/scroll-panel.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
-import { FramePanel } from "~/components/ui/frame.tsx";
+import { frameTableClass, frameTableRowClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
 const columnCount = 7;
-// Sticky under the 48px app bar on wide screens only; below lg the panel scrolls sideways and
-// a sticky header inside that scroll container would sit 48px down from its top.
-const stickyHeader = "[&_th]:top-12 max-lg:[&_th]:static";
 
 const stateBadges: Record<
   RecordingState,
@@ -49,17 +47,18 @@ function StateBadge({ recording }: { readonly recording: SSHRecording }): ReactE
 function RecordingRow({
   recording,
   writable,
-  striped,
+  overflowing,
 }: {
   readonly recording: SSHRecording;
   readonly writable: boolean;
-  readonly striped: boolean;
+  /** Whether the columns run past the panel, so the pinned last column draws its edge. */
+  readonly overflowing: boolean;
 }): ReactElement {
   const [deleting, setDeleting] = useState(false);
   const remove = useDeleteRecording();
 
   return (
-    <Table.Row className={cn("align-top", striped && "bg-kumo-elevated")}>
+    <Table.Row className={cn("align-top", frameTableRowClass)}>
       <Table.Cell className="whitespace-nowrap text-kumo-subtle">
         <RelativeTime value={recording.startedAt} />
       </Table.Cell>
@@ -74,7 +73,13 @@ function RecordingRow({
       <Table.Cell>
         <StateBadge recording={recording} />
       </Table.Cell>
-      <Table.Cell className="w-24 text-right whitespace-nowrap">
+      <Table.Cell
+        sticky="right"
+        className={cn(
+          "w-24 text-right whitespace-nowrap",
+          overflowing && "border-l border-kumo-hairline",
+        )}
+      >
         <LinkButton
           variant="ghost"
           shape="square"
@@ -141,43 +146,46 @@ export function SessionsTable({
 }: SessionsTableProps): ReactElement {
   return (
     <>
-      {/* Below lg the table scrolls sideways; above it the header stays sticky, which a
-          scroll container would break. */}
-      <FramePanel className="max-lg:overflow-x-auto">
-        <Table>
-          <Table.Header variant="compact" sticky className={stickyHeader}>
-            <Table.Row>
-              <Table.Head>Started</Table.Head>
-              <Table.Head>From</Table.Head>
-              <Table.Head>Session</Table.Head>
-              <Table.Head>Command</Table.Head>
-              <Table.Head>Size</Table.Head>
-              <Table.Head>State</Table.Head>
-              <Table.Head className="w-24">
-                <span className="sr-only">Actions</span>
-              </Table.Head>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {recordings.length === 0 ? (
+      <TableScrollPanel pinnedRight>
+        {(overflowing) => (
+          <Table className={frameTableClass}>
+            <Table.Header variant="compact" sticky>
               <Table.Row>
-                <Table.Cell colSpan={columnCount} className="p-0">
-                  <EmptySessions embeddedRecorder={embeddedRecorder} />
-                </Table.Cell>
+                <Table.Head>Started</Table.Head>
+                <Table.Head>From</Table.Head>
+                <Table.Head>Session</Table.Head>
+                <Table.Head>Command</Table.Head>
+                <Table.Head>Size</Table.Head>
+                <Table.Head>State</Table.Head>
+                <Table.Head
+                  sticky="right"
+                  className={cn("w-24", overflowing && "border-l border-kumo-hairline")}
+                >
+                  <span className="sr-only">Actions</span>
+                </Table.Head>
               </Table.Row>
-            ) : (
-              recordings.map((recording, index) => (
-                <RecordingRow
-                  key={recording.id}
-                  recording={recording}
-                  writable={writable}
-                  striped={index % 2 === 1}
-                />
-              ))
-            )}
-          </Table.Body>
-        </Table>
-      </FramePanel>
+            </Table.Header>
+            <Table.Body>
+              {recordings.length === 0 ? (
+                <Table.Row>
+                  <Table.Cell colSpan={columnCount} className="p-0">
+                    <EmptySessions embeddedRecorder={embeddedRecorder} />
+                  </Table.Cell>
+                </Table.Row>
+              ) : (
+                recordings.map((recording) => (
+                  <RecordingRow
+                    key={recording.id}
+                    recording={recording}
+                    writable={writable}
+                    overflowing={overflowing}
+                  />
+                ))
+              )}
+            </Table.Body>
+          </Table>
+        )}
+      </TableScrollPanel>
       <Paging
         count={recordings.length}
         hasMore={hasMore}

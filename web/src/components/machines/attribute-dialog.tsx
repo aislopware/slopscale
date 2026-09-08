@@ -10,6 +10,7 @@ import { invalidate } from "~/api/queries.ts";
 import type { Node } from "~/api/queries.ts";
 import type { CustomAttribute } from "~/api/schema.gen.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
+import { DateTimeField } from "~/components/ui/date-time-field.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { toLocalInput } from "~/lib/time.ts";
@@ -182,13 +183,12 @@ function AttributeForm({
           />
         )}
       </div>
-      <Input
+      <DateTimeField
         label="Expires"
-        type="datetime-local"
+        required={false}
+        emptyLabel="Never"
         value={expiry}
-        onChange={(event) => {
-          setExpiry(event.target.value);
-        }}
+        onChange={setExpiry}
       />
       <Input
         label="Comment"

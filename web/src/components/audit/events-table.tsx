@@ -17,16 +17,13 @@ import {
 } from "~/components/audit/cells.tsx";
 import { plural } from "~/components/overview/plural.ts";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { TableScrollPanel } from "~/components/table/scroll-panel.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
-import { FramePanel } from "~/components/ui/frame.tsx";
+import { frameTableClass, frameTableRowClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
 /** Every row spans this many columns when it opens. */
 const columnCount = 7;
-/** The console's top bar is `h-12`, so the sticky header parks under it instead of behind it. */
-// Sticky under the 48px app bar on wide screens only; below lg the panel scrolls sideways and
-// a sticky header inside that scroll container would sit 48px down from its top.
-const stickyHeader = "[&_th]:top-12 max-lg:[&_th]:static";
 
 /** A click on a control inside the row belongs to the control, not to the row. */
 function onControl(event: MouseEvent<HTMLElement>): boolean {
@@ -38,14 +35,14 @@ function onControl(event: MouseEvent<HTMLElement>): boolean {
 
 function EventRows({
   event,
-  striped,
+  overflowing,
   open,
   onToggle,
   onOpen,
 }: {
   readonly event: AuditEvent;
-  /** Zebra: the row is drawn on the elevated surface while it is closed. */
-  readonly striped: boolean;
+  /** Whether the columns run past the panel, so the pinned last column draws its edge. */
+  readonly overflowing: boolean;
   readonly open: boolean;
   readonly onToggle: () => void;
   readonly onOpen: () => void;
@@ -54,7 +51,7 @@ function EventRows({
     <>
       <Table.Row
         variant={open ? "selected" : "default"}
-        className={cn("cursor-pointer align-top", !open && striped && "bg-kumo-elevated")}
+        className={cn("cursor-pointer align-top", !open && frameTableRowClass)}
         onClick={(click) => {
           if (!onControl(click)) {
             onToggle();
@@ -76,10 +73,13 @@ function EventRows({
         <Table.Cell>
           <ResultCell event={event} />
         </Table.Cell>
-        <Table.Cell className="hidden w-full max-w-0 overflow-hidden lg:table-cell">
+        <Table.Cell className="hidden w-full min-w-72 lg:table-cell">
           <DetailCell event={event} onOpen={onOpen} />
         </Table.Cell>
-        <Table.Cell className="w-10 text-right">
+        <Table.Cell
+          sticky="right"
+          className={cn("w-10 text-right", overflowing && "border-l border-kumo-hairline")}
+        >
           <Button
             variant="ghost"
             shape="square"
@@ -131,49 +131,52 @@ export function EventsTable({
 
   return (
     <>
-      {/* Below lg the table scrolls sideways; above it the header stays sticky, which a
-          scroll container would break. */}
-      <FramePanel className="max-lg:overflow-x-auto">
-        <Table>
-          <Table.Header variant="compact" sticky className={stickyHeader}>
-            <Table.Row>
-              <Table.Head>Time</Table.Head>
-              <Table.Head>Actor</Table.Head>
-              <Table.Head>Action</Table.Head>
-              <Table.Head>Target</Table.Head>
-              <Table.Head>Result</Table.Head>
-              <Table.Head className="hidden w-full lg:table-cell">Detail</Table.Head>
-              <Table.Head className="w-10">
-                <span className="sr-only">Details</span>
-              </Table.Head>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {events.length === 0 ? (
+      <TableScrollPanel pinnedRight>
+        {(overflowing) => (
+          <Table className={frameTableClass}>
+            <Table.Header variant="compact" sticky>
               <Table.Row>
-                <Table.Cell colSpan={columnCount} className="p-0">
-                  <EmptyEvents filtered={filtered} onClearFilters={onClearFilters} />
-                </Table.Cell>
+                <Table.Head>Time</Table.Head>
+                <Table.Head>Actor</Table.Head>
+                <Table.Head>Action</Table.Head>
+                <Table.Head>Target</Table.Head>
+                <Table.Head>Result</Table.Head>
+                <Table.Head className="hidden w-full min-w-72 lg:table-cell">Detail</Table.Head>
+                <Table.Head
+                  sticky="right"
+                  className={cn("w-10", overflowing && "border-l border-kumo-hairline")}
+                >
+                  <span className="sr-only">Details</span>
+                </Table.Head>
               </Table.Row>
-            ) : (
-              events.map((event, index) => (
-                <EventRows
-                  key={event.id}
-                  event={event}
-                  striped={index % 2 === 1}
-                  open={openId === event.id}
-                  onToggle={() => {
-                    setOpenId((current) => (current === event.id ? null : event.id));
-                  }}
-                  onOpen={() => {
-                    setOpenId(event.id);
-                  }}
-                />
-              ))
-            )}
-          </Table.Body>
-        </Table>
-      </FramePanel>
+            </Table.Header>
+            <Table.Body>
+              {events.length === 0 ? (
+                <Table.Row>
+                  <Table.Cell colSpan={columnCount} className="p-0">
+                    <EmptyEvents filtered={filtered} onClearFilters={onClearFilters} />
+                  </Table.Cell>
+                </Table.Row>
+              ) : (
+                events.map((event) => (
+                  <EventRows
+                    key={event.id}
+                    event={event}
+                    overflowing={overflowing}
+                    open={openId === event.id}
+                    onToggle={() => {
+                      setOpenId((current) => (current === event.id ? null : event.id));
+                    }}
+                    onOpen={() => {
+                      setOpenId(event.id);
+                    }}
+                  />
+                ))
+              )}
+            </Table.Body>
+          </Table>
+        )}
+      </TableScrollPanel>
       <Paging
         count={events.length}
         hasMore={hasMore}

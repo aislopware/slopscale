@@ -13,6 +13,7 @@ import { groupItems, postureItems } from "~/components/access/pickers.ts";
 import { ProtocolFields } from "~/components/access/protocol-fields.tsx";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { DateTimeField } from "~/components/ui/date-time-field.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { toast } from "~/components/ui/toast.ts";
@@ -221,14 +222,14 @@ function RuleFields({
         />
       )}
       <ProtocolFields draft={draft} onChange={onChange} />
-      <Input
+      <DateTimeField
         label="Expires"
         required={false}
-        type="datetime-local"
-        description="The rule stops applying at this time and is kept, marked expired, until it is extended or deleted. Empty means never."
+        emptyLabel="Never"
+        description="The rule stops applying at this time and is kept, marked expired, until it is extended or deleted. With no time it never expires."
         value={draft.expires}
-        onChange={(event) => {
-          onChange({ expires: event.target.value });
+        onChange={(expires) => {
+          onChange({ expires });
         }}
       />
       <Switch.Group>

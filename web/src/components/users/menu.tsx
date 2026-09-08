@@ -22,6 +22,7 @@ import type { Me } from "~/auth/me.ts";
 import { MembershipDialog } from "~/components/access/membership-dialog.tsx";
 import { groupsOfUser } from "~/components/access/model.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
+import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { DeleteUserDialog, RenameUserDialog, RoleDialog } from "~/components/users/dialogs.tsx";
 import { useUserMutations } from "~/components/users/mutations.ts";
 import { EditProfileDialog } from "~/components/users/profile-dialog.tsx";
@@ -107,6 +108,15 @@ export function UserMenu({ user, me }: UserMenuProps): ReactElement {
   );
 }
 
+/** Why an item is off limits, in the order the server refuses it. */
+function itemReason(writable: boolean, own: boolean, ownReason: string): string | undefined {
+  if (!writable) {
+    return "Your credentials may not change users";
+  }
+
+  return own ? ownReason : undefined;
+}
+
 function UserMenuItems({
   user,
   me,
@@ -158,15 +168,17 @@ function UserMenuItems({
       >
         Edit profile…
       </DropdownMenu.Item>
-      <DropdownMenu.Item
-        icon={ShieldCheckIcon}
-        disabled={!writable || own}
-        onClick={() => {
-          onOpen("role");
-        }}
-      >
-        Change role…
-      </DropdownMenu.Item>
+      <DisabledReason reason={itemReason(writable, own, "A role is changed by someone else")}>
+        <DropdownMenu.Item
+          icon={ShieldCheckIcon}
+          disabled={!writable || own}
+          onClick={() => {
+            onOpen("role");
+          }}
+        >
+          Change role…
+        </DropdownMenu.Item>
+      </DisabledReason>
       {canEditGroups ? (
         <DropdownMenu.Item
           icon={UsersThreeIcon}
@@ -189,16 +201,18 @@ function UserMenuItems({
         />
       ) : null}
       <DropdownMenu.Separator />
-      <DropdownMenu.Item
-        icon={TrashIcon}
-        variant="danger"
-        disabled={!writable || own}
-        onClick={() => {
-          onOpen("delete");
-        }}
-      >
-        Delete…
-      </DropdownMenu.Item>
+      <DisabledReason reason={itemReason(writable, own, "You cannot delete your own account")}>
+        <DropdownMenu.Item
+          icon={TrashIcon}
+          variant="danger"
+          disabled={!writable || own}
+          onClick={() => {
+            onOpen("delete");
+          }}
+        >
+          Delete…
+        </DropdownMenu.Item>
+      </DisabledReason>
     </>
   );
 }

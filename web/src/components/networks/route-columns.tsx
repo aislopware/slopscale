@@ -57,7 +57,7 @@ export const routeColumns = helper.columns([
 
       return me === undefined ? null : <ApproveCell row={row.original} me={me} />;
     },
-    meta: { className: "w-28 text-right" },
+    meta: { className: "w-28 text-right", sticky: "right" },
   }),
 ]);
 
@@ -91,7 +91,7 @@ function MachineCell({ row }: { readonly row: RouteRow }): ReactElement {
 
 function NetworksCell({ row }: { readonly row: RouteRow }): ReactElement {
   if (row.networks.length === 0) {
-    return <span className="text-kumo-inactive">Manual</span>;
+    return <span className="text-kumo-subtle">Manual</span>;
   }
 
   return (

@@ -32,7 +32,7 @@ export const postureColumns = helper.columns([
       const text = scheduleSummary(row.original.schedule);
 
       return text === "" ? (
-        <span className="text-kumo-inactive">Always</span>
+        <span className="text-kumo-subtle">Always</span>
       ) : (
         <span className="whitespace-nowrap">{text}</span>
       );
@@ -48,12 +48,12 @@ export const postureColumns = helper.columns([
       const count = rulesUsingPosture(table.options.meta?.rules ?? [], row.original).length;
 
       return count === 0 ? (
-        <span className="text-kumo-inactive">—</span>
+        <span className="text-kumo-subtle">—</span>
       ) : (
         <span className="tabular-nums">{count}</span>
       );
     },
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "whitespace-nowrap", numeric: true },
   }),
   helper.accessor((posture) => posture.updatedAt, {
     id: "updated",
@@ -83,7 +83,7 @@ export const postureColumns = helper.columns([
         />
       );
     },
-    meta: { className: "w-12 text-right" },
+    meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
 
@@ -100,7 +100,7 @@ function NameCell({ posture }: { readonly posture: Posture }): ReactElement {
 
 function Expressions({ posture }: { readonly posture: Posture }): ReactElement {
   if (posture.expressions.length === 0) {
-    return <span className="text-kumo-inactive">Schedule only</span>;
+    return <span className="text-kumo-subtle">Schedule only</span>;
   }
 
   return (

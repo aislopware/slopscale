@@ -7,7 +7,7 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import type { ReactElement } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
 import type { Me } from "~/auth/me.ts";
@@ -37,6 +37,36 @@ function app(me: Me): ReactElement {
       <RouterProvider router={router} />
     </QueryClientProvider>
   );
+}
+
+/**
+ * Runs the body with the media query Kumo's Sidebar reads answering "narrow", which is how the
+ * sidebar becomes a drawer. The suite shares one browser window, so the query is answered here
+ * rather than resized; the classes that keep the desktop rail's controls out of the drawer are
+ * checked in the browser instead.
+ */
+async function withDrawer(body: () => Promise<void>): Promise<void> {
+  const real = globalThis.matchMedia.bind(globalThis);
+
+  // A real MediaQueryList with its answer pinned: everything else about it keeps working.
+  vi.stubGlobal("matchMedia", (query: string): MediaQueryList => {
+    const list = real(query);
+
+    return query.includes("max-width")
+      ? Object.defineProperty(list, "matches", { value: true, configurable: true })
+      : list;
+  });
+
+  try {
+    await body();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+}
+
+/** Clicks a control the window's real width keeps hidden with `display: none`. */
+function clickPart(root: Element, selector: string): void {
+  root.querySelector(selector)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 }
 
 describe(Shell, () => {
@@ -90,5 +120,63 @@ describe(Shell, () => {
     );
 
     await expect.element(screen.getByRole("link", { name: "Audit log" })).toBeVisible();
+  });
+
+  it("lists every page the caller may see in the palette", async () => {
+    const screen = await render(
+      app({
+        ...allAccess,
+        permissions: {
+          "devices:core:read": true,
+          "devices:routes:read": true,
+          "dns:read": true,
+          "feature_settings:read": true,
+          "logs:configuration:read": true,
+          "policy_file:read": true,
+          "users:read": true,
+          "webhooks:read": true,
+        },
+      }),
+    );
+
+    await screen.getByRole("button", { name: /Quick search/u }).click();
+
+    const palette = screen.getByRole("dialog");
+
+    // The pages group used to stop at eight rows, which cut off the last group of the sidebar.
+    await Promise.all(
+      ["Overview", "Audit log", "SSH sessions", "General", "Keys", "Integrations"].map(
+        async (page) => {
+          await expect.element(palette.getByText(page, { exact: true })).toBeVisible();
+        },
+      ),
+    );
+  });
+
+  it("opens the drawer and closes it with its own button", async () => {
+    await withDrawer(async () => {
+      const screen = await render(app(allAccess));
+
+      // A closed drawer is out of the accessible tree, so nothing in it can be reached by mistake.
+      await expect.element(screen.getByRole("link", { name: "Users" })).not.toBeInTheDocument();
+
+      clickPart(screen.container, '[data-sidebar="trigger"]');
+      await expect.element(screen.getByRole("link", { name: "Users" })).toBeVisible();
+
+      clickPart(screen.container, '[data-sidebar="close"]');
+      await expect.element(screen.getByRole("link", { name: "Users" })).not.toBeInTheDocument();
+    });
+  });
+
+  it("closes the drawer when the scrim is clicked", async () => {
+    await withDrawer(async () => {
+      const screen = await render(app(allAccess));
+
+      clickPart(screen.container, '[data-sidebar="trigger"]');
+      await expect.element(screen.getByRole("link", { name: "Users" })).toBeVisible();
+
+      clickPart(screen.container, "[data-sidebar-backdrop]");
+      await expect.element(screen.getByRole("link", { name: "Users" })).not.toBeInTheDocument();
+    });
   });
 });

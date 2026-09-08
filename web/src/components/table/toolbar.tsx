@@ -27,7 +27,7 @@ export function TableToolbar({
 
 /**
  * "Showing 3 of 12" on the band under a table panel, with room for paging controls on the right.
- * Its text starts where the cells' text starts.
+ * Its 20px inset starts the text where the text of the first cell above it starts.
  */
 export function TableFooter({
   children,
@@ -37,7 +37,7 @@ export function TableFooter({
   readonly actions?: ReactNode;
 }): ReactElement {
   return (
-    <div className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs text-kumo-subtle">
+    <div className="flex items-center justify-between gap-3 px-5 py-1.5 text-xs text-kumo-subtle">
       <span>{children}</span>
       {actions === undefined ? null : <span className="flex items-center gap-2">{actions}</span>}
     </div>

@@ -118,7 +118,7 @@ export const ruleColumns = helper.columns([
         />
       );
     },
-    meta: { className: "w-12 text-right" },
+    meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
 

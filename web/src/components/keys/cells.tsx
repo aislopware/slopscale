@@ -26,7 +26,7 @@ export function ExpiryCell({ value }: { readonly value: string | null }): ReactE
   const date = parseTime(value);
 
   if (date === null) {
-    return <span className="text-kumo-inactive">Never</span>;
+    return <span className="text-kumo-subtle">Never</span>;
   }
 
   if (isPast(date)) {

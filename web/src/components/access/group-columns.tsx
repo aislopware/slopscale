@@ -47,7 +47,7 @@ export const groupColumns = helper.columns([
     cell: ({ row }) => (
       <Count value={row.original.userIds.length} builtin={isBuiltin(row.original)} />
     ),
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "whitespace-nowrap", numeric: true },
   }),
   helper.accessor((group) => group.machines ?? -1, {
     id: "machines",
@@ -55,7 +55,7 @@ export const groupColumns = helper.columns([
     enableSorting: true,
     enableGlobalFilter: false,
     cell: ({ row }) => <MachinesCell group={row.original} />,
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "whitespace-nowrap", numeric: true },
   }),
   helper.accessor((group) => group.id, {
     id: "rules",
@@ -65,7 +65,7 @@ export const groupColumns = helper.columns([
     cell: ({ row, table }) => (
       <Count value={rulesUsingGroup(table.options.meta?.rules ?? [], row.original).length} />
     ),
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "whitespace-nowrap", numeric: true },
   }),
   helper.accessor((group) => group.createdAt, {
     id: "created",
@@ -75,7 +75,7 @@ export const groupColumns = helper.columns([
     sortDescFirst: true,
     cell: ({ row }) =>
       isBuiltin(row.original) ? (
-        <span className="text-kumo-inactive">—</span>
+        <span className="text-kumo-subtle">—</span>
       ) : (
         <span className="text-kumo-subtle">
           <RelativeTime value={row.original.createdAt} />
@@ -99,7 +99,7 @@ export const groupColumns = helper.columns([
         />
       );
     },
-    meta: { className: "w-12 text-right" },
+    meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
 
@@ -133,11 +133,11 @@ function Count({
 }): ReactElement {
   // The builtin group has no member list of its own; a count would be misleading either way.
   if (builtin) {
-    return <span className="text-kumo-inactive">—</span>;
+    return <span className="text-kumo-subtle">—</span>;
   }
 
   return value === 0 ? (
-    <span className="text-kumo-inactive">0</span>
+    <span className="text-kumo-subtle">0</span>
   ) : (
     <span className="text-kumo-default">{value}</span>
   );
@@ -147,14 +147,14 @@ function Count({
 function MachinesCell({ group }: { readonly group: GroupRow }): ReactElement {
   if (group.machines === null) {
     return (
-      <span className="text-kumo-inactive" title="You cannot list machines">
+      <span className="text-kumo-subtle" title="You cannot list machines">
         —
       </span>
     );
   }
 
   if (isSelf(group)) {
-    return <span className="text-kumo-inactive">—</span>;
+    return <span className="text-kumo-subtle">—</span>;
   }
 
   if (isBuiltin(group)) {
@@ -164,7 +164,7 @@ function MachinesCell({ group }: { readonly group: GroupRow }): ReactElement {
   const direct = group.nodeIds.length;
 
   return (
-    <span className="flex min-w-0 flex-col gap-0.5">
+    <span className="flex min-w-0 flex-col items-end gap-0.5">
       <Count value={group.machines} />
       {group.machines === direct ? null : (
         <span className="text-xs text-kumo-subtle">{`${direct} direct`}</span>

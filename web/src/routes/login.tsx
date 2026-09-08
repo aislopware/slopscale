@@ -47,7 +47,9 @@ function LoginPage(): ReactElement {
       </header>
       <main className="flex flex-1 items-center justify-center px-4 pb-24">
         <div className="flex w-full max-w-sm flex-col gap-4">
-          <Frame>
+          {/* In dark mode the canvas is nearly black, so the card needs a ring and a shadow of its
+              own to read as a surface. */}
+          <Frame className="shadow-lg ring-kumo-line">
             <FramePanel className="flex flex-col gap-6 px-6 py-6">
               <div className="flex flex-col gap-3">
                 <WaveformIcon className="size-8 text-kumo-brand" weight="duotone" />

@@ -87,7 +87,7 @@ export const columns = helper.columns([
         <MachineMenu node={row.original} me={me} users={users ?? emptyUsers} />
       );
     },
-    meta: { className: "w-12 text-right" },
+    meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
 

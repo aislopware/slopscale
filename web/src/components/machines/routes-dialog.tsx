@@ -5,6 +5,7 @@ import type { ReactElement, SubmitEvent } from "react";
 import { errorMessage } from "~/api/error.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import type { NodeDialogProps } from "~/components/machines/dialogs.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { isExitRoute } from "~/lib/node.ts";
@@ -63,8 +64,8 @@ function RoutesForm({
       {available.length === 0 ? (
         <p className="text-kumo-subtle">
           This machine does not advertise any routes. Run{" "}
-          <span className="font-mono text-[0.9em]">tailscale set --advertise-routes</span> or{" "}
-          <span className="font-mono text-[0.9em]">--advertise-exit-node</span> on it first.
+          <Code>tailscale set --advertise-routes</Code> or <Code>--advertise-exit-node</Code> on it
+          first.
         </p>
       ) : null}
       {exit.length > 0 ? (

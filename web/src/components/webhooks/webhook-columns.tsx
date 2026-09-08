@@ -58,7 +58,7 @@ export const webhookColumns = helper.columns([
         <WebhookMenu webhook={row.original} eventTypes={eventTypes ?? []} me={me} />
       );
     },
-    meta: { className: "w-12 text-right" },
+    meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
 
@@ -104,7 +104,7 @@ function DeliveryCell({ webhook }: { readonly webhook: Webhook }): ReactElement 
   const state = deliveryState(webhook);
 
   if (state === "never") {
-    return <span className="text-kumo-inactive">Never</span>;
+    return <span className="text-kumo-subtle">Never</span>;
   }
 
   return (

@@ -3,6 +3,7 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { Dialog } from "@cloudflare/kumo/components/dialog";
 import { cn } from "@cloudflare/kumo/utils";
 import { XIcon } from "@phosphor-icons/react";
+import { useEffect, useState } from "react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 
 export const DialogRoot = Dialog.Root;
@@ -56,17 +57,99 @@ export function DialogContent({
             }
           />
         </div>
-        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto p-6">
-          {description === undefined ? null : (
-            <Dialog.Description className="max-w-prose text-pretty text-kumo-subtle">
-              {description}
-            </Dialog.Description>
-          )}
-          {children}
-        </div>
+        <DialogBody description={description}>{children}</DialogBody>
       </div>
     </Dialog>
   );
+}
+
+/**
+ * The scrolling part of a dialog. When the form is taller than the screen, a hairline shadow under
+ * the header and above the footer says so, because a body clipped flush against the divider looks
+ * like the end of the form.
+ */
+function DialogBody({
+  description,
+  children,
+}: {
+  readonly description: string | undefined;
+  readonly children: ReactNode;
+}): ReactElement {
+  const { ref, top, bottom } = useScrollEdges();
+
+  return (
+    <div className="relative flex min-h-0 flex-col">
+      <div ref={ref} className="flex min-h-0 flex-col gap-4 overflow-y-auto p-6">
+        {description === undefined ? null : (
+          <Dialog.Description className="max-w-prose text-pretty text-kumo-subtle">
+            {description}
+          </Dialog.Description>
+        )}
+        {children}
+      </div>
+      {top ? <ScrollEdge side="top" /> : null}
+      {bottom ? <ScrollEdge side="bottom" /> : null}
+    </div>
+  );
+}
+
+function ScrollEdge({ side }: { readonly side: "top" | "bottom" }): ReactElement {
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute inset-x-0 h-4 from-kumo-contrast/12 to-transparent",
+        side === "top" ? "top-0 bg-linear-to-b" : "bottom-0 bg-linear-to-t",
+      )}
+    />
+  );
+}
+
+/** A scroll container is within a pixel of an edge often enough to treat that as being at it. */
+const edgeSlack = 1;
+
+interface ScrollEdges {
+  readonly ref: (node: HTMLDivElement | null) => void;
+  /** Whether content is hidden above and below what the container shows. */
+  readonly top: boolean;
+  readonly bottom: boolean;
+}
+
+function useScrollEdges(): ScrollEdges {
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const [edges, setEdges] = useState({ top: false, bottom: false });
+
+  useEffect((): (() => void) => {
+    const measure = (): void => {
+      if (node !== null) {
+        setEdges({
+          top: node.scrollTop > edgeSlack,
+          bottom: node.scrollTop + node.clientHeight < node.scrollHeight - edgeSlack,
+        });
+      }
+    };
+
+    // The body grows and shrinks with the form inside it, so measuring on scroll alone would miss a
+    // section opening up.
+    const observer = new ResizeObserver(measure);
+
+    if (node !== null) {
+      observer.observe(node);
+
+      for (const child of node.children) {
+        observer.observe(child);
+      }
+
+      node.addEventListener("scroll", measure, { passive: true });
+    }
+
+    return () => {
+      observer.disconnect();
+      node?.removeEventListener("scroll", measure);
+    };
+  }, [node]);
+
+  return { ref: setNode, top: edges.top, bottom: edges.bottom };
 }
 
 export function DialogFooter({ className, ...props }: ComponentProps<"div">): ReactElement {

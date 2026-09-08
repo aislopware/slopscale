@@ -16,6 +16,7 @@ import { CreatedKey, useCreatedKey } from "~/components/keys/created-key.tsx";
 import { expirationFor, expiryOptions } from "~/components/keys/expiration.ts";
 import type { ExpiryChoice } from "~/components/keys/expiration.ts";
 import { usePreAuthKeyMutations } from "~/components/keys/mutations.ts";
+import { Code } from "~/components/ui/code.tsx";
 import {
   DialogClose,
   DialogContent,
@@ -277,8 +278,8 @@ function PreAuthKeyFields({
 function TagsHint(): ReactElement {
   return (
     <>
-      Comma separated; <span className="font-mono text-[0.9em]">tag:</span> is added when missing. A
-      tagged machine belongs to its tags instead of the user.
+      Comma separated; <Code>tag:</Code> is added when missing. A tagged machine belongs to its tags
+      instead of the user.
     </>
   );
 }

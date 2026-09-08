@@ -1,17 +1,18 @@
 import { Switch } from "@cloudflare/kumo/components/switch";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import type { Settings } from "~/api/queries.ts";
 import type { UpdateSettingsRequestBody } from "~/api/schema.gen.ts";
 import { useSettingsMutation } from "~/components/settings/mutations.ts";
 import { SettingRow } from "~/components/settings/setting-row.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 interface ApprovalSwitch {
   readonly id: string;
   readonly title: string;
-  readonly description: string;
+  readonly description: ReactNode;
   readonly read: (settings: Settings) => boolean;
   readonly write: (on: boolean) => UpdateSettingsRequestBody;
 }
@@ -39,8 +40,13 @@ const trust: readonly ApprovalSwitch[] = [
   {
     id: "posture",
     title: "Collect device identity",
-    description:
-      "Ask connected machines for their hardware serial numbers, so postures can check node:serialNumber. A machine only answers when its client has posture checking on (tailscale set --posture-checking=true).",
+    description: (
+      <>
+        Ask connected machines for their hardware serial numbers, so postures can check{" "}
+        <Code>node:serialNumber</Code>. A machine only answers when its client has posture checking
+        on (<Code>tailscale set --posture-checking=true</Code>).
+      </>
+    ),
     read: (settings) => settings.postureIdentityOn,
     write: (on) => ({ postureIdentityOn: on }),
   },
