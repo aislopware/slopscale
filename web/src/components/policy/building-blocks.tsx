@@ -80,7 +80,7 @@ export function BuildingBlocks({
               <span className="text-xs text-kumo-subtle">
                 {blocks.valid
                   ? "Names in the draft"
-                  : "Names found in the text, since it does not parse"}
+                  : "Names picked out of the text, because the draft does not parse"}
               </span>
             ) : null}
           </span>

@@ -75,7 +75,7 @@ func init() {
 
 var webhooksCmd = &cobra.Command{
 	Use:     "webhooks",
-	Short:   "Manage webhooks: endpoints that receive signed event notifications",
+	Short:   "Manage the webhooks, endpoints that receive signed event notifications",
 	Aliases: []string{"webhook", "hooks"},
 }
 

@@ -540,7 +540,7 @@ var backfillNodeIPsCmd = &cobra.Command{
 	Short: "Give nodes the addresses they are missing",
 	Long: `Gives every node an address in each family the config enables and removes
 the addresses of a family whose prefix was taken out of the config. Run it after
-adding or removing prefix_v4 or prefix_v6.`,
+adding or removing prefixes.v4 or prefixes.v6.`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		if !confirmAction(cmd, "Are you sure that you want to assign/remove IPs to/from nodes?") {
 			return nil

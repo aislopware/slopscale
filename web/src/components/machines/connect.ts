@@ -55,7 +55,7 @@ const builders: Record<Platform, Builder> = {
     return {
       command: line,
       qr: line,
-      note: "For the Homebrew build. Installs the formula, starts the tailscaled service, then joins. The Mac App Store app instead takes the server address under the menu bar icon. Hold Option, choose Debug, then Custom Login Server.",
+      note: "This is the Homebrew build. It installs the formula, starts the tailscaled service, then joins. The Mac App Store app instead takes the server address under the menu bar icon. Hold Option, choose Debug, then Custom Login Server.",
     };
   },
   windows: (command) => {

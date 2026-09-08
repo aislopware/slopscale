@@ -42,7 +42,7 @@ func addDNSRuleFlags(cmd *cobra.Command) {
 
 var dnsRulesCmd = &cobra.Command{
 	Use:     "rules",
-	Short:   "Manage split DNS per group: domains and nameservers only some groups receive",
+	Short:   "Manage the split DNS domains and nameservers only some groups receive",
 	Aliases: []string{"rule"},
 }
 

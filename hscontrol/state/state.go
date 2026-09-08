@@ -726,6 +726,9 @@ func (s *State) Disconnect(id types.NodeID, epoch uint64) ([]change.Change, erro
 
 		n.LastSeen = &seen
 		n.IsOnline = new(false)
+		// The warnings describe a running client; the next map request
+		// brings the current set.
+		n.ClientWarnings = nil
 		// Offline nodes are not HA candidates; drop any stale
 		// Unhealthy bit so it does not surface in DebugRoutes.
 		n.Unhealthy = false

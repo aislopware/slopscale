@@ -80,9 +80,13 @@ func generateMapResponse(nc nodeConnection, mapper *mapper, r change.Change) (*t
 	// its own attribute changes (e.g., tags changed via admin API).
 	isSelfUpdate := r.OriginNode != 0 && r.OriginNode == nodeID
 
-	// A patch the node caused itself (endpoints, DERP home, version) is
-	// for its peers only; see [mapper.buildFromChange].
-	if isSelfUpdate && r.IsPatchOnly() {
+	// A patch the node caused itself (endpoints, DERP home, version)
+	// carries nothing it does not already know, and a self node in the
+	// response would make the client rebuild its whole netmap, so the
+	// origin gets nothing and only its peers get the patch. A key expiry
+	// or a rotation is not marked and still reaches the node as a self
+	// update, which is how it learns its key ran out.
+	if isSelfUpdate && r.OriginKnows {
 		return nil, nil //nolint:nilnil // Nothing to tell the node that sent the patch
 	}
 

@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tailcfg/nodecap"
+	"tailscale.com/types/key"
 	"tailscale.com/types/netmap"
 )
 
@@ -192,6 +193,18 @@ func TestClientAuditLogIsRecorded(t *testing.T) {
 		Action:  tailcfg.AuditNodeDisconnect,
 	})
 	assert.Equal(t, http.StatusUnauthorized, status)
+
+	// An action outside the closed set is refused, so a client cannot
+	// write names of its own into the log.
+	status, _ = postMachine(t, srv, alice, "audit-log", tailcfg.AuditLogRequest{
+		NodeKey: alice.NodePrivateKey().Public(),
+		Action:  tailcfg.ClientAuditAction("FORMAT_DISK"),
+	})
+	assert.Equal(t, http.StatusBadRequest, status)
+
+	events, err = srv.State().ListAuditEvents(types.AuditQuery{TargetKind: "node"})
+	require.NoError(t, err)
+	assert.Len(t, events, 1)
 }
 
 // TestFeatureQueryTellsHowToEnable pins /machine/feature/query, which
@@ -224,6 +237,8 @@ func TestFeatureQueryTellsHowToEnable(t *testing.T) {
 	assert.False(t, off.Complete)
 	assert.Contains(t, off.Text, "granting the https node attribute")
 	assert.Equal(t, srv.URL+"/admin/policy", off.URL)
+	// The CLI exits 0 after printing the text unless told to wait.
+	assert.True(t, off.ShouldWait)
 
 	reloadPolicy(t, srv, `{
 		"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}],
@@ -236,10 +251,15 @@ func TestFeatureQueryTellsHowToEnable(t *testing.T) {
 
 	assert.True(t, query("serve").Complete)
 
-	funnel := query("funnel")
-	assert.False(t, funnel.Complete)
-	assert.Contains(t, funnel.Text, "not available on this server")
-	assert.Empty(t, funnel.URL)
+	// Funnel is an error, not an answer: a text answer would make
+	// `tailscale funnel` print it and exit 0 with nothing set up, while
+	// an error sends the CLI to its own check, which fails loudly.
+	status, body := postMachine(t, srv, alice, "feature/query", tailcfg.QueryFeatureRequest{
+		Feature: "funnel",
+		NodeKey: alice.NodePrivateKey().Public(),
+	})
+	assert.Equal(t, http.StatusNotFound, status)
+	assert.Contains(t, string(body), "not available on this server")
 
 	assert.Contains(t, query("teleport").Text, "not a feature this server knows")
 }
@@ -313,4 +333,107 @@ func TestClientWarningsReachTheAPI(t *testing.T) {
 			assert.Equal(t, []string{}, n.ClientWarnings)
 		}
 	}
+}
+
+// TestExpiredKeyReachesTheNodeItself pins the natural key expiry: the
+// expiry pass sends a patch whose origin is the expiring node, and that
+// node must still get its self node with Expired set, which is how it
+// goes to "needs login". Only a patch the node caused with its own map
+// request (endpoints, DERP home, version) is withheld from it.
+func TestExpiredKeyReachesTheNodeItself(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	owner := srv.CreateUser(t, "owner")
+	alice := servertest.NewClient(t, srv, "alice", servertest.WithUser(owner))
+
+	node, ok := srv.State().GetNodeByNodeKey(alice.NodePrivateKey().Public())
+	require.True(t, ok)
+
+	soon := time.Now().Add(300 * time.Millisecond)
+
+	_, c, err := srv.State().SetNodeExpiry(node.ID(), &soon)
+	require.NoError(t, err)
+	srv.App.Change(c)
+
+	alice.WaitForCondition(t, "expiry set on the self node", 5*time.Second, func(nm *netmap.NetworkMap) bool {
+		return nm.SelfNode.Valid() && nm.SelfNode.KeyExpiry().Equal(soon.UTC()) && !nm.SelfNode.Expired()
+	})
+
+	// The expiry pass is what the server's timer runs; wait for the
+	// moment to pass rather than sleeping a fixed time.
+	require.Eventually(t, func() bool {
+		_, changes, changed := srv.State().ExpireExpiredNodes(time.Now().Add(-time.Minute))
+		if changed {
+			srv.App.Change(changes...)
+		}
+
+		return changed
+	}, 5*time.Second, 20*time.Millisecond)
+
+	alice.WaitForCondition(t, "self node marked expired", 5*time.Second, func(nm *netmap.NetworkMap) bool {
+		return nm.SelfNode.Valid() && nm.SelfNode.Expired()
+	})
+}
+
+// TestUserProfilesNameOnlyVisibleUsers pins the user profile list of a
+// full map: a user whose machines the recipient cannot reach is not named
+// in it, while the recipient's own user always is.
+func TestUserProfilesNameOnlyVisibleUsers(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	owner := srv.CreateUser(t, "owner")
+	other := srv.CreateUser(t, "other")
+
+	reloadPolicy(t, srv, `{
+		"acls": [{"action": "accept", "src": ["owner@"], "dst": ["owner@:*"]}]
+	}`)
+
+	alice := servertest.NewClient(t, srv, "alice", servertest.WithUser(owner))
+	bob := servertest.NewClient(t, srv, "bob", servertest.WithUser(other))
+
+	bobNode, ok := srv.State().GetNodeByNodeKey(bob.NodePrivateKey().Public())
+	require.True(t, ok)
+
+	// Force a full map after both exist.
+	alice.Reconnect(t)
+
+	alice.WaitForCondition(t, "full map without bob", 5*time.Second, func(nm *netmap.NetworkMap) bool {
+		return nm.SelfNode.Valid() && len(nm.UserProfiles) > 0
+	})
+
+	nm := alice.Netmap()
+	_, hasSelf := nm.UserProfiles[tailcfg.UserID(owner.ID)]
+	assert.True(t, hasSelf, "the recipient's own user is always named")
+
+	_, hasOther := nm.UserProfiles[bobNode.TailscaleUserID()]
+	assert.False(t, hasOther, "a user with no visible machine is not named: %v", nm.UserProfiles)
+	assert.Empty(t, nm.Peers)
+}
+
+// TestUnsupportedClientCannotUseAPreAuthKey pins the register order: a
+// client below the supported capability version is refused before the
+// request has any effect, so the pre-auth key it carried is still unused.
+func TestUnsupportedClientCannotUseAPreAuthKey(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	owner := srv.CreateUser(t, "owner")
+	alice := servertest.NewClient(t, srv, "alice", servertest.WithUser(owner))
+	ownerID := types.UserID(owner.ID)
+	keyStr := srv.CreatePreAuthKeyFromSpec(t, types.PreAuthKeySpec{UserID: &ownerID, Preauthorized: true})
+
+	status, body := postMachine(t, srv, alice, "register", tailcfg.RegisterRequest{
+		Version:  100,
+		NodeKey:  key.NewNode().Public(),
+		Hostinfo: &tailcfg.Hostinfo{Hostname: "old-client"},
+		Auth:     &tailcfg.RegisterResponseAuth{AuthKey: keyStr},
+	})
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Contains(t, string(body), "unsupported")
+
+	pak, err := srv.State().GetPreAuthKey(keyStr)
+	require.NoError(t, err)
+	assert.False(t, pak.Used)
 }

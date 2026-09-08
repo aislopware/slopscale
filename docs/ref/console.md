@@ -78,11 +78,12 @@ the signed-in user as the actor.
 
 ## Getting around
 
-The sidebar is grouped by what you are doing. *Tailnet* holds machines,
-users and keys. *Access* holds the access controls and, for everyone, the
-page to ask for temporary access. *Connectivity* holds networks, DNS and
-relays. *Logs* holds the audit log and the SSH session recordings. *Server*
-holds integrations and settings. A count next to _Machines_ and _Users_
+The sidebar starts with the overview and is then grouped by what you are
+doing. *Tailnet* holds machines and users. *Access* holds the access controls
+and, for everyone, the page to ask for temporary access. *Connectivity* holds
+networks, DNS and relays. *Logs* holds the audit log and the SSH session
+recordings. *Settings* holds the tailnet-wide switches under _General_, the
+keys and the integrations. A count next to _Machines_ and _Users_
 says how many are waiting for approval. The arrow in the sidebar footer
 collapses it to an icon rail. *Quick search*, or ++cmd+k++ / ++ctrl+k++,
 jumps to any page, machine or user by name. The top bar shows breadcrumbs
@@ -100,7 +101,7 @@ out*.
   sharing and the global exit node switch, plus rename, tag, expire and remove.
   A warning the client reports about itself, such as a subnet router whose
   kernel drops forwarded packets, shows at the top of the page until the client
-  stops reporting it.
+  stops reporting it or goes offline.
   _Add machine_ mints a pre-auth key and hands over the join command for
   Linux, macOS, Windows and Docker, next to a QR code carrying the same line
   so a phone or a machine without a shared clipboard can pick it up; the

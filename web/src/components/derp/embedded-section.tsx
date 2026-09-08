@@ -302,13 +302,13 @@ function ServerForm({
           field: "ipv4",
           label: "Public IPv4",
           placeholder: "198.51.100.1",
-          description: "Lets machines reach the relay when DNS is down.",
+          description: "Published in the DERP map so machines reach the relay when DNS is down.",
         })}
         {field({
           field: "ipv6",
           label: "Public IPv6",
           placeholder: "2001:db8::1",
-          description: "The IPv6 counterpart.",
+          description: "Published in the DERP map so machines reach the relay when DNS is down.",
         })}
       </div>
       <Switch

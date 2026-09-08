@@ -392,15 +392,9 @@ func (m *mapper) buildFromChange(
 
 	// If this is a self-update (the changed node is the receiving node),
 	// send a self-update response to ensure the node sees its own changes.
-	// A patch the node caused itself (its endpoints, DERP home or version)
-	// carries nothing it does not already know, and a self node in the
-	// response would make the client rebuild its whole netmap, so the
-	// origin gets nothing and only its peers get the patch.
+	// The batcher answers a patch the node caused itself before it gets
+	// here (see [Batcher] generateMapResponse and [change.Change.OriginKnows]).
 	if resp.OriginNode != 0 && resp.OriginNode == nodeID {
-		if resp.IsPatchOnly() {
-			return nil, nil //nolint:nilnil // Nothing to tell the node that sent the patch
-		}
-
 		return m.selfMapResponse(nodeID, capVer)
 	}
 
@@ -517,15 +511,16 @@ func (m *mapper) filterVisibleNodes(
 	nodeID types.NodeID,
 	peers views.Slice[types.NodeView],
 ) views.Slice[types.NodeView] {
-	visible, ok := m.visiblePeerIDs(nodeID)
+	node, ok := m.state.GetNodeByID(nodeID)
 	if !ok {
 		// Fail closed: emit no peer user profiles rather than risk a leak.
 		return views.SliceOf([]types.NodeView{})
 	}
 
-	return views.SliceOf(filterByVisible(visible, peers.AsSlice(), func(p types.NodeView) tailcfg.NodeID {
-		return p.ID().NodeID()
-	}))
+	// Filter the slice the caller is about to emit as peers rather than
+	// list the peers again, so the profiles and the peers come from the
+	// same snapshot and no user is named without its node.
+	return m.state.VisiblePeers(node, peers)
 }
 
 // filterByVisible keeps only the items whose key resolves to a NodeID present

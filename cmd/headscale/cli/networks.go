@@ -59,7 +59,7 @@ func init() {
 
 var networksCmd = &cobra.Command{
 	Use:     "networks",
-	Short:   "Manage networks: prefixes routed through nodes and handed to groups",
+	Short:   "Manage the networks, prefixes routed through nodes and handed to groups",
 	Aliases: []string{"network", "net"},
 }
 

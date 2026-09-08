@@ -126,7 +126,7 @@ function Attributes({ node }: { readonly node: Node }): ReactElement | null {
 
   if (node.globalExitNode) {
     marks.push(
-      <Mark key="global" hint="Global exit node. Every client is told to prefer it">
+      <Mark key="global" hint="Global exit node. Every client is told to prefer it.">
         <StarIcon size={markSize} weight="fill" className="text-kumo-warning" />
       </Mark>,
     );
@@ -156,7 +156,7 @@ function Attributes({ node }: { readonly node: Node }): ReactElement | null {
 
   if (node.ephemeral) {
     marks.push(
-      <Mark key="ephemeral" hint="Ephemeral. Deleted when it logs out or stays offline">
+      <Mark key="ephemeral" hint="Ephemeral. Deleted when it logs out or stays offline.">
         <HourglassIcon size={markSize} />
       </Mark>,
     );

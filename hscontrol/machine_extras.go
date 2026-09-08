@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -19,6 +18,14 @@ import (
 // ErrMachineKeyMismatch is returned when a machine request names a node
 // key that does not belong to the Noise session it arrived on.
 var ErrMachineKeyMismatch = errors.New("node key does not match the session")
+
+// ErrFeatureUnavailable is returned for a feature query this server cannot
+// satisfy at all, as opposed to one the policy has not granted yet.
+var ErrFeatureUnavailable = errors.New("feature unavailable on this server")
+
+// ErrUnknownAuditAction is returned for a client audit action outside the
+// closed set the audit log records.
+var ErrUnknownAuditAction = errors.New("unknown client audit action")
 
 // featureCaps lists, per feature the CLI can ask about, the self caps the
 // client needs before it stops asking (cmd/tailscale/cli enableFeatureInteractive).
@@ -46,8 +53,9 @@ func (ns *noiseServer) sessionNode(nodeKey key.NodePublic) (types.NodeView, erro
 
 // AuditLogHandler records a [tailcfg.AuditLogRequest], an action the
 // device's user took on the device, as an audit event whose actor is the
-// machine. The client sends one per audited action and does not retry a
-// refusal, so anything but a 200 loses the entry.
+// machine. The client queues entries on disk and retries a 5xx with
+// backoff; a 4xx drops the entry, so only a request that cannot be
+// recorded is refused.
 func (ns *noiseServer) AuditLogHandler(writer http.ResponseWriter, req *http.Request) {
 	var request tailcfg.AuditLogRequest
 
@@ -65,10 +73,18 @@ func (ns *noiseServer) AuditLogHandler(writer http.ResponseWriter, req *http.Req
 		return
 	}
 
+	action, ok := clientAuditAction(request.Action)
+	if !ok {
+		httpError(writer, NewHTTPError(http.StatusBadRequest, "unknown audit action",
+			fmt.Errorf("%w: %q", ErrUnknownAuditAction, request.Action)))
+
+		return
+	}
+
 	event := &types.AuditEvent{
 		ActorKind:  types.ActorNode,
 		ActorName:  node.GivenName(),
-		Action:     clientAuditAction(request.Action),
+		Action:     action,
 		TargetKind: "node",
 		TargetID:   node.ID().String(),
 		TargetName: node.GivenName(),
@@ -80,21 +96,21 @@ func (ns *noiseServer) AuditLogHandler(writer http.ResponseWriter, req *http.Req
 		event.ActorUserID = types.UserID(uid)
 	}
 
-	if !request.Timestamp.IsZero() {
-		event.Detail["reportedAt"] = request.Timestamp.UTC().Format(time.RFC3339)
-	}
-
 	audit.Record(ns.headscale.state, event)
 
 	writer.WriteHeader(http.StatusOK)
 }
 
 // clientAuditAction maps the client's action names onto the audit log's
-// dotted form: DISCONNECT_NODE becomes node.client.disconnect.
-func clientAuditAction(action tailcfg.ClientAuditAction) string {
-	name := strings.ToLower(strings.TrimSuffix(string(action), "_NODE"))
+// dotted form. The set is closed so a client cannot write names of its
+// own into the log; [tailcfg.ClientAuditAction] lists the ones control
+// planes must know.
+func clientAuditAction(action tailcfg.ClientAuditAction) (string, bool) {
+	if action == tailcfg.AuditNodeDisconnect {
+		return "node.client.disconnect", true
+	}
 
-	return "node.client." + strings.ReplaceAll(name, "_", "-")
+	return "", false
 }
 
 // FeatureQueryHandler answers `tailscale serve` and `tailscale funnel` when
@@ -118,6 +134,16 @@ func (ns *noiseServer) FeatureQueryHandler(writer http.ResponseWriter, req *http
 		return
 	}
 
+	// Funnel needs Tailscale's public ingress, which this server has no
+	// stand-in for. An error, not a text answer, keeps `tailscale funnel`
+	// on its own check, which fails loudly; a text answer makes the CLI
+	// print it and exit 0 with nothing set up.
+	if request.Feature == "funnel" {
+		httpError(writer, NewHTTPError(http.StatusNotFound, funnelUnavailable, ErrFeatureUnavailable))
+
+		return
+	}
+
 	response := ns.featureQueryResponse(node, request.Feature)
 
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -129,10 +155,6 @@ func (ns *noiseServer) FeatureQueryHandler(writer http.ResponseWriter, req *http
 }
 
 func (ns *noiseServer) featureQueryResponse(node types.NodeView, feature string) tailcfg.QueryFeatureResponse {
-	if feature == "funnel" {
-		return tailcfg.QueryFeatureResponse{Text: funnelUnavailable}
-	}
-
 	needed, known := featureCaps[feature]
 	if !known {
 		return tailcfg.QueryFeatureResponse{Text: fmt.Sprintf("%q is not a feature this server knows.", feature)}
@@ -152,13 +174,17 @@ func (ns *noiseServer) featureQueryResponse(node types.NodeView, feature string)
 		return tailcfg.QueryFeatureResponse{Complete: true}
 	}
 
+	// ShouldWait keeps the command open until the policy grants the
+	// attribute; without it the CLI prints the text and exits 0 having
+	// set nothing up.
 	return tailcfg.QueryFeatureResponse{
 		Text: fmt.Sprintf(
 			"%s is off for this machine. An administrator turns it on by granting the %s node attribute "+
-				"to the machine in the policy file, under Access controls.",
+				"to the machine in the policy file, under Access controls. This command waits for that.",
 			featureTitle(feature), strings.Join(missing, " and "),
 		),
-		URL: ns.headscale.cfg.ServerURL + "/admin/policy",
+		URL:        ns.headscale.cfg.ServerURL + "/admin/policy",
+		ShouldWait: true,
 	}
 }
 

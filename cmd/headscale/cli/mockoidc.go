@@ -35,7 +35,7 @@ func init() {
 var mockOidcCmd = &cobra.Command{
 	Use:   "mockoidc",
 	Short: "Run a mock OIDC server for testing",
-	Long:  "This internal command runs a OpenID Connect for testing purposes",
+	Long:  "Run an OpenID Connect provider that accepts any login, for tests.",
 	RunE: func(_ *cobra.Command, _ []string) error {
 		err := mockOIDC()
 		if err != nil {

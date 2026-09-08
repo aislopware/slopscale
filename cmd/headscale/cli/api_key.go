@@ -103,10 +103,8 @@ var listAPIKeys = &cobra.Command{
 var createAPIKeyCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create an API key",
-	Long: `
-Creates a new Api key, the Api key is only visible on creation
-and cannot be retrieved again.
-If you lose a key, create a new one and revoke (expire) the old one.`,
+	Long: `Create an API key. The key is shown once, on creation, and cannot be
+retrieved again. If you lose it, create a new one and expire the old one.`,
 	Aliases: []string{"c", cmdNew},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {

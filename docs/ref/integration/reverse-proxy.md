@@ -10,7 +10,7 @@
 Running Headscale behind a reverse proxy is useful when running multiple applications on the same server, and you want
 to reuse the same external IP and port - usually tcp/443 for HTTPS.
 
-Please see [limitations](#limitations) for known issues and limitations.
+See [limitations](#limitations) for the known issues.
 
 ## Configuration
 

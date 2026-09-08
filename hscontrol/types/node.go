@@ -457,9 +457,9 @@ func (node *Node) AppendToIPSet(build *netipx.IPSetBuilder) {
 //   - any approved subnet routes it advertises (subnet-router-as-src,
 //     used for subnet-to-subnet ACLs)
 //
-// Either identity matching a rule's src, combined with the dst
-// matching node2's IPs, node2's approved subnet routes, or "the
-// internet" when node2 is an exit node, grants access.
+// Access is granted when either identity matches a rule's src and the
+// rule's dst covers node2: its IPs, its approved subnet routes, or "the
+// internet" when node2 is an exit node.
 func (node *Node) CanAccess(matchers []matcher.Match, node2 *Node) bool {
 	return node.canAccess(matchers, node2, node.SubnetRoutes(), node2.SubnetRoutes(), node2.IsExitNode())
 }
@@ -1440,11 +1440,6 @@ func (nv NodeView) tailNode(
 	return &tNode, nil
 }
 
-// selfCapMap is the CapMap of a node's own entry: the baseline caps every
-// node receives, regardless of policy, overlaid with its policy caps, which
-// carry the nodeAttrs and the role caps (is-admin, is-owner) the policy
-// manager stamps from the owning user's role. Mirrors what Tailscale SaaS
-// emits for a default tailnet.
 // peerHostinfo is the Hostinfo a peer entry carries: everything the client
 // reads about a peer (name, OS, services, SSH host keys) without NetInfo,
 // the node's own NAT and DERP latency findings, which only describe the
@@ -1461,6 +1456,11 @@ func peerHostinfo(hi *tailcfg.Hostinfo) tailcfg.HostinfoView {
 	return trimmed.View()
 }
 
+// selfCapMap is the CapMap of a node's own entry: the baseline caps every
+// node receives, regardless of policy, overlaid with its policy caps, which
+// carry the nodeAttrs and the role caps (is-admin, is-owner) the policy
+// manager stamps from the owning user's role. Mirrors what Tailscale SaaS
+// emits for a default tailnet.
 func selfCapMap(cfg *Config, policyCaps tailcfg.NodeCapMap) tailcfg.NodeCapMap {
 	capMap := tailcfg.NodeCapMap{
 		nodecap.SSH: []tailcfg.RawMessage{},

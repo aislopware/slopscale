@@ -26,6 +26,14 @@ type Change struct {
 	// Used for self-update detection and filtering.
 	OriginNode types.NodeID
 
+	// OriginKnows marks a patch the origin node caused with its own map
+	// request (endpoints, DERP home, capability version): it carries
+	// nothing the node does not already know, so the node gets no
+	// response and only its peers get the patch. Set by the producer,
+	// never inferred from the patch's shape, because a key expiry or a
+	// key rotation has the same shape and the node must hear about those.
+	OriginKnows bool
+
 	// Content flags - what to include in the [tailcfg.MapResponse].
 	IncludeSelf    bool
 	IncludeDERPMap bool
@@ -141,17 +149,6 @@ func (r Change) IsSelfOnly() bool {
 	return true
 }
 
-// IsPatchOnly reports whether the change carries peer patches and nothing
-// else, the shape of an endpoint, DERP home or capability version update.
-func (r Change) IsPatchOnly() bool {
-	if len(r.PeerPatches) == 0 || len(r.PeersChanged) > 0 || len(r.PeersRemoved) > 0 || r.SendAllPeers {
-		return false
-	}
-
-	return !r.IncludeSelf && !r.IncludeDERPMap && !r.IncludeDNS && !r.IncludeDomain &&
-		!r.IncludePolicy && !r.RequiresRuntimePeerComputation && r.PingRequest == nil
-}
-
 // IsTargetedToNode returns true if this response should only be sent to [Change.TargetNode].
 func (r Change) IsTargetedToNode() bool {
 	return r.TargetNode != 0
@@ -263,6 +260,7 @@ func (r Change) boolFieldNames() []string {
 		"IncludePolicy",
 		"SendAllPeers",
 		"RequiresRuntimePeerComputation",
+		"OriginKnows",
 	}
 }
 
@@ -483,6 +481,7 @@ func KeyExpiryFor(id types.NodeID, expiry time.Time) Change {
 func EndpointOrDERPUpdate(id types.NodeID, patch *tailcfg.PeerChange) Change {
 	c := PeerPatched("endpoint/DERP update", patch)
 	c.OriginNode = id
+	c.OriginKnows = true
 
 	return c
 }

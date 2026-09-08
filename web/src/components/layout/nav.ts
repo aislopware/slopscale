@@ -50,8 +50,9 @@ export interface NavGroup {
 }
 
 /**
- * The sidebar, grouped by what the operator is doing: the things on the tailnet, who may reach
- * what, how packets and names travel, what happened, and the server itself.
+ * The sidebar, grouped by what the operator is doing: the machines and people on the tailnet, who
+ * may reach what, how packets and names travel, what happened, and the switches, credentials and
+ * outbound integrations that configure all of it.
  */
 export const navGroups: readonly NavGroup[] = [
   { items: [{ to: "/", label: "Overview", icon: SquaresFourIcon, exact: true }] },
@@ -66,7 +67,6 @@ export const navGroups: readonly NavGroup[] = [
         badge: "pendingNodes",
       },
       { to: "/users", label: "Users", icon: UsersIcon, scope: "users:read", badge: "pendingUsers" },
-      { to: "/keys", label: "Keys", icon: KeyIcon },
     ],
   },
   {
@@ -102,15 +102,16 @@ export const navGroups: readonly NavGroup[] = [
     ],
   },
   {
-    label: "Server",
+    label: "Settings",
     items: [
+      { to: "/settings", label: "General", icon: GearSixIcon, scope: "feature_settings:read" },
+      { to: "/keys", label: "Keys", icon: KeyIcon },
       {
         to: "/webhooks",
         label: "Integrations",
         icon: WebhooksLogoIcon,
         scope: "webhooks:read",
       },
-      { to: "/settings", label: "Settings", icon: GearSixIcon, scope: "feature_settings:read" },
     ],
   },
 ];

@@ -103,7 +103,7 @@ type Capture struct {
 type Input struct {
 	// FullPolicy is the unchanged policy that was POSTed to the SaaS
 	// API. Stored as a string because it is opaque JSON that round-
-	// trips losslessly without parsing. headscale's policy parser
+	// trips losslessly without parsing. The policy parser of headscale
 	// reads it on demand.
 	FullPolicy string `json:"full_policy"`
 
