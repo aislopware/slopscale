@@ -43,7 +43,7 @@ export function MultiPicker({
   // draw removable-looking chips and an input that invites typing.
   if (disabled) {
     return (
-      <Field label={label} hideLabel {...(description === undefined ? {} : { description })}>
+      <Field label={label} {...(description === undefined ? {} : { description })}>
         <ul
           aria-label={typeof label === "string" ? label : undefined}
           className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-kumo-line bg-kumo-recessed px-2 py-1.5"

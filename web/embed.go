@@ -38,9 +38,10 @@ const cacheForever = "public, max-age=31536000, immutable"
 
 // contentSecurityPolicy locks the console down to its own origin. Inline
 // styles are needed for Base UI's positioning and CodeMirror's injected
-// stylesheets; scripts stay strictly self-hosted.
+// stylesheets; scripts stay strictly self-hosted. Images may come from any
+// https origin so a user's profile picture can be previewed.
 const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-	"img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; " +
+	"img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; " +
 	"base-uri 'self'; form-action 'self'"
 
 // Built reports whether the embedded bundle contains a console.
