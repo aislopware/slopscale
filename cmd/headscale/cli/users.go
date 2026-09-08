@@ -112,13 +112,13 @@ func init() {
 
 var userCmd = &cobra.Command{
 	Use:     "users",
-	Short:   "Manage the users of Headscale",
+	Short:   "Manage users",
 	Aliases: []string{"user"},
 }
 
 var createUserCmd = &cobra.Command{
 	Use:     "create NAME",
-	Short:   "Creates a new user",
+	Short:   "Create a user",
 	Aliases: []string{"c", cmdNew},
 	Args: func(_ *cobra.Command, args []string) error {
 		if len(args) < 1 {
@@ -168,7 +168,7 @@ var createUserCmd = &cobra.Command{
 
 var destroyUserCmd = &cobra.Command{
 	Use:     "destroy --identifier ID or --name NAME",
-	Short:   "Destroys a user",
+	Short:   "Delete a user",
 	Aliases: []string{cmdDelete},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
@@ -257,7 +257,7 @@ var listUsersCmd = &cobra.Command{
 
 var renameUserCmd = &cobra.Command{
 	Use:     "rename",
-	Short:   "Renames a user",
+	Short:   "Rename a user",
 	Aliases: []string{"mv"},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
@@ -284,7 +284,7 @@ var renameUserCmd = &cobra.Command{
 
 var setUserCmd = &cobra.Command{
 	Use:   "set --identifier ID or --name NAME",
-	Short: "Sets a user's display name, email or profile picture",
+	Short: "Set a user's display name, email or profile picture",
 	Long: `
 Changes the profile the clients show for a user. A flag left out keeps its
 value and a flag set to an empty string clears it. A user who logs in through
@@ -385,10 +385,9 @@ which also withdraws every node the user owns.`,
 
 var setUserRoleCmd = &cobra.Command{
 	Use:   "set-role --identifier ID or --name NAME --role ROLE",
-	Short: "Sets a user's admin role",
-	Long: `
-Sets the role that bounds what the user may do through the admin API and
-console. Assigning owner transfers ownership: the previous owner becomes an
+	Short: "Set a user's role",
+	Long: `Sets the role that bounds what the user may do through the admin API and
+console. Assigning owner transfers ownership, and the previous owner becomes an
 admin. The owner's role changes only by such a transfer.`,
 	Aliases: []string{"role"},
 	RunE: clientRunE(

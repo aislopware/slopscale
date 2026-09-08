@@ -338,7 +338,7 @@ func (v NodeView) Unhealthy() bool { return v.ж.Unhealthy }
 // ActiveSessions counts live poll sessions for this node.
 // [State.Connect] increments it and every session release
 // ([State.Disconnect]) decrements it, so the node goes offline
-// exactly when its last session ends — regardless of the order in
+// exactly when its last session ends, regardless of the order in
 // which overlapping sessions' cleanups run. Never persisted, like
 // SessionEpoch.
 func (v NodeView) ActiveSessions() int { return v.ж.ActiveSessions }
@@ -346,7 +346,7 @@ func (v NodeView) ActiveSessions() int { return v.ж.ActiveSessions }
 // SessionEpoch identifies a poll session generation; Connect bumps
 // it. It complements ActiveSessions rather than duplicating it:
 // the epoch is monotonic, which the HA prober needs to detect that
-// a probe target reconnected mid-cycle — a refcount can return to
+// a probe target reconnected mid-cycle. A refcount can return to
 // its old value, a generation cannot. poll.go also uses the epoch
 // returned by Connect as a "Connect ran" sentinel for its cleanup,
 // and Disconnect logs it. Runtime-only.

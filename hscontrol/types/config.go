@@ -875,7 +875,7 @@ func validateServerConfig() error {
 	if viper.IsSet("dns.extra_records") && viper.IsSet("dns.extra_records_path") {
 		log.Fatal().
 			Msg("fatal config error: dns.extra_records and dns.extra_records_path are mutually exclusive. " +
-				"Please remove one of them from your config file")
+				"Remove one of them from the config file")
 	}
 
 	// Collect any validation errors and return them all at once
@@ -1522,7 +1522,7 @@ func LoadServerConfig() (*Config, error) {
 			"as the Tailscale client is NOT designed to operate on",
 			"any other ranges.",
 			"",
-			"Please revert your prefixes to subsets of the standard",
+			"Set the prefixes back to subsets of the standard",
 			"ranges as described in the example configuration.",
 			"",
 			"Any issue raised using a range outside of the",
@@ -1745,7 +1745,7 @@ func (d *deprecator) fatal(oldKey string) {
 	if viper.IsSet(oldKey) {
 		d.fatals.Add(
 			fmt.Sprintf(
-				"The %q configuration key has been removed. Please see the changelog for more details.",
+				"The %q configuration key has been removed. See the changelog for details.",
 				oldKey,
 			),
 		)
@@ -1775,7 +1775,7 @@ func (d *deprecator) fatalIfNewKeyIsNotUsed(newKey, oldKey string) {
 	if viper.IsSet(oldKey) && !viper.IsSet(newKey) {
 		d.fatals.Add(
 			fmt.Sprintf(
-				"The %q configuration key is deprecated. Please use %q instead. %q has been removed.",
+				"The %q configuration key is deprecated. Use %q instead. %q has been removed.",
 				oldKey,
 				newKey,
 				oldKey,
@@ -1784,7 +1784,7 @@ func (d *deprecator) fatalIfNewKeyIsNotUsed(newKey, oldKey string) {
 	} else if viper.IsSet(oldKey) {
 		d.warns.Add(
 			fmt.Sprintf(
-				"The %q configuration key is deprecated. Please use %q instead. %q has been removed.",
+				"The %q configuration key is deprecated. Use %q instead. %q has been removed.",
 				oldKey,
 				newKey,
 				oldKey,
@@ -1800,7 +1800,7 @@ func (d *deprecator) fatalIfSet(oldKey, newKey string) {
 	if viper.IsSet(oldKey) {
 		d.fatals.Add(
 			fmt.Sprintf(
-				"The %q configuration key has been removed. Please use %q instead.",
+				"The %q configuration key has been removed. Use %q instead.",
 				oldKey,
 				newKey,
 			),
@@ -1813,7 +1813,7 @@ func (d *deprecator) warnNoAlias(newKey, oldKey string) {
 	if viper.IsSet(oldKey) {
 		d.warns.Add(
 			fmt.Sprintf(
-				"The %q configuration key is deprecated. Please use %q instead. %q has been removed.",
+				"The %q configuration key is deprecated. Use %q instead. %q has been removed.",
 				oldKey,
 				newKey,
 				oldKey,

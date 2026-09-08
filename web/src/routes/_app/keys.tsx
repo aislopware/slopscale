@@ -107,7 +107,7 @@ function KeysPage(): ReactElement {
     <>
       <PageHeader
         title="Keys"
-        description="Pre-auth keys register machines without a login; API keys and OAuth clients authenticate this console and automation."
+        description="Pre-auth keys register machines without a login. API keys and OAuth clients authenticate this console and automation."
       />
       <div className="flex">
         <Tabs variant="segmented" tabs={tabItems} value={tab} onValueChange={handleTabChange} />

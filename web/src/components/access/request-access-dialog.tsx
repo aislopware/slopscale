@@ -134,7 +134,7 @@ function RequestForm({
         label="Reason"
         required={false}
         value={reason}
-        placeholder="What you need it for; the approver sees this"
+        placeholder="What you need it for. The approver sees this."
         minRows={reasonRows}
         onChange={(event) => {
           setReason(event.target.value);

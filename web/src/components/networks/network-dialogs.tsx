@@ -198,7 +198,7 @@ function NetworkForm({
       />
       <MultiPicker
         label="Routers"
-        description="Machines that route the prefixes. Each must advertise them with tailscale set --advertise-routes; two or more make a failover pair."
+        description="Machines that route the prefixes. Each must advertise them with tailscale set --advertise-routes. Two or more make a failover pair."
         placeholder="Machines that route the prefixes…"
         items={routerItems(nodes)}
         value={draft.routers}
@@ -229,7 +229,7 @@ function NetworkForm({
           <span className="flex flex-col gap-0.5">
             <span className="font-medium text-kumo-default">Enabled</span>
             <span className="text-xs text-kumo-subtle">
-              A disabled network keeps its settings but approves and hands out nothing.
+              A disabled network keeps its settings but approves no routes and gives none out.
             </span>
           </span>
         }
@@ -262,7 +262,7 @@ function NarrowingNotice({
       variant="alert"
       icon={<InfoIcon />}
       title="The narrowing is not in force yet"
-      description="The tailnet is open: no enabled access rule and no restricting policy file, so the groups reach every port behind the routers. The protocol and ports take effect once a rule is enabled."
+      description="The tailnet is open. There is no enabled access rule and no restricting policy file, so the groups reach every port behind the routers. The protocol and ports take effect once a rule is enabled."
     />
   );
 }

@@ -9,7 +9,7 @@ export function MagicDnsSection({ dns }: { readonly dns: Dns }): ReactElement {
   return (
     <Section
       title="MagicDNS"
-      description="Set in the config file: machines are named after the base domain, so it cannot change while they are registered."
+      description="Set in the config file. Machines are named after the base domain, so it cannot change while they are registered."
       bodyClassName="p-0"
     >
       <DefinitionList

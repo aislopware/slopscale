@@ -42,7 +42,7 @@ export function SourcesSection({
   return (
     <Section
       title="Map sources"
-      description="Maps of relays fetched and merged in order; a later map's region replaces an earlier one with the same id. Tailscale's public map is the usual first entry."
+      description="Maps of relays, fetched and merged in order. A later map's region replaces an earlier one with the same id. Tailscale's public map is the usual first entry."
       bodyClassName="p-0"
       {...(canEdit
         ? {
@@ -143,8 +143,8 @@ function RefetchRow({
         title="Refetch on a schedule"
         description={
           <>
-            Fetches the map URLs again so new or retired relays reach the machines. Off, the map
-            stays as it is until you refetch it here.
+            Fetches the map URLs again so new or retired relays reach the machines. When off, the
+            map stays as it is until you refetch it here.
             {derp.fetchedAt === "0001-01-01T00:00:00Z" ? null : (
               <>
                 {" "}

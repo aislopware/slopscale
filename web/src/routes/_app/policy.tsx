@@ -103,7 +103,7 @@ function PolicyPage(): ReactElement {
     <>
       <PageHeader
         title="Access controls"
-        description="Who may reach what: rules between groups of machines, and the policy file for everything else."
+        description="Rules between groups of machines, and the policy file for everything else."
         meta={describe(rules, groups.length)}
       />
       <div className="flex">

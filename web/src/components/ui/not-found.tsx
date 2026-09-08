@@ -8,7 +8,7 @@ export function NotFoundPanel(): ReactElement {
   return (
     <Empty
       title="Page not found"
-      description="Nothing lives at this address."
+      description="There is no page at this address."
       contents={
         <Link to="/">
           <Button variant="secondary">Back to overview</Button>

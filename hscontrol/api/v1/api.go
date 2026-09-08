@@ -143,7 +143,7 @@ func Handler(backend Backend) (*chi.Mux, huma.API) {
 }
 
 // WithLocalTrust wraps a handler so its requests bypass API-key authentication.
-// The unix socket uses this — access to the socket is the trust boundary — as
+// The unix socket uses this, since access to the socket is the trust boundary, as
 // do in-process tests that exercise the mux directly.
 func WithLocalTrust(next http.Handler) http.Handler {
 	return principal.WithLocalTrust(next)

@@ -31,7 +31,7 @@ import type { ProviderChoice } from "~/components/webhooks/model.ts";
 import type { WebhookMutations } from "~/components/webhooks/mutations.ts";
 
 const secretNote =
-  "The secret signs every delivery. It is shown this once; rotate it later if you lose it.";
+  "The secret signs every delivery. It is shown this once. Rotate it later if you lose it.";
 
 export interface WebhookDialogProps {
   /** The webhook to edit; absent when creating one. */
@@ -55,7 +55,7 @@ export function WebhookDialog(props: WebhookDialogProps): ReactElement {
         title={secret === null ? title : "Webhook created"}
         description={
           secret === null
-            ? "An endpoint the server posts events to. Generic endpoints get the signed JSON array; chat, Telegram, ntfy and email endpoints get the message alone."
+            ? "An endpoint the server posts events to. Generic endpoints get the signed JSON array. Chat, Telegram, ntfy and email endpoints get the message alone."
             : undefined
         }
       >

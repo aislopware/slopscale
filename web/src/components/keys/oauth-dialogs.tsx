@@ -100,7 +100,7 @@ function CreateOAuthClientForm({
       />
       <MultiPicker
         label="Scopes"
-        description="What the client's tokens may do; at least one, and none beyond your own."
+        description="What the client's tokens may do. Pick at least one, and none beyond your own."
         placeholder="Pick scopes"
         items={scopeItems(me)}
         value={scopes}

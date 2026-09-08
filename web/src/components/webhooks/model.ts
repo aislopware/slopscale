@@ -30,33 +30,41 @@ export const providerOptions: readonly ProviderOption[] = [
     label: "Generic (signed JSON)",
     description: "The full event array with a Tailscale-Webhook-Signature header.",
   },
-  { value: "slack", label: "Slack", description: "An incoming webhook; the message as text." },
+  { value: "slack", label: "Slack", description: "An incoming webhook. The message goes as text." },
   {
     value: "mattermost",
     label: "Mattermost",
-    description: "An incoming webhook; the message as text.",
+    description: "An incoming webhook. The message goes as text.",
   },
   {
     value: "googlechat",
     label: "Google Chat",
-    description: "A space webhook; the message as text.",
+    description: "A space webhook. The message goes as text.",
   },
-  { value: "discord", label: "Discord", description: "A channel webhook; the message as content." },
+  {
+    value: "discord",
+    label: "Discord",
+    description: "A channel webhook. The message goes as content.",
+  },
   {
     value: "teams",
     label: "Microsoft Teams",
-    description: "An incoming webhook or workflow; the message as text.",
+    description: "An incoming webhook or workflow. The message goes as text.",
   },
   {
     value: "telegram",
     label: "Telegram",
     description: "The Bot API's sendMessage URL with the chat in a chat_id query parameter.",
   },
-  { value: "ntfy", label: "ntfy", description: "A topic URL; the message as the notification." },
+  {
+    value: "ntfy",
+    label: "ntfy",
+    description: "A topic URL. The message goes as the notification.",
+  },
   {
     value: "email",
     label: "Email",
-    description: "mailto: and the recipients; sent through the server's SMTP settings.",
+    description: "mailto: and the recipients. Sent through the server's SMTP settings.",
   },
 ];
 
@@ -77,7 +85,7 @@ const urlFields: Partial<Record<ProviderChoice, UrlField>> = {
   telegram: {
     label: "Bot URL",
     placeholder: "https://api.telegram.org/bot<token>/sendMessage?chat_id=-100123",
-    hint: "The token is in the URL; the chat_id query parameter names the chat.",
+    hint: "The token is in the URL. The chat_id query parameter names the chat.",
   },
   email: {
     label: "Recipients",

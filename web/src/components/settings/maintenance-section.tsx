@@ -38,7 +38,7 @@ export function MaintenanceSection({ canRun }: { readonly canRun: boolean }): Re
     >
       <SettingRow
         title="Backfill IP addresses"
-        description="Aligns every machine with the address families in the server config: a machine missing an IPv4 or IPv6 address gets one, and an address in a family no longer configured is removed."
+        description="Gives every machine an address in each family the server config enables, and removes addresses in a family that is no longer enabled."
         control={
           <Button
             variant="secondary"

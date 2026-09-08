@@ -15,9 +15,8 @@ func init() {
 
 var healthCmd = &cobra.Command{
 	Use:   "health",
-	Short: "Check the health of the Headscale server",
-	Long: "Check the health of the Headscale server. This command will return " +
-		"an exit code of 0 if the server is healthy, or 1 if it is not.",
+	Short: "Check the health of the server",
+	Long:  "Exits with 0 when the server is healthy and 1 when it is not.",
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
 			resp, err := client.HealthWithResponse(ctx)

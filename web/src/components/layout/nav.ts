@@ -49,10 +49,14 @@ export interface NavGroup {
   readonly items: readonly NavItem[];
 }
 
+/**
+ * The sidebar, grouped by what the operator is doing: the things on the tailnet, who may reach
+ * what, how packets and names travel, what happened, and the server itself.
+ */
 export const navGroups: readonly NavGroup[] = [
   { items: [{ to: "/", label: "Overview", icon: SquaresFourIcon, exact: true }] },
   {
-    label: "Network",
+    label: "Tailnet",
     items: [
       {
         to: "/machines",
@@ -63,23 +67,26 @@ export const navGroups: readonly NavGroup[] = [
       },
       { to: "/users", label: "Users", icon: UsersIcon, scope: "users:read", badge: "pendingUsers" },
       { to: "/keys", label: "Keys", icon: KeyIcon },
+    ],
+  },
+  {
+    label: "Access",
+    items: [
+      { to: "/policy", label: "Access controls", icon: ShieldCheckIcon, scope: "policy_file:read" },
       { to: "/access", label: "My access", icon: HandWavingIcon },
     ],
   },
   {
-    label: "Control",
+    label: "Connectivity",
     items: [
-      { to: "/policy", label: "Access controls", icon: ShieldCheckIcon, scope: "policy_file:read" },
       { to: "/networks", label: "Networks", icon: PathIcon, scope: "devices:routes:read" },
       { to: "/dns", label: "DNS", icon: GlobeIcon, scope: "dns:read" },
       { to: "/relays", label: "Relays", icon: BroadcastIcon, scope: "feature_settings:read" },
-      {
-        to: "/webhooks",
-        label: "Integrations",
-        icon: WebhooksLogoIcon,
-        scope: "webhooks:read",
-      },
-      { to: "/settings", label: "Settings", icon: GearSixIcon, scope: "feature_settings:read" },
+    ],
+  },
+  {
+    label: "Logs",
+    items: [
       {
         to: "/audit",
         label: "Audit log",
@@ -92,6 +99,18 @@ export const navGroups: readonly NavGroup[] = [
         icon: TerminalWindowIcon,
         scope: "logs:configuration:read",
       },
+    ],
+  },
+  {
+    label: "Server",
+    items: [
+      {
+        to: "/webhooks",
+        label: "Integrations",
+        icon: WebhooksLogoIcon,
+        scope: "webhooks:read",
+      },
+      { to: "/settings", label: "Settings", icon: GearSixIcon, scope: "feature_settings:read" },
     ],
   },
 ];

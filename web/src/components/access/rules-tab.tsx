@@ -166,7 +166,7 @@ function StateBanner({
         variant="default"
         icon={<InfoIcon />}
         title="The policy file restricts access"
-        description="Rules add to what the file allows and cannot take any of it away; its tags, SSH rules and autogroups still apply."
+        description="Rules add to what the file allows and cannot take any of it away. Its tags, SSH rules and autogroups still apply."
       />
     );
   }

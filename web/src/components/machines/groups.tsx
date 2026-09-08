@@ -40,7 +40,7 @@ export function GroupsSection({
     <>
       <Section
         title="Groups"
-        description="Rules are written between groups; this machine is in these."
+        description="Rules are written between groups. This machine is in these."
         actions={
           canEdit ? (
             <Button

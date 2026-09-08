@@ -42,13 +42,13 @@ func init() {
 
 var apiKeysCmd = &cobra.Command{
 	Use:     "apikeys",
-	Short:   "Handle the Api keys in Headscale",
+	Short:   "Manage API keys",
 	Aliases: []string{"apikey", "api"},
 }
 
 var listAPIKeys = &cobra.Command{
 	Use:     cmdList,
-	Short:   "List the Api keys for headscale",
+	Short:   "List API keys",
 	Aliases: []string{"ls", cmdShow},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
@@ -102,7 +102,7 @@ var listAPIKeys = &cobra.Command{
 
 var createAPIKeyCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Creates a new Api key",
+	Short: "Create an API key",
 	Long: `
 Creates a new Api key, the Api key is only visible on creation
 and cannot be retrieved again.
@@ -162,7 +162,7 @@ func apiKeyIDOrPrefix(cmd *cobra.Command) (uint64, string, error) {
 
 var expireAPIKeyCmd = &cobra.Command{
 	Use:     cmdExpire,
-	Short:   "Expire an ApiKey",
+	Short:   "Expire an API key",
 	Aliases: []string{"revoke", aliasExp, "e"},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
@@ -198,7 +198,7 @@ var expireAPIKeyCmd = &cobra.Command{
 
 var deleteAPIKeyCmd = &cobra.Command{
 	Use:     cmdDelete,
-	Short:   "Delete an ApiKey",
+	Short:   "Delete an API key",
 	Aliases: []string{"remove", aliasDel},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {

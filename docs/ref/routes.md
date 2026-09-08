@@ -75,7 +75,7 @@ To accept routes advertised by a subnet router on a node:
 $ sudo tailscale set --accept-routes
 ```
 
-Please refer to the official [Tailscale
+See the official [Tailscale
 documentation](https://tailscale.com/docs/features/subnet-routers#use-your-subnet-routes-from-other-devices) for how to
 use a subnet router on different operating systems.
 
@@ -139,7 +139,7 @@ Advertise the route `192.168.0.0/24` from a subnet router that also advertises t
 $ sudo tailscale up --login-server <YOUR_HEADSCALE_URL> --advertise-tags tag:router --advertise-routes 192.168.0.0/24
 ```
 
-Please see the [official Tailscale
+See the [official Tailscale
 documentation](https://tailscale.com/docs/reference/syntax/policy-file#auto-approvers) for more information on auto
 approvers.
 
@@ -240,7 +240,7 @@ The exit node can now be used on a node with:
 $ sudo tailscale set --exit-node myexit
 ```
 
-Please refer to the official [Tailscale documentation](https://tailscale.com/docs/features/exit-nodes#use-the-exit-node)
+See the official [Tailscale documentation](https://tailscale.com/docs/features/exit-nodes#use-the-exit-node)
 for how to use an exit node on different operating systems.
 
 ### Restrict the use of an exit node with a policy
@@ -319,14 +319,14 @@ Advertise a node as exit node and also advertise the tag `tag:exit` when joining
 $ sudo tailscale up --login-server <YOUR_HEADSCALE_URL> --advertise-tags tag:exit --advertise-exit-node
 ```
 
-Please see the [official Tailscale documentation](https://tailscale.com/docs/reference/syntax/policy-file#autoapprovers)
+See the [official Tailscale documentation](https://tailscale.com/docs/reference/syntax/policy-file#autoapprovers)
 for more information on auto approvers.
 
 ## High availability
 
 Headscale supports high availability routing. Multiple subnet routers with overlapping routes or multiple exit nodes can
 be used to provide high availability for users. If one router node goes offline, another one can serve the same routes
-to clients. Please see the official [Tailscale documentation on high
+to clients. See the official [Tailscale documentation on high
 availability](https://tailscale.com/docs/how-to/set-up-high-availability#subnet-router-high-availability) for details.
 
 This feature is enabled by default when at least two nodes advertise the same prefix. See the configuration options

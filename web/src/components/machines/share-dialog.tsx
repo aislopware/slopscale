@@ -31,7 +31,7 @@ export function ShareDialog({
       <DialogContent
         size="base"
         title="Share machine"
-        description="The user's devices can reach this machine as if it were their own; the policy's autogroup:shared decides what they may access."
+        description="The user's devices can reach this machine as if it were their own. The policy's autogroup:shared decides what they may access."
       >
         <ShareForm node={node} users={users} onOpenChange={onOpenChange} mutations={mutations} />
       </DialogContent>

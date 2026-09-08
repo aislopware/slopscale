@@ -22,7 +22,7 @@ import { userLabel } from "~/lib/node.ts";
 
 type Mutations = ReturnType<typeof useUserMutations>;
 
-const nameHint = "Lowercase letters, digits and dashes; it must be unique.";
+const nameHint = "Lowercase letters, digits and dashes. It must be unique.";
 
 export interface UserDialogProps {
   readonly user: User;

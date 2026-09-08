@@ -72,7 +72,7 @@ function NetworksPage(): ReactElement {
     <>
       <PageHeader
         title="Networks"
-        description="Subnets and exit nodes reached through routing machines. A network hands its routes only to the groups you pick; the routes tab shows everything any machine advertises."
+        description="Subnets and exit nodes reached through routing machines. A network hands its routes only to the groups you pick. The routes tab shows everything any machine advertises."
         meta={describe(networks, nodes)}
       />
       <div className="flex">

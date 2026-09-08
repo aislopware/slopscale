@@ -53,7 +53,7 @@ export function PostureDialog(props: PostureDialogProps): ReactElement {
       <DialogContent
         size="lg"
         title={editing ? "Edit posture" : "New posture"}
-        description="Conditions a machine must meet before a rule that names this posture lets its traffic through. Every expression must hold; a schedule limits the posture to a weekly window."
+        description="Conditions a machine must meet before a rule that names this posture lets its traffic through. Every expression must hold. A schedule limits the posture to a weekly window."
       >
         <PostureForm {...props} />
       </DialogContent>
@@ -329,7 +329,7 @@ function ScheduleFields({
         />
         <Input
           label="To"
-          description="Before the start time wraps past midnight."
+          description="An end before the start wraps past midnight."
           value={draft.end}
           placeholder="18:00"
           spellCheck={false}
@@ -341,7 +341,7 @@ function ScheduleFields({
         <Input
           label="Time zone"
           required={false}
-          description="An IANA name; empty means UTC."
+          description="An IANA name such as Europe/Berlin. Empty means UTC."
           value={draft.timezone}
           placeholder="Asia/Ho_Chi_Minh"
           spellCheck={false}

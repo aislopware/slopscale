@@ -220,7 +220,7 @@ function RegionFields({
         placeholder="900"
         inputMode="numeric"
         autoComplete="off"
-        description="Above 900 stays clear of Tailscale's."
+        description="Use 900 or above to keep clear of Tailscale's regions."
         {...(errors.id === null ? {} : { error: errors.id })}
         onChange={(event) => {
           onId(event.target.value);
@@ -234,7 +234,7 @@ function RegionFields({
         placeholder="sgp"
         spellCheck={false}
         autoComplete="off"
-        description="Short code the clients show."
+        description="The short code clients show."
         {...(errors.code === null ? {} : { error: errors.code })}
         onChange={(event) => {
           onCode(event.target.value);
@@ -247,7 +247,7 @@ function RegionFields({
         value={name}
         placeholder="Singapore"
         autoComplete="off"
-        description="Empty takes the code."
+        description="Leave empty to use the code."
         onChange={(event) => {
           onName(event.target.value);
         }}
@@ -315,7 +315,7 @@ function RelayFields({
             key: "hostName",
             label: "Host name",
             placeholder: "derp.example.com",
-            description: "What its certificate is for.",
+            description: "The name on its TLS certificate.",
           })}
         </div>
         {removable ? (
@@ -335,13 +335,13 @@ function RelayFields({
           key: "ipv4",
           label: "IPv4",
           placeholder: "203.0.113.5",
-          description: "Fixed address, or none.",
+          description: "Optional. Used when DNS is down.",
         })}
         {text({
           key: "ipv6",
           label: "IPv6",
           placeholder: "2001:db8::5",
-          description: "Fixed address, or none.",
+          description: "Optional. Used when DNS is down.",
         })}
       </div>
       <div className="grid items-start gap-3 sm:grid-cols-3">
@@ -351,7 +351,7 @@ function RelayFields({
           key: "name",
           label: "Name",
           placeholder: relay.hostName === "" ? "derp1" : relay.hostName,
-          description: "Empty takes the host name.",
+          description: "Leave empty to use the host name.",
         })}
       </div>
       <div className="flex flex-wrap gap-6">

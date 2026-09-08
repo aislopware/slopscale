@@ -29,12 +29,12 @@ export const roleOptions: readonly RoleOption[] = [
   {
     value: "network-admin",
     label: "Network admin",
-    description: "Policy, DNS and route approval; reads everything else.",
+    description: "Policy, DNS and route approval. Reads everything else.",
   },
   {
     value: "it-admin",
     label: "IT admin",
-    description: "Users, devices, keys and settings; reads policy and routes.",
+    description: "Users, devices, keys and settings. Reads policy and routes.",
   },
   { value: "auditor", label: "Auditor", description: "Reads everything, changes nothing." },
   { value: "member", label: "Member", description: "No admin access." },

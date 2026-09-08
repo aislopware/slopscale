@@ -48,7 +48,7 @@ export function SSHRecordingSection({
   };
 
   const embedded = settings.embeddedRecorder
-    ? "The server runs the embedded recorder, which is always a default; these are added to it."
+    ? "The server runs the embedded recorder, which is always a default. These are added to it."
     : "The server does not run the embedded recorder (ssh_recording.enabled in the config file).";
 
   return (
@@ -88,7 +88,7 @@ export function SSHRecordingSection({
       />
       <SettingRow
         title="Require recording"
-        description="Reject a session when no default recorder can be reached, and end one whose recording breaks off. Off, the session goes on unrecorded and the failure is logged."
+        description="Reject a session when no default recorder can be reached, and end one whose recording breaks off. When off, the session goes on unrecorded and the failure is logged."
         control={
           <Switch
             aria-label="Require recording"

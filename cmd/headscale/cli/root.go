@@ -208,7 +208,7 @@ func filterPreReleasesIfStable(versionFunc func() string) func(string) bool {
 
 var rootCmd = &cobra.Command{
 	Use:   "headscale",
-	Short: "headscale - a Tailscale control server",
+	Short: "headscale, an open source Tailscale control server",
 	Long: `
 headscale is an open source implementation of the Tailscale control server
 

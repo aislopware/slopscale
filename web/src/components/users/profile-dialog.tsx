@@ -90,7 +90,7 @@ function EditProfileForm({
     <form onSubmit={submit} className="flex flex-col gap-4">
       <Input
         label="Display name"
-        description="Shown in place of the username; empty shows the username."
+        description="Shown instead of the username. Leave empty to show the username."
         required={false}
         value={displayName}
         autoComplete="off"

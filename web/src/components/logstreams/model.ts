@@ -61,7 +61,7 @@ export const destinationOptions: readonly DestinationOption[] = [
   {
     value: "loki",
     label: "Grafana Loki",
-    description: "The push API; labels job, type, stream and tailnet.",
+    description: "The push API, with the labels job, type, stream and tailnet.",
     placeholder: "https://loki.example.com/loki/api/v1/push",
     tokenLabel: "Bearer token",
     tokenRequired: false,

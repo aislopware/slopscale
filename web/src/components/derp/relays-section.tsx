@@ -146,7 +146,7 @@ export function RelaysSection({
         <DialogContent
           size="lg"
           title={dialog === "new" ? "Add region" : "Edit region"}
-          description="A region groups relays that are close to each other; a machine picks the region with the lowest latency and any relay in it. Each relay is a derper reachable on its host name."
+          description="A region groups relays that are close to each other. A machine picks the region with the lowest latency and any relay in it. Each relay is a derper reachable on its host name."
         >
           <RegionForm
             editing={dialog === "new" || dialog === "closed" ? null : dialog}

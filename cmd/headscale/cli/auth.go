@@ -33,7 +33,7 @@ var authCmd = &cobra.Command{
 
 var authRegisterCmd = &cobra.Command{
 	Use:   "register",
-	Short: "Register a node to your network",
+	Short: "Register a node",
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
 			user, _ := cmd.Flags().GetString("user")

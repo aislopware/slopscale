@@ -67,7 +67,7 @@ type ViaRouteResult struct {
 	Exclude []netip.Prefix
 	// UsePrimary contains prefixes from [ViaRouteResult.Include] where a regular
 	// (non-via) grant also covers the prefix. In these cases HA
-	// primary election wins — only the primary router should get
+	// primary election wins. Only the primary router should get
 	// the route in [tailcfg.Node.AllowedIPs]. When a prefix is NOT in [ViaRouteResult.UsePrimary],
 	// per-viewer via steering applies.
 	UsePrimary []netip.Prefix
@@ -226,7 +226,7 @@ type Node struct {
 	// ActiveSessions counts live poll sessions for this node.
 	// [State.Connect] increments it and every session release
 	// ([State.Disconnect]) decrements it, so the node goes offline
-	// exactly when its last session ends — regardless of the order in
+	// exactly when its last session ends, regardless of the order in
 	// which overlapping sessions' cleanups run. Never persisted, like
 	// SessionEpoch.
 	ActiveSessions int
@@ -234,7 +234,7 @@ type Node struct {
 	// SessionEpoch identifies a poll session generation; Connect bumps
 	// it. It complements ActiveSessions rather than duplicating it:
 	// the epoch is monotonic, which the HA prober needs to detect that
-	// a probe target reconnected mid-cycle — a refcount can return to
+	// a probe target reconnected mid-cycle. A refcount can return to
 	// its old value, a generation cannot. poll.go also uses the epoch
 	// returned by Connect as a "Connect ran" sentinel for its cleanup,
 	// and Disconnect logs it. Runtime-only.
@@ -442,9 +442,9 @@ func (node *Node) AppendToIPSet(build *netipx.IPSetBuilder) {
 //   - any approved subnet routes it advertises (subnet-router-as-src,
 //     used for subnet-to-subnet ACLs)
 //
-// Either identity matching a rule's src — combined with the dst
+// Either identity matching a rule's src, combined with the dst
 // matching node2's IPs, node2's approved subnet routes, or "the
-// internet" when node2 is an exit node — grants access.
+// internet" when node2 is an exit node, grants access.
 func (node *Node) CanAccess(matchers []matcher.Match, node2 *Node) bool {
 	return node.canAccess(matchers, node2, node.SubnetRoutes(), node2.SubnetRoutes(), node2.IsExitNode())
 }
@@ -553,8 +553,8 @@ func (node *Node) GetFQDN(baseDomain string) (string, error) {
 // ValidateGivenName reports whether givenName is usable as a node's DNS label:
 // a valid DNS label that, combined with baseDomain, yields an FQDN within
 // MaxHostnameLength. Admin-facing write paths (e.g. node rename) reject names
-// that fail this, since the mapper cannot build a map for a node — or any of
-// its peers — whose GetFQDN fails. Derived paths sanitise/coerce instead.
+// that fail this, since the mapper cannot build a map for a node, or any of
+// its peers, whose GetFQDN fails. Derived paths sanitise/coerce instead.
 func ValidateGivenName(givenName, baseDomain string) error {
 	err := dnsname.ValidLabel(givenName)
 	if err != nil {
@@ -574,7 +574,7 @@ func ValidateGivenName(givenName, baseDomain string) error {
 
 // AnnouncedRoutes returns the list of routes the node announces, as
 // reported by the client in [tailcfg.Hostinfo.RoutableIPs]. Announcement alone
-// does not grant visibility — see [Node.SubnetRoutes] for approval-gated
+// does not grant visibility. See [Node.SubnetRoutes] for approval-gated
 // access.
 func (node *Node) AnnouncedRoutes() []netip.Prefix {
 	if node.Hostinfo == nil {

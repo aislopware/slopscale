@@ -78,7 +78,9 @@ export function BuildingBlocks({
             </span>
             {open ? (
               <span className="text-xs text-kumo-subtle">
-                {blocks.valid ? "Names in the draft" : "Names found in the text; it does not parse"}
+                {blocks.valid
+                  ? "Names in the draft"
+                  : "Names found in the text, since it does not parse"}
               </span>
             ) : null}
           </span>

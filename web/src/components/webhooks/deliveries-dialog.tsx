@@ -39,7 +39,7 @@ export function DeliveriesDialog({
       <DialogContent
         size="lg"
         title="Deliveries"
-        description={`The last deliveries to ${urlHost(webhook.url)}, newest first. The server keeps the last hundred; a failed row shows the final status after every retry.`}
+        description={`The last deliveries to ${urlHost(webhook.url)}, newest first. The server keeps the last hundred. A failed row shows the final status after every retry.`}
       >
         {open ? <DeliveriesBody webhook={webhook} /> : null}
         <DialogFooter>

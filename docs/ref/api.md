@@ -11,7 +11,7 @@ one with the default expiration of 90 days:
 headscale apikeys create
 ```
 
-Copy the output of the command and save it for later. Please note that you can not retrieve an API key again. If the API
+Copy the output of the command and save it for later. An API key cannot be retrieved again. If the API
 key is lost, expire the old one, and create a new one.
 
 A key created this way is all-access. To hand out less, create the key for a user, so it is bounded by the user's

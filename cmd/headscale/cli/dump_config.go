@@ -13,7 +13,7 @@ func init() {
 
 var dumpConfigCmd = &cobra.Command{
 	Use:    "dumpConfig",
-	Short:  "dump current config to /etc/headscale/config.dump.yaml, integration test only",
+	Short:  "Dump the current config to /etc/headscale/config.dump.yaml (integration tests only)",
 	Hidden: true,
 	RunE: func(_ *cobra.Command, _ []string) error {
 		err := viper.WriteConfigAs("/etc/headscale/config.dump.yaml")

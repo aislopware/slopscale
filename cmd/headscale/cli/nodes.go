@@ -91,13 +91,13 @@ func init() {
 
 var nodeCmd = &cobra.Command{
 	Use:     "nodes",
-	Short:   "Manage the nodes of Headscale",
+	Short:   "Manage nodes",
 	Aliases: []string{"node"},
 }
 
 var registerNodeCmd = &cobra.Command{
 	Use:        "register",
-	Short:      "Registers a node to your network",
+	Short:      "Register a node",
 	Deprecated: "use 'headscale auth register --auth-id <id> --user <user>' instead",
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
@@ -259,7 +259,7 @@ var globalExitNodeCmd = &cobra.Command{
 	Use:   "global-exit-node",
 	Short: "Mark a node as the exit node every client is told to prefer",
 	Long: `Marks an exit node every client is told to prefer. Marking approves the node's
-exit routes; the node then carries suggest-exit-node and every node
+exit routes. The node then carries suggest-exit-node and every node
 auto-exit-node, so clients that use an exit node automatically
 (tailscale set --exit-node=auto:any) pick it.
 
@@ -401,10 +401,9 @@ var unshareNodeCmd = &cobra.Command{
 
 var expireNodeCmd = &cobra.Command{
 	Use:   cmdExpire,
-	Short: "Expire (log out) a node in your network",
-	Long: `Expiring a node will keep the node in the database and force it to reauthenticate.
-
-Use --disable to disable key expiry (node will never expire).`,
+	Short: "Expire a node so it has to sign in again",
+	Long: `Keeps the node in the database but disconnects it until someone signs in on
+it again. Use --disable to turn key expiry off, so the node never expires.`,
 	Aliases: []string{"logout", aliasExp, "e"},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
@@ -469,7 +468,7 @@ Use --disable to disable key expiry (node will never expire).`,
 
 var renameNodeCmd = &cobra.Command{
 	Use:   "rename NEW_NAME",
-	Short: "Renames a node in your network",
+	Short: "Rename a node",
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, args []string) error {
 			identifier, _ := cmd.Flags().GetUint64("identifier")
@@ -538,19 +537,10 @@ var deleteNodeCmd = &cobra.Command{
 
 var backfillNodeIPsCmd = &cobra.Command{
 	Use:   "backfillips",
-	Short: "Backfill IPs missing from nodes",
-	Long: `
-Backfill IPs can be used to add/remove IPs from nodes
-based on the current configuration of Headscale.
-
-If there are nodes that does not have IPv4 or IPv6
-even if prefixes for both are configured in the config,
-this command can be used to assign IPs of the sort to
-all nodes that are missing.
-
-If you remove IPv4 or IPv6 prefixes from the config,
-it can be run to remove the IPs that should no longer
-be assigned to nodes.`,
+	Short: "Give nodes the addresses they are missing",
+	Long: `Gives every node an address in each family the config enables and removes
+the addresses of a family whose prefix was taken out of the config. Run it after
+adding or removing prefix_v4 or prefix_v6.`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		if !confirmAction(cmd, "Are you sure that you want to assign/remove IPs to/from nodes?") {
 			return nil

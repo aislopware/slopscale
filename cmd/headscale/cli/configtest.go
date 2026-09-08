@@ -12,7 +12,7 @@ func init() {
 
 var configTestCmd = &cobra.Command{
 	Use:   "configtest",
-	Short: "Test the configuration.",
+	Short: "Test the configuration",
 	Long:  "Run a test of the configuration and exit.",
 	RunE: func(_ *cobra.Command, _ []string) error {
 		_, err := newHeadscaleServerWithConfig()

@@ -138,7 +138,7 @@ function IdentityText({ posture }: { readonly posture: NodePosture }): ReactElem
   if (!posture.identityCollectionOn) {
     return (
       <span className="text-xs text-kumo-subtle">
-        Collection is off; turn on &quot;Collect device identity&quot; under Settings.
+        Collection is off. Turn on &quot;Collect device identity&quot; under Settings.
       </span>
     );
   }
@@ -148,7 +148,7 @@ function IdentityText({ posture }: { readonly posture: NodePosture }): ReactElem
   if (identity === undefined) {
     return (
       <span className="text-xs text-kumo-subtle">
-        Not collected yet; the server asks when the machine connects.
+        Not collected yet. The server asks when the machine connects.
       </span>
     );
   }

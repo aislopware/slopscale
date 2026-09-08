@@ -1,8 +1,8 @@
 # DERP
 
 A [DERP (Designated Encrypted Relay for Packets) server](https://tailscale.com/docs/reference/derp-servers) is mainly
-used to relay traffic between two nodes in case a direct connection can't be established. Headscale provides an embedded
-DERP server to ensure seamless connectivity between nodes.
+used to relay traffic between two nodes in case a direct connection can't be established. Headscale runs an embedded DERP
+server so that two nodes always have a path to each other.
 
 ## Configuration
 

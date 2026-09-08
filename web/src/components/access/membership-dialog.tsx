@@ -106,7 +106,7 @@ function MembershipForm({
           label="Until"
           required={false}
           type="datetime-local"
-          description="The groups joined now are left again at this time. Empty means for good."
+          description="The machine leaves these groups at this time. Leave empty to keep them for good."
           value={expires}
           onChange={(event) => {
             setExpires(event.target.value);

@@ -210,7 +210,7 @@ function RuleFields({
       {postures.length === 0 ? null : (
         <MultiPicker
           label="Required postures"
-          description="A source machine must satisfy at least one of them; none means any machine in the groups."
+          description="A source machine must meet at least one of them. With none, any machine in the groups qualifies."
           placeholder="Postures the source must meet…"
           items={postureItems(postures)}
           value={draft.postures}

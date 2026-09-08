@@ -3,7 +3,7 @@
 Headscale and Tailscale provide debug and introspection capabilities that can be helpful when things don't work as
 expected. This page explains some debugging techniques to help pinpoint problems.
 
-Please also have a look at [Tailscale's Troubleshooting guide](https://tailscale.com/docs/reference/troubleshooting). It
+See also [Tailscale's Troubleshooting guide](https://tailscale.com/docs/reference/troubleshooting). It
 offers a many tips and suggestions to troubleshoot common issues.
 
 ## Tailscale

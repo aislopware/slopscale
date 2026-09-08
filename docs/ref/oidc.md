@@ -8,7 +8,7 @@ Headscale supports authentication via external identity providers using OpenID C
 - Synchronization of [standard OIDC claims](#supported-oidc-claims)
 - Sign-in to the [admin console](console.md#signing-in) with the same provider and redirect URI
 
-Please see [limitations](#limitations) for known issues and limitations.
+See [limitations](#limitations) for known issues.
 
 ## Configuration
 
@@ -16,7 +16,7 @@ OpenID requires configuration in Headscale and your identity provider:
 
 - Headscale: The `oidc` section of the Headscale [configuration](configuration.md) contains all available configuration
   options along with a description and their default values.
-- Identity provider: Please refer to the official documentation of your identity provider for specific instructions.
+- Identity provider: the provider's own documentation has the exact steps.
   Additionally, there might be some useful hints in the [Identity provider specific
   configuration](#identity-provider-specific-configuration) section below.
 
@@ -197,7 +197,7 @@ reauthenticate. The default node expiration can be configured via the top-level 
 
 === "Use expiration from Access Token"
 
-    Please keep in mind that the Access Token is typically a short-lived token that expires within a few minutes. You
+    The Access Token is typically a short-lived token that expires within a few minutes. You
     will have to configure token expiration in your identity provider to avoid frequent re-authentication.
 
     ```yaml hl_lines="5"
@@ -293,14 +293,14 @@ endpoint.
     - It must only contain letters, digits, hyphens, dots, underscores, and up to a single `@`.
     - The username must start with a letter.
 
-Please see the [GitHub label "OIDC"](https://github.com/juanfont/headscale/labels/OIDC) for OIDC related issues.
+See the [GitHub label "OIDC"](https://github.com/juanfont/headscale/labels/OIDC) for OIDC related issues.
 
 ## Identity provider specific configuration
 
 !!! warning "Third-party software and services"
 
     This section of the documentation is specific for third-party software and services. We recommend users read the
-    third-party documentation on how to configure and integrate an OIDC client. Please see the [Configuration
+    third-party documentation on how to configure and integrate an OIDC client. See the [Configuration
     section](#configuration) for a description of Headscale's OIDC related configuration settings.
 
 Any identity provider with OpenID Connect support should "just work" with Headscale. The following identity providers

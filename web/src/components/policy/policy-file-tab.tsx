@@ -112,7 +112,7 @@ export function PolicyFileTab({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex min-w-0 flex-col gap-1">
           <p className="text-sm text-kumo-subtle">
-            Grants, tags, SSH rules and autogroups written by hand; rules from the Rules tab are
+            Grants, tags, SSH rules and autogroups written by hand. Rules from the Rules tab are
             added on top.
           </p>
           <DraftState dirty={draft.dirty} updatedAt={policy.updatedAt} />

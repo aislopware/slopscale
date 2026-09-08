@@ -38,7 +38,7 @@ function emptyText(hasUser: boolean, hasGroups: boolean): string {
     return "No group takes requests right now. An administrator marks a group as requestable under Access controls.";
   }
 
-  return "Ask to join a group for a while; the request shows here with its outcome.";
+  return "Ask to join a group for a while. The request shows here with its outcome.";
 }
 
 /** The signed-in user's own asks for temporary access, and the way to file one. */

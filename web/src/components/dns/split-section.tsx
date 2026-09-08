@@ -159,7 +159,7 @@ function splitIssues(
 ): { readonly domain: string | null; readonly servers: string | null } {
   const taken =
     editing?.domain !== domain && settings.splitNameservers[domain] !== undefined
-      ? "This domain already has resolvers; edit that entry instead."
+      ? "This domain already has resolvers. Edit that entry instead."
       : null;
 
   return { domain: domainError(domain) ?? taken, servers: nameserversError(servers) };

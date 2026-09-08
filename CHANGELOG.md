@@ -29,8 +29,8 @@ Headscale unchanged; admin API keys remain all-access.
 
 ### User roles
 
-Every user now has a role — `owner`, `admin`, `network-admin`, `it-admin`,
-`auditor` or `member` — that bounds what the user may do through the admin API,
+Every user now has a role, one of `owner`, `admin`, `network-admin`, `it-admin`,
+`auditor` and `member`, that bounds what the user may do through the admin API,
 following Tailscale's user roles. The first user of a fresh server becomes the
 owner; existing users start as members, and `headscale users set-role` picks an
 owner and assigns the rest. An API key created for a user
@@ -49,10 +49,11 @@ admins carry Tailscale's `is-admin` capability. See
 
 Two tailnet-wide settings put an administrator between a node or user and the
 tailnet, following Tailscale's device approval and user approval. With
-`devicesApprovalOn`, a newly registered node waits — it has no peers, no peer
-sees it and the client shows it as needing machine authorization — until
-`headscale nodes approve` admits it, unless it registered with a preauthorized
-pre-auth key (the default for keys, `--preauthorized=false` opts out). With
+`devicesApprovalOn`, a newly registered node waits until
+`headscale nodes approve` admits it. It has no peers, no peer sees it and the
+client shows it as needing machine authorization. The wait is skipped when it
+registered with a preauthorized pre-auth key (the default for keys,
+`--preauthorized=false` opts out). With
 `usersApprovalOn`, a user created by an OpenID Connect login cannot register
 nodes until `headscale users approve` admits them. Both switches are off after
 an upgrade and everything that exists counts as approved; switching one off
@@ -349,13 +350,13 @@ console's _Audit log_ page; bound it with `audit.retention`. See
 
 - The gRPC API is removed; all programmatic access now goes through the HTTP API at `/api/v1` [#3324](https://github.com/juanfont/headscale/pull/3324)
 - API errors are now RFC 7807 `application/problem+json`, including authentication failures, instead of the previous gRPC-status JSON shape [#3324](https://github.com/juanfont/headscale/pull/3324)
-- Errors that previously returned HTTP 500 — unknown users or nodes, malformed input, duplicate names — now return the correct 404, 400 or 409 [#3324](https://github.com/juanfont/headscale/pull/3324)
+- Errors that previously returned HTTP 500, such as unknown users or nodes, malformed input and duplicate names, now return the correct 404, 400 or 409 [#3324](https://github.com/juanfont/headscale/pull/3324)
 - `GET /api/v1/policy` returns 404 instead of 500 when no policy has been set
 - The OpenAPI document is OpenAPI 3.1 at `/api/v1/openapi.yaml` (docs at `/api/v1/docs`), replacing Swagger 2.0 at `/swagger` [#3324](https://github.com/juanfont/headscale/pull/3324)
 
 #### CLI
 
-- `--output json` / `--output yaml` now emit the API's shape — camelCase fields, string-encoded IDs, RFC3339 timestamps — instead of the old Protobuf encoding [#3324](https://github.com/juanfont/headscale/pull/3324)
+- `--output json` / `--output yaml` now emit the API's shape (camelCase fields, string-encoded IDs, RFC3339 timestamps) instead of the old Protobuf encoding [#3324](https://github.com/juanfont/headscale/pull/3324)
 - `headscale policy` renames the database-bypass flag from `--bypass-grpc-and-access-database-directly` to `--bypass-server-and-access-database-directly` [#3324](https://github.com/juanfont/headscale/pull/3324)
 
 ### Changes

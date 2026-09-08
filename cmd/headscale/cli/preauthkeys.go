@@ -39,13 +39,13 @@ func init() {
 
 var preauthkeysCmd = &cobra.Command{
 	Use:     "preauthkeys",
-	Short:   "Handle the preauthkeys in Headscale",
+	Short:   "Manage pre-auth keys",
 	Aliases: []string{"preauthkey", "authkey", "pre"},
 }
 
 var listPreAuthKeys = &cobra.Command{
 	Use:     cmdList,
-	Short:   "List all preauthkeys",
+	Short:   "List pre-auth keys",
 	Aliases: []string{"ls", cmdShow},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
@@ -103,7 +103,7 @@ var listPreAuthKeys = &cobra.Command{
 
 var createPreAuthKeyCmd = &cobra.Command{
 	Use:     "create",
-	Short:   "Creates a new preauthkey",
+	Short:   "Create a pre-auth key",
 	Aliases: []string{"c", cmdNew},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
@@ -158,7 +158,7 @@ func preAuthKeyID(cmd *cobra.Command) (uint64, error) {
 
 var expirePreAuthKeyCmd = &cobra.Command{
 	Use:     cmdExpire,
-	Short:   "Expire a preauthkey",
+	Short:   "Expire a pre-auth key",
 	Aliases: []string{"revoke", aliasExp, "e"},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
@@ -187,7 +187,7 @@ var expirePreAuthKeyCmd = &cobra.Command{
 
 var deletePreAuthKeyCmd = &cobra.Command{
 	Use:     cmdDelete,
-	Short:   "Delete a preauthkey",
+	Short:   "Delete a pre-auth key",
 	Aliases: []string{aliasDel, "rm", "d"},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {

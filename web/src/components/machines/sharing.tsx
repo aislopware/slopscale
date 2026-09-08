@@ -51,7 +51,7 @@ export function SharingSection({
         {node.sharedWith.length === 0 ? (
           <SectionRow className="text-kumo-subtle">
             {isTagged(node)
-              ? "Tagged machines are not shared; the policy grants access to them instead."
+              ? "Tagged machines are not shared. The policy grants access to them instead."
               : "Not shared with anyone yet."}
           </SectionRow>
         ) : (

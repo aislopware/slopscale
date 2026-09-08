@@ -32,7 +32,7 @@ export interface GroupDialogProps {
   readonly mutations: AccessMutations;
 }
 
-const nameHint = "Letters, digits, spaces, dots, dashes and underscores; it must be unique.";
+const nameHint = "Letters, digits, spaces, dots, dashes and underscores. It must be unique.";
 
 /** Creates a group or edits one; the form mounts with the dialog so it starts from the record. */
 export function GroupDialog(props: GroupDialogProps): ReactElement {
@@ -43,7 +43,7 @@ export function GroupDialog(props: GroupDialogProps): ReactElement {
       <DialogContent
         size="lg"
         title={editing ? "Edit group" : "New group"}
-        description="A group is a set of machines. Add machines directly, or add users so every machine they own is in, now and later."
+        description="A group is a set of machines. Add machines directly, or add users so every machine they own is in it, now and later."
       >
         <GroupForm {...props} />
       </DialogContent>
@@ -149,7 +149,7 @@ function GroupForm({
             <span className="flex flex-col gap-0.5">
               <span className="font-medium text-kumo-default">Members may request access</span>
               <span className="text-xs text-kumo-subtle">
-                A signed-in user can ask to join this group for a while; an approver decides under
+                A signed-in user can ask to join this group for a while. An approver decides under
                 Requests.
               </span>
             </span>

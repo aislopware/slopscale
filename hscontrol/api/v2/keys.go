@@ -254,7 +254,7 @@ func handleListKeys(ctx context.Context, b Backend, in *listKeysInput) (*listKey
 // distinct from a numeric auth-key id, so a lookup that hits is authoritative.
 // The lookup is gated on the caller actually holding oauth_keys:read so a
 // token without it cannot tell a real client id (403) from an unknown key
-// (404) — i.e. no client-existence oracle.
+// (404), so there is no client-existence oracle.
 func handleGetKey(ctx context.Context, b Backend, in *keyByIDInput) (*keyOutput, error) {
 	err := requireDefaultTailnet(in.Tailnet)
 	if err != nil {

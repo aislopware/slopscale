@@ -199,7 +199,7 @@ function DnsRuleForm({
           <span className="flex flex-col gap-0.5">
             <span className="font-medium text-kumo-default">Enabled</span>
             <span className="text-xs text-kumo-subtle">
-              A disabled rule keeps its settings but is handed to nobody.
+              A disabled rule keeps its settings but reaches no machine.
             </span>
           </span>
         }

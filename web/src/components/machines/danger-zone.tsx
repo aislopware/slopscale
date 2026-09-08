@@ -28,7 +28,7 @@ export function DangerZone({ node }: { readonly node: Node }): ReactElement {
           description={
             node.suspended
               ? "Gives the machine its peers back. Nobody needs to sign in on it."
-              : "Cuts the machine off without touching its key; you can lift it any time."
+              : "Cuts the machine off without touching its key. You can lift it any time."
           }
           action={
             <Button

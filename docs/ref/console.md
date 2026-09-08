@@ -2,8 +2,8 @@
 
 Headscale ships a web console at `/admin/` on the server's own address. It
 lists machines, users and keys, edits the policy, approves devices and users,
-shares nodes and marks the global exit node — the same things the CLI and the
-API do — from a browser.
+shares nodes and marks the global exit node from a browser, the same things
+the CLI and the API do.
 
 The console is a static, client-rendered application embedded in the
 `headscale` binary. It keeps no state on the server and needs no extra process:
@@ -78,13 +78,16 @@ the signed-in user as the actor.
 
 ## Getting around
 
-The sidebar has two groups. *Network* holds machines, users and keys, and
-*Control* holds access controls, settings and the audit log. A count next
-to _Machines_ and _Users_ says how many are waiting for approval. The arrow
-in the sidebar footer collapses it to an icon rail. *Quick search*, or
-++cmd+k++ / ++ctrl+k++, jumps to any page, machine or user by name. The
-top bar shows breadcrumbs for where you are, the light/dark switch and the
-account menu with *Sign out*.
+The sidebar is grouped by what you are doing. *Tailnet* holds machines,
+users and keys. *Access* holds the access controls and, for everyone, the
+page to ask for temporary access. *Connectivity* holds networks, DNS and
+relays. *Logs* holds the audit log and the SSH session recordings. *Server*
+holds integrations and settings. A count next to _Machines_ and _Users_
+says how many are waiting for approval. The arrow in the sidebar footer
+collapses it to an icon rail. *Quick search*, or ++cmd+k++ / ++ctrl+k++,
+jumps to any page, machine or user by name. The top bar shows breadcrumbs
+for where you are, the light/dark switch and the account menu with *Sign
+out*.
 
 ## Pages
 

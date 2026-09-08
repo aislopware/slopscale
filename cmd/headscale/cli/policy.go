@@ -78,12 +78,12 @@ func init() {
 
 var policyCmd = &cobra.Command{
 	Use:   "policy",
-	Short: "Manage the Headscale ACL Policy",
+	Short: "Manage the policy",
 }
 
 var getPolicy = &cobra.Command{
 	Use:     "get",
-	Short:   "Print the current ACL Policy",
+	Short:   "Print the current policy",
 	Aliases: []string{cmdShow, "view", "fetch"},
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		var policyData string
@@ -131,10 +131,9 @@ var getPolicy = &cobra.Command{
 
 var setPolicy = &cobra.Command{
 	Use:   "set",
-	Short: "Updates the ACL Policy",
-	Long: `
-	Updates the existing ACL Policy with the provided policy. The policy must be a valid HuJSON object.
-	This command only works when the acl.policy_mode is set to "db", and the policy will be stored in the database.`,
+	Short: "Replace the policy",
+	Long: `Replaces the stored policy with the given HuJSON file. Works only when
+policy.mode is "database", where the policy lives in the database.`,
 	Aliases: []string{"put", cmdUpdate},
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		policyPath, _ := cmd.Flags().GetString("file")
@@ -196,11 +195,10 @@ var setPolicy = &cobra.Command{
 var checkPolicy = &cobra.Command{
 	Use:   "check",
 	Short: "Check the Policy file for errors",
-	Long: `
-	Check validates the policy against the server's live users and nodes,
-	running any "tests" or "sshTests" block. By default the command calls a
-	running headscale over its API; pass --` + bypassFlag + ` to
-	open the database directly when headscale is not running.`,
+	Long: `Validates the policy against the server's live users and nodes and runs its
+"tests" and "sshTests" blocks. By default the command calls a running headscale
+over its API. Pass --` + bypassFlag + ` to open the database directly when
+headscale is not running.`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		policyPath, _ := cmd.Flags().GetString("file")
 

@@ -181,7 +181,7 @@ export function DenyRequestDialog({
             label="Note"
             required={false}
             value={note}
-            placeholder="Why not, for the requester"
+            placeholder="The reason, shown to the requester"
             onChange={(event) => {
               setNote(event.target.value);
             }}

@@ -89,7 +89,7 @@ export function NameserversSection({
           <p id={overrideHelpId} className="max-w-prose text-kumo-subtle">
             Machines use the nameservers above for every query instead of only when their own
             resolvers cannot answer. Needs at least one nameserver. Turn it on to mark nameservers
-            to use with an exit node: a marked one stays in use while a machine routes through an
+            to use with an exit node. A marked one stays in use while a machine routes through an
             exit node, and the rest of its DNS goes through the exit node then. Turning it off
             clears the marks.
           </p>

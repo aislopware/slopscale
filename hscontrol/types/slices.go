@@ -4,7 +4,7 @@ import "net/netip"
 
 // The named slice types below are used for GORM-persisted [Node] columns
 // that serialise as JSON. GORM v2's struct-based Updates skips fields
-// it considers zero — for unnamed slice types that is nil — and the
+// it considers zero (nil for unnamed slice types) and the
 // default [reflect.Value.IsZero] treats a nil slice as zero. By giving
 // each slice an IsZero() that always returns false, the column is
 // always included in UPDATE statements regardless of whether the

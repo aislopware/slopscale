@@ -136,7 +136,7 @@ function CreateApiKeyForm({
       ) : null}
       <MultiPicker
         label="Scopes"
-        description="Limit the key to these operations. Empty means everything its owner may do; a scope the owner lacks is dropped."
+        description="Limit the key to these operations. Empty means everything its owner may do. A scope the owner lacks is dropped."
         placeholder="Everything the owner may do"
         items={scopeItems(me)}
         value={scopes}

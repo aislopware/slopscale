@@ -194,7 +194,7 @@ export function EmbeddedSection({
         <DialogContent
           size="base"
           title="Embedded relay details"
-          description="How the relay is published to the machines. A change restarts STUN when its address moves; the relay keeps serving."
+          description="How the relay is published to the machines. Changing the STUN address restarts STUN. The relay keeps serving."
         >
           <ServerForm
             derp={derp}
@@ -282,33 +282,33 @@ function ServerForm({
           field: "regionCode",
           label: "Region code",
           placeholder: "headscale",
-          description: "Short code the clients show.",
+          description: "The short code clients show.",
         })}
       </div>
       {field({
         field: "regionName",
         label: "Region name",
         placeholder: "Headscale Embedded DERP",
-        description: "Empty takes the code.",
+        description: "Leave empty to use the code.",
       })}
       {field({
         field: "stunAddr",
         label: "STUN address",
         placeholder: "0.0.0.0:3478",
-        description: "UDP host:port STUN listens on; open it on the firewall.",
+        description: "The UDP host:port STUN listens on. Open it on the firewall.",
       })}
       <div className="grid items-start gap-4 sm:grid-cols-2">
         {field({
           field: "ipv4",
           label: "Public IPv4",
           placeholder: "198.51.100.1",
-          description: "Published next to the host name.",
+          description: "Lets machines reach the relay when DNS is down.",
         })}
         {field({
           field: "ipv6",
           label: "Public IPv6",
           placeholder: "2001:db8::1",
-          description: "Reached while DNS is down.",
+          description: "The IPv6 counterpart.",
         })}
       </div>
       <Switch

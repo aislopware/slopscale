@@ -15,7 +15,7 @@ Headscale needs to be reloaded to pick up changes to the policy file. Either rel
 (`sudo systemctl reload headscale`) or by sending a SIGHUP signal (`sudo kill -HUP $(pidof headscale)`) to the main
 process. Headscale logs the result of policy processing after each reload.
 
-Please have a look at Tailscale's policy related documentation to learn more:
+Tailscale's policy documentation covers the format:
 
 - [Tailscale policy file](https://tailscale.com/docs/features/tailnet-policy-file): A description of supported sections
   within the policy file along with links to syntax references for each section.

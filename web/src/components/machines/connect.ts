@@ -55,7 +55,7 @@ const builders: Record<Platform, Builder> = {
     return {
       command: line,
       qr: line,
-      note: "For the Homebrew build: installs the formula, starts the tailscaled service, then joins. The Mac App Store app instead takes the server address under the menu bar icon: hold Option, choose Debug, then Custom Login Server.",
+      note: "For the Homebrew build. Installs the formula, starts the tailscaled service, then joins. The Mac App Store app instead takes the server address under the menu bar icon. Hold Option, choose Debug, then Custom Login Server.",
     };
   },
   windows: (command) => {
@@ -79,7 +79,7 @@ const builders: Record<Platform, Builder> = {
     return {
       command: parts.join(" \\\n  "),
       qr: parts.join(" "),
-      note: "Change the hostname to the name the container should have in the machine list. The volume, with TS_STATE_DIR pointing at it, keeps the identity across restarts; without the variable the container registers anew each time.",
+      note: "Change the hostname to the name the container should have in the machine list. The volume, with TS_STATE_DIR pointing at it, keeps the identity across restarts. Without the variable the container registers anew each time.",
     };
   },
   mobile: (_command, _key, server) => ({

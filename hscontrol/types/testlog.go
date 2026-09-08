@@ -27,7 +27,7 @@ const EnvTestLogLevel = "HEADSCALE_TEST_LOG_LEVEL"
 //
 // Pitfalls:
 //   - log.Fatal still calls [os.Exit] and log.Panic still panics regardless of
-//     level — only the rendered message is suppressed.
+//     level. Only the rendered message is suppressed.
 //   - Local buffer loggers ([zerolog.New] with a buffer) are also gated by the global
 //     level. Tests that assert on log output (currently only
 //     hscontrol/util/zlog) re-enable trace level via their own init_test.go.

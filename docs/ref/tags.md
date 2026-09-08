@@ -1,6 +1,6 @@
 # Tags
 
-Headscale supports Tailscale tags. Please read [Tailscale's tag documentation](https://tailscale.com/docs/features/tags)
+Headscale supports Tailscale tags. Read [Tailscale's tag documentation](https://tailscale.com/docs/features/tags)
 to learn how tags work and how to use them.
 
 Tags can be applied during [node registration](registration.md):

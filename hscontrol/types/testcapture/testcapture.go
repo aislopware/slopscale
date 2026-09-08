@@ -9,7 +9,7 @@
 // rather than a silent test failure, and so that consumers don't
 // have to repeat [json.Unmarshal] at every read site. Storing data as
 // [json.RawMessage] previously hid a serious capture-pipeline bug (the
-// IPN bus initial notification returns a stale Peers slice — see the
+// IPN bus initial notification returns a stale Peers slice. See the
 // comment on [Node.Netmap] below) for months.
 //
 // All four capture types (acl, routes, grant, ssh) use the same [Capture]
@@ -103,7 +103,7 @@ type Capture struct {
 type Input struct {
 	// FullPolicy is the unchanged policy that was POSTed to the SaaS
 	// API. Stored as a string because it is opaque JSON that round-
-	// trips losslessly without parsing — headscale's policy parser
+	// trips losslessly without parsing. headscale's policy parser
 	// reads it on demand.
 	FullPolicy string `json:"full_policy"`
 
@@ -235,7 +235,7 @@ type DNSInput struct {
 // Pointer fields are nil when the scenario does not override the
 // reset default for that setting. The fields mirror the
 // PATCH /tailnet/{tailnet}/settings request shape exposed by
-// tailscale.com/client/tailscale/v2 — in practice the headscale
+// tailscale.com/client/tailscale/v2. In practice the headscale
 // compatibility tests use the subset that observably affects the
 // captured netmap CapMap or DNSConfig.
 type SettingsInput struct {
@@ -317,7 +317,7 @@ type Node struct {
 	// settle on a fresh delta-triggered notification, NOT by reading
 	// the WatchIPNBus(NotifyInitialNetMap) initial notification.
 	// The initial notification carries cn.NetMap() which returns
-	// nb.netMap as-is — the [netmap.NetworkMap] whose Peers slice was
+	// nb.netMap as-is, the [netmap.NetworkMap] whose Peers slice was
 	// set at full-sync time and never re-synchronized from the
 	// authoritative nb.peers map. The capture tool previously used the initial
 	// notification and silently captured netmaps with mostly-empty

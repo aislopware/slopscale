@@ -134,7 +134,7 @@ export function ServerSection({ info }: { readonly info: ServerInfo }): ReactEle
   return (
     <Section
       title="Server"
-      description="What this console is talking to. These come from the config file and change with a restart."
+      description="The server this console talks to. These values come from the config file and change only with a restart."
       bodyClassName="p-0"
     >
       <DefinitionList items={items} />
