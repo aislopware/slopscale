@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for DERPMapRegionSource.
@@ -155,6 +156,24 @@ func (e WebhookRequestBodyProviderType) Valid() bool {
 	case WebhookRequestBodyProviderTypeTeams:
 		return true
 	case WebhookRequestBodyProviderTypeTelegram:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ExportAuditEventsParamsFormat.
+const (
+	Csv  ExportAuditEventsParamsFormat = "csv"
+	Json ExportAuditEventsParamsFormat = "json"
+)
+
+// Valid indicates whether the value is a known member of the ExportAuditEventsParamsFormat enum.
+func (e ExportAuditEventsParamsFormat) Valid() bool {
+	switch e {
+	case Csv:
+		return true
+	case Json:
 		return true
 	default:
 		return false
@@ -334,6 +353,26 @@ type ConsoleOIDC struct {
 	Provider  string `json:"provider"`
 }
 
+// ConsoleSession defines model for ConsoleSession.
+type ConsoleSession struct {
+	CreatedAt time.Time `json:"createdAt"`
+
+	// Current True for the session making this request.
+	Current   bool      `json:"current"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	Id        string    `json:"id"`
+
+	// LastSeenAt When it last made a request; written at most once a minute.
+	LastSeenAt time.Time `json:"lastSeenAt"`
+
+	// RemoteAddr Where the browser signed in from; empty for an older session.
+	RemoteAddr string `json:"remoteAddr"`
+	User       User   `json:"user"`
+
+	// UserAgent The browser that signed in; empty for an older session.
+	UserAgent string `json:"userAgent"`
+}
+
 // CreateAPIKeyOutputBody defines model for CreateAPIKeyOutputBody.
 type CreateAPIKeyOutputBody struct {
 	ApiKey string `json:"apiKey"`
@@ -350,6 +389,21 @@ type CreateApiKeyRequestBody struct {
 
 	// UserId Owning user id; empty for a legacy all-access key.
 	UserId *string `json:"userId,omitempty"`
+}
+
+// CreateInviteRequestBody defines model for CreateInviteRequestBody.
+type CreateInviteRequestBody struct {
+	// Email The invited address.
+	Email string `json:"email"`
+
+	// Expiry A Go duration; 720h at most, 168h by default.
+	Expiry *string `json:"expiry,omitempty"`
+
+	// GroupIds Groups the invited user joins.
+	GroupIds *[]string `json:"groupIds,omitempty"`
+
+	// Role owner is refused; defaults to member.
+	Role *string `json:"role,omitempty"`
 }
 
 // CreateOAuthClientOutputBody defines model for CreateOAuthClientOutputBody.
@@ -575,6 +629,9 @@ type DebugCreateNodeRequestBody struct {
 // DeleteAPIKeyOutputBody defines model for DeleteAPIKeyOutputBody.
 type DeleteAPIKeyOutputBody = map[string]interface{}
 
+// DeleteInviteOutputBody defines model for DeleteInviteOutputBody.
+type DeleteInviteOutputBody = map[string]interface{}
+
 // DeleteNodeOutputBody defines model for DeleteNodeOutputBody.
 type DeleteNodeOutputBody = map[string]interface{}
 
@@ -591,6 +648,12 @@ type DnsRuleOutputBody struct {
 
 // EmptyOutputBody defines model for EmptyOutputBody.
 type EmptyOutputBody = map[string]interface{}
+
+// EndUserSessionsOutputBody defines model for EndUserSessionsOutputBody.
+type EndUserSessionsOutputBody struct {
+	// Ended How many sessions were ended.
+	Ended int64 `json:"ended"`
+}
 
 // ErrorDetail defines model for ErrorDetail.
 type ErrorDetail struct {
@@ -714,6 +777,42 @@ type HealthResponseBody struct {
 	DatabaseConnectivity bool `json:"databaseConnectivity"`
 }
 
+// Invite defines model for Invite.
+type Invite struct {
+	Accepted   bool       `json:"accepted"`
+	AcceptedAt *time.Time `json:"acceptedAt"`
+
+	// AcceptedUserId The user the invite created.
+	AcceptedUserId *string   `json:"acceptedUserId,omitempty"`
+	CreatedAt      time.Time `json:"createdAt"`
+
+	// CreatedBy Who sent it; empty when unknown.
+	CreatedBy *string `json:"createdBy,omitempty"`
+	Email     string  `json:"email"`
+
+	// Expired True once the invite can no longer be accepted.
+	Expired   bool      `json:"expired"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	GroupIds  []string  `json:"groupIds"`
+	Id        string    `json:"id"`
+
+	// Role The role the invited user is created with.
+	Role string `json:"role"`
+}
+
+// InviteOutputBody defines model for InviteOutputBody.
+type InviteOutputBody struct {
+	// EmailError Why the mail was not sent.
+	EmailError *string `json:"emailError,omitempty"`
+
+	// EmailSent Whether the link was mailed.
+	EmailSent bool   `json:"emailSent"`
+	Invite    Invite `json:"invite"`
+
+	// Url The link to send; shown only here.
+	Url string `json:"url"`
+}
+
 // ListAPIKeysOutputBody defines model for ListAPIKeysOutputBody.
 type ListAPIKeysOutputBody struct {
 	ApiKeys []ApiKey `json:"apiKeys"`
@@ -733,6 +832,11 @@ type ListDNSRulesOutputBody struct {
 // ListGroupsOutputBody defines model for ListGroupsOutputBody.
 type ListGroupsOutputBody struct {
 	Groups []Group `json:"groups"`
+}
+
+// ListInvitesOutputBody defines model for ListInvitesOutputBody.
+type ListInvitesOutputBody struct {
+	Invites []Invite `json:"invites"`
 }
 
 // ListLogStreamsOutputBody defines model for ListLogStreamsOutputBody.
@@ -784,6 +888,11 @@ type ListRulesOutputBody struct {
 type ListSSHRecordingsOutputBody struct {
 	NextBefore string         `json:"nextBefore"`
 	Recordings []SSHRecording `json:"recordings"`
+}
+
+// ListSessionsOutputBody defines model for ListSessionsOutputBody.
+type ListSessionsOutputBody struct {
+	Sessions []ConsoleSession `json:"sessions"`
 }
 
 // ListUsersOutputBody defines model for ListUsersOutputBody.
@@ -1102,8 +1211,26 @@ type RequestOutputBody struct {
 	Request AccessRequest `json:"request"`
 }
 
+// ResendInviteRequestBody defines model for ResendInviteRequestBody.
+type ResendInviteRequestBody struct {
+	// Expiry How long the new link works for; 168h by default, 720h at most.
+	Expiry *string `json:"expiry,omitempty"`
+}
+
 // RevokeOAuthClientOutputBody defines model for RevokeOAuthClientOutputBody.
 type RevokeOAuthClientOutputBody = map[string]interface{}
+
+// RotateAPIKeyOutputBody defines model for RotateAPIKeyOutputBody.
+type RotateAPIKeyOutputBody struct {
+	ApiKey string `json:"apiKey"`
+	Prefix string `json:"prefix"`
+}
+
+// RotateApiKeyRequestBody defines model for RotateApiKeyRequestBody.
+type RotateApiKeyRequestBody struct {
+	// Expiration New expiry; omit to keep the key's current one.
+	Expiration *time.Time `json:"expiration,omitempty"`
+}
 
 // RuleEnabledInputBody defines model for RuleEnabledInputBody.
 type RuleEnabledInputBody struct {
@@ -1397,6 +1524,37 @@ type ListAuditEventsParams struct {
 	Limit *int64 `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ExportAuditEventsParams defines parameters for ExportAuditEvents.
+type ExportAuditEventsParams struct {
+	// ActorUserId Keep events by this user.
+	ActorUserId *string `form:"actorUserId,omitempty" json:"actorUserId,omitempty"`
+
+	// Action One action, or a prefix ending in a dot.
+	Action     *string `form:"action,omitempty" json:"action,omitempty"`
+	TargetKind *string `form:"targetKind,omitempty" json:"targetKind,omitempty"`
+	TargetId   *string `form:"targetId,omitempty" json:"targetId,omitempty"`
+
+	// Since RFC 3339; events at or after this time.
+	Since *time.Time `form:"since,omitempty" json:"since,omitempty"`
+
+	// Until RFC 3339; events before this time.
+	Until *time.Time `form:"until,omitempty" json:"until,omitempty"`
+
+	// Before Page: events with an ID below this one.
+	Before *string `form:"before,omitempty" json:"before,omitempty"`
+
+	// Format File format, csv by default.
+	Format *ExportAuditEventsParamsFormat `form:"format,omitempty" json:"format,omitempty"`
+}
+
+// ExportAuditEventsParamsFormat defines parameters for ExportAuditEvents.
+type ExportAuditEventsParamsFormat string
+
+// SetDERPParams defines parameters for SetDERP.
+type SetDERPParams struct {
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
 // ListNodesParams defines parameters for ListNodes.
 type ListNodesParams struct {
 	User *string `form:"user,omitempty" json:"user,omitempty"`
@@ -1458,6 +1616,9 @@ type CreateApiKeyJSONRequestBody = CreateApiKeyRequestBody
 // ExpireApiKeyJSONRequestBody defines body for ExpireApiKey for application/json ContentType.
 type ExpireApiKeyJSONRequestBody = ExpireApiKeyRequestBody
 
+// RotateApiKeyJSONRequestBody defines body for RotateApiKey for application/json ContentType.
+type RotateApiKeyJSONRequestBody = RotateApiKeyRequestBody
+
 // AuthApproveJSONRequestBody defines body for AuthApprove for application/json ContentType.
 type AuthApproveJSONRequestBody = AuthApproveRequestBody
 
@@ -1490,6 +1651,12 @@ type UpdateGroupJSONRequestBody = GroupRequestBody
 
 // AddGroupMemberJSONRequestBody defines body for AddGroupMember for application/json ContentType.
 type AddGroupMemberJSONRequestBody = GroupMemberRequestBody
+
+// CreateInviteJSONRequestBody defines body for CreateInvite for application/json ContentType.
+type CreateInviteJSONRequestBody = CreateInviteRequestBody
+
+// ResendInviteJSONRequestBody defines body for ResendInvite for application/json ContentType.
+type ResendInviteJSONRequestBody = ResendInviteRequestBody
 
 // CreateLogStreamJSONRequestBody defines body for CreateLogStream for application/json ContentType.
 type CreateLogStreamJSONRequestBody = LogStreamRequestBody
@@ -1858,6 +2025,24 @@ type ClientInterface interface {
 	// Corresponds with DELETE /api/v1/apikey/{prefix} (the `DeleteApiKey` operationId).
 	DeleteApiKey(ctx context.Context, prefix string, params *DeleteApiKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// RotateApiKeyWithBody Rotate API key
+	//
+	// Mints a new secret for the key and returns it once. The key keeps its id, owner, scopes and description, and its expiry unless the body carries a new one; the old secret is refused from that moment. An expired key cannot be rotated.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/apikey/{prefix}/rotate (the `RotateApiKey` operationId).
+	RotateApiKeyWithBody(ctx context.Context, prefix string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RotateApiKey Rotate API key
+	//
+	// Mints a new secret for the key and returns it once. The key keeps its id, owner, scopes and description, and its expiry unless the body carries a new one; the old secret is refused from that moment. An expired key cannot be rotated.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/apikey/{prefix}/rotate (the `RotateApiKey` operationId).
+	RotateApiKey(ctx context.Context, prefix string, body RotateApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListAuditEvents List audit events
 	//
 	// Newest first. Every writing API request and the server's own sign-in events are recorded; page with before=<last id>.
@@ -1866,6 +2051,15 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/audit (the `ListAuditEvents` operationId).
 	ListAuditEvents(ctx context.Context, params *ListAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ExportAuditEvents Export audit events
+	//
+	// The events matching the same filters as the list, oldest first, as a file download. At most 100000 events: when more match, the export stops there and the newest are left out, so narrow since and until to reach them.
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/audit/export (the `ExportAuditEvents` operationId).
+	ExportAuditEvents(ctx context.Context, params *ExportAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AuthApproveWithBody Approve a pending auth session
 	//
@@ -1935,6 +2129,20 @@ type ClientInterface interface {
 	// Corresponds with DELETE /api/v1/auth/session (the `EndSession` operationId).
 	EndSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListSessions List console sessions
+	//
+	// Lists the console sign-ins that have not expired. A caller who may manage users sees every session; anyone else sees only their own.
+	//
+	// Corresponds with GET /api/v1/auth/sessions (the `ListSessions` operationId).
+	ListSessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EndSessionByID End a console session
+	//
+	// Ends one console sign-in, so the browser holding its cookie is signed out on its next request. A caller who may manage users can end any session; anyone else only their own.
+	//
+	// Corresponds with DELETE /api/v1/auth/sessions/{id} (the `EndSessionByID` operationId).
+	EndSessionByID(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DebugCreateNodeWithBody Debug create node
 	//
 	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -1973,25 +2181,25 @@ type ClientInterface interface {
 
 	// SetDERPWithBody Set DERP settings
 	//
-	// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+	// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file. Send the ETag a read returned as If-Match to have the request refused with 412 when the settings changed since that read.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
-	SetDERPWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	SetDERPWithBody(ctx context.Context, params *SetDERPParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetDERP Set DERP settings
 	//
-	// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+	// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file. Send the ETag a read returned as If-Match to have the request refused with 412 when the settings changed since that read.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
-	SetDERP(ctx context.Context, body SetDERPJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	SetDERP(ctx context.Context, params *SetDERPParams, body SetDERPJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RefreshDERP Refetch the DERP maps
 	//
@@ -2216,6 +2424,68 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/health (the `Health` operationId).
 	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListInvites List invites
+	//
+	// Lists every invitation, pending and accepted. The tokens are not shown; re-send an invite to get a fresh link.
+	//
+	// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/invite (the `ListInvites` operationId).
+	ListInvites(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateInviteWithBody Invite a user
+	//
+	// Creates an invitation link. The first login that opens the link, or whose verified email matches the address, creates the user approved, with the invited role and groups. The link is returned once and mailed to the address when a mail server is configured.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/invite (the `CreateInvite` operationId).
+	CreateInviteWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateInvite Invite a user
+	//
+	// Creates an invitation link. The first login that opens the link, or whose verified email matches the address, creates the user approved, with the invited role and groups. The link is returned once and mailed to the address when a mail server is configured.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/invite (the `CreateInvite` operationId).
+	CreateInvite(ctx context.Context, body CreateInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteInvite Revoke an invite
+	//
+	// Deletes the invitation, so its link stops working.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v1/invite/{id} (the `DeleteInvite` operationId).
+	DeleteInvite(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResendInviteWithBody Re-send an invite
+	//
+	// Gives the invitation a new token and expiry and mails the new link. The link in the previous mail stops working.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/invite/{id}/resend (the `ResendInvite` operationId).
+	ResendInviteWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResendInvite Re-send an invite
+	//
+	// Gives the invitation a new token and expiry and mails the new link. The link in the previous mail stops working.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/invite/{id}/resend (the `ResendInvite` operationId).
+	ResendInvite(ctx context.Context, id string, body ResendInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListLogStreams List log streams
 	//
@@ -3007,6 +3277,15 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/user/{id}/role (the `SetUserRole` operationId).
 	SetUserRole(ctx context.Context, id string, body SetUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// EndUserSessions Sign a user out everywhere
+	//
+	// Ends every console session of the user. Their browsers are signed out on their next request; nothing else about the account changes.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v1/user/{id}/sessions (the `EndUserSessions` operationId).
+	EndUserSessions(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// RenameUser Rename user
 	//
 	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -3582,6 +3861,44 @@ func (c *Client) DeleteApiKey(ctx context.Context, prefix string, params *Delete
 	return c.Client.Do(req)
 }
 
+// RotateApiKeyWithBody Rotate API key
+//
+// Mints a new secret for the key and returns it once. The key keeps its id, owner, scopes and description, and its expiry unless the body carries a new one; the old secret is refused from that moment. An expired key cannot be rotated.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/apikey/{prefix}/rotate (the `RotateApiKey` operationId).
+func (c *Client) RotateApiKeyWithBody(ctx context.Context, prefix string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateApiKeyRequestWithBody(c.Server, prefix, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RotateApiKey Rotate API key
+//
+// Mints a new secret for the key and returns it once. The key keeps its id, owner, scopes and description, and its expiry unless the body carries a new one; the old secret is refused from that moment. An expired key cannot be rotated.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/apikey/{prefix}/rotate (the `RotateApiKey` operationId).
+func (c *Client) RotateApiKey(ctx context.Context, prefix string, body RotateApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateApiKeyRequest(c.Server, prefix, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListAuditEvents List audit events
 //
 // Newest first. Every writing API request and the server's own sign-in events are recorded; page with before=<last id>.
@@ -3591,6 +3908,25 @@ func (c *Client) DeleteApiKey(ctx context.Context, prefix string, params *Delete
 // Corresponds with GET /api/v1/audit (the `ListAuditEvents` operationId).
 func (c *Client) ListAuditEvents(ctx context.Context, params *ListAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListAuditEventsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ExportAuditEvents Export audit events
+//
+// The events matching the same filters as the list, oldest first, as a file download. At most 100000 events: when more match, the export stops there and the newest are left out, so narrow since and until to reach them.
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/audit/export (the `ExportAuditEvents` operationId).
+func (c *Client) ExportAuditEvents(ctx context.Context, params *ExportAuditEventsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewExportAuditEventsRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -3749,6 +4085,40 @@ func (c *Client) EndSession(ctx context.Context, reqEditors ...RequestEditorFn) 
 	return c.Client.Do(req)
 }
 
+// ListSessions List console sessions
+//
+// Lists the console sign-ins that have not expired. A caller who may manage users sees every session; anyone else sees only their own.
+//
+// Corresponds with GET /api/v1/auth/sessions (the `ListSessions` operationId).
+func (c *Client) ListSessions(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSessionsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EndSessionByID End a console session
+//
+// Ends one console sign-in, so the browser holding its cookie is signed out on its next request. A caller who may manage users can end any session; anyone else only their own.
+//
+// Corresponds with DELETE /api/v1/auth/sessions/{id} (the `EndSessionByID` operationId).
+func (c *Client) EndSessionByID(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEndSessionByIDRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // DebugCreateNodeWithBody Debug create node
 //
 // Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -3827,15 +4197,15 @@ func (c *Client) GetDERP(ctx context.Context, reqEditors ...RequestEditorFn) (*h
 
 // SetDERPWithBody Set DERP settings
 //
-// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file. Send the ETag a read returned as If-Match to have the request refused with 412 when the settings changed since that read.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
-func (c *Client) SetDERPWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetDERPRequestWithBody(c.Server, contentType, body)
+func (c *Client) SetDERPWithBody(ctx context.Context, params *SetDERPParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetDERPRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3848,15 +4218,15 @@ func (c *Client) SetDERPWithBody(ctx context.Context, contentType string, body i
 
 // SetDERP Set DERP settings
 //
-// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file. Send the ETag a read returned as If-Match to have the request refused with 412 when the settings changed since that read.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
-func (c *Client) SetDERP(ctx context.Context, body SetDERPJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetDERPRequest(c.Server, body)
+func (c *Client) SetDERP(ctx context.Context, params *SetDERPParams, body SetDERPJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetDERPRequest(c.Server, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -4321,6 +4691,128 @@ func (c *Client) RemoveGroupUser(ctx context.Context, id string, userId string, 
 // Corresponds with GET /api/v1/health (the `Health` operationId).
 func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewHealthRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListInvites List invites
+//
+// Lists every invitation, pending and accepted. The tokens are not shown; re-send an invite to get a fresh link.
+//
+// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/invite (the `ListInvites` operationId).
+func (c *Client) ListInvites(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListInvitesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateInviteWithBody Invite a user
+//
+// Creates an invitation link. The first login that opens the link, or whose verified email matches the address, creates the user approved, with the invited role and groups. The link is returned once and mailed to the address when a mail server is configured.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/invite (the `CreateInvite` operationId).
+func (c *Client) CreateInviteWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateInviteRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateInvite Invite a user
+//
+// Creates an invitation link. The first login that opens the link, or whose verified email matches the address, creates the user approved, with the invited role and groups. The link is returned once and mailed to the address when a mail server is configured.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/invite (the `CreateInvite` operationId).
+func (c *Client) CreateInvite(ctx context.Context, body CreateInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateInviteRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteInvite Revoke an invite
+//
+// Deletes the invitation, so its link stops working.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v1/invite/{id} (the `DeleteInvite` operationId).
+func (c *Client) DeleteInvite(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteInviteRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResendInviteWithBody Re-send an invite
+//
+// Gives the invitation a new token and expiry and mails the new link. The link in the previous mail stops working.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/invite/{id}/resend (the `ResendInvite` operationId).
+func (c *Client) ResendInviteWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResendInviteRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResendInvite Re-send an invite
+//
+// Gives the invitation a new token and expiry and mails the new link. The link in the previous mail stops working.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/invite/{id}/resend (the `ResendInvite` operationId).
+func (c *Client) ResendInvite(ctx context.Context, id string, body ResendInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResendInviteRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -5981,6 +6473,25 @@ func (c *Client) SetUserRole(ctx context.Context, id string, body SetUserRoleJSO
 	return c.Client.Do(req)
 }
 
+// EndUserSessions Sign a user out everywhere
+//
+// Ends every console session of the user. Their browsers are signed out on their next request; nothing else about the account changes.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v1/user/{id}/sessions (the `EndUserSessions` operationId).
+func (c *Client) EndUserSessions(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEndUserSessionsRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // RenameUser Rename user
 //
 // Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -6918,6 +7429,53 @@ func NewDeleteApiKeyRequest(server string, prefix string, params *DeleteApiKeyPa
 	return req, nil
 }
 
+// NewRotateApiKeyRequest calls the generic RotateApiKey builder with application/json body
+func NewRotateApiKeyRequest(server string, prefix string, body RotateApiKeyJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRotateApiKeyRequestWithBody(server, prefix, "application/json", bodyReader)
+}
+
+// NewRotateApiKeyRequestWithBody constructs an http.Request for the RotateApiKey method, with any body, and a specified content type
+func NewRotateApiKeyRequestWithBody(server string, prefix string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "prefix", prefix, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/apikey/%s/rotate", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListAuditEventsRequest constructs an http.Request for the ListAuditEvents method
 func NewListAuditEventsRequest(server string, params *ListAuditEventsParams) (*http.Request, error) {
 	var err error
@@ -7033,6 +7591,144 @@ func NewListAuditEventsRequest(server string, params *ListAuditEventsParams) (*h
 		if params.Limit != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewExportAuditEventsRequest constructs an http.Request for the ExportAuditEvents method
+func NewExportAuditEventsRequest(server string, params *ExportAuditEventsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/audit/export")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.ActorUserId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "actorUserId", *params.ActorUserId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Action != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "action", *params.Action, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.TargetKind != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "targetKind", *params.TargetKind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.TargetId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "targetId", *params.TargetId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Since != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "since", *params.Since, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Until != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "until", *params.Until, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Before != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "before", *params.Before, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "uint64"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Format != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "format", *params.Format, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -7230,6 +7926,67 @@ func NewEndSessionRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListSessionsRequest constructs an http.Request for the ListSessions method
+func NewListSessionsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/auth/sessions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewEndSessionByIDRequest constructs an http.Request for the EndSessionByID method
+func NewEndSessionByIDRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/auth/sessions/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewDebugCreateNodeRequest calls the generic DebugCreateNode builder with application/json body
 func NewDebugCreateNodeRequest(server string, body DebugCreateNodeJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -7325,18 +8082,18 @@ func NewGetDERPRequest(server string) (*http.Request, error) {
 }
 
 // NewSetDERPRequest calls the generic SetDERP builder with application/json body
-func NewSetDERPRequest(server string, body SetDERPJSONRequestBody) (*http.Request, error) {
+func NewSetDERPRequest(server string, params *SetDERPParams, body SetDERPJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewSetDERPRequestWithBody(server, "application/json", bodyReader)
+	return NewSetDERPRequestWithBody(server, params, "application/json", bodyReader)
 }
 
 // NewSetDERPRequestWithBody constructs an http.Request for the SetDERP method, with any body, and a specified content type
-func NewSetDERPRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+func NewSetDERPRequestWithBody(server string, params *SetDERPParams, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -7360,6 +8117,21 @@ func NewSetDERPRequestWithBody(server string, contentType string, body io.Reader
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -8001,6 +8773,154 @@ func NewHealthRequest(server string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewListInvitesRequest constructs an http.Request for the ListInvites method
+func NewListInvitesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/invite")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateInviteRequest calls the generic CreateInvite builder with application/json body
+func NewCreateInviteRequest(server string, body CreateInviteJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateInviteRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateInviteRequestWithBody constructs an http.Request for the CreateInvite method, with any body, and a specified content type
+func NewCreateInviteRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/invite")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteInviteRequest constructs an http.Request for the DeleteInvite method
+func NewDeleteInviteRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/invite/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewResendInviteRequest calls the generic ResendInvite builder with application/json body
+func NewResendInviteRequest(server string, id string, body ResendInviteJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewResendInviteRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewResendInviteRequestWithBody constructs an http.Request for the ResendInvite method, with any body, and a specified content type
+func NewResendInviteRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/invite/%s/resend", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -10446,6 +11366,40 @@ func NewSetUserRoleRequestWithBody(server string, id string, contentType string,
 	return req, nil
 }
 
+// NewEndUserSessionsRequest constructs an http.Request for the EndUserSessions method
+func NewEndUserSessionsRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/user/%s/sessions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewRenameUserRequest constructs an http.Request for the RenameUser method
 func NewRenameUserRequest(server string, oldId string, newName string) (*http.Request, error) {
 	var err error
@@ -11096,6 +12050,24 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with DELETE /api/v1/apikey/{prefix} (the `DeleteApiKey` operationId).
 	DeleteApiKeyWithResponse(ctx context.Context, prefix string, params *DeleteApiKeyParams, reqEditors ...RequestEditorFn) (*DeleteApiKeyResponse, error)
 
+	// RotateApiKeyWithBodyWithResponse Rotate API key
+	//
+	// Mints a new secret for the key and returns it once. The key keeps its id, owner, scopes and description, and its expiry unless the body carries a new one; the old secret is refused from that moment. An expired key cannot be rotated.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/apikey/{prefix}/rotate (the `RotateApiKey` operationId).
+	RotateApiKeyWithBodyWithResponse(ctx context.Context, prefix string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RotateApiKeyResponse, error)
+
+	// RotateApiKeyWithResponse Rotate API key
+	//
+	// Mints a new secret for the key and returns it once. The key keeps its id, owner, scopes and description, and its expiry unless the body carries a new one; the old secret is refused from that moment. An expired key cannot be rotated.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/apikey/{prefix}/rotate (the `RotateApiKey` operationId).
+	RotateApiKeyWithResponse(ctx context.Context, prefix string, body RotateApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*RotateApiKeyResponse, error)
+
 	// ListAuditEventsWithResponse List audit events
 	//
 	// Newest first. Every writing API request and the server's own sign-in events are recorded; page with before=<last id>.
@@ -11106,6 +12078,17 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/audit (the `ListAuditEvents` operationId).
 	ListAuditEventsWithResponse(ctx context.Context, params *ListAuditEventsParams, reqEditors ...RequestEditorFn) (*ListAuditEventsResponse, error)
+
+	// ExportAuditEventsWithResponse Export audit events
+	//
+	// The events matching the same filters as the list, oldest first, as a file download. At most 100000 events: when more match, the export stops there and the newest are left out, so narrow since and until to reach them.
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/audit/export (the `ExportAuditEvents` operationId).
+	ExportAuditEventsWithResponse(ctx context.Context, params *ExportAuditEventsParams, reqEditors ...RequestEditorFn) (*ExportAuditEventsResponse, error)
 
 	// AuthApproveWithBodyWithResponse Approve a pending auth session
 	//
@@ -11179,6 +12162,24 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with DELETE /api/v1/auth/session (the `EndSession` operationId).
 	EndSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*EndSessionResponse, error)
 
+	// ListSessionsWithResponse List console sessions
+	//
+	// Lists the console sign-ins that have not expired. A caller who may manage users sees every session; anyone else sees only their own.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/auth/sessions (the `ListSessions` operationId).
+	ListSessionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSessionsResponse, error)
+
+	// EndSessionByIDWithResponse End a console session
+	//
+	// Ends one console sign-in, so the browser holding its cookie is signed out on its next request. A caller who may manage users can end any session; anyone else only their own.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/auth/sessions/{id} (the `EndSessionByID` operationId).
+	EndSessionByIDWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*EndSessionByIDResponse, error)
+
 	// DebugCreateNodeWithBodyWithResponse Debug create node
 	//
 	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -11221,25 +12222,25 @@ type ClientWithResponsesInterface interface {
 
 	// SetDERPWithBodyWithResponse Set DERP settings
 	//
-	// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+	// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file. Send the ETag a read returned as If-Match to have the request refused with 412 when the settings changed since that read.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
-	SetDERPWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetDERPResponse, error)
+	SetDERPWithBodyWithResponse(ctx context.Context, params *SetDERPParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetDERPResponse, error)
 
 	// SetDERPWithResponse Set DERP settings
 	//
-	// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+	// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file. Send the ETag a read returned as If-Match to have the request refused with 412 when the settings changed since that read.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
-	SetDERPWithResponse(ctx context.Context, body SetDERPJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDERPResponse, error)
+	SetDERPWithResponse(ctx context.Context, params *SetDERPParams, body SetDERPJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDERPResponse, error)
 
 	// RefreshDERPWithResponse Refetch the DERP maps
 	//
@@ -11488,6 +12489,72 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/health (the `Health` operationId).
 	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
+
+	// ListInvitesWithResponse List invites
+	//
+	// Lists every invitation, pending and accepted. The tokens are not shown; re-send an invite to get a fresh link.
+	//
+	// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/invite (the `ListInvites` operationId).
+	ListInvitesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInvitesResponse, error)
+
+	// CreateInviteWithBodyWithResponse Invite a user
+	//
+	// Creates an invitation link. The first login that opens the link, or whose verified email matches the address, creates the user approved, with the invited role and groups. The link is returned once and mailed to the address when a mail server is configured.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/invite (the `CreateInvite` operationId).
+	CreateInviteWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateInviteResponse, error)
+
+	// CreateInviteWithResponse Invite a user
+	//
+	// Creates an invitation link. The first login that opens the link, or whose verified email matches the address, creates the user approved, with the invited role and groups. The link is returned once and mailed to the address when a mail server is configured.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/invite (the `CreateInvite` operationId).
+	CreateInviteWithResponse(ctx context.Context, body CreateInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateInviteResponse, error)
+
+	// DeleteInviteWithResponse Revoke an invite
+	//
+	// Deletes the invitation, so its link stops working.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/invite/{id} (the `DeleteInvite` operationId).
+	DeleteInviteWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteInviteResponse, error)
+
+	// ResendInviteWithBodyWithResponse Re-send an invite
+	//
+	// Gives the invitation a new token and expiry and mails the new link. The link in the previous mail stops working.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/invite/{id}/resend (the `ResendInvite` operationId).
+	ResendInviteWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ResendInviteResponse, error)
+
+	// ResendInviteWithResponse Re-send an invite
+	//
+	// Gives the invitation a new token and expiry and mails the new link. The link in the previous mail stops working.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/invite/{id}/resend (the `ResendInvite` operationId).
+	ResendInviteWithResponse(ctx context.Context, id string, body ResendInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*ResendInviteResponse, error)
 
 	// ListLogStreamsWithResponse List log streams
 	//
@@ -12346,6 +13413,17 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/user/{id}/role (the `SetUserRole` operationId).
 	SetUserRoleWithResponse(ctx context.Context, id string, body SetUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*SetUserRoleResponse, error)
+
+	// EndUserSessionsWithResponse Sign a user out everywhere
+	//
+	// Ends every console session of the user. Their browsers are signed out on their next request; nothing else about the account changes.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/user/{id}/sessions (the `EndUserSessions` operationId).
+	EndUserSessionsWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*EndUserSessionsResponse, error)
 
 	// RenameUserWithResponse Rename user
 	//
@@ -13297,6 +14375,54 @@ func (r DeleteApiKeyResponse) ContentType() string {
 	return ""
 }
 
+type RotateApiKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RotateAPIKeyOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RotateApiKeyResponse) GetJSON200() *RotateAPIKeyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r RotateApiKeyResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r RotateApiKeyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RotateApiKeyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RotateApiKeyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RotateApiKeyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListAuditEventsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -13339,6 +14465,54 @@ func (r ListAuditEventsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListAuditEventsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ExportAuditEventsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *openapi_types.File
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ExportAuditEventsResponse) GetJSON200() *openapi_types.File {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ExportAuditEventsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ExportAuditEventsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ExportAuditEventsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ExportAuditEventsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ExportAuditEventsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -13585,6 +14759,95 @@ func (r EndSessionResponse) ContentType() string {
 	return ""
 }
 
+type ListSessionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListSessionsOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSessionsResponse) GetJSON200() *ListSessionsOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListSessionsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSessionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSessionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSessionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSessionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type EndSessionByIDResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r EndSessionByIDResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r EndSessionByIDResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EndSessionByIDResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EndSessionByIDResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EndSessionByIDResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type DebugCreateNodeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -13633,6 +14896,11 @@ func (r DebugCreateNodeResponse) ContentType() string {
 	return ""
 }
 
+// ResetDERPResponse200Headers the declared response headers of an HTTP 200 response for ResetDERP
+type ResetDERPResponse200Headers struct {
+	ETag *string
+}
+
 type ResetDERPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -13640,6 +14908,8 @@ type ResetDERPResponse struct {
 	JSON200 *DERP
 	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
 	ApplicationproblemJSONDefault *ErrorModel
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ResetDERPResponse200Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -13681,6 +14951,11 @@ func (r ResetDERPResponse) ContentType() string {
 	return ""
 }
 
+// GetDERPResponse200Headers the declared response headers of an HTTP 200 response for GetDERP
+type GetDERPResponse200Headers struct {
+	ETag *string
+}
+
 type GetDERPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -13688,6 +14963,8 @@ type GetDERPResponse struct {
 	JSON200 *DERP
 	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
 	ApplicationproblemJSONDefault *ErrorModel
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *GetDERPResponse200Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -13729,6 +15006,11 @@ func (r GetDERPResponse) ContentType() string {
 	return ""
 }
 
+// SetDERPResponse200Headers the declared response headers of an HTTP 200 response for SetDERP
+type SetDERPResponse200Headers struct {
+	ETag *string
+}
+
 type SetDERPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -13736,6 +15018,8 @@ type SetDERPResponse struct {
 	JSON200 *DERP
 	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
 	ApplicationproblemJSONDefault *ErrorModel
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *SetDERPResponse200Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -13777,6 +15061,11 @@ func (r SetDERPResponse) ContentType() string {
 	return ""
 }
 
+// RefreshDERPResponse200Headers the declared response headers of an HTTP 200 response for RefreshDERP
+type RefreshDERPResponse200Headers struct {
+	ETag *string
+}
+
 type RefreshDERPResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -13784,6 +15073,8 @@ type RefreshDERPResponse struct {
 	JSON200 *DERP
 	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
 	ApplicationproblemJSONDefault *ErrorModel
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *RefreshDERPResponse200Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -14635,6 +15926,198 @@ func (r HealthResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r HealthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListInvitesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListInvitesOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListInvitesResponse) GetJSON200() *ListInvitesOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListInvitesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListInvitesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListInvitesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListInvitesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListInvitesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateInviteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *InviteOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateInviteResponse) GetJSON201() *InviteOutputBody {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CreateInviteResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateInviteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateInviteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateInviteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateInviteResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteInviteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DeleteInviteOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteInviteResponse) GetJSON200() *DeleteInviteOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeleteInviteResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteInviteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteInviteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteInviteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteInviteResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ResendInviteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *InviteOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ResendInviteResponse) GetJSON200() *InviteOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ResendInviteResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ResendInviteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ResendInviteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ResendInviteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ResendInviteResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -17514,6 +18997,54 @@ func (r SetUserRoleResponse) ContentType() string {
 	return ""
 }
 
+type EndUserSessionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EndUserSessionsOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r EndUserSessionsResponse) GetJSON200() *EndUserSessionsOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r EndUserSessionsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r EndUserSessionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EndUserSessionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EndUserSessionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EndUserSessionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type RenameUserResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -18419,6 +19950,36 @@ func (c *ClientWithResponses) DeleteApiKeyWithResponse(ctx context.Context, pref
 	return ParseDeleteApiKeyResponse(rsp)
 }
 
+// RotateApiKeyWithBodyWithResponse Rotate API key
+//
+// Mints a new secret for the key and returns it once. The key keeps its id, owner, scopes and description, and its expiry unless the body carries a new one; the old secret is refused from that moment. An expired key cannot be rotated.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/apikey/{prefix}/rotate (the `RotateApiKey` operationId).
+func (c *ClientWithResponses) RotateApiKeyWithBodyWithResponse(ctx context.Context, prefix string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RotateApiKeyResponse, error) {
+	rsp, err := c.RotateApiKeyWithBody(ctx, prefix, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateApiKeyResponse(rsp)
+}
+
+// RotateApiKeyWithResponse Rotate API key
+//
+// Mints a new secret for the key and returns it once. The key keeps its id, owner, scopes and description, and its expiry unless the body carries a new one; the old secret is refused from that moment. An expired key cannot be rotated.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/apikey/{prefix}/rotate (the `RotateApiKey` operationId).
+func (c *ClientWithResponses) RotateApiKeyWithResponse(ctx context.Context, prefix string, body RotateApiKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*RotateApiKeyResponse, error) {
+	rsp, err := c.RotateApiKey(ctx, prefix, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateApiKeyResponse(rsp)
+}
+
 // ListAuditEventsWithResponse List audit events
 //
 // Newest first. Every writing API request and the server's own sign-in events are recorded; page with before=<last id>.
@@ -18434,6 +19995,23 @@ func (c *ClientWithResponses) ListAuditEventsWithResponse(ctx context.Context, p
 		return nil, err
 	}
 	return ParseListAuditEventsResponse(rsp)
+}
+
+// ExportAuditEventsWithResponse Export audit events
+//
+// The events matching the same filters as the list, oldest first, as a file download. At most 100000 events: when more match, the export stops there and the newest are left out, so narrow since and until to reach them.
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/audit/export (the `ExportAuditEvents` operationId).
+func (c *ClientWithResponses) ExportAuditEventsWithResponse(ctx context.Context, params *ExportAuditEventsParams, reqEditors ...RequestEditorFn) (*ExportAuditEventsResponse, error) {
+	rsp, err := c.ExportAuditEvents(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseExportAuditEventsResponse(rsp)
 }
 
 // AuthApproveWithBodyWithResponse Approve a pending auth session
@@ -18556,6 +20134,36 @@ func (c *ClientWithResponses) EndSessionWithResponse(ctx context.Context, reqEdi
 	return ParseEndSessionResponse(rsp)
 }
 
+// ListSessionsWithResponse List console sessions
+//
+// Lists the console sign-ins that have not expired. A caller who may manage users sees every session; anyone else sees only their own.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/auth/sessions (the `ListSessions` operationId).
+func (c *ClientWithResponses) ListSessionsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSessionsResponse, error) {
+	rsp, err := c.ListSessions(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSessionsResponse(rsp)
+}
+
+// EndSessionByIDWithResponse End a console session
+//
+// Ends one console sign-in, so the browser holding its cookie is signed out on its next request. A caller who may manage users can end any session; anyone else only their own.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/auth/sessions/{id} (the `EndSessionByID` operationId).
+func (c *ClientWithResponses) EndSessionByIDWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*EndSessionByIDResponse, error) {
+	rsp, err := c.EndSessionByID(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEndSessionByIDResponse(rsp)
+}
+
 // DebugCreateNodeWithBodyWithResponse Debug create node
 //
 // Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -18622,15 +20230,15 @@ func (c *ClientWithResponses) GetDERPWithResponse(ctx context.Context, reqEditor
 
 // SetDERPWithBodyWithResponse Set DERP settings
 //
-// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file. Send the ETag a read returned as If-Match to have the request refused with 412 when the settings changed since that read.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
-func (c *ClientWithResponses) SetDERPWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetDERPResponse, error) {
-	rsp, err := c.SetDERPWithBody(ctx, contentType, body, reqEditors...)
+func (c *ClientWithResponses) SetDERPWithBodyWithResponse(ctx context.Context, params *SetDERPParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetDERPResponse, error) {
+	rsp, err := c.SetDERPWithBody(ctx, params, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -18639,15 +20247,15 @@ func (c *ClientWithResponses) SetDERPWithBodyWithResponse(ctx context.Context, c
 
 // SetDERPWithResponse Set DERP settings
 //
-// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file. Send the ETag a read returned as If-Match to have the request refused with 412 when the settings changed since that read.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
-func (c *ClientWithResponses) SetDERPWithResponse(ctx context.Context, body SetDERPJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDERPResponse, error) {
-	rsp, err := c.SetDERP(ctx, body, reqEditors...)
+func (c *ClientWithResponses) SetDERPWithResponse(ctx context.Context, params *SetDERPParams, body SetDERPJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDERPResponse, error) {
+	rsp, err := c.SetDERP(ctx, params, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -19044,6 +20652,108 @@ func (c *ClientWithResponses) HealthWithResponse(ctx context.Context, reqEditors
 		return nil, err
 	}
 	return ParseHealthResponse(rsp)
+}
+
+// ListInvitesWithResponse List invites
+//
+// Lists every invitation, pending and accepted. The tokens are not shown; re-send an invite to get a fresh link.
+//
+// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/invite (the `ListInvites` operationId).
+func (c *ClientWithResponses) ListInvitesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInvitesResponse, error) {
+	rsp, err := c.ListInvites(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListInvitesResponse(rsp)
+}
+
+// CreateInviteWithBodyWithResponse Invite a user
+//
+// Creates an invitation link. The first login that opens the link, or whose verified email matches the address, creates the user approved, with the invited role and groups. The link is returned once and mailed to the address when a mail server is configured.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/invite (the `CreateInvite` operationId).
+func (c *ClientWithResponses) CreateInviteWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateInviteResponse, error) {
+	rsp, err := c.CreateInviteWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateInviteResponse(rsp)
+}
+
+// CreateInviteWithResponse Invite a user
+//
+// Creates an invitation link. The first login that opens the link, or whose verified email matches the address, creates the user approved, with the invited role and groups. The link is returned once and mailed to the address when a mail server is configured.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/invite (the `CreateInvite` operationId).
+func (c *ClientWithResponses) CreateInviteWithResponse(ctx context.Context, body CreateInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateInviteResponse, error) {
+	rsp, err := c.CreateInvite(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateInviteResponse(rsp)
+}
+
+// DeleteInviteWithResponse Revoke an invite
+//
+// Deletes the invitation, so its link stops working.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/invite/{id} (the `DeleteInvite` operationId).
+func (c *ClientWithResponses) DeleteInviteWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteInviteResponse, error) {
+	rsp, err := c.DeleteInvite(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteInviteResponse(rsp)
+}
+
+// ResendInviteWithBodyWithResponse Re-send an invite
+//
+// Gives the invitation a new token and expiry and mails the new link. The link in the previous mail stops working.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/invite/{id}/resend (the `ResendInvite` operationId).
+func (c *ClientWithResponses) ResendInviteWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ResendInviteResponse, error) {
+	rsp, err := c.ResendInviteWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResendInviteResponse(rsp)
+}
+
+// ResendInviteWithResponse Re-send an invite
+//
+// Gives the invitation a new token and expiry and mails the new link. The link in the previous mail stops working.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/invite/{id}/resend (the `ResendInvite` operationId).
+func (c *ClientWithResponses) ResendInviteWithResponse(ctx context.Context, id string, body ResendInviteJSONRequestBody, reqEditors ...RequestEditorFn) (*ResendInviteResponse, error) {
+	rsp, err := c.ResendInvite(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResendInviteResponse(rsp)
 }
 
 // ListLogStreamsWithResponse List log streams
@@ -20420,6 +22130,23 @@ func (c *ClientWithResponses) SetUserRoleWithResponse(ctx context.Context, id st
 	return ParseSetUserRoleResponse(rsp)
 }
 
+// EndUserSessionsWithResponse Sign a user out everywhere
+//
+// Ends every console session of the user. Their browsers are signed out on their next request; nothing else about the account changes.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/user/{id}/sessions (the `EndUserSessions` operationId).
+func (c *ClientWithResponses) EndUserSessionsWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*EndUserSessionsResponse, error) {
+	rsp, err := c.EndUserSessions(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEndUserSessionsResponse(rsp)
+}
+
 // RenameUserWithResponse Rename user
 //
 // Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -21192,6 +22919,39 @@ func ParseDeleteApiKeyResponse(rsp *http.Response) (*DeleteApiKeyResponse, error
 	return response, nil
 }
 
+// ParseRotateApiKeyResponse parses an HTTP response from a RotateApiKeyWithResponse call
+func ParseRotateApiKeyResponse(rsp *http.Response) (*RotateApiKeyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RotateApiKeyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RotateAPIKeyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListAuditEventsResponse parses an HTTP response from a ListAuditEventsWithResponse call
 func ParseListAuditEventsResponse(rsp *http.Response) (*ListAuditEventsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -21219,6 +22979,42 @@ func ParseListAuditEventsResponse(rsp *http.Response) (*ListAuditEventsResponse,
 			return nil, err
 		}
 		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseExportAuditEventsResponse parses an HTTP response from a ExportAuditEventsWithResponse call
+func ParseExportAuditEventsResponse(rsp *http.Response) (*ExportAuditEventsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ExportAuditEventsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest openapi_types.File
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	case rsp.StatusCode == 200:
+		// Content-type (text/csv) unsupported
 
 	}
 
@@ -21399,6 +23195,68 @@ func ParseEndSessionResponse(rsp *http.Response) (*EndSessionResponse, error) {
 	return response, nil
 }
 
+// ParseListSessionsResponse parses an HTTP response from a ListSessionsWithResponse call
+func ParseListSessionsResponse(rsp *http.Response) (*ListSessionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSessionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListSessionsOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseEndSessionByIDResponse parses an HTTP response from a EndSessionByIDWithResponse call
+func ParseEndSessionByIDResponse(rsp *http.Response) (*EndSessionByIDResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EndSessionByIDResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseDebugCreateNodeResponse parses an HTTP response from a DebugCreateNodeWithResponse call
 func ParseDebugCreateNodeResponse(rsp *http.Response) (*DebugCreateNodeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -21462,6 +23320,19 @@ func ParseResetDERPResponse(rsp *http.Response) (*ResetDERPResponse, error) {
 
 	}
 
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ResetDERPResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	}
+
 	return response, nil
 }
 
@@ -21493,6 +23364,19 @@ func ParseGetDERPResponse(rsp *http.Response) (*GetDERPResponse, error) {
 		}
 		response.ApplicationproblemJSONDefault = &dest
 
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers GetDERPResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
 	}
 
 	return response, nil
@@ -21528,6 +23412,19 @@ func ParseSetDERPResponse(rsp *http.Response) (*SetDERPResponse, error) {
 
 	}
 
+	switch {
+	case rsp.StatusCode == 200:
+		var headers SetDERPResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
+	}
+
 	return response, nil
 }
 
@@ -21559,6 +23456,19 @@ func ParseRefreshDERPResponse(rsp *http.Response) (*RefreshDERPResponse, error) 
 		}
 		response.ApplicationproblemJSONDefault = &dest
 
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers RefreshDERPResponse200Headers
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
+		response.Headers200 = &headers
 	}
 
 	return response, nil
@@ -22108,6 +24018,138 @@ func ParseHealthResponse(rsp *http.Response) (*HealthResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest HealthResponseBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListInvitesResponse parses an HTTP response from a ListInvitesWithResponse call
+func ParseListInvitesResponse(rsp *http.Response) (*ListInvitesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListInvitesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListInvitesOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateInviteResponse parses an HTTP response from a CreateInviteWithResponse call
+func ParseCreateInviteResponse(rsp *http.Response) (*CreateInviteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateInviteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest InviteOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteInviteResponse parses an HTTP response from a DeleteInviteWithResponse call
+func ParseDeleteInviteResponse(rsp *http.Response) (*DeleteInviteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteInviteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DeleteInviteOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseResendInviteResponse parses an HTTP response from a ResendInviteWithResponse call
+func ParseResendInviteResponse(rsp *http.Response) (*ResendInviteResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ResendInviteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest InviteOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -24081,6 +26123,39 @@ func ParseSetUserRoleResponse(rsp *http.Response) (*SetUserRoleResponse, error) 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest UserOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseEndUserSessionsResponse parses an HTTP response from a EndUserSessionsWithResponse call
+func ParseEndUserSessionsResponse(rsp *http.Response) (*EndUserSessionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EndUserSessionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EndUserSessionsOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

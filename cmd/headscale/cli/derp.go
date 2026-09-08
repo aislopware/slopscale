@@ -286,7 +286,8 @@ func putDERP(
 	body clientv1.SetDERPRequestBody,
 	message string,
 ) error {
-	resp, err := client.SetDERPWithResponse(ctx, body)
+	// The CLI reads and writes in one go, so it has no ETag to send.
+	resp, err := client.SetDERPWithResponse(ctx, &clientv1.SetDERPParams{}, body)
 	if err != nil {
 		return fmt.Errorf("setting DERP settings: %w", err)
 	}

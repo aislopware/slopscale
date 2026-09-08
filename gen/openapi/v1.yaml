@@ -363,6 +363,43 @@ components:
         - provider
         - loginPath
       type: object
+    ConsoleSession:
+      additionalProperties: false
+      properties:
+        createdAt:
+          format: date-time
+          type: string
+        current:
+          description: True for the session making this request.
+          type: boolean
+        expiresAt:
+          format: date-time
+          type: string
+        id:
+          format: uint64
+          type: string
+        lastSeenAt:
+          description: When it last made a request; written at most once a minute.
+          format: date-time
+          type: string
+        remoteAddr:
+          description: Where the browser signed in from; empty for an older session.
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+        userAgent:
+          description: The browser that signed in; empty for an older session.
+          type: string
+      required:
+        - id
+        - user
+        - createdAt
+        - expiresAt
+        - lastSeenAt
+        - remoteAddr
+        - userAgent
+        - current
+      type: object
     CreateAPIKeyOutputBody:
       additionalProperties: false
       properties:
@@ -391,6 +428,26 @@ components:
           description: Owning user id; empty for a legacy all-access key.
           format: uint64
           type: string
+      type: object
+    CreateInviteRequestBody:
+      additionalProperties: false
+      properties:
+        email:
+          description: The invited address.
+          type: string
+        expiry:
+          description: A Go duration; 720h at most, 168h by default.
+          type: string
+        groupIds:
+          description: Groups the invited user joins.
+          items:
+            type: string
+          type: array
+        role:
+          description: owner is refused; defaults to member.
+          type: string
+      required:
+        - email
       type: object
     CreateOAuthClientOutputBody:
       additionalProperties: false
@@ -847,6 +904,9 @@ components:
     DeleteAPIKeyOutputBody:
       additionalProperties: false
       type: object
+    DeleteInviteOutputBody:
+      additionalProperties: false
+      type: object
     DeleteNodeOutputBody:
       additionalProperties: false
       type: object
@@ -866,6 +926,16 @@ components:
       type: object
     EmptyOutputBody:
       additionalProperties: false
+      type: object
+    EndUserSessionsOutputBody:
+      additionalProperties: false
+      properties:
+        ended:
+          description: How many sessions were ended.
+          format: int64
+          type: integer
+      required:
+        - ended
       type: object
     ErrorDetail:
       additionalProperties: false
@@ -1066,6 +1136,75 @@ components:
       required:
         - databaseConnectivity
       type: object
+    Invite:
+      additionalProperties: false
+      properties:
+        accepted:
+          type: boolean
+        acceptedAt:
+          format: date-time
+          type:
+            - string
+            - "null"
+        acceptedUserId:
+          description: The user the invite created.
+          format: uint64
+          type: string
+        createdAt:
+          format: date-time
+          type: string
+        createdBy:
+          description: Who sent it; empty when unknown.
+          format: uint64
+          type: string
+        email:
+          type: string
+        expired:
+          description: True once the invite can no longer be accepted.
+          type: boolean
+        expiresAt:
+          format: date-time
+          type: string
+        groupIds:
+          items:
+            type: string
+          type: array
+        id:
+          format: uint64
+          type: string
+        role:
+          description: The role the invited user is created with.
+          type: string
+      required:
+        - id
+        - email
+        - role
+        - groupIds
+        - expiresAt
+        - createdAt
+        - accepted
+        - acceptedAt
+        - expired
+      type: object
+    InviteOutputBody:
+      additionalProperties: false
+      properties:
+        emailError:
+          description: Why the mail was not sent.
+          type: string
+        emailSent:
+          description: Whether the link was mailed.
+          type: boolean
+        invite:
+          $ref: "#/components/schemas/Invite"
+        url:
+          description: The link to send; shown only here.
+          type: string
+      required:
+        - invite
+        - url
+        - emailSent
+      type: object
     ListAPIKeysOutputBody:
       additionalProperties: false
       properties:
@@ -1108,6 +1247,16 @@ components:
           type: array
       required:
         - groups
+      type: object
+    ListInvitesOutputBody:
+      additionalProperties: false
+      properties:
+        invites:
+          items:
+            $ref: "#/components/schemas/Invite"
+          type: array
+      required:
+        - invites
       type: object
     ListLogStreamsOutputBody:
       additionalProperties: false
@@ -1214,6 +1363,16 @@ components:
       required:
         - recordings
         - nextBefore
+      type: object
+    ListSessionsOutputBody:
+      additionalProperties: false
+      properties:
+        sessions:
+          items:
+            $ref: "#/components/schemas/ConsoleSession"
+          type: array
+      required:
+        - sessions
       type: object
     ListUsersOutputBody:
       additionalProperties: false
@@ -1933,8 +2092,34 @@ components:
       required:
         - request
       type: object
+    ResendInviteRequestBody:
+      additionalProperties: false
+      properties:
+        expiry:
+          description: How long the new link works for; 168h by default, 720h at most.
+          type: string
+      type: object
     RevokeOAuthClientOutputBody:
       additionalProperties: false
+      type: object
+    RotateAPIKeyOutputBody:
+      additionalProperties: false
+      properties:
+        apiKey:
+          type: string
+        prefix:
+          type: string
+      required:
+        - apiKey
+        - prefix
+      type: object
+    RotateApiKeyRequestBody:
+      additionalProperties: false
+      properties:
+        expiration:
+          description: New expiry; omit to keep the key's current one.
+          format: date-time
+          type: string
       type: object
     RuleEnabledInputBody:
       additionalProperties: false
@@ -3051,6 +3236,40 @@ paths:
       tags:
         - ApiKeys
       x-audit-action: apikey.delete
+  /api/v1/apikey/{prefix}/rotate:
+    post:
+      description: Mints a new secret for the key and returns it once. The key keeps its id, owner, scopes and description, and its expiry unless the body carries a new one; the old secret is refused from that moment. An expired key cannot be rotated.
+      operationId: rotateApiKey
+      parameters:
+        - in: path
+          name: prefix
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RotateApiKeyRequestBody"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RotateAPIKeyOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Rotate API key
+      tags:
+        - ApiKeys
+      x-audit-action: apikey.rotate
   /api/v1/audit:
     get:
       description: |-
@@ -3133,6 +3352,98 @@ paths:
       security:
         - bearer: []
       summary: List audit events
+      tags:
+        - Audit
+      x-required-scope: logs:configuration:read
+  /api/v1/audit/export:
+    get:
+      description: |-
+        The events matching the same filters as the list, oldest first, as a file download. At most 100000 events: when more match, the export stops there and the newest are left out, so narrow since and until to reach them.
+
+        Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: exportAuditEvents
+      parameters:
+        - description: Keep events by this user.
+          explode: false
+          in: query
+          name: actorUserId
+          schema:
+            description: Keep events by this user.
+            type: string
+        - description: One action, or a prefix ending in a dot.
+          explode: false
+          in: query
+          name: action
+          schema:
+            description: One action, or a prefix ending in a dot.
+            type: string
+        - explode: false
+          in: query
+          name: targetKind
+          schema:
+            type: string
+        - explode: false
+          in: query
+          name: targetId
+          schema:
+            type: string
+        - description: RFC 3339; events at or after this time.
+          explode: false
+          in: query
+          name: since
+          schema:
+            description: RFC 3339; events at or after this time.
+            format: date-time
+            type: string
+        - description: RFC 3339; events before this time.
+          explode: false
+          in: query
+          name: until
+          schema:
+            description: RFC 3339; events before this time.
+            format: date-time
+            type: string
+        - description: "Page: events with an ID below this one."
+          explode: false
+          in: query
+          name: before
+          schema:
+            description: "Page: events with an ID below this one."
+            format: uint64
+            type: string
+        - description: File format, csv by default.
+          explode: false
+          in: query
+          name: format
+          schema:
+            description: File format, csv by default.
+            enum:
+              - csv
+              - json
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                contentMediaType: application/octet-stream
+                format: binary
+                type: string
+            text/csv:
+              schema:
+                contentMediaType: application/octet-stream
+                format: binary
+                type: string
+          description: The events as a file.
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Export audit events
       tags:
         - Audit
       x-required-scope: logs:configuration:read
@@ -3269,6 +3580,54 @@ paths:
       tags:
         - Auth
       x-audit-action: console.logout
+  /api/v1/auth/sessions:
+    get:
+      description: Lists the console sign-ins that have not expired. A caller who may manage users sees every session; anyone else sees only their own.
+      operationId: listSessions
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListSessionsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List console sessions
+      tags:
+        - Auth
+  /api/v1/auth/sessions/{id}:
+    delete:
+      description: Ends one console sign-in, so the browser holding its cookie is signed out on its next request. A caller who may manage users can end any session; anyone else only their own.
+      operationId: endSessionByID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: End a console session
+      tags:
+        - Auth
+      x-audit-action: session.end
   /api/v1/debug/node:
     post:
       description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -3313,6 +3672,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/DERP"
           description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
         default:
           content:
             application/problem+json:
@@ -3339,6 +3702,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/DERP"
           description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
         default:
           content:
             application/problem+json:
@@ -3353,10 +3720,15 @@ paths:
       x-required-scope: feature_settings:read
     put:
       description: |-
-        Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+        Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file. Send the ETag a read returned as If-Match to have the request refused with 412 when the settings changed since that read.
 
         Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: setDERP
+      parameters:
+        - in: header
+          name: If-Match
+          schema:
+            type: string
       requestBody:
         content:
           application/json:
@@ -3370,6 +3742,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/DERP"
           description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
         default:
           content:
             application/problem+json:
@@ -3397,6 +3773,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/DERP"
           description: OK
+          headers:
+            ETag:
+              schema:
+                type: string
         default:
           content:
             application/problem+json:
@@ -3944,6 +4324,138 @@ paths:
       summary: Health check
       tags:
         - Health
+  /api/v1/invite:
+    get:
+      description: |-
+        Lists every invitation, pending and accepted. The tokens are not shown; re-send an invite to get a fresh link.
+
+        Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listInvites
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListInvitesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List invites
+      tags:
+        - Invites
+      x-required-scope: users:read
+    post:
+      description: |-
+        Creates an invitation link. The first login that opens the link, or whose verified email matches the address, creates the user approved, with the invited role and groups. The link is returned once and mailed to the address when a mail server is configured.
+
+        Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createInvite
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInviteRequestBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteOutputBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Invite a user
+      tags:
+        - Invites
+      x-audit-action: user.invite.create
+      x-required-scope: users
+  /api/v1/invite/{id}:
+    delete:
+      description: |-
+        Deletes the invitation, so its link stops working.
+
+        Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteInvite
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteInviteOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Revoke an invite
+      tags:
+        - Invites
+      x-audit-action: user.invite.delete
+      x-required-scope: users
+  /api/v1/invite/{id}/resend:
+    post:
+      description: |-
+        Gives the invitation a new token and expiry and mails the new link. The link in the previous mail stops working.
+
+        Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: resendInvite
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResendInviteRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Re-send an invite
+      tags:
+        - Invites
+      x-audit-action: user.invite.resend
+      x-required-scope: users
   /api/v1/log-stream:
     get:
       description: |-
@@ -5907,6 +6419,40 @@ paths:
       tags:
         - Users
       x-audit-action: user.role.set
+      x-required-scope: users
+  /api/v1/user/{id}/sessions:
+    delete:
+      description: |-
+        Ends every console session of the user. Their browsers are signed out on their next request; nothing else about the account changes.
+
+        Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: endUserSessions
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EndUserSessionsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Sign a user out everywhere
+      tags:
+        - Auth
+      x-audit-action: user.sessions.end
       x-required-scope: users
   /api/v1/user/{oldId}/rename/{newName}:
     post:

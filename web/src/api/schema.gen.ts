@@ -209,6 +209,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/apikey/{prefix}/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate API key
+         * @description Mints a new secret for the key and returns it once. The key keeps its id, owner, scopes and description, and its expiry unless the body carries a new one; the old secret is refused from that moment. An expired key cannot be rotated.
+         */
+        post: operations["rotateApiKey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/apikey/expire": {
         parameters: {
             query?: never;
@@ -240,6 +260,28 @@ export interface paths {
          *     Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         get: operations["listAuditEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/audit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export audit events
+         * @description The events matching the same filters as the list, oldest first, as a file download. At most 100000 events: when more match, the export stops there and the newest are left out, so narrow since and until to reach them.
+         *
+         *     Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["exportAuditEvents"];
         put?: never;
         post?: never;
         delete?: never;
@@ -348,6 +390,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List console sessions
+         * @description Lists the console sign-ins that have not expired. A caller who may manage users sees every session; anyone else sees only their own.
+         */
+        get: operations["listSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sessions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * End a console session
+         * @description Ends one console sign-in, so the browser holding its cookie is signed out on its next request. A caller who may manage users can end any session; anyone else only their own.
+         */
+        delete: operations["endSessionByID"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/debug/node": {
         parameters: {
             query?: never;
@@ -384,7 +466,7 @@ export interface paths {
         get: operations["getDERP"];
         /**
          * Set DERP settings
-         * @description Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+         * @description Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file. Send the ETag a read returned as If-Match to have the request refused with 412 when the settings changed since that read.
          *
          *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -650,6 +732,78 @@ export interface paths {
         get: operations["health"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List invites
+         * @description Lists every invitation, pending and accepted. The tokens are not shown; re-send an invite to get a fresh link.
+         *
+         *     Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listInvites"];
+        put?: never;
+        /**
+         * Invite a user
+         * @description Creates an invitation link. The first login that opens the link, or whose verified email matches the address, creates the user approved, with the invited role and groups. The link is returned once and mailed to the address when a mail server is configured.
+         *
+         *     Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["createInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/invite/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke an invite
+         * @description Deletes the invitation, so its link stops working.
+         *
+         *     Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["deleteInvite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/invite/{id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-send an invite
+         * @description Gives the invitation a new token and expiry and mails the new link. The link in the previous mail stops working.
+         *
+         *     Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["resendInvite"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1589,6 +1743,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/{id}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Sign a user out everywhere
+         * @description Ends every console session of the user. Their browsers are signed out on their next request; nothing else about the account changes.
+         *
+         *     Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["endUserSessions"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/{oldId}/rename/{newName}": {
         parameters: {
             query?: never;
@@ -1934,6 +2110,26 @@ export interface components {
             loginPath: string;
             provider: string;
         };
+        ConsoleSession: {
+            /** Format: date-time */
+            createdAt: string;
+            /** @description True for the session making this request. */
+            current: boolean;
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: uint64 */
+            id: string;
+            /**
+             * Format: date-time
+             * @description When it last made a request; written at most once a minute.
+             */
+            lastSeenAt: string;
+            /** @description Where the browser signed in from; empty for an older session. */
+            remoteAddr: string;
+            user: components["schemas"]["User"];
+            /** @description The browser that signed in; empty for an older session. */
+            userAgent: string;
+        };
         CreateAPIKeyOutputBody: {
             apiKey: string;
         };
@@ -1949,6 +2145,16 @@ export interface components {
              * @description Owning user id; empty for a legacy all-access key.
              */
             userId?: string;
+        };
+        CreateInviteRequestBody: {
+            /** @description The invited address. */
+            email: string;
+            /** @description A Go duration; 720h at most, 168h by default. */
+            expiry?: string;
+            /** @description Groups the invited user joins. */
+            groupIds?: string[];
+            /** @description owner is refused; defaults to member. */
+            role?: string;
         };
         CreateOAuthClientOutputBody: {
             clientSecret: string;
@@ -1995,6 +2201,7 @@ export interface components {
             user?: string;
         };
         DeleteAPIKeyOutputBody: Record<string, unknown>;
+        DeleteInviteOutputBody: Record<string, unknown>;
         DeleteNodeOutputBody: Record<string, unknown>;
         DeletePreAuthKeyOutputBody: Record<string, unknown>;
         DeleteUserOutputBody: Record<string, unknown>;
@@ -2136,6 +2343,13 @@ export interface components {
             useWithExitNode: string[];
         };
         EmptyOutputBody: Record<string, unknown>;
+        EndUserSessionsOutputBody: {
+            /**
+             * Format: int64
+             * @description How many sessions were ended.
+             */
+            ended: number;
+        };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
             location?: string;
@@ -2245,6 +2459,42 @@ export interface components {
         HealthResponseBody: {
             databaseConnectivity: boolean;
         };
+        Invite: {
+            accepted: boolean;
+            /** Format: date-time */
+            acceptedAt: string | null;
+            /**
+             * Format: uint64
+             * @description The user the invite created.
+             */
+            acceptedUserId?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /**
+             * Format: uint64
+             * @description Who sent it; empty when unknown.
+             */
+            createdBy?: string;
+            email: string;
+            /** @description True once the invite can no longer be accepted. */
+            expired: boolean;
+            /** Format: date-time */
+            expiresAt: string;
+            groupIds: string[];
+            /** Format: uint64 */
+            id: string;
+            /** @description The role the invited user is created with. */
+            role: string;
+        };
+        InviteOutputBody: {
+            /** @description Why the mail was not sent. */
+            emailError?: string;
+            /** @description Whether the link was mailed. */
+            emailSent: boolean;
+            invite: components["schemas"]["Invite"];
+            /** @description The link to send; shown only here. */
+            url: string;
+        };
         ListAPIKeysOutputBody: {
             apiKeys: components["schemas"]["ApiKey"][];
         };
@@ -2257,6 +2507,9 @@ export interface components {
         };
         ListGroupsOutputBody: {
             groups: components["schemas"]["Group"][];
+        };
+        ListInvitesOutputBody: {
+            invites: components["schemas"]["Invite"][];
         };
         ListLogStreamsOutputBody: {
             logStreams: components["schemas"]["LogStream"][];
@@ -2286,6 +2539,9 @@ export interface components {
         ListRulesOutputBody: {
             policyFileEnforces: boolean;
             rules: components["schemas"]["AccessRule"][];
+        };
+        ListSessionsOutputBody: {
+            sessions: components["schemas"]["ConsoleSession"][];
         };
         ListSSHRecordingsOutputBody: {
             nextBefore: string;
@@ -2552,7 +2808,22 @@ export interface components {
         RequestOutputBody: {
             request: components["schemas"]["AccessRequest"];
         };
+        ResendInviteRequestBody: {
+            /** @description How long the new link works for; 168h by default, 720h at most. */
+            expiry?: string;
+        };
         RevokeOAuthClientOutputBody: Record<string, unknown>;
+        RotateAPIKeyOutputBody: {
+            apiKey: string;
+            prefix: string;
+        };
+        RotateApiKeyRequestBody: {
+            /**
+             * Format: date-time
+             * @description New expiry; omit to keep the key's current one.
+             */
+            expiration?: string;
+        };
         RuleEnabledInputBody: {
             enabled: boolean;
         };
@@ -2801,8 +3072,10 @@ export type BackfillNodeIPsOutputBody = components['schemas']['BackfillNodeIPsOu
 export type CheckPolicyOutputBody = components['schemas']['CheckPolicyOutputBody'];
 export type ConsoleAuth = components['schemas']['ConsoleAuth'];
 export type ConsoleOidc = components['schemas']['ConsoleOIDC'];
+export type ConsoleSession = components['schemas']['ConsoleSession'];
 export type CreateApiKeyOutputBody = components['schemas']['CreateAPIKeyOutputBody'];
 export type CreateApiKeyRequestBody = components['schemas']['CreateApiKeyRequestBody'];
+export type CreateInviteRequestBody = components['schemas']['CreateInviteRequestBody'];
 export type CreateOAuthClientOutputBody = components['schemas']['CreateOAuthClientOutputBody'];
 export type CreateOAuthClientRequestBody = components['schemas']['CreateOAuthClientRequestBody'];
 export type CreatePreAuthKeyRequestBody = components['schemas']['CreatePreAuthKeyRequestBody'];
@@ -2810,6 +3083,7 @@ export type CreateUserRequestBody = components['schemas']['CreateUserRequestBody
 export type CustomAttribute = components['schemas']['CustomAttribute'];
 export type DebugCreateNodeRequestBody = components['schemas']['DebugCreateNodeRequestBody'];
 export type DeleteApiKeyOutputBody = components['schemas']['DeleteAPIKeyOutputBody'];
+export type DeleteInviteOutputBody = components['schemas']['DeleteInviteOutputBody'];
 export type DeleteNodeOutputBody = components['schemas']['DeleteNodeOutputBody'];
 export type DeletePreAuthKeyOutputBody = components['schemas']['DeletePreAuthKeyOutputBody'];
 export type DeleteUserOutputBody = components['schemas']['DeleteUserOutputBody'];
@@ -2826,6 +3100,7 @@ export type DnsRuleOutputBody = components['schemas']['DnsRuleOutputBody'];
 export type DnsRuleRequestBody = components['schemas']['DNSRuleRequestBody'];
 export type DnsSettings = components['schemas']['DNSSettings'];
 export type EmptyOutputBody = components['schemas']['EmptyOutputBody'];
+export type EndUserSessionsOutputBody = components['schemas']['EndUserSessionsOutputBody'];
 export type ErrorDetail = components['schemas']['ErrorDetail'];
 export type ErrorModel = components['schemas']['ErrorModel'];
 export type ExpireApiKeyOutputBody = components['schemas']['ExpireAPIKeyOutputBody'];
@@ -2839,10 +3114,13 @@ export type GroupMemberRequestBody = components['schemas']['GroupMemberRequestBo
 export type GroupOutputBody = components['schemas']['GroupOutputBody'];
 export type GroupRequestBody = components['schemas']['GroupRequestBody'];
 export type HealthResponseBody = components['schemas']['HealthResponseBody'];
+export type Invite = components['schemas']['Invite'];
+export type InviteOutputBody = components['schemas']['InviteOutputBody'];
 export type ListApiKeysOutputBody = components['schemas']['ListAPIKeysOutputBody'];
 export type ListAuditOutputBody = components['schemas']['ListAuditOutputBody'];
 export type ListDnsRulesOutputBody = components['schemas']['ListDNSRulesOutputBody'];
 export type ListGroupsOutputBody = components['schemas']['ListGroupsOutputBody'];
+export type ListInvitesOutputBody = components['schemas']['ListInvitesOutputBody'];
 export type ListLogStreamsOutputBody = components['schemas']['ListLogStreamsOutputBody'];
 export type ListNetworksOutputBody = components['schemas']['ListNetworksOutputBody'];
 export type ListNodesOutputBody = components['schemas']['ListNodesOutputBody'];
@@ -2851,6 +3129,7 @@ export type ListPosturesOutputBody = components['schemas']['ListPosturesOutputBo
 export type ListPreAuthKeysOutputBody = components['schemas']['ListPreAuthKeysOutputBody'];
 export type ListRequestsOutputBody = components['schemas']['ListRequestsOutputBody'];
 export type ListRulesOutputBody = components['schemas']['ListRulesOutputBody'];
+export type ListSessionsOutputBody = components['schemas']['ListSessionsOutputBody'];
 export type ListSshRecordingsOutputBody = components['schemas']['ListSSHRecordingsOutputBody'];
 export type ListUsersOutputBody = components['schemas']['ListUsersOutputBody'];
 export type ListWebhooksOutputBody = components['schemas']['ListWebhooksOutputBody'];
@@ -2882,7 +3161,10 @@ export type PreAuthKey = components['schemas']['PreAuthKey'];
 export type PreAuthKeyOutputBody = components['schemas']['PreAuthKeyOutputBody'];
 export type RequestOptionsOutputBody = components['schemas']['RequestOptionsOutputBody'];
 export type RequestOutputBody = components['schemas']['RequestOutputBody'];
+export type ResendInviteRequestBody = components['schemas']['ResendInviteRequestBody'];
 export type RevokeOAuthClientOutputBody = components['schemas']['RevokeOAuthClientOutputBody'];
+export type RotateApiKeyOutputBody = components['schemas']['RotateAPIKeyOutputBody'];
+export type RotateApiKeyRequestBody = components['schemas']['RotateApiKeyRequestBody'];
 export type RuleEnabledInputBody = components['schemas']['RuleEnabledInputBody'];
 export type RuleOutputBody = components['schemas']['RuleOutputBody'];
 export type ServerInfo = components['schemas']['ServerInfo'];
@@ -3430,6 +3712,41 @@ export interface operations {
             };
         };
     };
+    rotateApiKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prefix: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RotateApiKeyRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RotateAPIKeyOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     expireApiKey: {
         parameters: {
             query?: never;
@@ -3494,6 +3811,51 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListAuditOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    exportAuditEvents: {
+        parameters: {
+            query?: {
+                /** @description One action, or a prefix ending in a dot. */
+                action?: string;
+                /** @description Keep events by this user. */
+                actorUserId?: string;
+                /** @description Page: events with an ID below this one. */
+                before?: string;
+                /** @description File format, csv by default. */
+                format?: "csv" | "json";
+                /** @description RFC 3339; events at or after this time. */
+                since?: string;
+                targetId?: string;
+                targetKind?: string;
+                /** @description RFC 3339; events before this time. */
+                until?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The events as a file. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string;
+                    "text/csv": string;
                 };
             };
             /** @description Error */
@@ -3663,6 +4025,64 @@ export interface operations {
             };
         };
     };
+    listSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListSessionsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    endSessionByID: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     debugCreateNode: {
         parameters: {
             query?: never;
@@ -3708,6 +4128,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3728,7 +4149,9 @@ export interface operations {
     setDERP: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "If-Match"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -3741,6 +4164,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3770,6 +4194,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -3799,6 +4224,7 @@ export interface operations {
             /** @description OK */
             200: {
                 headers: {
+                    ETag?: string;
                     [name: string]: unknown;
                 };
                 content: {
@@ -4340,6 +4766,134 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponseBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listInvites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListInvitesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInviteRequestBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteInviteOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    resendInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResendInviteRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteOutputBody"];
                 };
             };
             /** @description Error */
@@ -6276,6 +6830,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    endUserSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndUserSessionsOutputBody"];
                 };
             };
             /** @description Error */
