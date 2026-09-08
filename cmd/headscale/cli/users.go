@@ -96,6 +96,11 @@ func init() {
 	usernameAndIDFlag(renameUserCmd)
 	renameUserCmd.Flags().StringP("new-name", "r", "", "New username")
 	mustMarkRequired(renameUserCmd, "new-name")
+	userCmd.AddCommand(setUserCmd)
+	usernameAndIDFlag(setUserCmd)
+	setUserCmd.Flags().StringP("display-name", "d", "", "Display name; an empty value clears it")
+	setUserCmd.Flags().StringP("email", "e", "", "Email; an empty value clears it")
+	setUserCmd.Flags().StringP("picture-url", "p", "", "Profile picture URL; an empty value clears it")
 	userCmd.AddCommand(setUserRoleCmd)
 	usernameAndIDFlag(setUserRoleCmd)
 	userCmd.AddCommand(approveUserCmd)
@@ -273,6 +278,69 @@ var renameUserCmd = &cobra.Command{
 			}
 
 			return printOutput(cmd, resp.JSON200.User, "User renamed")
+		},
+	),
+}
+
+var setUserCmd = &cobra.Command{
+	Use:   "set --identifier ID or --name NAME",
+	Short: "Sets a user's display name, email or profile picture",
+	Long: `
+Changes the profile the clients show for a user. A flag left out keeps its
+value and a flag set to an empty string clears it. A user who logs in through
+OIDC gets the values from the provider again at the next login.`,
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			userID, _, err := resolveSingleUser(ctx, client, cmd)
+			if err != nil {
+				return err
+			}
+
+			var request clientv1.UpdateUserJSONRequestBody
+
+			changed := false
+
+			if cmd.Flags().Changed("display-name") {
+				displayName, _ := cmd.Flags().GetString("display-name")
+				request.DisplayName = &displayName
+				changed = true
+			}
+
+			if cmd.Flags().Changed("email") {
+				email, _ := cmd.Flags().GetString("email")
+				request.Email = &email
+				changed = true
+			}
+
+			if cmd.Flags().Changed("picture-url") {
+				pictureURL, _ := cmd.Flags().GetString("picture-url")
+
+				_, parseErr := url.Parse(pictureURL)
+				if parseErr != nil {
+					return fmt.Errorf("invalid picture URL: %w", parseErr)
+				}
+
+				request.PictureUrl = &pictureURL
+				changed = true
+			}
+
+			if !changed {
+				return fmt.Errorf(
+					"%w: give at least one of --display-name, --email or --picture-url",
+					errMissingParameter,
+				)
+			}
+
+			resp, err := client.UpdateUserWithResponse(ctx, userID, request)
+			if err != nil {
+				return fmt.Errorf("updating user: %w", err)
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			return printOutput(cmd, resp.JSON200.User, "User updated")
 		},
 	),
 }

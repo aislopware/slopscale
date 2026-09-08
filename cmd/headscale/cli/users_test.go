@@ -458,6 +458,36 @@ func TestUserCommands(t *testing.T) {
 			want: "User renamed\n",
 		},
 		{
+			name:  "set sends only the flags given and reads an empty one as clearing",
+			src:   setUserCmd,
+			flags: map[string]string{"name": "bob", "display-name": "Robert", "picture-url": ""},
+			routes: map[string]apiHandler{
+				"GET /api/v1/user": listFiltered,
+				"PATCH /api/v1/user/{id}": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+					assert.Equal(t, "2", r.PathValue("id"))
+
+					var body map[string]any
+
+					decodeBody(t, r, &body)
+					assert.Equal(t, map[string]any{"displayName": "Robert", "pictureUrl": ""}, body)
+
+					updated := bob
+					updated.DisplayName = "Robert"
+
+					writeJSON(t, w, clientv1.UserOutputBody{User: updated})
+				},
+			},
+			want: "User updated\n",
+		},
+		{
+			name:    "set without a profile flag is refused before any call",
+			src:     setUserCmd,
+			flags:   map[string]string{"name": "bob"},
+			routes:  map[string]apiHandler{"GET /api/v1/user": listFiltered},
+			wantErr: "at least one of",
+		},
+		{
 			name:  "rename surfaces the api error",
 			src:   renameUserCmd,
 			flags: map[string]string{"identifier": "2", "new-name": "alice"},
