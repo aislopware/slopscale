@@ -68,6 +68,12 @@ same file:
 headscale audit export --since 2026-09-01T00:00:00Z --until 2026-10-01T00:00:00Z -o audit-september.csv
 ```
 
+The CLI takes the same filters as `headscale audit list`, `--user`, `--action`,
+`--target-kind`, `--target-id`, `--since` and `--before`, and adds `--until` and
+`--format`. `--since` and `--until` accept an RFC 3339 time or a duration back
+from now, such as `24h`. Without `--output` the file is written to stdout, so it
+can be piped.
+
 ```console
 curl -H "Authorization: Bearer $HEADSCALE_API_KEY" \
   "https://headscale.example.com/api/v1/audit/export?since=2026-09-01T00:00:00Z&until=2026-10-01T00:00:00Z" \

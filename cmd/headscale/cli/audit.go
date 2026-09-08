@@ -3,8 +3,11 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -12,19 +15,41 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const defaultAuditLimit = 50
+const (
+	defaultAuditLimit = 50
+
+	// auditExportFileMode is the permission of a written export; it holds the
+	// same records as the log itself, so it stays readable by its owner only.
+	auditExportFileMode = 0o600
+)
+
+var errInvalidAuditFormat = errors.New("--format must be csv or json")
 
 func init() {
 	rootCmd.AddCommand(auditCmd)
+
 	auditCmd.AddCommand(listAuditCmd)
+	auditFilterFlags(listAuditCmd)
 	listAuditCmd.Flags().Int64P("limit", "l", defaultAuditLimit, "Newest events to show (at most 500)")
-	listAuditCmd.Flags().StringP("user", "u", "", "Only events by this user ID")
-	listAuditCmd.Flags().StringP("action", "a", "",
+
+	auditCmd.AddCommand(exportAuditCmd)
+	auditFilterFlags(exportAuditCmd)
+	exportAuditCmd.Flags().String("until", "", "Only events before this time (RFC 3339 or a duration such as 1h)")
+	exportAuditCmd.Flags().String("format", "csv", "File format: csv or json")
+	exportAuditCmd.Flags().StringP("output", "o", "",
+		"Write the file here; stdout when unset, - for stdout explicitly")
+}
+
+// auditFilterFlags registers the filters the list and the export share, so
+// the same flag names select the same events in both.
+func auditFilterFlags(cmd *cobra.Command) {
+	cmd.Flags().StringP("user", "u", "", "Only events by this user ID")
+	cmd.Flags().StringP("action", "a", "",
 		"Only this action, or every action under a prefix ending with a dot (node.)")
-	listAuditCmd.Flags().String("target-kind", "", "Only events about this kind of object (node, user, ...)")
-	listAuditCmd.Flags().String("target-id", "", "Only events about this object ID (with --target-kind)")
-	listAuditCmd.Flags().String("since", "", "Only events at or after this time (RFC 3339 or a duration such as 24h)")
-	listAuditCmd.Flags().String("before", "", "Page: only events with an ID below this one")
+	cmd.Flags().String("target-kind", "", "Only events about this kind of object (node, user, ...)")
+	cmd.Flags().String("target-id", "", "Only events about this object ID (with --target-kind)")
+	cmd.Flags().String("since", "", "Only events at or after this time (RFC 3339 or a duration such as 24h)")
+	cmd.Flags().String("before", "", "Page: only events with an ID below this one")
 }
 
 var auditCmd = &cobra.Command{
@@ -65,6 +90,130 @@ as --before to fetch the next page.`,
 	),
 }
 
+var exportAuditCmd = &cobra.Command{
+	Use:   "export",
+	Short: "Export audit events as a file",
+	Long: `Writes the events matching the filters as one file, oldest first, so a
+spreadsheet reads top to bottom in the order things happened. The format is CSV
+by default and JSON with --format json. Without --output the file goes to
+stdout, ready to be piped:
+
+  headscale audit export --since 2026-09-01T00:00:00Z --until 2026-10-01T00:00:00Z -o september.csv`,
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			params, err := exportAuditParams(cmd)
+			if err != nil {
+				return err
+			}
+
+			// The export is a file download, not a JSON body, so the generated
+			// typed wrapper cannot parse it; the raw response is read here and
+			// a failure's problem detail decoded by hand.
+			resp, err := client.ExportAuditEvents(ctx, params)
+			if err != nil {
+				return fmt.Errorf("exporting audit events: %w", err)
+			}
+			defer func() { _ = resp.Body.Close() }()
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return fmt.Errorf("reading the audit export: %w", err)
+			}
+
+			if resp.StatusCode != http.StatusOK {
+				return auditExportError(resp.StatusCode, body)
+			}
+
+			return writeAuditExportFile(cmd, body)
+		},
+	),
+}
+
+// writeAuditExportFile writes the export where --output points, or to stdout
+// when it is unset or "-".
+func writeAuditExportFile(cmd *cobra.Command, body []byte) error {
+	output, _ := cmd.Flags().GetString("output")
+
+	if output == "" || output == "-" {
+		_, err := cmd.OutOrStdout().Write(body)
+		if err != nil {
+			return fmt.Errorf("writing the audit export: %w", err)
+		}
+
+		return nil
+	}
+
+	err := os.WriteFile(output, body, auditExportFileMode)
+	if err != nil {
+		return fmt.Errorf("writing the audit export: %w", err)
+	}
+
+	fmt.Printf("Audit log written to %s\n", output)
+
+	return nil
+}
+
+// auditExportError turns a failing export into an error, decoding the problem
+// detail the server sends in place of the file.
+func auditExportError(statusCode int, body []byte) error {
+	var problem clientv1.ErrorModel
+
+	err := json.Unmarshal(body, &problem)
+	if err != nil {
+		return apiError(statusCode, nil)
+	}
+
+	return apiError(statusCode, &problem)
+}
+
+// exportAuditParams turns the flags into query parameters, resolving relative
+// --since and --until against the current time.
+func exportAuditParams(cmd *cobra.Command) (*clientv1.ExportAuditEventsParams, error) {
+	params := &clientv1.ExportAuditEventsParams{}
+
+	for flag, dst := range map[string]**string{
+		"user":        &params.ActorUserId,
+		"action":      &params.Action,
+		"target-kind": &params.TargetKind,
+		"target-id":   &params.TargetId,
+		"before":      &params.Before,
+	} {
+		value, _ := cmd.Flags().GetString(flag)
+		if value != "" {
+			*dst = &value
+		}
+	}
+
+	for flag, dst := range map[string]**time.Time{
+		"since": &params.Since,
+		"until": &params.Until,
+	} {
+		value, _ := cmd.Flags().GetString(flag)
+		if value == "" {
+			continue
+		}
+
+		at, err := parseAuditTime(flag, value)
+		if err != nil {
+			return nil, err
+		}
+
+		*dst = &at
+	}
+
+	format, _ := cmd.Flags().GetString("format")
+	if format != "" {
+		f := clientv1.ExportAuditEventsParamsFormat(format)
+		if !f.Valid() {
+			return nil, fmt.Errorf("%w, not %q", errInvalidAuditFormat, format)
+		}
+
+		params.Format = &f
+	}
+
+	return params, nil
+}
+
 // auditParams turns the flags into query parameters, resolving a relative
 // --since against the current time.
 func auditParams(cmd *cobra.Command) (*clientv1.ListAuditEventsParams, error) {
@@ -88,7 +237,7 @@ func auditParams(cmd *cobra.Command) (*clientv1.ListAuditEventsParams, error) {
 
 	since, _ := cmd.Flags().GetString("since")
 	if since != "" {
-		at, err := parseSince(since)
+		at, err := parseAuditTime("since", since)
 		if err != nil {
 			return nil, err
 		}
@@ -99,8 +248,9 @@ func auditParams(cmd *cobra.Command) (*clientv1.ListAuditEventsParams, error) {
 	return params, nil
 }
 
-// parseSince accepts an RFC 3339 time or a duration back from now.
-func parseSince(value string) (time.Time, error) {
+// parseAuditTime accepts an RFC 3339 time or a duration back from now, naming
+// the flag it came from in the error.
+func parseAuditTime(flag, value string) (time.Time, error) {
 	at, err := time.Parse(time.RFC3339, value)
 	if err == nil {
 		return at, nil
@@ -108,7 +258,9 @@ func parseSince(value string) (time.Time, error) {
 
 	back, err := time.ParseDuration(value)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("--since %q is neither an RFC 3339 time nor a duration: %w", value, err)
+		return time.Time{}, fmt.Errorf(
+			"--%s %q is neither an RFC 3339 time nor a duration: %w", flag, value, err,
+		)
 	}
 
 	return time.Now().Add(-back), nil

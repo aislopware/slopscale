@@ -103,6 +103,8 @@ func init() {
 	setUserCmd.Flags().StringP("picture-url", "p", "", "Profile picture URL; an empty value clears it")
 	userCmd.AddCommand(setUserRoleCmd)
 	usernameAndIDFlag(setUserRoleCmd)
+	userCmd.AddCommand(signOutUserCmd)
+	usernameAndIDFlag(signOutUserCmd)
 	userCmd.AddCommand(approveUserCmd)
 	usernameAndIDFlag(approveUserCmd)
 	approveUserCmd.Flags().Bool("revoke", false, "Withdraw the approval instead of granting it")
@@ -343,6 +345,43 @@ OIDC gets the values from the provider again at the next login.`,
 			return printOutput(cmd, resp.JSON200.User, "User updated")
 		},
 	),
+}
+
+var signOutUserCmd = &cobra.Command{
+	Use:   "sign-out --identifier ID or --name NAME",
+	Short: "Sign a user out of every browser",
+	Long: `Ends every console session of the user, so each browser is asked to sign in
+again on its next request. This is what to reach for when a laptop goes
+missing; nothing else about the account changes.`,
+	Aliases: []string{"signout", "logout"},
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			userID, _, err := resolveSingleUser(ctx, client, cmd)
+			if err != nil {
+				return err
+			}
+
+			resp, err := client.EndUserSessionsWithResponse(ctx, userID)
+			if err != nil {
+				return fmt.Errorf("ending the user's sessions: %w", err)
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			return printOutput(cmd, resp.JSON200, endedSessionsMessage(resp.JSON200.Ended))
+		},
+	),
+}
+
+// endedSessionsMessage reports how many sessions a sign-out ended.
+func endedSessionsMessage(ended int64) string {
+	if ended == 1 {
+		return "Ended 1 session"
+	}
+
+	return fmt.Sprintf("Ended %d sessions", ended)
 }
 
 var approveUserCmd = &cobra.Command{

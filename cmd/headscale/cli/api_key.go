@@ -38,6 +38,12 @@ func init() {
 	deleteAPIKeyCmd.Flags().StringP("prefix", "p", "", "ApiKey prefix")
 	deleteAPIKeyCmd.Flags().Uint64P("id", "i", 0, "ApiKey ID")
 	apiKeysCmd.AddCommand(deleteAPIKeyCmd)
+
+	rotateAPIKeyCmd.Flags().StringP("prefix", "p", "", "ApiKey prefix")
+	mustMarkRequired(rotateAPIKeyCmd, "prefix")
+	rotateAPIKeyCmd.Flags().StringP("expiration", "e", "",
+		"Human-readable expiration of the rotated key (e.g. 30m, 24h); the key keeps its own when unset")
+	apiKeysCmd.AddCommand(rotateAPIKeyCmd)
 }
 
 var apiKeysCmd = &cobra.Command{
@@ -138,6 +144,45 @@ retrieved again. If you lose it, create a new one and expire the old one.`,
 			}
 
 			return printOutput(cmd, resp.JSON200.ApiKey, resp.JSON200.ApiKey)
+		},
+	),
+}
+
+var rotateAPIKeyCmd = &cobra.Command{
+	Use:   "rotate --prefix PREFIX",
+	Short: "Rotate an API key",
+	Long: `Mints a new secret for an existing key and prints it once, the same way create
+does. The key keeps its id, owner, scopes and description, and its expiry unless
+--expiration gives it a new one. The old secret is refused from that moment. An
+expired key cannot be rotated; create a new one instead.`,
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			prefix, _ := cmd.Flags().GetString("prefix")
+			if prefix == "" {
+				return fmt.Errorf("--prefix must be provided: %w", errMissingParameter)
+			}
+
+			body := clientv1.RotateApiKeyJSONRequestBody{}
+
+			if expiration, _ := cmd.Flags().GetString("expiration"); expiration != "" {
+				expiryTime, err := expirationFromFlag(cmd)
+				if err != nil {
+					return err
+				}
+
+				body.Expiration = &expiryTime
+			}
+
+			resp, err := client.RotateApiKeyWithResponse(ctx, prefix, body)
+			if err != nil {
+				return fmt.Errorf("rotating api key: %w", err)
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			return printOutput(cmd, resp.JSON200, resp.JSON200.ApiKey)
 		},
 	),
 }

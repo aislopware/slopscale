@@ -94,10 +94,19 @@ $ curl -X DELETE -H "Authorization: Bearer $KEY" \
     https://<your server>/api/v1/auth/sessions/7
 ```
 
-`DELETE /api/v1/user/{id}/sessions`, or _Sign out everywhere_ on the user's
-page, signs one user out of every browser, which is what to reach for when a
-laptop goes missing; it changes nothing else about the account. All three are
-recorded in the [audit log](audit.md) as `console.logout`, `session.end` and
+`headscale sessions list` prints the same table, `--user <id>` narrows it to one
+user, and `headscale sessions end <id>` ends a single session:
+
+```console
+$ headscale sessions list --user 3
+$ headscale sessions end 7
+```
+
+`DELETE /api/v1/user/{id}/sessions`, _Sign out everywhere_ on the user's page,
+or `headscale users sign-out --identifier <id>` signs one user out of every
+browser, which is what to reach for when a laptop goes missing; it changes
+nothing else about the account. All three are recorded in the
+[audit log](audit.md) as `console.logout`, `session.end` and
 `user.sessions.end`.
 
 The address a session records is the one the request came from after
@@ -113,10 +122,16 @@ find the sign-in page. _Users → Invite_ asks for the address, the
 and hands back a link; `headscale invites create` does the same from the CLI:
 
 ```console
+$ headscale invites create --email ada@example.com --role admin --group 3 --expiry 72h
 $ curl -X POST -H "Authorization: Bearer $KEY" \
     -d '{"email":"ada@example.com","role":"admin","groupIds":["3"],"expiry":"72h"}' \
     https://<your server>/api/v1/invite
 ```
+
+`--group` is repeatable and `--expiry` defaults to `168h`, a week, with `720h`
+the longest the server accepts. `headscale invites list` shows which
+invitations are still pending, `headscale invites resend <id>` mints a fresh
+link for one, and `headscale invites delete <id>` withdraws it.
 
 The link is `https://<your server>/admin/login?invite=<token>` and is shown
 once: the server keeps only a hash of the token, as it does for a session

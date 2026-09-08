@@ -318,3 +318,88 @@ func TestAPIKeyIDOrPrefix(t *testing.T) {
 		})
 	}
 }
+
+// apiKeyRotateFlags mirrors the flags init() registers on "apikeys rotate",
+// where --expiration is empty by default so the key keeps its own.
+func apiKeyRotateFlags(cmd *cobra.Command) {
+	cmd.Flags().StringP("prefix", "p", "", "")
+	cmd.Flags().StringP("expiration", "e", "", "")
+}
+
+func TestAPIKeyRotateCommand(t *testing.T) {
+	rotated := clientv1.RotateAPIKeyOutputBody{ApiKey: "abcd1234.newsecret", Prefix: "abcd1234"}
+
+	rotateRoute := func(assertBody func(t *testing.T, body clientv1.RotateApiKeyRequestBody)) apiHandler {
+		return func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+			t.Helper()
+			assertBearer(t, r)
+			assert.Equal(t, "abcd1234", r.PathValue("prefix"))
+
+			var body clientv1.RotateApiKeyRequestBody
+
+			decodeBody(t, r, &body)
+			assertBody(t, body)
+
+			writeJSON(t, w, rotated)
+		}
+	}
+
+	cases := []commandCase{
+		{
+			name:  "rotate keeps the current expiry when the flag is unset",
+			src:   rotateAPIKeyCmd,
+			flags: map[string]string{"prefix": "abcd1234"},
+			routes: map[string]apiHandler{
+				"POST /api/v1/apikey/{prefix}/rotate": rotateRoute(
+					func(t *testing.T, body clientv1.RotateApiKeyRequestBody) {
+						t.Helper()
+						assert.Nil(t, body.Expiration)
+					},
+				),
+			},
+			want: "abcd1234.newsecret\n",
+		},
+		{
+			name:  "rotate sends a new expiry and prints json",
+			src:   rotateAPIKeyCmd,
+			flags: map[string]string{"prefix": "abcd1234", "expiration": "1h", "output": "json"},
+			routes: map[string]apiHandler{
+				"POST /api/v1/apikey/{prefix}/rotate": rotateRoute(
+					func(t *testing.T, body clientv1.RotateApiKeyRequestBody) {
+						t.Helper()
+
+						if assert.NotNil(t, body.Expiration) {
+							assert.WithinDuration(t, time.Now().Add(time.Hour), *body.Expiration, time.Minute)
+						}
+					},
+				),
+			},
+			want: indentJSON(t, rotated),
+		},
+		{
+			name:    "rotate requires a prefix",
+			src:     rotateAPIKeyCmd,
+			wantErr: "--prefix must be provided",
+		},
+		{
+			name:    "rotate rejects an unparsable expiration before calling the api",
+			src:     rotateAPIKeyCmd,
+			flags:   map[string]string{"prefix": "abcd1234", "expiration": "soon"},
+			wantErr: "parsing duration",
+		},
+		{
+			name:  "rotate surfaces the api error",
+			src:   rotateAPIKeyCmd,
+			flags: map[string]string{"prefix": "abcd1234"},
+			routes: map[string]apiHandler{
+				"POST /api/v1/apikey/{prefix}/rotate": func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+					t.Helper()
+					writeProblem(t, w, http.StatusConflict, "an expired key cannot be rotated")
+				},
+			},
+			wantErr: "an expired key cannot be rotated",
+		},
+	}
+
+	runCommandCases(t, apiKeyRotateFlags, cases)
+}

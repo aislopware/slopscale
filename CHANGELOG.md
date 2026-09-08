@@ -372,8 +372,10 @@ last active, the address and browser it came from, and which one is making the
 request. An administrator can end any session with
 `DELETE /api/v1/auth/sessions/{id}` or sign a user out of every browser with
 `DELETE /api/v1/user/{id}/sessions` (_Sign out everywhere_ on the console's
-user page); a member sees and ends only their own. Both are recorded in the
-audit log as `session.end` and `user.sessions.end`.
+user page); a member sees and ends only their own. From the CLI these are
+`headscale sessions list`, `headscale sessions end` and
+`headscale users sign-out`. Both are recorded in the audit log as
+`session.end` and `user.sessions.end`.
 
 Users can be invited by email. `POST /api/v1/invite`, `headscale invites
 create` or _Invite_ on the console's _Users_ page returns a one-time link and

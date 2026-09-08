@@ -504,3 +504,74 @@ func TestUserCommands(t *testing.T) {
 
 	runCommandCases(t, userFlags, cases)
 }
+
+func TestUserSignOutCommand(t *testing.T) {
+	bob := clientv1.User{Id: "2", Name: "bob", Role: "member", CreatedAt: time.Date(2026, 3, 2, 12, 0, 0, 0, time.UTC)}
+
+	listBob := func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+		t.Helper()
+		assertBearer(t, r)
+		writeJSON(t, w, clientv1.ListUsersOutputBody{Users: []clientv1.User{bob}})
+	}
+
+	endSessions := func(ended int64) apiHandler {
+		return func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+			t.Helper()
+			assert.Equal(t, "2", r.PathValue("id"))
+			writeJSON(t, w, clientv1.EndUserSessionsOutputBody{Ended: ended})
+		}
+	}
+
+	cases := []commandCase{
+		{
+			name:  "sign-out resolves the user and reports how many sessions ended",
+			src:   signOutUserCmd,
+			flags: map[string]string{"identifier": "2"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/user":                  listBob,
+				"DELETE /api/v1/user/{id}/sessions": endSessions(3),
+			},
+			want: "Ended 3 sessions\n",
+		},
+		{
+			name:  "sign-out counts a single session in the singular",
+			src:   signOutUserCmd,
+			flags: map[string]string{"name": "bob"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/user":                  listBob,
+				"DELETE /api/v1/user/{id}/sessions": endSessions(1),
+			},
+			want: "Ended 1 session\n",
+		},
+		{
+			name:  "sign-out prints json",
+			src:   signOutUserCmd,
+			flags: map[string]string{"identifier": "2", "output": "json"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/user":                  listBob,
+				"DELETE /api/v1/user/{id}/sessions": endSessions(0),
+			},
+			want: indentJSON(t, clientv1.EndUserSessionsOutputBody{Ended: 0}),
+		},
+		{
+			name:    "sign-out needs a user",
+			src:     signOutUserCmd,
+			wantErr: "--name or --identifier flag is required",
+		},
+		{
+			name:  "sign-out surfaces the api error",
+			src:   signOutUserCmd,
+			flags: map[string]string{"identifier": "2"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/user": listBob,
+				"DELETE /api/v1/user/{id}/sessions": func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+					t.Helper()
+					writeProblem(t, w, http.StatusForbidden, "credential is missing the required scope")
+				},
+			},
+			wantErr: "missing the required scope",
+		},
+	}
+
+	runCommandCases(t, userFlags, cases)
+}
