@@ -461,9 +461,11 @@ type DNSSettings struct {
 	Nameservers []string `json:"nameservers"`
 
 	// OverrideLocalDns Used for every query.
-	OverrideLocalDns bool                 `json:"overrideLocalDns"`
-	SearchDomains    []string             `json:"searchDomains"`
-	SplitNameservers map[string]*[]string `json:"splitNameservers"`
+	OverrideLocalDns     bool                 `json:"overrideLocalDns"`
+	SearchDomains        []string             `json:"searchDomains"`
+	SplitNameservers     map[string]*[]string `json:"splitNameservers"`
+	SplitUseWithExitNode map[string]*[]string `json:"splitUseWithExitNode"`
+	UseWithExitNode      []string             `json:"useWithExitNode"`
 }
 
 // DebugCreateNodeRequestBody defines model for DebugCreateNodeRequestBody.
@@ -1071,11 +1073,13 @@ type SetAttributeRequestBody struct {
 
 // SetDNSRequestBody defines model for SetDNSRequestBody.
 type SetDNSRequestBody struct {
-	ExtraRecords     *[]DNSRecord          `json:"extraRecords,omitempty"`
-	Nameservers      *[]string             `json:"nameservers,omitempty"`
-	OverrideLocalDns *bool                 `json:"overrideLocalDns,omitempty"`
-	SearchDomains    *[]string             `json:"searchDomains,omitempty"`
-	SplitNameservers *map[string]*[]string `json:"splitNameservers,omitempty"`
+	ExtraRecords         *[]DNSRecord          `json:"extraRecords,omitempty"`
+	Nameservers          *[]string             `json:"nameservers,omitempty"`
+	OverrideLocalDns     *bool                 `json:"overrideLocalDns,omitempty"`
+	SearchDomains        *[]string             `json:"searchDomains,omitempty"`
+	SplitNameservers     *map[string]*[]string `json:"splitNameservers,omitempty"`
+	SplitUseWithExitNode *map[string]*[]string `json:"splitUseWithExitNode,omitempty"`
+	UseWithExitNode      *[]string             `json:"useWithExitNode,omitempty"`
 }
 
 // SetGlobalExitNodeRequestBody defines model for SetGlobalExitNodeRequestBody.

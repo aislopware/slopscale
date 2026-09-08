@@ -662,10 +662,24 @@ components:
               - array
               - "null"
           type: object
+        splitUseWithExitNode:
+          additionalProperties:
+            items:
+              type: string
+            type:
+              - array
+              - "null"
+          type: object
+        useWithExitNode:
+          items:
+            type: string
+          type: array
       required:
         - nameservers
         - overrideLocalDns
         - splitNameservers
+        - useWithExitNode
+        - splitUseWithExitNode
         - searchDomains
         - extraRecords
       type: object
@@ -1967,6 +1981,20 @@ components:
               - array
               - "null"
           type: object
+        splitUseWithExitNode:
+          additionalProperties:
+            items:
+              type: string
+            type:
+              - array
+              - "null"
+          type: object
+        useWithExitNode:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
       type: object
     SetGlobalExitNodeRequestBody:
       additionalProperties: false
