@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
 import { clientError } from "~/components/audit/cells.tsx";
-import { Frame } from "~/components/ui/frame.tsx";
+import { Frame, framePanelClass } from "~/components/ui/frame.tsx";
 
 /** One actor: the user behind the call, or the credential kind when no user is bound. */
 function actorKey(event: AuditEvent): string {
@@ -23,7 +23,7 @@ function Stat({
   readonly alert?: boolean;
 }): ReactElement {
   return (
-    <div className="flex flex-col gap-1 rounded-lg bg-kumo-base px-5 py-4 shadow-xs ring ring-kumo-line">
+    <div className={cn(framePanelClass, "flex flex-col gap-1 px-5 py-4")}>
       <span className="text-xs text-kumo-subtle">{label}</span>
       <span
         className={cn(

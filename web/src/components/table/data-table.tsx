@@ -14,7 +14,6 @@ export interface DataTableProps {
   readonly footer?: ReactNode;
   /** Adds a click handler and pointer cursor to every row. */
   readonly onRowClick?: ((rowId: string) => void) | undefined;
-  readonly rowClassName?: string;
 }
 
 /**
@@ -23,20 +22,15 @@ export interface DataTableProps {
  * cell widths and alignment and `enableSorting` for a sortable header; everything else is the
  * column's `cell` renderer.
  */
-export function DataTable({
-  empty,
-  footer,
-  onRowClick,
-  rowClassName,
-}: DataTableProps): ReactElement {
+export function DataTable({ empty, footer, onRowClick }: DataTableProps): ReactElement {
   const table = useTableContext();
   const { rows } = table.getRowModel();
 
   return (
     <>
       <FramePanel>
-        {/* The empty state sits outside the scroll area so that the columns'
-            minimum widths cannot push it off a phone screen. */}
+        {/* Only the table scrolls sideways. The empty state sits outside that scroll
+            area so the columns' minimum widths cannot push it off a phone screen. */}
         <div className="overflow-x-auto">
           <Table>
             <Table.Header variant="compact">
@@ -73,7 +67,7 @@ export function DataTable({
                 : rows.map((row) => (
                     <Table.Row
                       key={row.id}
-                      className={cn(onRowClick !== undefined && "cursor-pointer", rowClassName)}
+                      className={cn(onRowClick !== undefined && "cursor-pointer")}
                       onClick={
                         onRowClick === undefined
                           ? undefined

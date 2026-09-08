@@ -24,7 +24,9 @@ import { RelativeTime } from "~/components/ui/relative-time.tsx";
 /** Every row spans this many columns when it opens. */
 const columnCount = 7;
 /** The console's top bar is `h-12`, so the sticky header parks under it instead of behind it. */
-const stickyHeader = "[&_th]:top-12";
+// Sticky under the 48px app bar on wide screens only; below lg the panel scrolls sideways and
+// a sticky header inside that scroll container would sit 48px down from its top.
+const stickyHeader = "[&_th]:top-12 max-lg:[&_th]:static";
 
 /** A click on a control inside the row belongs to the control, not to the row. */
 function onControl(event: MouseEvent<HTMLElement>): boolean {
@@ -129,7 +131,9 @@ export function EventsTable({
 
   return (
     <>
-      <FramePanel>
+      {/* Below lg the table scrolls sideways; above it the header stays sticky, which a
+          scroll container would break. */}
+      <FramePanel className="max-lg:overflow-x-auto">
         <Table>
           <Table.Header variant="compact" sticky className={stickyHeader}>
             <Table.Row>

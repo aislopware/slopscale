@@ -18,10 +18,10 @@ export interface DialogContentProps {
 }
 
 /**
- * Kumo's dialog in the same shape as its DeleteResource block, framed: the dialog surface is the
- * tinted band and the header, body and {@link DialogFooter} sit on an inset panel, like every other
- * framed surface in the console. Always render it, driven by `open` on the root, so the open/close
- * animation plays.
+ * Kumo's dialog in the same shape as its DeleteResource block, framed. The dialog surface is the
+ * tinted band, and the header, the body and the {@link DialogFooter} sit on an inset panel with the
+ * same 4px gap and 12px/8px radii as a Frame. Always render it, driven by `open` on the root, so
+ * the open/close animation plays.
  */
 export function DialogContent({
   title,

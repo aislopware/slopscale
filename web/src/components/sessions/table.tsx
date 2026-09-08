@@ -27,7 +27,9 @@ import { FramePanel } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
 const columnCount = 7;
-const stickyHeader = "[&_th]:top-12";
+// Sticky under the 48px app bar on wide screens only; below lg the panel scrolls sideways and
+// a sticky header inside that scroll container would sit 48px down from its top.
+const stickyHeader = "[&_th]:top-12 max-lg:[&_th]:static";
 
 const stateBadges: Record<
   RecordingState,
@@ -139,7 +141,9 @@ export function SessionsTable({
 }: SessionsTableProps): ReactElement {
   return (
     <>
-      <FramePanel>
+      {/* Below lg the table scrolls sideways; above it the header stays sticky, which a
+          scroll container would break. */}
+      <FramePanel className="max-lg:overflow-x-auto">
         <Table>
           <Table.Header variant="compact" sticky className={stickyHeader}>
             <Table.Row>

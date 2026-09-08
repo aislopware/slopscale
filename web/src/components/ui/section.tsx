@@ -26,12 +26,12 @@ export function Section({
 }): ReactElement {
   return (
     <Frame className={className}>
-      {/* px-5 lines the title up with the text of the rows inside the panel. */}
+      {/* px-5 puts the title where the text of the rows inside the panel starts. */}
       <FrameBand className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 px-5 pt-1.5 pb-2">
         <div className="flex min-w-0 flex-1 basis-56 flex-col gap-0.5">
           <h2 className="font-semibold text-kumo-strong">{title}</h2>
           {description === undefined ? null : (
-            <p className="max-w-prose text-xs text-kumo-subtle">{description}</p>
+            <p className="max-w-prose text-kumo-subtle">{description}</p>
           )}
         </div>
         {actions === undefined ? null : (

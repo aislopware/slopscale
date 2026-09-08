@@ -13,7 +13,7 @@ import type { ReactElement, ReactNode } from "react";
 import type { Node, User } from "~/api/queries.ts";
 import { allUsers } from "~/components/overview/links.ts";
 import { plural } from "~/components/overview/plural.ts";
-import { Frame } from "~/components/ui/frame.tsx";
+import { Frame, framePanelClass } from "~/components/ui/frame.tsx";
 import { isExitNode, nodeName } from "~/lib/node.ts";
 
 /** Column count by tile count, so a shorter strip still fills its row. */
@@ -26,8 +26,10 @@ const columnsFor: readonly string[] = [
 ];
 
 /** Each tile is its own inset panel in the strip's Frame. */
-const tileClass =
-  "flex flex-col gap-1.5 rounded-lg bg-kumo-base px-5 py-4 text-kumo-default no-underline shadow-xs ring ring-kumo-line hover:bg-kumo-tint focus-visible:bg-kumo-tint";
+const tileClass = cn(
+  framePanelClass,
+  "flex flex-col gap-1.5 px-5 py-4 text-kumo-default no-underline hover:bg-kumo-tint focus-visible:bg-kumo-tint",
+);
 
 type Tone = "neutral" | "warning";
 
