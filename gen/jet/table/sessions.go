@@ -23,6 +23,8 @@ type sessionsTable struct {
 	CreatedAt  sqlite.ColumnTimestamp
 	ExpiresAt  sqlite.ColumnTimestamp
 	LastSeenAt sqlite.ColumnTimestamp
+	RemoteAddr sqlite.ColumnString
+	UserAgent  sqlite.ColumnString
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -70,8 +72,10 @@ func newSessionsTableImpl(schemaName, tableName, alias string) sessionsTable {
 		CreatedAtColumn  = sqlite.TimestampColumn("created_at")
 		ExpiresAtColumn  = sqlite.TimestampColumn("expires_at")
 		LastSeenAtColumn = sqlite.TimestampColumn("last_seen_at")
-		allColumns       = sqlite.ColumnList{IDColumn, TokenHashColumn, UserIDColumn, CreatedAtColumn, ExpiresAtColumn, LastSeenAtColumn}
-		mutableColumns   = sqlite.ColumnList{TokenHashColumn, UserIDColumn, CreatedAtColumn, ExpiresAtColumn, LastSeenAtColumn}
+		RemoteAddrColumn = sqlite.StringColumn("remote_addr")
+		UserAgentColumn  = sqlite.StringColumn("user_agent")
+		allColumns       = sqlite.ColumnList{IDColumn, TokenHashColumn, UserIDColumn, CreatedAtColumn, ExpiresAtColumn, LastSeenAtColumn, RemoteAddrColumn, UserAgentColumn}
+		mutableColumns   = sqlite.ColumnList{TokenHashColumn, UserIDColumn, CreatedAtColumn, ExpiresAtColumn, LastSeenAtColumn, RemoteAddrColumn, UserAgentColumn}
 		defaultColumns   = sqlite.ColumnList{}
 	)
 
@@ -85,6 +89,8 @@ func newSessionsTableImpl(schemaName, tableName, alias string) sessionsTable {
 		CreatedAt:  CreatedAtColumn,
 		ExpiresAt:  ExpiresAtColumn,
 		LastSeenAt: LastSeenAtColumn,
+		RemoteAddr: RemoteAddrColumn,
+		UserAgent:  UserAgentColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,
