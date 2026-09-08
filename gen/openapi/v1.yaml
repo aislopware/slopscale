@@ -389,6 +389,41 @@ components:
           format: uint64
           type: string
       type: object
+    CreateOAuthClientOutputBody:
+      additionalProperties: false
+      properties:
+        clientSecret:
+          type: string
+        oauthClient:
+          $ref: "#/components/schemas/OAuthClient"
+      required:
+        - oauthClient
+        - clientSecret
+      type: object
+    CreateOAuthClientRequestBody:
+      additionalProperties: false
+      properties:
+        description:
+          description: What the client is for.
+          type: string
+        scopes:
+          description: Scopes the client may grant; at least one.
+          items:
+            type: string
+          minItems: 1
+          type:
+            - array
+            - "null"
+        tags:
+          description: Tags the client may put on its tokens.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - scopes
+      type: object
     CreatePreAuthKeyRequestBody:
       additionalProperties: false
       properties:
@@ -944,6 +979,16 @@ components:
       required:
         - nodes
       type: object
+    ListOAuthClientsOutputBody:
+      additionalProperties: false
+      properties:
+        oauthClients:
+          items:
+            $ref: "#/components/schemas/OAuthClient"
+          type: array
+      required:
+        - oauthClients
+      type: object
     ListPosturesOutputBody:
       additionalProperties: false
       properties:
@@ -1465,6 +1510,42 @@ components:
         - aclTags
         - preauthorized
       type: object
+    OAuthClient:
+      additionalProperties: false
+      properties:
+        clientId:
+          type: string
+        createdAt:
+          format: date-time
+          type:
+            - string
+            - "null"
+        description:
+          type: string
+        scopes:
+          description: Scopes the client may grant its tokens.
+          items:
+            type: string
+          type: array
+        tags:
+          description: Tags the client may put on its tokens.
+          items:
+            type: string
+          type: array
+        userId:
+          description: Creating user id; null for the socket.
+          format: uint64
+          type:
+            - string
+            - "null"
+      required:
+        - clientId
+        - description
+        - scopes
+        - tags
+        - userId
+        - createdAt
+      type: object
     PolicyRequestBody:
       additionalProperties: false
       properties:
@@ -1677,6 +1758,9 @@ components:
           $ref: "#/components/schemas/AccessRequest"
       required:
         - request
+      type: object
+    RevokeOAuthClientOutputBody:
+      additionalProperties: false
       type: object
     RuleEnabledInputBody:
       additionalProperties: false
@@ -4578,6 +4662,97 @@ paths:
         - Nodes
       x-audit-action: node.tags.set
       x-required-scope: devices:core
+  /api/v1/oauth-client:
+    get:
+      description: |-
+        Every client that can mint v2 API tokens; revoked clients are gone.
+
+        Requires the `oauth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listOAuthClients
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListOAuthClientsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List OAuth clients
+      tags:
+        - OAuthClients
+      x-required-scope: oauth_keys:read
+    post:
+      description: |-
+        The client secret is in this response only. Scopes may not exceed the caller's own.
+
+        Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createOAuthClient
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOAuthClientRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateOAuthClientOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create OAuth client
+      tags:
+        - OAuthClients
+      x-audit-action: oauthclient.create
+      x-required-scope: oauth_keys
+  /api/v1/oauth-client/{clientId}:
+    delete:
+      description: |-
+        Deletes the client and every access token it issued.
+
+        Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: revokeOAuthClient
+      parameters:
+        - in: path
+          name: clientId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevokeOAuthClientOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Revoke OAuth client
+      tags:
+        - OAuthClients
+      x-audit-action: oauthclient.revoke
+      x-required-scope: oauth_keys
   /api/v1/policy:
     get:
       description: Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).

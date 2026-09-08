@@ -1099,6 +1099,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/oauth-client": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List OAuth clients
+         * @description Every client that can mint v2 API tokens; revoked clients are gone.
+         *
+         *     Requires the `oauth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listOAuthClients"];
+        put?: never;
+        /**
+         * Create OAuth client
+         * @description The client secret is in this response only. Scopes may not exceed the caller's own.
+         *
+         *     Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["createOAuthClient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/oauth-client/{clientId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke OAuth client
+         * @description Deletes the client and every access token it issued.
+         *
+         *     Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["revokeOAuthClient"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/policy": {
         parameters: {
             query?: never;
@@ -1837,6 +1887,18 @@ export interface components {
              */
             userId?: string;
         };
+        CreateOAuthClientOutputBody: {
+            clientSecret: string;
+            oauthClient: components["schemas"]["OAuthClient"];
+        };
+        CreateOAuthClientRequestBody: {
+            /** @description What the client is for. */
+            description?: string;
+            /** @description Scopes the client may grant; at least one. */
+            scopes: string[] | null;
+            /** @description Tags the client may put on its tokens. */
+            tags?: string[] | null;
+        };
         CreatePreAuthKeyRequestBody: {
             aclTags?: string[] | null;
             ephemeral?: boolean;
@@ -2082,6 +2144,9 @@ export interface components {
         ListNodesOutputBody: {
             nodes: components["schemas"]["Node"][];
         };
+        ListOAuthClientsOutputBody: {
+            oauthClients: components["schemas"]["OAuthClient"][];
+        };
         ListPosturesOutputBody: {
             geoIpAvailable: boolean;
             postures: components["schemas"]["Posture"][];
@@ -2264,6 +2329,21 @@ export interface components {
             used: boolean;
             user: components["schemas"]["User"];
         };
+        OAuthClient: {
+            clientId: string;
+            /** Format: date-time */
+            createdAt: string | null;
+            description: string;
+            /** @description Scopes the client may grant its tokens. */
+            scopes: string[];
+            /** @description Tags the client may put on its tokens. */
+            tags: string[];
+            /**
+             * Format: uint64
+             * @description Creating user id; null for the socket.
+             */
+            userId: string | null;
+        };
         PolicyRequestBody: {
             policy?: string;
         };
@@ -2343,6 +2423,7 @@ export interface components {
         RequestOutputBody: {
             request: components["schemas"]["AccessRequest"];
         };
+        RevokeOAuthClientOutputBody: Record<string, unknown>;
         RuleEnabledInputBody: {
             enabled: boolean;
         };
@@ -2575,6 +2656,8 @@ export type ConsoleAuth = components['schemas']['ConsoleAuth'];
 export type ConsoleOidc = components['schemas']['ConsoleOIDC'];
 export type CreateApiKeyOutputBody = components['schemas']['CreateAPIKeyOutputBody'];
 export type CreateApiKeyRequestBody = components['schemas']['CreateApiKeyRequestBody'];
+export type CreateOAuthClientOutputBody = components['schemas']['CreateOAuthClientOutputBody'];
+export type CreateOAuthClientRequestBody = components['schemas']['CreateOAuthClientRequestBody'];
 export type CreatePreAuthKeyRequestBody = components['schemas']['CreatePreAuthKeyRequestBody'];
 export type CreateUserRequestBody = components['schemas']['CreateUserRequestBody'];
 export type CustomAttribute = components['schemas']['CustomAttribute'];
@@ -2611,6 +2694,7 @@ export type ListGroupsOutputBody = components['schemas']['ListGroupsOutputBody']
 export type ListLogStreamsOutputBody = components['schemas']['ListLogStreamsOutputBody'];
 export type ListNetworksOutputBody = components['schemas']['ListNetworksOutputBody'];
 export type ListNodesOutputBody = components['schemas']['ListNodesOutputBody'];
+export type ListOAuthClientsOutputBody = components['schemas']['ListOAuthClientsOutputBody'];
 export type ListPosturesOutputBody = components['schemas']['ListPosturesOutputBody'];
 export type ListPreAuthKeysOutputBody = components['schemas']['ListPreAuthKeysOutputBody'];
 export type ListRequestsOutputBody = components['schemas']['ListRequestsOutputBody'];
@@ -2632,6 +2716,7 @@ export type NodeOutputBody = components['schemas']['NodeOutputBody'];
 export type NodePosture = components['schemas']['NodePosture'];
 export type NodePosturesOutputBody = components['schemas']['NodePosturesOutputBody'];
 export type NodePreAuthKey = components['schemas']['NodePreAuthKey'];
+export type OAuthClient = components['schemas']['OAuthClient'];
 export type PolicyRequestBody = components['schemas']['PolicyRequestBody'];
 export type PolicyResponseBody = components['schemas']['PolicyResponseBody'];
 export type Posture = components['schemas']['Posture'];
@@ -2645,6 +2730,7 @@ export type PreAuthKey = components['schemas']['PreAuthKey'];
 export type PreAuthKeyOutputBody = components['schemas']['PreAuthKeyOutputBody'];
 export type RequestOptionsOutputBody = components['schemas']['RequestOptionsOutputBody'];
 export type RequestOutputBody = components['schemas']['RequestOutputBody'];
+export type RevokeOAuthClientOutputBody = components['schemas']['RevokeOAuthClientOutputBody'];
 export type RuleEnabledInputBody = components['schemas']['RuleEnabledInputBody'];
 export type RuleOutputBody = components['schemas']['RuleOutputBody'];
 export type ServerInfo = components['schemas']['ServerInfo'];
@@ -4990,6 +5076,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NodeOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listOAuthClients: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListOAuthClientsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createOAuthClient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOAuthClientRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreateOAuthClientOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    revokeOAuthClient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clientId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevokeOAuthClientOutputBody"];
                 };
             };
             /** @description Error */
