@@ -119,7 +119,11 @@ and is refused, leaving everything as it was, when a map cannot be fetched;
 `automatically_add_embedded_derp_region` stay in the configuration file.
 `GET /api/v1/server` now reports the region count and whether the relay
 runs instead of listing the regions; the list, with where each region came
-from, is at `GET /api/v1/derp`. See
+from, is at `GET /api/v1/derp`. Turning the relay off or client
+verification on drops the machines connected to it, so they reconnect
+under the new rule; a request that leaves `verifyClients` out gets
+verification on; and a fetched map with a broken relay entry is served
+without it rather than failing the refresh. See
 [DERP](https://headscale.net/development/ref/derp/).
 
 ### Groups and access rules
@@ -262,8 +266,7 @@ inside the server: it joins the tailnet as `headscale-recorder`
 (`tag:headscale-recorder`), takes the upload every machine's client sends
 when a session starts, stores one asciinema file per session under
 `ssh_recording.dir`, and deletes them after `ssh_recording.retention`. The
-tailnet default recorders are a setting (`headscale settings set
---ssh-recorders tag:recorder`, `sshRecorders` in `/api/v1/settings`, the
+tailnet default recorders are a setting (`headscale settings set --ssh-recorders tag:recorder`, `sshRecorders` in `/api/v1/settings`, the
 _SSH session recording_ section of the console's _Settings_ page), an SSH
 rule may name its own with `recorder` and require it with
 `enforceRecorder`, and the tailnet-wide `sshRecordingEnforce` switch

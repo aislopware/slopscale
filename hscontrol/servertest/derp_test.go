@@ -57,6 +57,49 @@ func derpRegion(id tailcfg.DERPRegionID, code string) tailcfg.DERPRegion {
 	}
 }
 
+// connectRelay connects a DERP client with the key to the server's
+// embedded relay and proves it is admitted with a ping.
+func connectRelay(ctx context.Context, t *testing.T, url string, k key.NodePrivate) *derphttp.Client {
+	t.Helper()
+
+	relay, err := derphttp.NewClient(k, url, t.Logf, netmon.NewStatic())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = relay.Close() })
+	require.NoError(t, relay.Connect(ctx))
+	require.NoError(t, relay.SendPing([8]byte{1}))
+
+	msg, err := relay.Recv()
+	for err == nil {
+		if _, ok := msg.(derp.PongMessage); ok {
+			break
+		}
+
+		msg, err = relay.Recv()
+	}
+
+	require.NoError(t, err)
+
+	return relay
+}
+
+// relayDropped reports whether the relay ends the client's connection:
+// a read fails, rather than blocking until the deadline.
+func relayDropped(relay *derphttp.Client) bool {
+	done := make(chan bool, 1)
+
+	go func() {
+		_, err := relay.Recv()
+		done <- err != nil
+	}()
+
+	select {
+	case dropped := <-done:
+		return dropped
+	case <-time.After(derpWait):
+		return false
+	}
+}
+
 func regionIDs(body map[string]any) []int {
 	regions, _ := body["regions"].([]any)
 	ids := make([]int, 0, len(regions))
@@ -183,22 +226,7 @@ func TestDERPSettingsEndToEnd(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), derpWait)
 		defer cancel()
 
-		relay, err := derphttp.NewClient(node.NodePrivateKey(), srv.URL+"/derp", t.Logf, netmon.NewStatic())
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = relay.Close() })
-		require.NoError(t, relay.Connect(ctx))
-		require.NoError(t, relay.SendPing([8]byte{1}))
-
-		msg, err := relay.Recv()
-		for err == nil {
-			if _, ok := msg.(derp.PongMessage); ok {
-				break
-			}
-
-			msg, err = relay.Recv()
-		}
-
-		require.NoError(t, err)
+		connectRelay(ctx, t, srv.URL+"/derp", node.NodePrivateKey())
 
 		stranger, err := derphttp.NewClient(key.NewNode(), srv.URL+"/derp", t.Logf, netmon.NewStatic())
 		require.NoError(t, err)
@@ -210,6 +238,50 @@ func TestDERPSettingsEndToEnd(t *testing.T) {
 		}
 
 		assert.Error(t, err, "verify_clients refuses a key the tailnet does not know")
+	})
+
+	t.Run("turning verification on drops the clients it no longer admits", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), derpWait)
+		defer cancel()
+
+		open := map[string]any{
+			"urls": []string{mapSrv.URL},
+			"regions": []map[string]any{{
+				"id": 20, "code": "sgp",
+				"nodes": []map[string]any{{"hostName": "sgp.derp.example", "ipv4": "203.0.113.5"}},
+			}},
+			"server": map[string]any{
+				"enabled": true, "regionId": 999, "regionCode": "headscale",
+				"verifyClients": false, "stunAddr": "127.0.0.1:0",
+			},
+		}
+		status, body := apiCall(t, client, ownerKey, http.MethodPut, v1, open)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, int32(1), fetches.Load(), "an unchanged URL list is not fetched again")
+
+		stranger := connectRelay(ctx, t, srv.URL+"/derp", key.NewNode())
+		member := connectRelay(ctx, t, srv.URL+"/derp", node.NodePrivateKey())
+
+		verified := map[string]any{
+			"urls": []string{mapSrv.URL},
+			"regions": []map[string]any{{
+				"id": 20, "code": "sgp",
+				"nodes": []map[string]any{{"hostName": "sgp.derp.example", "ipv4": "203.0.113.5"}},
+			}},
+			"server": map[string]any{
+				"enabled": true, "regionId": 999, "regionCode": "headscale", "stunAddr": "127.0.0.1:0",
+			},
+		}
+		status, body = apiCall(t, client, ownerKey, http.MethodPut, v1, verified)
+		require.Equal(t, http.StatusOK, status, body)
+
+		effective, _ := body["effective"].(map[string]any)
+		server, _ := effective["server"].(map[string]any)
+		assert.Equal(t, true, server["verifyClients"], "a request that says nothing about verification gets it")
+
+		assert.True(t, relayDropped(stranger), "the stranger is dropped")
+		assert.True(t, relayDropped(member), "every client reconnects under the new rule")
+		connectRelay(ctx, t, srv.URL+"/derp", node.NodePrivateKey())
 	})
 
 	t.Run("refresh refetches", func(t *testing.T) {
@@ -266,7 +338,12 @@ func TestDERPSettingsEndToEnd(t *testing.T) {
 		}
 	})
 
-	t.Run("turning the relay off stops it", func(t *testing.T) {
+	t.Run("turning the relay off stops it and drops its clients", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(t.Context(), derpWait)
+		defer cancel()
+
+		connected := connectRelay(ctx, t, srv.URL+"/derp", node.NodePrivateKey())
+
 		status, body := apiCall(t, client, ownerKey, http.MethodPut, v1, map[string]any{
 			"urls":   []string{mapSrv.URL},
 			"server": map[string]any{"enabled": false},
@@ -275,6 +352,7 @@ func TestDERPSettingsEndToEnd(t *testing.T) {
 		assert.Equal(t, false, body["relayRunning"])
 		assert.Empty(t, body["stunAddr"])
 		assert.Equal(t, []int{10, 11, 900}, regionIDs(body))
+		assert.True(t, relayDropped(connected), "a connected client is dropped with the relay")
 
 		resp, err := client.Get(srv.URL + "/derp") //nolint:noctx // test client
 		require.NoError(t, err)
@@ -314,6 +392,43 @@ func TestDERPSettingsEndToEnd(t *testing.T) {
 		assert.True(t, actions["derp.refresh"], "audit: %v", actions)
 		assert.True(t, actions["derp.reset"], "audit: %v", actions)
 	})
+}
+
+// TestDERPFetchedMapIsSanitized proves a fetched map with a null relay
+// and relays under the wrong region id is served without them rather
+// than crashing the refresh.
+func TestDERPFetchedMapIsSanitized(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+
+	dirty := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"Regions":{
+			"10":{"RegionID":10,"RegionCode":"nyc","Nodes":[
+				null,
+				{"Name":"a","RegionID":99,"HostName":"a.example"},
+				{"Name":"a","HostName":"dup.example"}
+			]},
+			"11":{"RegionID":11,"RegionCode":"empty","Nodes":[null]}
+		}}`))
+	}))
+	t.Cleanup(dirty.Close)
+
+	_, _, err := srv.State().SetDERP(t.Context(), types.DERPSettings{
+		URLs:   []string{dirty.URL},
+		Server: types.DERPServerSettings{Enabled: false},
+	})
+	require.NoError(t, err)
+
+	_, err = srv.State().RefreshDERPMap(t.Context())
+	require.NoError(t, err, "a refresh of the same map survives the null relay")
+
+	regions := srv.State().DERPMap().AsStruct().Regions
+	require.Contains(t, regions, tailcfg.DERPRegionID(10))
+	assert.Empty(t, regions[11].Nodes, "a region whose only relay was null is left without relays")
+	require.Len(t, regions[10].Nodes, 1, "the null and the duplicate relay are dropped")
+	assert.Equal(t, tailcfg.DERPRegionID(10), regions[10].Nodes[0].RegionID, "the relay carries the map's region id")
+	assert.Equal(t, "a.example", regions[10].Nodes[0].HostName)
 }
 
 // TestDERPSetThroughState proves the state entry point the API and the

@@ -5,6 +5,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 )
 
@@ -235,4 +237,45 @@ func TestShuffleDERPMapWithoutBaseDomain(t *testing.T) {
 	if diff := cmp.Diff(originalNodes, shuffledNodes); diff != "" {
 		t.Errorf("Shuffle changed node set (-original +shuffled):\n%s", diff)
 	}
+}
+
+// TestBuildSanitizesRegions proves a fetched map with a null relay, a
+// relay under the wrong region id, a duplicate name and a null region
+// builds into one the clients can rely on.
+func TestBuildSanitizesRegions(t *testing.T) {
+	t.Parallel()
+
+	built := Build(&tailcfg.DERPMap{Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
+		10: {RegionID: 99, RegionCode: "nyc", Nodes: []*tailcfg.DERPNode{
+			nil,
+			{Name: "a", RegionID: 99, HostName: "a.example"},
+			{Name: "a", HostName: "dup.example"},
+			{Name: "", HostName: "unnamed.example"},
+		}},
+		11: {RegionID: 11, RegionCode: "empty", Nodes: []*tailcfg.DERPNode{nil}},
+		12: nil,
+	}})
+
+	require.Len(t, built.Regions, 2, "the null region is dropped, the one without relays stays")
+	assert.Empty(t, built.Regions[11].Nodes)
+
+	region := built.Regions[10]
+	require.NotNil(t, region)
+	assert.Equal(t, tailcfg.DERPRegionID(10), region.RegionID, "the region carries the map's id")
+	require.Len(t, region.Nodes, 1)
+	assert.Equal(t, "a.example", region.Nodes[0].HostName, "the first relay of a name stays")
+	assert.Equal(t, tailcfg.DERPRegionID(10), region.Nodes[0].RegionID)
+}
+
+func TestHasRelay(t *testing.T) {
+	t.Parallel()
+
+	assert.False(t, HasRelay(nil))
+	assert.False(t, HasRelay(&tailcfg.DERPMap{}))
+	assert.False(t, HasRelay(&tailcfg.DERPMap{Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
+		1: {Nodes: []*tailcfg.DERPNode{{Name: "s", STUNOnly: true}}},
+	}}), "STUN-only relays carry no traffic")
+	assert.True(t, HasRelay(&tailcfg.DERPMap{Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
+		1: {Nodes: []*tailcfg.DERPNode{{Name: "s", STUNOnly: true}, {Name: "a"}}},
+	}}))
 }

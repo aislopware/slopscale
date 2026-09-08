@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/juanfont/headscale/hscontrol/derp"
@@ -192,19 +194,37 @@ func (s *State) DERPRelay() *derpServer.DERPServer {
 
 // LoadDERPMap fetches the map sources and builds the live map from the
 // effective settings, at startup. A source that cannot be fetched fails
-// the load, as does a map with no relay at all.
+// the load, as does a map with no relay at all. A stored override that
+// turns the embedded relay on while the server has no relay key is
+// served without the embedded region, with a warning.
 func (s *State) LoadDERPMap(ctx context.Context) error {
 	s.derpMu.Lock()
 	defer s.derpMu.Unlock()
 
 	settings := s.effectiveDERPLocked()
 
-	err := s.fetchDERPSourcesLocked(ctx, settings)
+	if settings.Server.Enabled && s.derp.relay == nil && s.derp.override != nil {
+		log.Warn().Msg("the stored DERP settings turn the embedded relay on, but the server has no relay key")
+	}
+
+	sources, err := s.fetchDERPSourcesLocked(ctx, settings)
 	if err != nil {
 		return err
 	}
 
-	return s.applyDERPLocked(ctx, settings)
+	err = s.applyDERPRelayLocked(ctx, settings.Server)
+	if err != nil {
+		return err
+	}
+
+	built, err := s.buildDERPLocked(ctx, settings, sources)
+	if err != nil {
+		return err
+	}
+
+	s.publishDERPLocked(built)
+
+	return nil
 }
 
 // RefreshDERPMap refetches the map sources and rebuilds the live map. It
@@ -216,25 +236,30 @@ func (s *State) RefreshDERPMap(ctx context.Context) (bool, error) {
 
 	settings := s.effectiveDERPLocked()
 
-	err := s.fetchDERPSourcesLocked(ctx, settings)
+	sources, err := s.fetchDERPSourcesLocked(ctx, settings)
 	if err != nil {
+		return false, err
+	}
+
+	built, err := s.buildDERPLocked(ctx, settings, sources)
+	if err != nil {
+		s.derp.fetchErr = err
+
 		return false, err
 	}
 
 	before := s.derpMap.Load()
+	s.publishDERPLocked(built)
 
-	err = s.applyDERPLocked(ctx, settings)
-	if err != nil {
-		return false, err
-	}
-
-	return !derpMapsEqual(before, s.derpMap.Load()), nil
+	return !derpMapsEqual(before, built.derpMap), nil
 }
 
 // SetDERP replaces the runtime DERP settings. The settings are normalized
-// and validated, the map sources fetched, the embedded relay brought to
-// the settings, the map rebuilt and stored, and the new map pushed to
-// every client. Nothing is stored when a step fails.
+// and validated, new map sources fetched (unchanged ones are reused, so a
+// source that is down does not block a change elsewhere), the embedded
+// relay brought to the settings, the map built, the settings stored and
+// only then the map published and pushed to every client. A step that
+// fails leaves the previous settings, relay and map in force.
 func (s *State) SetDERP(ctx context.Context, settings types.DERPSettings) (DERPStatus, change.Change, error) {
 	settings = settings.Normalize()
 
@@ -250,23 +275,24 @@ func (s *State) SetDERP(ctx context.Context, settings types.DERPSettings) (DERPS
 		return DERPStatus{}, change.Change{}, ErrDERPRelayUnavailable
 	}
 
-	err = s.fetchDERPSourcesLocked(ctx, settings)
+	sources, err := s.sourcesForLocked(ctx, settings)
 	if err != nil {
 		return DERPStatus{}, change.Change{}, err
 	}
 
-	err = s.applyDERPLocked(ctx, settings)
+	err = s.commitDERPLocked(ctx, settings, sources, func() error {
+		saveErr := s.db.SaveDERPSettings(settings)
+		if saveErr != nil {
+			return fmt.Errorf("saving derp settings: %w", saveErr)
+		}
+
+		s.derp.override = &settings
+
+		return nil
+	})
 	if err != nil {
 		return DERPStatus{}, change.Change{}, err
 	}
-
-	err = s.db.SaveDERPSettings(settings)
-	if err != nil {
-		return DERPStatus{}, change.Change{}, fmt.Errorf("saving derp settings: %w", err)
-	}
-
-	s.derp.override = &settings
-	s.signalDERPChangedLocked()
 
 	return s.derpStatusLocked(), change.DERPMap(), nil
 }
@@ -283,25 +309,70 @@ func (s *State) ResetDERP(ctx context.Context) (DERPStatus, change.Change, error
 		return DERPStatus{}, change.Change{}, ErrDERPRelayUnavailable
 	}
 
-	err := s.fetchDERPSourcesLocked(ctx, settings)
+	sources, err := s.sourcesForLocked(ctx, settings)
 	if err != nil {
 		return DERPStatus{}, change.Change{}, err
 	}
 
-	err = s.applyDERPLocked(ctx, settings)
+	err = s.commitDERPLocked(ctx, settings, sources, func() error {
+		deleteErr := s.db.DeleteDERPSettings()
+		if deleteErr != nil {
+			return fmt.Errorf("deleting derp settings: %w", deleteErr)
+		}
+
+		s.derp.override = nil
+
+		return nil
+	})
 	if err != nil {
 		return DERPStatus{}, change.Change{}, err
 	}
-
-	err = s.db.DeleteDERPSettings()
-	if err != nil {
-		return DERPStatus{}, change.Change{}, fmt.Errorf("deleting derp settings: %w", err)
-	}
-
-	s.derp.override = nil
-	s.signalDERPChangedLocked()
 
 	return s.derpStatusLocked(), change.DERPMap(), nil
+}
+
+// commitDERPLocked brings the relay to the settings, builds the map,
+// stores the settings through persist and publishes the map. The relay is
+// put back to the previous settings when a later step fails, so the
+// running relay never disagrees with the settings in force.
+func (s *State) commitDERPLocked(
+	ctx context.Context,
+	settings types.DERPSettings,
+	sources fetchedSources,
+	persist func() error,
+) error {
+	previous := s.effectiveDERPLocked()
+
+	err := s.applyDERPRelayLocked(ctx, settings.Server)
+	if err != nil {
+		return err
+	}
+
+	built, err := s.buildDERPLocked(ctx, settings, sources)
+	if err != nil {
+		s.rollbackDERPRelayLocked(ctx, previous.Server)
+
+		return err
+	}
+
+	err = persist()
+	if err != nil {
+		s.rollbackDERPRelayLocked(ctx, previous.Server)
+
+		return err
+	}
+
+	s.publishDERPLocked(built)
+	s.signalDERPChangedLocked()
+
+	return nil
+}
+
+func (s *State) rollbackDERPRelayLocked(ctx context.Context, server types.DERPServerSettings) {
+	err := s.applyDERPRelayLocked(ctx, server)
+	if err != nil {
+		log.Error().Err(err).Msg("restoring the embedded DERP relay after a failed settings change")
+	}
 }
 
 // loadDERP reads the stored override, if any, when the server starts.
@@ -324,38 +395,78 @@ func (s *State) signalDERPChangedLocked() {
 	}
 }
 
-// fetchDERPSourcesLocked fetches the settings' URLs and the file's paths
-// and keeps them for the next build. A failure keeps the previous
-// sources and is recorded for the status.
-func (s *State) fetchDERPSourcesLocked(ctx context.Context, settings types.DERPSettings) error {
-	sources, err := derp.FetchSources(ctx, settings.URLs, s.cfg.DERP.Paths)
+// fetchedSources are the maps behind a settings' URLs, then the file's
+// paths, and when they were fetched.
+type fetchedSources struct {
+	maps      []*tailcfg.DERPMap
+	fetchedAt time.Time
+}
+
+// fetchDERPSourcesLocked fetches the settings' URLs and the file's paths.
+// A failure is recorded for the status and returned; nothing is kept.
+func (s *State) fetchDERPSourcesLocked(ctx context.Context, settings types.DERPSettings) (fetchedSources, error) {
+	maps, err := derp.FetchSources(ctx, settings.URLs, s.cfg.DERP.Paths)
 	if err != nil {
 		s.derp.fetchErr = err
 
-		return fmt.Errorf("%w: %w", ErrDERPSourceUnreachable, err)
+		return fetchedSources{}, fmt.Errorf("%w: %w", ErrDERPSourceUnreachable, err)
 	}
 
-	s.derp.sources = sources
-	s.derp.fetchedAt = time.Now()
-	s.derp.fetchErr = nil
-
-	return nil
+	return fetchedSources{maps: maps, fetchedAt: time.Now()}, nil
 }
 
-// applyDERPLocked brings the embedded relay to the settings and builds
-// the live map from the fetched sources, the custom regions and the
-// embedded region. The relay is left as it was when the map would be
-// empty.
-func (s *State) applyDERPLocked(ctx context.Context, settings types.DERPSettings) error {
-	maps := make([]*tailcfg.DERPMap, 0, len(s.derp.sources)+3)
-	sources := make(map[tailcfg.DERPRegionID]DERPRegionSource)
+// sourcesForLocked returns the maps a settings change builds from: the
+// ones already fetched when the URLs are the same as the settings in
+// force, so a change to the relay or the schedule needs no network, and
+// a fresh fetch otherwise.
+func (s *State) sourcesForLocked(ctx context.Context, settings types.DERPSettings) (fetchedSources, error) {
+	current := s.effectiveDERPLocked()
+	if s.derp.sources != nil && slices.Equal(settings.URLs, current.URLs) {
+		return fetchedSources{maps: s.derp.sources, fetchedAt: s.derp.fetchedAt}, nil
+	}
+
+	return s.fetchDERPSourcesLocked(ctx, settings)
+}
+
+// applyDERPRelayLocked brings the embedded relay to the settings; without
+// a relay there is nothing to do.
+func (s *State) applyDERPRelayLocked(_ context.Context, server types.DERPServerSettings) error {
+	if s.derp.relay == nil {
+		return nil
+	}
+
+	// The relay's STUN listener outlives the request and runs on its
+	// own context, cancelled when the relay is turned off.
+	//nolint:contextcheck // see above
+	return s.derp.relay.Apply(server)
+}
+
+// builtDERP is a map ready to publish, with where each region came from.
+type builtDERP struct {
+	sources fetchedSources
+	derpMap *tailcfg.DERPMap
+	regions map[tailcfg.DERPRegionID]DERPRegionSource
+}
+
+// buildDERPLocked builds the map from the config's inline map, the
+// fetched sources, the custom regions and the embedded region, in that
+// order. The embedded region is published on the STUN port the relay is
+// bound to, which differs from the settings when they asked for port 0.
+// A map without a relay that carries traffic is refused.
+func (s *State) buildDERPLocked(
+	ctx context.Context,
+	settings types.DERPSettings,
+	sources fetchedSources,
+) (builtDERP, error) {
+	maps := make([]*tailcfg.DERPMap, 0, len(sources.maps)+3)
+	regions := make(map[tailcfg.DERPRegionID]DERPRegionSource)
 
 	if s.cfg.DERP.DERPMap != nil {
 		maps = append(maps, s.cfg.DERP.DERPMap)
-		markDERPSources(sources, s.cfg.DERP.DERPMap, DERPSourceConfig)
+		markDERPSources(regions, s.cfg.DERP.DERPMap, DERPSourceConfig)
 	}
 
-	for i, m := range s.derp.sources {
+	for i, m := range sources.maps {
 		maps = append(maps, m)
 
 		src := DERPSourceFile
@@ -366,44 +477,52 @@ func (s *State) applyDERPLocked(ctx context.Context, settings types.DERPSettings
 			}
 		}
 
-		markDERPSources(sources, m, src)
+		markDERPSources(regions, m, src)
 	}
 
 	custom := settings.RegionsMap()
 	maps = append(maps, custom)
-	markDERPSources(sources, custom, DERPSourceCustom)
+	markDERPSources(regions, custom, DERPSourceCustom)
 
-	if settings.Server.Enabled && s.cfg.DERP.AutomaticallyAddEmbeddedDerpRegion {
-		region, err := derp.EmbeddedRegion(ctx, s.cfg.ServerURL, settings.Server)
+	if settings.Server.Enabled && s.derp.relay != nil && s.cfg.DERP.AutomaticallyAddEmbeddedDerpRegion {
+		server := settings.Server
+		if bound := s.derp.relay.STUNAddr(); bound != "" {
+			server.STUNAddr = bound
+		}
+
+		region, err := derp.EmbeddedRegion(ctx, s.cfg.ServerURL, server)
 		if err != nil {
-			return err
+			return builtDERP{}, err
 		}
 
 		maps = append(maps, &tailcfg.DERPMap{
 			Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{region.RegionID: &region},
 		})
-		sources[region.RegionID] = DERPSourceEmbedded
+		regions[region.RegionID] = DERPSourceEmbedded
 	}
 
 	derpMap := derp.Build(maps...)
-	if len(derpMap.Regions) == 0 {
-		return types.ErrDERPMapEmpty
+	if !derp.HasRelay(derpMap) {
+		return builtDERP{}, types.ErrDERPMapEmpty
 	}
 
-	if s.derp.relay != nil {
-		// The relay's STUN listener outlives this call and runs on its
-		// own context, cancelled when the relay is turned off.
-		//nolint:contextcheck // see above
-		err := s.derp.relay.Apply(settings.Server)
-		if err != nil {
-			return err
+	for id := range regions {
+		if _, ok := derpMap.Regions[id]; !ok {
+			delete(regions, id)
 		}
 	}
 
-	s.derp.regions = sources
-	s.derpMap.Store(derpMap)
+	return builtDERP{sources: sources, derpMap: derpMap, regions: regions}, nil
+}
 
-	return nil
+// publishDERPLocked makes a built map the live one and remembers the
+// sources it came from.
+func (s *State) publishDERPLocked(built builtDERP) {
+	s.derp.sources = built.sources.maps
+	s.derp.fetchedAt = built.sources.fetchedAt
+	s.derp.fetchErr = nil
+	s.derp.regions = built.regions
+	s.derpMap.Store(built.derpMap)
 }
 
 func markDERPSources(
@@ -416,45 +535,36 @@ func markDERPSources(
 	}
 }
 
-// derpMapsEqual compares two maps region by region, ignoring the order
-// relays were shuffled into.
+// derpMapsEqual compares two maps as the clients see them, region flags
+// and home parameters included, ignoring only the order relays were
+// shuffled into.
 func derpMapsEqual(a, b *tailcfg.DERPMap) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
 
-	if len(a.Regions) != len(b.Regions) {
-		return false
-	}
-
-	for id, ra := range a.Regions {
-		rb, ok := b.Regions[id]
-		if !ok || !derpRegionsEqual(ra, rb) {
-			return false
-		}
-	}
-
-	return true
+	return reflect.DeepEqual(canonicalDERPMap(a), canonicalDERPMap(b))
 }
 
-func derpRegionsEqual(a, b *tailcfg.DERPRegion) bool {
-	if a.RegionCode != b.RegionCode || a.RegionName != b.RegionName || len(a.Nodes) != len(b.Nodes) {
-		return false
+// canonicalDERPMap is a copy with the relays of every region in name
+// order and an empty home parameter set folded to nil.
+func canonicalDERPMap(dm *tailcfg.DERPMap) *tailcfg.DERPMap {
+	out := &tailcfg.DERPMap{
+		OmitDefaultRegions: dm.OmitDefaultRegions,
+		Regions:            make(map[tailcfg.DERPRegionID]*tailcfg.DERPRegion, len(dm.Regions)),
 	}
 
-	byName := make(map[string]*tailcfg.DERPNode, len(a.Nodes))
-	for _, n := range a.Nodes {
-		byName[n.Name] = n
+	for id, region := range dm.Regions {
+		cloned := region.Clone()
+		slices.SortFunc(cloned.Nodes, func(x, y *tailcfg.DERPNode) int { return strings.Compare(x.Name, y.Name) })
+		out.Regions[id] = cloned
 	}
 
-	for _, n := range b.Nodes {
-		other, ok := byName[n.Name]
-		if !ok || *other != *n {
-			return false
-		}
+	if dm.HomeParams != nil && len(dm.HomeParams.RegionScore) > 0 {
+		out.HomeParams = dm.HomeParams.Clone()
 	}
 
-	return true
+	return out
 }
 
 // LogDERPMap logs the live map's regions at startup.

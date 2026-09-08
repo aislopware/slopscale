@@ -226,7 +226,18 @@ func setupEmbeddedDERPServer(
 
 	derpServerKey, err := readOrCreatePrivateKey(cfg.DERP.ServerPrivateKeyPath)
 	if err != nil {
-		return nil, fmt.Errorf("reading or creating DERP server private key: %w", err)
+		if cfg.DERP.ServerEnabled {
+			return nil, fmt.Errorf("reading or creating DERP server private key: %w", err)
+		}
+
+		// The relay is off in the file and its key cannot be read or
+		// made, which a read-only key directory causes; the server runs
+		// without a relay rather than refusing to start over one it was
+		// not asked to run.
+		log.Warn().Err(err).Str("path", cfg.DERP.ServerPrivateKeyPath).
+			Msg("no embedded DERP relay: its key cannot be read or created")
+
+		return nil, nil //nolint:nilnil // intentional: no relay key, no embedded relay
 	}
 
 	if derpServerKey.Equal(*noisePrivateKey) {
@@ -894,9 +905,13 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 			lastExpiryCheck = h.expireNodesTick(lastExpiryCheck)
 
 		case <-derpTimer.C:
-			err := h.refreshDERPMap(ctx)
-			if err != nil {
-				log.Error().Err(err).Msg("failed to build new DERPMap, retrying later")
+			// The timer also fires while automatic updates are off, so
+			// it re-reads the settings; it fetches only when they say so.
+			if h.state.EffectiveDERP().AutoUpdate {
+				err := h.refreshDERPMap(ctx)
+				if err != nil {
+					log.Error().Err(err).Msg("failed to build new DERPMap, retrying later")
+				}
 			}
 
 			derpTimer.Reset(h.derpRefreshInterval())
@@ -1090,7 +1105,8 @@ func (h *Headscale) expireNodesTick(lastExpiryCheck time.Time) time.Time {
 
 // derpRefreshInterval is how long until the map sources are refetched:
 // the effective settings' frequency, or a day's wait while auto update
-// is off so the timer still fires and re-reads the settings.
+// is off, after which the scheduler re-reads the settings without
+// fetching.
 func (h *Headscale) derpRefreshInterval() time.Duration {
 	settings := h.state.EffectiveDERP()
 	if !settings.AutoUpdate || settings.UpdateFrequency < types.DERPMinUpdateFrequency {

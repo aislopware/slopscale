@@ -60,6 +60,18 @@ $ headscale derp reset
 file alone can express stays in the file: the map files in `derp.paths`, the relay's key and
 `automatically_add_embedded_derp_region`.
 
+A few things to know when changing the relays while machines use them:
+
+- A change that keeps the map URLs reuses the maps already fetched, so a map source that is down does not stop you
+  from changing the embedded relay or the schedule. Changing the URLs fetches them.
+- Turning the embedded relay off, or turning client verification on, drops the machines connected to it. They
+  reconnect within seconds, to the next closest relay or to the embedded one under the new rule. A request to
+  `PUT /api/v1/derp` that leaves `verifyClients` out gets verification on.
+- With the schedule off the map is not fetched again until you refetch it, in the console or with
+  `headscale derp refresh`.
+- The embedded relay is published on the STUN port it is bound to, so a `stun_listen_addr` with port 0 works.
+- The audit log records the map URLs without user info or query strings.
+
 ### Remove Tailscale's DERP servers
 
 Headscale's embedded DERP is added to the list of free-to-use [DERP

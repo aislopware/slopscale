@@ -183,17 +183,35 @@ func TestDERPServerApply(t *testing.T) {
 	require.NoError(t, srv.Apply(settings))
 	assert.NotEmpty(t, srv.STUNAddr())
 
-	// Off stops STUN and closes the handler.
+	// Off stops STUN, closes the handler and replaces the relay proper,
+	// which drops its clients; the next one serves when turned on again.
+	before := srv.server()
 	settings.Enabled = false
 	require.NoError(t, srv.Apply(settings))
 	assert.False(t, srv.Enabled())
 	assert.Empty(t, srv.STUNAddr())
+	assert.NotSame(t, before, srv.server(), "the relay proper is replaced so its clients are dropped")
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/derp", nil)
 	req.Header.Set("Upgrade", "DERP")
 	srv.DERPHandler(rec, req)
 	assert.Equal(t, http.StatusNotFound, rec.Code)
+
+	// Turning verification on while serving replaces it too; keeping it
+	// on or turning it off does not.
+	settings.Enabled = true
+	settings.VerifyClients = false
+	require.NoError(t, srv.Apply(settings))
+	serving := srv.server()
+	settings.VerifyClients = true
+	require.NoError(t, srv.Apply(settings))
+	assert.NotSame(t, serving, srv.server(), "verification tightened, clients must be re-admitted")
+	verifying := srv.server()
+	require.NoError(t, srv.Apply(settings))
+	settings.VerifyClients = false
+	require.NoError(t, srv.Apply(settings))
+	assert.Same(t, verifying, srv.server(), "the same or a looser rule keeps the clients")
 }
 
 func TestDERPServerApplyBadSTUNAddrKeepsState(t *testing.T) {

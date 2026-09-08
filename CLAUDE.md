@@ -168,19 +168,25 @@ while one exists, with or without a policy. The node-attrs fast path in
 server cannot make a client use an exit node; the caps only drive the
 client's own suggestion and auto pick.
 
-The DERP map is state, not config: `State.SetDERP`/`ResetDERP`
-store a `types.DERPSettings` override in the `settings` table (key `derp`,
-like DNS), fetch the sources and rebuild the map before anything is written,
-so a source that cannot be reached leaves the old map and settings in place
-(`ErrDERPSourceUnreachable`, 502). `derp.Build` merges by region id, later
-wins, in this order: URLs, file paths, custom regions, the embedded relay;
-`State.DERP()` reports which source each region came from. The embedded
-relay is one `derpServer.DERPServer` created whenever a key path exists and
-driven by `Apply(DERPServerSettings)`, which the server calls under
-`derpMu`; its handler answers 404 while off, and client verification goes
-through the process-global `headscale-derp-verify://` transport. The app's
-scheduler re-arms its DERP timer from `derpRefreshInterval()` and wakes on
-`State.DERPChanged()`. Map files, the key path and
+The DERP map is state, not config: `State.SetDERP`/`ResetDERP` store a
+`types.DERPSettings` override in the `settings` table (key `derp`, like
+DNS). The order under `derpMu` is fetch (only when the URL list changed,
+else the cached sources), apply the relay, build the map, persist, publish;
+a failure after the relay moved puts it back, so a source that cannot be
+reached (`ErrDERPSourceUnreachable`, 502) or a database error leaves the
+old map, relay and settings in place. `derp.Build` merges by region id,
+later wins, in this order: URLs, file paths, custom regions, the embedded
+relay, and drops null or unnamed relays and empty regions; the embedded
+region carries the STUN port the relay is bound to. `State.DERP()` reports
+which source each region came from. The embedded relay is one
+`derpServer.DERPServer` created whenever a key path exists (a missing key
+only fails startup when the file enables the relay) and driven by
+`Apply(DERPServerSettings)`; its handler answers 404 while off, client
+verification goes through the process-global `headscale-derp-verify://`
+transport, and turning it off or verification on replaces the Tailscale
+server inside so connected clients are dropped. The app's scheduler re-arms
+its DERP timer from `derpRefreshInterval()`, wakes on `State.DERPChanged()`
+and fetches only while auto update is on. Map files, the key path and
 `automatically_add_embedded_derp_region` come only from the config file.
 
 API responses read through `NodeView`, `UserView`, and `PreAuthKeyView`.

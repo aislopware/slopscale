@@ -45,11 +45,13 @@ type VerifyFunc func(*http.Request, io.Writer) error
 
 // DERPServer is the embedded relay. It is created once with the server's
 // key and brought up or down at runtime with [DERPServer.Apply]: the HTTP
-// handler answers only while enabled and STUN listens only then.
+// handler answers only while enabled and STUN listens only then. The
+// Tailscale relay inside is replaced when the relay turns off or starts
+// verifying clients, which drops every connected client; a client that
+// reconnects is admitted afresh.
 type DERPServer struct {
-	key           key.NodePrivate
-	tailscaleDERP *derpserver.Server
-	verify        VerifyFunc
+	key    key.NodePrivate
+	verify VerifyFunc
 	// id keys the verify transport's registry, so several servers in one
 	// process (tests) each verify against their own tailnet.
 	id string
@@ -57,11 +59,12 @@ type DERPServer struct {
 	enabled       atomic.Bool
 	verifyClients atomic.Bool
 
-	mu       sync.Mutex
-	stunAddr string
-	stunConn *net.UDPConn
-	stunStop context.CancelFunc
-	stunDone chan struct{}
+	mu            sync.Mutex
+	tailscaleDERP *derpserver.Server
+	stunAddr      string
+	stunConn      *net.UDPConn
+	stunStop      context.CancelFunc
+	stunDone      chan struct{}
 }
 
 // NewDERPServer creates the relay, off. verify decides which clients the
@@ -69,22 +72,17 @@ type DERPServer struct {
 func NewDERPServer(derpKey key.NodePrivate, verify VerifyFunc) *DERPServer {
 	log.Trace().Caller().Msg("creating new embedded DERP server")
 
-	server := derpserver.New(derpKey, util.TSLogfWrapper())
-
 	d := &DERPServer{
-		key:           derpKey,
-		tailscaleDERP: server,
-		verify:        verify,
-		id:            verifyID(derpKey.Public()),
+		key:    derpKey,
+		verify: verify,
+		id:     verifyID(derpKey.Public()),
 	}
 
 	// The relay always asks; the transport answers "allow" while
-	// verification is off. The Tailscale server reads its verify URL
-	// without a lock, so it is set once here rather than toggled.
+	// verification is off.
 	registerVerifyTransport()
 	verifyServers.Store(d.id, d)
-	server.SetVerifyClientURL(DerpVerifyScheme + "://" + d.id + "/verify")
-	server.SetVerifyClientURLFailOpen(false)
+	d.tailscaleDERP = d.newTailscaleServer()
 
 	return d
 }
@@ -92,15 +90,21 @@ func NewDERPServer(derpKey key.NodePrivate, verify VerifyFunc) *DERPServer {
 // Apply brings the relay to the settings: it starts STUN on the settings'
 // address (rebinding when the address changed), turns client verification
 // on or off and opens the handler; or, when the settings turn the relay
-// off, stops STUN and closes the handler. A STUN bind failure leaves the
+// off, stops STUN, closes the handler and drops the connected clients.
+// Turning verification on drops them too, so every client is admitted
+// under the new rule when it reconnects. A STUN bind failure leaves the
 // relay as it was and is returned.
 func (d *DERPServer) Apply(s types.DERPServerSettings) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	if !s.Enabled {
-		d.enabled.Store(false)
+		wasEnabled := d.enabled.Swap(false)
 		d.stopSTUNLocked()
+
+		if wasEnabled {
+			d.dropClientsLocked()
+		}
 
 		return nil
 	}
@@ -122,8 +126,12 @@ func (d *DERPServer) Apply(s types.DERPServerSettings) error {
 		d.startSTUNLocked(udpConn, s.STUNAddr)
 	}
 
-	d.verifyClients.Store(s.VerifyClients)
-	d.enabled.Store(true)
+	wasVerifying := d.verifyClients.Swap(s.VerifyClients)
+	wasEnabled := d.enabled.Swap(true)
+
+	if wasEnabled && s.VerifyClients && !wasVerifying {
+		d.dropClientsLocked()
+	}
 
 	return nil
 }
@@ -224,6 +232,36 @@ func (d *DERPServer) DERPHandler(
 	}
 }
 
+// newTailscaleServer creates the relay proper, asking this server's verify
+// transport about every client. The Tailscale server reads its verify URL
+// without a lock, so it is set once here rather than toggled.
+func (d *DERPServer) newTailscaleServer() *derpserver.Server {
+	server := derpserver.New(d.key, util.TSLogfWrapper())
+	server.SetVerifyClientURL(DerpVerifyScheme + "://" + d.id + "/verify")
+	server.SetVerifyClientURLFailOpen(false)
+
+	return server
+}
+
+// server is the relay proper, replaced by Apply when the clients must go.
+func (d *DERPServer) server() *derpserver.Server {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	return d.tailscaleDERP
+}
+
+// dropClientsLocked closes the relay proper, which drops every connected
+// client, and creates the next one so the relay can serve again.
+func (d *DERPServer) dropClientsLocked() {
+	err := d.tailscaleDERP.Close()
+	if err != nil {
+		log.Error().Caller().Err(err).Msg("closing embedded DERP relay")
+	}
+
+	d.tailscaleDERP = d.newTailscaleServer()
+}
+
 // DERPProbeHandler is the endpoint that js/wasm clients hit to measure
 // DERP latency, since they can't do UDP STUN queries.
 func DERPProbeHandler(
@@ -287,7 +325,7 @@ func (d *DERPServer) serveWebsocket(writer http.ResponseWriter, req *http.Reques
 
 	wc := wsconn.NetConn(req.Context(), websocketConn, websocket.MessageBinary, req.RemoteAddr)
 	brw := bufio.NewReadWriter(bufio.NewReader(wc), bufio.NewWriter(wc))
-	d.tailscaleDERP.Accept(req.Context(), wc, brw, req.RemoteAddr)
+	d.server().Accept(req.Context(), wc, brw, req.RemoteAddr)
 }
 
 func (d *DERPServer) servePlain(writer http.ResponseWriter, req *http.Request) {
@@ -341,7 +379,7 @@ func (d *DERPServer) servePlain(writer http.ResponseWriter, req *http.Request) {
 			string(pubKeyStr))
 	}
 
-	d.tailscaleDERP.Accept(req.Context(), netConn, conn, netConn.RemoteAddr().String())
+	d.server().Accept(req.Context(), netConn, conn, netConn.RemoteAddr().String())
 }
 
 func (d *DERPServer) startSTUNLocked(conn *net.UDPConn, addr string) {

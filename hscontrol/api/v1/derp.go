@@ -3,6 +3,7 @@ package apiv1
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -60,8 +61,9 @@ type DERPServerSettings struct {
 	RegionCode string `json:"regionCode,omitempty" required:"false"`
 	// RegionName is empty to take the code.
 	RegionName string `json:"regionName,omitempty" required:"false"`
-	// VerifyClients admits only this tailnet's machines.
-	VerifyClients bool `json:"verifyClients,omitempty" required:"false"`
+	// VerifyClients admits only this tailnet's machines. Left out of a
+	// request it is on; a response always carries it.
+	VerifyClients *bool `json:"verifyClients,omitempty" required:"false"`
 	// STUNAddr is the UDP host:port STUN listens on.
 	STUNAddr string `json:"stunAddr,omitempty" required:"false"`
 	// IPv4 and IPv6 are public addresses published next to the host name.
@@ -209,7 +211,7 @@ func derpServerFrom(s types.DERPServerSettings) DERPServerSettings {
 		RegionID:      int(s.RegionID),
 		RegionCode:    s.RegionCode,
 		RegionName:    s.RegionName,
-		VerifyClients: s.VerifyClients,
+		VerifyClients: &s.VerifyClients,
 		STUNAddr:      s.STUNAddr,
 		IPv4:          s.IPv4,
 		IPv6:          s.IPv6,
@@ -217,12 +219,19 @@ func derpServerFrom(s types.DERPServerSettings) DERPServerSettings {
 }
 
 func derpServerTo(s DERPServerSettings) types.DERPServerSettings {
+	// Verification is the safe side, so a request that says nothing
+	// about it gets it rather than an open relay.
+	verify := true
+	if s.VerifyClients != nil {
+		verify = *s.VerifyClients
+	}
+
 	return types.DERPServerSettings{
 		Enabled:       s.Enabled,
 		RegionID:      tailcfg.DERPRegionID(s.RegionID),
 		RegionCode:    s.RegionCode,
 		RegionName:    s.RegionName,
-		VerifyClients: s.VerifyClients,
+		VerifyClients: verify,
 		STUNAddr:      s.STUNAddr,
 		IPv4:          s.IPv4,
 		IPv6:          s.IPv6,
@@ -330,7 +339,7 @@ func registerDERP(api huma.API, b Backend) {
 			return nil, mapError("setting derp", err)
 		}
 
-		audit.Detail(ctx, "urls", st.Effective.URLs)
+		audit.Detail(ctx, "urls", auditURLs(st.Effective.URLs))
 		audit.Detail(ctx, "regions", len(st.Effective.Regions))
 		audit.Detail(ctx, "embedded", st.Effective.Server.Enabled)
 
@@ -378,4 +387,27 @@ func registerDERP(api huma.API, b Backend) {
 
 		return &derpOutput{Body: derpFrom(b.State.DERP())}, nil
 	})
+}
+
+// auditURLs is the map URLs as the audit log records them: scheme, host
+// and path only, since a private map's URL may carry credentials in its
+// user info or query.
+func auditURLs(urls []string) []string {
+	out := make([]string, 0, len(urls))
+
+	for _, raw := range urls {
+		u, err := url.Parse(raw)
+		if err != nil {
+			out = append(out, "(unparseable URL)")
+
+			continue
+		}
+
+		u.User = nil
+		u.RawQuery = ""
+		u.Fragment = ""
+		out = append(out, u.String())
+	}
+
+	return out
 }

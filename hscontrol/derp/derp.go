@@ -57,7 +57,7 @@ func loadDERPMapFromURL(ctx context.Context, addr url.URL) (*tailcfg.DERPMap, er
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fetching DERP map from %s: %w", addr.String(), err)
+		return nil, fmt.Errorf("fetching DERP map from %s: %w", addr.Redacted(), err)
 	}
 
 	defer resp.Body.Close()
@@ -93,7 +93,7 @@ func mergeDERPMaps(derpMaps []*tailcfg.DERPMap) *tailcfg.DERPMap {
 		// shuffle alias regions shared with the source map or a previously
 		// served map, racing concurrent readers.
 		for id, region := range derpMap.Regions {
-			if cloned := region.Clone(); cloned != nil {
+			if cloned := sanitizeRegion(id, region); cloned != nil {
 				result.Regions[id] = cloned
 			}
 		}
@@ -171,6 +171,36 @@ func FetchSources(ctx context.Context, urls, paths []string) ([]*tailcfg.DERPMap
 	return maps, nil
 }
 
+// sanitizeRegion clones a fetched region into a shape the server and the
+// clients can rely on: the region and its relays carry the map's id, a
+// null relay or one without a name is dropped, and of two relays with the
+// same name the first stays. A region without relays is kept; a client
+// simply has nothing to measure there.
+func sanitizeRegion(id tailcfg.DERPRegionID, region *tailcfg.DERPRegion) *tailcfg.DERPRegion {
+	cloned := region.Clone()
+	if cloned == nil {
+		return nil
+	}
+
+	cloned.RegionID = id
+	seen := make(map[string]bool, len(cloned.Nodes))
+	nodes := cloned.Nodes[:0]
+
+	for _, node := range cloned.Nodes {
+		if node == nil || node.Name == "" || seen[node.Name] {
+			continue
+		}
+
+		seen[node.Name] = true
+		node.RegionID = id
+		nodes = append(nodes, node)
+	}
+
+	cloned.Nodes = nodes
+
+	return cloned
+}
+
 // Build merges the maps in order, a later region replacing an earlier one
 // with the same ID, and shuffles the relays within each region so clients
 // do not all start with the same one.
@@ -179,6 +209,25 @@ func Build(maps ...*tailcfg.DERPMap) *tailcfg.DERPMap {
 	shuffleDERPMap(derpMap)
 
 	return derpMap
+}
+
+// HasRelay reports whether the map holds a relay that carries traffic,
+// not only STUN-only relays: without one a client that cannot connect
+// directly has no path.
+func HasRelay(dm *tailcfg.DERPMap) bool {
+	if dm == nil {
+		return false
+	}
+
+	for _, region := range dm.Regions {
+		for _, node := range region.Nodes {
+			if node != nil && !node.STUNOnly {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // debugUseDERPIP makes the embedded relay's region carry the server's IP
