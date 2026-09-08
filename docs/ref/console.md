@@ -183,10 +183,12 @@ the user it created.
 The sidebar starts with the overview and is then grouped by what you are
 doing. *Tailnet* holds machines and users. *Access* holds the access controls
 and, for everyone, the page to ask for temporary access. *Connectivity* holds
-networks, DNS and relays. *Logs* holds the audit log and the SSH session
-recordings. *Settings* holds the tailnet-wide switches under _General_, the
-keys and the integrations. A count next to _Machines_ and _Users_
-says how many are waiting for approval. The arrow in the sidebar footer
+networks, routes, DNS and relays. *Logs* holds the audit log and the SSH
+session recordings. *Administration* holds the settings, the keys and the
+integrations. An item with several parts, such as _Access controls_, _Keys_
+or _Integrations_, opens into a page per part, each with its own address.
+A count next to _Machines_, _Users_, _Routes_ and _Requests_ says how many
+are waiting for approval. The arrow in the sidebar footer
 collapses it to an icon rail. *Quick search*, or ++cmd+k++ / ++ctrl+k++,
 jumps to any page, machine or user by name. The top bar shows breadcrumbs
 for where you are, the light/dark switch and the account menu with *Sign
@@ -215,23 +217,27 @@ out*.
   delete users. Each user has _Sign out everywhere_, which ends every console
   session of theirs. _Invite_ mints a link for an address, with the role and
   groups the person gets on their first login.
-- **Keys**: pre-auth keys (create with reusable, ephemeral, pre-authorized and
-  tags; expire; delete), API keys and OAuth clients for the v2 API (create
-  with scopes and tags; revoke; _Rotate secret_ mints a new secret for an
-  API key that keeps its id and scopes). New keys and client secrets are
-  shown once, with a copy button.
-- **Access controls**: [groups and access rules](access-control.md), and the
-  [policy](policy.md) file in an editor with syntax highlighting. *Check*
-  validates the draft against the server without saving; *Save* applies it.
-  Leaving the page with unsaved changes asks first.
+- **Keys**: a page each for pre-auth keys (create with reusable, ephemeral,
+  pre-authorized and tags; expire; delete), API keys and OAuth clients for
+  the v2 API (create with scopes and tags; revoke; _Rotate secret_ mints a
+  new secret for an API key that keeps its id and scopes). New keys and
+  client secrets are shown once, with a copy button.
+- **Access controls**: a page each for the [rules, groups](access-control.md)
+  and [postures](device-trust.md), the queue of
+  [access requests](temporary-access.md), and the [policy](policy.md) file
+  in an editor with syntax highlighting. *Check* validates the draft against
+  the server without saving; *Save* applies it. Leaving the page with unsaved
+  changes asks first.
 - **Networks**: [networks](networks.md) that hand subnets and exit nodes to
-  groups, and a list of every route any machine advertises, with approval for
-  the ones no network owns.
+  groups.
+- **Routes**: every route any machine advertises, with approval for the ones
+  no network owns.
 - **DNS**: nameservers, split DNS, search domains and extra records, changed
   at runtime; see [DNS](dns.md).
-- **Webhooks**: endpoints that receive signed event notifications, with
-  their subscriptions and last delivery; create, edit, test, rotate the
-  secret and delete; see [Webhooks](webhooks.md).
+- **Integrations**: a page for webhooks, endpoints that receive signed event
+  notifications, with their subscriptions and last delivery (create, edit,
+  test, rotate the secret and delete; see [Webhooks](webhooks.md)), and one
+  for log streams, which ship the audit log to a SIEM in batches.
 - **Audit log**: who changed what, newest first, with filters by action, user
   and time, and _Export_ as CSV or JSON with the same filters; see
   [Audit log](audit.md).

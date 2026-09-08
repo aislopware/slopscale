@@ -46,7 +46,7 @@ export interface PanelControls {
   readonly status: StatusFilter;
   readonly handleQueryChange: (value: string) => void;
   readonly handleStatusChange: (value: string) => void;
-  /** Clears search and status, keeping the open tab. */
+  /** Clears search and status. */
   readonly handleClear: () => void;
 }
 

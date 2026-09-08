@@ -132,7 +132,14 @@ export function EventsTable({
 
   return (
     <>
-      <TableScroll pinnedRight>
+      <TableScroll
+        pinnedRight
+        below={
+          events.length === 0 ? (
+            <EmptyEvents filtered={filtered} onClearFilters={onClearFilters} />
+          ) : null
+        }
+      >
         {(overflowing) => (
           // Fixed layout: every column but Summary has a set width, so Summary takes what is left
           // of the panel and its chips wrap inside it instead of stretching the table past the
@@ -152,28 +159,20 @@ export function EventsTable({
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {events.length === 0 ? (
-                <Table.Row>
-                  <Table.Cell colSpan={columnCount} className="p-0">
-                    <EmptyEvents filtered={filtered} onClearFilters={onClearFilters} />
-                  </Table.Cell>
-                </Table.Row>
-              ) : (
-                events.map((event) => (
-                  <EventRows
-                    key={event.id}
-                    event={event}
-                    overflowing={overflowing}
-                    open={openId === event.id}
-                    onToggle={() => {
-                      setOpenId((current) => (current === event.id ? null : event.id));
-                    }}
-                    onOpen={() => {
-                      setOpenId(event.id);
-                    }}
-                  />
-                ))
-              )}
+              {events.map((event) => (
+                <EventRows
+                  key={event.id}
+                  event={event}
+                  overflowing={overflowing}
+                  open={openId === event.id}
+                  onToggle={() => {
+                    setOpenId((current) => (current === event.id ? null : event.id));
+                  }}
+                  onOpen={() => {
+                    setOpenId(event.id);
+                  }}
+                />
+              ))}
             </Table.Body>
           </Table>
         )}

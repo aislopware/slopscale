@@ -80,7 +80,7 @@ export function networksOfNode(networks: readonly Network[], nodeId: string): Ne
 
 export type RouteStatus = "approved" | "pending" | "stale";
 
-/** One advertised or approved route on one machine, the unit of the routes tab. */
+/** One advertised or approved route on one machine, the unit of the routes page. */
 export interface RouteRow {
   readonly id: string;
   readonly node: Node;

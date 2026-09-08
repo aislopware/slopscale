@@ -189,9 +189,9 @@ Through the API, `GET`, `POST /api/v1/posture`, `GET`, `PUT`,
 rule, under `policy_file` (`policy_file:read` to list). `GET /api/v1/node/{id}/postures` lists the postures a machine satisfies right
 now, and the console shows them under _Device posture_ on the machine's
 page. The audit log records `posture.create`, `posture.update` and
-`posture.delete`. In the console, postures live in a _Postures_ tab next
-to the rules and groups, and a rule's editor has a _Required postures_
-picker.
+`posture.delete`. In the console, postures live on the _Postures_ page under
+_Access controls_, next to the rules and groups, and a rule's editor has a
+_Required postures_ picker.
 
 ### Postures in the policy file
 

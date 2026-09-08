@@ -27,8 +27,6 @@ import { TableFooter } from "~/components/table/toolbar.tsx";
 import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
-const columnCount = 7;
-
 const stateBadges: Record<
   RecordingState,
   { variant: "success" | "warning" | "error"; label: string }
@@ -143,7 +141,12 @@ export function SessionsTable({
 }: SessionsTableProps): ReactElement {
   return (
     <>
-      <TableScroll pinnedRight>
+      <TableScroll
+        pinnedRight
+        below={
+          recordings.length === 0 ? <EmptySessions embeddedRecorder={embeddedRecorder} /> : null
+        }
+      >
         {(overflowing) => (
           <Table className={frameTableClass}>
             <Table.Header variant="compact" sticky>
@@ -160,22 +163,14 @@ export function SessionsTable({
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {recordings.length === 0 ? (
-                <Table.Row>
-                  <Table.Cell colSpan={columnCount} className="p-0">
-                    <EmptySessions embeddedRecorder={embeddedRecorder} />
-                  </Table.Cell>
-                </Table.Row>
-              ) : (
-                recordings.map((recording) => (
-                  <RecordingRow
-                    key={recording.id}
-                    recording={recording}
-                    writable={writable}
-                    overflowing={overflowing}
-                  />
-                ))
-              )}
+              {recordings.map((recording) => (
+                <RecordingRow
+                  key={recording.id}
+                  recording={recording}
+                  writable={writable}
+                  overflowing={overflowing}
+                />
+              ))}
             </Table.Body>
           </Table>
         )}

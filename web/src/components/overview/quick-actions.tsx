@@ -45,7 +45,7 @@ export function QuickActions({ me, onAddMachine }: QuickActionsProps): ReactElem
         </>
       ) : null}
       {can(me, "policy_file") ? (
-        <LinkButton href="/policy" variant="secondary" size="sm" icon={ShieldCheckIcon}>
+        <LinkButton href="/policy/rules" variant="secondary" size="sm" icon={ShieldCheckIcon}>
           Access controls
         </LinkButton>
       ) : null}

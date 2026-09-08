@@ -196,7 +196,7 @@ export function DeleteGroupDialog({
             {using.map((rule) => (
               <li key={rule.id} className="truncate">
                 <Link
-                  to="/policy"
+                  to="/policy/rules"
                   search={{ q: rule.name }}
                   className="hover:text-kumo-link"
                   onClick={() => {

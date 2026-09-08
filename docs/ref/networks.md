@@ -73,7 +73,7 @@ has. A network for a printer subnet on `tcp` port 631 hands out the whole
 route but lets its groups print and nothing more. The narrowing only takes
 effect while the tailnet enforces; on an open tailnet the route stays open, the
 network list reports `enforcing: false`, and the console marks the narrowing as
-not in force. The routes page under _Networks_ lists every route any
+not in force. The _Routes_ page next to _Networks_ lists every route any
 machine advertises, network-owned or not, and approves the rest by hand.
 
 A group that a network uses cannot be deleted until the network drops it.

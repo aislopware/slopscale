@@ -57,8 +57,8 @@ Requests need a user behind the credential: a console session, or an
 API key owned by a user. A member holds no admin scope and can still
 file and follow their own requests. The console shows them under
 _My access_, which every signed-in user has, and shows an approver the
-queue under _Requests_ on the _Access controls_ page, with the number
-pending on the tab.
+queue on the _Requests_ page under _Access controls_, with the number
+pending next to it in the sidebar.
 
 ```console
 headscale groups create --name "Prod" --requestable

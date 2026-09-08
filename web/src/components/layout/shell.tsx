@@ -8,12 +8,13 @@ import { useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
-import { nodesQuery, usersQuery } from "~/api/queries.ts";
+import { accessRequestsQuery, nodesQuery, usersQuery } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import { can, displayName, roleLabel } from "~/auth/me.ts";
 import { signOut } from "~/auth/session.ts";
-import type { NavItem } from "~/components/layout/nav.ts";
-import { isActive, visibleGroups } from "~/components/layout/nav.ts";
+import { pendingCount } from "~/components/access/request-model.ts";
+import type { NavBadge, NavItem, NavPath, NavPlace } from "~/components/layout/nav.ts";
+import { isActive, pagesOf, placeOf, visibleGroups } from "~/components/layout/nav.ts";
 import { QuickSearch } from "~/components/layout/quick-search.tsx";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
@@ -40,10 +41,15 @@ export function Shell({
 }): ReactElement {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const groups = visibleGroups(me);
-  const pages = groups.flatMap((group) => group.items);
-  const current = pages.find((item) => isActive(item, pathname));
+  const pages = pagesOf(groups);
+  const place = placeOf(groups, pathname);
   const counts = usePendingCounts(me);
   const [searchOpen, setSearchOpen] = useState(false);
+  // What the reader clicked open or shut, and on which page. Arriving at another page forgets it,
+  // so the branch the page is under opens and the others settle closed: the sidebar shows where
+  // the reader is, not where they poked.
+  const [toggles, setToggles] = useState<Toggles>({ at: pathname, open: {} });
+  const toggled = toggles.at === pathname ? toggles.open : {};
 
   return (
     <BreadcrumbProvider>
@@ -83,19 +89,32 @@ export function Shell({
                   <Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>
                 )}
                 <Sidebar.Menu>
-                  {group.items.map((item) => (
-                    <Sidebar.MenuButton
-                      key={item.to}
-                      href={item.to}
-                      icon={item.icon}
-                      active={isActive(item, pathname)}
-                      tooltip={item.label}
-                      className={touchRowClass}
-                    >
-                      {item.label}
-                      <PendingBadge item={item} counts={counts} />
-                    </Sidebar.MenuButton>
-                  ))}
+                  {group.items.map((item) =>
+                    item.children === undefined ? (
+                      <Sidebar.MenuButton
+                        key={item.to}
+                        href={item.to}
+                        icon={item.icon}
+                        active={isActive(item, pathname)}
+                        tooltip={item.label}
+                        className={touchRowClass}
+                      >
+                        {item.label}
+                        <PendingBadge badge={item.badge} counts={counts} />
+                      </Sidebar.MenuButton>
+                    ) : (
+                      <NavBranch
+                        key={item.to}
+                        item={item}
+                        pathname={pathname}
+                        counts={counts}
+                        open={toggled[item.to]}
+                        onOpenChange={(open) => {
+                          setToggles({ at: pathname, open: { ...toggled, [item.to]: open } });
+                        }}
+                      />
+                    ),
+                  )}
                 </Sidebar.Menu>
               </Sidebar.Group>
             ))}
@@ -107,7 +126,7 @@ export function Shell({
         </Sidebar>
         <div className="flex min-h-svh min-w-0 flex-1 flex-col bg-kumo-canvas">
           <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 border-b border-kumo-line bg-kumo-base px-4 lg:px-6">
-            <Trail current={current} />
+            <Trail place={place} />
             <div className="flex items-center gap-1">
               <ThemeToggle />
               <AccountMenu me={me} />
@@ -125,34 +144,107 @@ export function Shell({
   );
 }
 
-interface PendingCounts {
-  readonly pendingNodes: number;
-  readonly pendingUsers: number;
+interface Toggles {
+  /** The page the reader was on when they clicked. */
+  readonly at: string;
+  readonly open: Partial<Record<NavPath, boolean>>;
 }
+
+/**
+ * A branch of the sidebar: a button that opens and closes the pages under it. It opens on its own
+ * while one of them is the current page, and shows as current itself only while closed, so the
+ * highlight is on one row at a time. Closed, it carries the sum of its pages' counts.
+ */
+function NavBranch({
+  item,
+  pathname,
+  counts,
+  open,
+  onOpenChange,
+}: {
+  readonly item: NavItem;
+  readonly pathname: string;
+  readonly counts: PendingCounts;
+  /** What the reader last clicked it to, or nothing since the last page change. */
+  readonly open: boolean | undefined;
+  readonly onOpenChange: (open: boolean) => void;
+}): ReactElement {
+  const children = item.children ?? [];
+  const active = isActive(item, pathname);
+  const shown = open ?? active;
+  const total = children.reduce(
+    (sum, child) => sum + (child.badge === undefined ? 0 : counts[child.badge]),
+    0,
+  );
+
+  return (
+    <Sidebar.MenuItem>
+      <Sidebar.Collapsible open={shown} onOpenChange={onOpenChange}>
+        <Sidebar.CollapsibleTrigger
+          render={
+            <Sidebar.MenuButton
+              icon={item.icon}
+              active={active && !shown}
+              tooltip={item.label}
+              className={touchRowClass}
+            >
+              {item.label}
+              {shown ? null : <CountBadge count={total} />}
+              <Sidebar.MenuChevron />
+            </Sidebar.MenuButton>
+          }
+        />
+        <Sidebar.CollapsibleContent>
+          <Sidebar.MenuSub>
+            {children.map((child) => (
+              <Sidebar.MenuSubButton
+                key={child.to}
+                href={child.to}
+                active={isActive(child, pathname)}
+                className={touchRowClass}
+              >
+                {child.label}
+                <PendingBadge badge={child.badge} counts={counts} />
+              </Sidebar.MenuSubButton>
+            ))}
+          </Sidebar.MenuSub>
+        </Sidebar.CollapsibleContent>
+      </Sidebar.Collapsible>
+    </Sidebar.MenuItem>
+  );
+}
+
+type PendingCounts = Readonly<Record<NavBadge, number>>;
 
 function usePendingCounts(me: Me): PendingCounts {
   const nodes = useQuery({ ...nodesQuery, enabled: can(me, "devices:core:read") });
   const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
+  const requests = useQuery({ ...accessRequestsQuery, enabled: can(me, "policy_file:read") });
+  const nodeList = nodes.data?.nodes ?? [];
 
   return {
-    pendingNodes: (nodes.data?.nodes ?? []).filter((node) => !node.approved).length,
+    pendingNodes: nodeList.filter((node) => !node.approved).length,
     pendingUsers: (users.data?.users ?? []).filter((user) => !user.approved).length,
+    pendingRoutes: nodeList.reduce(
+      (sum, node) =>
+        sum + node.availableRoutes.filter((route) => !node.approvedRoutes.includes(route)).length,
+      0,
+    ),
+    pendingRequests: pendingCount(requests.data?.requests ?? []),
   };
 }
 
 function PendingBadge({
-  item,
+  badge,
   counts,
 }: {
-  readonly item: NavItem;
+  readonly badge: NavBadge | undefined;
   readonly counts: PendingCounts;
 }): ReactElement | null {
-  if (item.badge === undefined) {
-    return null;
-  }
+  return badge === undefined ? null : <CountBadge count={counts[badge]} />;
+}
 
-  const count = counts[item.badge];
-
+function CountBadge({ count }: { readonly count: number }): ReactElement | null {
   return count === 0 ? null : (
     <Sidebar.MenuBadge title={`${count} waiting for approval`}>{count}</Sidebar.MenuBadge>
   );
@@ -169,21 +261,29 @@ function Brand(): ReactElement {
   );
 }
 
-/** Breadcrumb trail: the section, then the page a detail route announced through useBreadcrumb. */
-function Trail({ current }: { readonly current: NavItem | undefined }): ReactElement {
+/**
+ * Breadcrumb trail: the sidebar item, then the page under it when the item is a branch, or the page
+ * a detail route announced through useBreadcrumb. A branch's crumb goes straight to its first page
+ * the caller may see, the one its own address would redirect to.
+ */
+function Trail({ place }: { readonly place: NavPlace | undefined }): ReactElement {
   const leaf = useBreadcrumbLeaf();
+  const current = place?.item;
+  const last: string | null = place?.child?.label ?? leaf;
 
   return (
     <div className="flex min-w-0 items-center gap-2">
       <Sidebar.Trigger className="md:hidden" aria-label="Open navigation" />
       <Breadcrumbs>
-        {current === undefined || leaf === null ? (
+        {current === undefined || last === null ? (
           <Breadcrumbs.Current>{current?.label ?? leaf ?? "headscale"}</Breadcrumbs.Current>
         ) : (
           <>
-            <Breadcrumbs.Link href={current.to}>{current.label}</Breadcrumbs.Link>
+            <Breadcrumbs.Link href={current.children?.[0]?.to ?? current.to}>
+              {current.label}
+            </Breadcrumbs.Link>
             <Breadcrumbs.Separator />
-            <Breadcrumbs.Current>{leaf}</Breadcrumbs.Current>
+            <Breadcrumbs.Current>{last}</Breadcrumbs.Current>
           </>
         )}
       </Breadcrumbs>

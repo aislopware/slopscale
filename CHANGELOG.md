@@ -223,7 +223,7 @@ address or a schedule boundary changes. The policy file takes Tailscale's
 `postures`, `srcPosture` and `defaultSrcPosture` as well. `/api/v1/posture`,
 `POST /api/v1/posture/check`, `GET /api/v1/node/{id}/postures`,
 `headscale postures`, the `--posture` flag of `headscale access-rules`, a
-_Postures_ tab and a _Required postures_ picker in the console's access
+_Postures_ page and a _Required postures_ picker in the console's access
 controls cover it. See
 [Device trust](https://headscale.net/development/ref/device-trust/).
 
@@ -244,7 +244,7 @@ rebuilds the policy. `--expires` on `headscale access-rules` and
 `/api/v1/access-request`, the `accessRequestCreated`,
 `accessRequestApproved` and `accessRequestDenied` webhook events, the
 `access_request.*` audit actions, a _My access_ page for every signed-in
-user and a _Requests_ tab under the console's access controls cover it.
+user and a _Requests_ page under the console's access controls cover it.
 See [Temporary access](https://headscale.net/development/ref/temporary-access/).
 
 ### Notifications and log streaming
@@ -312,8 +312,8 @@ only the machines in its groups ever see them, which makes a split tunnel
 without a policy file. Two routers make a failover pair. A network can narrow
 what its groups reach behind the routers to a protocol and ports, the way an
 access rule does, so a printer subnet can be handed out on TCP 631 alone.
-Manage networks from the console's _Networks_ page, which also lists every
-route any machine advertises, with `headscale networks`, or through
+Manage networks from the console's _Networks_ page, with every route any
+machine advertises on the _Routes_ page next to it, with `headscale networks`, or through
 `/api/v1/network`. See [Networks](https://headscale.net/development/ref/networks/).
 
 ### Global exit node
@@ -339,7 +339,10 @@ Windows, Docker, the phone apps) with a QR code carrying the same line, so a
 machine without a shared clipboard can scan it. Panels, tables and dialogs
 are framed: a tinted band carries the title, the column headers or the row
 count, and the content sits on an inset panel with concentric corners; a
-table's search, filters and primary action sit on the page above its frame. Copyable values
+table's search, filters and primary action sit on the page above its frame. A
+page with several parts, such as the access controls, the keys or the
+integrations, is a branch of the sidebar with a page and an address per part
+rather than a row of tabs. Copyable values
 keep their copy icon in view. There is a dark mode. It signs
 in only through the configured identity
 provider (Google, or any OIDC issuer) and shows what that user's role allows.

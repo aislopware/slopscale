@@ -10,7 +10,7 @@ import { nodesQuery, usersQuery } from "~/api/queries.ts";
 import type { Node, User } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import { can } from "~/auth/me.ts";
-import type { NavItem } from "~/components/layout/nav.ts";
+import type { NavPage } from "~/components/layout/nav.ts";
 
 interface Command {
   readonly id: string;
@@ -62,7 +62,7 @@ export function QuickSearch({
   onOpenChange,
 }: {
   readonly me: Me;
-  readonly pages: readonly NavItem[];
+  readonly pages: readonly NavPage[];
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
 }): ReactElement {
@@ -172,7 +172,7 @@ function useShortcut(open: boolean, onOpenChange: (open: boolean) => void): void
 }
 
 interface Sources {
-  readonly pages: readonly NavItem[];
+  readonly pages: readonly NavPage[];
   readonly nodes: readonly Node[];
   readonly users: readonly User[];
 }
@@ -190,6 +190,7 @@ function buildGroups(
       items: pages.map((page) => ({
         id: `page:${page.to}`,
         title: page.label,
+        ...(page.hint === undefined ? {} : { hint: page.hint }),
         icon: page.icon,
         go: () => {
           void navigate({ to: page.to });

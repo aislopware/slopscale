@@ -24,7 +24,7 @@ export function MatchedPostures({ node }: { readonly node: Node }): ReactElement
     <SectionRow className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-4">
         <span className="text-sm font-medium text-kumo-default">Postures</span>
-        <Link to="/policy" search={{ tab: "postures" }} className="text-xs text-kumo-link">
+        <Link to="/policy/postures" className="text-xs text-kumo-link">
           Manage postures
         </Link>
       </div>

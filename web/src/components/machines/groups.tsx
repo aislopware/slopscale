@@ -133,8 +133,8 @@ function GroupRow({
     <SectionRow className="flex items-center justify-between gap-4 py-2.5">
       <span className="flex min-w-0 flex-col gap-0.5">
         <Link
-          to="/policy"
-          search={{ tab: "groups", q: group.name }}
+          to="/policy/groups"
+          search={{ q: group.name }}
           className="truncate font-medium text-kumo-default hover:text-kumo-link"
         >
           {group.name}
