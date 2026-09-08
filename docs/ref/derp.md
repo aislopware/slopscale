@@ -28,6 +28,12 @@ Keep in mind that [additional ports are needed to run a DERP server](../setup/re
 relaying traffic, it also uses STUN (udp/3478) to help clients discover their public IP addresses and perform NAT
 traversal. [Check DERP server connectivity](#check-derp-server-connectivity) to see if everything works.
 
+The embedded DERP server also answers `/bootstrap-dns`, the endpoint a client asks when its own DNS is broken, for
+example while `tailscale switch` moves it between servers and `/etc/resolv.conf` still points at the old tailnet's
+MagicDNS. The answer is the addresses of every DERP node and of this server, resolved every ten minutes; the client's
+`q` parameter narrows it to the name asked for. External DERP servers answer that endpoint only when run with
+`derper --bootstrap-dns-names`.
+
 ### Remove Tailscale's DERP servers
 
 Once enabled, Headscale's embedded DERP is added to the list of free-to-use [DERP

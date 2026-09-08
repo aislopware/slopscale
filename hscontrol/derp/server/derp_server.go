@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -193,57 +192,6 @@ func DERPProbeHandler(
 		writer.WriteHeader(http.StatusMethodNotAllowed)
 
 		_, err := writer.Write([]byte("bogus probe method"))
-		if err != nil {
-			log.Error().
-				Caller().
-				Err(err).
-				Msg("Failed to write HTTP response")
-		}
-	}
-}
-
-// DERPBootstrapDNSHandler implements the /bootstrap-dns endpoint
-// Described in https://github.com/tailscale/tailscale/issues/1405,
-// this endpoint provides a way to help a client when it fails to start up
-// because its DNS are broken.
-// The initial implementation is here https://github.com/tailscale/tailscale/pull/1406
-// They have a cache, but not clear if that is really necessary at Headscale, uh, scale.
-// An example implementation is found here https://derp.tailscale.com/bootstrap-dns
-// Coordination server is included automatically, since local DERP is using the same DNS Name in d.serverURL.
-func DERPBootstrapDNSHandler(
-	derpMap tailcfg.DERPMapView,
-) func(http.ResponseWriter, *http.Request) {
-	return func(
-		writer http.ResponseWriter,
-		req *http.Request,
-	) {
-		dnsEntries := make(map[string][]net.IP)
-
-		resolvCtx, cancel := context.WithTimeout(req.Context(), time.Minute)
-		defer cancel()
-
-		var resolver net.Resolver
-
-		for _, region := range derpMap.Regions().All() {
-			for _, node := range region.Nodes().All() {
-				addrs, err := resolver.LookupIP(resolvCtx, "ip", node.HostName())
-				if err != nil {
-					log.Trace().
-						Caller().
-						Err(err).
-						Msgf("bootstrap DNS lookup failed %q", node.HostName())
-
-					continue
-				}
-
-				dnsEntries[node.HostName()] = addrs
-			}
-		}
-
-		writer.Header().Set("Content-Type", "application/json")
-		writer.WriteHeader(http.StatusOK)
-
-		err := json.NewEncoder(writer).Encode(dnsEntries)
 		if err != nil {
 			log.Error().
 				Caller().

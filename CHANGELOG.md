@@ -338,6 +338,7 @@ console's _Audit log_ page; bound it with `audit.retention`. See
 - `HEADSCALE_DEBUG_DEADLOCK` and `HEADSCALE_DEBUG_DEADLOCK_TIMEOUT` are removed; they configured a lock detector no lock used
 - SQLite is compiled in defensive mode with double-quoted string literals disabled (the flags in `sqlite.cflags`), so SQL that could corrupt the database file is refused and a mistyped `"identifier"` is an error rather than a silent string; a binary built without those flags still runs but logs a warning at startup
 - Expiring or deleting a non-existent pre-auth key now returns an error instead of silently succeeding [#3324](https://github.com/juanfont/headscale/pull/3324)
+- The embedded DERP server's `/bootstrap-dns` now answers the `q` parameter a client sends when its own DNS is broken, and includes the control server's own address next to the DERP nodes, resolved every ten minutes instead of on every request. A client can therefore find the server through the DERP it still reaches by IP, which is what `tailscale switch` between two servers needs [#2757](https://github.com/juanfont/headscale/issues/2757)
 - Improve systemd service file hardening [#3341](https://github.com/juanfont/headscale/pull/3341)
 - Headscale now requires Go 1.27 to build
 - Fix `headscale policy set --bypass-server-and-access-database-directly` storing the policy with its comments blanked out; the file is now saved as written

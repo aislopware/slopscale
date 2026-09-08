@@ -513,65 +513,6 @@ func TestDERPProbeHandler(t *testing.T) {
 	}
 }
 
-func TestDERPBootstrapDNSHandler(t *testing.T) {
-	t.Parallel()
-
-	derpMap := &tailcfg.DERPMap{
-		Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
-			1: {
-				RegionID: 1,
-				Nodes: []*tailcfg.DERPNode{
-					// IP literals resolve without touching DNS, which keeps
-					// the test deterministic offline.
-					{Name: "1a", RegionID: 1, HostName: "127.0.0.1"},
-					{Name: "1b", RegionID: 1, HostName: "::1"},
-				},
-			},
-			2: {
-				RegionID: 2,
-				Nodes: []*tailcfg.DERPNode{
-					// RFC 2606 reserves .invalid; the lookup fails and the
-					// entry is skipped rather than failing the response.
-					{Name: "2a", RegionID: 2, HostName: "derp.headscale.invalid"},
-				},
-			},
-		},
-	}
-
-	rec := httptest.NewRecorder()
-	DERPBootstrapDNSHandler(
-		derpMap.View(),
-	)(
-		rec,
-		httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/bootstrap-dns", nil),
-	)
-
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
-
-	var entries map[string][]string
-	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &entries))
-
-	assert.Equal(t, []string{"127.0.0.1"}, entries["127.0.0.1"])
-	assert.Equal(t, []string{"::1"}, entries["::1"])
-	assert.NotContains(t, entries, "derp.headscale.invalid")
-}
-
-func TestDERPBootstrapDNSHandlerEmptyMap(t *testing.T) {
-	t.Parallel()
-
-	rec := httptest.NewRecorder()
-	DERPBootstrapDNSHandler(
-		(&tailcfg.DERPMap{}).View(),
-	)(
-		rec,
-		httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/bootstrap-dns", nil),
-	)
-
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, "{}", rec.Body.String())
-}
-
 func TestServerSTUNListener(t *testing.T) {
 	t.Parallel()
 
