@@ -2,6 +2,7 @@ package hscontrol
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,8 +12,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/juanfont/headscale/hscontrol/capver"
 	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/juanfont/headscale/web"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -242,5 +245,35 @@ func TestHttpUserError(t *testing.T) {
 				assert.NotContains(t, rec.Body.String(), tt.wantNotContain)
 			}
 		})
+	}
+}
+
+// TestRegisterHandlerLinksToConsole pins the registration page to the console
+// form that finishes the flow: the link carries the auth id and appears
+// exactly when the binary embeds a console, so a build without one keeps
+// pointing at the CLI alone.
+func TestRegisterHandlerLinksToConsole(t *testing.T) {
+	t.Parallel()
+
+	authID := types.MustAuthID()
+	provider := &AuthProviderWeb{}
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("auth_id", authID.String())
+	req := httptest.NewRequestWithContext(
+		context.WithValue(t.Context(), chi.RouteCtxKey, rctx),
+		http.MethodGet, "/register/"+authID.String(), http.NoBody,
+	)
+	rec := httptest.NewRecorder()
+
+	provider.RegisterHandler(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "headscale auth register --auth-id "+authID.String())
+
+	link := web.Prefix + "machines/register?key=" + authID.String()
+	if web.Built() {
+		assert.Contains(t, rec.Body.String(), `href="`+link+`"`)
+	} else {
+		assert.NotContains(t, rec.Body.String(), link)
 	}
 }
