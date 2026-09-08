@@ -792,7 +792,7 @@ components:
       additionalProperties: false
       properties:
         builtin:
-          description: Empty for operator-made groups, "all" for the builtin group.
+          description: Empty for operator-made groups, else "all" or "self".
           type: string
         createdAt:
           format: date-time
@@ -813,7 +813,7 @@ components:
             type: string
           type: array
         requestable:
-          description: Whether members may request to join the group for a while.
+          description: Whether members may ask to join the group for a while.
           type: boolean
         updatedAt:
           format: date-time
@@ -3318,7 +3318,7 @@ paths:
   /api/v1/group:
     get:
       description: |-
-        Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none.
+        Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none; the builtin "self" group is a rule destination meaning the machines owned by the same user as the source.
 
         Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: listGroups
@@ -3438,7 +3438,7 @@ paths:
       x-required-scope: policy_file:read
     patch:
       description: |-
-        Renames or re-describes a group and replaces its machines and users when given. The builtin group cannot be changed.
+        Renames or re-describes a group and replaces its machines and users when given. The builtin groups cannot be changed.
 
         Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: updateGroup

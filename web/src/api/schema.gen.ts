@@ -467,7 +467,7 @@ export interface paths {
         };
         /**
          * List groups
-         * @description Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none.
+         * @description Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none; the builtin "self" group is a rule destination meaning the machines owned by the same user as the source.
          *
          *     Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -511,7 +511,7 @@ export interface paths {
         head?: never;
         /**
          * Update group
-         * @description Renames or re-describes a group and replaces its machines and users when given. The builtin group cannot be changed.
+         * @description Renames or re-describes a group and replaces its machines and users when given. The builtin groups cannot be changed.
          *
          *     Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -2071,7 +2071,7 @@ export interface components {
             id?: string;
         };
         Group: {
-            /** @description Empty for operator-made groups, "all" for the builtin group. */
+            /** @description Empty for operator-made groups, else "all" or "self". */
             builtin: string;
             /** Format: date-time */
             createdAt: string;
@@ -2081,7 +2081,7 @@ export interface components {
             id: string;
             name: string;
             nodeIds: string[];
-            /** @description Whether members may request to join the group for a while. */
+            /** @description Whether members may ask to join the group for a while. */
             requestable: boolean;
             /** Format: date-time */
             updatedAt: string;
