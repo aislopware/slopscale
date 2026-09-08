@@ -3,14 +3,11 @@ import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import type { ReactElement } from "react";
 
 import { expiresSoon } from "~/components/keys/status.ts";
-import { CopyButton } from "~/components/ui/copy-button.tsx";
+import { CopyText } from "~/components/ui/copy-text.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { formatAbsolute, formatRelative, isPast, parseTime } from "~/lib/time.ts";
 
-/**
- * The identifying head of a key: monospace, with a copy button that appears when the row is
- * hovered. The row supplies the `group/row` class.
- */
+/** The identifying head of a key: a click-to-copy monospace run. */
 export function KeyPrefix({
   text,
   copy,
@@ -21,16 +18,7 @@ export function KeyPrefix({
   readonly copy: string;
   readonly label: string;
 }): ReactElement {
-  return (
-    <span className="flex items-center gap-1">
-      <span className="truncate font-mono text-[0.9em] text-kumo-default">{text}</span>
-      <CopyButton
-        value={copy}
-        label={label}
-        className="opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100"
-      />
-    </span>
-  );
+  return <CopyText value={text} copy={copy} label={label} className="text-kumo-default" />;
 }
 
 /** When a key runs out: quiet until the last day, then a warning badge, then an error one. */

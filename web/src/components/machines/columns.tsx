@@ -13,12 +13,12 @@ import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import type { Node, User } from "~/api/queries.ts";
-import { CopyText } from "~/components/machines/copy-text.tsx";
 import { expiryWorthShowing } from "~/components/machines/filters.ts";
 import { MachineMenu } from "~/components/machines/menu.tsx";
 import { StatusBadge } from "~/components/machines/status-badge.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
+import { CopyText } from "~/components/ui/copy-text.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import {
   approvedSubnets,

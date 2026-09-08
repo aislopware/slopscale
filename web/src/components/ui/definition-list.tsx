@@ -1,19 +1,20 @@
 import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement, ReactNode } from "react";
 
-import { CopyButton } from "~/components/ui/copy-button.tsx";
+import { CopyText } from "~/components/ui/copy-text.tsx";
 
 export interface Definition {
   readonly label: ReactNode;
   readonly value: ReactNode;
-  /** Renders the value in monospace and adds a hover copy button for this text. */
+  /** Renders the value as a click-to-copy monospace run putting this text on the clipboard. */
   readonly copy?: string;
   readonly key?: string;
 }
 
 /**
  * Label/value rows with hairlines between them: the console's way to show facts about a resource.
- * Mono values get a copy button that appears on hover, instead of input-shaped boxes.
+ * Mono values are a CopyText: click to copy, with the icon always visible so every value ends at
+ * the same edge.
  */
 export function DefinitionList({
   items,
@@ -34,26 +35,20 @@ export function DefinitionList({
         <div
           key={item.key ?? index}
           className={cn(
-            "group flex min-w-0 items-baseline justify-between gap-4 border-t border-kumo-hairline px-5 py-2.5 first:border-t-0",
+            "flex min-w-0 items-baseline justify-between gap-4 border-t border-kumo-hairline px-5 py-2.5 first:border-t-0",
             columns === 2 && "xl:nth-[2]:border-t-0",
           )}
         >
           <dt className="shrink-0 text-kumo-subtle">{item.label}</dt>
-          <dd className="flex min-w-0 items-center gap-1.5 text-right text-kumo-default">
+          <dd className="flex min-w-0 items-center justify-end text-right text-kumo-default">
             {item.copy === undefined ? (
               <span className={cn("min-w-0", wrap ? "break-all" : "truncate")}>{item.value}</span>
             ) : (
-              <>
-                <span
-                  className={cn("min-w-0 font-mono text-[0.9em]", wrap ? "break-all" : "truncate")}
-                >
-                  {item.value}
-                </span>
-                <CopyButton
-                  value={item.copy}
-                  className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                />
-              </>
+              <CopyText
+                value={typeof item.value === "string" ? item.value : item.copy}
+                copy={item.copy}
+                wrap={wrap}
+              />
             )}
           </dd>
         </div>

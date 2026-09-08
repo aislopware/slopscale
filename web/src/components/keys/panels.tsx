@@ -304,7 +304,6 @@ function PanelTable({
 }): ReactElement {
   return (
     <DataTable
-      rowClassName="group/row"
       empty={
         total === 0 ? (
           firstEmpty
