@@ -227,6 +227,57 @@ func (node *Node) postureAttributes(now time.Time) PostureAttributes {
 	return attrs
 }
 
+// postureInputsEqual reports whether two nodes feed [Node.postureAttributes]
+// the same values, comparing the inputs in place rather than building
+// the two maps. It runs for every node on every NodeStore write, in
+// [NodeView.HasPolicyChange]. Expiry is left out, as the map compared
+// there is built at the zero time; a custom attribute that shadows a
+// reported one counts as a change here, which only costs a recompile.
+func (node *Node) postureInputsEqual(other *Node) bool {
+	if node.IsTagged() != other.IsTagged() {
+		return false
+	}
+
+	if !hostinfoPostureEqual(node.Hostinfo, other.Hostinfo) {
+		return false
+	}
+
+	if !slices.Equal(node.serialNumbers(), other.serialNumbers()) {
+		return false
+	}
+
+	return slices.EqualFunc(node.Attributes, other.Attributes, func(a, b NodeAttribute) bool {
+		return a.Key == b.Key && a.Value == b.Value
+	})
+}
+
+func (node *Node) serialNumbers() []string {
+	if node.Posture == nil {
+		return nil
+	}
+
+	return node.Posture.SerialNumbers
+}
+
+// hostinfoPostureEqual compares the Hostinfo fields the attribute map
+// carries.
+func hostinfoPostureEqual(a, b *tailcfg.Hostinfo) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+
+	return a.OS == b.OS &&
+		a.OSVersion == b.OSVersion &&
+		a.IPNVersion == b.IPNVersion &&
+		a.AllowsUpdate == b.AllowsUpdate &&
+		a.Hostname == b.Hostname &&
+		a.Machine == b.Machine &&
+		a.Distro == b.Distro &&
+		a.DistroVersion == b.DistroVersion &&
+		a.DeviceModel == b.DeviceModel &&
+		a.Package == b.Package
+}
+
 // PostureAttributes returns the node's attribute map now.
 func (nv NodeView) PostureAttributes(now time.Time) PostureAttributes {
 	if !nv.Valid() {

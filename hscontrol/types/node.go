@@ -383,16 +383,20 @@ func (node *Node) RequestTags() []string {
 }
 
 func (node *Node) Prefixes() []netip.Prefix {
-	ips := node.IPs()
-	if len(ips) == 0 {
+	if node.IPv4 == nil && node.IPv6 == nil {
 		return nil
 	}
 
-	addrs := make([]netip.Prefix, 0, len(ips))
+	// Built straight from the two addresses: this runs once per peer per
+	// map response, so it skips the intermediate [Node.IPs] slice.
+	addrs := make([]netip.Prefix, 0, 2)
 
-	for _, nodeAddress := range ips {
-		ip := netip.PrefixFrom(nodeAddress, nodeAddress.BitLen())
-		addrs = append(addrs, ip)
+	if node.IPv4 != nil {
+		addrs = append(addrs, netip.PrefixFrom(*node.IPv4, node.IPv4.BitLen()))
+	}
+
+	if node.IPv6 != nil {
+		addrs = append(addrs, netip.PrefixFrom(*node.IPv6, node.IPv6.BitLen()))
 	}
 
 	return addrs
@@ -1269,20 +1273,7 @@ func (nv NodeView) HasPolicyChange(other NodeView) bool {
 	// The policy's postures read the attribute map, so what feeds it
 	// counts: the reported OS and versions, the serials and the custom
 	// attributes.
-	return !maps.EqualFunc(nv.PostureAttributes(time.Time{}), other.PostureAttributes(time.Time{}), attributeEqual)
-}
-
-// attributeEqual compares two attribute values, which are scalars or
-// serial number lists.
-func attributeEqual(a, b any) bool {
-	as, aok := a.([]string)
-	bs, bok := b.([]string)
-
-	if aok || bok {
-		return aok && bok && slices.Equal(as, bs)
-	}
-
-	return a == b
+	return !nv.ж.postureInputsEqual(other.ж)
 }
 
 // TailNodes converts a slice of [NodeView] values into Tailscale [tailcfg.Node] values.
