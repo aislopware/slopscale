@@ -640,14 +640,9 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 
 	// Precompute each node's subnet routes and exit-node status once; the
 	// O(n^2) pair scans below would otherwise recompute them for every pair.
-	type nodeRoutes struct {
-		subnet []netip.Prefix
-		isExit bool
-	}
-
 	routeInfo := make(map[types.NodeID]nodeRoutes, nodes.Len())
 	for _, n := range nodes.All() {
-		routeInfo[n.ID()] = nodeRoutes{subnet: n.SubnetRoutes(), isExit: n.IsExitNode()}
+		routeInfo[n.ID()] = routesOf(n)
 	}
 
 	// If we have a global filter, use it for all nodes (normal case).
@@ -664,8 +659,7 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 				}
 
 				ri, rj := routeInfo[nodes.At(i).ID()], routeInfo[nodes.At(j).ID()]
-				if nodes.At(i).CanAccessWithRoutes(pm.matchers, nodes.At(j), ri.subnet, rj.subnet, rj.isExit) ||
-					nodes.At(j).CanAccessWithRoutes(pm.matchers, nodes.At(i), rj.subnet, ri.subnet, ri.isExit) {
+				if pm.globalPeersLocked(nodes.At(i), nodes.At(j), ri, rj) {
 					ret[nodes.At(i).ID()] = append(ret[nodes.At(i).ID()], nodes.At(j))
 					ret[nodes.At(j).ID()] = append(ret[nodes.At(j).ID()], nodes.At(i))
 				}
@@ -690,35 +684,14 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 
 	// Check each node pair for peer relationships.
 	// Start j at i+1 to avoid checking the same pair twice and creating duplicates.
-	// We use symmetric visibility: if EITHER node can access the other, BOTH see
-	// each other. This matches the global filter path behavior and ensures that
-	// one-way access rules (e.g., admin -> tagged server) still allow both nodes
-	// to see each other as peers, which is required for network connectivity.
 	for i := range nodes.Len() {
 		nodeI := nodes.At(i)
-		matchersI, hasFilterI := nodeMatchers[nodeI.ID()]
-		riI := routeInfo[nodeI.ID()]
 
 		for j := i + 1; j < nodes.Len(); j++ {
 			nodeJ := nodes.At(j)
-			matchersJ, hasFilterJ := nodeMatchers[nodeJ.ID()]
-			riJ := routeInfo[nodeJ.ID()]
 
-			// Check all access directions for symmetric peer visibility.
-			// For via grants, filter rules exist on the via-designated node
-			// (e.g., router-a) with sources being the client (group-a).
-			// We need to check BOTH:
-			//   1. nodeI.CanAccess(matchersI, nodeJ) — can nodeI reach nodeJ?
-			//   2. nodeJ.CanAccess(matchersI, nodeI) — can nodeJ reach nodeI
-			//      using nodeI's matchers? (reverse direction: the matchers
-			//      on the via node accept traffic FROM the source)
-			// Same for matchersJ in both directions.
-			canIAccessJ := hasFilterI && nodeI.CanAccessWithRoutes(matchersI, nodeJ, riI.subnet, riJ.subnet, riJ.isExit)
-			canJAccessI := hasFilterJ && nodeJ.CanAccessWithRoutes(matchersJ, nodeI, riJ.subnet, riI.subnet, riI.isExit)
-			canJReachI := hasFilterI && nodeJ.CanAccessWithRoutes(matchersI, nodeI, riJ.subnet, riI.subnet, riI.isExit)
-			canIReachJ := hasFilterJ && nodeI.CanAccessWithRoutes(matchersJ, nodeJ, riI.subnet, riJ.subnet, riJ.isExit)
-
-			if canIAccessJ || canJAccessI || canJReachI || canIReachJ {
+			if perNodePeers(nodeI, nodeJ, nodeMatchers[nodeI.ID()], nodeMatchers[nodeJ.ID()],
+				routeInfo[nodeI.ID()], routeInfo[nodeJ.ID()]) {
 				ret[nodeI.ID()] = append(ret[nodeI.ID()], nodeJ)
 				ret[nodeJ.ID()] = append(ret[nodeJ.ID()], nodeI)
 			}
@@ -726,6 +699,82 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 	}
 
 	return ret
+}
+
+// nodeRoutes is a node's subnet routes and exit-node status, computed
+// once per peer scan.
+type nodeRoutes struct {
+	subnet []netip.Prefix
+	isExit bool
+}
+
+func routesOf(n types.NodeView) nodeRoutes {
+	return nodeRoutes{subnet: n.SubnetRoutes(), isExit: n.IsExitNode()}
+}
+
+// perNodePeers reports whether a and b see each other under per-node
+// filters. Visibility is symmetric: if EITHER node can access the other,
+// BOTH see each other, so one-way rules (admin -> tagged server) still
+// connect. Each node's own matchers are checked in both directions: for
+// via grants the rules live on the via node with the client as source,
+// and for autogroup:shared they live on the shared node with the sharee
+// as source, so the other node's matchers are the ones that admit it.
+func perNodePeers(a, b types.NodeView, ma, mb []matcher.Match, ra, rb nodeRoutes) bool {
+	hasA, hasB := len(ma) > 0, len(mb) > 0
+
+	return (hasA && a.CanAccessWithRoutes(ma, b, ra.subnet, rb.subnet, rb.isExit)) ||
+		(hasB && b.CanAccessWithRoutes(mb, a, rb.subnet, ra.subnet, ra.isExit)) ||
+		(hasA && b.CanAccessWithRoutes(ma, a, rb.subnet, ra.subnet, ra.isExit)) ||
+		(hasB && a.CanAccessWithRoutes(mb, b, ra.subnet, rb.subnet, rb.isExit))
+}
+
+// VisiblePeers narrows candidates to the ones node may see: the decision
+// [PolicyManager.BuildPeerMap] makes for every pair of the tailnet, made
+// for one node against a candidate list. The incremental map paths use
+// it so a node added or changed reaches only the netmaps the full map
+// would show it in. Without a policy every candidate is visible; with a
+// policy that leaves node's own filter empty (autogroup:shared before
+// anything is shared) the candidates' filters still decide, and a
+// candidate nobody's filter admits stays hidden.
+func (pm *PolicyManager) VisiblePeers(
+	node types.NodeView,
+	candidates views.Slice[types.NodeView],
+) views.Slice[types.NodeView] {
+	if pm == nil {
+		return candidates
+	}
+
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	rn := routesOf(node)
+	out := make([]types.NodeView, 0, candidates.Len())
+
+	var nodeMatchers []matcher.Match
+	if pm.needsPerNodeFilter {
+		nodeMatchers = pm.matchersForNodeLocked(node)
+	}
+
+	for _, peer := range candidates.All() {
+		if peer.ID() == node.ID() {
+			continue
+		}
+
+		rp := routesOf(peer)
+
+		var visible bool
+		if pm.needsPerNodeFilter {
+			visible = perNodePeers(node, peer, nodeMatchers, pm.matchersForNodeLocked(peer), rn, rp)
+		} else {
+			visible = pm.globalPeersLocked(node, peer, rn, rp)
+		}
+
+		if visible {
+			out = append(out, peer)
+		}
+	}
+
+	return views.SliceOf(out)
 }
 
 // FilterForNode returns the filter rules for a specific node, already reduced
@@ -771,17 +820,7 @@ func (pm *PolicyManager) MatchersForNode(node types.NodeView) ([]matcher.Match, 
 		return pm.matchers, nil
 	}
 
-	if cached, ok := pm.matchersForNodeMap.Load(node.ID()); ok {
-		return cached, nil
-	}
-
-	// For autogroup:self or via grants, derive matchers from
-	// the stored compiled grants for this specific node.
-	unreduced := pm.filterRulesForNodeLocked(node)
-	matchers := matcher.MatchesFromFilterRules(unreduced)
-	pm.matchersForNodeMap.Store(node.ID(), matchers)
-
-	return matchers, nil
+	return pm.matchersForNodeLocked(node), nil
 }
 
 // SetUsers updates the users in the policy manager and updates the filter rules.
@@ -1620,6 +1659,29 @@ func (pm *PolicyManager) NodesWithChangedCapMap() []types.NodeID {
 	pm.nodeAttrsChanged = nil
 
 	return out
+}
+
+// globalPeersLocked reports whether a and b see each other under the
+// global filter: either may reach the other.
+func (pm *PolicyManager) globalPeersLocked(a, b types.NodeView, ra, rb nodeRoutes) bool {
+	return a.CanAccessWithRoutes(pm.matchers, b, ra.subnet, rb.subnet, rb.isExit) ||
+		b.CanAccessWithRoutes(pm.matchers, a, rb.subnet, ra.subnet, ra.isExit)
+}
+
+// matchersForNodeLocked derives a node's unreduced matchers from the
+// compiled grants, cached until the next recompile. The lock must be held.
+func (pm *PolicyManager) matchersForNodeLocked(node types.NodeView) []matcher.Match {
+	if cached, ok := pm.matchersForNodeMap.Load(node.ID()); ok {
+		return cached
+	}
+
+	// For autogroup:self or via grants, derive matchers from
+	// the stored compiled grants for this specific node.
+	unreduced := pm.filterRulesForNodeLocked(node)
+	matchers := matcher.MatchesFromFilterRules(unreduced)
+	pm.matchersForNodeMap.Store(node.ID(), matchers)
+
+	return matchers
 }
 
 // updateLocked updates the filter rules based on the current policy and nodes.

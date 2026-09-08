@@ -14,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/policy"
 	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
@@ -467,18 +466,7 @@ func (m *mapper) visiblePeerIDs(nodeID types.NodeID) (map[tailcfg.NodeID]struct{
 		return nil, false
 	}
 
-	matchers, err := m.state.MatchersForNode(node)
-	if err != nil {
-		return nil, false
-	}
-
-	peers := m.state.ListPeers(nodeID)
-
-	// No matchers means no policy restrictions, so every peer is visible —
-	// the same default buildTailPeers applies.
-	if len(matchers) > 0 {
-		peers = policy.ReduceNodes(node, peers, matchers)
-	}
+	peers := m.state.VisiblePeers(node, m.state.ListPeers(nodeID))
 
 	// Key by tailcfg.NodeID so the peer-patch path can look up by patch.NodeID
 	// directly, avoiding an unchecked int64->uint64 conversion.

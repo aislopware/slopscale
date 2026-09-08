@@ -503,10 +503,10 @@ func TestBuildFromChangeVisibilityMatchesFullMap(t *testing.T) {
 
 	// wantFull pins the actual peer-visibility semantics so the invariant below
 	// cannot pass vacuously (e.g. if every path broke to zero identically).
-	// Note deny_all: an empty ACL set compiles to zero matchers, which headscale
-	// treats as "no visibility restriction" — all peers are visible on every
-	// path (the packet filter denies traffic separately). user_isolation and
-	// autogroup_self are the discriminating cases that prove filtering works.
+	// deny_all is an ACL set with no rules: the policy enforces, the filter
+	// is empty, and nobody sees anybody, on the full map and on every
+	// incremental path alike. user_isolation and autogroup_self are the
+	// discriminating cases that prove filtering works.
 	tests := []struct {
 		name     string
 		policy   string
@@ -521,7 +521,7 @@ func TestBuildFromChangeVisibilityMatchesFullMap(t *testing.T) {
 			]}`,
 			1,
 		},
-		{"deny_all", `{"acls":[]}`, 2},
+		{"deny_all", `{"acls":[]}`, 0},
 		{
 			"autogroup_self",
 			`{"acls":[{"action":"accept","src":["autogroup:member"],"dst":["autogroup:self:*"]}]}`,
@@ -530,10 +530,15 @@ func TestBuildFromChangeVisibilityMatchesFullMap(t *testing.T) {
 	}
 
 	// The subtests share one State and each installs its own policy, so
-	// they must run one after another.
+	// they must run one after another. The policy goes in the way the API
+	// puts it there, through the database and a reload, so the NodeStore's
+	// peer map is rebuilt for it as in production.
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := s.SetPolicy([]byte(tt.policy))
+			_, err := s.SetPolicyInDB(tt.policy)
+			require.NoError(t, err)
+
+			_, err = s.ReloadPolicy()
 			require.NoError(t, err)
 
 			full := fullVisible(t)

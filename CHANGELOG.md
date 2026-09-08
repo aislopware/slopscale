@@ -331,6 +331,7 @@ console's _Audit log_ page; bound it with `audit.retention`. See
 - Fix `headscale policy set --bypass-server-and-access-database-directly` storing the policy with its comments blanked out; the file is now saved as written
 - Fix the OIDC success page always saying "Node registered"; a node logging in again now sees "Node reauthenticated"
 - Fix a registration followup that arrives after the login completed being refused with "extending key is not allowed"; the client now gets its registered node
+- Fix a node that registers or changes under a policy which hides it (one whose own filter is empty, such as `autogroup:shared` before anything is shared, or `autogroup:self`) still reaching the netmaps of nodes that could not access it: the incremental map update skipped the policy whenever the recipient's own filter was empty, and now applies the same pairwise rule as the full map
 - User roles: `headscale users set-role`, a `Role` column in `headscale users list`, `POST /api/v1/user/{id}/role`, `GET /api/v1/whoami`, a `userId` on API keys and `headscale apikeys create --user`; the v2 user object's `role` field and `?role=` filter now reflect the real role
 - The `is-admin` node capability, previously stamped on every node, is now stamped only on devices of the owner and admins; `is-owner` on the owner's. Clients use these for admin-console affordances in their UI only
 - `POST /api/v1/apikey` without an `expiration` now mints a key that never expires instead of one that was already expired

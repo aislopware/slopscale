@@ -320,23 +320,15 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 		return nil, ErrNodeNotFoundMapper
 	}
 
-	// Get unreduced matchers for peer relationship determination.
-	// [State.MatchersForNode] returns unreduced matchers that include all rules where the
-	// node could be either source or destination. This is different from
-	// [State.FilterForNode] which returns reduced rules for packet filtering (only rules
-	// where node is destination).
+	// The policy decides which of the candidates the node may see, by
+	// the same rule that built the full map's peer list.
+	changedViews := b.mapper.state.VisiblePeers(node, peers)
+
+	// The node's unreduced matchers (every rule where it is source or
+	// destination) drive the per-peer route computation below.
 	matchers, err := b.mapper.state.MatchersForNode(node)
 	if err != nil {
 		return nil, err
-	}
-
-	// If there are filter rules present, see if there are any nodes that cannot
-	// access each-other at all and remove them from the peers.
-	var changedViews views.Slice[types.NodeView]
-	if len(matchers) > 0 {
-		changedViews = policy.ReduceNodes(node, peers, matchers)
-	} else {
-		changedViews = peers
 	}
 
 	// Snapshot the per-node policy CapMap once per peer-list build

@@ -1176,6 +1176,19 @@ func (s *State) MatchersForNode(node types.NodeView) ([]matcher.Match, error) {
 	return s.polMan.MatchersForNode(node)
 }
 
+// VisiblePeers narrows candidates to the peers node may see under the
+// live policy, by the pairwise rule the NodeStore's peer map was built
+// with. The full map takes its peers from that map; the incremental
+// paths take theirs from here, so a node the policy hands an empty
+// filter (autogroup:shared before anything is shared, say) sees nobody
+// rather than everybody.
+func (s *State) VisiblePeers(
+	node types.NodeView,
+	candidates views.Slice[types.NodeView],
+) views.Slice[types.NodeView] {
+	return s.polMan.VisiblePeers(node, candidates)
+}
+
 // NodeCapMap returns the policy-derived CapMap for the given node, suitable
 // for merging into [tailcfg.Node.CapMap] when the node is rendered as self or
 // as someone else's peer.

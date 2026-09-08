@@ -24,6 +24,9 @@ type PolicyManager interface {
 	FilterForNode(node types.NodeView) ([]tailcfg.FilterRule, error)
 	// MatchersForNode returns matchers for peer relationship determination (unreduced)
 	MatchersForNode(node types.NodeView) ([]matcher.Match, error)
+	// VisiblePeers narrows candidates to the peers node may see, by the
+	// same pairwise rule BuildPeerMap applies to the whole tailnet.
+	VisiblePeers(node types.NodeView, candidates views.Slice[types.NodeView]) views.Slice[types.NodeView]
 	// BuildPeerMap constructs peer relationship maps for the given nodes
 	BuildPeerMap(nodes views.Slice[types.NodeView]) map[types.NodeID][]types.NodeView
 	SSHPolicy(baseURL string, node types.NodeView) (*tailcfg.SSHPolicy, error)
