@@ -1,7 +1,12 @@
 package apiv1
 
 import (
+	"bufio"
 	"context"
+	"encoding/csv"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -9,11 +14,18 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/rs/zerolog/log"
 )
 
 func init() {
-	registrations = append(registrations, registerAudit)
+	registrations = append(registrations, registerAudit, registerAuditExport)
 }
+
+const (
+	tagAudit = "Audit"
+	// auditDefaultPage is the list page size when a request asks for none.
+	auditDefaultPage = 50
+)
 
 // AuditEvent is one entry of the audit log.
 type AuditEvent struct {
@@ -36,7 +48,10 @@ type AuditEvent struct {
 	RemoteAddr string `json:"remoteAddr"`
 }
 
-type listAuditInput struct {
+// AuditFilters are the query filters the list and the export share. It is
+// exported because huma skips unexported embedded fields, which would drop
+// every filter from both operations.
+type AuditFilters struct {
 	ActorUserID string `doc:"Keep events by this user."                query:"actorUserId"`
 	Action      string `doc:"One action, or a prefix ending in a dot." query:"action"`
 	TargetKind  string `query:"targetKind"`
@@ -44,7 +59,12 @@ type listAuditInput struct {
 	Since       string `doc:"RFC 3339; events at or after this time."  format:"date-time"  query:"since"`
 	Until       string `doc:"RFC 3339; events before this time."       format:"date-time"  query:"until"`
 	Before      string `doc:"Page: events with an ID below this one."  format:"uint64"     query:"before"`
-	Limit       int    `doc:"Page size, at most 500."                  maximum:"500"       minimum:"1"    query:"limit"`
+}
+
+type listAuditInput struct {
+	AuditFilters
+
+	Limit int `doc:"Page size, at most 500." maximum:"500" minimum:"1" query:"limit"`
 }
 
 type listAuditOutput struct {
@@ -63,12 +83,17 @@ func registerAudit(api huma.API, b Backend) {
 		Summary:     "List audit events",
 		Description: "Newest first. Every writing API request and the server's own sign-in events are " +
 			"recorded; page with before=<last id>.",
-		Tags:     []string{"Audit"},
+		Tags:     []string{tagAudit},
 		Security: bearerAuth,
 	}, scope.LogsConfigurationRead), func(_ context.Context, in *listAuditInput) (*listAuditOutput, error) {
-		q, err := auditQuery(in)
+		q, err := auditQuery(&in.AuditFilters)
 		if err != nil {
 			return nil, err
+		}
+
+		q.Limit = in.Limit
+		if q.Limit == 0 {
+			q.Limit = auditDefaultPage
 		}
 
 		events, err := b.State.ListAuditEvents(q)
@@ -91,16 +116,13 @@ func registerAudit(api huma.API, b Backend) {
 	})
 }
 
-func auditQuery(in *listAuditInput) (types.AuditQuery, error) {
+// auditQuery turns the shared filters into a store query; the caller sets
+// the limit it wants.
+func auditQuery(in *AuditFilters) (types.AuditQuery, error) {
 	q := types.AuditQuery{
 		Action:     in.Action,
 		TargetKind: in.TargetKind,
 		TargetID:   in.TargetID,
-		Limit:      in.Limit,
-	}
-
-	if q.Limit == 0 {
-		q.Limit = 50
 	}
 
 	if in.ActorUserID != "" {
@@ -173,4 +195,219 @@ func auditEventFromType(e *types.AuditEvent) AuditEvent {
 	}
 
 	return out
+}
+
+const (
+	// auditExportCSV and auditExportJSON are the formats an export is
+	// written in, with the content type each is served as.
+	auditExportCSV      = "csv"
+	auditExportCSVMedia = "text/csv"
+	auditExportCSVType  = auditExportCSVMedia + "; charset=utf-8"
+	auditExportJSON     = "json"
+	auditExportJSONType = "application/json"
+
+	// auditExportMax is the number of events an export writes at most;
+	// hscontrol/db enforces it, this only says so.
+	auditExportMax = "100000"
+)
+
+type exportAuditInput struct {
+	AuditFilters
+
+	Format string `doc:"File format, csv by default." enum:"csv,json" query:"format"`
+}
+
+// registerAuditExport adds the download, which streams the matching events
+// as a file rather than a JSON page.
+func registerAuditExport(api huma.API, b Backend) {
+	huma.Register(api, withScope(huma.Operation{
+		OperationID: "exportAuditEvents",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/audit/export",
+		Summary:     "Export audit events",
+		Description: "The events matching the same filters as the list, oldest first, as a file " +
+			"download. At most " + auditExportMax + " events: when more match, the export stops there " +
+			"and the newest are left out, so narrow since and until to reach them.",
+		Tags:     []string{tagAudit},
+		Security: bearerAuth,
+		Responses: map[string]*huma.Response{
+			"200": {
+				Description: "The events as a file.",
+				Content: map[string]*huma.MediaType{
+					auditExportCSVMedia: {Schema: &huma.Schema{Type: "string", Format: "binary"}},
+					auditExportJSONType: {Schema: &huma.Schema{Type: "string", Format: "binary"}},
+				},
+			},
+		},
+	}, scope.LogsConfigurationRead), func(_ context.Context, in *exportAuditInput) (*huma.StreamResponse, error) {
+		q, err := auditQuery(&in.AuditFilters)
+		if err != nil {
+			return nil, err
+		}
+
+		format := in.Format
+		if format == "" {
+			format = auditExportCSV
+		}
+
+		contentType := auditExportCSVType
+		if format == auditExportJSON {
+			contentType = auditExportJSONType
+		}
+
+		return &huma.StreamResponse{Body: func(ctx huma.Context) {
+			ctx.SetHeader("Content-Type", contentType)
+			ctx.SetHeader("Content-Disposition",
+				`attachment; filename="`+auditExportFilename(q, format)+`"`)
+			ctx.SetStatus(http.StatusOK)
+
+			err := writeAuditExport(ctx.BodyWriter(), format, func(fn func(*types.AuditEvent) error) error {
+				return b.State.ExportAuditEvents(q, fn)
+			})
+			if err != nil {
+				log.Error().Err(err).Str("format", format).Msg("exporting audit events")
+			}
+		}}, nil
+	})
+}
+
+// auditExporter hands every matching event to fn, oldest first.
+type auditExporter func(fn func(*types.AuditEvent) error) error
+
+// writeAuditExport streams the events in the chosen format.
+func writeAuditExport(w io.Writer, format string, export auditExporter) error {
+	if format == auditExportJSON {
+		return writeAuditJSON(w, export)
+	}
+
+	return writeAuditCSV(w, export)
+}
+
+// auditCSVHeader names the columns, in the order auditCSVRow writes them.
+var auditCSVHeader = []string{
+	"id", "time", "action", "actorKind", "actorUserId", "actorName",
+	"targetKind", "targetId", "targetName", "outcome", "remoteAddr", "detail",
+}
+
+func writeAuditCSV(w io.Writer, export auditExporter) error {
+	out := csv.NewWriter(w)
+
+	err := out.Write(auditCSVHeader)
+	if err != nil {
+		return fmt.Errorf("writing audit export header: %w", err)
+	}
+
+	err = export(func(e *types.AuditEvent) error {
+		row, rowErr := auditCSVRow(e)
+		if rowErr != nil {
+			return rowErr
+		}
+
+		return out.Write(row)
+	})
+	if err != nil {
+		return fmt.Errorf("writing audit export: %w", err)
+	}
+
+	out.Flush()
+
+	err = out.Error()
+	if err != nil {
+		return fmt.Errorf("writing audit export: %w", err)
+	}
+
+	return nil
+}
+
+// auditCSVRow renders one event; the detail is one cell of JSON.
+func auditCSVRow(e *types.AuditEvent) ([]string, error) {
+	detail := ""
+
+	if len(e.Detail) > 0 {
+		raw, err := json.Marshal(e.Detail)
+		if err != nil {
+			return nil, fmt.Errorf("encoding detail of audit event %d: %w", e.ID, err)
+		}
+
+		detail = string(raw)
+	}
+
+	actorUserID := ""
+	if e.ActorUserID != 0 {
+		actorUserID = strconv.FormatUint(uint64(e.ActorUserID), 10)
+	}
+
+	return []string{
+		strconv.FormatUint(e.ID, 10),
+		e.CreatedAt.UTC().Format(time.RFC3339),
+		e.Action,
+		string(e.ActorKind),
+		actorUserID,
+		e.ActorName,
+		e.TargetKind,
+		e.TargetID,
+		e.TargetName,
+		strconv.Itoa(e.Outcome),
+		e.RemoteAddr,
+		detail,
+	}, nil
+}
+
+// writeAuditJSON writes the events as one array, in the shape the list
+// endpoint returns them.
+func writeAuditJSON(w io.Writer, export auditExporter) error {
+	out := bufio.NewWriter(w)
+	first := true
+
+	_, _ = out.WriteString("[")
+
+	err := export(func(e *types.AuditEvent) error {
+		raw, err := json.Marshal(auditEventFromType(e))
+		if err != nil {
+			return fmt.Errorf("encoding audit event %d: %w", e.ID, err)
+		}
+
+		if !first {
+			_, _ = out.WriteString(",")
+		}
+
+		first = false
+
+		// bufio keeps the first write error; Flush reports it.
+		_, _ = out.Write(raw)
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("writing audit export: %w", err)
+	}
+
+	_, _ = out.WriteString("]\n")
+
+	err = out.Flush()
+	if err != nil {
+		return fmt.Errorf("writing audit export: %w", err)
+	}
+
+	return nil
+}
+
+// auditExportFilename names the download after the window it covers: the
+// filters when they bound it, the log's start and now when they do not.
+func auditExportFilename(q types.AuditQuery, format string) string {
+	from := "start"
+	if !q.Since.IsZero() {
+		from = auditExportStamp(q.Since)
+	}
+
+	to := auditExportStamp(time.Now())
+	if !q.Until.IsZero() {
+		to = auditExportStamp(q.Until)
+	}
+
+	return "audit-" + from + "-" + to + "." + format
+}
+
+func auditExportStamp(t time.Time) string {
+	return t.UTC().Format("20060102T150405Z")
 }

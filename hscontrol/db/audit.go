@@ -16,6 +16,12 @@ const (
 	auditDefaultLimit = 50
 	// auditMaxLimit caps a page so one request cannot pull the whole log.
 	auditMaxLimit = 500
+	// auditExportBatch is how many events one export query reads; an
+	// export walks the log batch by batch so it never holds all of it.
+	auditExportBatch = 1000
+	// auditExportMaxRows caps an export so one request cannot pull an
+	// unbounded log; the API states this number in its description.
+	auditExportMaxRows = 100000
 )
 
 // auditEventRow is a row of the audit_events table.
@@ -144,6 +150,98 @@ func (hsdb *HSDatabase) ListAuditEvents(q types.AuditQuery) ([]types.AuditEvent,
 		limit = auditMaxLimit
 	}
 
+	var records []auditEventRecord
+
+	err := hsdb.ex.query(
+		jet.SELECT(table.AuditEvents.AllColumns).FROM(table.AuditEvents).
+			WHERE(auditWhere(q)).ORDER_BY(table.AuditEvents.ID.DESC()).LIMIT(int64(limit)),
+		&records,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listing audit events: %w", err)
+	}
+
+	return auditEvents(records)
+}
+
+// ExportAuditEvents calls fn for every event matching q, oldest first,
+// reading auditExportBatch events per query so a large export never sits
+// in memory at once. It stops after q.Limit events (auditExportMaxRows by
+// default, and its maximum either way) or when fn returns an error, which
+// it returns as-is.
+func (hsdb *HSDatabase) ExportAuditEvents(q types.AuditQuery, fn func(*types.AuditEvent) error) error {
+	remaining := auditExportRows(q.Limit)
+	after := uint64(0)
+
+	for remaining > 0 {
+		batch := min(remaining, auditExportBatch)
+
+		var records []auditEventRecord
+
+		err := hsdb.ex.query(
+			jet.SELECT(table.AuditEvents.AllColumns).FROM(table.AuditEvents).
+				WHERE(auditWhere(q).AND(table.AuditEvents.ID.GT(jet.Uint64(after)))).
+				ORDER_BY(table.AuditEvents.ID.ASC()).LIMIT(int64(batch)),
+			&records,
+		)
+		if err != nil {
+			return fmt.Errorf("exporting audit events: %w", err)
+		}
+
+		events, err := auditEvents(records)
+		if err != nil {
+			return err
+		}
+
+		for i := range events {
+			err = fn(&events[i])
+			if err != nil {
+				return err
+			}
+
+			after = events[i].ID
+		}
+
+		if len(events) < batch {
+			return nil
+		}
+
+		remaining -= len(events)
+	}
+
+	return nil
+}
+
+// auditExportRows clamps a requested export size to the maximum; zero and
+// below ask for the maximum.
+func auditExportRows(limit int) int {
+	if limit <= 0 || limit > auditExportMaxRows {
+		return auditExportMaxRows
+	}
+
+	return limit
+}
+
+// auditEvents decodes rows into events, failing on the first unreadable
+// detail.
+func auditEvents(records []auditEventRecord) ([]types.AuditEvent, error) {
+	events := make([]types.AuditEvent, 0, len(records))
+
+	for i := range records {
+		e, err := records[i].Event.event()
+		if err != nil {
+			return nil, err
+		}
+
+		events = append(events, *e)
+	}
+
+	return events, nil
+}
+
+// auditWhere turns q's filters into the clause the list and the export
+// share; ordering, paging and limits are the caller's.
+func auditWhere(q types.AuditQuery) jet.BoolExpression {
 	where := jet.Bool(true)
 
 	if q.ActorUserID != 0 {
@@ -183,29 +281,7 @@ func (hsdb *HSDatabase) ListAuditEvents(q types.AuditQuery) ([]types.AuditEvent,
 		where = where.AND(table.AuditEvents.ID.LT(jet.Uint64(q.Before)))
 	}
 
-	var records []auditEventRecord
-
-	err := hsdb.ex.query(
-		jet.SELECT(table.AuditEvents.AllColumns).FROM(table.AuditEvents).
-			WHERE(where).ORDER_BY(table.AuditEvents.ID.DESC()).LIMIT(int64(limit)),
-		&records,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("listing audit events: %w", err)
-	}
-
-	events := make([]types.AuditEvent, 0, len(records))
-
-	for i := range records {
-		e, err := records[i].Event.event()
-		if err != nil {
-			return nil, err
-		}
-
-		events = append(events, *e)
-	}
-
-	return events, nil
+	return where
 }
 
 // DeleteAuditEventsBefore drops events older than cutoff, returning how

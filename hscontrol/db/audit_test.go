@@ -1,6 +1,9 @@
 package db
 
 import (
+	"errors"
+	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -128,4 +131,106 @@ func TestAuditRetention(t *testing.T) {
 	left, err := db.ListAuditEvents(types.AuditQuery{})
 	require.NoError(t, err)
 	assert.Len(t, left, 2)
+}
+
+func TestAuditExport(t *testing.T) {
+	t.Parallel()
+
+	db, err := newSQLiteTestDB()
+	require.NoError(t, err)
+
+	base := time.Date(2026, 9, 8, 10, 0, 0, 0, time.UTC)
+
+	// More than one batch, so the export's paging is exercised.
+	const total = auditExportBatch + 250
+
+	for i := range total {
+		action := "node.delete"
+		if i%2 == 0 {
+			action = "user.role.set"
+		}
+
+		require.NoError(t, db.RecordAuditEvent(&types.AuditEvent{
+			CreatedAt:  base.Add(time.Duration(i) * time.Second),
+			ActorKind:  types.ActorSession,
+			Action:     action,
+			TargetKind: "node",
+			TargetID:   strconv.Itoa(i),
+			Outcome:    200,
+			Detail:     map[string]any{"index": float64(i)},
+		}))
+	}
+
+	t.Run("oldest first across batches", func(t *testing.T) {
+		t.Parallel()
+
+		var ids []uint64
+
+		require.NoError(t, db.ExportAuditEvents(types.AuditQuery{}, func(e *types.AuditEvent) error {
+			ids = append(ids, e.ID)
+
+			return nil
+		}))
+
+		require.Len(t, ids, total)
+		assert.True(t, slices.IsSorted(ids), "the export runs oldest first")
+	})
+
+	t.Run("filters like the list", func(t *testing.T) {
+		t.Parallel()
+
+		count := 0
+
+		require.NoError(t, db.ExportAuditEvents(
+			types.AuditQuery{Action: "node.delete"},
+			func(e *types.AuditEvent) error {
+				count++
+
+				assert.Equal(t, "node.delete", e.Action)
+				assert.NotEmpty(t, e.Detail)
+
+				return nil
+			},
+		))
+
+		assert.Equal(t, total/2, count)
+	})
+
+	t.Run("stops at the limit", func(t *testing.T) {
+		t.Parallel()
+
+		count := 0
+
+		require.NoError(t, db.ExportAuditEvents(types.AuditQuery{Limit: 7}, func(_ *types.AuditEvent) error {
+			count++
+
+			return nil
+		}))
+
+		assert.Equal(t, 7, count)
+	})
+
+	t.Run("stops on the writer's error", func(t *testing.T) {
+		t.Parallel()
+
+		errStop := errors.New("stop")
+		count := 0
+
+		err := db.ExportAuditEvents(types.AuditQuery{}, func(_ *types.AuditEvent) error {
+			count++
+
+			return errStop
+		})
+		require.ErrorIs(t, err, errStop)
+		assert.Equal(t, 1, count)
+	})
+}
+
+func TestAuditExportRowsCap(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, auditExportMaxRows, auditExportRows(0), "no limit asks for the maximum")
+	assert.Equal(t, auditExportMaxRows, auditExportRows(-1))
+	assert.Equal(t, auditExportMaxRows, auditExportRows(auditExportMaxRows+1), "the maximum is a cap")
+	assert.Equal(t, 10, auditExportRows(10))
 }
