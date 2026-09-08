@@ -2284,6 +2284,8 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             discoKey: string;
+            /** @description true when the node is deleted on logout or after the ephemeral timeout. */
+            ephemeral: boolean;
             /** Format: date-time */
             expiry: string | null;
             givenName: string;

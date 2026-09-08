@@ -818,8 +818,11 @@ type Node struct {
 	AvailableRoutes []string   `json:"availableRoutes"`
 	CreatedAt       time.Time  `json:"createdAt"`
 	DiscoKey        string     `json:"discoKey"`
-	Expiry          *time.Time `json:"expiry"`
-	GivenName       string     `json:"givenName"`
+
+	// Ephemeral true when the node is deleted on logout or after the ephemeral timeout.
+	Ephemeral bool       `json:"ephemeral"`
+	Expiry    *time.Time `json:"expiry"`
+	GivenName string     `json:"givenName"`
 
 	// GlobalExitNode true when every client is told to prefer this exit node.
 	GlobalExitNode bool               `json:"globalExitNode"`

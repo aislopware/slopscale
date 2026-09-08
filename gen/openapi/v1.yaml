@@ -1356,6 +1356,9 @@ components:
           type: string
         discoKey:
           type: string
+        ephemeral:
+          description: true when the node is deleted on logout or after the ephemeral timeout.
+          type: boolean
         expiry:
           format: date-time
           type:
@@ -1443,6 +1446,7 @@ components:
         - tags
         - sharedWith
         - globalExitNode
+        - ephemeral
       type: object
     NodeOutputBody:
       additionalProperties: false
