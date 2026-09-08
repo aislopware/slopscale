@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"strconv"
 	"strings"
@@ -315,6 +316,12 @@ func (p *PendingLogin) Wait(tb testing.TB, timeout time.Duration) *TestClient {
 // UpdateFullNetmap implements [controlclient.NetmapUpdater].
 // Called by [controlclient.Direct] when a new [netmap.NetworkMap] is received.
 func (c *TestClient) UpdateFullNetmap(nm *netmap.NetworkMap) {
+	// The control client hands every netmap the same DisplayMessages map
+	// and edits it in place when the next response arrives, so a test
+	// reading a stored netmap would race that write. Detach it here, on
+	// the client's goroutine, before the next response can touch it.
+	nm.DisplayMessages = maps.Clone(nm.DisplayMessages)
+
 	c.mu.Lock()
 	c.netmap = nm
 	c.history = append(c.history, nm)
@@ -608,9 +615,21 @@ func (c *TestClient) WaitForCondition(
 		case <-c.updates:
 			// Check again.
 		case <-deadline:
-			tb.Fatalf("servertest: WaitForCondition(%s, %q): timeout after %v", c.Name, desc, timeout)
+			tb.Fatalf("servertest: WaitForCondition(%s, %q): timeout after %v; last netmap:\n%s",
+				c.Name, desc, timeout, describeNetmap(c.Netmap()))
 		}
 	}
+}
+
+// describeNetmap renders a netmap for a failure message: the self node,
+// every peer, and the packet filter, so a wait that timed out says what
+// the client was looking at.
+func describeNetmap(nm *netmap.NetworkMap) string {
+	if nm == nil {
+		return "(none)"
+	}
+
+	return nm.Concise() + fmt.Sprintf("filter: %d rules\n", len(nm.PacketFilter))
 }
 
 // Direct returns the underlying [controlclient.Direct] for
