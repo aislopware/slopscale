@@ -12,6 +12,7 @@ import { render } from "vitest-browser-react";
 import type { AuditEvent } from "~/api/queries.ts";
 import { EventsTable } from "~/components/audit/events-table.tsx";
 import type { EventsTableProps } from "~/components/audit/events-table.tsx";
+import { formatAbsolute } from "~/lib/time.ts";
 
 const deletion: AuditEvent = {
   id: "42",
@@ -117,12 +118,13 @@ describe(EventsTable, () => {
     await expect.element(screen.getByText("reusable=yes")).toBeVisible();
     await expect.element(screen.getByText("ephemeral=no")).toBeVisible();
     await expect.element(screen.getByText(/^expiration=/u)).not.toBeInTheDocument();
-    await expect.element(screen.getByText("+1")).toBeVisible();
-    await screen.getByRole("button", { name: "Show details" }).click();
+    await screen.getByRole("button", { name: "+1" }).click();
 
     await expect.element(screen.getByText("expiration")).toBeVisible();
     await expect.element(screen.getByText("2026-09-30T00:00:00Z")).not.toBeInTheDocument();
-    await expect.element(screen.getByText(/Sep 30, 2026/u)).toBeVisible();
+    const expiration = formatAbsolute(new Date("2026-09-30T00:00:00Z"));
+
+    await expect.element(screen.getByText(expiration)).toBeVisible();
   });
 
   it("names the local socket after the tool that used it", async () => {

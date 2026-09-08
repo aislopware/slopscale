@@ -39,7 +39,7 @@ export function MachinesEmpty({
         description="Register a device with a pre-auth key or by signing in; it appears here immediately."
         contents={
           canCreateKeys ? (
-            <Button variant="secondary" size="sm" icon={PlusIcon} onClick={onAddMachine}>
+            <Button variant="secondary" icon={PlusIcon} onClick={onAddMachine}>
               Add machine
             </Button>
           ) : null
@@ -56,7 +56,7 @@ export function MachinesEmpty({
         title="No machines need approval"
         description="Every machine on the tailnet has been approved."
         contents={
-          <Button variant="secondary" size="sm" onClick={onClearFilters}>
+          <Button variant="secondary" onClick={onClearFilters}>
             View all machines
           </Button>
         }
@@ -71,7 +71,7 @@ export function MachinesEmpty({
       title="No machines match"
       description="Try a different search or filter."
       contents={
-        <Button variant="secondary" size="sm" onClick={onClearFilters}>
+        <Button variant="secondary" onClick={onClearFilters}>
           Clear filters
         </Button>
       }

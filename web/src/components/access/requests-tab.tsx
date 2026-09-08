@@ -14,6 +14,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
+import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 
 const filters = ["pending", "all"] as const;
@@ -72,22 +73,20 @@ export function RequestsTab({
 
   return (
     <LayerCard className="overflow-hidden">
-      <TableToolbar
-        actions={
-          <Tabs
-            variant="segmented"
-            tabs={[...filterItems]}
-            value={filter}
-            onValueChange={(value) => {
-              setFilter(filters.find((known) => known === value) ?? "pending");
-            }}
-          />
-        }
-      >
+      <TableToolbar>
         <SearchInput
           value={search}
           placeholder="Search by requester, machine, group or reason"
           onValueChange={onSearchChange}
+        />
+        <Tabs
+          variant="segmented"
+          size="sm"
+          tabs={countedTabs(filterItems, (value) => (value === "pending" ? pending : rows.length))}
+          value={filter}
+          onValueChange={(value) => {
+            setFilter(filters.find((known) => known === value) ?? "pending");
+          }}
         />
       </TableToolbar>
       <table.AppTable>

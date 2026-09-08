@@ -83,9 +83,10 @@ function derivedText(value: unknown): string {
 
 function derived(posture: NodePosture): Definition[] {
   return shownAttributes.flatMap(({ key, label }) => {
-    const text = derivedText(posture.attributes[key]);
+    const value = posture.attributes[key];
+    const text = derivedText(value);
 
-    return text === "" ? [] : [{ key, label, value: text, copy: text }];
+    return text === "" ? [] : [{ key, label, value: text, copy: attributeText(value) }];
   });
 }
 

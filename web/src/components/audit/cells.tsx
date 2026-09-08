@@ -1,4 +1,5 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
+import { Button } from "@cloudflare/kumo/components/button";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { cn } from "@cloudflare/kumo/utils";
 import { Link } from "@tanstack/react-router";
@@ -35,8 +36,9 @@ export const clientError = 400;
 
 /** At most this many detail fields per row; the rest are counted. */
 const maxDetailFields = 2;
-/** A string that starts like an RFC 3339 timestamp is shown as a local date. */
-const timestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/u;
+/** A whole RFC 3339 timestamp with its zone, as the API writes them; anything looser stays text. */
+const timestampPattern =
+  /^(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u;
 
 /**
  * A name that leads somewhere reads as a link without turning the column blue: it only takes the
@@ -144,7 +146,7 @@ export function ResultCell({ event }: { readonly event: AuditEvent }): ReactElem
  */
 function detailText(value: unknown): string {
   if (typeof value === "string") {
-    const date = timestampPattern.test(value) ? parseTime(value) : null;
+    const date = timestamp(value);
 
     return date === null ? value : formatAbsolute(date);
   }
@@ -168,6 +170,25 @@ function detailText(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/**
+ * The string as a date, or null when it is not a timestamp or names a day that does not exist: Date
+ * accepts "2026-02-30" and rolls it into March, which would silently rewrite a value.
+ */
+function timestamp(value: string): Date | null {
+  const match = timestampPattern.exec(value);
+  const date = match === null ? null : parseTime(value);
+
+  if (match?.groups === undefined || date === null) {
+    return null;
+  }
+
+  const month = Number(match.groups["month"]);
+  const day = Number(match.groups["day"]);
+  const calendar = new Date(Date.UTC(Number(match.groups["year"]), month - 1, day));
+
+  return calendar.getUTCMonth() === month - 1 && calendar.getUTCDate() === day ? date : null;
+}
+
 /** The value as the server sent it, for the copy button. */
 function rawText(value: unknown): string {
   return typeof value === "string" ? value : (JSON.stringify(value) ?? String(value));
@@ -178,7 +199,14 @@ function rawText(value: unknown): string {
  * on hover; the row itself opens on click, so every field stays one click away and the column keeps
  * its width.
  */
-export function DetailCell({ event }: { readonly event: AuditEvent }): ReactNode {
+export function DetailCell({
+  event,
+  onOpen,
+}: {
+  readonly event: AuditEvent;
+  /** Opens the row: the "+N" chip is a button of its own, so the row's click does not reach it. */
+  readonly onOpen: () => void;
+}): ReactNode {
   const fields = Object.entries(event.detail);
 
   if (fields.length === 0) {
@@ -194,15 +222,20 @@ export function DetailCell({ event }: { readonly event: AuditEvent }): ReactNode
         <Badge
           key={key}
           variant="secondary"
-          className="max-w-full font-mono text-[0.85em] font-normal [&>span]:truncate"
+          className="max-w-full font-mono text-[0.85em] font-normal"
         >
-          {`${key}=${detailText(value)}`}
+          <span className="min-w-0 truncate">{`${key}=${detailText(value)}`}</span>
         </Badge>
       ))}
       {hidden.length === 0 ? null : (
-        <Tooltip content={hidden.join(", ")}>
-          <Badge variant="outline">{`+${hidden.length}`}</Badge>
-        </Tooltip>
+        <Tooltip
+          content={hidden.join(", ")}
+          render={
+            <Button variant="secondary" size="xs" onClick={onOpen}>
+              {`+${hidden.length}`}
+            </Button>
+          }
+        />
       )}
     </div>
   );

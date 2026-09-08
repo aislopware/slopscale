@@ -38,12 +38,14 @@ function EventRows({
   striped,
   open,
   onToggle,
+  onOpen,
 }: {
   readonly event: AuditEvent;
   /** Zebra: the row is drawn on the elevated surface while it is closed. */
   readonly striped: boolean;
   readonly open: boolean;
   readonly onToggle: () => void;
+  readonly onOpen: () => void;
 }): ReactElement {
   return (
     <>
@@ -72,7 +74,7 @@ function EventRows({
           <ResultCell event={event} />
         </Table.Cell>
         <Table.Cell className="hidden w-full max-w-0 overflow-hidden lg:table-cell">
-          <DetailCell event={event} />
+          <DetailCell event={event} onOpen={onOpen} />
         </Table.Cell>
         <Table.Cell className="w-10 text-right">
           <Button
@@ -156,6 +158,9 @@ export function EventsTable({
               onToggle={() => {
                 setOpenId((current) => (current === event.id ? null : event.id));
               }}
+              onOpen={() => {
+                setOpenId(event.id);
+              }}
             />
           ))
         )}
@@ -226,7 +231,7 @@ function EmptyEvents({
         title="No events match"
         description="Nothing was recorded in this range for these filters."
         contents={
-          <Button variant="secondary" size="sm" onClick={onClearFilters}>
+          <Button variant="secondary" onClick={onClearFilters}>
             Clear filters
           </Button>
         }
