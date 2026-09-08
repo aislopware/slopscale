@@ -30,6 +30,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
 	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/juanfont/headscale/hscontrol/util/zlog"
 	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
 	"github.com/juanfont/headscale/hscontrol/webhook"
 	"github.com/oschwald/maxminddb-golang/v2"
@@ -2508,7 +2509,7 @@ func (s *State) UpdateNodeFromMapRequest(
 	log.Trace().
 		Caller().
 		Uint64(zf.NodeID, id.Uint64()).
-		Interface("request", req).
+		Object("request", zlog.MapRequest(&req)).
 		Msg("Processing MapRequest for node")
 
 	var (
@@ -3778,15 +3779,15 @@ func hostinfoEqual(oldNode types.NodeView, newHI *tailcfg.Hostinfo) bool {
 		return false
 	}
 
-	old := oldNode.AsStruct().Hostinfo
-
-	return old.Equal(newHI)
+	// The views compare in place; cloning the node here cost a full
+	// copy on every map request.
+	return oldNode.Hostinfo().Equal(newHI.View())
 }
 
 func routesChanged(oldNode types.NodeView, newHI *tailcfg.Hostinfo) bool {
 	var oldRoutes []netip.Prefix
-	if oldNode.Valid() && oldNode.AsStruct().Hostinfo != nil {
-		oldRoutes = oldNode.AsStruct().Hostinfo.RoutableIPs
+	if oldNode.Valid() && oldNode.Hostinfo().Valid() {
+		oldRoutes = oldNode.Hostinfo().RoutableIPs().AsSlice()
 	}
 
 	newRoutes := slices.Clone(newHI.RoutableIPs)

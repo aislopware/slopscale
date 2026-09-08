@@ -141,6 +141,38 @@ func NewNodeStore(allNodes types.Nodes, peersFunc PeersFunc, batchSize int, batc
 	return store
 }
 
+// operationMetrics is the duration histogram and counter of one NodeStore
+// operation with its label resolved once, so the reads on the map request
+// path pay an atomic add and an observe rather than a label lookup and a
+// timer allocation per call.
+type operationMetrics struct {
+	duration prometheus.Observer
+	count    prometheus.Counter
+}
+
+func newOperationMetrics(op string) operationMetrics {
+	return operationMetrics{
+		duration: nodeStoreOperationDuration.WithLabelValues(op),
+		count:    nodeStoreOperations.WithLabelValues(op),
+	}
+}
+
+// observe records one operation that started at start; call it deferred
+// with time.Now() as the argument.
+func (m operationMetrics) observe(start time.Time) {
+	m.duration.Observe(time.Since(start).Seconds())
+	m.count.Inc()
+}
+
+var (
+	nodeStoreGetMetrics                          = newOperationMetrics("get")
+	nodeStoreGetByKeyMetrics                     = newOperationMetrics("get_by_key")
+	nodeStoreGetNodesByMachineKeyAllUsersMetrics = newOperationMetrics("get_nodes_by_machine_key_all_users")
+	nodeStoreListMetrics                         = newOperationMetrics("list")
+	nodeStoreListByUserMetrics                   = newOperationMetrics("list_by_user")
+	nodeStoreListPeersMetrics                    = newOperationMetrics("list_peers")
+)
+
 // Snapshot is the representation of the current state of the [NodeStore].
 // It contains all nodes and their relationships.
 // It is a copy-on-write structure, meaning that when a write occurs,
@@ -151,6 +183,9 @@ type Snapshot struct {
 	nodesByID map[types.NodeID]types.Node
 
 	// calculated from nodesByID
+	// nodeViewsByID holds one view per node over a copy the snapshot
+	// owns, so a read hands out a pointer instead of copying the node.
+	nodeViewsByID     map[types.NodeID]types.NodeView
 	nodesByNodeKey    map[key.NodePublic]types.NodeView
 	nodesByMachineKey map[key.MachinePublic]map[types.UserID]types.NodeView
 	peersByNode       map[types.NodeID][]types.NodeView
@@ -448,9 +483,14 @@ func snapshotFromNodes(
 	timer := prometheus.NewTimer(nodeStoreSnapshotBuildDuration)
 	defer timer.ObserveDuration()
 
+	// One copy per node, shared by every index; each view points at it.
 	allNodes := make([]types.NodeView, 0, len(nodes))
+	nodeViewsByID := make(map[types.NodeID]types.NodeView, len(nodes))
+
 	for _, n := range nodes {
-		allNodes = append(allNodes, n.View())
+		nodeView := n.View()
+		allNodes = append(allNodes, nodeView)
+		nodeViewsByID[n.ID] = nodeView
 	}
 
 	routes, isPrimaryRoute := electPrimaryRoutes(nodes, prev.Global)
@@ -458,9 +498,10 @@ func snapshotFromNodes(
 
 	newSnap := Snapshot{
 		nodesByID:         nodes,
+		nodeViewsByID:     nodeViewsByID,
 		allNodes:          allNodes,
-		nodesByNodeKey:    make(map[key.NodePublic]types.NodeView),
-		nodesByMachineKey: make(map[key.MachinePublic]map[types.UserID]types.NodeView),
+		nodesByNodeKey:    make(map[key.NodePublic]types.NodeView, len(nodes)),
+		nodesByMachineKey: make(map[key.MachinePublic]map[types.UserID]types.NodeView, len(nodes)),
 
 		// peersByNode is most likely the most expensive operation,
 		// it will use the list of all nodes, combined with the
@@ -481,7 +522,7 @@ func snapshotFromNodes(
 
 	// Build nodesByUser, nodesByNodeKey, and nodesByMachineKey maps
 	for _, n := range nodes {
-		nodeView := n.View()
+		nodeView := nodeViewsByID[n.ID]
 		userID := n.TypedUserID()
 
 		// Tagged nodes are owned by their tags, not a user,
@@ -668,17 +709,11 @@ func electRegionalRoutes(
 // The [types.NodeView] might be invalid, so it must be checked with .Valid(), which must
 // be used to ensure it isn't an invalid node (this is more of a node error or node is broken).
 func (s *NodeStore) GetNode(id types.NodeID) (types.NodeView, bool) {
-	timer := prometheus.NewTimer(nodeStoreOperationDuration.WithLabelValues("get"))
-	defer timer.ObserveDuration()
+	defer nodeStoreGetMetrics.observe(time.Now())
 
-	nodeStoreOperations.WithLabelValues("get").Inc()
+	nodeView, exists := s.data.Load().nodeViewsByID[id]
 
-	n, exists := s.data.Load().nodesByID[id]
-	if !exists {
-		return types.NodeView{}, false
-	}
-
-	return n.View(), true
+	return nodeView, exists
 }
 
 // GetNodeByNodeKey retrieves a node by its [key.NodePublic].
@@ -686,10 +721,7 @@ func (s *NodeStore) GetNode(id types.NodeID) (types.NodeView, bool) {
 // The [types.NodeView] might be invalid, so it must be checked with .Valid(), which must
 // be used to ensure it isn't an invalid node (this is more of a node error or node is broken).
 func (s *NodeStore) GetNodeByNodeKey(nodeKey key.NodePublic) (types.NodeView, bool) {
-	timer := prometheus.NewTimer(nodeStoreOperationDuration.WithLabelValues("get_by_key"))
-	defer timer.ObserveDuration()
-
-	nodeStoreOperations.WithLabelValues("get_by_key").Inc()
+	defer nodeStoreGetByKeyMetrics.observe(time.Now())
 
 	nodeView, exists := s.data.Load().nodesByNodeKey[nodeKey]
 
@@ -706,10 +738,7 @@ func (s *NodeStore) GetNodeByNodeKey(nodeKey key.NodePublic) (types.NodeView, bo
 // match, [0] for a tagged node, or reject when the set is ambiguous — rather
 // than guessing from a single arbitrary pick.
 func (s *NodeStore) GetNodesByMachineKeyAllUsers(machineKey key.MachinePublic) map[types.UserID]types.NodeView {
-	timer := prometheus.NewTimer(nodeStoreOperationDuration.WithLabelValues("get_nodes_by_machine_key_all_users"))
-	defer timer.ObserveDuration()
-
-	nodeStoreOperations.WithLabelValues("get_nodes_by_machine_key_all_users").Inc()
+	defer nodeStoreGetNodesByMachineKeyAllUsersMetrics.observe(time.Now())
 
 	userMap := s.data.Load().nodesByMachineKey[machineKey]
 
@@ -780,20 +809,14 @@ func (s *NodeStore) DebugString() string {
 
 // ListNodes returns a slice of all nodes in the store.
 func (s *NodeStore) ListNodes() views.Slice[types.NodeView] {
-	timer := prometheus.NewTimer(nodeStoreOperationDuration.WithLabelValues("list"))
-	defer timer.ObserveDuration()
-
-	nodeStoreOperations.WithLabelValues("list").Inc()
+	defer nodeStoreListMetrics.observe(time.Now())
 
 	return views.SliceOf(s.data.Load().allNodes)
 }
 
 // ListPeers returns a slice of all peers for a given node ID.
 func (s *NodeStore) ListPeers(id types.NodeID) views.Slice[types.NodeView] {
-	timer := prometheus.NewTimer(nodeStoreOperationDuration.WithLabelValues("list_peers"))
-	defer timer.ObserveDuration()
-
-	nodeStoreOperations.WithLabelValues("list_peers").Inc()
+	defer nodeStoreListPeersMetrics.observe(time.Now())
 
 	return views.SliceOf(s.data.Load().peersByNode[id])
 }
@@ -850,12 +873,12 @@ func (s *NodeStore) HANodes() map[netip.Prefix][]types.NodeID {
 // Unknown nodes report healthy so absence does not exclude them from
 // election.
 func (s *NodeStore) IsNodeHealthy(id types.NodeID) bool {
-	n, ok := s.data.Load().nodesByID[id]
+	n, ok := s.data.Load().nodeViewsByID[id]
 	if !ok {
 		return true
 	}
 
-	return !n.Unhealthy
+	return !n.Unhealthy()
 }
 
 // PrimaryRoutesForNodeAs returns the prefixes for which id is the primary
@@ -980,10 +1003,7 @@ func (s *NodeStore) RebuildPeerMaps() {
 
 // ListNodesByUser returns a slice of all nodes for a given user ID.
 func (s *NodeStore) ListNodesByUser(uid types.UserID) views.Slice[types.NodeView] {
-	timer := prometheus.NewTimer(nodeStoreOperationDuration.WithLabelValues("list_by_user"))
-	defer timer.ObserveDuration()
-
-	nodeStoreOperations.WithLabelValues("list_by_user").Inc()
+	defer nodeStoreListByUserMetrics.observe(time.Now())
 
 	return views.SliceOf(s.data.Load().nodesByUser[uid])
 }

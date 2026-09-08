@@ -497,13 +497,16 @@ func (m *mapSession) writeMap(msg *tailcfg.MapResponse) error {
 		}
 	}
 
-	m.log.Trace().
-		Caller().
-		Str(zf.Chan, fmt.Sprintf("%p", m.ch)).
-		TimeDiff("timeSpent", time.Now(), startWrite).
-		Str(zf.MachineKey, m.node.MachineKey.String()).
-		Bool("keepalive", msg.KeepAlive).
-		Msg("finished writing mapresp to node")
+	// Runs for every frame including keepalives, so the fields are only
+	// built when trace logging is on.
+	if e := m.log.Trace(); e.Enabled() {
+		e.Caller().
+			Str(zf.Chan, fmt.Sprintf("%p", m.ch)).
+			TimeDiff("timeSpent", time.Now(), startWrite).
+			Str(zf.MachineKey, m.node.MachineKey.String()).
+			Bool("keepalive", msg.KeepAlive).
+			Msg("finished writing mapresp to node")
+	}
 
 	return nil
 }
