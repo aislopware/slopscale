@@ -120,7 +120,7 @@ export function SourcesSection({
   );
 }
 
-/** How often the map URLs are fetched again, and whether at all. */
+/** Whether the map URLs are fetched again on a schedule, and how often. */
 function RefetchRow({
   derp,
   canEdit,
@@ -138,21 +138,40 @@ function RefetchRow({
     : [...frequencyPresets, frequency];
 
   return (
-    <SettingRow
-      title="Refetch on a schedule"
-      description={
-        <>
-          Fetches the map URLs again so new or retired relays reach the machines.
-          {derp.fetchedAt === "0001-01-01T00:00:00Z" ? null : (
-            <>
-              {" "}
-              Last fetched <RelativeTime value={derp.fetchedAt} />.
-            </>
-          )}
-        </>
-      }
-      control={
-        <span className="flex items-center gap-3">
+    <>
+      <SettingRow
+        title="Refetch on a schedule"
+        description={
+          <>
+            Fetches the map URLs again so new or retired relays reach the machines. Off, the map
+            stays as it is until you refetch it here.
+            {derp.fetchedAt === "0001-01-01T00:00:00Z" ? null : (
+              <>
+                {" "}
+                Last fetched <RelativeTime value={derp.fetchedAt} />.
+              </>
+            )}
+          </>
+        }
+        control={
+          <Switch
+            aria-label="Refetch on a schedule"
+            checked={settings.autoUpdate}
+            disabled={!canEdit || pending}
+            transitioning={pending}
+            onCheckedChange={(on) => {
+              mutations.apply(
+                withAutoUpdate(settings, on),
+                `Scheduled refetch ${on ? "on" : "off"}`,
+              );
+            }}
+          />
+        }
+      />
+      <SettingRow
+        title="Refetch interval"
+        description="How long between two fetches while the schedule is on."
+        control={
           <Select
             aria-label="Refetch interval"
             value={frequency}
@@ -173,20 +192,8 @@ function RefetchRow({
               </Select.Option>
             ))}
           </Select>
-          <Switch
-            aria-label="Refetch on a schedule"
-            checked={settings.autoUpdate}
-            disabled={!canEdit || pending}
-            transitioning={pending}
-            onCheckedChange={(on) => {
-              mutations.apply(
-                withAutoUpdate(settings, on),
-                `Scheduled refetch ${on ? "on" : "off"}`,
-              );
-            }}
-          />
-        </span>
-      }
-    />
+        }
+      />
+    </>
   );
 }

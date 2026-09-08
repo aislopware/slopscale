@@ -3,20 +3,22 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { PencilSimpleIcon } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { Derp } from "~/api/queries.ts";
 import {
   customRegionIds,
+  firstError,
   serverDraft,
-  serverError,
+  serverFieldErrors,
   serverFromDraft,
   withServer,
 } from "~/components/derp/model.ts";
 import type { ServerDraft } from "~/components/derp/model.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
+import { focusFirstInvalid } from "~/components/derp/region-form.tsx";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
@@ -45,7 +47,40 @@ function stunFact(derp: Derp): Definition {
 
   const configured = derp.effective.server.stunAddr ?? "";
 
-  return { label: "STUN", value: configured === "" ? <Muted>Not set</Muted> : configured };
+  return {
+    label: "STUN",
+    value:
+      configured === "" ? (
+        <Muted>Not set</Muted>
+      ) : (
+        <span className="flex flex-wrap items-baseline justify-end gap-x-2">
+          <span>{configured}</span>
+          <Muted>not listening</Muted>
+        </span>
+      ),
+  };
+}
+
+function regionFact(derp: Derp): Definition {
+  const { server } = derp.effective;
+
+  if (!server.enabled) {
+    return { label: "Region", value: <Muted>Not published</Muted> };
+  }
+
+  if (!derp.autoAddEmbedded) {
+    return {
+      label: "Region",
+      value: (
+        <span className="flex flex-wrap items-baseline justify-end gap-x-2">
+          <span>{regionLabel(server)}</span>
+          <Muted>published by the map file, not these settings</Muted>
+        </span>
+      ),
+    };
+  }
+
+  return { label: "Region", value: regionLabel(server) };
 }
 
 function facts(derp: Derp): readonly Definition[] {
@@ -68,10 +103,7 @@ function facts(derp: Derp): readonly Definition[] {
       ),
     },
     { label: "Reached at", value: derp.serverUrl, copy: derp.serverUrl },
-    {
-      label: "Region",
-      value: server.enabled ? regionLabel(server) : <Muted>Not published</Muted>,
-    },
+    regionFact(derp),
     stunFact(derp),
     {
       label: "Admits",
@@ -187,9 +219,11 @@ function ServerForm({
   readonly onDone: () => void;
 }): ReactElement {
   const settings = derp.effective;
+  const form = useRef<HTMLFormElement>(null);
   const [draft, setDraft] = useState<ServerDraft>(() => serverDraft(settings.server));
   const [touched, setTouched] = useState(false);
-  const issue = serverError(draft, customRegionIds(settings));
+  const errors = serverFieldErrors(draft, customRegionIds(settings));
+  const issue = firstError(errors);
 
   function update(patch: Partial<ServerDraft>): void {
     setDraft((current) => ({ ...current, ...patch }));
@@ -200,6 +234,8 @@ function ServerForm({
     setTouched(true);
 
     if (issue !== null) {
+      focusFirstInvalid(form.current);
+
       return;
     }
 
@@ -214,27 +250,18 @@ function ServerForm({
     );
   }
 
-  const field = ({
-    key,
-    label,
-    placeholder,
-    description,
-  }: {
-    readonly key: keyof ServerDraft;
+  const field = (props: {
+    readonly field: keyof ServerDraft;
     readonly label: string;
     readonly placeholder: string;
     readonly description?: string;
   }): ReactElement => (
-    <Input
-      className="w-full"
-      label={label}
-      value={String(draft[key])}
-      placeholder={placeholder}
-      spellCheck={false}
-      autoComplete="off"
-      {...(description === undefined ? {} : { description })}
-      onChange={(event) => {
-        update({ [key]: event.target.value });
+    <ServerField
+      {...props}
+      value={String(draft[props.field])}
+      error={touched ? errors[props.field] : undefined}
+      onChange={(value) => {
+        update({ [props.field]: value });
       }}
       onBlur={() => {
         setTouched(true);
@@ -243,42 +270,42 @@ function ServerForm({
   );
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form ref={form} onSubmit={submit} className="flex flex-col gap-4">
       <div className="grid items-start gap-4 sm:grid-cols-2">
         {field({
-          key: "regionId",
+          field: "regionId",
           label: "Region id",
           placeholder: "999",
           description: "Replaces a fetched region with the same id.",
         })}
         {field({
-          key: "regionCode",
+          field: "regionCode",
           label: "Region code",
           placeholder: "headscale",
           description: "Short code the clients show.",
         })}
       </div>
       {field({
-        key: "regionName",
+        field: "regionName",
         label: "Region name",
         placeholder: "Headscale Embedded DERP",
         description: "Empty takes the code.",
       })}
       {field({
-        key: "stunAddr",
+        field: "stunAddr",
         label: "STUN address",
         placeholder: "0.0.0.0:3478",
         description: "UDP host:port STUN listens on; open it on the firewall.",
       })}
       <div className="grid items-start gap-4 sm:grid-cols-2">
         {field({
-          key: "ipv4",
+          field: "ipv4",
           label: "Public IPv4",
           placeholder: "198.51.100.1",
           description: "Published next to the host name.",
         })}
         {field({
-          key: "ipv6",
+          field: "ipv6",
           label: "Public IPv6",
           placeholder: "2001:db8::1",
           description: "Reached while DNS is down.",
@@ -291,11 +318,46 @@ function ServerForm({
           update({ verifyClients: on });
         }}
       />
-      {touched && issue !== null ? <p className="text-sm text-kumo-danger">{issue}</p> : null}
       <DialogError
         message={mutations.set.isError ? errorMessage(mutations.set.error) : undefined}
       />
       <FormFooter label="Save" pending={mutations.set.isPending} />
     </form>
+  );
+}
+
+function ServerField({
+  label,
+  placeholder,
+  description,
+  value,
+  error,
+  onChange,
+  onBlur,
+}: {
+  readonly field: keyof ServerDraft;
+  readonly label: string;
+  readonly placeholder: string;
+  readonly description?: string;
+  readonly value: string;
+  readonly error: string | undefined;
+  readonly onChange: (value: string) => void;
+  readonly onBlur: () => void;
+}): ReactElement {
+  return (
+    <Input
+      className="w-full"
+      label={label}
+      value={value}
+      placeholder={placeholder}
+      spellCheck={false}
+      autoComplete="off"
+      {...(description === undefined ? {} : { description })}
+      {...(error === undefined ? {} : { error })}
+      onChange={(event) => {
+        onChange(event.target.value);
+      }}
+      onBlur={onBlur}
+    />
   );
 }

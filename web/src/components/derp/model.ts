@@ -349,15 +349,61 @@ export function relayFromDraft(draft: RelayDraft): DerpRelay {
   return relay;
 }
 
+/** What is wrong with each field of a relay draft; empty when nothing is. */
+export type FieldErrors<Draft> = Partial<Record<keyof Draft, string>>;
+
+export function relayFieldErrors(draft: RelayDraft): FieldErrors<RelayDraft> {
+  const errors: FieldErrors<RelayDraft> = {};
+  const checks: readonly (readonly [keyof RelayDraft, string | null])[] = [
+    ["hostName", hostNameError(draft.hostName.trim())],
+    ["ipv4", ipv4Error(draft.ipv4.trim(), true)],
+    ["ipv6", ipv6Error(draft.ipv6.trim(), true)],
+    ["derpPort", portError(draft.derpPort.trim())],
+    ["stunPort", portError(draft.stunPort.trim())],
+  ];
+
+  for (const [field, error] of checks) {
+    if (error !== null) {
+      errors[field] = error;
+    }
+  }
+
+  return errors;
+}
+
 /** The first thing wrong with a relay draft, or null. */
 export function relayError(draft: RelayDraft): string | null {
-  return (
-    hostNameError(draft.hostName.trim()) ??
-    ipv4Error(draft.ipv4.trim(), true) ??
-    ipv6Error(draft.ipv6.trim(), true) ??
-    portError(draft.derpPort) ??
-    portError(draft.stunPort)
-  );
+  return firstError(relayFieldErrors(draft));
+}
+
+export function firstError<Draft>(errors: FieldErrors<Draft>): string | null {
+  const first = Object.values(errors).find((error) => typeof error === "string");
+
+  return typeof first === "string" ? first : null;
+}
+
+/** The name a relay is published under: its own, or its host name. */
+export function relayPublishedName(draft: RelayDraft): string {
+  const name = draft.name.trim();
+
+  return name === "" ? draft.hostName.trim() : name;
+}
+
+/** A name two relays of a region share, or null. */
+export function duplicateRelayName(relays: readonly RelayDraft[]): string | null {
+  const seen = new Set<string>();
+
+  for (const relay of relays) {
+    const name = relayPublishedName(relay);
+
+    if (name !== "" && seen.has(name)) {
+      return name;
+    }
+
+    seen.add(name);
+  }
+
+  return null;
 }
 
 /** The embedded relay as the form edits it. */
@@ -399,14 +445,30 @@ export function serverFromDraft(draft: ServerDraft, enabled: boolean): DerpServe
   };
 }
 
+export function serverFieldErrors(
+  draft: ServerDraft,
+  taken: readonly number[],
+): FieldErrors<ServerDraft> {
+  const errors: FieldErrors<ServerDraft> = {};
+  const checks: readonly (readonly [keyof ServerDraft, string | null])[] = [
+    ["regionId", regionIdError(draft.regionId.trim(), taken)],
+    ["regionCode", regionCodeError(draft.regionCode.trim())],
+    ["stunAddr", stunAddrError(draft.stunAddr.trim())],
+    ["ipv4", ipv4Error(draft.ipv4.trim(), false)],
+    ["ipv6", ipv6Error(draft.ipv6.trim(), false)],
+  ];
+
+  for (const [field, error] of checks) {
+    if (error !== null) {
+      errors[field] = error;
+    }
+  }
+
+  return errors;
+}
+
 export function serverError(draft: ServerDraft, taken: readonly number[]): string | null {
-  return (
-    regionIdError(draft.regionId, taken) ??
-    regionCodeError(draft.regionCode.trim()) ??
-    stunAddrError(draft.stunAddr.trim()) ??
-    ipv4Error(draft.ipv4.trim(), false) ??
-    ipv6Error(draft.ipv6.trim(), false)
-  );
+  return firstError(serverFieldErrors(draft, taken));
 }
 
 /** The ids the custom regions use, which the embedded relay and a new region must avoid. */

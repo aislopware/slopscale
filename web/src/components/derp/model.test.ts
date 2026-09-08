@@ -8,8 +8,10 @@ import {
   frequencyLabel,
   hostNameError,
   regionIdError,
+  duplicateRelayName,
   relayDraft,
   relayError,
+  relayFieldErrors,
   relayFromDraft,
   serverDraft,
   serverError,
@@ -138,5 +140,19 @@ describe("validation", () => {
     expect(serverError(draft, [900])).toBeNull();
     expect(serverError({ ...draft, regionId: "900" }, [900])).not.toBeNull();
     expect(serverFromDraft(draft, false)).toStrictEqual({ ...base.server, enabled: false });
+  });
+
+  it("names the field a relay error belongs to", () => {
+    const errors = relayFieldErrors({ ...relayDraft(), hostName: "ok.example", ipv6: "bad" });
+
+    expect(Object.keys(errors)).toStrictEqual(["ipv6"]);
+  });
+
+  it("spots two relays published under one name", () => {
+    const first = { ...relayDraft(), hostName: "a.example", name: "shared" };
+    const second = { ...relayDraft(), hostName: "shared" };
+
+    expect(duplicateRelayName([first, second])).toBe("shared");
+    expect(duplicateRelayName([first, { ...second, name: "own" }])).toBeNull();
   });
 });

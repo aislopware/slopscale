@@ -2,7 +2,7 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
@@ -10,20 +10,58 @@ import type { Derp } from "~/api/queries.ts";
 import type { DerpCustomRegion } from "~/api/schema.gen.ts";
 import {
   customRegionIds,
+  duplicateRelayName,
+  firstError,
   regionCodeError,
   regionIdError,
   relayDraft,
-  relayError,
+  relayFieldErrors,
   relayFromDraft,
   withRegion,
 } from "~/components/derp/model.ts";
-import type { RelayDraft } from "~/components/derp/model.ts";
+import type { FieldErrors, RelayDraft } from "~/components/derp/model.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DialogError } from "~/components/ui/dialog.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 const iconSize = 16;
+
+/** Moves focus to the first field the form marks invalid, after React rendered the marks. */
+export function focusFirstInvalid(form: HTMLFormElement | null): void {
+  requestAnimationFrame(() => {
+    form?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  });
+}
+
+/** What is wrong in the form, or null. Field errors are also shown at their field. */
+function regionIssue(
+  relays: readonly RelayDraft[],
+  relayErrors: readonly FieldErrors<RelayDraft>[],
+  regionErrors: { readonly id: string | null; readonly code: string | null },
+): string | null {
+  if (regionErrors.id !== null) {
+    return regionErrors.id;
+  }
+
+  if (regionErrors.code !== null) {
+    return regionErrors.code;
+  }
+
+  if (relays.length === 0) {
+    return "Add at least one relay.";
+  }
+
+  const index = relayErrors.findIndex((errors) => firstError(errors) !== null);
+
+  if (index !== -1) {
+    return `Relay ${index + 1}: ${firstError(relayErrors[index] ?? {}) ?? ""}`;
+  }
+
+  const duplicate = duplicateRelayName(relays);
+
+  return duplicate === null ? null : `Two relays are named ${duplicate}; give one its own name.`;
+}
 
 /** Adds a region of relays, or edits one; the whole configuration is sent back. */
 export function RegionForm({
@@ -38,6 +76,7 @@ export function RegionForm({
   readonly onDone: () => void;
 }): ReactElement {
   const settings = derp.effective;
+  const form = useRef<HTMLFormElement>(null);
   const [id, setId] = useState(editing === null ? "" : String(editing.id));
   const [code, setCode] = useState(editing?.code ?? "");
   const [name, setName] = useState(editing?.name ?? "");
@@ -47,12 +86,16 @@ export function RegionForm({
   const [touched, setTouched] = useState(false);
   const taken = customRegionIds(settings).filter((existing) => existing !== editing?.id);
   const embeddedId = settings.server.enabled ? [settings.server.regionId ?? 0] : [];
-  const issue =
-    regionIdError(id.trim(), [...taken, ...embeddedId]) ??
-    regionCodeError(code.trim()) ??
-    (relays.length === 0 ? "Add at least one relay." : null) ??
-    relays.map((relay) => relayError(relay)).find((error) => error !== null) ??
-    null;
+  const regionErrors = {
+    id: regionIdError(id.trim(), [...taken, ...embeddedId]),
+    code: regionCodeError(code.trim()),
+  };
+  const relayErrors = relays.map((relay) => relayFieldErrors(relay));
+  const issue = regionIssue(relays, relayErrors, regionErrors);
+  const atField =
+    regionErrors.id !== null ||
+    regionErrors.code !== null ||
+    relayErrors.some((errors) => firstError(errors) !== null);
 
   function updateRelay(key: string, patch: Partial<RelayDraft>): void {
     setRelays((current) =>
@@ -65,6 +108,8 @@ export function RegionForm({
     setTouched(true);
 
     if (issue !== null) {
+      focusFirstInvalid(form.current);
+
       return;
     }
 
@@ -90,11 +135,12 @@ export function RegionForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form ref={form} onSubmit={submit} className="flex flex-col gap-4">
       <RegionFields
         id={id}
         code={code}
         name={name}
+        errors={touched ? regionErrors : { id: null, code: null }}
         onId={setId}
         onCode={setCode}
         onName={setName}
@@ -116,10 +162,12 @@ export function RegionForm({
             Add relay
           </Button>
         </div>
-        {relays.map((relay) => (
+        {relays.map((relay, index) => (
           <RelayFields
             key={relay.key}
+            position={index + 1}
             relay={relay}
+            errors={touched ? (relayErrors[index] ?? {}) : {}}
             removable={relays.length > 1}
             onChange={(patch) => {
               updateRelay(relay.key, patch);
@@ -133,7 +181,9 @@ export function RegionForm({
           />
         ))}
       </div>
-      {touched && issue !== null ? <p className="text-sm text-kumo-danger">{issue}</p> : null}
+      {touched && issue !== null && !atField ? (
+        <p className="text-sm text-kumo-danger">{issue}</p>
+      ) : null}
       <DialogError
         message={mutations.set.isError ? errorMessage(mutations.set.error) : undefined}
       />
@@ -146,6 +196,7 @@ function RegionFields({
   id,
   code,
   name,
+  errors,
   onId,
   onCode,
   onName,
@@ -154,6 +205,7 @@ function RegionFields({
   readonly id: string;
   readonly code: string;
   readonly name: string;
+  readonly errors: { readonly id: string | null; readonly code: string | null };
   readonly onId: (value: string) => void;
   readonly onCode: (value: string) => void;
   readonly onName: (value: string) => void;
@@ -169,6 +221,7 @@ function RegionFields({
         inputMode="numeric"
         autoComplete="off"
         description="Above 900 stays clear of Tailscale's."
+        {...(errors.id === null ? {} : { error: errors.id })}
         onChange={(event) => {
           onId(event.target.value);
         }}
@@ -182,6 +235,7 @@ function RegionFields({
         spellCheck={false}
         autoComplete="off"
         description="Short code the clients show."
+        {...(errors.code === null ? {} : { error: errors.code })}
         onChange={(event) => {
           onCode(event.target.value);
         }}
@@ -203,13 +257,17 @@ function RegionFields({
 }
 
 function RelayFields({
+  position,
   relay,
+  errors,
   removable,
   onChange,
   onRemove,
   onBlur,
 }: {
+  readonly position: number;
   readonly relay: RelayDraft;
+  readonly errors: FieldErrors<RelayDraft>;
   readonly removable: boolean;
   readonly onChange: (patch: Partial<RelayDraft>) => void;
   readonly onRemove: () => void;
@@ -225,24 +283,32 @@ function RelayFields({
     readonly label: string;
     readonly placeholder: string;
     readonly description?: string;
-  }): ReactElement => (
-    <Input
-      className="w-full"
-      label={label}
-      value={String(relay[key])}
-      placeholder={placeholder}
-      spellCheck={false}
-      autoComplete="off"
-      {...(description === undefined ? {} : { description })}
-      onChange={(event) => {
-        onChange({ [key]: event.target.value });
-      }}
-      onBlur={onBlur}
-    />
-  );
+  }): ReactElement => {
+    const error = errors[key];
+
+    return (
+      <Input
+        className="w-full"
+        label={label}
+        value={String(relay[key])}
+        placeholder={placeholder}
+        spellCheck={false}
+        autoComplete="off"
+        {...(description === undefined ? {} : { description })}
+        {...(error === undefined ? {} : { error })}
+        onChange={(event) => {
+          onChange({ [key]: event.target.value });
+        }}
+        onBlur={onBlur}
+      />
+    );
+  };
 
   return (
-    <fieldset className="flex flex-col gap-3 rounded-lg border border-kumo-line bg-kumo-recessed p-4">
+    <fieldset
+      aria-label={`Relay ${position}`}
+      className="flex flex-col gap-3 rounded-lg border border-kumo-line bg-kumo-recessed p-4"
+    >
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           {text({
@@ -258,7 +324,7 @@ function RelayFields({
             shape="square"
             size="sm"
             icon={<TrashIcon size={iconSize} />}
-            aria-label={`Remove relay ${relay.hostName === "" ? "" : relay.hostName}`.trim()}
+            aria-label={`Remove relay ${position}`}
             className="mt-6"
             onClick={onRemove}
           />

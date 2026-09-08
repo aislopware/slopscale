@@ -1,4 +1,5 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
+import { Table } from "@cloudflare/kumo/components/table";
 import type { ReactElement } from "react";
 
 import type { Derp } from "~/api/queries.ts";
@@ -28,42 +29,34 @@ export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
           <p className="text-kumo-subtle">No regions. Machines must connect directly.</p>
         </SectionRow>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs text-kumo-subtle">
-              <th scope="col" className="px-5 py-2 font-medium">
-                Id
-              </th>
-              <th scope="col" className="px-2 py-2 font-medium">
-                Code
-              </th>
-              <th scope="col" className="px-2 py-2 font-medium">
-                Name
-              </th>
-              <th scope="col" className="px-2 py-2 text-right font-medium">
-                Relays
-              </th>
-              <th scope="col" className="px-5 py-2 text-right font-medium">
-                From
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {derp.regions.map((region) => (
-              <tr key={region.id} className="border-t border-kumo-hairline">
-                <td className="px-5 py-2 font-mono tabular-nums">{region.id}</td>
-                <td className="px-2 py-2 font-mono">{region.code}</td>
-                <td className="px-2 py-2 text-kumo-subtle">{region.name}</td>
-                <td className="px-2 py-2 text-right tabular-nums">{region.nodes}</td>
-                <td className="px-5 py-2 text-right">
-                  <Badge variant={sourceVariants[region.source]}>
-                    {sourceLabels[region.source]}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <Table>
+            <Table.Header variant="compact">
+              <Table.Row>
+                <Table.Head className="w-16">Id</Table.Head>
+                <Table.Head>Code</Table.Head>
+                <Table.Head>Name</Table.Head>
+                <Table.Head className="text-right">Relays</Table.Head>
+                <Table.Head className="text-right">From</Table.Head>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {derp.regions.map((region) => (
+                <Table.Row key={region.id}>
+                  <Table.Cell className="font-mono tabular-nums">{region.id}</Table.Cell>
+                  <Table.Cell className="font-mono">{region.code}</Table.Cell>
+                  <Table.Cell className="text-kumo-subtle">{region.name}</Table.Cell>
+                  <Table.Cell className="text-right tabular-nums">{region.nodes}</Table.Cell>
+                  <Table.Cell className="text-right">
+                    <Badge variant={sourceVariants[region.source]}>
+                      {sourceLabels[region.source]}
+                    </Badge>
+                  </Table.Cell>
+                </Table.Row>
+              ))}
+            </Table.Body>
+          </Table>
+        </div>
       )}
     </Section>
   );
