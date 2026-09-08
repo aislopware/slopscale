@@ -501,3 +501,56 @@ func TestNodeAttrsAppConnectors(t *testing.T) {
 	connector.WaitForUpdate(t, 10*time.Second)
 	assert.False(t, hasCap(connector.Netmap(), capName), "the tagged connector is not a member")
 }
+
+// TestNodeAttrsIPPool registers nodes under a policy with ipPool grants
+// and checks each new node is numbered from the pool its user or tag
+// names, while a node no grant names gets an address from the default
+// range and an existing node keeps its address across a policy change.
+func TestNodeAttrsIPPool(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	dev := srv.CreateUser(t, "pool-dev")
+	other := srv.CreateUser(t, "pool-other")
+
+	v4Of := func(c *servertest.TestClient) netip.Addr {
+		var v4 netip.Addr
+
+		c.WaitForCondition(t, "self has an IPv4 address", 10*time.Second,
+			func(nm *netmap.NetworkMap) bool {
+				for _, addr := range nm.SelfNode.Addresses().All() {
+					if addr.Addr().Is4() {
+						v4 = addr.Addr()
+
+						return true
+					}
+				}
+
+				return false
+			})
+
+		return v4
+	}
+
+	before := servertest.NewClient(t, srv, "pool-before", servertest.WithUser(dev))
+	beforeV4 := v4Of(before)
+
+	reloadPolicy(t, srv, `{
+		"tagOwners": {"tag:pool-server": ["pool-dev@"]},
+		"nodeAttrs": [
+			{"target": ["pool-dev@"], "ipPool": ["100.81.0.0/24"]},
+			{"target": ["tag:pool-server"], "ipPool": ["100.82.0.0/24"]}
+		]
+	}`)
+
+	devNode := servertest.NewClient(t, srv, "pool-dev-node", servertest.WithUser(dev))
+	tagged := servertest.NewClient(t, srv, "pool-tagged",
+		servertest.WithUser(dev), servertest.WithTags("tag:pool-server"))
+	unnamed := servertest.NewClient(t, srv, "pool-unnamed", servertest.WithUser(other))
+
+	assert.True(t, netip.MustParsePrefix("100.81.0.0/24").Contains(v4Of(devNode)), "user pool: %s", v4Of(devNode))
+	assert.True(t, netip.MustParsePrefix("100.82.0.0/24").Contains(v4Of(tagged)), "tag pool: %s", v4Of(tagged))
+	assert.False(t, netip.MustParsePrefix("100.81.0.0/24").Contains(v4Of(unnamed)), "no pool: %s", v4Of(unnamed))
+	assert.False(t, netip.MustParsePrefix("100.82.0.0/24").Contains(v4Of(unnamed)), "no pool: %s", v4Of(unnamed))
+	assert.Equal(t, beforeV4, v4Of(before), "an existing node keeps its address")
+}

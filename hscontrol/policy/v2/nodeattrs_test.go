@@ -272,9 +272,9 @@ func TestNodeAttrsValidate(t *testing.T) {
 			wantErr: ErrNodeAttrAppValueInvalid,
 		},
 		{
-			name:    "ipPool set rejected as unsupported",
-			extra:   `"nodeAttrs": [{"target": ["autogroup:member"], "ipPool": ["100.81.0.0/16"]}]`,
-			wantErr: ErrNodeAttrIPPoolUnsupported,
+			name:    "ipPool on a host target rejected",
+			extra:   `"nodeAttrs": [{"target": ["100.64.0.1"], "ipPool": ["100.81.0.0/16"]}]`,
+			wantErr: ErrNodeAttrIPPoolTarget,
 		},
 		{
 			name:    "ipPool overlapping reserved range rejected at validate",
@@ -385,4 +385,78 @@ func TestNodesWithChangedCapMap(t *testing.T) {
 
 	assert.Empty(t, pm.NodesWithChangedCapMap(),
 		"reloading the same policy must not produce CapMap diffs")
+}
+
+// TestIPPoolFor covers pool selection for a node that has no address yet:
+// the first grant naming the node's user, group or tag wins, and nodes no
+// grant names get no pool.
+func TestIPPoolFor(t *testing.T) {
+	t.Parallel()
+
+	users := nodeAttrsTestUsers()
+	nodes := nodeAttrsTestNodes(users)
+
+	policy := `{
+		"groups": {"group:dev": ["bob@example.org"]},
+		"tagOwners": {` + nodeAttrsTagOwners + `},
+		"nodeAttrs": [
+			{"target": ["alice@example.com"], "ipPool": ["100.81.0.0/24"]},
+			{"target": ["group:dev"], "ipPool": ["100.82.0.0/24", "100.83.0.0/24"]},
+			{"target": ["tag:server"], "ipPool": ["100.84.0.0/24"]},
+			{"target": ["autogroup:member"], "ipPool": ["100.85.0.0/24"]}
+		]
+	}`
+
+	pm, err := NewPolicyManager([]byte(policy), users, nodes.ViewSlice())
+	require.NoError(t, err)
+
+	newNode := func(user *types.User, tags ...string) types.NodeView {
+		n := &types.Node{GivenName: "fresh", Tags: tags, Hostinfo: &tailcfg.Hostinfo{}}
+		if user != nil {
+			n.User = user
+			n.UserID = &user.ID
+		}
+
+		return n.View()
+	}
+
+	tests := []struct {
+		name string
+		node types.NodeView
+		want []netip.Prefix
+	}{
+		{name: "user grant", node: newNode(&users[0]), want: prefixes("100.81.0.0/24")},
+		{
+			name: "group grant, first match wins",
+			node: newNode(&users[1]),
+			want: prefixes("100.82.0.0/24", "100.83.0.0/24"),
+		},
+		{name: "tag grant", node: newNode(nil, "tag:server"), want: prefixes("100.84.0.0/24")},
+		{name: "unnamed tag", node: newNode(nil, "tag:prod"), want: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, pm.IPPoolFor(tt.node))
+		})
+	}
+
+	t.Run("no policy", func(t *testing.T) {
+		t.Parallel()
+
+		var none *PolicyManager
+
+		assert.Nil(t, none.IPPoolFor(newNode(&users[0])))
+	})
+}
+
+func prefixes(ps ...string) []netip.Prefix {
+	out := make([]netip.Prefix, 0, len(ps))
+	for _, p := range ps {
+		out = append(out, netip.MustParsePrefix(p))
+	}
+
+	return out
 }

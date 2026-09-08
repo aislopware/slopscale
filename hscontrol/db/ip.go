@@ -184,7 +184,69 @@ func (i *IPAllocator) FreeIPs(ips []netip.Addr) {
 	}
 }
 
-var ErrCouldNotAllocateIP = errors.New("failed to allocate IP")
+var (
+	ErrCouldNotAllocateIP = errors.New("failed to allocate IP")
+	// ErrIPPoolOutsidePrefix reports an ipPool that prefixes.v4 does not
+	// contain; the policy validates pools against the CGNAT range only.
+	ErrIPPoolOutsidePrefix = errors.New("ipPool is outside prefixes.v4")
+	// ErrIPPoolExhausted reports that every pool named for the node is full.
+	ErrIPPoolExhausted = errors.New("every ipPool for the node is full")
+)
+
+// NextIn allocates a pair like [IPAllocator.Next], but takes the IPv4
+// address from the first of pools with a free address, as a nodeAttrs
+// ipPool asks. IPv6 is unaffected. A pool outside the IPv4 prefix or a
+// set of full pools is an error rather than a fallback to the whole
+// prefix, so a node never lands outside the range the policy chose.
+func (i *IPAllocator) NextIn(pools []netip.Prefix) (*netip.Addr, *netip.Addr, error) {
+	if len(pools) == 0 || i.prefix4 == nil {
+		return i.Next()
+	}
+
+	ret4, err := i.allocateFromPools(pools)
+	if err != nil {
+		return nil, nil, fmt.Errorf("allocating IPv4 address: %w", err)
+	}
+
+	var ret6 *netip.Addr
+
+	if i.prefix6 != nil {
+		ret6, err = i.allocateNext(&i.prev6, i.prefix6)
+		if err != nil {
+			return nil, nil, fmt.Errorf("allocating IPv6 address: %w", err)
+		}
+	}
+
+	return ret4, ret6, nil
+}
+
+// allocateFromPools takes the first free address of the first pool that
+// has one. Every pool must lie within the IPv4 prefix.
+func (i *IPAllocator) allocateFromPools(pools []netip.Prefix) (*netip.Addr, error) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	for _, pool := range pools {
+		if !pool.Addr().Is4() || !i.prefix4.Overlaps(pool) || pool.Bits() < i.prefix4.Bits() {
+			return nil, fmt.Errorf("%w: %s", ErrIPPoolOutsidePrefix, pool)
+		}
+	}
+
+	for _, p := range pools {
+		pool := p.Masked()
+
+		ip, err := i.next(pool.Addr(), &pool)
+		if err == nil {
+			return ip, nil
+		}
+
+		if !errors.Is(err, ErrCouldNotAllocateIP) {
+			return nil, err
+		}
+	}
+
+	return nil, ErrIPPoolExhausted
+}
 
 // allocateNext allocates the next address from prefix under i.mu, advancing
 // prev so a run of allocations (e.g. BackfillNodeIPs) does not rescan
@@ -232,9 +294,13 @@ func (i *IPAllocator) next(prev netip.Addr, prefix *netip.Prefix) (*netip.Addr, 
 	// starting point at random and then scans deterministically: this keeps
 	// the loop finite, so an exhausted prefix returns ErrCouldNotAllocateIP
 	// instead of re-drawing in-prefix addresses forever under i.mu.
+	// The first and last address of the prefix are never handed out; the
+	// configured prefixes add them to the used set, a pool does not.
+	first, last := util.GetIPPrefixEndpoints(*prefix)
+
 	start := ip
 	for {
-		if prefix.Contains(ip) && !set.Contains(ip) && !isTailscaleReservedIP(ip) {
+		if prefix.Contains(ip) && ip != first && ip != last && !set.Contains(ip) && !isTailscaleReservedIP(ip) {
 			i.usedIPs.Add(ip)
 
 			return &ip, nil

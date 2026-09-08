@@ -101,6 +101,11 @@ type PolicyManager interface {
 	// both fields are empty and the caller falls back to existing behavior.
 	ViaRoutesForPeer(viewer, peer types.NodeView) types.ViaRouteResult
 
+	// IPPoolFor returns the nodeAttrs ipPool a new node is numbered from,
+	// resolved from the node's user or tags, or nil when no grant names
+	// it. Called before the node has an address.
+	IPPoolFor(node types.NodeView) []netip.Prefix
+
 	// NodeCapMap returns the policy-derived CapMap for the given node,
 	// or nil when no nodeAttrs entry targets it. The returned map is
 	// owned by the manager; treat it as read-only and copy before

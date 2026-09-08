@@ -1594,6 +1594,28 @@ func resolveTagOwners(p *Policy, users types.Users, nodes views.Slice[types.Node
 	return ret, nil
 }
 
+// IPPoolFor returns the nodeAttrs ipPool a new node is numbered from, or
+// nil when no grant names it. A target that fails to resolve is logged and
+// treated as no pool, so a stale user in the policy does not block
+// registration.
+func (pm *PolicyManager) IPPoolFor(node types.NodeView) []netip.Prefix {
+	if pm == nil {
+		return nil
+	}
+
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	pools, err := pm.pol.ipPoolFor(pm.users, node)
+	if err != nil {
+		log.Warn().Err(err).Str("node", node.Hostname()).Msg("resolving ipPool for a new node")
+
+		return nil
+	}
+
+	return pools
+}
+
 // NodeCapMap returns the policy-derived CapMap for the given node, or
 // nil when the node has no nodeAttrs entries that target it. The
 // returned map is a defensive clone — caller mutations cannot reach

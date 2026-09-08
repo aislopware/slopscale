@@ -286,6 +286,27 @@ the connector, which learns and advertises the routes. Approve the connector's r
 }
 ```
 
+### IP pools
+
+`ipPool` numbers new nodes from a range of your choosing, as Tailscale's
+[IP pools](https://tailscale.com/kb/1304/ip-pool) do. The target must be a
+user, group, tag or autogroup, because the pool is chosen before the node has
+an address. The first grant that names the node's user or tags wins, the
+first listed pool with a free address is used, and a node keeps its address
+when the policy changes later. Pools must lie within the CGNAT range, outside
+the ranges Tailscale reserves, and within `prefixes.v4`; a full pool refuses
+the registration instead of falling back to the default range. Only IPv4 is
+pooled.
+
+```json title="policy.json"
+{
+  "nodeAttrs": [
+    { "target": ["group:dev"], "ipPool": ["100.85.0.0/16"] },
+    { "target": ["tag:server"], "ipPool": ["100.86.0.0/24", "100.87.0.0/24"] }
+  ]
+}
+```
+
 ## Network-wide policy options
 
 The following options are applied for the entire tailnet. Consider [node attributes](#node-attributes) for a more

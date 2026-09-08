@@ -3655,8 +3655,8 @@ func (s *State) saveNewNode(nodeToRegister *types.Node, params newNodeParams) (t
 		return types.NodeView{}, err
 	}
 
-	// Allocate new IPs
-	ipv4, ipv6, err := s.ipAlloc.Next()
+	// Allocate new IPs, from the policy's ipPool when one names the node.
+	ipv4, ipv6, err := s.ipAlloc.NextIn(s.polMan.IPPoolFor(nodeToRegister.View()))
 	if err != nil {
 		return types.NodeView{}, fmt.Errorf("allocating IPs: %w", err)
 	}

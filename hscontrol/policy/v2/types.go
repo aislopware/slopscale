@@ -108,8 +108,8 @@ var (
 	ErrNodeAttrsIPPoolOutOfRange    = errors.New("nodeAttrs ipPool must be within 100.64.0.0/10")
 	ErrNodeAttrsAutogroupNotAllowed = errors.New("nodeAttrs target does not support this autogroup")
 	ErrNodeAttrUnsupported          = errors.New("nodeAttrs uses a feature headscale does not yet support")
-	ErrNodeAttrIPPoolUnsupported    = errors.New(
-		"nodeAttrs ipPool requires the IP allocator (https://github.com/juanfont/headscale/issues/2912)",
+	ErrNodeAttrIPPoolTarget         = errors.New(
+		"nodeAttrs ipPool target must be a user, group, tag or autogroup",
 	)
 	ErrNodeAttrTargetUnsupported = errors.New("nodeAttrs target alias type is not supported")
 	ErrNodeAttrAppCapInvalid     = errors.New(
@@ -2174,8 +2174,10 @@ type Grant struct {
 // definitions, for one). Values from several grants for the same
 // capability are concatenated.
 //
-// IPPool is parsed and validated for forward compatibility with the IP
-// allocator; the policy compiler does not consume it yet.
+// IPPool lists the IPv4 ranges a new node matching Targets is numbered
+// from, as Tailscale's ipPool does: [Policy.ipPoolFor] picks the first
+// grant that names the node and the allocator takes the first pool with a
+// free address. Nodes that already have an address keep it.
 type NodeAttrGrant struct {
 	Targets Aliases                              `json:"target"`
 	Attrs   []nodecap.Cap                        `json:"attr,omitempty"`
@@ -2460,6 +2462,21 @@ func validateNodeAttrApp(capName nodecap.Cap, values []tailcfg.RawMessage) error
 		err := json.Unmarshal([]byte(value), &object)
 		if err != nil {
 			return fmt.Errorf("%w: %q for %q", ErrNodeAttrAppValueInvalid, string(value), name)
+		}
+	}
+
+	return nil
+}
+
+// validateNodeAttrIPPoolTargets rejects ipPool targets that name addresses
+// rather than principals: a pool is chosen for a node before it has an
+// address, so only its user, group, tag or autogroup can pick one.
+func validateNodeAttrIPPoolTargets(targets Aliases) error {
+	for _, target := range targets {
+		switch target.(type) {
+		case *Username, *Group, *Tag, *AutoGroup, Asterix:
+		default:
+			return fmt.Errorf("%w: %q", ErrNodeAttrIPPoolTarget, target.String())
 		}
 	}
 
@@ -3131,7 +3148,10 @@ func (pol *Policy) validate() error {
 		}
 
 		if len(na.IPPool) > 0 {
-			errs = append(errs, ErrNodeAttrIPPoolUnsupported)
+			err := validateNodeAttrIPPoolTargets(na.Targets)
+			if err != nil {
+				errs = append(errs, err)
+			}
 		}
 
 		for _, prefix := range na.IPPool {

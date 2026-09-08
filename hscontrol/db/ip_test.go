@@ -528,3 +528,50 @@ func TestIPAllocatorNextNoReservedIPs(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, na("100.115.94.0"), *nextChrome)
 }
+
+// TestIPAllocatorNextIn covers allocation from a nodeAttrs ipPool: the
+// first pool with room wins, the pool's network and broadcast addresses
+// are skipped, a pool outside prefixes.v4 is refused and full pools are an
+// error rather than a fall back to the whole prefix.
+func TestIPAllocatorNextIn(t *testing.T) {
+	t.Parallel()
+
+	alloc, err := NewIPAllocator(
+		nil,
+		new(tsaddr.CGNATRange()),
+		new(tsaddr.TailscaleULARange()),
+		types.IPAllocationStrategySequential,
+	)
+	require.NoError(t, err)
+
+	pools := []netip.Prefix{netip.MustParsePrefix("100.81.0.0/30"), netip.MustParsePrefix("100.82.0.0/30")}
+
+	// A /30 holds two usable addresses.
+	v4, v6, err := alloc.NextIn(pools)
+	require.NoError(t, err)
+	assert.Equal(t, na("100.81.0.1"), *v4)
+	require.NotNil(t, v6)
+
+	v4, _, err = alloc.NextIn(pools)
+	require.NoError(t, err)
+	assert.Equal(t, na("100.81.0.2"), *v4)
+
+	v4, _, err = alloc.NextIn(pools)
+	require.NoError(t, err)
+	assert.Equal(t, na("100.82.0.1"), *v4, "the second pool takes over once the first is full")
+
+	v4, _, err = alloc.NextIn(pools)
+	require.NoError(t, err)
+	assert.Equal(t, na("100.82.0.2"), *v4)
+
+	_, _, err = alloc.NextIn(pools)
+	require.ErrorIs(t, err, ErrIPPoolExhausted)
+
+	_, _, err = alloc.NextIn([]netip.Prefix{netip.MustParsePrefix("10.0.0.0/24")})
+	require.ErrorIs(t, err, ErrIPPoolOutsidePrefix)
+
+	// Without a pool the default range is untouched by the pool allocations.
+	v4, _, err = alloc.NextIn(nil)
+	require.NoError(t, err)
+	assert.Equal(t, na("100.64.0.1"), *v4)
+}

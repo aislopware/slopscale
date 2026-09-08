@@ -10,6 +10,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/rs/zerolog/log"
 	"go4.org/netipx"
+	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tailcfg/nodecap"
 	"tailscale.com/tailcfg/peercap"
@@ -1241,4 +1242,44 @@ func compileViaForNode(
 	}
 
 	return rules
+}
+
+// ipPoolPlaceholder stands in for the address of a node that has none yet,
+// so nodeAttrs targets can be resolved against it. It is the MagicDNS
+// service address, which the allocator never hands out, so no real node
+// can collide with it.
+var ipPoolPlaceholder = tsaddr.TailscaleServiceIP()
+
+// ipPoolFor returns the ipPool of the first nodeAttrs grant whose targets
+// name node, or nil when none does. The node need not have an address:
+// it is resolved through a placeholder, so only principal targets (user,
+// group, tag, autogroup) can match, which [validateNodeAttrIPPoolTargets]
+// guarantees.
+func (pol *Policy) ipPoolFor(users types.Users, node types.NodeView) ([]netip.Prefix, error) {
+	if pol == nil || !slices.ContainsFunc(pol.NodeAttrs, func(na NodeAttrGrant) bool { return len(na.IPPool) > 0 }) {
+		return nil, nil
+	}
+
+	probe := node.AsStruct()
+	placeholder := ipPoolPlaceholder
+	probe.IPv4 = &placeholder
+	probe.IPv6 = nil
+	probes := views.SliceOf([]types.NodeView{probe.View()})
+
+	for _, na := range pol.NodeAttrs {
+		if len(na.IPPool) == 0 {
+			continue
+		}
+
+		resolved, err := na.Targets.Resolve(pol, users, probes)
+		if err != nil {
+			return nil, fmt.Errorf("nodeAttrs ipPool target %s: %w", na.Targets, err)
+		}
+
+		if resolved != nil && resolved.Contains(placeholder) {
+			return slices.Clone(na.IPPool), nil
+		}
+	}
+
+	return nil, nil
 }
