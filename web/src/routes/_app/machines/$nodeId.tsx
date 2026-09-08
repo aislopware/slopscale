@@ -125,6 +125,12 @@ function MachineFacts({ node }: { readonly node: Node }): ReactElement {
       <span>{isTagged(node) ? "Tagged machine" : ownerLabel(node)}</span>
       <span aria-hidden>·</span>
       <span>{registerMethods[node.registerMethod] ?? "registered"}</span>
+      {node.ephemeral ? (
+        <>
+          <span aria-hidden>·</span>
+          <span>ephemeral, deleted when it logs out or stays offline</span>
+        </>
+      ) : null}
       <span aria-hidden>·</span>
       <span>
         {node.online ? (
