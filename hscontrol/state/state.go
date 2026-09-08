@@ -2121,7 +2121,7 @@ func (s *State) HandleNodeFromPreAuthKey(
 		// Update existing node - NodeStore first, then database
 		updatedNodeView, ok := s.nodeStore.UpdateNode(existingNodeSameUser.ID(), func(node *types.Node) {
 			node.NodeKey = regReq.NodeKey
-			node.Hostname = hostname
+			setHostname(node, hostname)
 
 			// TODO(kradalby): We should ensure we use the same hostinfo and node merge semantics
 			// when a node re-registers as we do when it sends a map request (UpdateNodeFromMapRequest).
@@ -2390,6 +2390,23 @@ func (s *State) PingDB(ctx context.Context) error {
 // [NodeStore] collision-bump "-N" suffix. It is used to detect whether a
 // GivenName has been admin-renamed (in which case it must not be
 // overwritten by client-side hostname changes).
+// setHostname records the hostname the client reports and keeps the
+// MagicDNS name following it. The GivenName is re-derived only while it is
+// still what the old hostname produced, so an administrator's rename
+// survives; [NodeStore.UpdateNode] bumps a colliding name with "-N". Every
+// path that takes a hostname from the client, the map request and both
+// re-registration paths, goes through here, so a machine re-imaged under a
+// new name is reachable under it after `tailscale up --force-reauth` too.
+func setHostname(node *types.Node, hostname string) {
+	autoDerived := isAutoDerivedGivenName(node.GivenName, node.Hostname)
+
+	node.Hostname = hostname
+
+	if autoDerived {
+		node.GivenName = dnsname.SanitizeHostname(hostname)
+	}
+}
+
 func isAutoDerivedGivenName(given, hostname string) bool {
 	base := dnsname.SanitizeHostname(hostname)
 	if given == base {
@@ -2537,16 +2554,7 @@ func (s *State) UpdateNodeFromMapRequest(
 			// NetInfo preservation has already been handled above before early return check
 			currentNode.Hostinfo = req.Hostinfo
 			if req.Hostinfo != nil && req.Hostinfo.Hostname != "" {
-				// Preserve an admin-renamed GivenName: only auto-derive when the
-				// current GivenName is still what SanitizeHostname of the old
-				// Hostname would produce (possibly with a "-N" collision bump).
-				autoDerived := isAutoDerivedGivenName(currentNode.GivenName, currentNode.Hostname)
-
-				currentNode.Hostname = req.Hostinfo.Hostname
-				if autoDerived {
-					currentNode.GivenName = dnsname.SanitizeHostname(req.Hostinfo.Hostname)
-					// [NodeStore.UpdateNode] auto-bumps GivenName on collision.
-				}
+				setHostname(currentNode, req.Hostinfo.Hostname)
 			}
 
 			if routeChange {
@@ -3327,7 +3335,7 @@ func (s *State) mutateNodeForAuthUpdate(
 
 	node.NodeKey = regData.NodeKey
 	node.DiscoKey = regData.DiscoKey
-	node.Hostname = params.Hostname
+	setHostname(node, params.Hostname)
 
 	// Preserve NetInfo from existing node when re-registering
 	node.Hostinfo = params.ValidHostinfo
