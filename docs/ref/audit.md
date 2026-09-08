@@ -54,6 +54,46 @@ Reading the log needs the `logs:configuration:read` scope, which every
 log*. To ship it to a SIEM as it is written, see [Log
 streaming](log-streaming.md).
 
+## Exporting
+
+`GET /api/v1/audit/export` returns the audit log as a file instead of a JSON
+page. It takes the same filters as the list, `actorUserId`, `action`,
+`targetKind`, `targetId`, `since`, `until` and `before`, plus `format`, which is
+`csv` (the default) or `json`. Events come oldest first, so a spreadsheet reads
+top to bottom in the order things happened. The console's _Audit log_ page has
+an _Export_ button for the window and filters on screen, and the CLI writes the
+same file:
+
+```console
+headscale audit export --since 2026-09-01T00:00:00Z --until 2026-10-01T00:00:00Z -o audit-september.csv
+```
+
+```console
+curl -H "Authorization: Bearer $HEADSCALE_API_KEY" \
+  "https://headscale.example.com/api/v1/audit/export?since=2026-09-01T00:00:00Z&until=2026-10-01T00:00:00Z" \
+  -o audit-september.csv
+```
+
+The response is an attachment, `text/csv; charset=utf-8` or `application/json`,
+named after the window it covers (`audit-20260901T000000Z-20261001T000000Z.csv`).
+Without `since` the name starts at `start`; without `until` it ends at the time
+of the request.
+
+The CSV has a header row and one row per event, with the columns `id`, `time`,
+`action`, `actorKind`, `actorUserId`, `actorName`, `targetKind`, `targetId`,
+`targetName`, `outcome`, `remoteAddr` and `detail`. `time` is RFC 3339 in UTC,
+`outcome` is the HTTP status the request ended with, and `detail` is the
+action's own fields as JSON in a single cell. The JSON format is one array of
+the same events in the shape `GET /api/v1/audit` returns them.
+
+The server reads the log in batches while it writes the response, so the export
+never sits in memory, and it stops at 100000 events. When a filter matches more
+than that, the file holds the oldest 100000 and the newest are left out; export
+one window at a time with `since` and `until` to get all of them.
+
+Exporting needs the `logs:configuration:read` scope, the same as reading the
+list, and is a read: it records no audit event of its own.
+
 ## Retention
 
 Events are kept forever by default. To bound the table, set a retention in

@@ -127,6 +127,14 @@ verification on; and a fetched map with a broken relay entry is served
 without it rather than failing the refresh. See
 [DERP](https://headscale.net/development/ref/derp/).
 
+- `GET /api/v1/derp` returns an `ETag` for the settings in force and
+  `PUT /api/v1/derp` accepts it back as `If-Match`: when someone else changed
+  the settings in between, the request is refused with `412 Precondition
+Failed` and nothing is written, so two operators editing the relays at the
+  same time no longer overwrite each other. A request without `If-Match`
+  behaves as before, and the `PUT` and the reset return the new `ETag`. The
+  console sends the tag it read.
+
 ### Groups and access rules
 
 Access can now be managed without a policy file, the way NetBird does it.
@@ -347,6 +355,51 @@ sign-ins. Read it with `headscale audit list`, `GET /api/v1/audit` or the
 console's _Audit log_ page; bound it with `audit.retention`. See
 [Audit log](https://headscale.net/development/ref/audit/).
 
+The log can be downloaded as a file: `GET /api/v1/audit/export` takes the same
+filters as the list plus `format=csv|json` and streams every matching event,
+oldest first, as an attachment named after the window it covers. The server
+reads the log in pages while it writes, so a long export does not build up in
+memory; one export carries at most 100000 events, so narrow `since` and
+`until` to walk a longer log. It needs the same `logs:configuration:read`
+scope as reading the list. The console's _Audit log_ page has an _Export_
+button and `headscale audit export` writes the file from the CLI.
+
+### Console sessions and user invites
+
+Console sign-ins can be listed and ended. `GET /api/v1/auth/sessions` shows
+every unexpired browser session with the user, when it was opened, when it was
+last active, the address and browser it came from, and which one is making the
+request. An administrator can end any session with
+`DELETE /api/v1/auth/sessions/{id}` or sign a user out of every browser with
+`DELETE /api/v1/user/{id}/sessions` (_Sign out everywhere_ on the console's
+user page); a member sees and ends only their own. Both are recorded in the
+audit log as `session.end` and `user.sessions.end`.
+
+Users can be invited by email. `POST /api/v1/invite`, `headscale invites
+create` or _Invite_ on the console's _Users_ page returns a one-time link and
+mails it to the address when `notifications.smtp` is configured. The first
+login that opens the link, or whose verified email matches the invitation,
+creates the user approved, even while user approval is on, with the invited
+role and groups. Invitations expire (seven days by default, thirty at most),
+can be revoked with `DELETE /api/v1/invite/{id}` and re-sent with a fresh link
+with `POST /api/v1/invite/{id}/resend`. An invitation cannot hand out
+ownership; transfer it instead. See
+[Console](https://headscale.net/development/ref/console/).
+
+### API key rotation
+
+An API key can be rotated: `POST /api/v1/apikey/{prefix}/rotate`,
+`headscale apikeys rotate` or the _Rotate_ action on the console's _Keys_ page
+mints a new secret for an existing key and returns it once, while the key keeps
+its id, owner, scopes, description and expiry, so nothing that refers to the
+key has to be re-created. The old secret is refused from the moment the call
+returns, which makes rotation the way to replace a leaked key without a window
+in which both work. The body may carry an `expiration` to set a new expiry;
+omitting it keeps the current one. An expired key cannot be rotated, since
+expiry is how a key is revoked, so a replacement must be created instead. A key
+that carries its own scopes may only rotate a key no wider than itself, and
+rotations are recorded in the audit log as `apikey.rotate`.
+
 ### BREAKING
 
 #### API
@@ -369,6 +422,8 @@ console's _Audit log_ page; bound it with `audit.retention`. See
 - `database.gorm` is replaced by `database.query_log` (`slow_threshold`, `log_not_found`, `parameterized`); the old keys are still read with a deprecation warning and `prepare_stmt` is dropped because statements are always prepared and cached
 - SQLite runs with a 64 MiB page cache per connection instead of SQLite's 2 MiB default
 - SQLite maps up to 256 MiB of the database file into memory (`mmap_size`) and keeps temporary tables in memory instead of on disk, so reads on a machine with spare RAM skip the page cache copy and sorts do not touch the disk. The lookups on the map request and registration paths (`nodes.node_key`, `nodes.machine_key`, `nodes.user_id`, `pre_auth_keys.key`) are indexed by a migration, which a large database on PostgreSQL will notice on every registration. The hot paths do less work per request: a node is read from the in-memory store without a copy, an unchanged Hostinfo is recognised without cloning it four times, the peer list is filtered through the policy once per map response instead of twice, the DERP map is shared instead of cloned into every full map, and a node's posture inputs are compared in place on every store write. `make build` now strips the binary like the release builds do
+- The in-memory node store no longer recomputes who may see whom on every write. A write that changes none of the inputs of that computation, which is every endpoint, DERP region or last-seen update, carries the previous peer map forward; only a new or deleted node, a change of tags, user, addresses, routes, shares, posture or approval, or a policy reload recomputes it. On a 1000-node tailnet that turns a 30 ms, 23 MiB rebuild per write into 1.6 ms and 1.5 MiB. The recompute itself is faster too: pairs are indexed by position instead of by map key (46% less time for 1000 nodes), the snapshot rebuild allocates a third of what it did, a map request from an unchanged address no longer queues a store write, a broadcast change is no longer copied once per connected node, and the poll session keeps a view of the node instead of cloning it. A server start runs the SQLite foreign key check only after a migration actually ran.
+- A DERP map source that cannot be reached no longer keeps the server from starting: the map is built from the local regions, the failure shows on the Relays page and in `headscale derp`, and the server retries every five minutes until a fetch succeeds. The retry runs off the scheduler, so an unreachable source no longer stalls key expiry and health checks for the length of its back-off.
 - Map responses cost less CPU and memory to build and send: the control protocol is encoded with Go's `encoding/json/v2` into pooled buffers, via grants are resolved once per policy change instead of once per viewer-peer pair, and the hot database statements are rendered once and only bound per call. A full map for a 100-node tailnet takes about 40% less CPU and 60% fewer allocations than before
 - `HEADSCALE_DEBUG_DEADLOCK` and `HEADSCALE_DEBUG_DEADLOCK_TIMEOUT` are removed; they configured a lock detector no lock used
 - SQLite is compiled in defensive mode with double-quoted string literals disabled (the flags in `sqlite.cflags`), so SQL that could corrupt the database file is refused and a mistyped `"identifier"` is an error rather than a silent string; a binary built without those flags still runs but logs a warning at startup

@@ -46,6 +46,22 @@ and to expire an API key:
 headscale apikeys expire --prefix <PREFIX>
 ```
 
+A key can be rotated instead of replaced. Rotating mints a new secret for the
+same key and prints it once; the key keeps its id, owner, scopes, description
+and expiry, and the old secret stops working immediately:
+
+```shell
+headscale apikeys rotate --prefix <PREFIX>
+```
+
+Pass `--expiration` to give the rotated key a new expiry; without it the key
+keeps the one it has. An expired key cannot be rotated, because expiring a key
+is how it is revoked, so create a new key instead. A key that carries its own
+scopes may only rotate a key whose scopes it could have minted itself, so
+rotation never widens a credential. The console's _Keys_ page offers the same
+action, and every rotation is recorded in the audit log as `apikey.rotate`,
+naming the prefix the key had and the one it now answers to.
+
 ## REST API
 
 - API endpoint: `/api/v1`, e.g. `https://headscale.example.com/api/v1`

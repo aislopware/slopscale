@@ -33,6 +33,11 @@ the owner and admins hold.
 Switching a setting off approves every node or user that was waiting, so
 nothing stays stuck behind a requirement that no longer exists.
 
+An [invited user](console.md#inviting-users) is created approved whatever
+`usersApprovalOn` says: the administrator who sent the invitation already
+vouched for the address, so making them wait again would ask the same question
+twice.
+
 ### Key expiry
 
 The same endpoint carries the tailnet's key expiry, following

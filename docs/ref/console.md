@@ -67,7 +67,7 @@ What the console can show and change is decided by the signed-in user's
 current [role](roles.md), read on every request:
 
 - A role change takes effect at once, and deleting the user ends their
-  sessions.
+  sessions. So does _Sign out everywhere_.
 - An auditor sees everything and can change nothing, an `it-admin` cannot
   approve routes, and so on. Pages the user cannot read are hidden; actions
   they cannot take are disabled.
@@ -75,6 +75,93 @@ current [role](roles.md), read on every request:
 
 Everything the console changes is written to the [audit log](audit.md) with
 the signed-in user as the actor.
+
+## Sessions
+
+A sign-in opens a session that lasts seven days. There is no sliding renewal,
+so a stolen cookie is bounded the same way as a fresh one, and _Sign out_ in
+the account menu ends the session it was made from.
+
+Every session is listed under _Settings → Keys_ with the user it belongs to,
+when it was opened, when it last made a request, and the address and browser it
+came from. An administrator sees every session and can end any of them; a
+member sees and ends only their own. Ending a session takes effect on that
+browser's next request: it is asked to sign in again.
+
+```console
+$ curl -H "Authorization: Bearer $KEY" https://<your server>/api/v1/auth/sessions
+$ curl -X DELETE -H "Authorization: Bearer $KEY" \
+    https://<your server>/api/v1/auth/sessions/7
+```
+
+`DELETE /api/v1/user/{id}/sessions`, or _Sign out everywhere_ on the user's
+page, signs one user out of every browser, which is what to reach for when a
+laptop goes missing; it changes nothing else about the account. All three are
+recorded in the [audit log](audit.md) as `console.logout`, `session.end` and
+`user.sessions.end`.
+
+The address a session records is the one the request came from after
+`trusted_proxies` was applied, so a deployment behind a reverse proxy shows the
+browser's address rather than the proxy's. A session opened before this version
+shows neither an address nor a browser.
+
+## Inviting users
+
+An administrator can invite someone by email instead of waiting for them to
+find the sign-in page. _Users → Invite_ asks for the address, the
+[role](roles.md) and any [groups](access-control.md) the person should join,
+and hands back a link; `headscale invites create` does the same from the CLI:
+
+```console
+$ curl -X POST -H "Authorization: Bearer $KEY" \
+    -d '{"email":"ada@example.com","role":"admin","groupIds":["3"],"expiry":"72h"}' \
+    https://<your server>/api/v1/invite
+```
+
+The link is `https://<your server>/admin/login?invite=<token>` and is shown
+once: the server keeps only a hash of the token, as it does for a session
+cookie or a pre-auth key. When [`notifications.smtp`](webhooks.md) is
+configured the link is also mailed to the address, and the response says
+whether that worked (`emailSent`, with `emailError` when it did not). A mail
+that cannot be sent does not fail the invitation. The link works either way
+and can be passed on by hand.
+
+An invitation is consumed by the first login it fits, in either of two ways:
+
+- the person opens the link, which carries the token through the identity
+  provider and back, or
+- the person signs in by themselves and the identity provider vouches for an
+  email that matches a pending invitation.
+
+Either way the user is created **approved**, even while
+[user approval](approval.md) is on, because an administrator already vouched
+for the address, with the invited role and groups. An account that already
+exists keeps the role and groups it has and the invitation stays pending; an
+invitation cannot promote someone who is already signed up.
+
+Invitations expire: seven days by default, thirty at most. An expired,
+revoked or already-used link says so on the sign-in page rather than signing
+the person in without the role they were promised.
+
+```console
+$ curl -H "Authorization: Bearer $KEY" https://<your server>/api/v1/invite
+$ curl -X POST -H "Authorization: Bearer $KEY" -d '{}' \
+    https://<your server>/api/v1/invite/4/resend
+$ curl -X DELETE -H "Authorization: Bearer $KEY" https://<your server>/api/v1/invite/4
+```
+
+Re-sending mints a new token and a new expiry, so the link in the previous
+mail stops working. Revoking deletes the invitation.
+
+An invitation cannot hand out ownership: the tailnet has exactly one owner and
+that role moves only by [transfer](roles.md). The invited address must be free
+of both an existing user and another pending invitation, otherwise the request
+is refused.
+
+Creating, re-sending and revoking are recorded in the
+[audit log](audit.md) as `user.invite.create`, `user.invite.resend` and
+`user.invite.delete`; accepting is recorded as `user.invite.accept` against
+the user it created.
 
 ## Getting around
 
@@ -106,8 +193,10 @@ out*.
   Linux, macOS, Windows and Docker, next to a QR code carrying the same line
   so a phone or a machine without a shared clipboard can pick it up; the
   iOS and Android tab gives the server address and where the app takes it.
-- **Users**: create, rename, approve, change the [role](roles.md) and delete
-  users.
+- **Users**: create, invite, rename, approve, change the [role](roles.md) and
+  delete users. Each user has _Sign out everywhere_, which ends every console
+  session of theirs. _Invite_ mints a link for an address, with the role and
+  groups the person gets on their first login.
 - **Keys**: pre-auth keys (create with reusable, ephemeral, pre-authorized and
   tags; expire; delete), API keys and OAuth clients for the v2 API (create
   with scopes and tags; revoke). New keys and client secrets are shown once,
