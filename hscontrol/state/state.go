@@ -2722,7 +2722,10 @@ func isUsefulEndpointType(t tailcfg.EndpointType) bool {
 }
 
 // buildMapRequestChangeResponse determines the appropriate response type for a [tailcfg.MapRequest] update.
-// Hostinfo changes require a full update, while endpoint/DERP changes can use lightweight patches.
+// Hostinfo changes require a full update, while endpoint/DERP changes can use lightweight patches. A request
+// that moved nothing worth telling peers about (a periodic re-send, a reconnect with matching state, or
+// STUN-only endpoint churn) yields an empty change, which the batcher drops; it used to count as "node
+// added" and fan a peer change out to every connected node (juanfont/headscale#3417).
 func buildMapRequestChangeResponse(
 	id types.NodeID,
 	node types.NodeView,
@@ -2752,7 +2755,7 @@ func buildMapRequestChangeResponse(
 		return change.EndpointOrDERPUpdate(id, patch), nil
 	}
 
-	return change.NodeAdded(id), nil
+	return change.Change{}, nil
 }
 
 // lockRegistration serialises registration for a single machine key and
