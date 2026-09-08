@@ -97,7 +97,9 @@ func (s *State) CreateGroup(name, description string, requestable bool) (types.A
 }
 
 // UpdateGroup renames or re-describes a group and sets whether members
-// may request to join it. Builtin groups are fixed.
+// may request to join it. Builtin groups are fixed, and a synced group
+// keeps its name: the sync finds it by the claim's name, so a renamed
+// one would be recreated empty at the next sign-in.
 func (s *State) UpdateGroup(
 	id types.GroupID, name, description string, requestable bool,
 ) (types.AccessGroup, change.Change, error) {
@@ -115,6 +117,10 @@ func (s *State) UpdateGroup(
 	err = types.ValidateGroupName(name)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
+	}
+
+	if existing.Source == types.GroupSourceOIDC && name != existing.Name {
+		return types.AccessGroup{}, change.Change{}, types.ErrGroupSyncedName
 	}
 
 	group, err := s.db.UpdateGroup(id, name, strings.TrimSpace(description), requestable)
@@ -324,6 +330,13 @@ func (s *State) requireEditableGroup(id types.GroupID) error {
 	}
 
 	return nil
+}
+
+// CheckGroupUsersEditable reports whether userIDs may replace the group's
+// users: always for an operator-made group, only when the set is unchanged
+// for a synced one. Callers use it to refuse a request before writing.
+func (s *State) CheckGroupUsersEditable(id types.GroupID, userIDs []types.UserID) error {
+	return s.requireEditableGroupUsers(id, userIDs)
 }
 
 // requireEditableGroupUsers is [State.requireEditableGroup] plus the rule

@@ -380,6 +380,9 @@ var (
 	ErrGroupSyncedUsers  = errors.New(
 		"the users of a group synced from the identity provider follow its groups claim and cannot be edited",
 	)
+	ErrGroupSyncedName = errors.New(
+		"a group synced from the identity provider keeps the name of its groups claim",
+	)
 	ErrGroupMemberMissing = errors.New("not a member of the group")
 	ErrRuleNameEmpty      = errors.New("rule name must not be empty")
 	ErrRuleNameTooLong    = errors.New("rule name must be at most 64 characters")

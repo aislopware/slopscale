@@ -79,8 +79,11 @@ func TestSyncUserGroups(t *testing.T) {
 	_, _, err = s.AddGroupNode(sre.ID, node.ID, nil)
 	require.NoError(t, err)
 
-	// A synced group can be renamed, described and deleted like any other.
+	// A synced group can be described and deleted like any other, but it
+	// keeps its name: the sync finds it by the claim's name.
 	_, _, err = s.UpdateGroup(sre.ID, "sre-team", "on call", true)
+	require.ErrorIs(t, err, types.ErrGroupSyncedName)
+	_, _, err = s.UpdateGroup(sre.ID, "sre", "on call", true)
 	require.NoError(t, err)
 	_, err = s.DeleteGroup(sre.ID)
 	require.NoError(t, err)

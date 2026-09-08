@@ -3,8 +3,10 @@ package apiv1
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 
@@ -103,6 +105,11 @@ func registerUsers(api huma.API, b Backend) {
 			if err == nil {
 				return nil, huma.Error409Conflict("user already exists")
 			}
+		}
+
+		err := validatePictureURL(in.Body.PictureURL)
+		if err != nil {
+			return nil, huma.Error400BadRequest(err.Error())
 		}
 
 		user, policyChanged, err := b.State.CreateUser(types.User{
@@ -347,6 +354,13 @@ func handleUpdateUser(ctx context.Context, b Backend, in *updateUserInput) (*use
 		return nil, huma.Error400BadRequest("nothing to update")
 	}
 
+	if in.Body.PictureURL != nil {
+		err = validatePictureURL(*in.Body.PictureURL)
+		if err != nil {
+			return nil, huma.Error400BadRequest(err.Error())
+		}
+	}
+
 	user, c, err := b.State.UpdateUser(id, func(user *types.User) error {
 		if in.Body.DisplayName != nil {
 			user.DisplayName = *in.Body.DisplayName
@@ -374,4 +388,21 @@ func handleUpdateUser(ctx context.Context, b Backend, in *updateUserInput) (*use
 	out.Body.User = userFromView(user.View())
 
 	return out, nil
+}
+
+var errPictureURLNotHTTPS = errors.New("the picture URL must be an https URL with a host")
+
+// validatePictureURL accepts an empty picture or an https URL with a host:
+// the clients fetch the picture, so nothing else can be shown.
+func validatePictureURL(raw string) error {
+	if raw == "" {
+		return nil
+	}
+
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme != "https" || u.Host == "" {
+		return errPictureURLNotHTTPS
+	}
+
+	return nil
 }

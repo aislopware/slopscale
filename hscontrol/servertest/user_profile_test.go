@@ -56,6 +56,10 @@ func TestUserProfileUpdateReachesClients(t *testing.T) {
 	}
 
 	status, body = apiCall(t, client, ownerKey, http.MethodPatch, v1+"/user/"+userID(alice),
+		map[string]any{"pictureUrl": "http://example.com/alice.png"})
+	assert.Equal(t, http.StatusBadRequest, status, "the clients fetch the picture over https only: %v", body)
+
+	status, body = apiCall(t, client, ownerKey, http.MethodPatch, v1+"/user/"+userID(alice),
 		map[string]any{"displayName": "Alice"})
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Equal(t, "https://example.com/alice.png", field(t, body, "user", "profilePicUrl"),

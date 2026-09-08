@@ -68,6 +68,21 @@ func TestOIDCGroupSync(t *testing.T) {
 	status, body := apiCall(t, client, apiKey, http.MethodDelete, v1+"/group/"+engID+"/user/"+userID(&user), nil)
 	assert.Equal(t, http.StatusBadRequest, status, "the users of a synced group follow the claim: %v", body)
 
+	// A rename is refused, and a stale user list is refused before the
+	// description is written.
+	status, body = apiCall(t, client, apiKey, http.MethodPatch, v1+"/group/"+engID,
+		map[string]any{"name": "engineering", "description": "renamed"})
+	assert.Equal(t, http.StatusBadRequest, status, "a synced group keeps its name: %v", body)
+	status, body = apiCall(t, client, apiKey, http.MethodPatch, v1+"/group/"+engID,
+		map[string]any{"name": "eng", "description": "half written", "userIds": []string{}})
+	assert.Equal(t, http.StatusBadRequest, status, "a changed user list is refused: %v", body)
+	status, body = apiCall(t, client, apiKey, http.MethodGet, v1+"/group/"+engID, nil)
+	require.Equal(t, http.StatusOK, status, body)
+	assert.Empty(t, field(t, body, "group", "description"), "nothing was written before the refusal")
+	status, body = apiCall(t, client, apiKey, http.MethodPatch, v1+"/group/"+engID,
+		map[string]any{"name": "eng", "description": "described"})
+	assert.Equal(t, http.StatusOK, status, "the description of a synced group can change: %v", body)
+
 	second := servertest.NewPendingLogin(t, srv, "carol-phone")
 	completeOIDCLogin(t, srv, client, second)
 	second.Wait(t, oidcLoginTimeout)

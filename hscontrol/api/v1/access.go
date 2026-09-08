@@ -444,6 +444,11 @@ func registerGroups(api huma.API, b Backend) {
 			return nil, err
 		}
 
+		err = checkGroupUserEdit(b, id, in.Body.UserIDs)
+		if err != nil {
+			return nil, err
+		}
+
 		group, c, err := b.State.UpdateGroup(id, in.Body.Name, in.Body.Description, in.Body.Requestable)
 		if err != nil {
 			return nil, mapError("updating group", err)
@@ -651,6 +656,27 @@ func removeGroupMember(
 
 // setGroupMembersFromBody replaces the members a create or update body
 // carries, keeping the side it omits.
+// checkGroupUserEdit refuses a user edit on a synced group before anything
+// is written, so a rejected member list does not leave the name and
+// description half-updated.
+func checkGroupUserEdit(b Backend, id types.GroupID, userIDs *[]string) error {
+	if userIDs == nil {
+		return nil
+	}
+
+	parsed, err := parseUserIDs(*userIDs)
+	if err != nil {
+		return err
+	}
+
+	err = b.State.CheckGroupUsersEditable(id, parsed)
+	if err != nil {
+		return mapError("updating group", err)
+	}
+
+	return nil
+}
+
 func setGroupMembersFromBody(b Backend, group types.AccessGroup, body GroupRequestBody) (
 	types.AccessGroup, change.Change, error,
 ) {
