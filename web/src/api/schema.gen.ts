@@ -1895,7 +1895,7 @@ export interface components {
             /** @description What the client is for. */
             description?: string;
             /** @description Scopes the client may grant; at least one. */
-            scopes: string[] | null;
+            scopes: string[];
             /** @description Tags the client may put on its tokens. */
             tags?: string[] | null;
         };

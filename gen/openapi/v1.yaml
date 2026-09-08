@@ -411,9 +411,7 @@ components:
           items:
             type: string
           minItems: 1
-          type:
-            - array
-            - "null"
+          type: array
         tags:
           description: Tags the client may put on its tokens.
           items:
