@@ -128,6 +128,9 @@ type State struct {
 	settings atomic.Pointer[types.Settings]
 	// webhooks delivers events to the registered endpoints.
 	webhooks *webhook.Dispatcher
+	// mailer sends the mail the server writes itself (an invite link);
+	// nil when no mail server is configured.
+	mailer webhook.Mailer
 	// logStreams ships the audit log to the registered sinks.
 	logStreams *logstream.Streamer
 	// logStreamMu orders writes to the log streams against reloads.
@@ -319,6 +322,7 @@ func NewState(cfg *types.Config) (*State, error) {
 	s.webhooks = webhook.New(db, tailnetName(cfg))
 
 	if mailer := webhook.NewSMTPMailer(cfg.SMTP); mailer != nil {
+		s.mailer = mailer
 		s.webhooks.SetMailer(mailer)
 	}
 

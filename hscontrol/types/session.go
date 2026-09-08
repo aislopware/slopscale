@@ -20,6 +20,12 @@ type Session struct {
 	CreatedAt  time.Time
 	ExpiresAt  time.Time
 	LastSeenAt time.Time
+
+	// RemoteAddr and UserAgent are what the browser looked like when it
+	// signed in, so an operator can tell one sign-in from another. They
+	// are empty for a session opened before the columns existed.
+	RemoteAddr string
+	UserAgent  string
 }
 
 // Expired reports whether the session is past its expiry at now.

@@ -443,10 +443,32 @@ CREATE TABLE sessions(
   created_at datetime,
   expires_at datetime,
   last_seen_at datetime,
+  remote_addr text,
+  user_agent text,
 
   CONSTRAINT fk_sessions_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE UNIQUE INDEX idx_sessions_token_hash ON sessions(token_hash);
+
+-- user_invites are the invitations an administrator sends: the invitee
+-- holds a random token in a link, and the row maps its hash to the role
+-- and groups the user gets on the first login. created_by and
+-- accepted_user_id have no foreign key so an invite outlives the
+-- administrator who sent it and the user it created.
+CREATE TABLE user_invites(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  token_hash blob NOT NULL,
+  email text NOT NULL,
+  role text NOT NULL,
+  groups text,
+  expires_at datetime,
+  created_at datetime,
+  created_by integer,
+  accepted_at datetime,
+  accepted_user_id integer
+);
+CREATE UNIQUE INDEX idx_user_invites_token_hash ON user_invites(token_hash);
+CREATE INDEX idx_user_invites_email ON user_invites(email);
 
 -- audit_events is the append-only record of who changed what: every
 -- writing API request and the sign-in events the server performs itself.

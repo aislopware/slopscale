@@ -3,14 +3,30 @@ package state
 import (
 	"time"
 
+	hsdb "github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 // CreateSession signs userID in to the admin console for
 // [types.SessionLifetime] and returns the cookie token, which is shown to
-// the browser once and stored only as a hash.
-func (s *State) CreateSession(userID types.UserID) (string, *types.Session, error) {
-	return s.db.CreateSession(userID, time.Now().Add(types.SessionLifetime))
+// the browser once and stored only as a hash. client records what the
+// browser looked like, so an operator can tell one sign-in from another.
+func (s *State) CreateSession(
+	userID types.UserID,
+	client hsdb.SessionClient,
+) (string, *types.Session, error) {
+	return s.db.CreateSession(userID, time.Now().Add(types.SessionLifetime), client)
+}
+
+// ListSessions returns the console sessions that have not expired. A
+// non-zero userID narrows the list to that user's sessions.
+func (s *State) ListSessions(userID types.UserID) ([]types.Session, error) {
+	return s.db.ListSessions(userID, time.Now())
+}
+
+// GetSession reads one console session, expired or not.
+func (s *State) GetSession(id uint64) (*types.Session, error) {
+	return s.db.GetSession(id)
 }
 
 // AuthenticateSession resolves a cookie token to its live session.

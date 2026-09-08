@@ -339,9 +339,26 @@ CREATE TABLE sessions(
   created_at timestamptz,
   expires_at timestamptz,
   last_seen_at timestamptz,
+  remote_addr text,
+  user_agent text,
   CONSTRAINT fk_sessions_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE UNIQUE INDEX idx_sessions_token_hash ON sessions(token_hash);
+
+CREATE TABLE user_invites(
+  id bigserial PRIMARY KEY,
+  token_hash bytea NOT NULL,
+  email text NOT NULL,
+  role text NOT NULL,
+  groups text,
+  expires_at timestamptz,
+  created_at timestamptz,
+  created_by bigint,
+  accepted_at timestamptz,
+  accepted_user_id bigint
+);
+CREATE UNIQUE INDEX idx_user_invites_token_hash ON user_invites(token_hash);
+CREATE INDEX idx_user_invites_email ON user_invites(email);
 
 CREATE TABLE audit_events(
   id bigserial PRIMARY KEY,

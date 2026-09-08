@@ -36,6 +36,8 @@ type sessionRow struct {
 	CreatedAt  *time.Time
 	ExpiresAt  *time.Time
 	LastSeenAt *time.Time
+	RemoteAddr *string
+	UserAgent  *string
 }
 
 type sessionRecord struct {
@@ -46,6 +48,14 @@ func (r *sessionRow) session() *types.Session {
 	s := &types.Session{
 		ID:     r.ID,
 		UserID: types.UserID(r.UserID),
+	}
+
+	if r.RemoteAddr != nil {
+		s.RemoteAddr = *r.RemoteAddr
+	}
+
+	if r.UserAgent != nil {
+		s.UserAgent = *r.UserAgent
 	}
 
 	if r.CreatedAt != nil {
@@ -69,10 +79,22 @@ func hashSessionToken(token string) []byte {
 	return sum[:]
 }
 
+// SessionClient is what the browser opening a session looked like: the
+// address the request came from once the trusted proxies were resolved,
+// and its User-Agent header.
+type SessionClient struct {
+	RemoteAddr string
+	UserAgent  string
+}
+
 // CreateSession opens a console session for userID that lasts until
 // expiresAt and returns the token the browser must present. The token is
 // returned once; only its hash is stored.
-func (hsdb *HSDatabase) CreateSession(userID types.UserID, expiresAt time.Time) (string, *types.Session, error) {
+func (hsdb *HSDatabase) CreateSession(
+	userID types.UserID,
+	expiresAt time.Time,
+	client SessionClient,
+) (string, *types.Session, error) {
 	raw := make([]byte, sessionTokenBytes)
 
 	_, err := rand.Read(raw)
@@ -90,6 +112,8 @@ func (hsdb *HSDatabase) CreateSession(userID types.UserID, expiresAt time.Time) 
 		CreatedAt:  &now,
 		ExpiresAt:  &expiresAt,
 		LastSeenAt: &now,
+		RemoteAddr: optionalText(client.RemoteAddr),
+		UserAgent:  optionalText(sessionUserAgent(client.UserAgent)),
 	}
 
 	var inserted idRow
@@ -146,6 +170,73 @@ func (hsdb *HSDatabase) AuthenticateSession(token string) (*types.Session, error
 	}
 
 	return session, nil
+}
+
+// maxUserAgentLength bounds what is stored of a User-Agent header: the
+// column is for showing an operator which browser signed in, and the
+// header is attacker-controlled.
+const maxUserAgentLength = 512
+
+// sessionUserAgent cuts a User-Agent header to what is worth storing.
+func sessionUserAgent(agent string) string {
+	if len(agent) > maxUserAgentLength {
+		return agent[:maxUserAgentLength]
+	}
+
+	return agent
+}
+
+// optionalText keeps an empty string out of the database, so a column
+// that was never filled reads back as NULL rather than "".
+func optionalText(s string) *string {
+	if s == "" {
+		return nil
+	}
+
+	return &s
+}
+
+// GetSession reads one session, whether or not it has expired.
+func (hsdb *HSDatabase) GetSession(id uint64) (*types.Session, error) {
+	var record sessionRecord
+
+	err := hsdb.ex.query(
+		jet.SELECT(table.Sessions.AllColumns).FROM(table.Sessions).
+			WHERE(table.Sessions.ID.EQ(jet.Uint64(id))).LIMIT(1),
+		&record,
+	)
+	if err != nil {
+		return nil, ErrSessionNotFound
+	}
+
+	return record.Session.session(), nil
+}
+
+// ListSessions returns the sessions that have not expired at now, newest
+// first. A non-zero userID narrows the list to that user's sessions.
+func (hsdb *HSDatabase) ListSessions(userID types.UserID, now time.Time) ([]types.Session, error) {
+	where := table.Sessions.ExpiresAt.GT(jet.TimestampExp(timeArg(now)))
+	if userID != 0 {
+		where = where.AND(table.Sessions.UserID.EQ(jet.Uint64(uint64(userID))))
+	}
+
+	var records []sessionRecord
+
+	err := hsdb.ex.query(
+		jet.SELECT(table.Sessions.AllColumns).FROM(table.Sessions).
+			WHERE(where).ORDER_BY(table.Sessions.CreatedAt.DESC(), table.Sessions.ID.DESC()),
+		&records,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listing sessions: %w", err)
+	}
+
+	out := make([]types.Session, 0, len(records))
+	for i := range records {
+		out = append(out, *records[i].Session.session())
+	}
+
+	return out, nil
 }
 
 // DeleteSession ends one session; a session that is already gone is not

@@ -622,7 +622,71 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 				return tx.ex.execAll("creating lookup indexes", lookupIndexes)
 			},
 		},
+		{
+			// Console session management: a session records where the
+			// browser signed in from. Sessions that exist keep both
+			// columns empty. See docs/ref/console.md.
+			id:  "202609160900-session-client",
+			run: migrateSessionClient,
+		},
+		{
+			// User invites: user_invites records the invitations an
+			// administrator sends, which a first login consumes. See
+			// docs/ref/console.md.
+			id:  "202609161000-user-invites",
+			run: migrateUserInvites,
+		},
 	}
+}
+
+// migrateSessionClient (202609160900) adds the remote_addr and user_agent
+// columns to sessions. Sessions that exist keep both empty.
+func migrateSessionClient(tx *Tx) error {
+	for _, column := range []string{"remote_addr", "user_agent"} {
+		err := tx.ex.addColumnIfMissing("sessions", column, typeText)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// migrateUserInvites (202609161000) creates the user_invites table.
+func migrateUserInvites(tx *Tx) error {
+	return createTables(tx, []tableDefinition{
+		{
+			name: "user_invites",
+			sqlite: `CREATE TABLE user_invites(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  token_hash blob NOT NULL,
+  email text NOT NULL,
+  role text NOT NULL,
+  groups text,
+  expires_at datetime,
+  created_at datetime,
+  created_by integer,
+  accepted_at datetime,
+  accepted_user_id integer
+)`,
+			postgres: `CREATE TABLE user_invites(
+  id bigserial PRIMARY KEY,
+  token_hash bytea NOT NULL,
+  email text NOT NULL,
+  role text NOT NULL,
+  groups text,
+  expires_at timestamptz,
+  created_at timestamptz,
+  created_by bigint,
+  accepted_at timestamptz,
+  accepted_user_id bigint
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_user_invites_token_hash ON user_invites(token_hash)`,
+				`CREATE INDEX idx_user_invites_email ON user_invites(email)`,
+			},
+		},
+	})
 }
 
 // lookupIndexes are the indexes 202609151200-lookup-indexes adds; they are

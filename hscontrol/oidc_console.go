@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/juanfont/headscale/hscontrol/audit"
+	hsdb "github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/templates"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/web"
@@ -67,11 +68,14 @@ func (a *AuthProviderOIDC) ConsoleProvider() ConsoleProvider {
 }
 
 // ConsoleLoginHandler serves [ConsoleLoginPath]: it sends the browser to
-// the identity provider and remembers where in the console to land.
+// the identity provider and remembers where in the console to land. An
+// invite link's token rides in ?invite and is kept server-side under the
+// OIDC state, so the callback can consume it once the identity is known.
 func (a *AuthProviderOIDC) ConsoleLoginHandler(writer http.ResponseWriter, req *http.Request) {
 	a.startAuth(writer, req, AuthInfo{
-		Console:  true,
-		Redirect: consoleRedirect(req.URL.Query().Get("redirect")),
+		Console:     true,
+		Redirect:    consoleRedirect(req.URL.Query().Get("redirect")),
+		InviteToken: req.URL.Query().Get(InviteTokenParam),
 	})
 }
 
@@ -108,7 +112,10 @@ func (a *AuthProviderOIDC) handleConsoleCallback(
 		return
 	}
 
-	token, session, err := a.h.state.CreateSession(types.UserID(user.ID))
+	token, session, err := a.h.state.CreateSession(types.UserID(user.ID), hsdb.SessionClient{
+		RemoteAddr: sessionRemoteAddr(req.RemoteAddr),
+		UserAgent:  req.UserAgent(),
+	})
 	if err != nil {
 		httpUserError(writer, NewHTTPError(http.StatusInternalServerError, "could not open a session", err))
 
@@ -140,6 +147,19 @@ func (a *AuthProviderOIDC) handleConsoleCallback(
 
 	//nolint:gosec // consoleRedirect confined the target to the console prefix when the flow started.
 	http.Redirect(writer, req, authInfo.Redirect, http.StatusSeeOther)
+}
+
+// sessionRemoteAddr is the address a session records: the host part of
+// the request's remote address, which the trusted-proxy middleware has
+// already resolved to the real client. The port says nothing about who
+// signed in.
+func sessionRemoteAddr(remote string) string {
+	host, _, err := net.SplitHostPort(remote)
+	if err != nil {
+		return remote
+	}
+
+	return host
 }
 
 // renderConsoleRefused shows the sign-in error page with a message meant

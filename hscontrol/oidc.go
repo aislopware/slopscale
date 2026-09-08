@@ -86,6 +86,12 @@ type AuthInfo struct {
 	// the callback opens a session and sends the browser to Redirect.
 	Console  bool
 	Redirect string
+
+	// InviteToken is the token of the invite link the sign-in started
+	// from. It is kept here rather than in a cookie so it survives the
+	// round trip through the identity provider without leaving the
+	// server.
+	InviteToken string
 }
 
 type AuthProviderOIDC struct {
@@ -234,7 +240,29 @@ func (a *AuthProviderOIDC) OIDCCallbackHandler(
 		return
 	}
 
-	user, _, err := a.createOrUpdateUserFromClaim(claims)
+	// TODO(kradalby): Is this comment right?
+	// If the node exists, then the node should be reauthenticated,
+	// if the node does not exist, and the machine key exists, then
+	// this is a new node that should be registered.
+	//
+	// The flow is picked up before the user is resolved, because an
+	// invite the sign-in carries decides how the user is created.
+	authInfo := a.getAuthInfoFromState(state)
+	if authInfo == nil {
+		log.Debug().Caller().Str("state", state).Msg("state not found in cache, login session may have expired")
+		httpUserError(writer, NewHTTPError(http.StatusGone, "login session expired, try again", nil))
+
+		return
+	}
+
+	invite, err := a.resolveInvite(authInfo, claims)
+	if err != nil {
+		renderInviteRefused(writer, err)
+
+		return
+	}
+
+	user, err := a.userFromClaims(claims, invite)
 	if err != nil {
 		httpUserError(writer, NewHTTPError(
 			http.StatusInternalServerError,
@@ -255,18 +283,6 @@ func (a *AuthProviderOIDC) OIDCCallbackHandler(
 	err = a.syncConfiguredGroups(user, claims)
 	if err != nil {
 		httpUserError(writer, NewHTTPError(http.StatusInternalServerError, "could not sync groups", err))
-
-		return
-	}
-
-	// TODO(kradalby): Is this comment right?
-	// If the node exists, then the node should be reauthenticated,
-	// if the node does not exist, and the machine key exists, then
-	// this is a new node that should be registered.
-	authInfo := a.getAuthInfoFromState(state)
-	if authInfo == nil {
-		log.Debug().Caller().Str("state", state).Msg("state not found in cache, login session may have expired")
-		httpUserError(writer, NewHTTPError(http.StatusGone, "login session expired, try again", nil))
 
 		return
 	}
@@ -736,16 +752,9 @@ func (a *AuthProviderOIDC) createOrUpdateUserFromClaim(
 		c       change.Change
 	)
 
-	user, err = a.h.state.GetUserByOIDCIdentifier(claims.Identifier())
-	if err != nil && !errors.Is(err, db.ErrUserNotFound) {
-		return nil, change.Change{}, fmt.Errorf("creating or updating user: %w", err)
-	}
-
-	if user == nil {
-		user, err = a.matchUserByEmail(claims)
-		if err != nil {
-			return nil, change.Change{}, err
-		}
+	user, err = a.lookupUser(claims)
+	if err != nil {
+		return nil, change.Change{}, err
 	}
 
 	// if the user is still not found, create a new empty user.
@@ -774,6 +783,22 @@ func (a *AuthProviderOIDC) createOrUpdateUserFromClaim(
 	}
 
 	return user, c, nil
+}
+
+// lookupUser finds the user a login already belongs to: the one carrying
+// the same iss/sub identifier, or the one the email matches when
+// oidc.match_by_email is on. A nil user is a first login.
+func (a *AuthProviderOIDC) lookupUser(claims *types.OIDCClaims) (*types.User, error) {
+	user, err := a.h.state.GetUserByOIDCIdentifier(claims.Identifier())
+	if err != nil && !errors.Is(err, db.ErrUserNotFound) {
+		return nil, fmt.Errorf("looking up user: %w", err)
+	}
+
+	if user != nil {
+		return user, nil
+	}
+
+	return a.matchUserByEmail(claims)
 }
 
 // matchUserByEmail finds the OIDC user a login with an unknown iss/sub
