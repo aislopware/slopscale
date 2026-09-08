@@ -91,7 +91,7 @@ export function SessionsBody({
     <TableScroll pinnedRight>
       {(overflowing) => (
         <Table className={frameTableClass}>
-          <Table.Header variant="compact" sticky>
+          <Table.Header variant="compact">
             <Table.Row>
               <Table.Head>User</Table.Head>
               <Table.Head>Opened</Table.Head>
@@ -221,7 +221,6 @@ function SignOutEverywhere({ me, count }: { readonly me: Me; readonly count: num
       <DisabledReason reason={reason}>
         <Button
           variant="secondary"
-          size="sm"
           icon={SignOutIcon}
           disabled={reason !== undefined || count === 0}
           onClick={() => {

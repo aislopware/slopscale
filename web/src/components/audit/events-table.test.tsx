@@ -63,12 +63,20 @@ function noop(): void {
   // The table only reports the click; paging belongs to the page.
 }
 
+const onePage = {
+  page: 1,
+  pageSize: 100,
+  loaded: 1,
+  hasMore: false,
+  fetching: false,
+  failed: false,
+  setPage: noop,
+};
+
 const base: Omit<EventsTableProps, "events"> = {
   filtered: false,
   onClearFilters: noop,
-  hasMore: false,
-  loadingMore: false,
-  onLoadMore: noop,
+  paging: onePage,
 };
 
 /**
@@ -161,7 +169,7 @@ describe(EventsTable, () => {
     const screen = await render(app({ ...base, events: [], filtered: true }));
 
     await expect.element(screen.getByText("No events match")).toBeVisible();
-    await expect.element(screen.getByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    await expect.element(screen.getByRole("button", { name: "Next page" })).not.toBeInTheDocument();
   });
 
   it("offers a reset when the filters hid everything", async () => {
@@ -172,11 +180,28 @@ describe(EventsTable, () => {
     expect(onClearFilters).toHaveBeenCalledOnce();
   });
 
-  it("loads the next page only when the server has one", async () => {
-    const onLoadMore = vi.fn<() => void>();
-    const screen = await render(app({ ...base, events: [deletion], hasMore: true, onLoadMore }));
+  it("walks to the next page while the server has one", async () => {
+    const setPage = vi.fn<(page: number) => void>();
+    const paging = { ...onePage, hasMore: true, setPage };
+    const screen = await render(app({ ...base, events: [deletion], paging }));
 
-    await screen.getByRole("button", { name: "Load more" }).click();
-    expect(onLoadMore).toHaveBeenCalledOnce();
+    await expect.element(screen.getByText("Showing 1–1")).toBeVisible();
+    await screen.getByRole("button", { name: "Next page" }).click();
+    expect(setPage).toHaveBeenCalledWith(2);
+  });
+
+  it("says when the next page did not load", async () => {
+    const paging = { ...onePage, hasMore: true, failed: true };
+    const screen = await render(app({ ...base, events: [deletion], paging }));
+
+    await expect.element(screen.getByText(/The next page did not load/v)).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Next page" })).toBeEnabled();
+  });
+
+  it("names the whole list once the server has no more", async () => {
+    const screen = await render(app({ ...base, events: [deletion] }));
+
+    await expect.element(screen.getByText("Showing all 1 event")).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Next page" })).not.toBeInTheDocument();
   });
 });

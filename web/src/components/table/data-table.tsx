@@ -1,4 +1,3 @@
-import { Pagination } from "@cloudflare/kumo/components/pagination";
 import { Table } from "@cloudflare/kumo/components/table";
 import { cn } from "@cloudflare/kumo/utils";
 import { ArrowDownIcon, ArrowsDownUpIcon, ArrowUpIcon } from "@phosphor-icons/react";
@@ -7,30 +6,20 @@ import { useEffect, useRef } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import { useTableContext } from "~/components/table/app-table.tsx";
+import { PagingBand, smallestPageSize } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
-import {
-  FrameBand,
-  frameTableClass,
-  frameTableRowClass,
-  pinnedEdgeClass,
-} from "~/components/ui/frame.tsx";
+import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 
 export interface DataTableProps {
   /** Rendered in place of the body when the (filtered) model is empty. */
   readonly empty: ReactNode;
   /**
-   * Rendered on the band under the panel: "Showing N of M". A table with a second page shows its
-   * paging controls there instead, because the range they name replaces that count.
+   * Rendered on the band under the panel: "Showing N of M". A table with enough rows to page shows
+   * the range, the page size and the paging controls there instead.
    */
   readonly footer?: ReactNode;
   /** Adds a click handler and pointer cursor to every row. */
   readonly onRowClick?: ((rowId: string) => void) | undefined;
-  /**
-   * Whether the panel scrolls its rows with the header pinned to the top, from `lg` up: a phone has
-   * no room for a window inside the page, so there the page keeps scrolling. On by default, since a
-   * table shorter than the cap never reaches it.
-   */
-  readonly scroll?: boolean;
 }
 
 /**
@@ -40,12 +29,7 @@ export interface DataTableProps {
  * to an edge and `enableSorting` for a sortable header; everything else is the column's `cell`
  * renderer.
  */
-export function DataTable({
-  empty,
-  footer,
-  onRowClick,
-  scroll = true,
-}: DataTableProps): ReactElement {
+export function DataTable({ empty, footer, onRowClick }: DataTableProps): ReactElement {
   const table = useTableContext();
   const { rows } = table.getRowModel();
   const pinnedRight = table
@@ -70,14 +54,10 @@ export function DataTable({
 
   return (
     <>
-      <TableScroll
-        scroll={scroll}
-        pinnedRight={pinnedRight}
-        below={rows.length === 0 ? empty : null}
-      >
+      <TableScroll pinnedRight={pinnedRight} below={rows.length === 0 ? empty : null}>
         {(overflowing) => (
           <Table className={frameTableClass}>
-            <Table.Header variant="compact" {...(scroll ? { sticky: true } : {})}>
+            <Table.Header variant="compact">
               {table.getHeaderGroups().map((group) => (
                 <Table.Row key={group.id}>
                   {group.headers.map((header) => {
@@ -169,37 +149,31 @@ function cellClass(
 }
 
 /**
- * The band under the panel: the page's own count while everything fits on one page, and the range
- * with Previous and Next once it does not.
+ * The band under the panel: the page's own count while the rows fit the smallest page, and the
+ * range with the page size and the paging controls once there are enough rows to page.
  */
 function PageBand({ fallback }: { readonly fallback: ReactNode }): ReactNode {
   const table = useTableContext();
+  const total = table.getRowCount();
 
-  if (table.getPageCount() <= 1) {
+  if (total <= smallestPageSize) {
     return fallback;
   }
 
   const { pageIndex, pageSize } = table.state.pagination;
-  const total = table.getRowCount();
-  const first = pageIndex * pageSize + 1;
-  const last = Math.min(first + pageSize - 1, total);
 
   return (
-    <FrameBand className="px-5">
-      <Pagination
-        page={pageIndex + 1}
-        perPage={pageSize}
-        totalCount={total}
-        setPage={(page) => {
-          table.setPageIndex(page - 1);
-        }}
-      >
-        <Pagination.Info className="text-sm">
-          {() => `Showing ${first}–${last} of ${total}`}
-        </Pagination.Info>
-        <Pagination.Controls controls="simple" />
-      </Pagination>
-    </FrameBand>
+    <PagingBand
+      page={pageIndex + 1}
+      pageSize={pageSize}
+      total={total}
+      setPage={(page) => {
+        table.setPageIndex(page - 1);
+      }}
+      setPageSize={(size) => {
+        table.setPageSize(size);
+      }}
+    />
   );
 }
 

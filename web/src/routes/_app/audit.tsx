@@ -12,6 +12,8 @@ import { can } from "~/auth/me.ts";
 import { EventsTable } from "~/components/audit/events-table.tsx";
 import { ExportMenu } from "~/components/audit/export-menu.tsx";
 import { AuditStats } from "~/components/audit/stats.tsx";
+import { tablePageSize } from "~/components/table/app-table.tsx";
+import { usePageWindow } from "~/components/table/page-window.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableToolbar } from "~/components/table/toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
@@ -103,8 +105,20 @@ function AuditPage(): ReactElement {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
-  const events = useInfiniteQuery(auditQuery(filtersOf(search)));
+  const filters = filtersOf(search);
+  const events = useInfiniteQuery(auditQuery(filters));
   const rows = events.data?.pages.flatMap((page) => page.events) ?? [];
+  const window = usePageWindow({
+    rows,
+    pageSize: tablePageSize,
+    hasMore: events.hasNextPage,
+    fetching: events.isFetchingNextPage,
+    failed: events.isFetchNextPageError,
+    fetchMore: () => {
+      void events.fetchNextPage();
+    },
+    resetKey: JSON.stringify(filters),
+  });
 
   return (
     <>
@@ -152,16 +166,12 @@ function AuditPage(): ReactElement {
       </TableToolbar>
       <Frame>
         <EventsTable
-          events={rows}
+          events={window.rows}
           filtered={isFiltered(search)}
           onClearFilters={() => {
             void navigate({ search: () => ({ ...clearedSearch }) });
           }}
-          hasMore={events.hasNextPage}
-          loadingMore={events.isFetchingNextPage}
-          onLoadMore={() => {
-            void events.fetchNextPage();
-          }}
+          paging={window}
         />
       </Frame>
     </>

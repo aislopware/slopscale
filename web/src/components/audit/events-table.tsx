@@ -4,7 +4,7 @@ import { Table } from "@cloudflare/kumo/components/table";
 import { cn } from "@cloudflare/kumo/utils";
 import { CaretDownIcon, CaretRightIcon, ClockCounterClockwiseIcon } from "@phosphor-icons/react";
 import { useState } from "react";
-import type { MouseEvent, ReactElement, ReactNode } from "react";
+import type { MouseEvent, ReactElement } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
 import {
@@ -15,10 +15,10 @@ import {
   ResultCell,
   TargetCell,
 } from "~/components/audit/cells.tsx";
-import { plural } from "~/components/overview/plural.ts";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import type { CursorPaging } from "~/components/table/page-window.ts";
+import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
-import { TableFooter } from "~/components/table/toolbar.tsx";
 import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
@@ -110,23 +110,18 @@ export interface EventsTableProps {
   readonly filtered: boolean;
   /** Puts the page back to the default range with no action and any user. */
   readonly onClearFilters: () => void;
-  /** The server has at least one more page for these filters. */
-  readonly hasMore: boolean;
-  readonly loadingMore: boolean;
-  readonly onLoadMore: () => void;
+  readonly paging: CursorPaging;
 }
 
 /**
  * The audit list: server-ordered (newest first) and server-paged, so the table neither sorts nor
- * filters. A row opens in place to show every recorded field; "Load more" appends the next page.
+ * filters. A row opens in place to show every recorded field; the band below walks the pages.
  */
 export function EventsTable({
   events,
   filtered,
   onClearFilters,
-  hasMore,
-  loadingMore,
-  onLoadMore,
+  paging,
 }: EventsTableProps): ReactElement {
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -145,7 +140,7 @@ export function EventsTable({
           // of the panel and its chips wrap inside it instead of stretching the table past the
           // panel. The minimum keeps the columns readable on a phone, where the panel scrolls.
           <Table className={cn(frameTableClass, "min-w-[800px] table-fixed")}>
-            <Table.Header variant="compact" sticky>
+            <Table.Header variant="compact">
               <Table.Row>
                 <Table.Head className="w-32">Time</Table.Head>
                 <Table.Head className="w-40">Actor</Table.Head>
@@ -177,46 +172,9 @@ export function EventsTable({
           </Table>
         )}
       </TableScroll>
-      <Paging
-        count={events.length}
-        hasMore={hasMore}
-        loadingMore={loadingMore}
-        onLoadMore={onLoadMore}
-      />
+      <CursorBand paging={paging} noun="event" />
     </>
   );
-}
-
-function Paging({
-  count,
-  hasMore,
-  loadingMore,
-  onLoadMore,
-}: {
-  readonly count: number;
-  readonly hasMore: boolean;
-  readonly loadingMore: boolean;
-  readonly onLoadMore: () => void;
-}): ReactNode {
-  if (count === 0) {
-    return null;
-  }
-
-  if (hasMore) {
-    return (
-      <TableFooter
-        actions={
-          <Button variant="secondary" size="xs" loading={loadingMore} onClick={onLoadMore}>
-            Load more
-          </Button>
-        }
-      >
-        {`Showing ${plural(count, "event")}`}
-      </TableFooter>
-    );
-  }
-
-  return <TableFooter>{`Showing all ${plural(count, "event")} in this range`}</TableFooter>;
 }
 
 /**

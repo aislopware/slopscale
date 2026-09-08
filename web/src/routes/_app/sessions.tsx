@@ -5,6 +5,8 @@ import type { ReactElement } from "react";
 import { settingsQuery, sshRecordingsQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { SessionsTable } from "~/components/sessions/table.tsx";
+import { tablePageSize } from "~/components/table/app-table.tsx";
+import { usePageWindow } from "~/components/table/page-window.ts";
 import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
@@ -29,6 +31,16 @@ function SessionsPage(): ReactElement {
   const settings = useSuspenseQuery(settingsQuery).data;
   const recordings = useInfiniteQuery(sshRecordingsQuery);
   const rows = recordings.data?.pages.flatMap((page) => page.recordings) ?? [];
+  const window = usePageWindow({
+    rows,
+    pageSize: tablePageSize,
+    hasMore: recordings.hasNextPage,
+    fetching: recordings.isFetchingNextPage,
+    failed: recordings.isFetchNextPageError,
+    fetchMore: () => {
+      void recordings.fetchNextPage();
+    },
+  });
 
   return (
     <>
@@ -38,14 +50,10 @@ function SessionsPage(): ReactElement {
       />
       <Frame>
         <SessionsTable
-          recordings={rows}
+          recordings={window.rows}
           writable={can(me, "logs:configuration")}
           embeddedRecorder={settings.embeddedRecorder}
-          hasMore={recordings.hasNextPage}
-          loadingMore={recordings.isFetchingNextPage}
-          onLoadMore={() => {
-            void recordings.fetchNextPage();
-          }}
+          paging={window}
         />
       </Frame>
     </>

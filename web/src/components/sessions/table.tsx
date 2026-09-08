@@ -6,12 +6,11 @@ import { Table } from "@cloudflare/kumo/components/table";
 import { cn } from "@cloudflare/kumo/utils";
 import { DownloadSimpleIcon, TerminalWindowIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { SSHRecording } from "~/api/queries.ts";
 import { sshRecordingCastUrl } from "~/api/queries.ts";
-import { plural } from "~/components/overview/plural.ts";
 import {
   castFileName,
   formatBytes,
@@ -22,8 +21,9 @@ import {
 import type { RecordingState } from "~/components/sessions/model.ts";
 import { useDeleteRecording } from "~/components/sessions/mutations.ts";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import type { CursorPaging } from "~/components/table/page-window.ts";
+import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
-import { TableFooter } from "~/components/table/toolbar.tsx";
 import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
@@ -125,9 +125,7 @@ export interface SessionsTableProps {
   readonly writable: boolean;
   /** Whether the server runs the embedded recorder, which changes what an empty list means. */
   readonly embeddedRecorder: boolean;
-  readonly hasMore: boolean;
-  readonly loadingMore: boolean;
-  readonly onLoadMore: () => void;
+  readonly paging: CursorPaging;
 }
 
 /** Recorded SSH sessions, newest first and server-paged; each row downloads or deletes its file. */
@@ -135,9 +133,7 @@ export function SessionsTable({
   recordings,
   writable,
   embeddedRecorder,
-  hasMore,
-  loadingMore,
-  onLoadMore,
+  paging,
 }: SessionsTableProps): ReactElement {
   return (
     <>
@@ -149,7 +145,7 @@ export function SessionsTable({
       >
         {(overflowing) => (
           <Table className={frameTableClass}>
-            <Table.Header variant="compact" sticky>
+            <Table.Header variant="compact">
               <Table.Row>
                 <Table.Head>Started</Table.Head>
                 <Table.Head>From</Table.Head>
@@ -175,46 +171,9 @@ export function SessionsTable({
           </Table>
         )}
       </TableScroll>
-      <Paging
-        count={recordings.length}
-        hasMore={hasMore}
-        loadingMore={loadingMore}
-        onLoadMore={onLoadMore}
-      />
+      <CursorBand paging={paging} noun="recording" />
     </>
   );
-}
-
-function Paging({
-  count,
-  hasMore,
-  loadingMore,
-  onLoadMore,
-}: {
-  readonly count: number;
-  readonly hasMore: boolean;
-  readonly loadingMore: boolean;
-  readonly onLoadMore: () => void;
-}): ReactNode {
-  if (count === 0) {
-    return null;
-  }
-
-  if (hasMore) {
-    return (
-      <TableFooter
-        actions={
-          <Button variant="secondary" size="xs" loading={loadingMore} onClick={onLoadMore}>
-            Load more
-          </Button>
-        }
-      >
-        {`Showing ${plural(count, "recording")}`}
-      </TableFooter>
-    );
-  }
-
-  return <TableFooter>{`Showing all ${plural(count, "recording")}`}</TableFooter>;
 }
 
 function EmptySessions({ embeddedRecorder }: { readonly embeddedRecorder: boolean }): ReactElement {
@@ -227,7 +186,7 @@ function EmptySessions({ embeddedRecorder }: { readonly embeddedRecorder: boolea
       description={
         embeddedRecorder
           ? "Sessions on machines with an SSH rule land here once the recorder receives them."
-          : "Turn on ssh_recording in the server config, or name a recorder under Settings, and sessions land here."
+          : "Turn on ssh_recording in the server config, or name a recorder under Settings → Tailnet, and sessions land here."
       }
     />
   );

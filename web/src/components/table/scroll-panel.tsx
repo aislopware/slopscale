@@ -4,9 +4,6 @@ import type { ReactElement, ReactNode } from "react";
 import { useOverflowEdges } from "~/components/table/overflow.ts";
 import { FramePanel } from "~/components/ui/frame.tsx";
 
-/** As tall as a table's rows may get before the panel scrolls them under a pinned header. */
-const scrollHeightClass = "lg:max-h-[70vh]";
-
 export interface TableScrollProps {
   /**
    * The table. It is called with whether the columns run past the panel, so a pinned column can
@@ -18,34 +15,26 @@ export interface TableScrollProps {
    * with no rows shows where its rows would be.
    */
   readonly below?: ReactNode;
-  /**
-   * Whether the rows scroll inside the panel with the header pinned to the top, from `lg` up: a
-   * phone has no room for a window inside the page, so there the page keeps scrolling. A table
-   * shorter than the cap never reaches it.
-   */
-  readonly scroll?: boolean;
   /** Whether the table pins a column to its right edge, which then draws that edge itself. */
   readonly pinnedRight?: boolean;
 }
 
 /**
- * The scroll container a `frameTableClass` table sits in, on the band of a Frame. The table draws
- * the panel on its own body, so this is not a panel: the header sticks to the top of the container
- * on the band's tint and the rows scroll under it. Anything below stays put however far the columns
- * run, and the edge a column ran past is faded, so a table that scrolls sideways looks like it
- * does.
+ * The container a `frameTableClass` table sits in, on the band of a Frame. The table draws the
+ * panel on its own body, so this is not a panel. The rows never scroll inside it: the page scrolls,
+ * and a long table pages. Only the columns can run past the panel, sideways, and the edge they ran
+ * past is faded so a table that scrolls sideways looks like it does.
  */
 export function TableScroll({
   children,
   below,
-  scroll = true,
   pinnedRight = false,
 }: TableScrollProps): ReactElement {
   const { ref, edges } = useOverflowEdges();
 
   return (
     <div className="relative min-w-0">
-      <div ref={ref} className={cn("overflow-auto", scroll && scrollHeightClass)}>
+      <div ref={ref} className="overflow-x-auto">
         {children(edges.left || edges.right)}
       </div>
       {below === null || below === undefined ? null : <FramePanel>{below}</FramePanel>}

@@ -86,7 +86,7 @@ export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
         <TableScroll>
           {() => (
             <Table className={frameTableClass}>
-              <Table.Header variant="compact" sticky>
+              <Table.Header variant="compact">
                 <Table.Row>
                   <Table.Head className="w-16">Id</Table.Head>
                   <Table.Head>Code</Table.Head>
