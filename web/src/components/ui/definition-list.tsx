@@ -40,7 +40,7 @@ export function DefinitionList({
           )}
         >
           <dt className="shrink-0 text-kumo-subtle">{item.label}</dt>
-          <dd className="flex min-w-0 items-center justify-end text-right text-kumo-default">
+          <dd className="flex min-w-0 flex-1 items-center justify-end text-right text-kumo-default">
             {item.copy === undefined ? (
               <span className={cn("min-w-0", wrap ? "break-all" : "truncate")}>{item.value}</span>
             ) : (

@@ -1,11 +1,12 @@
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement, ReactNode } from "react";
 
+import { Frame, FrameBand, FramePanel } from "~/components/ui/frame.tsx";
+
 /**
- * A page section: a 14px semibold title (with optional description and actions) above a single
- * LayerCard surface. The title sits outside the card, so cards never nest and a page reads as a
- * list of named regions rather than a stack of identical boxes.
+ * A page section: a Frame whose band carries the 14px semibold title (with optional description and
+ * actions) and whose panel holds the content. Panels never nest, so a page reads as a list of named
+ * regions rather than a stack of identical boxes.
  */
 export function Section({
   title,
@@ -20,26 +21,29 @@ export function Section({
   readonly actions?: ReactNode;
   readonly children: ReactNode;
   readonly className?: string;
-  /** Classes for the card; pass `p-0` for tables and lists that draw their own edges. */
+  /** Classes for the panel; pass `p-0` for tables and lists that draw their own edges. */
   readonly bodyClassName?: string;
 }): ReactElement {
   return (
-    <section className={cn("flex flex-col gap-2", className)}>
-      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1 px-0.5">
-        <div className="flex flex-col gap-0.5">
+    <Frame className={className}>
+      {/* px-5 lines the title up with the text of the rows inside the panel. */}
+      <FrameBand className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 px-5 pt-1.5 pb-2">
+        <div className="flex min-w-0 flex-1 basis-56 flex-col gap-0.5">
           <h2 className="font-semibold text-kumo-strong">{title}</h2>
           {description === undefined ? null : (
-            <p className="text-xs text-kumo-subtle">{description}</p>
+            <p className="max-w-prose text-xs text-kumo-subtle">{description}</p>
           )}
         </div>
-        {actions === undefined ? null : <div className="flex items-center gap-2">{actions}</div>}
-      </header>
-      <LayerCard className={cn("overflow-hidden", bodyClassName)}>{children}</LayerCard>
-    </section>
+        {actions === undefined ? null : (
+          <div className="flex shrink-0 items-center gap-2">{actions}</div>
+        )}
+      </FrameBand>
+      <FramePanel className={bodyClassName}>{children}</FramePanel>
+    </Frame>
   );
 }
 
-/** A row inside a Section card with the console's padding; hairlines between siblings. */
+/** A row inside a Section panel with the console's padding; hairlines between siblings. */
 export function SectionRow({
   className,
   children,

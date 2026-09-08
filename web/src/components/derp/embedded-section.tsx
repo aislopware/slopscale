@@ -92,7 +92,7 @@ function facts(derp: Derp): readonly Definition[] {
     {
       label: "Status",
       value: (
-        <span className="flex items-center gap-2">
+        <span className="flex flex-wrap items-center justify-end gap-2">
           <Badge appearance="dot" variant={derp.relayRunning ? "success" : "neutral"}>
             {derp.relayRunning ? "Running" : "Off"}
           </Badge>

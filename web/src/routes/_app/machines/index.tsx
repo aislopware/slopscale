@@ -1,4 +1,3 @@
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useDeferredValue, useState } from "react";
@@ -23,6 +22,7 @@ import { plural } from "~/components/overview/plural.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
+import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 /**
@@ -86,7 +86,7 @@ function MachinesPage(): ReactElement {
   return (
     <>
       <PageHeader title="Machines" meta={summary(machines)} />
-      <LayerCard className="overflow-hidden">
+      <Frame>
         <MachinesToolbar
           me={me}
           query={query}
@@ -137,7 +137,7 @@ function MachinesPage(): ReactElement {
             }
           />
         </table.AppTable>
-      </LayerCard>
+      </Frame>
       <CreatePreAuthKeyDialog
         me={me}
         intent="add-machine"

@@ -1,7 +1,6 @@
 import { Banner } from "@cloudflare/kumo/components/banner";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { InfoIcon, PlusIcon, ShieldCheckIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
@@ -17,6 +16,7 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
+import { Frame } from "~/components/ui/frame.tsx";
 
 export interface RulesTabProps {
   readonly me: Me;
@@ -61,7 +61,7 @@ export function RulesTab({
   return (
     <>
       <StateBanner enabled={enabled} policyFileEnforces={policyFileEnforces} />
-      <LayerCard className="overflow-hidden">
+      <Frame>
         <TableToolbar
           actions={
             <Button
@@ -134,7 +134,7 @@ export function RulesTab({
             }
           />
         </table.AppTable>
-      </LayerCard>
+      </Frame>
       <RuleDialog
         groups={groups}
         postures={postures}

@@ -1,6 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { PlusIcon, ShippingContainerIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useState } from "react";
 import type { ReactElement } from "react";
@@ -16,6 +15,7 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
+import { Frame } from "~/components/ui/frame.tsx";
 
 export function LogStreamsTab({
   me,
@@ -47,7 +47,7 @@ export function LogStreamsTab({
 
   return (
     <>
-      <LayerCard className="overflow-hidden">
+      <Frame>
         <TableToolbar
           actions={
             <Button
@@ -116,7 +116,7 @@ export function LogStreamsTab({
             }
           />
         </table.AppTable>
-      </LayerCard>
+      </Frame>
       <LogStreamDialog open={creating} onOpenChange={setCreating} mutations={mutations} />
     </>
   );

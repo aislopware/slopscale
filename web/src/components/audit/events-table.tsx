@@ -18,6 +18,7 @@ import {
 import { plural } from "~/components/overview/plural.ts";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
+import { FramePanel } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
 /** Every row spans this many columns when it opens. */
@@ -127,57 +128,55 @@ export function EventsTable({
   const [openId, setOpenId] = useState<string | null>(null);
 
   return (
-    <Table>
-      <Table.Header variant="compact" sticky className={stickyHeader}>
-        <Table.Row>
-          <Table.Head>Time</Table.Head>
-          <Table.Head>Actor</Table.Head>
-          <Table.Head>Action</Table.Head>
-          <Table.Head>Target</Table.Head>
-          <Table.Head>Result</Table.Head>
-          <Table.Head className="hidden w-full lg:table-cell">Detail</Table.Head>
-          <Table.Head className="w-10">
-            <span className="sr-only">Details</span>
-          </Table.Head>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {events.length === 0 ? (
-          <Table.Row>
-            <Table.Cell colSpan={columnCount} className="p-0">
-              <EmptyEvents filtered={filtered} onClearFilters={onClearFilters} />
-            </Table.Cell>
-          </Table.Row>
-        ) : (
-          events.map((event, index) => (
-            <EventRows
-              key={event.id}
-              event={event}
-              striped={index % 2 === 1}
-              open={openId === event.id}
-              onToggle={() => {
-                setOpenId((current) => (current === event.id ? null : event.id));
-              }}
-              onOpen={() => {
-                setOpenId(event.id);
-              }}
-            />
-          ))
-        )}
-      </Table.Body>
-      <Table.Footer>
-        <Table.Row>
-          <Table.Cell colSpan={columnCount} className="p-0">
-            <Paging
-              count={events.length}
-              hasMore={hasMore}
-              loadingMore={loadingMore}
-              onLoadMore={onLoadMore}
-            />
-          </Table.Cell>
-        </Table.Row>
-      </Table.Footer>
-    </Table>
+    <>
+      <FramePanel>
+        <Table>
+          <Table.Header variant="compact" sticky className={stickyHeader}>
+            <Table.Row>
+              <Table.Head>Time</Table.Head>
+              <Table.Head>Actor</Table.Head>
+              <Table.Head>Action</Table.Head>
+              <Table.Head>Target</Table.Head>
+              <Table.Head>Result</Table.Head>
+              <Table.Head className="hidden w-full lg:table-cell">Detail</Table.Head>
+              <Table.Head className="w-10">
+                <span className="sr-only">Details</span>
+              </Table.Head>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {events.length === 0 ? (
+              <Table.Row>
+                <Table.Cell colSpan={columnCount} className="p-0">
+                  <EmptyEvents filtered={filtered} onClearFilters={onClearFilters} />
+                </Table.Cell>
+              </Table.Row>
+            ) : (
+              events.map((event, index) => (
+                <EventRows
+                  key={event.id}
+                  event={event}
+                  striped={index % 2 === 1}
+                  open={openId === event.id}
+                  onToggle={() => {
+                    setOpenId((current) => (current === event.id ? null : event.id));
+                  }}
+                  onOpen={() => {
+                    setOpenId(event.id);
+                  }}
+                />
+              ))
+            )}
+          </Table.Body>
+        </Table>
+      </FramePanel>
+      <Paging
+        count={events.length}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        onLoadMore={onLoadMore}
+      />
+    </>
   );
 }
 
@@ -198,14 +197,15 @@ function Paging({
 
   if (hasMore) {
     return (
-      <Button
-        variant="ghost"
-        className="h-10 w-full rounded-none"
-        loading={loadingMore}
-        onClick={onLoadMore}
+      <TableFooter
+        actions={
+          <Button variant="secondary" size="xs" loading={loadingMore} onClick={onLoadMore}>
+            Load more
+          </Button>
+        }
       >
-        Load more
-      </Button>
+        {`Showing ${plural(count, "event")}`}
+      </TableFooter>
     );
   }
 

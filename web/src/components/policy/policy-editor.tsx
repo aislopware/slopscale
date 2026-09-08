@@ -1,11 +1,11 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { EditorView } from "@codemirror/view";
 import { FileCodeIcon } from "@phosphor-icons/react";
 import { useImperativeHandle, useRef } from "react";
 import type { ReactElement, Ref } from "react";
 
 import { CodeEditor } from "~/components/ui/code-editor.tsx";
+import { Frame, FrameBand, FramePanel } from "~/components/ui/frame.tsx";
 
 const iconSize = 14;
 
@@ -75,8 +75,8 @@ export function PolicyEditor({
   }));
 
   return (
-    <LayerCard className="flex min-w-0 flex-col overflow-hidden p-0">
-      <div className="flex items-center justify-between gap-3 border-b border-kumo-line bg-kumo-recessed px-3 py-2 text-xs text-kumo-subtle">
+    <Frame>
+      <FrameBand className="flex items-center justify-between gap-3 text-xs text-kumo-subtle">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-lh items-center">
             <FileCodeIcon size={iconSize} aria-hidden />
@@ -96,15 +96,17 @@ export function PolicyEditor({
             Discard
           </Button>
         ) : null}
-      </div>
-      <div ref={host} className="h-[60vh] min-h-96">
-        <CodeEditor
-          value={value}
-          onChange={onChange}
-          readOnly={readOnly}
-          aria-label="Tailnet policy"
-        />
-      </div>
-    </LayerCard>
+      </FrameBand>
+      <FramePanel>
+        <div ref={host} className="h-[60vh] min-h-96">
+          <CodeEditor
+            value={value}
+            onChange={onChange}
+            readOnly={readOnly}
+            aria-label="Tailnet policy"
+          />
+        </div>
+      </FramePanel>
+    </Frame>
   );
 }

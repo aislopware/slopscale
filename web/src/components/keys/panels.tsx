@@ -1,6 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import type { TabsItem } from "@cloudflare/kumo/components/tabs";
 import { KeyIcon, PlusIcon } from "@phosphor-icons/react";
@@ -31,6 +30,7 @@ import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
+import { Frame } from "~/components/ui/frame.tsx";
 
 const preAuthStatusTabs: readonly { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -263,7 +263,7 @@ function KeyPanel({
   readonly children: ReactNode;
 }): ReactElement {
   return (
-    <LayerCard className="overflow-hidden">
+    <Frame>
       <TableToolbar actions={action}>
         <SearchInput
           value={controls.query}
@@ -280,7 +280,7 @@ function KeyPanel({
         )}
       </TableToolbar>
       {children}
-    </LayerCard>
+    </Frame>
   );
 }
 

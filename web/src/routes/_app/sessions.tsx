@@ -1,4 +1,3 @@
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { useInfiniteQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import type { ReactElement } from "react";
@@ -6,6 +5,7 @@ import type { ReactElement } from "react";
 import { settingsQuery, sshRecordingsQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { SessionsTable } from "~/components/sessions/table.tsx";
+import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/sessions")({
@@ -36,7 +36,7 @@ function SessionsPage(): ReactElement {
         title="SSH sessions"
         description="Terminal recordings of SSH sessions, one asciinema file each. Play a download with asciinema play."
       />
-      <LayerCard className="overflow-clip p-0">
+      <Frame>
         <SessionsTable
           recordings={rows}
           writable={can(me, "logs:configuration")}
@@ -47,7 +47,7 @@ function SessionsPage(): ReactElement {
             void recordings.fetchNextPage();
           }}
         />
-      </LayerCard>
+      </Frame>
     </>
   );
 }

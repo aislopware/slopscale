@@ -1,6 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { HandWavingIcon, PlusIcon } from "@phosphor-icons/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
@@ -16,6 +15,7 @@ import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
+import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
 export const Route = createFileRoute("/_app/access")({
@@ -88,7 +88,7 @@ function MyAccessPage(): ReactElement {
           </Button>
         }
       />
-      <LayerCard className="overflow-hidden">
+      <Frame>
         <table.AppTable>
           <DataTable
             empty={
@@ -121,7 +121,7 @@ function MyAccessPage(): ReactElement {
             }
           />
         </table.AppTable>
-      </LayerCard>
+      </Frame>
       <RequestAccessDialog
         options={options}
         open={requesting}

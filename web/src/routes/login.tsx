@@ -1,6 +1,5 @@
 import { Banner } from "@cloudflare/kumo/components/banner";
 import { Button } from "@cloudflare/kumo/components/button";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { SignInIcon, WaveformIcon } from "@phosphor-icons/react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import type { ReactElement } from "react";
@@ -10,6 +9,7 @@ import { ApiError } from "~/api/error.ts";
 import { consoleAuthQuery, meQuery } from "~/auth/me.ts";
 import { consolePath } from "~/auth/session.ts";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
+import { Frame, FramePanel } from "~/components/ui/frame.tsx";
 
 const searchSchema = object({
   redirect: optional(string()),
@@ -47,47 +47,49 @@ function LoginPage(): ReactElement {
       </header>
       <main className="flex flex-1 items-center justify-center px-4 pb-24">
         <div className="flex w-full max-w-sm flex-col gap-4">
-          <LayerCard className="flex flex-col gap-6 px-6 py-6">
-            <div className="flex flex-col gap-3">
-              <WaveformIcon className="size-8 text-kumo-brand" weight="duotone" />
-              <div className="flex flex-col gap-1">
-                <h1 className="text-xl font-semibold text-kumo-strong">Sign in to headscale</h1>
-                <p className="text-kumo-subtle">
-                  {oidc === undefined
-                    ? "This server has no identity provider, so the console cannot sign anyone in."
-                    : "Use the account your administrator gave access to."}
-                </p>
+          <Frame>
+            <FramePanel className="flex flex-col gap-6 px-6 py-6">
+              <div className="flex flex-col gap-3">
+                <WaveformIcon className="size-8 text-kumo-brand" weight="duotone" />
+                <div className="flex flex-col gap-1">
+                  <h1 className="text-xl font-semibold text-kumo-strong">Sign in to headscale</h1>
+                  <p className="text-kumo-subtle">
+                    {oidc === undefined
+                      ? "This server has no identity provider, so the console cannot sign anyone in."
+                      : "Use the account your administrator gave access to."}
+                  </p>
+                </div>
               </div>
-            </div>
-            {oidc === undefined ? (
-              <Banner
-                variant="alert"
-                title="No identity provider"
-                description="Set the oidc section of the server configuration and restart it. The CLI and the API keep working with API keys."
-              />
-            ) : (
-              <Button
-                variant="primary"
-                size="lg"
-                className="w-full"
-                icon={SignInIcon}
-                onClick={() => {
-                  // The provider flow is served by headscale, not routed by
-                  // the console, so this is a full navigation.
-                  globalThis.location.assign(
-                    `${oidc.loginPath}?redirect=${encodeURIComponent(consolePath(target ?? "/"))}`,
-                  );
-                }}
-              >
-                Continue with {oidc.provider}
-              </Button>
-            )}
-            <p className="text-xs text-kumo-subtle">
-              {oidc === undefined
-                ? "See the OpenID Connect page of the documentation."
-                : "A sign-in lasts seven days in this browser. Sign out from the account menu to end it sooner."}
-            </p>
-          </LayerCard>
+              {oidc === undefined ? (
+                <Banner
+                  variant="alert"
+                  title="No identity provider"
+                  description="Set the oidc section of the server configuration and restart it. The CLI and the API keep working with API keys."
+                />
+              ) : (
+                <Button
+                  variant="primary"
+                  size="lg"
+                  className="w-full"
+                  icon={SignInIcon}
+                  onClick={() => {
+                    // The provider flow is served by headscale, not routed by
+                    // the console, so this is a full navigation.
+                    globalThis.location.assign(
+                      `${oidc.loginPath}?redirect=${encodeURIComponent(consolePath(target ?? "/"))}`,
+                    );
+                  }}
+                >
+                  Continue with {oidc.provider}
+                </Button>
+              )}
+              <p className="text-xs text-kumo-subtle">
+                {oidc === undefined
+                  ? "See the OpenID Connect page of the documentation."
+                  : "A sign-in lasts seven days in this browser. Sign out from the account menu to end it sooner."}
+              </p>
+            </FramePanel>
+          </Frame>
           <p className="text-center text-xs text-kumo-subtle">
             <span className="font-mono text-[0.9em]">{globalThis.location.host}</span>
           </p>

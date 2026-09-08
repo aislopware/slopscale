@@ -1,4 +1,3 @@
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { Select } from "@cloudflare/kumo/components/select";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import type { TabsItem } from "@cloudflare/kumo/components/tabs";
@@ -14,6 +13,7 @@ import { EventsTable } from "~/components/audit/events-table.tsx";
 import { AuditStats } from "~/components/audit/stats.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableToolbar } from "~/components/table/toolbar.tsx";
+import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { userLabel } from "~/lib/node.ts";
 
@@ -116,7 +116,7 @@ function AuditPage(): ReactElement {
         }
       />
       <AuditStats events={rows} />
-      <LayerCard className="overflow-clip p-0">
+      <Frame>
         <TableToolbar>
           <SearchInput
             value={search.action}
@@ -152,7 +152,7 @@ function AuditPage(): ReactElement {
             void events.fetchNextPage();
           }}
         />
-      </LayerCard>
+      </Frame>
     </>
   );
 }

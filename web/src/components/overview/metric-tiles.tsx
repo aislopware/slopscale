@@ -1,4 +1,3 @@
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { SkeletonLine } from "@cloudflare/kumo/components/loader";
 import { cn } from "@cloudflare/kumo/utils";
 import {
@@ -14,12 +13,10 @@ import type { ReactElement, ReactNode } from "react";
 import type { Node, User } from "~/api/queries.ts";
 import { allUsers } from "~/components/overview/links.ts";
 import { plural } from "~/components/overview/plural.ts";
+import { Frame } from "~/components/ui/frame.tsx";
 import { isExitNode, nodeName } from "~/lib/node.ts";
 
-/**
- * The strip is one card split by hairlines, so the column count has to match the number of tiles
- * exactly: an empty cell would show the hairline fill as a grey block. Indexed by tile count.
- */
+/** Column count by tile count, so a shorter strip still fills its row. */
 const columnsFor: readonly string[] = [
   "grid-cols-1",
   "grid-cols-1",
@@ -28,9 +25,9 @@ const columnsFor: readonly string[] = [
   "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
 ];
 
-/** Tiles sit on the card's own surface; the 1px grid gap behind them draws the hairlines. */
+/** Each tile is its own inset panel in the strip's Frame. */
 const tileClass =
-  "flex flex-col gap-1.5 bg-kumo-base px-5 py-4 text-kumo-default no-underline hover:bg-kumo-tint focus-visible:bg-kumo-tint";
+  "flex flex-col gap-1.5 rounded-lg bg-kumo-base px-5 py-4 text-kumo-default no-underline shadow-xs ring ring-kumo-line hover:bg-kumo-tint focus-visible:bg-kumo-tint";
 
 type Tone = "neutral" | "warning";
 
@@ -64,7 +61,7 @@ function TileBody({
       </span>
       <span
         className={cn(
-          "text-2xl font-semibold",
+          "text-2xl font-semibold tabular-nums",
           tone === "warning" ? "text-kumo-warning" : "text-kumo-strong",
         )}
       >
@@ -226,9 +223,5 @@ export function MetricTiles({
     return null;
   }
 
-  return (
-    <LayerCard className={cn("grid gap-px bg-kumo-hairline", columnsFor[tiles.length])}>
-      {tiles}
-    </LayerCard>
-  );
+  return <Frame className={cn("grid gap-1", columnsFor[tiles.length])}>{tiles}</Frame>;
 }

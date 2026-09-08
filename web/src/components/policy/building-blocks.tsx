@@ -1,10 +1,10 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
 import { Collapsible } from "@cloudflare/kumo/components/collapsible";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { CaretDownIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 import type { PolicyBlocks } from "~/components/policy/blocks.ts";
+import { Frame, FramePanel } from "~/components/ui/frame.tsx";
 
 const caretSize = 14;
 
@@ -70,8 +70,8 @@ export function BuildingBlocks({
       className="hidden h-fit min-w-0 xl:block"
       render={<section />}
     >
-      <LayerCard className="overflow-hidden p-0">
-        <Collapsible.Trigger className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none">
+      <Frame>
+        <Collapsible.Trigger className="flex w-full items-center justify-between gap-2 rounded-lg px-4 py-2 text-left hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none">
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className="font-semibold whitespace-nowrap text-kumo-strong">
               Building blocks
@@ -90,22 +90,24 @@ export function BuildingBlocks({
             className="shrink-0 text-kumo-subtle transition-transform duration-100 ease-out [[data-panel-open]_&]:rotate-180"
           />
         </Collapsible.Trigger>
-        <Collapsible.Panel className="border-t border-kumo-hairline">
-          <BlockRow
-            label="User groups (group:)"
-            names={blocks.groups}
-            empty="No groups yet"
-            onSelect={onSelect}
-          />
-          <BlockRow label="Tags" names={blocks.tags} empty="No tags yet" onSelect={onSelect} />
-          <BlockRow
-            label="Autogroups"
-            names={blocks.autogroups}
-            empty="None referenced"
-            onSelect={onSelect}
-          />
+        <Collapsible.Panel>
+          <FramePanel>
+            <BlockRow
+              label="User groups (group:)"
+              names={blocks.groups}
+              empty="No groups yet"
+              onSelect={onSelect}
+            />
+            <BlockRow label="Tags" names={blocks.tags} empty="No tags yet" onSelect={onSelect} />
+            <BlockRow
+              label="Autogroups"
+              names={blocks.autogroups}
+              empty="None referenced"
+              onSelect={onSelect}
+            />
+          </FramePanel>
         </Collapsible.Panel>
-      </LayerCard>
+      </Frame>
     </Collapsible.Root>
   );
 }

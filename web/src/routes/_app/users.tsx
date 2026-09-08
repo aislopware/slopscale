@@ -1,6 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import { UsersIcon } from "@phosphor-icons/react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
@@ -19,6 +18,7 @@ import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
+import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { AddUserButton } from "~/components/users/add-user.tsx";
 import { columns } from "~/components/users/columns.tsx";
@@ -124,7 +124,7 @@ function UsersPage(): ReactElement {
   return (
     <>
       <PageHeader title="Users" meta={describe(total, pending)} />
-      <LayerCard className="overflow-hidden">
+      <Frame>
         <TableToolbar actions={<AddUserButton me={me} />}>
           <SearchInput
             value={text}
@@ -167,7 +167,7 @@ function UsersPage(): ReactElement {
             }
           />
         </table.AppTable>
-      </LayerCard>
+      </Frame>
     </>
   );
 }

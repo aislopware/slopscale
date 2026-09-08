@@ -1,6 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { PlusIcon, ShieldCheckIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useState } from "react";
 import type { ReactElement } from "react";
@@ -16,6 +15,7 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
+import { Frame } from "~/components/ui/frame.tsx";
 
 export interface PosturesTabProps {
   readonly me: Me;
@@ -54,7 +54,7 @@ export function PosturesTab({
 
   return (
     <>
-      <LayerCard className="overflow-hidden">
+      <Frame>
         <TableToolbar
           actions={
             <Button
@@ -124,7 +124,7 @@ export function PosturesTab({
             }
           />
         </table.AppTable>
-      </LayerCard>
+      </Frame>
       <PostureDialog
         geoIpAvailable={geoIpAvailable}
         open={creating}

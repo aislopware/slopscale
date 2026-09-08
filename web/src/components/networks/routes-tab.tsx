@@ -1,6 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { SignpostIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useMemo } from "react";
 import type { ReactElement } from "react";
@@ -14,6 +13,7 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
+import { Frame } from "~/components/ui/frame.tsx";
 
 export interface RoutesTabProps {
   readonly me: Me;
@@ -48,7 +48,7 @@ export function RoutesTab({
   const pending = rows.filter((row) => row.status === "pending").length;
 
   return (
-    <LayerCard className="overflow-hidden">
+    <Frame>
       <TableToolbar>
         <SearchInput
           value={search}
@@ -93,7 +93,7 @@ export function RoutesTab({
           }
         />
       </table.AppTable>
-    </LayerCard>
+    </Frame>
   );
 }
 

@@ -18,10 +18,10 @@ export interface DialogContentProps {
 }
 
 /**
- * Kumo's dialog in the same shape as its DeleteResource block: a bordered header with the
- * sentence-case title and close button, the body with an optional description first, and a bordered
- * {@link DialogFooter}. Always render it, driven by `open` on the root, so the open/close animation
- * plays.
+ * Kumo's dialog in the same shape as its DeleteResource block, framed: the dialog surface is the
+ * tinted band and the header, body and {@link DialogFooter} sit on an inset panel, like every other
+ * framed surface in the console. Always render it, driven by `open` on the root, so the open/close
+ * animation plays.
  */
 export function DialogContent({
   title,
@@ -36,32 +36,34 @@ export function DialogContent({
       // Kumo pins the dialog below the top edge with no height limit, so a long form on a short
       // screen would lose its footer; the body scrolls instead.
       className={cn(
-        "flex max-h-[calc(100svh-3rem)] flex-col p-0 sm:max-h-[calc(100svh-5rem)]",
+        "flex max-h-[calc(100svh-3rem)] flex-col bg-kumo-elevated p-1 ring-kumo-hairline sm:max-h-[calc(100svh-5rem)]",
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-4 border-b border-kumo-line px-6 py-4">
-        <Dialog.Title className="text-lg font-semibold text-kumo-default">{title}</Dialog.Title>
-        <Dialog.Close
-          render={
-            <Button
-              variant="ghost"
-              shape="square"
-              size="sm"
-              icon={XIcon}
-              aria-label="Close"
-              className="-m-1"
-            />
-          }
-        />
-      </div>
-      <div className="flex min-h-0 flex-col gap-4 overflow-y-auto p-6">
-        {description === undefined ? null : (
-          <Dialog.Description className="max-w-prose text-pretty text-kumo-subtle">
-            {description}
-          </Dialog.Description>
-        )}
-        {children}
+      <div className="flex min-h-0 flex-col overflow-hidden rounded-lg bg-kumo-base shadow-xs ring ring-kumo-line">
+        <div className="flex items-center justify-between gap-4 border-b border-kumo-line px-6 py-4">
+          <Dialog.Title className="text-lg font-semibold text-kumo-default">{title}</Dialog.Title>
+          <Dialog.Close
+            render={
+              <Button
+                variant="ghost"
+                shape="square"
+                size="sm"
+                icon={XIcon}
+                aria-label="Close"
+                className="-m-1"
+              />
+            }
+          />
+        </div>
+        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto p-6">
+          {description === undefined ? null : (
+            <Dialog.Description className="max-w-prose text-pretty text-kumo-subtle">
+              {description}
+            </Dialog.Description>
+          )}
+          {children}
+        </div>
       </div>
     </Dialog>
   );

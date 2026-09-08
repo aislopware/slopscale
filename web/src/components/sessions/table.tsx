@@ -23,6 +23,7 @@ import type { RecordingState } from "~/components/sessions/model.ts";
 import { useDeleteRecording } from "~/components/sessions/mutations.ts";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
+import { FramePanel } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
 const columnCount = 7;
@@ -137,51 +138,49 @@ export function SessionsTable({
   onLoadMore,
 }: SessionsTableProps): ReactElement {
   return (
-    <Table>
-      <Table.Header variant="compact" sticky className={stickyHeader}>
-        <Table.Row>
-          <Table.Head>Started</Table.Head>
-          <Table.Head>From</Table.Head>
-          <Table.Head>Session</Table.Head>
-          <Table.Head>Command</Table.Head>
-          <Table.Head>Size</Table.Head>
-          <Table.Head>State</Table.Head>
-          <Table.Head className="w-24">
-            <span className="sr-only">Actions</span>
-          </Table.Head>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {recordings.length === 0 ? (
-          <Table.Row>
-            <Table.Cell colSpan={columnCount} className="p-0">
-              <EmptySessions embeddedRecorder={embeddedRecorder} />
-            </Table.Cell>
-          </Table.Row>
-        ) : (
-          recordings.map((recording, index) => (
-            <RecordingRow
-              key={recording.id}
-              recording={recording}
-              writable={writable}
-              striped={index % 2 === 1}
-            />
-          ))
-        )}
-      </Table.Body>
-      <Table.Footer>
-        <Table.Row>
-          <Table.Cell colSpan={columnCount} className="p-0">
-            <Paging
-              count={recordings.length}
-              hasMore={hasMore}
-              loadingMore={loadingMore}
-              onLoadMore={onLoadMore}
-            />
-          </Table.Cell>
-        </Table.Row>
-      </Table.Footer>
-    </Table>
+    <>
+      <FramePanel>
+        <Table>
+          <Table.Header variant="compact" sticky className={stickyHeader}>
+            <Table.Row>
+              <Table.Head>Started</Table.Head>
+              <Table.Head>From</Table.Head>
+              <Table.Head>Session</Table.Head>
+              <Table.Head>Command</Table.Head>
+              <Table.Head>Size</Table.Head>
+              <Table.Head>State</Table.Head>
+              <Table.Head className="w-24">
+                <span className="sr-only">Actions</span>
+              </Table.Head>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {recordings.length === 0 ? (
+              <Table.Row>
+                <Table.Cell colSpan={columnCount} className="p-0">
+                  <EmptySessions embeddedRecorder={embeddedRecorder} />
+                </Table.Cell>
+              </Table.Row>
+            ) : (
+              recordings.map((recording, index) => (
+                <RecordingRow
+                  key={recording.id}
+                  recording={recording}
+                  writable={writable}
+                  striped={index % 2 === 1}
+                />
+              ))
+            )}
+          </Table.Body>
+        </Table>
+      </FramePanel>
+      <Paging
+        count={recordings.length}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        onLoadMore={onLoadMore}
+      />
+    </>
   );
 }
 
@@ -202,14 +201,15 @@ function Paging({
 
   if (hasMore) {
     return (
-      <Button
-        variant="ghost"
-        className="h-10 w-full rounded-none"
-        loading={loadingMore}
-        onClick={onLoadMore}
+      <TableFooter
+        actions={
+          <Button variant="secondary" size="xs" loading={loadingMore} onClick={onLoadMore}>
+            Load more
+          </Button>
+        }
       >
-        Load more
-      </Button>
+        {`Showing ${plural(count, "recording")}`}
+      </TableFooter>
     );
   }
 

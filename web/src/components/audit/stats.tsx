@@ -1,9 +1,9 @@
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
 import { clientError } from "~/components/audit/cells.tsx";
+import { Frame } from "~/components/ui/frame.tsx";
 
 /** One actor: the user behind the call, or the credential kind when no user is bound. */
 function actorKey(event: AuditEvent): string {
@@ -23,11 +23,11 @@ function Stat({
   readonly alert?: boolean;
 }): ReactElement {
   return (
-    <div className="flex flex-col gap-1 px-5 py-4">
+    <div className="flex flex-col gap-1 rounded-lg bg-kumo-base px-5 py-4 shadow-xs ring ring-kumo-line">
       <span className="text-xs text-kumo-subtle">{label}</span>
       <span
         className={cn(
-          "text-xl font-semibold",
+          "text-xl font-semibold tabular-nums",
           alert && value > 0 ? "text-kumo-danger" : "text-kumo-strong",
         )}
       >
@@ -47,10 +47,10 @@ export function AuditStats({ events }: { readonly events: readonly AuditEvent[] 
   const failures = events.filter((event) => event.outcome >= clientError).length;
 
   return (
-    <LayerCard className="grid grid-cols-3 divide-x divide-kumo-hairline overflow-hidden p-0">
+    <Frame className="grid grid-cols-3 gap-1">
       <Stat label="Events loaded" value={events.length} hint="In the selected range" />
       <Stat label="Distinct actors" value={actors.size} hint="Users, keys and the CLI" />
       <Stat label="Failures" value={failures} hint="Outcome 400 or worse" alert />
-    </LayerCard>
+    </Frame>
   );
 }
