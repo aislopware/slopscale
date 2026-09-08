@@ -193,10 +193,12 @@ func (s *State) DERPRelay() *derpServer.DERPServer {
 }
 
 // LoadDERPMap fetches the map sources and builds the live map from the
-// effective settings, at startup. A source that cannot be fetched fails
-// the load, as does a map with no relay at all. A stored override that
-// turns the embedded relay on while the server has no relay key is
-// served without the embedded region, with a warning.
+// effective settings, at startup. A source that cannot be fetched does
+// not keep the server from starting: the map is built from the local
+// regions, the failure shows in [State.DERP] and the scheduler refetches
+// until a fetch succeeds. A map with no relay at all fails the load. A
+// stored override that turns the embedded relay on while the server has
+// no relay key is served without the embedded region, with a warning.
 func (s *State) LoadDERPMap(ctx context.Context) error {
 	s.derpMu.Lock()
 	defer s.derpMu.Unlock()
@@ -207,24 +209,44 @@ func (s *State) LoadDERPMap(ctx context.Context) error {
 		log.Warn().Msg("the stored DERP settings turn the embedded relay on, but the server has no relay key")
 	}
 
-	sources, err := s.fetchDERPSourcesLocked(ctx, settings)
-	if err != nil {
-		return err
+	sources, fetchErr := s.fetchDERPSourcesLocked(ctx, settings)
+	if fetchErr != nil {
+		log.Warn().
+			Err(fetchErr).
+			Msg("DERP map sources could not be fetched, serving the local regions until a fetch succeeds")
+
+		sources = fetchedSources{}
 	}
 
-	err = s.applyDERPRelayLocked(ctx, settings.Server)
+	err := s.applyDERPRelayLocked(ctx, settings.Server)
 	if err != nil {
 		return err
 	}
 
 	built, err := s.buildDERPLocked(ctx, settings, sources)
 	if err != nil {
+		if fetchErr != nil {
+			return fmt.Errorf("%w (after %w)", err, fetchErr)
+		}
+
 		return err
 	}
 
 	s.publishDERPLocked(built)
+	// publish clears the error; a failed startup fetch stays visible so
+	// the status reports it and the scheduler keeps retrying.
+	s.derp.fetchErr = fetchErr
 
 	return nil
+}
+
+// DERPFetchFailed reports whether the last fetch of the map sources
+// failed, so the scheduler retries even while automatic updates are off.
+func (s *State) DERPFetchFailed() bool {
+	s.derpMu.Lock()
+	defer s.derpMu.Unlock()
+
+	return s.derp.fetchErr != nil
 }
 
 // RefreshDERPMap refetches the map sources and rebuilds the live map. It

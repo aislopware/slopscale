@@ -14,6 +14,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -73,6 +74,9 @@ type Headscale struct {
 
 	// Things that generate changes
 	extraRecordMan *dns.ExtraRecordsMan
+
+	// derpRefreshing is set while a DERP refresh runs in the background.
+	derpRefreshing atomic.Bool
 	authProvider   AuthProvider
 	mapBatcher     *mapper.Batcher
 
@@ -906,12 +910,10 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 
 		case <-derpTimer.C:
 			// The timer also fires while automatic updates are off, so
-			// it re-reads the settings; it fetches only when they say so.
-			if h.state.EffectiveDERP().AutoUpdate {
-				err := h.refreshDERPMap(ctx)
-				if err != nil {
-					log.Error().Err(err).Msg("failed to build new DERPMap, retrying later")
-				}
+			// it re-reads the settings; it fetches only when they say so,
+			// or when the last fetch failed and the map is missing regions.
+			if h.state.EffectiveDERP().AutoUpdate || h.state.DERPFetchFailed() {
+				h.refreshDERPMapInBackground(ctx)
 			}
 
 			derpTimer.Reset(h.derpRefreshInterval())
@@ -1108,6 +1110,10 @@ func (h *Headscale) expireNodesTick(lastExpiryCheck time.Time) time.Time {
 // is off, after which the scheduler re-reads the settings without
 // fetching.
 func (h *Headscale) derpRefreshInterval() time.Duration {
+	if h.state.DERPFetchFailed() {
+		return derpRefreshRetry
+	}
+
 	settings := h.state.EffectiveDERP()
 	if !settings.AutoUpdate || settings.UpdateFrequency < types.DERPMinUpdateFrequency {
 		return derpRefreshIdle
@@ -1116,7 +1122,28 @@ func (h *Headscale) derpRefreshInterval() time.Duration {
 	return settings.UpdateFrequency
 }
 
-const derpRefreshIdle = 24 * time.Hour
+const (
+	derpRefreshIdle  = 24 * time.Hour
+	derpRefreshRetry = 5 * time.Minute
+)
+
+// refreshDERPMapInBackground runs [Headscale.refreshDERPMap] off the
+// scheduler goroutine, which must keep serving expiry and health ticks
+// while a fetch backs off, and skips the run while one is in flight.
+func (h *Headscale) refreshDERPMapInBackground(ctx context.Context) {
+	if !h.derpRefreshing.CompareAndSwap(false, true) {
+		return
+	}
+
+	go func() {
+		defer h.derpRefreshing.Store(false)
+
+		err := h.refreshDERPMap(ctx)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to build new DERPMap, retrying later")
+		}
+	}()
+}
 
 // refreshDERPMap refetches the map sources, retrying with backoff until
 // ctx ends, and pushes the map when it changed. It returns an error
