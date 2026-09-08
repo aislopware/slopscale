@@ -916,7 +916,7 @@ type Node struct {
 	ApprovedRoutes  []string   `json:"approvedRoutes"`
 	AvailableRoutes []string   `json:"availableRoutes"`
 
-	// ClientWarnings Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup. Empty while the client reports none, and after a restart of the server until the client polls again.
+	// ClientWarnings Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup, etc-apt-source-disabled when the Tailscale apt source is commented out. A newer client may report flags not listed here. Empty while the client reports none, while it is offline, and after a restart of the server until it polls again.
 	ClientWarnings []string  `json:"clientWarnings"`
 	CreatedAt      time.Time `json:"createdAt"`
 	DiscoKey       string    `json:"discoKey"`

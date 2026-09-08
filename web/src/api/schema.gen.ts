@@ -2395,7 +2395,7 @@ export interface components {
             approvedAt: string | null;
             approvedRoutes: string[];
             availableRoutes: string[];
-            /** @description Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup. Empty while the client reports none, and after a restart of the server until the client polls again. */
+            /** @description Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup, etc-apt-source-disabled when the Tailscale apt source is commented out. A newer client may report flags not listed here. Empty while the client reports none, while it is offline, and after a restart of the server until it polls again. */
             clientWarnings: string[];
             /** Format: date-time */
             createdAt: string;
