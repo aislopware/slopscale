@@ -27,14 +27,15 @@ func TestPeerCapMap(t *testing.T) {
 	empty := []tailcfg.RawMessage{}
 
 	tests := []struct {
-		name string
-		peer *types.Node
-		self tailcfg.NodeCapMap
-		want tailcfg.NodeCapMap
+		name   string
+		peer   *types.Node
+		self   tailcfg.NodeCapMap
+		global bool
+		want   tailcfg.NodeCapMap
 	}{
 		{
-			name: "no self caps",
-			peer: exitNode,
+			name: "a plain node with no self caps",
+			peer: plainNode,
 			self: nil,
 			want: nil,
 		},
@@ -51,10 +52,24 @@ func TestPeerCapMap(t *testing.T) {
 			want: nil,
 		},
 		{
-			name: "suggest-exit-node on an exit node",
+			name: "every approved exit node is suggested",
 			peer: exitNode,
-			self: tailcfg.NodeCapMap{nodecap.SuggestExitNode: empty},
-			want: tailcfg.NodeCapMap{nodecap.SuggestExitNode: empty},
+			self: nil,
+			want: tailcfg.NodeCapMap{nodecap.SuggestExitNode: nil},
+		},
+		{
+			name:   "a global exit node narrows the suggestion to the marked",
+			peer:   exitNode,
+			self:   nil,
+			global: true,
+			want:   nil,
+		},
+		{
+			name:   "a marked exit node is suggested",
+			peer:   exitNode,
+			self:   tailcfg.NodeCapMap{nodecap.SuggestExitNode: empty},
+			global: true,
+			want:   tailcfg.NodeCapMap{nodecap.SuggestExitNode: empty},
 		},
 		{
 			name: "dns-subdomain-resolve reaches every peer",
@@ -74,7 +89,7 @@ func TestPeerCapMap(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := PeerCapMap(tt.peer.View(), tt.self)
+			got := PeerCapMap(tt.peer.View(), tt.self, tt.global)
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("PeerCapMap mismatch (-want +got):\n%s", diff)
 			}

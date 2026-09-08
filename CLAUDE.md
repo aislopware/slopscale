@@ -150,14 +150,20 @@ stamps `Sharer` on the peer view for sharees. `HasPolicyChange` compares
 not. Deleting a user cascades the rows in the database and
 `dropSharesWithUser` mirrors that in the NodeStore.
 
-The global exit node is `nodes.global_exit_node`, written only by
+Exit node suggestions follow the hosted control plane's wire shape (the
+issue_3212 captures): `PeerCapMap` in `policy/v2/tailnet_state_caps.go` puts
+`suggest-exit-node` on the peer view of every approved exit node, never on a
+self view, and the mapper passes it whether a global exit node exists. The
+global exit node is `nodes.global_exit_node`, written only by
 `State.SetGlobalExitNode` (which also approves the exit routes) and read by
 `stampGlobalExitNodes` in `policy/v2/compiled.go`: `suggest-exit-node` on the
-marked nodes, `auto-exit-node` on every node while one exists, with or
-without a policy. The node-attrs fast path in `refreshNodeAttrsLocked` must
-stay open while a global exit node exists, and `HasPolicyChange` compares the
-flag so `SetNodes` recompiles. The control server cannot make a client use an
-exit node; the caps only drive the client's own suggestion and auto pick.
+marked nodes' self caps, which `PeerCapMap` then requires while any node is
+marked, so a mark narrows the suggestion; `auto-exit-node` on every node
+while one exists, with or without a policy. The node-attrs fast path in
+`refreshNodeAttrsLocked` must stay open while a global exit node exists, and
+`HasPolicyChange` compares the flag so `SetNodes` recompiles. The control
+server cannot make a client use an exit node; the caps only drive the
+client's own suggestion and auto pick.
 
 API responses read through `NodeView`, `UserView`, and `PreAuthKeyView`.
 `AsStruct()` clones the whole record and is only for write/merge copies.

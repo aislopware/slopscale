@@ -1200,6 +1200,19 @@ func (s *State) NodeCapMap(id types.NodeID) tailcfg.NodeCapMap {
 	return s.polMan.NodeCapMap(id)
 }
 
+// HasGlobalExitNode reports whether any node carries the global exit
+// node mark, which narrows the exit nodes peers are told to suggest to
+// the marked ones (see PeerCapMap in hscontrol/policy/v2).
+func (s *State) HasGlobalExitNode() bool {
+	for _, n := range s.nodeStore.ListNodes().All() {
+		if n.GlobalExitNode() {
+			return true
+		}
+	}
+
+	return false
+}
+
 // NodeCapMaps returns a snapshot of every node's policy CapMap so
 // callers can amortise lock acquisition over a peer loop.
 func (s *State) NodeCapMaps() map[types.NodeID]tailcfg.NodeCapMap {

@@ -281,10 +281,10 @@ route any machine advertises, with `headscale networks`, or through
 
 `headscale nodes global-exit-node --identifier <node>` (or
 `POST /api/v1/node/{id}/global-exit-node`) marks an exit node every client is
-told to prefer, with no policy involved: its exit routes are approved, it
-carries `suggest-exit-node` on every other client's view of it and every node
-carries `auto-exit-node`, so `tailscale exit-node suggest` names it and clients
-set to `--exit-node=auto:any` pick it. See
+told to prefer, with no policy involved: its exit routes are approved, the
+marked nodes alone carry `suggest-exit-node` on every other client's view of
+them and every node carries `auto-exit-node`, so `tailscale exit-node suggest`
+names one and clients set to `--exit-node=auto:any` pick it. See
 [Global exit node](https://headscale.net/development/ref/routes/#global-exit-node).
 
 ### Admin console
@@ -343,6 +343,7 @@ console's _Audit log_ page; bound it with `audit.retention`. See
 - Online peers now carry `LastSeen` in the map response and in the online and offline patches, as Tailscale's control plane sends it. The Apple clients on 1.102 read a peer without it as never seen and showed it offline in the peer list, and the `tailscale status` last-seen column was empty for online machines [#3415](https://github.com/juanfont/headscale/issues/3415), [#3420](https://github.com/juanfont/headscale/issues/3420)
 - The `dns-subdomain-resolve` node attribute now reaches peers: a client answers `*.<machine>` with that machine's addresses only when the attribute is on its peer entry, and headscale set it on the machine's own entry alone [#3322](https://github.com/juanfont/headscale/issues/3322)
 - Deleting a machine, by hand or by ephemeral clean-up, now ends its map stream with its own key expired, and a machine that polls with a key the server no longer knows gets the same answer instead of a 404. The client goes to "needs login" at once, where before it kept receiving keep-alives, then retried the 404 until someone ran `tailscale up --force-reauth`, and its stale stream held up a graceful shutdown [#3410](https://github.com/juanfont/headscale/issues/3410)
+- Every approved exit node is now suggested to the other machines (`suggest-exit-node` on their view of it), as Tailscale's control plane does with no policy at all. The macOS and iOS apps since Tailscale 1.102 build their exit node list from the suggestion and showed "No exit nodes available" without one. Marking a global exit node narrows the suggestion to the marked machines, as before [#3415](https://github.com/juanfont/headscale/issues/3415)
 - Improve systemd service file hardening [#3341](https://github.com/juanfont/headscale/pull/3341)
 - Headscale now requires Go 1.27 to build
 - Fix `headscale policy set --bypass-server-and-access-database-directly` storing the policy with its comments blanked out; the file is now saved as written

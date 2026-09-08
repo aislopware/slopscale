@@ -335,6 +335,7 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 	// instead of locking the policy manager per peer. The per-call
 	// path used to take pm.mu N times for an N-peer response.
 	allCapMaps := b.mapper.state.NodeCapMaps()
+	globalExitNodes := b.mapper.state.HasGlobalExitNode()
 
 	// Build tail nodes with per-peer via-aware route function.
 	tailPeers := make([]*tailcfg.Node, 0, changedViews.Len())
@@ -373,13 +374,12 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 
 		// [tailcfg.Node.CapMap] on a peer carries the small set of
 		// caps the Tailscale client reads from the peer view rather
-		// than the self view (suggest-exit-node, dns-subdomain-resolve
-		// — see ipn/ipnlocal/local.go:7534 and node_backend.go:745).
+		// than the self view (suggest-exit-node, dns-subdomain-resolve).
 		// The Tailscale-hosted control plane stamps these only when
 		// the peer satisfies the cap's emission condition; every other
 		// cap stays off the peer view, leaving CapMap empty for most
 		// peers. [policyv2.PeerCapMap] encodes those conditions.
-		tn.CapMap = policyv2.PeerCapMap(peer, allCapMaps[peer.ID()])
+		tn.CapMap = policyv2.PeerCapMap(peer, allCapMaps[peer.ID()], globalExitNodes)
 
 		tailPeers = append(tailPeers, tn)
 	}

@@ -149,6 +149,14 @@ The setup of an exit node requires double opt-in, once from an exit node and onc
 within the tailnet. Optionally, use [`autoApprovers` to automatically approve an exit
 node](#automatically-approve-an-exit-node-with-auto-approvers).
 
+### Suggested exit nodes
+
+Every approved exit node is suggested to the other clients: it carries the
+`suggest-exit-node` capability on their view of it, as it does on Tailscale's
+own control plane, so `tailscale exit-node suggest` picks one and the Apple
+clients list them. Nothing needs to be written in the policy for this. To
+suggest only some of the exit nodes, mark them as global exit nodes.
+
 ### Global exit node
 
 An administrator can mark an exit node as the one every client is told to
@@ -160,10 +168,11 @@ $ headscale nodes global-exit-node --identifier 7 --revoke
 ```
 
 Marking approves the node's exit routes, so it serves as an exit node as soon
-as it advertises them. The node then carries the `suggest-exit-node`
-capability on every other client's view of it and every node carries
-`auto-exit-node`, the way Tailscale's exit node suggestions work: `tailscale exit-node suggest` names it, and a client set to use an exit node
-automatically picks it:
+as it advertises them. While at least one node is marked, only the marked
+nodes carry `suggest-exit-node` on the other clients' view of them, and every
+node carries `auto-exit-node`, the way Tailscale's exit node suggestions work:
+`tailscale exit-node suggest` names a marked node, and a client set to use an
+exit node automatically picks it:
 
 ```console
 $ sudo tailscale set --exit-node=auto:any
@@ -173,7 +182,8 @@ The control server cannot switch a client's exit-node use on by itself; that
 stays with the device (or its MDM policy). Several nodes may be marked, in
 which case each client picks the closest by DERP region. The same operation is
 `POST /api/v1/node/{id}/global-exit-node` with an optional `{"enabled": false}` body, and a node's `globalExitNode` field reports the mark. Clearing
-the mark keeps the approved routes.
+the mark keeps the approved routes, so the node stays a suggested exit node
+like any other.
 
 ### Setup an exit node
 

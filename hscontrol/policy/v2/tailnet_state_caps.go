@@ -22,42 +22,39 @@ import (
 	"tailscale.com/tailcfg/nodecap"
 )
 
-// PeerCapMap returns the subset of peerSelfCaps the Tailscale client
-// reads from the peer view (rather than the self view) given the
-// peer's state. Returns nil when no peer-consumed cap applies, matching
+// PeerCapMap returns the caps a peer entry carries: the few the Tailscale
+// client reads from the peer view rather than the self view
+// (suggest-exit-node at ipn/ipnlocal/local.go suggestExitNode,
+// dns-subdomain-resolve at node_backend.go magicDNSSubdomainHost), each
+// under its own condition. It returns nil when none applies, matching
 // the empirical wire shape where [tailcfg.Node.CapMap] is omitted for
-// most peers.
-//
-// Caps the client reads from the peer view rather than the self view
-// (suggest-exit-node, dns-subdomain-resolve — see
-// ipn/ipnlocal/local.go:7534 and node_backend.go:745) are emitted only
-// when the peer satisfies the cap's emission condition. This function
-// encodes those conditions; the mapper calls it from
+// most peers. The mapper calls it from
 // [mapper.MapResponseBuilder.buildTailPeers] and the compat test calls
 // it to compute the expected per-peer wire shape.
-func PeerCapMap(peer types.NodeView, peerSelfCaps tailcfg.NodeCapMap) tailcfg.NodeCapMap {
-	if len(peerSelfCaps) == 0 {
-		return nil
-	}
-
+//
+// suggest-exit-node goes on every peer with approved exit routes, which
+// is what the hosted control plane does with no nodeAttrs at all (the
+// issue_3212 captures with an exit auto-approver): a client without a
+// suggested peer shows no exit nodes on Apple platforms since Tailscale
+// 1.102 (juanfont/headscale#3415). A global exit node narrows the set:
+// while one is marked, globalExitNodes is true and only peers whose own
+// caps carry suggest-exit-node (the marked ones, and any a nodeAttrs
+// grant names) are suggested. Approval gates the cap in both cases so a
+// suggestion never follows an advertised-but-not-yet-trusted node.
+func PeerCapMap(peer types.NodeView, peerSelfCaps tailcfg.NodeCapMap, globalExitNodes bool) tailcfg.NodeCapMap {
 	var out tailcfg.NodeCapMap
 
-	// suggest-exit-node — surfaced on Peer.CapMap when the peer
-	// advertises exit routes AND those routes are approved. Client
-	// reads at ipn/ipnlocal/local.go:7534. Approval gating prevents
-	// the suggestion from following an advertised-but-not-yet-trusted
-	// node.
 	if peer.IsExitNode() {
-		if v, ok := peerSelfCaps[nodecap.SuggestExitNode]; ok {
+		v, marked := peerSelfCaps[nodecap.SuggestExitNode]
+		if marked || !globalExitNodes {
 			out = tailcfg.NodeCapMap{nodecap.SuggestExitNode: v}
 		}
 	}
 
 	// dns-subdomain-resolve — the client answers *.<peer name> with the
-	// peer's addresses when the peer carries the cap on its peer view
-	// (ipn/ipnlocal/node_backend.go magicDNSSubdomainHost); the self
-	// view only covers the node's own name. Nothing gates it, so it is
-	// copied whenever the policy stamps it on the peer.
+	// peer's addresses when the peer carries the cap on its peer view;
+	// the self view only covers the node's own name. Nothing gates it,
+	// so it is copied whenever the policy stamps it on the peer.
 	// See juanfont/headscale#3322.
 	if v, ok := peerSelfCaps[nodecap.DNSSubdomainResolve]; ok {
 		if out == nil {
