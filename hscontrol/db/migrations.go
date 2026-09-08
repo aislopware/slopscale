@@ -611,7 +611,27 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 				return tx.ex.addColumnIfMissing("groups", "source", typeText)
 			},
 		},
+		{
+			// The map request path looks a node up by node key, the
+			// registration path by machine key and a pre-auth key by
+			// its key, and every read of a user's nodes filters on
+			// user_id. None of those columns had an index, so each of
+			// them scanned the table.
+			id: "202609151200-lookup-indexes",
+			run: func(tx *Tx) error {
+				return tx.ex.execAll("creating lookup indexes", lookupIndexes)
+			},
+		},
 	}
+}
+
+// lookupIndexes are the indexes 202609151200-lookup-indexes adds; they are
+// the same statements schema.sql and schema_postgres.sql carry.
+var lookupIndexes = []string{
+	`CREATE INDEX idx_nodes_node_key ON nodes(node_key)`,
+	`CREATE INDEX idx_nodes_machine_key ON nodes(machine_key)`,
+	`CREATE INDEX idx_nodes_user_id ON nodes(user_id)`,
+	`CREATE INDEX idx_pre_auth_keys_key ON pre_auth_keys(key)`,
 }
 
 // migrateAccessGroups (202609081000) creates the groups, group_nodes,

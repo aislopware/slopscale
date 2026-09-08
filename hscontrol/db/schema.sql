@@ -68,6 +68,7 @@ CREATE TABLE pre_auth_keys(
   CONSTRAINT fk_pre_auth_keys_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON pre_auth_keys(prefix) WHERE prefix IS NOT NULL AND prefix != '';
+CREATE INDEX idx_pre_auth_keys_key ON pre_auth_keys(key);
 
 -- scopes is a JSON array of scope names narrowing the key below its
 -- owner's role, empty for the whole role; description names the key.
@@ -163,6 +164,9 @@ CREATE TABLE nodes(
   CONSTRAINT fk_nodes_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_nodes_auth_key FOREIGN KEY(auth_key_id) REFERENCES pre_auth_keys(id)
 );
+CREATE INDEX idx_nodes_node_key ON nodes(node_key);
+CREATE INDEX idx_nodes_machine_key ON nodes(machine_key);
+CREATE INDEX idx_nodes_user_id ON nodes(user_id);
 
 -- node_attributes are the custom posture attributes set through the API,
 -- Tailscale style: a "custom:" key with a string, number or bool value
