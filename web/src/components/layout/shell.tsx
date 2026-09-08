@@ -119,15 +119,17 @@ export function Shell({
               </Sidebar.Group>
             ))}
           </Sidebar.Content>
-          {/* Collapsing to the icon rail is a desktop idea; the drawer is either open or gone. */}
-          <Sidebar.Footer className="justify-end max-md:hidden">
+          {/* Collapsing to the icon rail is a desktop idea; the drawer is either open or gone. The
+              trigger sits at the left edge, in the column the icons are in, so it is in the same
+              place on the rail and on the open sidebar. */}
+          <Sidebar.Footer className="justify-start max-md:hidden">
             <Sidebar.Trigger />
           </Sidebar.Footer>
         </Sidebar>
         <div className="flex min-h-svh min-w-0 flex-1 flex-col bg-kumo-canvas">
           <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 border-b border-kumo-line bg-kumo-base px-4 lg:px-6">
             <Trail place={place} />
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <ThemeToggle />
               <AccountMenu me={me} />
             </div>

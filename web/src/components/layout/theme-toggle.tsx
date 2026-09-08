@@ -19,22 +19,30 @@ const labels: Record<Theme, string> = {
   dark: "Theme: dark",
 };
 
-/** The three states the theme can be in, named. A cycling button asked the operator to guess. */
+const iconSize = 16;
+
+/**
+ * The three states the theme can be in, named. A cycling button asked the operator to guess. The
+ * trigger is an outlined button the height of the avatar beside it, with the state as its label, so
+ * the top bar's two controls read as a pair.
+ */
 export function ThemeToggle(): ReactElement {
   const current = useTheme();
   const active = options.find((option) => option.value === current) ?? options.at(-1);
+  const Icon = active?.icon ?? DesktopIcon;
 
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger
         render={
           <Button
-            variant="ghost"
-            shape="square"
-            size="sm"
-            icon={active?.icon}
+            variant="outline"
+            className="h-8 gap-1.5 px-2.5 text-sm"
             aria-label={labels[current]}
-          />
+          >
+            <Icon size={iconSize} aria-hidden />
+            {active?.label}
+          </Button>
         }
       />
       <DropdownMenu.Content align="end" className="min-w-40">

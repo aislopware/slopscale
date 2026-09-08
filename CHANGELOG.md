@@ -340,15 +340,21 @@ machine without a shared clipboard can scan it. Panels, tables and dialogs
 are framed: a tinted band carries the title, the column headers or the row
 count, and the content sits on an inset panel with concentric corners; a
 table's search, filters and primary action sit on the page above its frame. A
-page with several parts, such as the access controls, the keys or the
-integrations, is a branch of the sidebar with a page and an address per part
-rather than a row of tabs. Copyable values
-keep their copy icon in view. There is a dark mode. It signs
+page with several parts, such as the access controls, DNS, relays, settings,
+the keys or the integrations, is a branch of the sidebar with a page and an
+address per part rather than a row of tabs. The policy file editor
+underlines what the server would refuse as it is typed, completes section
+names, rule keys and the names the file defines, explains them on hover,
+and asks the server about the rest once typing pauses; the posture editor
+colours and checks expressions the same way. URLs show their host in the
+foreground. Copyable values keep their copy icon in view. There is a dark mode. It signs
 in only through the configured identity
 provider (Google, or any OIDC issuer) and shows what that user's role allows.
 _Settings_ carries the IP backfill (`headscale nodes backfillips`).
-Long tables page at fifty rows under a pinned header, scroll sideways on a
-phone with the row menu kept in reach, and figures line up on the right.
+Long tables page at fifty rows, with the page size and the page controls
+on the band under the rows, scroll sideways on a phone with the row menu
+kept in reach, and figures line up on the right; the page is the only thing
+that scrolls.
 _Machines_ keeps its filters in the URL, so a filtered list can be shared,
 selects rows for approving, expiring or deleting in one go, and refreshes
 on its own every fifteen seconds while the tab is open. A disabled control
