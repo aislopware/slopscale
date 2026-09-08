@@ -130,12 +130,6 @@ var unmodelledTailnetStateCaps = []nodecap.Cap{
 	// with no real-world equivalent.
 	nodecap.TailnetDisplayName,
 
-	// [tailcfg.NodeAttrMaxKeyDuration]: tailnet-wide max key duration
-	// value. Headscale has cfg.Node.Expiry but does not surface it
-	// as a cap today; the hosted control plane emits this only when
-	// a non-default value is configured.
-	nodecap.MaxKeyDuration,
-
 	// [tailcfg.NodeAttrNativeIPV4]: peer-consumed cap conditional on
 	// tailnet ipv4 reachability state. Out of scope for the current
 	// peer-cap adoption (only suggest-exit-node is wired in this

@@ -320,9 +320,10 @@ func (v NodeView) SharedWith() views.Slice[UserID] { return views.SliceOf(v.ж.S
 func (v NodeView) GlobalExitNode() bool { return v.ж.GlobalExitNode }
 
 // Ephemeral is set when the client asked to be ephemeral in its
-// register request rather than through an ephemeral pre-auth key.
-// [NodeView.IsEphemeral] reads both; only registration writes it.
-func (v NodeView) Ephemeral() bool { return v.ж.Ephemeral }
+// register request (a tailscaled with mem: state, a tsnet Server
+// with Ephemeral) rather than through an ephemeral pre-auth key.
+// [Node.IsEphemeral] reads both; only registration writes it.
+func (v NodeView) Ephemeral() bool      { return v.ж.Ephemeral }
 func (v NodeView) CreatedAt() time.Time { return v.ж.CreatedAt }
 func (v NodeView) UpdatedAt() time.Time { return v.ж.UpdatedAt }
 func (v NodeView) DeletedAt() views.ValuePointer[time.Time] {
@@ -351,7 +352,20 @@ func (v NodeView) ActiveSessions() int { return v.ж.ActiveSessions }
 // returned by Connect as a "Connect ran" sentinel for its cleanup,
 // and Disconnect logs it. Runtime-only.
 func (v NodeView) SessionEpoch() uint64 { return v.ж.SessionEpoch }
-func (v NodeView) String() string       { return v.ж.String() }
+
+// CapVer is the capability version the client last sent in a map
+// request, what peers see as [tailcfg.Node.Cap]. Zero until the node
+// polls after a restart; the client treats zero as unknown.
+// Runtime-only, written by [State.UpdateNodeFromMapRequest].
+func (v NodeView) CapVer() tailcfg.CapabilityVersion { return v.ж.CapVer }
+
+// ClientWarnings are the warn-* flags the client last sent in
+// [tailcfg.MapRequest.DebugFlags], without the prefix and sorted:
+// "ip-forwarding-off" for a subnet router whose kernel drops
+// forwarded packets, "router-unhealthy" for a broken route setup.
+// Runtime-only, written by [State.UpdateNodeFromMapRequest].
+func (v NodeView) ClientWarnings() views.Slice[string] { return views.SliceOf(v.ж.ClientWarnings) }
+func (v NodeView) String() string                      { return v.ж.String() }
 
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _NodeViewNeedsRegeneration = Node(struct {
@@ -389,6 +403,8 @@ var _NodeViewNeedsRegeneration = Node(struct {
 	Unhealthy      bool
 	ActiveSessions int
 	SessionEpoch   uint64
+	CapVer         tailcfg.CapabilityVersion
+	ClientWarnings []string
 }{})
 
 // View returns a read-only view of PreAuthKey.

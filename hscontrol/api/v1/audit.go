@@ -20,7 +20,7 @@ type AuditEvent struct {
 	ID        string    `format:"uint64"  json:"id"`
 	CreatedAt time.Time `json:"createdAt"`
 
-	ActorKind   string `doc:"local, api_key, oauth, session or system."                      json:"actorKind"`
+	ActorKind   string `doc:"local, api_key, oauth, session, node or system."                json:"actorKind"`
 	ActorUserID string `doc:"The user behind the actor; empty for a credential without one." json:"actorUserId"`
 	ActorName   string `doc:"The actor's user name, or the credential's prefix."             json:"actorName"`
 

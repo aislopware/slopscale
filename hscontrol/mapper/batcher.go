@@ -80,6 +80,12 @@ func generateMapResponse(nc nodeConnection, mapper *mapper, r change.Change) (*t
 	// its own attribute changes (e.g., tags changed via admin API).
 	isSelfUpdate := r.OriginNode != 0 && r.OriginNode == nodeID
 
+	// A patch the node caused itself (endpoints, DERP home, version) is
+	// for its peers only; see [mapper.buildFromChange].
+	if isSelfUpdate && r.IsPatchOnly() {
+		return nil, nil //nolint:nilnil // Nothing to tell the node that sent the patch
+	}
+
 	var (
 		mapResp *tailcfg.MapResponse
 		err     error
@@ -498,6 +504,13 @@ func (b *Batcher) MapResponseFromChange(id types.NodeID, ch change.Change) (*tai
 	case <-b.done:
 		return nil, fmt.Errorf("%w while generating map response for node %d", ErrBatcherShuttingDown, id)
 	}
+}
+
+// FullMapResponse builds the one map a non-streaming request without
+// OmitPeers is owed, straight from the mapper: the node holds no stream,
+// so it is not in the batcher and the work queue cannot serve it.
+func (b *Batcher) FullMapResponse(id types.NodeID, capVer tailcfg.CapabilityVersion) (*tailcfg.MapResponse, error) {
+	return b.mapper.fullMapResponse(id, capVer)
 }
 
 // DebugNodeInfo contains debug information about a node's connections.

@@ -72,6 +72,11 @@ type Node struct {
 	// Ephemeral covers both an ephemeral pre-auth key and a client that asked
 	// to be ephemeral when it registered.
 	Ephemeral bool `doc:"true when the node is deleted on logout or after the ephemeral timeout." json:"ephemeral"`
+
+	// ClientWarnings are what the client itself reports as broken, taken
+	// from the warn-* flags of its last map request.
+	//nolint:lll // doc tag
+	ClientWarnings []string `doc:"Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup. Empty while the client reports none, and after a restart of the server until the client polls again." json:"clientWarnings" nullable:"false"`
 }
 
 // NodePreAuthKey is the PreAuthKey shape embedded in a Node response. The
@@ -697,6 +702,8 @@ func nodeFromView(view types.NodeView) Node {
 		at := view.ApprovedAt().Get()
 		n.ApprovedAt = &at
 	}
+
+	n.ClientWarnings = nonNilStrings(view.ClientWarnings().AsSlice())
 
 	if view.SuspendedAt().Valid() {
 		at := view.SuspendedAt().Get()

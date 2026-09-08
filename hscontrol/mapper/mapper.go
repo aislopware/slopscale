@@ -294,7 +294,7 @@ func (m *mapper) fullMapResponse(
 		WithDebugConfig().
 		WithSSHPolicy().
 		WithDNSConfig().
-		WithUserProfiles(peers).
+		WithUserProfiles(m.filterVisibleNodes(nodeID, peers)).
 		WithPacketFilters().
 		WithPeers(peers).
 		Build()
@@ -372,7 +372,7 @@ func (m *mapper) policyChangeResponse(
 	// Cross-user peers must also carry their user profile, otherwise the
 	// client's netmap shows the peer without a UserProfiles[user] entry.
 	if currentPeers.Len() > 0 {
-		builder.WithUserProfiles(currentPeers)
+		builder.WithUserProfiles(m.filterVisibleNodes(nodeID, currentPeers))
 		builder.WithPeerChanges(currentPeers)
 	}
 
@@ -392,7 +392,15 @@ func (m *mapper) buildFromChange(
 
 	// If this is a self-update (the changed node is the receiving node),
 	// send a self-update response to ensure the node sees its own changes.
+	// A patch the node caused itself (its endpoints, DERP home or version)
+	// carries nothing it does not already know, and a self node in the
+	// response would make the client rebuild its whole netmap, so the
+	// origin gets nothing and only its peers get the patch.
 	if resp.OriginNode != 0 && resp.OriginNode == nodeID {
+		if resp.IsPatchOnly() {
+			return nil, nil //nolint:nilnil // Nothing to tell the node that sent the patch
+		}
+
 		return m.selfMapResponse(nodeID, capVer)
 	}
 

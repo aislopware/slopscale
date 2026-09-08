@@ -94,6 +94,7 @@ func (src *Node) Clone() *Node {
 	if dst.IsOnline != nil {
 		dst.IsOnline = new(*src.IsOnline)
 	}
+	dst.ClientWarnings = append(src.ClientWarnings[:0:0], src.ClientWarnings...)
 	return dst
 }
 
@@ -133,6 +134,8 @@ var _NodeCloneNeedsRegeneration = Node(struct {
 	Unhealthy      bool
 	ActiveSessions int
 	SessionEpoch   uint64
+	CapVer         tailcfg.CapabilityVersion
+	ClientWarnings []string
 }{})
 
 // Clone makes a deep copy of PreAuthKey.

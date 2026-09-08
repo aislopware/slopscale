@@ -141,6 +141,17 @@ func (r Change) IsSelfOnly() bool {
 	return true
 }
 
+// IsPatchOnly reports whether the change carries peer patches and nothing
+// else, the shape of an endpoint, DERP home or capability version update.
+func (r Change) IsPatchOnly() bool {
+	if len(r.PeerPatches) == 0 || len(r.PeersChanged) > 0 || len(r.PeersRemoved) > 0 || r.SendAllPeers {
+		return false
+	}
+
+	return !r.IncludeSelf && !r.IncludeDERPMap && !r.IncludeDNS && !r.IncludeDomain &&
+		!r.IncludePolicy && !r.RequiresRuntimePeerComputation && r.PingRequest == nil
+}
+
 // IsTargetedToNode returns true if this response should only be sent to [Change.TargetNode].
 func (r Change) IsTargetedToNode() bool {
 	return r.TargetNode != 0

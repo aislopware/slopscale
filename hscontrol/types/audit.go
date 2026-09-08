@@ -17,6 +17,9 @@ const (
 	// ActorSystem is the server acting on its own: a node registering, an
 	// automatic approval, an expiry.
 	ActorSystem ActorKind = "system"
+	// ActorNode is a machine reporting what its user did on it, over the
+	// control connection: leaving the tailnet, for one.
+	ActorNode ActorKind = "node"
 )
 
 // AuditEvent is one entry of the audit log: who did what to which object,

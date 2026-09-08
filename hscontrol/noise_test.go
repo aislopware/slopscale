@@ -200,9 +200,8 @@ func TestRegistrationHandler_OversizedBody(t *testing.T) {
 
 	ns.RegistrationHandler(rec, req)
 
-	// [json.Decoder.Decode] returns [http.MaxBytesError] → [regErr] wraps it → handler writes
-	// a [tailcfg.RegisterResponse] with the error and then [rejectUnsupported] kicks in
-	// for version 0 → returns 400.
+	// Decoding fails on the truncated body, which the handler answers
+	// with 400 before the request can have any effect.
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 

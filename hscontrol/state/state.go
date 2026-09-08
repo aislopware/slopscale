@@ -2515,6 +2515,7 @@ func (s *State) UpdateNodeFromMapRequest(
 		autoApprovedRoutes []netip.Prefix
 		endpointChanged    bool
 		derpChanged        bool
+		capChanged         bool
 		persistWorthy      bool
 		prevRegion         tailcfg.DERPRegionID
 	)
@@ -2525,6 +2526,16 @@ func (s *State) UpdateNodeFromMapRequest(
 	// We need to ensure we update the node as it is in the [NodeStore] at
 	// the time of the request.
 	updatedNode, ok := s.nodeStore.UpdateNode(id, func(currentNode *types.Node) {
+		// The client's version and warnings are runtime facts that every
+		// request restates, so they land before the "nothing changed"
+		// exit below and never count as a change worth persisting.
+		if req.Version != 0 && currentNode.CapVer != req.Version {
+			currentNode.CapVer = req.Version
+			capChanged = true
+		}
+
+		currentNode.ClientWarnings = clientWarnings(req.DebugFlags)
+
 		peerChange := currentNode.PeerChangeFromMapRequest(req)
 
 		// Track what specifically changed. An endpoint delta is only
@@ -2718,7 +2729,25 @@ func (s *State) UpdateNodeFromMapRequest(
 
 	// Determine the most specific change type based on what actually changed.
 	// This allows us to send lightweight patch updates instead of full map responses.
-	return buildMapRequestChangeResponse(id, updatedNode, hostinfoChanged, endpointChanged, derpChanged)
+	return buildMapRequestChangeResponse(id, updatedNode, hostinfoChanged, endpointChanged, derpChanged, capChanged)
+}
+
+// clientWarnings picks the warn-* entries out of a map request's
+// [tailcfg.MapRequest.DebugFlags], without the prefix and sorted, so the
+// API can show an operator why a subnet router does not forward. Nil
+// when the client sent none.
+func clientWarnings(flags []string) []string {
+	var out []string
+
+	for _, flag := range flags {
+		if warning, ok := strings.CutPrefix(flag, "warn-"); ok && warning != "" {
+			out = append(out, warning)
+		}
+	}
+
+	slices.Sort(out)
+
+	return slices.Compact(out)
 }
 
 // endpointBroadcastWorthy reports whether an endpoint-only delta is worth
@@ -2786,27 +2815,30 @@ func isUsefulEndpointType(t tailcfg.EndpointType) bool {
 func buildMapRequestChangeResponse(
 	id types.NodeID,
 	node types.NodeView,
-	hostinfoChanged, endpointChanged, derpChanged bool,
+	hostinfoChanged, endpointChanged, derpChanged, capChanged bool,
 ) (change.Change, error) {
 	// Hostinfo changes require NodeAdded (full update) as they may affect many fields.
 	if hostinfoChanged {
 		return change.NodeAdded(id), nil
 	}
 
-	// Return specific change types for endpoint and/or DERP updates.
-	if endpointChanged || derpChanged {
+	// Return specific change types for endpoint, DERP and capability
+	// version updates. The version rides as a patch so peers learn that
+	// an upgraded client now speaks peer relay, which magicsock gates on
+	// [tailcfg.Node.Cap].
+	if endpointChanged || derpChanged || capChanged {
 		patch := &tailcfg.PeerChange{NodeID: id.NodeID()}
+
+		if capChanged {
+			patch.Cap = node.CapVer()
+		}
 
 		if endpointChanged {
 			patch.Endpoints = node.Endpoints().AsSlice()
 		}
 
 		if derpChanged {
-			if hi := node.Hostinfo(); hi.Valid() {
-				if ni := hi.NetInfo(); ni.Valid() {
-					patch.DERPRegion = ni.PreferredDERP()
-				}
-			}
+			patch.DERPRegion = viewerDERPRegion(node)
 		}
 
 		return change.EndpointOrDERPUpdate(id, patch), nil

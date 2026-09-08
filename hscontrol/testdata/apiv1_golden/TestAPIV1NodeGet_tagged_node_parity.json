@@ -6,6 +6,7 @@
       "approvedAt": "\u003ctimestamp\u003e",
       "approvedRoutes": [],
       "availableRoutes": [],
+      "clientWarnings": [],
       "createdAt": "\u003ctimestamp\u003e",
       "discoKey": "\u003csecret\u003e",
       "ephemeral": false,

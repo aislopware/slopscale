@@ -181,6 +181,23 @@ func (m *mapSession) serve() {
 	if m.isEndpointUpdate() {
 		m.w.WriteHeader(http.StatusOK)
 		mapResponseEndpointUpdates.WithLabelValues("ok").Inc()
+
+		return
+	}
+
+	// Stream off without OmitPeers asks for one MapResponse and then the
+	// end of the connection ([tailcfg.MapRequest.Stream]); an empty 200
+	// reads as EOF on the client's size prefix.
+	resp, err := m.h.mapBatcher.FullMapResponse(m.node.ID, m.capVer)
+	if err != nil {
+		httpError(m.w, err)
+
+		return
+	}
+
+	err = m.writeMap(resp)
+	if err != nil {
+		m.log.Error().Caller().Err(err).Msg("writing the one-shot map response")
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/netip"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/juanfont/headscale/hscontrol/policy"
@@ -13,6 +14,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
+	"tailscale.com/tailcfg/nodecap"
 	"tailscale.com/types/views"
 	"tailscale.com/util/multierr"
 )
@@ -81,6 +83,15 @@ func (b *MapResponseBuilder) WithSelfNode() *MapResponseBuilder {
 	if err != nil {
 		b.addError(err)
 		return b
+	}
+
+	// tailnet.maxKeyDuration carries the key expiry cap as seconds, the
+	// shape the hosted control plane uses; it is omitted while the cap is
+	// off, which the client reads as the default.
+	if keyExpiry := b.mapper.state.Settings().KeyExpiry; keyExpiry > 0 {
+		tailnode.CapMap[nodecap.MaxKeyDuration] = []tailcfg.RawMessage{
+			tailcfg.RawMessage(strconv.FormatFloat(keyExpiry.Seconds(), 'f', -1, 64)),
+		}
 	}
 
 	b.resp.Node = tailnode
@@ -344,7 +355,7 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 		// Pass the peer's policy CapMap so per-peer address-shape rules
 		// (today: disable-ipv4) apply consistently in the viewer's
 		// netmap; the entry's own CapMap is set by PeerCapMap below.
-		tn, err := peer.PeerTailNode(b.capVer, func(_ types.NodeID) []netip.Prefix {
+		tn, err := peer.PeerTailNode(func(_ types.NodeID) []netip.Prefix {
 			return b.mapper.state.RoutesForPeer(node, peer, matchers)
 		}, b.mapper.cfg, allCapMaps[peer.ID()])
 		if err == nil {

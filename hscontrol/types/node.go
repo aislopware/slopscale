@@ -110,6 +110,8 @@ func (id NodeID) String() string {
 }
 
 // Node is a Headscale client.
+//
+//nolint:dupl // The field list is mirrored by the regeneration guard in types_clone.go on purpose.
 type Node struct {
 	ID NodeID
 
@@ -239,6 +241,19 @@ type Node struct {
 	// returned by Connect as a "Connect ran" sentinel for its cleanup,
 	// and Disconnect logs it. Runtime-only.
 	SessionEpoch uint64
+
+	// CapVer is the capability version the client last sent in a map
+	// request, what peers see as [tailcfg.Node.Cap]. Zero until the node
+	// polls after a restart; the client treats zero as unknown.
+	// Runtime-only, written by [State.UpdateNodeFromMapRequest].
+	CapVer tailcfg.CapabilityVersion
+
+	// ClientWarnings are the warn-* flags the client last sent in
+	// [tailcfg.MapRequest.DebugFlags], without the prefix and sorted:
+	// "ip-forwarding-off" for a subnet router whose kernel drops
+	// forwarded packets, "router-unhealthy" for a broken route setup.
+	// Runtime-only, written by [State.UpdateNodeFromMapRequest].
+	ClientWarnings []string
 }
 
 type Nodes []*Node
@@ -1311,12 +1326,11 @@ func (nv NodeView) TailNode(
 // CapMap, because the caller replaces it with [policyv2.PeerCapMap] and
 // building the baseline map for every peer was pure waste.
 func (nv NodeView) PeerTailNode(
-	capVer tailcfg.CapabilityVersion,
 	primaryRouteFunc RouteFunc,
 	cfg *Config,
 	policyCaps tailcfg.NodeCapMap,
 ) (*tailcfg.Node, error) {
-	return nv.tailNode(capVer, primaryRouteFunc, cfg, policyCaps, false)
+	return nv.tailNode(nv.CapVer(), primaryRouteFunc, cfg, policyCaps, false)
 }
 
 func (nv NodeView) tailNode(
@@ -1373,8 +1387,13 @@ func (nv NodeView) tailNode(
 	}
 
 	var capMap tailcfg.NodeCapMap
+
+	hostinfo := nv.Hostinfo()
+
 	if withCapMap {
 		capMap = selfCapMap(cfg, selfPolicyCaps)
+	} else {
+		hostinfo = peerHostinfo(nv.ж.Hostinfo)
 	}
 
 	tNode := tailcfg.Node{
@@ -1397,7 +1416,7 @@ func (nv NodeView) tailNode(
 		AllowedIPs:    allowedIPs,
 		Endpoints:     nv.Endpoints().AsSlice(),
 		HomeDERP:      derp,
-		Hostinfo:      nv.Hostinfo(),
+		Hostinfo:      hostinfo,
 		Created:       nv.CreatedAt().UTC(),
 
 		Online: nv.IsOnline().Clone(),
@@ -1426,6 +1445,22 @@ func (nv NodeView) tailNode(
 // carry the nodeAttrs and the role caps (is-admin, is-owner) the policy
 // manager stamps from the owning user's role. Mirrors what Tailscale SaaS
 // emits for a default tailnet.
+// peerHostinfo is the Hostinfo a peer entry carries: everything the client
+// reads about a peer (name, OS, services, SSH host keys) without NetInfo,
+// the node's own NAT and DERP latency findings, which only describe the
+// node's path to the network and would tell every peer how it connects.
+// A shallow copy keeps the map path free of a deep clone per peer.
+func peerHostinfo(hi *tailcfg.Hostinfo) tailcfg.HostinfoView {
+	if hi == nil || hi.NetInfo == nil {
+		return hi.View()
+	}
+
+	trimmed := *hi
+	trimmed.NetInfo = nil
+
+	return trimmed.View()
+}
+
 func selfCapMap(cfg *Config, policyCaps tailcfg.NodeCapMap) tailcfg.NodeCapMap {
 	capMap := tailcfg.NodeCapMap{
 		nodecap.SSH: []tailcfg.RawMessage{},

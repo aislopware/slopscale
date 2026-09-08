@@ -195,17 +195,18 @@ func (h *Headscale) NoiseUpgradeHandler(
 		// We currently do not support device attributes.
 		r.Patch("/set-device-attr", ns.NotImplementedHandler)
 
-		// A [tailcfg.AuditLogRequest] to send audit log entries to the server.
-		// The server is expected to store them "somewhere".
-		// We currently do not support device attributes.
-		r.Post("/audit-log", ns.NotImplementedHandler)
+		// A [tailcfg.AuditLogRequest] carries an action the device's user
+		// took locally, such as leaving the tailnet; it lands in the
+		// audit log with the machine as actor.
+		r.Post("/audit-log", ns.AuditLogHandler)
 
 		// handles requests to get an OIDC ID token. Receives a [tailcfg.TokenRequest].
 		r.Post("/id-token", ns.NotImplementedHandler)
 
-		// Asks the server if a feature is available and receive information about how to enable it.
-		// Gets a [tailcfg.QueryFeatureRequest] and returns a [tailcfg.QueryFeatureResponse].
-		r.Post("/feature/query", ns.NotImplementedHandler)
+		// `tailscale serve` and `tailscale funnel` ask whether the node may
+		// use the feature and how to turn it on; a [tailcfg.QueryFeatureRequest]
+		// gets a [tailcfg.QueryFeatureResponse].
+		r.Post("/feature/query", ns.FeatureQueryHandler)
 
 		r.Post("/update-health", ns.NotImplementedHandler)
 
@@ -527,42 +528,35 @@ func (ns *noiseServer) RegistrationHandler(
 		return
 	}
 
-	//nolint:contextcheck // req.Context() is passed to handleRegister inside the anonymous closure
-	registerRequest, registerResponse := func() (*tailcfg.RegisterRequest, *tailcfg.RegisterResponse) {
-		var resp *tailcfg.RegisterResponse
+	var registerRequest tailcfg.RegisterRequest
 
-		var regReq tailcfg.RegisterRequest
+	err := wire.UnmarshalRead(req.Body, &registerRequest)
+	if err != nil {
+		httpError(writer, NewHTTPError(http.StatusBadRequest, "malformed register request", err))
 
-		err := wire.UnmarshalRead(req.Body, &regReq)
-		if err != nil {
-			return &regReq, regErr(err)
-		}
+		return
+	}
 
-		resp, err = ns.headscale.handleRegister(req.Context(), regReq, ns.conn.Peer())
-		if err != nil {
-			if httpErr, ok := errors.AsType[HTTPError](err); ok {
-				resp = &tailcfg.RegisterResponse{
-					Error: httpErr.Msg,
-				}
-
-				return &regReq, resp
-			}
-
-			return &regReq, regErr(err)
-		}
-
-		return &regReq, resp
-	}()
-
-	// Reject unsupported versions
+	// Reject unsupported versions before the request has any effect: a
+	// refused client must not consume a pre-auth key or leave an auth
+	// cache entry behind.
 	if rejectUnsupported(writer, registerRequest.Version, ns.machineKey, registerRequest.NodeKey) {
 		return
+	}
+
+	registerResponse, err := ns.headscale.handleRegister(req.Context(), registerRequest, ns.conn.Peer())
+	if err != nil {
+		if httpErr, ok := errors.AsType[HTTPError](err); ok {
+			registerResponse = &tailcfg.RegisterResponse{Error: httpErr.Msg}
+		} else {
+			registerResponse = regErr(err)
+		}
 	}
 
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	writer.WriteHeader(http.StatusOK)
 
-	err := wire.MarshalWrite(writer, registerResponse)
+	err = wire.MarshalWrite(writer, registerResponse)
 	if err != nil {
 		log.Error().Caller().Err(err).Msg("noise registration handler: failed to encode RegisterResponse")
 		return

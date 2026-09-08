@@ -78,6 +78,9 @@ type clientConfig struct {
 	user       *types.User
 	authKey    string
 	hostinfo   func(*tailcfg.Hostinfo)
+	// debugFlags go with every map request, the way tailscaled reports
+	// warn-ip-forwarding-off and its kin.
+	debugFlags []string
 	serials    []string
 	posture    bool
 }
@@ -117,6 +120,12 @@ func WithEphemeral() ClientOption {
 // state or a tsnet server with Ephemeral does, whatever key it uses.
 func WithEphemeralLogin() ClientOption {
 	return func(c *clientConfig) { c.loginFlags |= controlclient.LoginEphemeral }
+}
+
+// WithDebugFlags sets the [tailcfg.MapRequest.DebugFlags] the client sends
+// with every map request, such as warn-ip-forwarding-off.
+func WithDebugFlags(flags ...string) ClientOption {
+	return func(c *clientConfig) { c.debugFlags = flags }
 }
 
 // WithHostname sets the client's hostname in [tailcfg.Hostinfo].
@@ -227,6 +236,7 @@ func newTestClient(tb testing.TB, server *TestServer, name, hostname, authKey st
 		Dialer:               dialer,
 		Bus:                  bus,
 		C2NHandler:           c2nHandler(cc),
+		DebugFlags:           cc.debugFlags,
 	})
 	if err != nil {
 		tb.Fatalf("servertest: NewDirect(%s): %v", name, err)

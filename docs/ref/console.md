@@ -98,6 +98,9 @@ out*.
   routes. Search by name, address, user or tag and filter by status or user.
   Each machine has a detail page with its keys, routes (approve with a switch),
   sharing and the global exit node switch, plus rename, tag, expire and remove.
+  A warning the client reports about itself, such as a subnet router whose
+  kernel drops forwarded packets, shows at the top of the page until the client
+  stops reporting it.
   _Add machine_ mints a pre-auth key and hands over the join command for
   Linux, macOS, Windows and Docker, next to a QR code carrying the same line
   so a phone or a machine without a shared clipboard can pick it up; the
