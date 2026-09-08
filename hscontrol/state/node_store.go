@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"tailscale.com/net/tsaddr"
+	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
 	"tailscale.com/types/views"
 	"tailscale.com/util/dnsname"
@@ -124,7 +125,7 @@ func NewNodeStore(allNodes types.Nodes, peersFunc PeersFunc, batchSize int, batc
 		nodes[n.ID] = *n
 	}
 
-	snap := snapshotFromNodes(nodes, peersFunc, nil)
+	snap := snapshotFromNodes(nodes, peersFunc, PrimaryRouteLedger{})
 
 	store := &NodeStore{
 		peersFunc:    peersFunc,
@@ -161,6 +162,29 @@ type Snapshot struct {
 	// primary does not flap on every unrelated batch.
 	routes         map[netip.Prefix]types.NodeID
 	isPrimaryRoute map[types.NodeID]bool
+
+	// regionalRoutes maps a DERP region to the primary advertiser of each
+	// prefix among the region's own online, healthy advertisers. A viewer
+	// homed in that region is steered to it instead of the tailnet-wide
+	// primary, as Tailscale's regional routing does; a region without a
+	// healthy advertiser for a prefix has no entry and falls back.
+	regionalRoutes map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID
+}
+
+// PrimaryRouteLedger is a snapshot's primary assignment: the tailnet-wide
+// primary per prefix and the per-region primaries. Callers compare a
+// ledger taken before a write with the one after to learn whether any
+// viewer's routes moved.
+type PrimaryRouteLedger struct {
+	Global   map[netip.Prefix]types.NodeID
+	Regional map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID
+}
+
+// Equal reports whether both ledgers assign every prefix, tailnet-wide and
+// per region, to the same node.
+func (l PrimaryRouteLedger) Equal(o PrimaryRouteLedger) bool {
+	return maps.Equal(l.Global, o.Global) &&
+		maps.EqualFunc(l.Regional, o.Regional, maps.Equal)
 }
 
 // PeersFunc is a function that takes a list of nodes and returns a map
@@ -419,7 +443,7 @@ func resolveGivenName(nodes map[types.NodeID]types.Node, self types.NodeID, base
 func snapshotFromNodes(
 	nodes map[types.NodeID]types.Node,
 	peersFunc PeersFunc,
-	prevRoutes map[netip.Prefix]types.NodeID,
+	prev PrimaryRouteLedger,
 ) Snapshot {
 	timer := prometheus.NewTimer(nodeStoreSnapshotBuildDuration)
 	defer timer.ObserveDuration()
@@ -429,7 +453,8 @@ func snapshotFromNodes(
 		allNodes = append(allNodes, n.View())
 	}
 
-	routes, isPrimaryRoute := electPrimaryRoutes(nodes, prevRoutes)
+	routes, isPrimaryRoute := electPrimaryRoutes(nodes, prev.Global)
+	regionalRoutes := electRegionalRoutes(nodes, prev.Regional)
 
 	newSnap := Snapshot{
 		nodesByID:         nodes,
@@ -451,6 +476,7 @@ func snapshotFromNodes(
 
 		routes:         routes,
 		isPrimaryRoute: isPrimaryRoute,
+		regionalRoutes: regionalRoutes,
 	}
 
 	// Build nodesByUser, nodesByNodeKey, and nodesByMachineKey maps
@@ -518,7 +544,23 @@ func electPrimaryRoutes(
 	prev map[netip.Prefix]types.NodeID,
 ) (map[netip.Prefix]types.NodeID, map[types.NodeID]bool) {
 	advertisers := onlineAdvertisers(nodes, slices.Sorted(maps.Keys(nodes)))
+	routes := electPrefixes(nodes, advertisers, prev)
 
+	isPrimaryRoute := make(map[types.NodeID]bool, len(routes))
+	for _, id := range routes {
+		isPrimaryRoute[id] = true
+	}
+
+	return routes, isPrimaryRoute
+}
+
+// electPrefixes runs the primary election of [electPrimaryRoutes] over
+// the given advertisers, carrying prev forward where it still holds.
+func electPrefixes(
+	nodes map[types.NodeID]types.Node,
+	advertisers map[netip.Prefix][]types.NodeID,
+	prev map[netip.Prefix]types.NodeID,
+) map[netip.Prefix]types.NodeID {
 	routes := make(map[netip.Prefix]types.NodeID, len(advertisers))
 	for prefix, candidates := range advertisers {
 		if cur, ok := prev[prefix]; ok &&
@@ -559,12 +601,66 @@ func electPrimaryRoutes(
 		}
 	}
 
-	isPrimaryRoute := make(map[types.NodeID]bool, len(routes))
-	for _, id := range routes {
-		isPrimaryRoute[id] = true
+	return routes
+}
+
+// electRegionalRoutes runs the primary election once per DERP region over
+// the region's own advertisers, so a viewer homed in a region with a
+// working router for a prefix is steered to that router rather than the
+// tailnet-wide primary (Tailscale's regional routing). Only prefixes with
+// healthy advertisers in more than one region take part: with every
+// advertiser in one region the tailnet-wide election already answers.
+// Regions are read from each node's preferred DERP; nodes without one
+// belong to no region.
+func electRegionalRoutes(
+	nodes map[types.NodeID]types.Node,
+	prev map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID,
+) map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID {
+	ids := slices.Sorted(maps.Keys(nodes))
+	advertisers := onlineAdvertisers(nodes, ids)
+
+	byRegion := make(map[tailcfg.DERPRegionID]map[netip.Prefix][]types.NodeID)
+
+	for prefix, candidates := range advertisers {
+		regions := make(map[tailcfg.DERPRegionID][]types.NodeID)
+
+		for _, id := range candidates {
+			n := nodes[id]
+
+			// An unhealthy router never holds a region: the region falls
+			// back to the tailnet-wide primary, where the all-unhealthy
+			// rule of [electPrefixes] applies.
+			region := n.DERPRegion()
+			if region == 0 || n.Unhealthy {
+				continue
+			}
+
+			regions[region] = append(regions[region], id)
+		}
+
+		if len(regions) < 2 {
+			continue
+		}
+
+		for region, ids := range regions {
+			if byRegion[region] == nil {
+				byRegion[region] = make(map[netip.Prefix][]types.NodeID)
+			}
+
+			byRegion[region][prefix] = ids
+		}
 	}
 
-	return routes, isPrimaryRoute
+	if len(byRegion) == 0 {
+		return nil
+	}
+
+	regional := make(map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID, len(byRegion))
+	for region, regionAdvertisers := range byRegion {
+		regional[region] = electPrefixes(nodes, regionAdvertisers, prev[region])
+	}
+
+	return regional
 }
 
 // GetNode retrieves a node by its ID.
@@ -762,11 +858,73 @@ func (s *NodeStore) IsNodeHealthy(id types.NodeID) bool {
 	return !n.Unhealthy
 }
 
-// PrimaryRoutes returns the snapshot's prefix→primary map. The map is
-// owned by the snapshot and must not be mutated; it is safe to read
-// concurrently because snapshots are immutable once published.
-func (s *NodeStore) PrimaryRoutes() map[netip.Prefix]types.NodeID {
-	return s.data.Load().routes
+// PrimaryRoutesForNodeAs returns the prefixes for which id is the primary
+// advertiser as seen from a viewer homed in the given DERP region: the
+// region's own primary where the region has one, the tailnet-wide primary
+// elsewhere. Region 0 (unknown) sees the tailnet-wide assignment.
+func (s *NodeStore) PrimaryRoutesForNodeAs(id types.NodeID, region tailcfg.DERPRegionID) []netip.Prefix {
+	snap := s.data.Load()
+
+	regional := snap.regionalRoutes[region]
+	if len(regional) == 0 {
+		return s.PrimaryRoutesForNode(id)
+	}
+
+	out := make([]netip.Prefix, 0)
+
+	for prefix, nodeID := range snap.routes {
+		if local, ok := regional[prefix]; ok {
+			nodeID = local
+		}
+
+		if nodeID == id {
+			out = append(out, prefix)
+		}
+	}
+
+	return out
+}
+
+// RegionalRoutesDiffer reports whether a viewer moving from one DERP
+// region to another would be steered to a different router for any
+// prefix, so the caller knows when the move needs the viewer's peers
+// rebuilt.
+func (s *NodeStore) RegionalRoutesDiffer(from, to tailcfg.DERPRegionID) bool {
+	snap := s.data.Load()
+	if len(snap.regionalRoutes) == 0 || from == to {
+		return false
+	}
+
+	for prefix, global := range snap.routes {
+		before, ok := snap.regionalRoutes[from][prefix]
+		if !ok {
+			before = global
+		}
+
+		after, ok := snap.regionalRoutes[to][prefix]
+		if !ok {
+			after = global
+		}
+
+		if before != after {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ledger returns the snapshot's primary assignment.
+func (snap *Snapshot) ledger() PrimaryRouteLedger {
+	return PrimaryRouteLedger{Global: snap.routes, Regional: snap.regionalRoutes}
+}
+
+// PrimaryRoutes returns the snapshot's primary assignment, tailnet-wide
+// and per region. The maps are owned by the snapshot and must not be
+// mutated; they are safe to read concurrently because snapshots are
+// immutable once published.
+func (s *NodeStore) PrimaryRoutes() PrimaryRouteLedger {
+	return s.data.Load().ledger()
 }
 
 // PrimaryRoutesString renders the snapshot's prefix→primary map for
@@ -787,6 +945,17 @@ func (s *NodeStore) PrimaryRoutesString() string {
 	var b strings.Builder
 	for _, p := range prefixes {
 		fmt.Fprintf(&b, "%s: %d\n", p, snap.routes[p])
+	}
+
+	for _, region := range slices.Sorted(maps.Keys(snap.regionalRoutes)) {
+		regional := snap.regionalRoutes[region]
+
+		regionPrefixes := slices.Collect(maps.Keys(regional))
+		slices.SortFunc(regionPrefixes, netip.Prefix.Compare)
+
+		for _, p := range regionPrefixes {
+			fmt.Fprintf(&b, "%s in DERP region %d: %d\n", p, region, regional[p])
+		}
 	}
 
 	return b.String()
@@ -930,7 +1099,7 @@ func (s *NodeStore) applyBatch(batch []work) {
 	}
 
 	prev := s.data.Load()
-	newSnap := snapshotFromNodes(nodes, s.peersFunc, prev.routes)
+	newSnap := snapshotFromNodes(nodes, s.peersFunc, prev.ledger())
 	s.data.Store(&newSnap)
 
 	// Update node count gauge

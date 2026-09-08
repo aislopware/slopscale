@@ -14,7 +14,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"net/netip"
 	"slices"
 	"strconv"
@@ -671,7 +670,7 @@ func (s *State) Connect(id types.NodeID) ([]change.Change, uint64) {
 
 	log.Info().EmbedObject(node).Msg("node connected")
 
-	if !maps.Equal(prevRoutes, s.nodeStore.PrimaryRoutes()) {
+	if !prevRoutes.Equal(s.nodeStore.PrimaryRoutes()) {
 		c = append(c, change.NodeAdded(id))
 	}
 
@@ -1058,7 +1057,7 @@ func (s *State) SetApprovedRoutes(nodeID types.NodeID, routes []netip.Prefix) (t
 
 	// PolicyChange fans out a fresh netmap whenever the new approved
 	// set shifted a primary advertiser.
-	routeChange := !maps.Equal(prevRoutes, s.nodeStore.PrimaryRoutes())
+	routeChange := !prevRoutes.Equal(s.nodeStore.PrimaryRoutes())
 	if routeChange || !c.IsFull() {
 		c = change.PolicyChange()
 	}
@@ -1318,7 +1317,7 @@ func (s *State) RoutesForPeer(
 	matchers []matcher.Match,
 ) []netip.Prefix {
 	viaResult := s.polMan.ViaRoutesForPeer(viewer, peer)
-	globalPrimaries := s.nodeStore.PrimaryRoutesForNode(peer.ID())
+	globalPrimaries := s.nodeStore.PrimaryRoutesForNodeAs(peer.ID(), viewerDERPRegion(viewer))
 	exitRoutes := peer.ExitRoutes()
 
 	var reduced []netip.Prefix
@@ -1381,6 +1380,20 @@ func (s *State) RoutesForPeer(
 	return s.networkRoutesFor(viewer, peer, reduced)
 }
 
+// viewerDERPRegion returns the DERP region a viewer is homed in, or 0.
+func viewerDERPRegion(viewer types.NodeView) tailcfg.DERPRegionID {
+	if !viewer.Valid() {
+		return 0
+	}
+
+	hi := viewer.Hostinfo()
+	if !hi.Valid() || !hi.NetInfo().Valid() {
+		return 0
+	}
+
+	return hi.NetInfo().PreferredDERP()
+}
+
 // PrimaryRoutesString renders the current prefix→primary assignment
 // for diagnostics.
 func (s *State) PrimaryRoutesString() string {
@@ -1432,7 +1445,7 @@ func (s *State) BatchSetNodeHealth(updates map[types.NodeID]bool) bool {
 
 	s.nodeStore.UpdateNodes(fns)
 
-	return !maps.Equal(prevRoutes, s.nodeStore.PrimaryRoutes())
+	return !prevRoutes.Equal(s.nodeStore.PrimaryRoutes())
 }
 
 // healthSetter returns an UpdateNodeFunc that flips n.Unhealthy to
@@ -2493,6 +2506,7 @@ func (s *State) UpdateNodeFromMapRequest(
 		endpointChanged    bool
 		derpChanged        bool
 		persistWorthy      bool
+		prevRegion         tailcfg.DERPRegionID
 	)
 	// Snapshot the primary assignment so we can tell whether the
 	// Hostinfo + auto-approval that follows shifted any prefix.
@@ -2511,6 +2525,7 @@ func (s *State) UpdateNodeFromMapRequest(
 		endpointChanged = peerChange.Endpoints != nil &&
 			endpointBroadcastWorthy(currentNode.Endpoints, req.Endpoints, req.EndpointTypes)
 		derpChanged = peerChange.DERPRegion != 0
+		prevRegion = currentNode.DERPRegion()
 		hostinfoChanged = !hostinfoEqual(currentNode.View(), req.Hostinfo)
 
 		// Get the correct NetInfo to use
@@ -2646,7 +2661,7 @@ func (s *State) UpdateNodeFromMapRequest(
 	// snapshot diff catches that.
 	nodeRouteChange := change.Change{}
 
-	if !maps.Equal(prevRoutes, s.nodeStore.PrimaryRoutes()) {
+	if !prevRoutes.Equal(s.nodeStore.PrimaryRoutes()) {
 		log.Debug().
 			Caller().
 			Uint64(zf.NodeID, id.Uint64()).
@@ -2670,6 +2685,17 @@ func (s *State) UpdateNodeFromMapRequest(
 		if err != nil {
 			return change.Change{}, fmt.Errorf("saving to database: %w", err)
 		}
+	}
+
+	// A node that moved to another DERP region may be steered to other
+	// subnet routers under regional routing; its own peers must then be
+	// rebuilt, which only a policy change from the node does (a plain
+	// node-added change sends the origin its self node alone).
+	if derpChanged && s.nodeStore.RegionalRoutesDiffer(prevRegion, viewerDERPRegion(updatedNode)) {
+		c := change.PolicyChange()
+		c.OriginNode = id
+
+		return c.Merge(policyChange), nil
 	}
 
 	if !policyChange.IsEmpty() {

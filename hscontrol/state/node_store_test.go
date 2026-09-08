@@ -154,7 +154,7 @@ func TestSnapshotFromNodes(t *testing.T) {
 			t.Parallel()
 
 			nodes, peersFunc := tt.setupFunc()
-			snapshot := snapshotFromNodes(nodes, peersFunc, nil)
+			snapshot := snapshotFromNodes(nodes, peersFunc, PrimaryRouteLedger{})
 			tt.validate(t, nodes, snapshot)
 		})
 	}

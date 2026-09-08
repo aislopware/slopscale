@@ -247,8 +247,23 @@ func (s *State) DebugRoutes() types.DebugRoutes {
 		debug.AvailableRoutes[nv.ID()] = approved
 	}
 
-	for prefix, id := range s.nodeStore.PrimaryRoutes() {
+	ledger := s.nodeStore.PrimaryRoutes()
+	for prefix, id := range ledger.Global {
 		debug.PrimaryRoutes[prefix.String()] = id
+	}
+
+	for region, routes := range ledger.Regional {
+		for prefix, id := range routes {
+			if debug.RegionalPrimaryRoutes == nil {
+				debug.RegionalPrimaryRoutes = make(map[tailcfg.DERPRegionID]map[string]types.NodeID)
+			}
+
+			if debug.RegionalPrimaryRoutes[region] == nil {
+				debug.RegionalPrimaryRoutes[region] = make(map[string]types.NodeID)
+			}
+
+			debug.RegionalPrimaryRoutes[region][prefix.String()] = id
+		}
 	}
 
 	var unhealthy []types.NodeID
@@ -337,7 +352,7 @@ func (s *State) DebugOverviewJSON() DebugOverviewInfo {
 	}
 
 	// Route information
-	info.PrimaryRoutes = len(s.nodeStore.PrimaryRoutes())
+	info.PrimaryRoutes = len(s.nodeStore.PrimaryRoutes().Global)
 
 	return info
 }

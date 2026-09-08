@@ -318,6 +318,16 @@ func (node *Node) HasIP(i netip.Addr) bool {
 	return slices.Contains(node.IPs(), i)
 }
 
+// DERPRegion returns the DERP region the node reported as its home, or 0
+// when it has not reported one.
+func (node *Node) DERPRegion() tailcfg.DERPRegionID {
+	if node.Hostinfo == nil || node.Hostinfo.NetInfo == nil {
+		return 0
+	}
+
+	return node.Hostinfo.NetInfo.PreferredDERP
+}
+
 // IsTagged reports if a device is tagged and therefore should not be treated
 // as a user-owned device.
 // When a node has tags, the tags define its identity (not the user).

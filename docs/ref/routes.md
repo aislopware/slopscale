@@ -332,6 +332,15 @@ availability](https://tailscale.com/docs/how-to/set-up-high-availability#subnet-
 This feature is enabled by default when at least two nodes advertise the same prefix. See the configuration options
 `node.routes.ha` in the [configuration file](configuration.md) for details.
 
+### Regional routing
+
+When the routers for a prefix sit in different DERP regions, headscale steers each client to the router that shares
+its region, as Tailscale's [regional routing](https://tailscale.com/blog/regional-routing) does. A region is the DERP
+region a node reports as its home, so it needs no configuration beyond a [DERP map](derp.md) with more than one
+region. A client whose region has no healthy router for the prefix, or that has not reported a region, uses the
+tailnet-wide primary, which is the lowest node ID among the healthy routers. A client that changes region is steered
+again. The `/debug/routes` endpoint lists the per-region primaries next to the tailnet-wide ones.
+
 ## Troubleshooting
 
 ### Enable IP forwarding

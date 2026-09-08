@@ -262,7 +262,7 @@ func checkPrimariesProperties(
 	// Structural invariants on the live snapshot, independent of the
 	// model. These catch shapes the model alone cannot — e.g. an owner
 	// that is offline but still has the prefix attributed to it.
-	snapshotPrimaries := ns.PrimaryRoutes()
+	snapshotPrimaries := ns.PrimaryRoutes().Global
 
 	// A primary that owns ≥1 prefix in `routes` must also light up
 	// `isPrimaryRoute` (PrimaryRoutesForNode returns nil unless the
@@ -382,7 +382,7 @@ func nodeForRapid(id types.NodeID) types.Node {
 // prefix→primary map so the caller can compare against a later
 // snapshot without aliasing the live map.
 func snapshotPrimariesCopy(ns *NodeStore) map[netip.Prefix]types.NodeID {
-	live := ns.PrimaryRoutes()
+	live := ns.PrimaryRoutes().Global
 
 	out := make(map[netip.Prefix]types.NodeID, len(live))
 	maps.Copy(out, live)
