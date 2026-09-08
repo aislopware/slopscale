@@ -17,14 +17,20 @@ export function Section({
   children,
   className,
   bodyClassName,
+  panel = true,
 }: {
   readonly title: ReactNode;
   readonly description?: ReactNode;
   readonly actions?: ReactNode;
   readonly children: ReactNode;
   readonly className?: string;
-  /** Classes for the panel; pass `p-0` for tables and lists that draw their own edges. */
+  /** Classes for the panel; pass `p-0` for lists that draw their own edges. */
   readonly bodyClassName?: string;
+  /**
+   * Whether the children go in a panel. A `frameTableClass` table draws the panel on its own body,
+   * so it goes straight on the band, with its header as the band's last line.
+   */
+  readonly panel?: boolean;
 }): ReactElement {
   return (
     <Frame className={className}>
@@ -41,7 +47,7 @@ export function Section({
           <div className="flex min-h-lh shrink-0 items-center gap-2">{actions}</div>
         )}
       </FrameBand>
-      <FramePanel className={bodyClassName}>{children}</FramePanel>
+      {panel ? <FramePanel className={bodyClassName}>{children}</FramePanel> : children}
     </Frame>
   );
 }

@@ -46,6 +46,7 @@ export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
       title="Map machines receive"
       description="Every region after merging the sources, the relays you run and the embedded relay. A machine measures its latency to each region and keeps the closest one as home."
       bodyClassName="p-0"
+      panel={regions.length === 0}
       {...(derp.regions.length === 0
         ? {}
         : {

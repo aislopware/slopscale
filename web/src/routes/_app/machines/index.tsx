@@ -113,30 +113,30 @@ function MachinesPage(): ReactElement {
   return (
     <>
       <PageHeader title="Machines" meta={summary(machines)} />
+      <MachinesToolbar
+        me={me}
+        query={view.query}
+        onAddMachine={addMachine}
+        status={view.status}
+        user={view.user}
+        users={users.data?.users}
+        tags={tagOptions(machines)}
+        tag={view.tag}
+        counts={statusCounts(machines)}
+        onQueryChange={(value) => {
+          setFilters({ ...view, query: value }, true);
+        }}
+        onStatusChange={(value) => {
+          setFilters({ ...view, status: value });
+        }}
+        onUserChange={(value) => {
+          setFilters({ ...view, user: value });
+        }}
+        onTagChange={(value) => {
+          setFilters({ ...view, tag: value });
+        }}
+      />
       <Frame>
-        <MachinesToolbar
-          me={me}
-          query={view.query}
-          onAddMachine={addMachine}
-          status={view.status}
-          user={view.user}
-          users={users.data?.users}
-          tags={tagOptions(machines)}
-          tag={view.tag}
-          counts={statusCounts(machines)}
-          onQueryChange={(value) => {
-            setFilters({ ...view, query: value }, true);
-          }}
-          onStatusChange={(value) => {
-            setFilters({ ...view, status: value });
-          }}
-          onUserChange={(value) => {
-            setFilters({ ...view, user: value });
-          }}
-          onTagChange={(value) => {
-            setFilters({ ...view, tag: value });
-          }}
-        />
         <FilterChips
           chips={machineChips(view, users.data?.users, setFilters)}
           onClearAll={clearFilters}

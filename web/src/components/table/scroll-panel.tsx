@@ -13,7 +13,10 @@ export interface TableScrollProps {
    * draw its edge only while something is scrolled behind it.
    */
   readonly children: (overflowing: boolean) => ReactNode;
-  /** Rendered inside the panel but outside the scroll container, such as an empty state. */
+  /**
+   * Rendered as a panel under the header, outside the scroll container: the empty state a table
+   * with no rows shows where its rows would be.
+   */
   readonly below?: ReactNode;
   /**
    * Whether the rows scroll inside the panel with the header pinned to the top, from `lg` up: a
@@ -26,10 +29,11 @@ export interface TableScrollProps {
 }
 
 /**
- * The scroll container a table sits in. It lives inside the panel rather than being the panel, so
- * the table's header sticks to the top of the rows rather than to the page, and anything below it
- * stays put however far the columns run. The edge a column ran past is faded, so a table that
- * scrolls sideways looks like it does.
+ * The scroll container a `frameTableClass` table sits in, on the band of a Frame. The table draws
+ * the panel on its own body, so this is not a panel: the header sticks to the top of the container
+ * on the band's tint and the rows scroll under it. Anything below stays put however far the columns
+ * run, and the edge a column ran past is faded, so a table that scrolls sideways looks like it
+ * does.
  */
 export function TableScroll({
   children,
@@ -44,19 +48,10 @@ export function TableScroll({
       <div ref={ref} className={cn("overflow-auto", scroll && scrollHeightClass)}>
         {children(edges.left || edges.right)}
       </div>
-      {below}
+      {below === null || below === undefined ? null : <FramePanel>{below}</FramePanel>}
       {edges.left ? <ScrollFade side="left" /> : null}
       {edges.right && !pinnedRight ? <ScrollFade side="right" /> : null}
     </div>
-  );
-}
-
-/** A `TableScroll` as the panel of a Frame, which is how a table page draws its table. */
-export function TableScrollPanel(props: TableScrollProps): ReactElement {
-  return (
-    <FramePanel>
-      <TableScroll {...props} />
-    </FramePanel>
   );
 }
 

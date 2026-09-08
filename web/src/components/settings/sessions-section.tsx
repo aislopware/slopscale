@@ -40,6 +40,7 @@ export function ConsoleSessionsSection({ me }: { readonly me: Me }): ReactElemen
       description="Browsers signed in to this console. Ending a session signs its browser out on its next request."
       actions={<SignOutEverywhere me={me} count={rows.length} />}
       bodyClassName="p-0"
+      panel={sessions.isPending || sessions.isError || rows.length === 0}
     >
       <SessionsBody
         sessions={sessions.isPending ? undefined : rows}

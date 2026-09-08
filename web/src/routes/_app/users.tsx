@@ -123,30 +123,30 @@ function UsersPage(): ReactElement {
   return (
     <>
       <PageHeader title="Users" meta={describe(total, pending)} />
+      <TableToolbar
+        actions={
+          <>
+            <InviteUserButton me={me} />
+            <AddUserButton me={me} />
+          </>
+        }
+      >
+        <SearchInput
+          value={text}
+          placeholder="Search by name, email or role"
+          onValueChange={handleSearchChange}
+        />
+        <Tabs
+          variant="segmented"
+          tabs={countedTabs(
+            filterTabs,
+            (value) => users.data.users.filter((user) => matchesFilter(user, value)).length,
+          )}
+          value={filter}
+          onValueChange={handleFilterChange}
+        />
+      </TableToolbar>
       <Frame>
-        <TableToolbar
-          actions={
-            <>
-              <InviteUserButton me={me} />
-              <AddUserButton me={me} />
-            </>
-          }
-        >
-          <SearchInput
-            value={text}
-            placeholder="Search by name, email or role"
-            onValueChange={handleSearchChange}
-          />
-          <Tabs
-            variant="segmented"
-            tabs={countedTabs(
-              filterTabs,
-              (value) => users.data.users.filter((user) => matchesFilter(user, value)).length,
-            )}
-            value={filter}
-            onValueChange={handleFilterChange}
-          />
-        </TableToolbar>
         <table.AppTable>
           <DataTable
             empty={

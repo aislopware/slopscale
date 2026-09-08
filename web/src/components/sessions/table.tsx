@@ -22,7 +22,7 @@ import {
 import type { RecordingState } from "~/components/sessions/model.ts";
 import { useDeleteRecording } from "~/components/sessions/mutations.ts";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
-import { TableScrollPanel } from "~/components/table/scroll-panel.tsx";
+import { TableScroll } from "~/components/table/scroll-panel.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
@@ -143,7 +143,7 @@ export function SessionsTable({
 }: SessionsTableProps): ReactElement {
   return (
     <>
-      <TableScrollPanel pinnedRight>
+      <TableScroll pinnedRight>
         {(overflowing) => (
           <Table className={frameTableClass}>
             <Table.Header variant="compact" sticky>
@@ -179,7 +179,7 @@ export function SessionsTable({
             </Table.Body>
           </Table>
         )}
-      </TableScrollPanel>
+      </TableScroll>
       <Paging
         count={recordings.length}
         hasMore={hasMore}

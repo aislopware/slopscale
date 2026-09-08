@@ -48,7 +48,7 @@ export function RoutesTab({
   const pending = rows.filter((row) => row.status === "pending").length;
 
   return (
-    <Frame>
+    <>
       <TableToolbar>
         <SearchInput
           value={search}
@@ -56,44 +56,46 @@ export function RoutesTab({
           onValueChange={onSearchChange}
         />
       </TableToolbar>
-      <table.AppTable>
-        <DataTable
-          empty={
-            total === 0 ? (
-              <Empty
-                className={tableEmptyClass}
-                size="sm"
-                icon={<SignpostIcon size={emptyIconSize} />}
-                title="Nothing advertised"
-                description="No machine advertises a subnet or offers itself as an exit node. Run tailscale set --advertise-routes or --advertise-exit-node on one."
-              />
-            ) : (
-              <Empty
-                className={tableEmptyClass}
-                size="sm"
-                title="No routes match"
-                description="No route matches this search."
-                contents={
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      onSearchChange("");
-                    }}
-                  >
-                    Clear search
-                  </Button>
-                }
-              />
-            )
-          }
-          footer={
-            total === 0 ? undefined : (
-              <TableFooter>{`Showing ${shown} of ${countRoutes(total)} · ${pending} pending`}</TableFooter>
-            )
-          }
-        />
-      </table.AppTable>
-    </Frame>
+      <Frame>
+        <table.AppTable>
+          <DataTable
+            empty={
+              total === 0 ? (
+                <Empty
+                  className={tableEmptyClass}
+                  size="sm"
+                  icon={<SignpostIcon size={emptyIconSize} />}
+                  title="Nothing advertised"
+                  description="No machine advertises a subnet or offers itself as an exit node. Run tailscale set --advertise-routes or --advertise-exit-node on one."
+                />
+              ) : (
+                <Empty
+                  className={tableEmptyClass}
+                  size="sm"
+                  title="No routes match"
+                  description="No route matches this search."
+                  contents={
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        onSearchChange("");
+                      }}
+                    >
+                      Clear search
+                    </Button>
+                  }
+                />
+              )
+            }
+            footer={
+              total === 0 ? undefined : (
+                <TableFooter>{`Showing ${shown} of ${countRoutes(total)} · ${pending} pending`}</TableFooter>
+              )
+            }
+          />
+        </table.AppTable>
+      </Frame>
+    </>
   );
 }
 

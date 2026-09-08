@@ -337,8 +337,9 @@ opens a search over pages, machines and users, and every table filters in
 place. _Add machine_ hands over the join command per platform (Linux, macOS,
 Windows, Docker, the phone apps) with a QR code carrying the same line, so a
 machine without a shared clipboard can scan it. Panels, tables and dialogs
-are framed: a tinted band carries the title, the filters or the row count, and
-the content sits on an inset panel with concentric corners. Copyable values
+are framed: a tinted band carries the title, the column headers or the row
+count, and the content sits on an inset panel with concentric corners; a
+table's search, filters and primary action sit on the page above its frame. Copyable values
 keep their copy icon in view. There is a dark mode. It signs
 in only through the configured identity
 provider (Google, or any OIDC issuer) and shows what that user's role allows.

@@ -61,27 +61,27 @@ export function RulesTab({
   return (
     <>
       <StateBanner enabled={enabled} policyFileEnforces={policyFileEnforces} />
+      <TableToolbar
+        actions={
+          <Button
+            variant="primary"
+            icon={PlusIcon}
+            disabled={!canEdit}
+            onClick={() => {
+              setCreating(true);
+            }}
+          >
+            New rule
+          </Button>
+        }
+      >
+        <SearchInput
+          value={search}
+          placeholder="Search by name, group or protocol"
+          onValueChange={onSearchChange}
+        />
+      </TableToolbar>
       <Frame>
-        <TableToolbar
-          actions={
-            <Button
-              variant="primary"
-              icon={PlusIcon}
-              disabled={!canEdit}
-              onClick={() => {
-                setCreating(true);
-              }}
-            >
-              New rule
-            </Button>
-          }
-        >
-          <SearchInput
-            value={search}
-            placeholder="Search by name, group or protocol"
-            onValueChange={onSearchChange}
-          />
-        </TableToolbar>
         <table.AppTable>
           <DataTable
             empty={

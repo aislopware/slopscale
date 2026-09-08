@@ -17,7 +17,7 @@ import {
 } from "~/components/audit/cells.tsx";
 import { plural } from "~/components/overview/plural.ts";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
-import { TableScrollPanel } from "~/components/table/scroll-panel.tsx";
+import { TableScroll } from "~/components/table/scroll-panel.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
@@ -90,11 +90,13 @@ function EventRows({
           />
         </Table.Cell>
       </Table.Row>
-      <Table.Row variant="selected" className={open ? undefined : "hidden"}>
-        <Table.Cell colSpan={columnCount} className="p-0">
-          {open ? <EventDetail event={event} /> : null}
-        </Table.Cell>
-      </Table.Row>
+      {open ? (
+        <Table.Row variant="selected">
+          <Table.Cell colSpan={columnCount} className="p-0">
+            <EventDetail event={event} />
+          </Table.Cell>
+        </Table.Row>
+      ) : null}
     </>
   );
 }
@@ -130,7 +132,7 @@ export function EventsTable({
 
   return (
     <>
-      <TableScrollPanel pinnedRight>
+      <TableScroll pinnedRight>
         {(overflowing) => (
           // Fixed layout: every column but Summary has a set width, so Summary takes what is left
           // of the panel and its chips wrap inside it instead of stretching the table past the
@@ -175,7 +177,7 @@ export function EventsTable({
             </Table.Body>
           </Table>
         )}
-      </TableScrollPanel>
+      </TableScroll>
       <Paging
         count={events.length}
         hasMore={hasMore}

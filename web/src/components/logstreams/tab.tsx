@@ -47,27 +47,27 @@ export function LogStreamsTab({
 
   return (
     <>
+      <TableToolbar
+        actions={
+          <Button
+            variant="primary"
+            icon={PlusIcon}
+            disabled={!canEdit}
+            onClick={() => {
+              setCreating(true);
+            }}
+          >
+            New log stream
+          </Button>
+        }
+      >
+        <SearchInput
+          value={search}
+          placeholder="Search by name, URL or destination"
+          onValueChange={onSearchChange}
+        />
+      </TableToolbar>
       <Frame>
-        <TableToolbar
-          actions={
-            <Button
-              variant="primary"
-              icon={PlusIcon}
-              disabled={!canEdit}
-              onClick={() => {
-                setCreating(true);
-              }}
-            >
-              New log stream
-            </Button>
-          }
-        >
-          <SearchInput
-            value={search}
-            placeholder="Search by name, URL or destination"
-            onValueChange={onSearchChange}
-          />
-        </TableToolbar>
         <table.AppTable>
           <DataTable
             empty={

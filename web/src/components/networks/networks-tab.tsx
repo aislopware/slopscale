@@ -59,27 +59,27 @@ export function NetworksTab({
 
   return (
     <>
+      <TableToolbar
+        actions={
+          <Button
+            variant="primary"
+            icon={PlusIcon}
+            disabled={!canEdit}
+            onClick={() => {
+              setCreating(true);
+            }}
+          >
+            New network
+          </Button>
+        }
+      >
+        <SearchInput
+          value={search}
+          placeholder="Search by name, prefix, router or group"
+          onValueChange={onSearchChange}
+        />
+      </TableToolbar>
       <Frame>
-        <TableToolbar
-          actions={
-            <Button
-              variant="primary"
-              icon={PlusIcon}
-              disabled={!canEdit}
-              onClick={() => {
-                setCreating(true);
-              }}
-            >
-              New network
-            </Button>
-          }
-        >
-          <SearchInput
-            value={search}
-            placeholder="Search by name, prefix, router or group"
-            onValueChange={onSearchChange}
-          />
-        </TableToolbar>
         <table.AppTable>
           <DataTable
             empty={

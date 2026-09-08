@@ -54,27 +54,27 @@ export function PosturesTab({
 
   return (
     <>
+      <TableToolbar
+        actions={
+          <Button
+            variant="primary"
+            icon={PlusIcon}
+            disabled={!canEdit}
+            onClick={() => {
+              setCreating(true);
+            }}
+          >
+            New posture
+          </Button>
+        }
+      >
+        <SearchInput
+          value={search}
+          placeholder="Search by name, description or expression"
+          onValueChange={onSearchChange}
+        />
+      </TableToolbar>
       <Frame>
-        <TableToolbar
-          actions={
-            <Button
-              variant="primary"
-              icon={PlusIcon}
-              disabled={!canEdit}
-              onClick={() => {
-                setCreating(true);
-              }}
-            >
-              New posture
-            </Button>
-          }
-        >
-          <SearchInput
-            value={search}
-            placeholder="Search by name, description or expression"
-            onValueChange={onSearchChange}
-          />
-        </TableToolbar>
         <table.AppTable>
           <DataTable
             empty={

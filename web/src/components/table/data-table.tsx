@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import { useTableContext } from "~/components/table/app-table.tsx";
-import { TableScrollPanel } from "~/components/table/scroll-panel.tsx";
+import { TableScroll } from "~/components/table/scroll-panel.tsx";
 import {
   FrameBand,
   frameTableClass,
@@ -70,7 +70,7 @@ export function DataTable({
 
   return (
     <>
-      <TableScrollPanel
+      <TableScroll
         scroll={scroll}
         pinnedRight={pinnedRight}
         below={rows.length === 0 ? empty : null}
@@ -146,7 +146,7 @@ export function DataTable({
             </Table.Body>
           </Table>
         )}
-      </TableScrollPanel>
+      </TableScroll>
       <PageBand fallback={footer} />
     </>
   );

@@ -113,44 +113,44 @@ function AuditPage(): ReactElement {
         description="Who changed what through the API and the console."
       />
       <AuditStats events={rows} />
+      <TableToolbar actions={<ExportMenu filters={filtersOf(search)} />}>
+        <SearchInput
+          value={search.action}
+          placeholder="Filter by action"
+          onValueChange={(value) => {
+            void navigate({
+              search: (previous) => ({ ...previous, action: value }),
+              replace: true,
+            });
+          }}
+        />
+        <Tabs
+          variant="segmented"
+          aria-label="Time range"
+          tabs={rangeTabs}
+          value={search.since}
+          onValueChange={(value) => {
+            void navigate({
+              search: (previous) => ({
+                ...previous,
+                since: isRange(value) ? value : defaultRange,
+              }),
+            });
+          }}
+        />
+        {users.data === undefined ? null : (
+          <Select
+            aria-label="Filter by user"
+            className="w-44"
+            value={search.actor}
+            items={userOptions(users.data.users)}
+            onValueChange={(value) => {
+              void navigate({ search: (previous) => ({ ...previous, actor: value ?? "" }) });
+            }}
+          />
+        )}
+      </TableToolbar>
       <Frame>
-        <TableToolbar actions={<ExportMenu filters={filtersOf(search)} />}>
-          <SearchInput
-            value={search.action}
-            placeholder="Filter by action"
-            onValueChange={(value) => {
-              void navigate({
-                search: (previous) => ({ ...previous, action: value }),
-                replace: true,
-              });
-            }}
-          />
-          <Tabs
-            variant="segmented"
-            aria-label="Time range"
-            tabs={rangeTabs}
-            value={search.since}
-            onValueChange={(value) => {
-              void navigate({
-                search: (previous) => ({
-                  ...previous,
-                  since: isRange(value) ? value : defaultRange,
-                }),
-              });
-            }}
-          />
-          {users.data === undefined ? null : (
-            <Select
-              aria-label="Filter by user"
-              className="w-44"
-              value={search.actor}
-              items={userOptions(users.data.users)}
-              onValueChange={(value) => {
-                void navigate({ search: (previous) => ({ ...previous, actor: value ?? "" }) });
-              }}
-            />
-          )}
-        </TableToolbar>
         <EventsTable
           events={rows}
           filtered={isFiltered(search)}

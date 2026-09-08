@@ -46,22 +46,39 @@ export function FramePanel({
 }
 
 /**
- * A table drawn as the panel of a Frame. Its outer cells step in to 20px, where the text of a band
- * row and of a `SectionRow` starts, so the first column lines up with the title above it while the
- * columns between keep Kumo's 12px. A cell that spans the row, such as an expanded row or an empty
- * state, keeps the padding its own class asks for.
+ * A table that sits on the band of a Frame and draws the panel itself, on its body. The header row
+ * is the band's last line: the band's tint and no edge of its own. The body rows carry the panel's
+ * ring and radius through their cell borders, since a row group cannot draw one, so the panel
+ * starts at the first row, the way a Section's title sits above its rows. Borders are separate so a
+ * cell can own a corner. Its outer cells step in to 20px, where the text of a band row and of a
+ * `SectionRow` starts, so the first column lines up with the title above it while the columns
+ * between keep Kumo's 12px. A cell that spans the row, such as an expanded row, keeps the padding
+ * its own class asks for.
  */
-export const frameTableClass =
-  "[&_td:first-child:not([colspan])]:pl-5 [&_th:first-child]:pl-5 [&_td:last-child:not([colspan])]:pr-5 [&_th:last-child]:pr-5";
+export const frameTableClass = cn(
+  "border-separate border-spacing-0",
+  "[&_th]:border-b-0 [&_th]:bg-kumo-elevated",
+  "[&_td]:border-b [&_td]:border-kumo-hairline",
+  "[&_td:first-child]:border-l [&_td:first-child]:border-l-kumo-line",
+  "[&_td:last-child]:border-r [&_td:last-child]:border-r-kumo-line",
+  "[&_tbody>tr:first-child>td]:border-t [&_tbody>tr:first-child>td]:border-t-kumo-line",
+  "[&_tbody>tr:last-child>td]:border-b-kumo-line",
+  "[&_tbody>tr:first-child>td:first-child]:rounded-tl-lg",
+  "[&_tbody>tr:first-child>td:last-child]:rounded-tr-lg",
+  "[&_tbody>tr:last-child>td:first-child]:rounded-bl-lg",
+  "[&_tbody>tr:last-child>td:last-child]:rounded-br-lg",
+  "[&_td:first-child:not([colspan])]:pl-5 [&_td:last-child:not([colspan])]:pr-5 [&_th:first-child]:pl-5 [&_th:last-child]:pr-5",
+);
 
 /**
- * A body row of a `frameTableClass` table. Kumo's default row variant stripes every second row;
- * these drop the stripe and highlight on hover instead, which is enough to follow one row across a
- * wide table and leaves a sticky column one background to match. The hover rules carry the `even`
- * modifier as well, so they outrank the stripe they replace instead of relying on source order.
+ * A body row of a `frameTableClass` table. The row paints the panel's surface, since the table sits
+ * on the band. Kumo's default row variant stripes every second row; these drop the stripe and
+ * highlight on hover instead, which is enough to follow one row across a wide table and leaves a
+ * sticky column one background to match. The hover rules carry the `even` modifier as well, so they
+ * outrank the stripe they replace instead of relying on source order.
  */
 export const frameTableRowClass =
-  "even:bg-kumo-base even:[--kumo-table-row-bg:var(--color-kumo-base)] hover:bg-kumo-tint hover:[--kumo-table-row-bg:var(--color-kumo-tint)] even:hover:bg-kumo-tint even:hover:[--kumo-table-row-bg:var(--color-kumo-tint)]";
+  "bg-kumo-base [--kumo-table-row-bg:var(--color-kumo-base)] even:bg-kumo-base even:[--kumo-table-row-bg:var(--color-kumo-base)] hover:bg-kumo-tint hover:[--kumo-table-row-bg:var(--color-kumo-tint)] even:hover:bg-kumo-tint even:hover:[--kumo-table-row-bg:var(--color-kumo-tint)]";
 
 /**
  * The edge of a column pinned to the right of a table while something is scrolled behind it: a

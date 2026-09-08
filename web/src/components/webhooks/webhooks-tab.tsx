@@ -49,27 +49,27 @@ export function WebhooksTab({
 
   return (
     <>
+      <TableToolbar
+        actions={
+          <Button
+            variant="primary"
+            icon={PlusIcon}
+            disabled={!canEdit}
+            onClick={() => {
+              setCreating(true);
+            }}
+          >
+            New webhook
+          </Button>
+        }
+      >
+        <SearchInput
+          value={search}
+          placeholder="Search by URL, description, provider or event"
+          onValueChange={onSearchChange}
+        />
+      </TableToolbar>
       <Frame>
-        <TableToolbar
-          actions={
-            <Button
-              variant="primary"
-              icon={PlusIcon}
-              disabled={!canEdit}
-              onClick={() => {
-                setCreating(true);
-              }}
-            >
-              New webhook
-            </Button>
-          }
-        >
-          <SearchInput
-            value={search}
-            placeholder="Search by URL, description, provider or event"
-            onValueChange={onSearchChange}
-          />
-        </TableToolbar>
         <table.AppTable>
           <DataTable
             empty={

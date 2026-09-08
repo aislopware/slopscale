@@ -65,27 +65,27 @@ export function GroupsTab({
 
   return (
     <>
+      <TableToolbar
+        actions={
+          <Button
+            variant="primary"
+            icon={PlusIcon}
+            disabled={!canEdit}
+            onClick={() => {
+              setCreating(true);
+            }}
+          >
+            New group
+          </Button>
+        }
+      >
+        <SearchInput
+          value={search}
+          placeholder="Search by name or description"
+          onValueChange={onSearchChange}
+        />
+      </TableToolbar>
       <Frame>
-        <TableToolbar
-          actions={
-            <Button
-              variant="primary"
-              icon={PlusIcon}
-              disabled={!canEdit}
-              onClick={() => {
-                setCreating(true);
-              }}
-            >
-              New group
-            </Button>
-          }
-        >
-          <SearchInput
-            value={search}
-            placeholder="Search by name or description"
-            onValueChange={onSearchChange}
-          />
-        </TableToolbar>
         <table.AppTable>
           <DataTable
             empty={

@@ -72,7 +72,7 @@ export function RequestsTab({
   const pending = rows.filter((row) => row.status === "pending").length;
 
   return (
-    <Frame>
+    <>
       <TableToolbar>
         <SearchInput
           value={search}
@@ -88,42 +88,44 @@ export function RequestsTab({
           }}
         />
       </TableToolbar>
-      <table.AppTable>
-        <DataTable
-          empty={
-            <Empty
-              className={tableEmptyClass}
-              size="sm"
-              icon={<HandWavingIcon size={emptyIconSize} />}
-              title={filter === "pending" ? "Nothing to decide" : "No requests"}
-              description={
-                filter === "pending"
-                  ? "No request is waiting. Members ask under My access, for groups marked as requestable."
-                  : "No request matches this search."
-              }
-              contents={
-                search === "" ? undefined : (
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      onSearchChange("");
-                    }}
-                  >
-                    Clear search
-                  </Button>
-                )
-              }
-            />
-          }
-          footer={
-            rows.length === 0 ? undefined : (
-              <TableFooter>
-                {`Showing ${shown} of ${rows.length === 1 ? "1 request" : `${rows.length} requests`} · ${pending} pending`}
-              </TableFooter>
-            )
-          }
-        />
-      </table.AppTable>
-    </Frame>
+      <Frame>
+        <table.AppTable>
+          <DataTable
+            empty={
+              <Empty
+                className={tableEmptyClass}
+                size="sm"
+                icon={<HandWavingIcon size={emptyIconSize} />}
+                title={filter === "pending" ? "Nothing to decide" : "No requests"}
+                description={
+                  filter === "pending"
+                    ? "No request is waiting. Members ask under My access, for groups marked as requestable."
+                    : "No request matches this search."
+                }
+                contents={
+                  search === "" ? undefined : (
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        onSearchChange("");
+                      }}
+                    >
+                      Clear search
+                    </Button>
+                  )
+                }
+              />
+            }
+            footer={
+              rows.length === 0 ? undefined : (
+                <TableFooter>
+                  {`Showing ${shown} of ${rows.length === 1 ? "1 request" : `${rows.length} requests`} · ${pending} pending`}
+                </TableFooter>
+              )
+            }
+          />
+        </table.AppTable>
+      </Frame>
+    </>
   );
 }

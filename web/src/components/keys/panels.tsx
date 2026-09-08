@@ -263,7 +263,7 @@ function KeyPanel({
   readonly children: ReactNode;
 }): ReactElement {
   return (
-    <Frame>
+    <>
       <TableToolbar actions={action}>
         <SearchInput
           value={controls.query}
@@ -279,8 +279,8 @@ function KeyPanel({
           />
         )}
       </TableToolbar>
-      {children}
-    </Frame>
+      <Frame>{children}</Frame>
+    </>
   );
 }
 
