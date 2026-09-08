@@ -160,39 +160,66 @@ func (r Change) IsFull() bool {
 		r.IncludeDNS && r.IncludeDomain && r.IncludePolicy
 }
 
+// The categories [Change.Type] reports, the bounded set of values allowed as
+// a Prometheus label. A consumer that resolves one metric per type reads them
+// from [Types].
+const (
+	TypeFull    = "full"
+	TypeSelf    = "self"
+	TypePolicy  = "policy"
+	TypePatch   = "patch"
+	TypePeers   = "peers"
+	TypeConfig  = "config"
+	TypePing    = "ping"
+	TypeUnknown = "unknown"
+)
+
+// Types lists every value [Change.Type] can return. Add a new category here
+// when adding one to [Change.Type].
+var Types = []string{
+	TypeFull,
+	TypeSelf,
+	TypePolicy,
+	TypePatch,
+	TypePeers,
+	TypeConfig,
+	TypePing,
+	TypeUnknown,
+}
+
 // Type returns a categorized type string for metrics.
 // This provides a bounded set of values suitable for Prometheus labels,
 // unlike [Change.Reason] which is free-form text for logging.
 func (r Change) Type() string {
 	if r.IsFull() {
-		return "full"
+		return TypeFull
 	}
 
 	if r.IsSelfOnly() {
-		return "self"
+		return TypeSelf
 	}
 
 	if r.RequiresRuntimePeerComputation {
-		return "policy"
+		return TypePolicy
 	}
 
 	if len(r.PeerPatches) > 0 && len(r.PeersChanged) == 0 && len(r.PeersRemoved) == 0 && !r.SendAllPeers {
-		return "patch"
+		return TypePatch
 	}
 
 	if len(r.PeersChanged) > 0 || len(r.PeersRemoved) > 0 || r.SendAllPeers {
-		return "peers"
+		return TypePeers
 	}
 
 	if r.IncludeDERPMap || r.IncludeDNS || r.IncludeDomain || r.IncludePolicy {
-		return "config"
+		return TypeConfig
 	}
 
 	if r.PingRequest != nil {
-		return "ping"
+		return TypePing
 	}
 
-	return "unknown"
+	return TypeUnknown
 }
 
 // ShouldSendToNode determines if this response should be sent to nodeID.
@@ -226,14 +253,27 @@ func SplitTargetedAndBroadcast(rs []Change) ([]Change, []Change) {
 	return broadcast, targeted
 }
 
-// FilterForNode returns responses that should be sent to the given node.
+// FilterForNode returns the responses in rs that should be sent to the given
+// node. A broadcast batch keeps every change for every node, and that case
+// returns rs itself, so the batcher does not copy the batch once per node.
+// The result may alias rs, so callers must not append to it.
 func FilterForNode(nodeID types.NodeID, rs []Change) []Change {
-	var result []Change
+	drop := slices.IndexFunc(rs, func(r Change) bool { return !r.ShouldSendToNode(nodeID) })
+	if drop < 0 {
+		return rs
+	}
 
-	for _, r := range rs {
+	result := make([]Change, drop, len(rs)-1)
+	copy(result, rs[:drop])
+
+	for _, r := range rs[drop+1:] {
 		if r.ShouldSendToNode(nodeID) {
 			result = append(result, r)
 		}
+	}
+
+	if len(result) == 0 {
+		return nil
 	}
 
 	return result

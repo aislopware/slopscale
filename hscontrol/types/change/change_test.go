@@ -691,3 +691,50 @@ func TestNodeKeyRotatedEmitsPatchNotWholeNode(t *testing.T) {
 	assert.Equal(t, expiry, *patch.KeyExpiry)
 	assert.Equal(t, []netip.AddrPort(node.Endpoints), patch.Endpoints, "patch must carry endpoints")
 }
+
+// TestFilterForNode covers the aliasing contract: a batch every node keeps is
+// returned as-is so the batcher does not copy it once per node, while a batch
+// with a change for another node is filtered into a fresh slice.
+func TestFilterForNode(t *testing.T) {
+	broadcast := []Change{{Reason: "a"}, {Reason: "b"}}
+
+	got := FilterForNode(1, broadcast)
+	assert.Equal(t, broadcast, got)
+	assert.Same(t, &broadcast[0], &got[0], "an unfiltered batch must not be copied")
+
+	mixed := []Change{
+		{Reason: "a"},
+		{Reason: "other", TargetNode: 2},
+		{Reason: "mine", TargetNode: 1},
+		{Reason: "b"},
+	}
+
+	got = FilterForNode(1, mixed)
+	assert.Equal(t, []Change{
+		{Reason: "a"},
+		{Reason: "mine", TargetNode: 1},
+		{Reason: "b"},
+	}, got)
+	assert.Equal(t, "other", mixed[1].Reason, "filtering must not modify the input")
+
+	assert.Nil(t, FilterForNode(1, []Change{{Reason: "other", TargetNode: 2}}))
+	assert.Nil(t, FilterForNode(1, nil))
+}
+
+// TestTypesMatchesChangeType keeps [Types] in sync with [Change.Type], which a
+// consumer reads to resolve one metric per category at startup.
+func TestTypesMatchesChangeType(t *testing.T) {
+	categories := []string{
+		FullUpdate().Type(),
+		SelfUpdate(1).Type(),
+		PolicyChange().Type(),
+		PeerPatched("test", &tailcfg.PeerChange{NodeID: 1}).Type(),
+		PeersChanged("test", 1).Type(),
+		DERPMap().Type(),
+		PingNode(1, &tailcfg.PingRequest{}).Type(),
+		Change{}.Type(),
+	}
+
+	assert.ElementsMatch(t, Types, categories,
+		"Types must list exactly the categories Change.Type returns")
+}
