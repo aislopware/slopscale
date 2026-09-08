@@ -1154,7 +1154,7 @@ func dns() (DNSConfig, error) {
 			return DNSConfig{}, fmt.Errorf("unmarshalling dns extra records: %w", err)
 		}
 
-		dns.ExtraRecords = extraRecords
+		dns.ExtraRecords = NormalizeExtraRecords(extraRecords)
 	}
 
 	return dns, nil

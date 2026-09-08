@@ -135,15 +135,27 @@ func (s DNSSettings) Normalize() DNSSettings {
 	}
 
 	if len(s.ExtraRecords) > 0 {
-		out.ExtraRecords = make([]tailcfg.DNSRecord, 0, len(s.ExtraRecords))
+		out.ExtraRecords = NormalizeExtraRecords(s.ExtraRecords)
+	}
 
-		for _, r := range s.ExtraRecords {
-			out.ExtraRecords = append(out.ExtraRecords, tailcfg.DNSRecord{
-				Name:  normalizeDomain(r.Name),
-				Type:  strings.ToUpper(strings.TrimSpace(r.Type)),
-				Value: strings.TrimSpace(r.Value),
-			})
-		}
+	return out
+}
+
+// NormalizeExtraRecords returns the records with their names lowercased
+// and trailing dots dropped, types uppercased, and whitespace trimmed.
+// The client's resolver matches a query against the record name after
+// lowercasing the query, so a name written as "Printer.fritz.box" never
+// resolves (juanfont/headscale#2782); every path that takes records in,
+// the config file, the watched file and the API, goes through here.
+func NormalizeExtraRecords(records []tailcfg.DNSRecord) []tailcfg.DNSRecord {
+	out := make([]tailcfg.DNSRecord, 0, len(records))
+
+	for _, r := range records {
+		out = append(out, tailcfg.DNSRecord{
+			Name:  normalizeDomain(r.Name),
+			Type:  strings.ToUpper(strings.TrimSpace(r.Type)),
+			Value: strings.TrimSpace(r.Value),
+		})
 	}
 
 	return out

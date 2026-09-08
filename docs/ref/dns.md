@@ -130,6 +130,8 @@ hostname and port combination "http://hostname-in-magic-dns.myvpn.example.com:30
               JSON file containing extra DNS records.
             - Be sure to "sort keys" and produce a stable output in case you generate the JSON file with a script.
               Headscale uses a checksum to detect changes to the file and a stable output avoids unnecessary processing.
+            - Headscale reads the file once it has been left alone for a moment, so a script may write it in several
+              steps. Record names are lowercased on the way in, as a client only matches lowercase names.
 
 1. Verify that DNS records are properly set using the DNS querying tool of your choice:
 

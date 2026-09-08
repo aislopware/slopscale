@@ -9,9 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/cenkalti/backoff/v5"
 	"github.com/fsnotify/fsnotify"
+	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 	"tailscale.com/util/set"
@@ -19,6 +21,13 @@ import (
 
 // ErrPathIsDirectory is returned when a directory path is provided where a file is expected.
 var ErrPathIsDirectory = errors.New("path is a directory, only file is supported")
+
+// extraRecordsSettle is how long the watched file must be quiet before it
+// is read again. An editor or a script writes the file in several steps
+// (truncate, write, rename, chmod), each an event of its own, and reading
+// after the first one sees a partial file that fails to parse
+// (juanfont/headscale#2753).
+const extraRecordsSettle = 100 * time.Millisecond
 
 type ExtraRecordsMan struct {
 	mu      sync.RWMutex
@@ -29,6 +38,10 @@ type ExtraRecordsMan struct {
 	updateCh chan []tailcfg.DNSRecord
 	closeCh  chan struct{}
 	hash     [32]byte
+
+	// settle is armed by a write event and fires once the file has been
+	// quiet for [extraRecordsSettle]; nil until the first event.
+	settle *time.Timer
 }
 
 // NewExtraRecordsManager creates a new [ExtraRecordsMan] and starts watching the file at the given path.
@@ -88,10 +101,19 @@ func (e *ExtraRecordsMan) Records() []tailcfg.DNSRecord {
 }
 
 func (e *ExtraRecordsMan) Run() {
+	// A stopped timer whose channel never fires until the first event
+	// arms it, so the select below needs no nil check.
+	e.settle = time.NewTimer(time.Hour)
+	e.settle.Stop()
+
+	defer e.settle.Stop()
+
 	for {
 		select {
 		case <-e.closeCh:
 			return
+		case <-e.settle.C:
+			e.updateRecords()
 		case event, ok := <-e.watcher.Events:
 			if !ok {
 				log.Error().Caller().Msgf("file watcher event channel closing")
@@ -125,26 +147,34 @@ func (e *ExtraRecordsMan) UpdateCh() <-chan []tailcfg.DNSRecord {
 // handleWatchEvent processes a single fsnotify event for the watched file.
 // It reports whether Run should keep looping; false means the caller must
 // stop the goroutine.
+//
+// An event may carry several operations at once (kqueue reports
+// WRITE|CHMOD for a truncating rewrite), so each is tested as a bit, not
+// as the whole value.
 func (e *ExtraRecordsMan) handleWatchEvent(event fsnotify.Event) bool {
-	switch event.Op {
-	case fsnotify.Create, fsnotify.Write, fsnotify.Chmod:
-		log.Trace().
-			Caller().
-			Str("path", event.Name).
-			Str("op", event.Op.String()).
-			Msg("extra records received filewatch event")
-
-		if event.Name != e.path {
-			return true
-		}
-
-		e.updateRecords()
-
 	// If a file is removed or renamed, fsnotify will lose track of it
 	// and not watch it. We will therefore attempt to re-add it with a backoff.
-	case fsnotify.Remove, fsnotify.Rename:
+	if event.Has(fsnotify.Remove) || event.Has(fsnotify.Rename) {
 		return e.handleWatchRemoveOrRename()
 	}
+
+	if !event.Has(fsnotify.Create) && !event.Has(fsnotify.Write) && !event.Has(fsnotify.Chmod) {
+		return true
+	}
+
+	log.Trace().
+		Caller().
+		Str("path", event.Name).
+		Str("op", event.Op.String()).
+		Msg("extra records received filewatch event")
+
+	if event.Name != e.path {
+		return true
+	}
+
+	// Read once the writer has gone quiet, not on every step of the
+	// write.
+	e.settle.Reset(extraRecordsSettle)
 
 	return true
 }
@@ -285,5 +315,5 @@ func readExtraRecordsFromPath(path string) ([]tailcfg.DNSRecord, [32]byte, error
 
 	hash := sha256.Sum256(b)
 
-	return records, hash, nil
+	return types.NormalizeExtraRecords(records), hash, nil
 }
