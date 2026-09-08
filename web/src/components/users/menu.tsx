@@ -22,13 +22,9 @@ import type { Me } from "~/auth/me.ts";
 import { MembershipDialog } from "~/components/access/membership-dialog.tsx";
 import { groupsOfUser } from "~/components/access/model.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
-import {
-  DeleteUserDialog,
-  EditProfileDialog,
-  RenameUserDialog,
-  RoleDialog,
-} from "~/components/users/dialogs.tsx";
+import { DeleteUserDialog, RenameUserDialog, RoleDialog } from "~/components/users/dialogs.tsx";
 import { useUserMutations } from "~/components/users/mutations.ts";
+import { EditProfileDialog } from "~/components/users/profile-dialog.tsx";
 
 const actionsIconSize = 18;
 

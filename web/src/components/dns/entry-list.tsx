@@ -9,8 +9,10 @@ const iconSize = 16;
 export interface Entry {
   readonly key: string;
   readonly value: ReactNode;
-  /** Shown to the right of the value, before the actions. */
+  /** Shown next to the value, such as a badge saying where it came from. */
   readonly aside?: ReactNode;
+  /** A control for the entry, aligned with the actions column so rows line up. */
+  readonly control?: ReactNode;
   /** Absent when the entry cannot be removed, such as the base domain. */
   readonly onRemove?: (() => void) | undefined;
   readonly removeLabel?: string;
@@ -44,8 +46,17 @@ export function EntryList({
             <span className="min-w-0 font-mono text-sm break-all">{entry.value}</span>
             {entry.aside}
           </div>
-          {canEdit && entry.onRemove !== undefined ? (
-            <RemoveButton label={entry.removeLabel ?? "Remove"} disabled={pending} entry={entry} />
+          {entry.control !== undefined || (canEdit && entry.onRemove !== undefined) ? (
+            <div className="flex shrink-0 items-center gap-3">
+              {entry.control}
+              {canEdit && entry.onRemove !== undefined ? (
+                <RemoveButton
+                  label={entry.removeLabel ?? "Remove"}
+                  disabled={pending}
+                  entry={entry}
+                />
+              ) : null}
+            </div>
           ) : null}
         </SectionRow>
       ))}

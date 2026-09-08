@@ -18,6 +18,9 @@ import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { ValueDialog } from "~/components/dns/value-dialog.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 
+/** The id of the override paragraph, which explains why a disabled toggle is disabled. */
+const overrideHelpId = "dns-override-local-help";
+
 export function NameserversSection({
   settings,
   canEdit,
@@ -59,11 +62,12 @@ export function NameserversSection({
         entries={settings.nameservers.map((ns) => ({
           key: ns,
           value: ns,
-          aside: (
+          control: (
             <ExitNodeToggle
-              label={`Use ${ns} with an exit node`}
+              name={`Use with exit node: ${ns}`}
               checked={keptWithExitNode(settings, ns)}
               disabled={!canEdit || pending || !settings.overrideLocalDns}
+              describedBy={settings.overrideLocalDns ? undefined : overrideHelpId}
               pending={pending}
               onChange={(on) => {
                 mutations.apply(
@@ -82,11 +86,12 @@ export function NameserversSection({
       <SectionRow className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="flex min-w-0 flex-col gap-1">
           <span className="font-medium text-kumo-strong">Override local DNS</span>
-          <p className="max-w-prose text-kumo-subtle">
+          <p id={overrideHelpId} className="max-w-prose text-kumo-subtle">
             Machines use the nameservers above for every query instead of only when their own
-            resolvers cannot answer. Needs at least one nameserver. A nameserver marked to use with
-            an exit node stays in use while a machine routes through one; the rest of its DNS goes
-            through the exit node then.
+            resolvers cannot answer. Needs at least one nameserver. Turn it on to mark nameservers
+            to use with an exit node: a marked one stays in use while a machine routes through an
+            exit node, and the rest of its DNS goes through the exit node then. Turning it off
+            clears the marks.
           </p>
         </div>
         <span className="flex h-lh shrink-0 items-center">
@@ -127,30 +132,36 @@ export function NameserversSection({
 }
 
 /** The per-nameserver switch for keeping it while an exit node is selected. */
+/**
+ * "Use with exit node" as a labelled switch: the visible label is clickable, and the accessible
+ * name adds the resolver or domain it belongs to.
+ */
 export function ExitNodeToggle({
-  label,
+  name,
   checked,
   disabled,
+  describedBy,
   pending,
   onChange,
 }: {
-  readonly label: string;
+  readonly name: string;
   readonly checked: boolean;
   readonly disabled: boolean;
+  readonly describedBy?: string | undefined;
   readonly pending: boolean;
   readonly onChange: (on: boolean) => void;
 }): ReactElement {
   return (
-    <span className="flex items-center gap-2 text-xs text-kumo-subtle">
-      Use with exit node
-      <Switch
-        size="sm"
-        aria-label={label}
-        checked={checked}
-        disabled={disabled}
-        transitioning={pending}
-        onCheckedChange={onChange}
-      />
-    </span>
+    <Switch
+      size="sm"
+      label={<span className="text-sm text-kumo-subtle">Use with exit node</span>}
+      controlFirst={false}
+      aria-label={name}
+      {...(describedBy === undefined ? {} : { "aria-describedby": describedBy })}
+      checked={checked}
+      disabled={disabled}
+      transitioning={pending}
+      onCheckedChange={onChange}
+    />
   );
 }

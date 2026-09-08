@@ -1,8 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 
 import { api } from "~/api/client.ts";
 import type { Mutation } from "~/api/mutation.ts";
 import { invalidate } from "~/api/queries.ts";
+import { meQuery } from "~/auth/me.ts";
 import { toast } from "~/components/ui/toast.ts";
 
 interface UserMutations {
@@ -20,16 +22,28 @@ interface UserMutations {
  */
 export function useUserMutations(): UserMutations {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const refresh = async (): Promise<void> => {
     await invalidate(queryClient, "/api/v1/user");
+  };
+  // A name, profile or role change may be the operator's own, which the account menu and the
+  // route guards read from a query held static; fetch it afresh and re-run the guards. Machines
+  // carry their owner's profile too.
+  const refreshIdentity = async (): Promise<void> => {
+    await Promise.all([
+      refresh(),
+      invalidate(queryClient, "/api/v1/node"),
+      queryClient.query({ ...meQuery, staleTime: 0 }),
+    ]);
+    await router.invalidate();
   };
 
   return {
     create: api.useMutation("post", "/api/v1/user", { onSuccess: refresh }),
     rename: api.useMutation("post", "/api/v1/user/{oldId}/rename/{newName}", {
-      onSuccess: refresh,
+      onSuccess: refreshIdentity,
     }),
-    update: api.useMutation("patch", "/api/v1/user/{id}", { onSuccess: refresh }),
+    update: api.useMutation("patch", "/api/v1/user/{id}", { onSuccess: refreshIdentity }),
     approve: api.useMutation("post", "/api/v1/user/{id}/approve", {
       onSuccess: async () => {
         toast.success("User approved");
@@ -39,7 +53,7 @@ export function useUserMutations(): UserMutations {
         toast.error("Could not approve user", error);
       },
     }),
-    setRole: api.useMutation("post", "/api/v1/user/{id}/role", { onSuccess: refresh }),
+    setRole: api.useMutation("post", "/api/v1/user/{id}/role", { onSuccess: refreshIdentity }),
     remove: api.useMutation("delete", "/api/v1/user/{id}", {
       // Deleting a user takes their machines with it, so the node list is stale too.
       onSuccess: async () => {

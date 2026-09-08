@@ -65,11 +65,13 @@ function GroupForm({
   const synced = group !== undefined && isSynced(group);
   const [requestable, setRequestable] = useState(group?.requestable ?? false);
   const mutation = group === undefined ? mutations.createGroup : mutations.updateGroup;
+  // A synced group's users follow the identity provider, so the request leaves them out rather
+  // than resubmitting a list a sign-in may have changed since the dialog opened.
   const body = {
     name: name.trim(),
     description: description.trim(),
     nodeIds,
-    userIds,
+    ...(synced ? {} : { userIds }),
     requestable,
   };
 
@@ -94,8 +96,11 @@ function GroupForm({
     <form onSubmit={submit} className="flex flex-col gap-4">
       <Input
         label="Name"
-        description={nameHint}
+        description={
+          synced ? "Synced from the identity provider: the name is the groups claim's." : nameHint
+        }
         value={name}
+        readOnly={synced}
         spellCheck={false}
         autoComplete="off"
         placeholder="Engineering"
@@ -211,6 +216,41 @@ export function DeleteGroupDialog({
     );
   }
 
+  const remove = (): void => {
+    deleteGroup.mutate(
+      { params: { path: { id: group.id } } },
+      {
+        onSuccess: () => {
+          onOpenChange(false);
+        },
+      },
+    );
+  };
+
+  // A synced group comes back at the next sign-in that carries its claim, as a new group without
+  // this one's description, machines or rules, so say that instead of promising a lasting delete.
+  if (isSynced(group)) {
+    return (
+      <DialogRoot open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          size="sm"
+          title="Delete synced group"
+          description={`${group.name} is synced from the identity provider. The next sign-in whose groups claim names it creates the group again, empty and without this description and these machines. To keep it gone, remove the claim at the provider or turn group sync off.`}
+        >
+          <DialogError
+            message={deleteGroup.isError ? errorMessage(deleteGroup.error) : undefined}
+          />
+          <DialogFooter>
+            <DialogClose render={<Button variant="secondary">Cancel</Button>} />
+            <Button variant="destructive" loading={deleteGroup.isPending} onClick={remove}>
+              Delete group
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </DialogRoot>
+    );
+  }
+
   return (
     <DeleteResource
       open={open}
@@ -220,16 +260,7 @@ export function DeleteGroupDialog({
       deleteButtonText="Delete group"
       isDeleting={deleteGroup.isPending}
       {...(deleteGroup.isError ? { errorMessage: errorMessage(deleteGroup.error) } : {})}
-      onDelete={() => {
-        deleteGroup.mutate(
-          { params: { path: { id: group.id } } },
-          {
-            onSuccess: () => {
-              onOpenChange(false);
-            },
-          },
-        );
-      }}
+      onDelete={remove}
     />
   );
 }

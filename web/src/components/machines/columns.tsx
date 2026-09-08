@@ -1,4 +1,5 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
+import { Button } from "@cloudflare/kumo/components/button";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import {
   GlobeIcon,
@@ -186,10 +187,22 @@ function Mark({
   readonly hint: string;
   readonly children: ReactElement;
 }): ReactElement {
+  // The trigger is a Kumo button so it has a name for the screen reader and a focus ring for
+  // the keyboard; the icon is decoration.
   return (
-    <Tooltip content={hint}>
-      <span className="flex h-lh items-center text-kumo-subtle">{children}</span>
-    </Tooltip>
+    <Tooltip
+      content={hint}
+      render={
+        <Button
+          variant="ghost"
+          shape="square"
+          size="xs"
+          aria-label={hint}
+          className="h-lh text-kumo-subtle"
+          icon={<span aria-hidden>{children}</span>}
+        />
+      }
+    />
   );
 }
 

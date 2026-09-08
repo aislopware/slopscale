@@ -81,44 +81,46 @@ export function SplitDnsSection({
                 {servers.join(", ")}
               </span>
             </div>
-            <ExitNodeToggle
-              label={`Use ${domain} resolvers with an exit node`}
-              checked={splitKeptWithExitNode(settings, domain)}
-              disabled={!canEdit || pending}
-              pending={pending}
-              onChange={(on) => {
-                mutations.apply(
-                  withSplitUseWithExitNode(settings, domain, on),
-                  `${domain} ${on ? "kept" : "dropped"} with an exit node`,
-                );
-              }}
-            />
-            {canEdit ? (
-              <span className="flex shrink-0 items-center">
-                <Button
-                  variant="ghost"
-                  shape="square"
-                  size="sm"
-                  icon={<PencilSimpleIcon size={iconSize} />}
-                  aria-label={`Edit split DNS for ${domain}`}
-                  disabled={pending}
-                  onClick={() => {
-                    setDialog({ domain, servers });
-                  }}
-                />
-                <Button
-                  variant="ghost"
-                  shape="square"
-                  size="sm"
-                  icon={<TrashIcon size={iconSize} />}
-                  aria-label={`Remove split DNS for ${domain}`}
-                  disabled={pending}
-                  onClick={() => {
-                    mutations.apply(withoutSplit(settings, domain), `Removed ${domain}`);
-                  }}
-                />
-              </span>
-            ) : null}
+            <div className="flex shrink-0 items-center gap-3">
+              <ExitNodeToggle
+                name={`Use with exit node: ${domain}`}
+                checked={splitKeptWithExitNode(settings, domain)}
+                disabled={!canEdit || pending}
+                pending={pending}
+                onChange={(on) => {
+                  mutations.apply(
+                    withSplitUseWithExitNode(settings, domain, on),
+                    `${domain} ${on ? "kept" : "dropped"} with an exit node`,
+                  );
+                }}
+              />
+              {canEdit ? (
+                <span className="flex shrink-0 items-center">
+                  <Button
+                    variant="ghost"
+                    shape="square"
+                    size="sm"
+                    icon={<PencilSimpleIcon size={iconSize} />}
+                    aria-label={`Edit split DNS for ${domain}`}
+                    disabled={pending}
+                    onClick={() => {
+                      setDialog({ domain, servers });
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    shape="square"
+                    size="sm"
+                    icon={<TrashIcon size={iconSize} />}
+                    aria-label={`Remove split DNS for ${domain}`}
+                    disabled={pending}
+                    onClick={() => {
+                      mutations.apply(withoutSplit(settings, domain), `Removed ${domain}`);
+                    }}
+                  />
+                </span>
+              ) : null}
+            </div>
           </SectionRow>
         ))
       )}
