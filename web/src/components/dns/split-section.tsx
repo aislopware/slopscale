@@ -12,10 +12,13 @@ import {
   normalizeDomain,
   parseList,
   splitEntries,
+  splitKeptWithExitNode,
   withSplit,
+  withSplitUseWithExitNode,
   withoutSplit,
 } from "~/components/dns/model.ts";
 import type { DnsMutations } from "~/components/dns/mutations.ts";
+import { ExitNodeToggle } from "~/components/dns/nameservers-section.tsx";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
@@ -44,7 +47,7 @@ export function SplitDnsSection({
   return (
     <Section
       title="Split DNS"
-      description="Domains answered by their own resolvers, such as an internal zone behind a subnet router."
+      description="Domains answered by their own resolvers, such as an internal zone behind a subnet router. A domain marked to use with an exit node keeps its resolvers while a machine routes through one."
       bodyClassName="p-0"
       {...(canEdit
         ? {
@@ -78,6 +81,18 @@ export function SplitDnsSection({
                 {servers.join(", ")}
               </span>
             </div>
+            <ExitNodeToggle
+              label={`Use ${domain} resolvers with an exit node`}
+              checked={splitKeptWithExitNode(settings, domain)}
+              disabled={!canEdit || pending}
+              pending={pending}
+              onChange={(on) => {
+                mutations.apply(
+                  withSplitUseWithExitNode(settings, domain, on),
+                  `${domain} ${on ? "kept" : "dropped"} with an exit node`,
+                );
+              }}
+            />
             {canEdit ? (
               <span className="flex shrink-0 items-center">
                 <Button

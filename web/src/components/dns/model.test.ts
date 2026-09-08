@@ -8,8 +8,12 @@ import {
   parseList,
   recordError,
   splitEntries,
+  splitKeptWithExitNode,
+  withOverrideLocalDns,
   withRecord,
   withSplit,
+  withSplitUseWithExitNode,
+  withUseWithExitNode,
   withoutNameserver,
   withoutRecord,
   withoutSplit,
@@ -19,6 +23,8 @@ const base: DnsSettings = {
   nameservers: ["1.1.1.1"],
   overrideLocalDns: false,
   splitNameservers: { "corp.example": ["10.0.0.1"], gone: null },
+  useWithExitNode: [],
+  splitUseWithExitNode: {},
   searchDomains: ["lab.example"],
   extraRecords: [{ name: "a.corp", type: "A", value: "10.0.0.5" }],
 };
@@ -111,8 +117,45 @@ describe("editing helpers", () => {
     expect(withoutRecord(base, 0).extraRecords).toStrictEqual([]);
   });
 
-  it("removes a nameserver", () => {
-    expect(withoutNameserver(base, "1.1.1.1").nameservers).toStrictEqual([]);
+  it("removes a nameserver and its exit node mark", () => {
+    const kept = withUseWithExitNode({ ...base, overrideLocalDns: true }, "1.1.1.1", true);
+
+    expect(kept.useWithExitNode).toStrictEqual(["1.1.1.1"]);
+    expect(withUseWithExitNode(kept, "1.1.1.1", true).useWithExitNode).toStrictEqual(["1.1.1.1"]);
+    expect(withoutNameserver(kept, "1.1.1.1")).toMatchObject({
+      nameservers: [],
+      useWithExitNode: [],
+    });
+  });
+
+  it("drops the exit node marks when the override goes off", () => {
+    const kept = withUseWithExitNode({ ...base, overrideLocalDns: true }, "1.1.1.1", true);
+
+    expect(withOverrideLocalDns(kept, false).useWithExitNode).toStrictEqual([]);
+    expect(withOverrideLocalDns(kept, true).useWithExitNode).toStrictEqual(["1.1.1.1"]);
+  });
+
+  it("keeps a split domain with all of its resolvers or none", () => {
+    const kept = withSplitUseWithExitNode(base, "corp.example", true);
+
+    expect(kept.splitUseWithExitNode).toStrictEqual({ "corp.example": ["10.0.0.1"] });
+    expect(splitKeptWithExitNode(kept, "corp.example")).toBe(true);
+    expect(splitKeptWithExitNode(base, "corp.example")).toBe(false);
+    expect(
+      withSplitUseWithExitNode(kept, "corp.example", false).splitUseWithExitNode,
+    ).toStrictEqual({});
+  });
+
+  it("carries the exit node mark through split edits", () => {
+    const kept = withSplitUseWithExitNode(base, "corp.example", true);
+    const edited = withSplit(kept, { domain: "corp.example", servers: ["10.0.0.1", "10.0.0.2"] });
+
+    expect(edited.splitUseWithExitNode).toStrictEqual({ "corp.example": ["10.0.0.1", "10.0.0.2"] });
+    expect(
+      withSplit(kept, { domain: "new.example", servers: ["10.0.0.3"], previous: "corp.example" })
+        .splitUseWithExitNode,
+    ).toStrictEqual({ "new.example": ["10.0.0.3"] });
+    expect(withoutSplit(kept, "corp.example").splitUseWithExitNode).toStrictEqual({});
   });
 
   it("parses lines and commas", () => {

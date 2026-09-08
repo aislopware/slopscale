@@ -9,13 +9,43 @@ export function recordTypeLabel(type: RecordType): string {
   return type === "" ? "Auto (A or AAAA)" : type;
 }
 
+type SplitMap = DnsSettings["splitNameservers"];
+
 /** The split map without the nulls the schema allows, in domain order. */
 export function splitEntries(settings: DnsSettings): readonly (readonly [string, string[]])[] {
-  return Object.entries(settings.splitNameservers)
+  return entriesOf(settings.splitNameservers);
+}
+
+function entriesOf(map: SplitMap): readonly (readonly [string, string[]])[] {
+  return Object.entries(map)
     .flatMap(([domain, servers]): (readonly [string, string[]])[] =>
       servers === null ? [] : [[domain, servers]],
     )
     .toSorted(([left], [right]) => left.localeCompare(right));
+}
+
+function cloneSplit(map: SplitMap): Record<string, string[]> {
+  return Object.fromEntries(entriesOf(map).map(([domain, servers]) => [domain, [...servers]]));
+}
+
+/** Whether the machine keeps using the nameserver while it has an exit node selected. */
+export function keptWithExitNode(settings: DnsSettings, nameserver: string): boolean {
+  return settings.useWithExitNode.includes(nameserver);
+}
+
+/**
+ * Whether the domain's resolvers survive an exit node. The client keeps the route only when every
+ * one of them is marked, so the console marks them all or none.
+ */
+export function splitKeptWithExitNode(settings: DnsSettings, domain: string): boolean {
+  const servers = settings.splitNameservers[domain];
+  const kept = settings.splitUseWithExitNode[domain];
+
+  if (servers === undefined || servers === null || servers.length === 0 || !kept) {
+    return false;
+  }
+
+  return servers.every((server) => kept.includes(server));
 }
 
 /**
@@ -38,9 +68,9 @@ export function cloneSettings(settings: DnsSettings): DnsSettings {
   return {
     nameservers: [...settings.nameservers],
     overrideLocalDns: settings.overrideLocalDns,
-    splitNameservers: Object.fromEntries(
-      splitEntries(settings).map(([domain, servers]) => [domain, [...servers]]),
-    ),
+    splitNameservers: cloneSplit(settings.splitNameservers),
+    useWithExitNode: [...settings.useWithExitNode],
+    splitUseWithExitNode: cloneSplit(settings.splitUseWithExitNode),
     searchDomains: [...settings.searchDomains],
     extraRecords: settings.extraRecords.map((record) => ({ ...record })),
   };
@@ -228,12 +258,61 @@ export function withoutNameserver(settings: DnsSettings, value: string): DnsSett
   const next = cloneSettings(settings);
 
   next.nameservers = next.nameservers.filter((existing) => existing !== value);
+  next.useWithExitNode = next.useWithExitNode.filter((existing) => existing !== value);
 
   return next;
 }
 
+/**
+ * Turning the override off also drops the nameservers kept with an exit node: the client honours
+ * the flag only on the resolvers it uses for every query, and the server refuses the pair.
+ */
 export function withOverrideLocalDns(settings: DnsSettings, on: boolean): DnsSettings {
-  return { ...cloneSettings(settings), overrideLocalDns: on };
+  const next = cloneSettings(settings);
+
+  next.overrideLocalDns = on;
+
+  if (!on) {
+    next.useWithExitNode = [];
+  }
+
+  return next;
+}
+
+export function withUseWithExitNode(
+  settings: DnsSettings,
+  nameserver: string,
+  on: boolean,
+): DnsSettings {
+  const next = cloneSettings(settings);
+
+  next.useWithExitNode = next.useWithExitNode.filter((existing) => existing !== nameserver);
+
+  if (on) {
+    next.useWithExitNode.push(nameserver);
+  }
+
+  return next;
+}
+
+/** Marks every resolver of the domain, or none, since the client needs all of them. */
+export function withSplitUseWithExitNode(
+  settings: DnsSettings,
+  domain: string,
+  on: boolean,
+): DnsSettings {
+  const next = cloneSettings(settings);
+  const servers = next.splitNameservers[domain];
+
+  if (on && servers !== undefined && servers !== null) {
+    next.splitUseWithExitNode[domain] = [...servers];
+  } else {
+    next.splitUseWithExitNode = Object.fromEntries(
+      Object.entries(next.splitUseWithExitNode).filter(([existing]) => existing !== domain),
+    );
+  }
+
+  return next;
 }
 
 export interface SplitEdit {
@@ -243,20 +322,20 @@ export interface SplitEdit {
   readonly previous?: string | undefined;
 }
 
-/** Sets the domain's resolvers. */
+/** Sets the domain's resolvers; a domain kept with an exit node keeps its new resolvers too. */
 export function withSplit(settings: DnsSettings, edit: SplitEdit): DnsSettings {
+  const previous = edit.previous ?? edit.domain;
+  const kept = splitKeptWithExitNode(settings, previous);
   const next =
-    edit.previous === undefined || edit.previous === edit.domain
-      ? cloneSettings(settings)
-      : withoutSplit(settings, edit.previous);
+    previous === edit.domain ? cloneSettings(settings) : withoutSplit(settings, previous);
 
   next.splitNameservers[edit.domain] = [...edit.servers];
 
-  return next;
+  return withSplitUseWithExitNode(next, edit.domain, kept);
 }
 
 export function withoutSplit(settings: DnsSettings, domain: string): DnsSettings {
-  const next = cloneSettings(settings);
+  const next = withSplitUseWithExitNode(settings, domain, false);
 
   next.splitNameservers = Object.fromEntries(
     Object.entries(next.splitNameservers).filter(([existing]) => existing !== domain),

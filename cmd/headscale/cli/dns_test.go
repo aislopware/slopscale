@@ -15,6 +15,8 @@ func dnsFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSlice("nameserver", []string{}, "")
 	cmd.Flags().Bool("override-local-dns", false, "")
 	cmd.Flags().StringSlice("split", []string{}, "")
+	cmd.Flags().StringSlice("use-with-exit-node", []string{}, "")
+	cmd.Flags().StringSlice("split-use-with-exit-node", []string{}, "")
 	cmd.Flags().StringSlice("search-domain", []string{}, "")
 	cmd.Flags().StringArray("record", []string{}, "")
 	cmd.Flags().Bool("keep", false, "")
@@ -201,6 +203,49 @@ func TestDNSCommands(t *testing.T) {
 				},
 			},
 			wantIn: []string{"MagicDNS: on"},
+		},
+		{
+			name: "set --keep with the exit node flags replaces only those",
+			src:  setDNSCmd,
+			flags: map[string]string{
+				"keep":                     "true",
+				"use-with-exit-node":       "1.1.1.1",
+				"split-use-with-exit-node": "corp.example=10.0.0.1",
+			},
+			routes: map[string]apiHandler{
+				"GET /api/v1/dns": func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+					t.Helper()
+					writeJSON(t, w, current)
+				},
+				"PUT /api/v1/dns": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+
+					var body clientv1.SetDNSRequestBody
+
+					decodeBody(t, r, &body)
+
+					if assert.NotNil(t, body.Nameservers) {
+						assert.Equal(t, current.Effective.Nameservers, *body.Nameservers)
+					}
+
+					if assert.NotNil(t, body.UseWithExitNode) {
+						assert.Equal(t, []string{"1.1.1.1"}, *body.UseWithExitNode)
+					}
+
+					keptSplit := []string{"10.0.0.1"}
+
+					if assert.NotNil(t, body.SplitUseWithExitNode) {
+						split := *body.SplitUseWithExitNode
+						assert.Equal(t, keptSplit, *split["corp.example"])
+					}
+
+					kept := current
+					kept.Effective.UseWithExitNode = []string{"1.1.1.1"}
+					kept.Effective.SplitUseWithExitNode = map[string]*[]string{"corp.example": &keptSplit}
+					writeJSON(t, w, kept)
+				},
+			},
+			wantIn: []string{"Kept with an exit node: 1.1.1.1", "Split DNS kept with an exit node:"},
 		},
 		{
 			name:    "set with malformed split entry fails and makes no request",

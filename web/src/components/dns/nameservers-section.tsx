@@ -7,9 +7,11 @@ import type { ReactElement } from "react";
 import type { DnsSettings } from "~/api/schema.gen.ts";
 import { EntryList } from "~/components/dns/entry-list.tsx";
 import {
+  keptWithExitNode,
   nameserverError,
   withNameserver,
   withOverrideLocalDns,
+  withUseWithExitNode,
   withoutNameserver,
 } from "~/components/dns/model.ts";
 import type { DnsMutations } from "~/components/dns/mutations.ts";
@@ -57,6 +59,20 @@ export function NameserversSection({
         entries={settings.nameservers.map((ns) => ({
           key: ns,
           value: ns,
+          aside: (
+            <ExitNodeToggle
+              label={`Use ${ns} with an exit node`}
+              checked={keptWithExitNode(settings, ns)}
+              disabled={!canEdit || pending || !settings.overrideLocalDns}
+              pending={pending}
+              onChange={(on) => {
+                mutations.apply(
+                  withUseWithExitNode(settings, ns, on),
+                  `${ns} ${on ? "kept" : "dropped"} with an exit node`,
+                );
+              }}
+            />
+          ),
           removeLabel: `Remove nameserver ${ns}`,
           onRemove: () => {
             mutations.apply(withoutNameserver(settings, ns), `Removed ${ns}`);
@@ -68,7 +84,9 @@ export function NameserversSection({
           <span className="font-medium text-kumo-strong">Override local DNS</span>
           <p className="max-w-prose text-kumo-subtle">
             Machines use the nameservers above for every query instead of only when their own
-            resolvers cannot answer. Needs at least one nameserver.
+            resolvers cannot answer. Needs at least one nameserver. A nameserver marked to use with
+            an exit node stays in use while a machine routes through one; the rest of its DNS goes
+            through the exit node then.
           </p>
         </div>
         <span className="flex h-lh shrink-0 items-center">
@@ -105,5 +123,34 @@ export function NameserversSection({
         }}
       />
     </Section>
+  );
+}
+
+/** The per-nameserver switch for keeping it while an exit node is selected. */
+export function ExitNodeToggle({
+  label,
+  checked,
+  disabled,
+  pending,
+  onChange,
+}: {
+  readonly label: string;
+  readonly checked: boolean;
+  readonly disabled: boolean;
+  readonly pending: boolean;
+  readonly onChange: (on: boolean) => void;
+}): ReactElement {
+  return (
+    <span className="flex items-center gap-2 text-xs text-kumo-subtle">
+      Use with exit node
+      <Switch
+        size="sm"
+        aria-label={label}
+        checked={checked}
+        disabled={disabled}
+        transitioning={pending}
+        onCheckedChange={onChange}
+      />
+    </span>
   );
 }

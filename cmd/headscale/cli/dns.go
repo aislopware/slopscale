@@ -27,6 +27,16 @@ func init() {
 		[]string{},
 		"Split DNS domain nameservers (domain=ns1,ns2, domain=ns1;ns2, or repeat)",
 	)
+	setDNSCmd.Flags().StringSlice(
+		"use-with-exit-node",
+		[]string{},
+		"Global nameservers a machine keeps using while it has an exit node selected (needs --override-local-dns)",
+	)
+	setDNSCmd.Flags().StringSlice(
+		"split-use-with-exit-node",
+		[]string{},
+		"Split DNS nameservers kept while an exit node is selected (domain=ns1,ns2 or repeat)",
+	)
 	setDNSCmd.Flags().StringSlice("search-domain", []string{}, "Search domains appended to base domain")
 	setDNSCmd.Flags().StringArray("record", []string{}, "Extra DNS records (name=value or name=TYPE:value)")
 	setDNSCmd.Flags().Bool("keep", false, "Keep existing settings and only replace specified fields")
@@ -65,7 +75,7 @@ settings, leaving omitted settings empty. Use --keep to start from the current
 effective settings and only replace the fields whose flags were given.`,
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
-			var splitMap map[string]*[]string
+			var splitMap, splitKeepMap map[string]*[]string
 
 			if cmd.Flags().Changed("split") {
 				splitEntries, _ := cmd.Flags().GetStringSlice("split")
@@ -76,6 +86,17 @@ effective settings and only replace the fields whose flags were given.`,
 				}
 
 				splitMap = parsed
+			}
+
+			if cmd.Flags().Changed("split-use-with-exit-node") {
+				splitEntries, _ := cmd.Flags().GetStringSlice("split-use-with-exit-node")
+
+				parsed, err := parseSplitFlag(splitEntries)
+				if err != nil {
+					return err
+				}
+
+				splitKeepMap = parsed
 			}
 
 			var records []clientv1.DNSRecord
@@ -107,7 +128,7 @@ effective settings and only replace the fields whose flags were given.`,
 				current = getResp.JSON200
 			}
 
-			body := buildSetDNSBody(cmd, current, splitMap, records)
+			body := buildSetDNSBody(cmd, current, splitMap, splitKeepMap, records)
 
 			resp, err := client.SetDNSWithResponse(ctx, body)
 			if err != nil {
@@ -145,19 +166,30 @@ var resetDNSCmd = &cobra.Command{
 func buildSetDNSBody(
 	cmd *cobra.Command,
 	current *clientv1.DNS,
-	splitMap map[string]*[]string,
+	splitMap, splitKeepMap map[string]*[]string,
 	records []clientv1.DNSRecord,
 ) clientv1.SetDNSRequestBody {
 	var body clientv1.SetDNSRequestBody
 
 	if current != nil {
 		body = clientv1.SetDNSRequestBody{
-			Nameservers:      &current.Effective.Nameservers,
-			OverrideLocalDns: &current.Effective.OverrideLocalDns,
-			SplitNameservers: &current.Effective.SplitNameservers,
-			SearchDomains:    &current.Effective.SearchDomains,
-			ExtraRecords:     &current.Effective.ExtraRecords,
+			Nameservers:          &current.Effective.Nameservers,
+			OverrideLocalDns:     &current.Effective.OverrideLocalDns,
+			SplitNameservers:     &current.Effective.SplitNameservers,
+			UseWithExitNode:      &current.Effective.UseWithExitNode,
+			SplitUseWithExitNode: &current.Effective.SplitUseWithExitNode,
+			SearchDomains:        &current.Effective.SearchDomains,
+			ExtraRecords:         &current.Effective.ExtraRecords,
 		}
+	}
+
+	if cmd.Flags().Changed("use-with-exit-node") {
+		keep, _ := cmd.Flags().GetStringSlice("use-with-exit-node")
+		body.UseWithExitNode = &keep
+	}
+
+	if cmd.Flags().Changed("split-use-with-exit-node") {
+		body.SplitUseWithExitNode = &splitKeepMap
 	}
 
 	if cmd.Flags().Changed("nameserver") {
@@ -319,9 +351,22 @@ func printDNSHuman(dns *clientv1.DNS, prefix string) error {
 
 	fmt.Printf("Override local DNS: %s\n", onOff(dns.Effective.OverrideLocalDns))
 
+	if len(dns.Effective.UseWithExitNode) > 0 {
+		fmt.Printf("Kept with an exit node: %s\n", strings.Join(dns.Effective.UseWithExitNode, ", "))
+	}
+
 	err := printSplitDNS(dns.Effective.SplitNameservers)
 	if err != nil {
 		return err
+	}
+
+	if len(dns.Effective.SplitUseWithExitNode) > 0 {
+		fmt.Println("Split DNS kept with an exit node:")
+
+		err = printSplitDNS(dns.Effective.SplitUseWithExitNode)
+		if err != nil {
+			return err
+		}
 	}
 
 	if len(dns.Effective.SearchDomains) > 0 {

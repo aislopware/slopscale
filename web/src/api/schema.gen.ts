@@ -2018,6 +2018,10 @@ export interface components {
             splitNameservers: {
                 [key: string]: string[] | null;
             };
+            splitUseWithExitNode: {
+                [key: string]: string[] | null;
+            };
+            useWithExitNode: string[];
         };
         EmptyOutputBody: Record<string, unknown>;
         ErrorDetail: {
@@ -2483,6 +2487,10 @@ export interface components {
             splitNameservers?: {
                 [key: string]: string[] | null;
             };
+            splitUseWithExitNode?: {
+                [key: string]: string[] | null;
+            };
+            useWithExitNode?: string[] | null;
         };
         SetGlobalExitNodeRequestBody: {
             /** @description false clears the mark. */
