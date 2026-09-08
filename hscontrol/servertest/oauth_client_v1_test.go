@@ -90,6 +90,43 @@ func TestOAuthClientsV1(t *testing.T) {
 		assert.Equal(t, http.StatusForbidden, status)
 	})
 
+	t.Run("null or empty scopes are refused", func(t *testing.T) {
+		for _, scopes := range []any{nil, []string{}} {
+			status, _ := apiCall(t, client, ownerKey, http.MethodPost, v1+"/oauth-client", map[string]any{
+				"scopes": scopes,
+			})
+			assert.Equal(t, http.StatusUnprocessableEntity, status)
+		}
+	})
+
+	t.Run("a token cannot hand out tags it does not own", func(t *testing.T) {
+		setTagPolicy(t, srv, owner.Name)
+
+		status, body := apiCall(t, client, ownerKey, http.MethodPost, v1+"/oauth-client", map[string]any{
+			"scopes": []string{"oauth_keys", "auth_keys"}, "tags": []string{"tag:ci"},
+		})
+		require.Equal(t, http.StatusOK, status, body)
+
+		secret, ok := body["clientSecret"].(string)
+		require.True(t, ok)
+		token := accessToken(t, client, srv.URL, secret)
+
+		status, _ = apiCall(t, client, token, http.MethodPost, v1+"/oauth-client", map[string]any{
+			"scopes": []string{"auth_keys"}, "tags": []string{"tag:prod"},
+		})
+		assert.Equal(t, http.StatusForbidden, status)
+
+		status, _ = apiCall(t, client, token, http.MethodPost, v1+"/oauth-client", map[string]any{
+			"scopes": []string{"auth_keys"}, "tags": []string{"tag:nowhere"},
+		})
+		assert.Equal(t, http.StatusBadRequest, status)
+
+		status, _ = apiCall(t, client, token, http.MethodPost, v1+"/oauth-client", map[string]any{
+			"scopes": []string{"auth_keys"}, "tags": []string{"tag:ci-child"},
+		})
+		assert.Equal(t, http.StatusOK, status)
+	})
+
 	t.Run("machine scopes need tags", func(t *testing.T) {
 		status, _ := apiCall(t, client, ownerKey, http.MethodPost, v1+"/oauth-client", map[string]any{
 			"scopes": []string{"devices:core"},
@@ -111,6 +148,42 @@ func TestOAuthClientsV1(t *testing.T) {
 
 		status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/oauth-client", nil)
 		require.Equal(t, http.StatusOK, status, body)
-		assert.Len(t, body["oauthClients"], 1)
+
+		clients, ok := body["oauthClients"].([]any)
+		require.True(t, ok)
+		assert.NotEmpty(t, clients)
+
+		for _, entry := range clients {
+			listed, isMap := entry.(map[string]any)
+			require.True(t, isMap)
+			assert.NotEqual(t, clientID, listed["clientId"])
+		}
 	})
+}
+
+// setTagPolicy defines tag:ci (owned by owner) with tag:ci-child under it, and
+// tag:prod owned by nobody, so a token holding tag:ci may delegate tag:ci-child
+// and nothing else.
+func setTagPolicy(t *testing.T, srv *servertest.TestServer, owner string) {
+	t.Helper()
+
+	policy := `{
+		"tagOwners": {
+			"tag:ci": ["` + owner + `@"],
+			"tag:ci-child": ["tag:ci"],
+			"tag:prod": []
+		},
+		"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}]
+	}`
+
+	st := srv.State()
+
+	_, err := st.SetPolicy([]byte(policy))
+	require.NoError(t, err)
+
+	_, err = st.SetPolicyInDB(policy)
+	require.NoError(t, err)
+
+	_, err = st.ReloadPolicy()
+	require.NoError(t, err)
 }

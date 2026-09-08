@@ -34,7 +34,7 @@ type CreateOAuthClientRequestBody struct {
 	Description string `doc:"What the client is for." json:"description,omitempty"`
 	// Scopes bound every token the client mints; each must be within the
 	// caller's own grant, so a limited credential cannot mint a wider client.
-	Scopes []string `doc:"Scopes the client may grant; at least one." json:"scopes" minItems:"1"`
+	Scopes []string `doc:"Scopes the client may grant; at least one." json:"scopes" minItems:"1" nullable:"false"`
 	// Tags are required with devices:core or auth_keys, because such a client
 	// mints tagged, tailnet-owned credentials.
 	Tags []string `doc:"Tags the client may put on its tokens." json:"tags,omitempty"`
@@ -148,6 +148,22 @@ func createOAuthClient(
 			return nil, huma.Error403Forbidden(
 				"client may not be granted scope " + s + " beyond the creating credential",
 			)
+		}
+	}
+
+	// A token is bounded by its own tags too, each defined in policy, as on
+	// v2; an API key keeps the syntax-only tag validation above.
+	if p.IsOAuth() {
+		for _, tag := range body.Tags {
+			if !b.State.TagExists(tag) {
+				return nil, huma.Error400BadRequest("tag " + tag + " is not defined in policy")
+			}
+
+			if !b.State.TagOwnedByTags(tag, p.Tags) {
+				return nil, huma.Error403Forbidden(
+					"client may not be granted tag " + tag + " beyond the creating token",
+				)
+			}
 		}
 	}
 
