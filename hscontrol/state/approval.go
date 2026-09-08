@@ -6,8 +6,10 @@ import (
 	"time"
 
 	hsdb "github.com/juanfont/headscale/hscontrol/db"
+	"github.com/juanfont/headscale/hscontrol/policy"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
+	"tailscale.com/types/views"
 )
 
 var (
@@ -280,19 +282,39 @@ func requireApprovedUser(user *types.User) error {
 	return nil
 }
 
-// admittedPeerCandidates drops nodes that are waiting for approval or
-// suspended before the policy builds the peer map, so such a node has no
-// peers and appears in nobody's.
-func admittedPeerCandidates(nodes []types.NodeView) []types.NodeView {
-	admitted := nodes[:0:0]
+// peerPositionsFunc is the node store's peer relationship: the policy's
+// pair scan over the admitted nodes, mapped back to positions in the
+// full list. A node waiting for approval, or suspended, has no peers and
+// is nobody's peer.
+func peerPositionsFunc(polMan policy.PolicyManager) PeerPositionsFunc {
+	return func(nodes []types.NodeView) [][]int32 {
+		admitted := make([]types.NodeView, 0, len(nodes))
+		fullPos := make([]int32, 0, len(nodes))
 
-	for _, n := range nodes {
-		if n.IsAdmitted() {
-			admitted = append(admitted, n)
+		for i, n := range nodes {
+			if n.IsAdmitted() {
+				admitted = append(admitted, n)
+				fullPos = append(fullPos, int32(i))
+			}
 		}
-	}
 
-	return admitted
+		lists := polMan.BuildPeerPositions(views.SliceOf(admitted))
+		if lists == nil {
+			return nil
+		}
+
+		out := make([][]int32, len(nodes))
+
+		for k, list := range lists {
+			for i, p := range list {
+				list[i] = fullPos[p]
+			}
+
+			out[fullPos[k]] = list
+		}
+
+		return out
+	}
 }
 
 // SetNodeSuspension suspends a node or lifts the suspension. A suspended

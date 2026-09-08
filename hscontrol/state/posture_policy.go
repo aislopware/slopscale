@@ -152,9 +152,18 @@ func (s *State) NoteNodeSourceAddr(id types.NodeID, addr netip.Addr) change.Chan
 	}
 
 	addr = addr.Unmap()
+
+	// Every map request restates the address, and a NodeStore write
+	// rebuilds the whole snapshot, so a request from the same address
+	// must not queue one. The read is a pointer load.
+	current, ok := s.nodeStore.GetNode(id)
+	if !ok || current.SourceAddr() == addr {
+		return change.Change{}
+	}
+
 	changed := false
 
-	_, ok := s.nodeStore.UpdateNode(id, func(node *types.Node) {
+	_, ok = s.nodeStore.UpdateNode(id, func(node *types.Node) {
 		if node.SourceAddr != addr {
 			node.SourceAddr = addr
 			changed = true

@@ -36,7 +36,7 @@ func TestSnapshotFromNodes(t *testing.T) {
 			validate: func(t *testing.T, _ map[types.NodeID]types.Node, snapshot Snapshot) {
 				assert.Empty(t, snapshot.nodesByID)
 				assert.Empty(t, snapshot.allNodes)
-				assert.Empty(t, snapshot.peersByNode)
+				assert.Empty(t, snapshot.peersByNode())
 				assert.Empty(t, snapshot.nodesByUser)
 			},
 		},
@@ -52,12 +52,12 @@ func TestSnapshotFromNodes(t *testing.T) {
 			validate: func(t *testing.T, nodes map[types.NodeID]types.Node, snapshot Snapshot) {
 				assert.Len(t, snapshot.nodesByID, 1)
 				assert.Len(t, snapshot.allNodes, 1)
-				assert.Len(t, snapshot.peersByNode, 1)
+				assert.Len(t, snapshot.peersByNode(), 1)
 				assert.Len(t, snapshot.nodesByUser, 1)
 
 				require.Contains(t, snapshot.nodesByID, types.NodeID(1))
 				assert.Equal(t, nodes[1].ID, snapshot.nodesByID[1].ID)
-				assert.Empty(t, snapshot.peersByNode[1]) // no other nodes, so no peers
+				assert.Empty(t, snapshot.peersByNode()[1]) // no other nodes, so no peers
 				assert.Len(t, snapshot.nodesByUser[1], 1)
 				assert.Equal(t, types.NodeID(1), snapshot.nodesByUser[1][0].ID())
 			},
@@ -75,14 +75,14 @@ func TestSnapshotFromNodes(t *testing.T) {
 			validate: func(t *testing.T, _ map[types.NodeID]types.Node, snapshot Snapshot) {
 				assert.Len(t, snapshot.nodesByID, 2)
 				assert.Len(t, snapshot.allNodes, 2)
-				assert.Len(t, snapshot.peersByNode, 2)
+				assert.Len(t, snapshot.peersByNode(), 2)
 				assert.Len(t, snapshot.nodesByUser, 1)
 
 				// Each node sees the other as peer (but not itself)
-				assert.Len(t, snapshot.peersByNode[1], 1)
-				assert.Equal(t, types.NodeID(2), snapshot.peersByNode[1][0].ID())
-				assert.Len(t, snapshot.peersByNode[2], 1)
-				assert.Equal(t, types.NodeID(1), snapshot.peersByNode[2][0].ID())
+				assert.Len(t, snapshot.peersByNode()[1], 1)
+				assert.Equal(t, types.NodeID(2), snapshot.peersByNode()[1][0].ID())
+				assert.Len(t, snapshot.peersByNode()[2], 1)
+				assert.Equal(t, types.NodeID(1), snapshot.peersByNode()[2][0].ID())
 				assert.Len(t, snapshot.nodesByUser[1], 2)
 			},
 		},
@@ -100,13 +100,13 @@ func TestSnapshotFromNodes(t *testing.T) {
 			validate: func(t *testing.T, _ map[types.NodeID]types.Node, snapshot Snapshot) {
 				assert.Len(t, snapshot.nodesByID, 3)
 				assert.Len(t, snapshot.allNodes, 3)
-				assert.Len(t, snapshot.peersByNode, 3)
+				assert.Len(t, snapshot.peersByNode(), 3)
 				assert.Len(t, snapshot.nodesByUser, 2)
 
 				// Each node should have 2 peers (all others, but not itself)
-				assert.Len(t, snapshot.peersByNode[1], 2)
-				assert.Len(t, snapshot.peersByNode[2], 2)
-				assert.Len(t, snapshot.peersByNode[3], 2)
+				assert.Len(t, snapshot.peersByNode()[1], 2)
+				assert.Len(t, snapshot.peersByNode()[2], 2)
+				assert.Len(t, snapshot.peersByNode()[3], 2)
 
 				// User groupings
 				assert.Len(t, snapshot.nodesByUser[1], 2) // user1 has nodes 1,3
@@ -129,22 +129,22 @@ func TestSnapshotFromNodes(t *testing.T) {
 			validate: func(t *testing.T, _ map[types.NodeID]types.Node, snapshot Snapshot) {
 				assert.Len(t, snapshot.nodesByID, 4)
 				assert.Len(t, snapshot.allNodes, 4)
-				assert.Len(t, snapshot.peersByNode, 4)
+				assert.Len(t, snapshot.peersByNode(), 4)
 				assert.Len(t, snapshot.nodesByUser, 4)
 
 				// Odd nodes should only see other odd nodes as peers
-				require.Len(t, snapshot.peersByNode[1], 1)
-				assert.Equal(t, types.NodeID(3), snapshot.peersByNode[1][0].ID())
+				require.Len(t, snapshot.peersByNode()[1], 1)
+				assert.Equal(t, types.NodeID(3), snapshot.peersByNode()[1][0].ID())
 
-				require.Len(t, snapshot.peersByNode[3], 1)
-				assert.Equal(t, types.NodeID(1), snapshot.peersByNode[3][0].ID())
+				require.Len(t, snapshot.peersByNode()[3], 1)
+				assert.Equal(t, types.NodeID(1), snapshot.peersByNode()[3][0].ID())
 
 				// Even nodes should only see other even nodes as peers
-				require.Len(t, snapshot.peersByNode[2], 1)
-				assert.Equal(t, types.NodeID(4), snapshot.peersByNode[2][0].ID())
+				require.Len(t, snapshot.peersByNode()[2], 1)
+				assert.Equal(t, types.NodeID(4), snapshot.peersByNode()[2][0].ID())
 
-				require.Len(t, snapshot.peersByNode[4], 1)
-				assert.Equal(t, types.NodeID(2), snapshot.peersByNode[4][0].ID())
+				require.Len(t, snapshot.peersByNode()[4], 1)
+				assert.Equal(t, types.NodeID(2), snapshot.peersByNode()[4][0].ID())
 			},
 		},
 	}
@@ -154,7 +154,7 @@ func TestSnapshotFromNodes(t *testing.T) {
 			t.Parallel()
 
 			nodes, peersFunc := tt.setupFunc()
-			snapshot := snapshotFromNodes(nodes, peersFunc, PrimaryRouteLedger{})
+			snapshot := snapshotFromNodes(nodes, peerPositionsOf(peersFunc), PrimaryRouteLedger{}, nil)
 			tt.validate(t, nodes, snapshot)
 		})
 	}
@@ -256,7 +256,7 @@ func TestNodeStoreOperations(t *testing.T) {
 						snapshot := store.data.Load()
 						assert.Empty(t, snapshot.nodesByID)
 						assert.Empty(t, snapshot.allNodes)
-						assert.Empty(t, snapshot.peersByNode)
+						assert.Empty(t, snapshot.peersByNode())
 						assert.Empty(t, snapshot.nodesByUser)
 					},
 				},
@@ -271,12 +271,12 @@ func TestNodeStoreOperations(t *testing.T) {
 						snapshot := store.data.Load()
 						assert.Len(t, snapshot.nodesByID, 1)
 						assert.Len(t, snapshot.allNodes, 1)
-						assert.Len(t, snapshot.peersByNode, 1)
+						assert.Len(t, snapshot.peersByNode(), 1)
 						assert.Len(t, snapshot.nodesByUser, 1)
 
 						require.Contains(t, snapshot.nodesByID, types.NodeID(1))
 						assert.Equal(t, node.ID, snapshot.nodesByID[1].ID)
-						assert.Empty(t, snapshot.peersByNode[1]) // no peers yet
+						assert.Empty(t, snapshot.peersByNode()[1]) // no peers yet
 						assert.Len(t, snapshot.nodesByUser[1], 1)
 					},
 				},
@@ -297,9 +297,9 @@ func TestNodeStoreOperations(t *testing.T) {
 						snapshot := store.data.Load()
 						assert.Len(t, snapshot.nodesByID, 1)
 						assert.Len(t, snapshot.allNodes, 1)
-						assert.Len(t, snapshot.peersByNode, 1)
+						assert.Len(t, snapshot.peersByNode(), 1)
 						assert.Len(t, snapshot.nodesByUser, 1)
-						assert.Empty(t, snapshot.peersByNode[1])
+						assert.Empty(t, snapshot.peersByNode()[1])
 					},
 				},
 				{
@@ -313,14 +313,14 @@ func TestNodeStoreOperations(t *testing.T) {
 						snapshot := store.data.Load()
 						assert.Len(t, snapshot.nodesByID, 2)
 						assert.Len(t, snapshot.allNodes, 2)
-						assert.Len(t, snapshot.peersByNode, 2)
+						assert.Len(t, snapshot.peersByNode(), 2)
 						assert.Len(t, snapshot.nodesByUser, 1)
 
 						// Now both nodes should see each other as peers
-						assert.Len(t, snapshot.peersByNode[1], 1)
-						assert.Equal(t, types.NodeID(2), snapshot.peersByNode[1][0].ID())
-						assert.Len(t, snapshot.peersByNode[2], 1)
-						assert.Equal(t, types.NodeID(1), snapshot.peersByNode[2][0].ID())
+						assert.Len(t, snapshot.peersByNode()[1], 1)
+						assert.Equal(t, types.NodeID(2), snapshot.peersByNode()[1][0].ID())
+						assert.Len(t, snapshot.peersByNode()[2], 1)
+						assert.Equal(t, types.NodeID(1), snapshot.peersByNode()[2][0].ID())
 						assert.Len(t, snapshot.nodesByUser[1], 2)
 					},
 				},
@@ -335,13 +335,13 @@ func TestNodeStoreOperations(t *testing.T) {
 						snapshot := store.data.Load()
 						assert.Len(t, snapshot.nodesByID, 3)
 						assert.Len(t, snapshot.allNodes, 3)
-						assert.Len(t, snapshot.peersByNode, 3)
+						assert.Len(t, snapshot.peersByNode(), 3)
 						assert.Len(t, snapshot.nodesByUser, 2)
 
 						// All nodes should see the other 2 as peers
-						assert.Len(t, snapshot.peersByNode[1], 2)
-						assert.Len(t, snapshot.peersByNode[2], 2)
-						assert.Len(t, snapshot.peersByNode[3], 2)
+						assert.Len(t, snapshot.peersByNode()[1], 2)
+						assert.Len(t, snapshot.peersByNode()[2], 2)
+						assert.Len(t, snapshot.peersByNode()[3], 2)
 
 						// User groupings
 						assert.Len(t, snapshot.nodesByUser[1], 2) // user1 has nodes 1,2
@@ -367,7 +367,7 @@ func TestNodeStoreOperations(t *testing.T) {
 						snapshot := store.data.Load()
 						assert.Len(t, snapshot.nodesByID, 3)
 						assert.Len(t, snapshot.allNodes, 3)
-						assert.Len(t, snapshot.peersByNode, 3)
+						assert.Len(t, snapshot.peersByNode(), 3)
 						assert.Len(t, snapshot.nodesByUser, 2)
 					},
 				},
@@ -379,17 +379,17 @@ func TestNodeStoreOperations(t *testing.T) {
 						snapshot := store.data.Load()
 						assert.Len(t, snapshot.nodesByID, 2)
 						assert.Len(t, snapshot.allNodes, 2)
-						assert.Len(t, snapshot.peersByNode, 2)
+						assert.Len(t, snapshot.peersByNode(), 2)
 						assert.Len(t, snapshot.nodesByUser, 2)
 
 						// Node 2 should be gone
 						assert.NotContains(t, snapshot.nodesByID, types.NodeID(2))
 
 						// Remaining nodes should see each other as peers
-						assert.Len(t, snapshot.peersByNode[1], 1)
-						assert.Equal(t, types.NodeID(3), snapshot.peersByNode[1][0].ID())
-						assert.Len(t, snapshot.peersByNode[3], 1)
-						assert.Equal(t, types.NodeID(1), snapshot.peersByNode[3][0].ID())
+						assert.Len(t, snapshot.peersByNode()[1], 1)
+						assert.Equal(t, types.NodeID(3), snapshot.peersByNode()[1][0].ID())
+						assert.Len(t, snapshot.peersByNode()[3], 1)
+						assert.Equal(t, types.NodeID(1), snapshot.peersByNode()[3][0].ID())
 
 						// User groupings updated
 						assert.Len(t, snapshot.nodesByUser[1], 1) // user1 now has only node 1
@@ -405,7 +405,7 @@ func TestNodeStoreOperations(t *testing.T) {
 						snapshot := store.data.Load()
 						assert.Empty(t, snapshot.nodesByID)
 						assert.Empty(t, snapshot.allNodes)
-						assert.Empty(t, snapshot.peersByNode)
+						assert.Empty(t, snapshot.peersByNode())
 						assert.Empty(t, snapshot.nodesByUser)
 					},
 				},
@@ -447,8 +447,8 @@ func TestNodeStoreOperations(t *testing.T) {
 						assert.Equal(t, "node2", snapshot.nodesByID[2].Hostname) // unchanged
 
 						// Peers should still work correctly
-						assert.Len(t, snapshot.peersByNode[1], 1)
-						assert.Len(t, snapshot.peersByNode[2], 1)
+						assert.Len(t, snapshot.peersByNode()[1], 1)
+						assert.Len(t, snapshot.peersByNode()[2], 1)
 					},
 				},
 			},
@@ -479,17 +479,17 @@ func TestNodeStoreOperations(t *testing.T) {
 						assert.Len(t, snapshot.nodesByID, 4)
 
 						// Verify odd-even peer relationships
-						require.Len(t, snapshot.peersByNode[1], 1)
-						assert.Equal(t, types.NodeID(3), snapshot.peersByNode[1][0].ID())
+						require.Len(t, snapshot.peersByNode()[1], 1)
+						assert.Equal(t, types.NodeID(3), snapshot.peersByNode()[1][0].ID())
 
-						require.Len(t, snapshot.peersByNode[2], 1)
-						assert.Equal(t, types.NodeID(4), snapshot.peersByNode[2][0].ID())
+						require.Len(t, snapshot.peersByNode()[2], 1)
+						assert.Equal(t, types.NodeID(4), snapshot.peersByNode()[2][0].ID())
 
-						require.Len(t, snapshot.peersByNode[3], 1)
-						assert.Equal(t, types.NodeID(1), snapshot.peersByNode[3][0].ID())
+						require.Len(t, snapshot.peersByNode()[3], 1)
+						assert.Equal(t, types.NodeID(1), snapshot.peersByNode()[3][0].ID())
 
-						require.Len(t, snapshot.peersByNode[4], 1)
-						assert.Equal(t, types.NodeID(2), snapshot.peersByNode[4][0].ID())
+						require.Len(t, snapshot.peersByNode()[4], 1)
+						assert.Equal(t, types.NodeID(2), snapshot.peersByNode()[4][0].ID())
 					},
 				},
 				{
@@ -501,13 +501,13 @@ func TestNodeStoreOperations(t *testing.T) {
 						assert.Len(t, snapshot.nodesByID, 3)
 
 						// Node 3 (odd) should now have no peers
-						assert.Empty(t, snapshot.peersByNode[3])
+						assert.Empty(t, snapshot.peersByNode()[3])
 
 						// Even nodes should still see each other
-						require.Len(t, snapshot.peersByNode[2], 1)
-						assert.Equal(t, types.NodeID(4), snapshot.peersByNode[2][0].ID())
-						require.Len(t, snapshot.peersByNode[4], 1)
-						assert.Equal(t, types.NodeID(2), snapshot.peersByNode[4][0].ID())
+						require.Len(t, snapshot.peersByNode()[2], 1)
+						assert.Equal(t, types.NodeID(4), snapshot.peersByNode()[2][0].ID())
+						require.Len(t, snapshot.peersByNode()[4], 1)
+						assert.Equal(t, types.NodeID(2), snapshot.peersByNode()[4][0].ID())
 					},
 				},
 			},
@@ -599,9 +599,9 @@ func TestNodeStoreOperations(t *testing.T) {
 						assert.Equal(t, "node3", snapshot.nodesByID[3].Hostname)
 
 						// Verify peer relationships are updated correctly with new node
-						assert.Len(t, snapshot.peersByNode[1], 2) // sees nodes 2 and 3
-						assert.Len(t, snapshot.peersByNode[2], 2) // sees nodes 1 and 3
-						assert.Len(t, snapshot.peersByNode[3], 2) // sees nodes 1 and 2
+						assert.Len(t, snapshot.peersByNode()[1], 2) // sees nodes 2 and 3
+						assert.Len(t, snapshot.peersByNode()[2], 2) // sees nodes 1 and 3
+						assert.Len(t, snapshot.peersByNode()[3], 2) // sees nodes 1 and 2
 					},
 				},
 				{
@@ -1316,10 +1316,10 @@ func TestRebuildPeerMapsWithChangedPeersFunc(t *testing.T) {
 
 	// Initially, nodes should see each other as peers
 	snapshot := store.data.Load()
-	require.Len(t, snapshot.peersByNode[1], 1, "node1 should have 1 peer initially")
-	require.Len(t, snapshot.peersByNode[2], 1, "node2 should have 1 peer initially")
-	require.Equal(t, types.NodeID(2), snapshot.peersByNode[1][0].ID())
-	require.Equal(t, types.NodeID(1), snapshot.peersByNode[2][0].ID())
+	require.Len(t, snapshot.peersByNode()[1], 1, "node1 should have 1 peer initially")
+	require.Len(t, snapshot.peersByNode()[2], 1, "node2 should have 1 peer initially")
+	require.Equal(t, types.NodeID(2), snapshot.peersByNode()[1][0].ID())
+	require.Equal(t, types.NodeID(1), snapshot.peersByNode()[2][0].ID())
 
 	// Now "change the policy" by disabling peers
 	allowPeers = false
@@ -1329,8 +1329,8 @@ func TestRebuildPeerMapsWithChangedPeersFunc(t *testing.T) {
 
 	// After rebuild, nodes should have no peers
 	snapshot = store.data.Load()
-	assert.Empty(t, snapshot.peersByNode[1], "node1 should have no peers after rebuild")
-	assert.Empty(t, snapshot.peersByNode[2], "node2 should have no peers after rebuild")
+	assert.Empty(t, snapshot.peersByNode()[1], "node1 should have no peers after rebuild")
+	assert.Empty(t, snapshot.peersByNode()[2], "node2 should have no peers after rebuild")
 
 	// Verify that ListPeers returns the correct result
 	peers1 := store.ListPeers(1)
@@ -1346,8 +1346,8 @@ func TestRebuildPeerMapsWithChangedPeersFunc(t *testing.T) {
 
 	// Nodes should see each other again
 	snapshot = store.data.Load()
-	require.Len(t, snapshot.peersByNode[1], 1, "node1 should have 1 peer after re-enabling")
-	require.Len(t, snapshot.peersByNode[2], 1, "node2 should have 1 peer after re-enabling")
+	require.Len(t, snapshot.peersByNode()[1], 1, "node1 should have 1 peer after re-enabling")
+	require.Len(t, snapshot.peersByNode()[2], 1, "node2 should have 1 peer after re-enabling")
 
 	peers1 = store.ListPeers(1)
 	peers2 = store.ListPeers(2)

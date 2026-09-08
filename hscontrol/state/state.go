@@ -265,14 +265,7 @@ func NewState(cfg *types.Config) (*State, error) {
 
 	// [policy.PolicyManager.BuildPeerMap] handles both global and per-node filter complexity.
 	// This moves the complex peer relationship logic into the policy package where it belongs.
-	nodeStore := NewNodeStore(
-		nodes,
-		func(nodes []types.NodeView) map[types.NodeID][]types.NodeView {
-			return polMan.BuildPeerMap(views.SliceOf(admittedPeerCandidates(nodes)))
-		},
-		batchSize,
-		batchTimeout,
-	)
+	nodeStore := NewNodeStorePositional(nodes, peerPositionsFunc(polMan), batchSize, batchTimeout)
 	nodeStore.Start()
 
 	s := &State{
@@ -2514,11 +2507,12 @@ func (s *State) UpdateNodeFromMapRequest(
 	id types.NodeID,
 	req tailcfg.MapRequest,
 ) (change.Change, error) {
-	log.Trace().
-		Caller().
-		Uint64(zf.NodeID, id.Uint64()).
-		Object("request", zlog.MapRequest(&req)).
-		Msg("Processing MapRequest for node")
+	if e := log.Trace(); e.Enabled() {
+		e.Caller().
+			Uint64(zf.NodeID, id.Uint64()).
+			Object("request", zlog.MapRequest(&req)).
+			Msg("Processing MapRequest for node")
+	}
 
 	var (
 		routeChange        bool

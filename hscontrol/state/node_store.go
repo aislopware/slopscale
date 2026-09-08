@@ -1,6 +1,7 @@
 package state
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"maps"
@@ -106,7 +107,7 @@ var (
 type NodeStore struct {
 	data atomic.Pointer[Snapshot]
 
-	peersFunc  PeersFunc
+	peersFunc  PeerPositionsFunc
 	writeQueue chan work
 
 	// stopped is closed once by Stop to signal the writer goroutine to exit
@@ -119,13 +120,28 @@ type NodeStore struct {
 	batchTimeout time.Duration
 }
 
+// NewNodeStore builds a store whose peers come from a [PeersFunc] keyed by
+// node id. Production passes positions through [NewNodeStorePositional];
+// this constructor adapts the map form so tests can hand in any peer
+// relationship.
 func NewNodeStore(allNodes types.Nodes, peersFunc PeersFunc, batchSize int, batchTimeout time.Duration) *NodeStore {
+	return NewNodeStorePositional(allNodes, peerPositionsOf(peersFunc), batchSize, batchTimeout)
+}
+
+// NewNodeStorePositional builds a store whose peers come from a
+// [PeerPositionsFunc].
+func NewNodeStorePositional(
+	allNodes types.Nodes,
+	peersFunc PeerPositionsFunc,
+	batchSize int,
+	batchTimeout time.Duration,
+) *NodeStore {
 	nodes := make(map[types.NodeID]types.Node, len(allNodes))
 	for _, n := range allNodes {
 		nodes[n.ID] = *n
 	}
 
-	snap := snapshotFromNodes(nodes, peersFunc, PrimaryRouteLedger{})
+	snap := snapshotFromNodes(nodes, peersFunc, PrimaryRouteLedger{}, nil)
 
 	store := &NodeStore{
 		peersFunc:    peersFunc,
@@ -164,6 +180,19 @@ func (m operationMetrics) observe(start time.Time) {
 	m.count.Inc()
 }
 
+// observeDuration records only the duration of one operation. The write
+// paths count the operation separately, once the write has completed, so
+// a write that is dropped by a stopped store is not counted.
+func (m operationMetrics) observeDuration(start time.Time) {
+	m.duration.Observe(time.Since(start).Seconds())
+}
+
+// observeSince records the time since start on an unlabelled histogram.
+// Used instead of [prometheus.NewTimer], which allocates a timer per call.
+func observeSince(h prometheus.Observer, start time.Time) {
+	h.Observe(time.Since(start).Seconds())
+}
+
 var (
 	nodeStoreGetMetrics                          = newOperationMetrics("get")
 	nodeStoreGetByKeyMetrics                     = newOperationMetrics("get_by_key")
@@ -171,6 +200,11 @@ var (
 	nodeStoreListMetrics                         = newOperationMetrics("list")
 	nodeStoreListByUserMetrics                   = newOperationMetrics("list_by_user")
 	nodeStoreListPeersMetrics                    = newOperationMetrics("list_peers")
+	nodeStorePutMetrics                          = newOperationMetrics("put")
+	nodeStoreUpdateMetrics                       = newOperationMetrics("update")
+	nodeStoreUpdateMultiMetrics                  = newOperationMetrics("update_multi")
+	nodeStoreDeleteMetrics                       = newOperationMetrics("delete")
+	nodeStoreSetNameMetrics                      = newOperationMetrics("set_name")
 )
 
 // Snapshot is the representation of the current state of the [NodeStore].
@@ -187,10 +221,22 @@ type Snapshot struct {
 	// owns, so a read hands out a pointer instead of copying the node.
 	nodeViewsByID     map[types.NodeID]types.NodeView
 	nodesByNodeKey    map[key.NodePublic]types.NodeView
-	nodesByMachineKey map[key.MachinePublic]map[types.UserID]types.NodeView
-	peersByNode       map[types.NodeID][]types.NodeView
+	nodesByMachineKey map[key.MachinePublic]machineKeyNodes
 	nodesByUser       map[types.UserID][]types.NodeView
-	allNodes          []types.NodeView
+	// allNodes is sorted by id, so peerPositions stays valid across
+	// batches that keep the node set.
+	allNodes []types.NodeView
+	// posByID is each node's position in allNodes.
+	posByID map[types.NodeID]int32
+
+	// peerPositions is the peer relationship as positions into allNodes,
+	// the form the policy computes it in: peerPositions[i] lists the
+	// positions of node i's peers, nil for a node without an entry. A
+	// batch that changes no input of that computation carries it forward
+	// instead of paying the O(n²) policy scan, and a read resolves the
+	// views through allNodes, so the peers always point at the current
+	// copies.
+	peerPositions [][]int32
 
 	// routes maps each prefix to its current primary advertiser. The
 	// previous assignment is carried over when still valid so the
@@ -204,6 +250,37 @@ type Snapshot struct {
 	// primary, as Tailscale's regional routing does; a region without a
 	// healthy advertiser for a prefix has no entry and falls back.
 	regionalRoutes map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID
+}
+
+// machineKeyNode is one node of the machine key index together with the
+// user that owns it. Tagged nodes carry the tagged sentinel UserID(0).
+type machineKeyNode struct {
+	userID types.UserID
+	node   types.NodeView
+}
+
+// machineKeyNodes holds every node registered under one machine key. A
+// device is normally registered by a single user, so the first node is
+// stored inline and rest stays nil; only a device registered by several
+// users (the "create new, do not transfer" path) allocates. Keeping the
+// common case allocation-free matters because the index is rebuilt for
+// every node on every write batch.
+type machineKeyNodes struct {
+	first machineKeyNode
+	rest  []machineKeyNode
+}
+
+// add records that node, owned by userID, uses the machine key this entry
+// indexes.
+func (m machineKeyNodes) add(userID types.UserID, node types.NodeView) machineKeyNodes {
+	if !m.first.node.Valid() {
+		m.first = machineKeyNode{userID: userID, node: node}
+		return m
+	}
+
+	m.rest = append(m.rest, machineKeyNode{userID: userID, node: node})
+
+	return m
 }
 
 // PrimaryRouteLedger is a snapshot's primary assignment: the tailnet-wide
@@ -227,6 +304,82 @@ func (l PrimaryRouteLedger) Equal(o PrimaryRouteLedger) bool {
 // This will typically be used to calculate which nodes can see each other
 // based on the current policy.
 type PeersFunc func(nodes []types.NodeView) map[types.NodeID][]types.NodeView
+
+// PeerPositionsFunc computes the peer relationship as positions into the
+// slice it is given: out[i] lists the positions of node i's peers. A nil
+// list means the node has no entry in the peer map; an empty one means
+// it has an entry without peers.
+type PeerPositionsFunc func(nodes []types.NodeView) [][]int32
+
+// peerPositionsOf adapts a [PeersFunc] to positions.
+func peerPositionsOf(peersFunc PeersFunc) PeerPositionsFunc {
+	return func(nodes []types.NodeView) [][]int32 {
+		byID := peersFunc(nodes)
+		if byID == nil {
+			return nil
+		}
+
+		posByID := make(map[types.NodeID]int32, len(nodes))
+		for i, n := range nodes {
+			posByID[n.ID()] = int32(i)
+		}
+
+		out := make([][]int32, len(nodes))
+
+		for i, n := range nodes {
+			peers, ok := byID[n.ID()]
+			if !ok {
+				continue
+			}
+
+			list := make([]int32, 0, len(peers))
+			for _, p := range peers {
+				if pos, ok := posByID[p.ID()]; ok {
+					list = append(list, pos)
+				}
+			}
+
+			out[i] = list
+		}
+
+		return out
+	}
+}
+
+// peerInputsChanged reports whether an update to a node could change who
+// its peers are: the inputs the policy reads (what HasPolicyChange
+// compares), whether the node is admitted, its routes and exit status,
+// and the user identity the policy resolves names through. A batch of
+// updates that changes none of these keeps the previous peer map.
+func peerInputsChanged(old, updated *types.Node) bool {
+	if old.View().HasPolicyChange(updated.View()) {
+		return true
+	}
+
+	if old.IsAdmitted() != updated.IsAdmitted() || old.IsExitNode() != updated.IsExitNode() {
+		return true
+	}
+
+	if !slices.Equal(old.ApprovedRoutes, updated.ApprovedRoutes) ||
+		!slices.Equal(old.AnnouncedRoutes(), updated.AnnouncedRoutes()) {
+		return true
+	}
+
+	return !userIdentityEqual(old.User, updated.User)
+}
+
+// userIdentityEqual compares what the policy resolves a user by. A tagged
+// node carries no user.
+func userIdentityEqual(a, b *types.User) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+
+	return a.Name == b.Name &&
+		a.Email == b.Email &&
+		a.Role == b.Role &&
+		a.ProviderIdentifier == b.ProviderIdentifier
+}
 
 // work represents a single operation to be performed on the [NodeStore].
 type work struct {
@@ -253,8 +406,7 @@ type work struct {
 // This is a blocking operation that waits for the write to complete.
 // Returns the resulting node after all modifications in the batch have been applied.
 func (s *NodeStore) PutNode(n types.Node) types.NodeView {
-	timer := prometheus.NewTimer(nodeStoreOperationDuration.WithLabelValues("put"))
-	defer timer.ObserveDuration()
+	defer nodeStorePutMetrics.observeDuration(time.Now())
 
 	w := work{
 		op:         put,
@@ -279,7 +431,7 @@ func (s *NodeStore) PutNode(n types.Node) types.NodeView {
 
 	resultNode := <-w.nodeResult
 
-	nodeStoreOperations.WithLabelValues("put").Inc()
+	nodeStorePutMetrics.count.Inc()
 
 	return resultNode
 }
@@ -298,12 +450,14 @@ type UpdateNodeFunc func(n *types.Node)
 // [NodeStore.UpdateNodes] directly; collecting changes into one batch
 // keeps the election from running on a half-applied snapshot.
 func (s *NodeStore) UpdateNode(nodeID types.NodeID, updateFn UpdateNodeFunc) (types.NodeView, bool) {
-	timer := prometheus.NewTimer(nodeStoreOperationDuration.WithLabelValues("update"))
-	defer timer.ObserveDuration()
+	defer nodeStoreUpdateMetrics.observeDuration(time.Now())
 
-	s.UpdateNodes(map[types.NodeID]UpdateNodeFunc{nodeID: updateFn})
-
-	nodeStoreOperations.WithLabelValues("update").Inc()
+	// Goes through updateNodes rather than UpdateNodes so a single-node
+	// write is timed and counted once, as "update", not also as
+	// "update_multi".
+	if s.updateNodes(map[types.NodeID]UpdateNodeFunc{nodeID: updateFn}) {
+		nodeStoreUpdateMetrics.count.Inc()
+	}
 
 	return s.GetNode(nodeID)
 }
@@ -316,40 +470,17 @@ func (s *NodeStore) UpdateNode(nodeID types.NodeID, updateFn UpdateNodeFunc) (ty
 // would change the election outcome — e.g. the HA prober applying
 // concurrent probe-timeout results.
 func (s *NodeStore) UpdateNodes(updates map[types.NodeID]UpdateNodeFunc) {
-	timer := prometheus.NewTimer(nodeStoreOperationDuration.WithLabelValues("update_multi"))
-	defer timer.ObserveDuration()
+	defer nodeStoreUpdateMultiMetrics.observeDuration(time.Now())
 
-	if len(updates) == 0 {
-		return
+	if s.updateNodes(updates) {
+		nodeStoreUpdateMultiMetrics.count.Inc()
 	}
-
-	w := work{
-		op:           updateMulti,
-		multiUpdates: updates,
-		result:       make(chan struct{}),
-	}
-
-	nodeStoreQueueDepth.Inc()
-
-	select {
-	case s.writeQueue <- w:
-	case <-s.stopped:
-		nodeStoreQueueDepth.Dec()
-
-		return
-	}
-
-	<-w.result
-	nodeStoreQueueDepth.Dec()
-
-	nodeStoreOperations.WithLabelValues("update_multi").Inc()
 }
 
 // DeleteNode removes a node from the store by its ID.
 // This is a blocking operation that waits for the write to complete.
 func (s *NodeStore) DeleteNode(id types.NodeID) {
-	timer := prometheus.NewTimer(nodeStoreOperationDuration.WithLabelValues("delete"))
-	defer timer.ObserveDuration()
+	defer nodeStoreDeleteMetrics.observeDuration(time.Now())
 
 	w := work{
 		op:     del,
@@ -370,7 +501,7 @@ func (s *NodeStore) DeleteNode(id types.NodeID) {
 	<-w.result
 	nodeStoreQueueDepth.Dec()
 
-	nodeStoreOperations.WithLabelValues("delete").Inc()
+	nodeStoreDeleteMetrics.count.Inc()
 }
 
 // SetGivenName sets [types.Node.GivenName] on the node identified by id,
@@ -388,8 +519,7 @@ func (s *NodeStore) DeleteNode(id types.NodeID) {
 // write are atomic with respect to concurrent
 // [NodeStore.PutNode]/[NodeStore.UpdateNode].
 func (s *NodeStore) SetGivenName(id types.NodeID, name string) (types.NodeView, error) {
-	timer := prometheus.NewTimer(nodeStoreOperationDuration.WithLabelValues("set_name"))
-	defer timer.ObserveDuration()
+	defer nodeStoreSetNameMetrics.observeDuration(time.Now())
 
 	w := work{
 		op:         setName,
@@ -413,7 +543,7 @@ func (s *NodeStore) SetGivenName(id types.NodeID, name string) (types.NodeView, 
 	<-w.result
 	nodeStoreQueueDepth.Dec()
 
-	nodeStoreOperations.WithLabelValues("set_name").Inc()
+	nodeStoreSetNameMetrics.count.Inc()
 
 	err := <-w.errResult
 	if err != nil {
@@ -438,33 +568,65 @@ func (s *NodeStore) Stop() {
 	})
 }
 
-// resolveGivenName returns a unique DNS label for the node identified
-// by self, based on the caller-supplied base label. If base is empty
-// it falls back to [fallbackGivenName] ("node"). The label's own holder
-// (self) is excluded from the collision scan so an idempotent write
-// keeps the current label.
+// givenNames counts how many nodes hold each given name.
+// [NodeStore.applyBatch] builds it once per batch and keeps it in step
+// with the names the batch writes, so resolving a name costs a lookup per
+// candidate instead of a scan over every node per operation.
+type givenNames map[string]int
+
+func newGivenNames(nodes map[types.NodeID]types.Node) givenNames {
+	names := make(givenNames, len(nodes))
+	for _, n := range nodes {
+		names[n.GivenName]++
+	}
+
+	return names
+}
+
+// free reports whether candidate is available to the node currently named
+// selfName: nobody holds it, or only that node does.
+func (g givenNames) free(candidate, selfName string) bool {
+	held := g[candidate]
+	if candidate == selfName {
+		held--
+	}
+
+	return held <= 0
+}
+
+// hold records one more node holding name.
+func (g givenNames) hold(name string) {
+	g[name]++
+}
+
+// release records one fewer node holding name.
+func (g givenNames) release(name string) {
+	if g[name] <= 1 {
+		delete(g, name)
+		return
+	}
+
+	g[name]--
+}
+
+// resolveGivenName returns a unique DNS label for a node whose current
+// label is selfName (empty for a node that is being created), based on
+// the caller-supplied base label. If base is empty it falls back to
+// [fallbackGivenName] ("node"). The label's own holder is excluded from
+// the collision check so an idempotent write keeps the current label.
 //
 // On collision the label is bumped as base, base-1, base-2, …, first
 // unused wins. Must be called from the [NodeStore] writer goroutine
-// (inside [NodeStore.applyBatch]) so the nodes map reflects all earlier
-// ops in the batch and no other writer can interleave.
-func resolveGivenName(nodes map[types.NodeID]types.Node, self types.NodeID, base string) string {
+// (inside [NodeStore.applyBatch]) so taken reflects all earlier ops in
+// the batch and no other writer can interleave.
+func resolveGivenName(taken givenNames, selfName, base string) string {
 	if base == "" {
 		base = fallbackGivenName
 	}
 
-	taken := make(map[string]struct{}, len(nodes))
-	for id, n := range nodes {
-		if id == self {
-			continue
-		}
-
-		taken[n.GivenName] = struct{}{}
-	}
-
 	candidate := base
 	for i := 1; ; i++ {
-		if _, busy := taken[candidate]; !busy {
+		if taken.free(candidate, selfName) {
 			return candidate
 		}
 
@@ -475,13 +637,18 @@ func resolveGivenName(nodes map[types.NodeID]types.Node, self types.NodeID, base
 // snapshotFromNodes builds the index maps and primary-route table for
 // a new [Snapshot]. prevRoutes carries forward the previous primary
 // assignment so a still-valid choice survives unrelated batches.
+//
+// keepPeers, when not nil, is the previous snapshot's peer relationship
+// over the same node set; the caller vouches that the batch changed no
+// input of it (see peerInputsChanged), so the policy scan is skipped and
+// the views are re-pointed at the new copies.
 func snapshotFromNodes(
 	nodes map[types.NodeID]types.Node,
-	peersFunc PeersFunc,
+	peersFunc PeerPositionsFunc,
 	prev PrimaryRouteLedger,
+	keepPeers [][]int32,
 ) Snapshot {
-	timer := prometheus.NewTimer(nodeStoreSnapshotBuildDuration)
-	defer timer.ObserveDuration()
+	defer observeSince(nodeStoreSnapshotBuildDuration, time.Now())
 
 	// One copy per node, shared by every index; each view points at it.
 	allNodes := make([]types.NodeView, 0, len(nodes))
@@ -493,27 +660,36 @@ func snapshotFromNodes(
 		nodeViewsByID[n.ID] = nodeView
 	}
 
+	slices.SortFunc(allNodes, func(a, b types.NodeView) int { return cmp.Compare(a.ID(), b.ID()) })
+
+	posByID := make(map[types.NodeID]int32, len(allNodes))
+	for i, n := range allNodes {
+		posByID[n.ID()] = int32(i)
+	}
+
 	routes, isPrimaryRoute := electPrimaryRoutes(nodes, prev.Global)
 	regionalRoutes := electRegionalRoutes(nodes, prev.Regional)
+
+	// The peer relationship is the expensive part: every pair of nodes
+	// through the policy. It is only recomputed when a batch changed an
+	// input of it.
+	peerPositions := keepPeers
+	if keepPeers == nil {
+		start := time.Now()
+		peerPositions = peersFunc(allNodes)
+
+		observeSince(nodeStorePeersCalculationDuration, start)
+	}
 
 	newSnap := Snapshot{
 		nodesByID:         nodes,
 		nodeViewsByID:     nodeViewsByID,
 		allNodes:          allNodes,
 		nodesByNodeKey:    make(map[key.NodePublic]types.NodeView, len(nodes)),
-		nodesByMachineKey: make(map[key.MachinePublic]map[types.UserID]types.NodeView, len(nodes)),
-
-		// peersByNode is most likely the most expensive operation,
-		// it will use the list of all nodes, combined with the
-		// current policy to precalculate which nodes are peers and
-		// can see each other.
-		peersByNode: func() map[types.NodeID][]types.NodeView {
-			peersTimer := prometheus.NewTimer(nodeStorePeersCalculationDuration)
-			defer peersTimer.ObserveDuration()
-
-			return peersFunc(allNodes)
-		}(),
-		nodesByUser: make(map[types.UserID][]types.NodeView),
+		nodesByMachineKey: make(map[key.MachinePublic]machineKeyNodes, len(nodes)),
+		posByID:           posByID,
+		peerPositions:     peerPositions,
+		nodesByUser:       make(map[types.UserID][]types.NodeView),
 
 		routes:         routes,
 		isPrimaryRoute: isPrimaryRoute,
@@ -534,27 +710,25 @@ func snapshotFromNodes(
 		newSnap.nodesByNodeKey[n.NodeKey] = nodeView
 
 		// Build machine key index
-		if newSnap.nodesByMachineKey[n.MachineKey] == nil {
-			newSnap.nodesByMachineKey[n.MachineKey] = make(map[types.UserID]types.NodeView)
-		}
-
-		newSnap.nodesByMachineKey[n.MachineKey][userID] = nodeView
+		newSnap.nodesByMachineKey[n.MachineKey] = newSnap.nodesByMachineKey[n.MachineKey].add(userID, nodeView)
 	}
 
 	return newSnap
 }
 
 // onlineAdvertisers maps each non-exit prefix to the IDs of online nodes
-// that approve it. Nodes are visited in the order of ids, so the per-prefix
-// slices preserve that order.
-func onlineAdvertisers(
-	nodes map[types.NodeID]types.Node,
-	ids []types.NodeID,
-) map[netip.Prefix][]types.NodeID {
-	advertisers := make(map[netip.Prefix][]types.NodeID)
+// that approve it, in ascending node ID order.
+//
+// The order comes from sorting the per-prefix slices, which hold one or
+// two IDs in practice, rather than from visiting the nodes in ID order:
+// materialising and sorting every node ID costs a slice of the whole
+// tailnet on every rebuild, including the common one where no node
+// advertises a route at all. The map itself is only allocated once there
+// is something to put in it.
+func onlineAdvertisers(nodes map[types.NodeID]types.Node) map[netip.Prefix][]types.NodeID {
+	var advertisers map[netip.Prefix][]types.NodeID
 
-	for _, id := range ids {
-		n := nodes[id]
+	for id, n := range nodes {
 		if n.IsOnline == nil || !*n.IsOnline {
 			continue
 		}
@@ -564,8 +738,16 @@ func onlineAdvertisers(
 				continue
 			}
 
+			if advertisers == nil {
+				advertisers = make(map[netip.Prefix][]types.NodeID)
+			}
+
 			advertisers[p] = append(advertisers[p], id)
 		}
+	}
+
+	for _, ids := range advertisers {
+		slices.Sort(ids)
 	}
 
 	return advertisers
@@ -584,7 +766,14 @@ func electPrimaryRoutes(
 	nodes map[types.NodeID]types.Node,
 	prev map[netip.Prefix]types.NodeID,
 ) (map[netip.Prefix]types.NodeID, map[types.NodeID]bool) {
-	advertisers := onlineAdvertisers(nodes, slices.Sorted(maps.Keys(nodes)))
+	advertisers := onlineAdvertisers(nodes)
+	if len(advertisers) == 0 {
+		// Nothing is advertised, so nothing is elected. Returning early
+		// keeps a tailnet without subnet routers off the election path
+		// entirely, which every write batch would otherwise pay for.
+		return nil, nil
+	}
+
 	routes := electPrefixes(nodes, advertisers, prev)
 
 	isPrimaryRoute := make(map[types.NodeID]bool, len(routes))
@@ -657,8 +846,10 @@ func electRegionalRoutes(
 	nodes map[types.NodeID]types.Node,
 	prev map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID,
 ) map[tailcfg.DERPRegionID]map[netip.Prefix]types.NodeID {
-	ids := slices.Sorted(maps.Keys(nodes))
-	advertisers := onlineAdvertisers(nodes, ids)
+	advertisers := onlineAdvertisers(nodes)
+	if len(advertisers) == 0 {
+		return nil
+	}
 
 	byRegion := make(map[tailcfg.DERPRegionID]map[netip.Prefix][]types.NodeID)
 
@@ -740,10 +931,17 @@ func (s *NodeStore) GetNodeByNodeKey(nodeKey key.NodePublic) (types.NodeView, bo
 func (s *NodeStore) GetNodesByMachineKeyAllUsers(machineKey key.MachinePublic) map[types.UserID]types.NodeView {
 	defer nodeStoreGetNodesByMachineKeyAllUsersMetrics.observe(time.Now())
 
-	userMap := s.data.Load().nodesByMachineKey[machineKey]
+	entry, ok := s.data.Load().nodesByMachineKey[machineKey]
+	if !ok {
+		return map[types.UserID]types.NodeView{}
+	}
 
-	out := make(map[types.UserID]types.NodeView, len(userMap))
-	maps.Copy(out, userMap)
+	out := make(map[types.UserID]types.NodeView, 1+len(entry.rest))
+	out[entry.first.userID] = entry.first.node
+
+	for _, e := range entry.rest {
+		out[e.userID] = e.node
+	}
 
 	return out
 }
@@ -783,18 +981,22 @@ func (s *NodeStore) DebugString() string {
 
 	totalPeers := 0
 
-	for nodeID, peers := range snapshot.peersByNode {
-		peerCount := len(peers)
+	withEntry := 0
 
-		totalPeers += peerCount
-		if node, exists := snapshot.nodesByID[nodeID]; exists {
-			fmt.Fprintf(&sb, "  - Node %d (%s): %d peers\n",
-				nodeID, node.Hostname, peerCount)
+	for i, peers := range snapshot.peerPositions {
+		if peers == nil {
+			continue
 		}
+
+		withEntry++
+		totalPeers += len(peers)
+
+		node := snapshot.allNodes[i]
+		fmt.Fprintf(&sb, "  - Node %d (%s): %d peers\n", node.ID(), node.Hostname(), len(peers))
 	}
 
-	if len(snapshot.peersByNode) > 0 {
-		avgPeers := float64(totalPeers) / float64(len(snapshot.peersByNode))
+	if withEntry > 0 {
+		avgPeers := float64(totalPeers) / float64(withEntry)
 		fmt.Fprintf(&sb, "  - Average peers per node: %.1f\n", avgPeers)
 	}
 
@@ -818,7 +1020,49 @@ func (s *NodeStore) ListNodes() views.Slice[types.NodeView] {
 func (s *NodeStore) ListPeers(id types.NodeID) views.Slice[types.NodeView] {
 	defer nodeStoreListPeersMetrics.observe(time.Now())
 
-	return views.SliceOf(s.data.Load().peersByNode[id])
+	return views.SliceOf(s.data.Load().peersOf(id))
+}
+
+// peersOf resolves a node's peers through allNodes, so they point at the
+// snapshot's current copies whether or not the relationship was carried
+// over from an earlier batch. Nil when the node has no entry.
+func (snap *Snapshot) peersOf(id types.NodeID) []types.NodeView {
+	pos, ok := snap.posByID[id]
+	if !ok || int(pos) >= len(snap.peerPositions) {
+		return nil
+	}
+
+	list := snap.peerPositions[pos]
+	if list == nil {
+		return nil
+	}
+
+	out := make([]types.NodeView, len(list))
+	for i, p := range list {
+		out[i] = snap.allNodes[p]
+	}
+
+	return out
+}
+
+// peersByNode materialises the whole relationship, for tests and the
+// debug dump; readers use [Snapshot.peersOf].
+func (snap *Snapshot) peersByNode() map[types.NodeID][]types.NodeView {
+	if snap.peerPositions == nil {
+		return nil
+	}
+
+	out := make(map[types.NodeID][]types.NodeView)
+
+	for i, list := range snap.peerPositions {
+		if list == nil {
+			continue
+		}
+
+		out[snap.allNodes[i].ID()] = snap.peersOf(snap.allNodes[i].ID())
+	}
+
+	return out
 }
 
 // PrimaryRouteFor returns the current primary advertiser for prefix.
@@ -851,10 +1095,7 @@ func (s *NodeStore) PrimaryRoutesForNode(id types.NodeID) []netip.Prefix {
 func (s *NodeStore) HANodes() map[netip.Prefix][]types.NodeID {
 	snap := s.data.Load()
 
-	advertisers := onlineAdvertisers(
-		snap.nodesByID,
-		slices.Sorted(maps.Keys(snap.nodesByID)),
-	)
+	advertisers := onlineAdvertisers(snap.nodesByID)
 
 	out := make(map[netip.Prefix][]types.NodeID)
 
@@ -1008,6 +1249,37 @@ func (s *NodeStore) ListNodesByUser(uid types.UserID) views.Slice[types.NodeView
 	return views.SliceOf(s.data.Load().nodesByUser[uid])
 }
 
+// updateNodes queues updates as one batch entry and waits for the batch
+// to be applied. It reports whether the write ran; an empty update set or
+// a stopped store drops it. Metrics belong to the caller so that
+// [NodeStore.UpdateNode] is timed once instead of twice.
+func (s *NodeStore) updateNodes(updates map[types.NodeID]UpdateNodeFunc) bool {
+	if len(updates) == 0 {
+		return false
+	}
+
+	w := work{
+		op:           updateMulti,
+		multiUpdates: updates,
+		result:       make(chan struct{}),
+	}
+
+	nodeStoreQueueDepth.Inc()
+
+	select {
+	case s.writeQueue <- w:
+	case <-s.stopped:
+		nodeStoreQueueDepth.Dec()
+
+		return false
+	}
+
+	<-w.result
+	nodeStoreQueueDepth.Dec()
+
+	return true
+}
+
 // applyBatch applies a batch of work to the node store.
 // This means that it takes a copy of the current nodes,
 // then applies the batch of operations to that copy,
@@ -1024,19 +1296,38 @@ func (s *NodeStore) ListNodesByUser(uid types.UserID) views.Slice[types.NodeView
 //
 //nolint:gocognit // NodeStore write path; CLAUDE.md requires benchmark before restructuring
 func (s *NodeStore) applyBatch(batch []work) {
-	timer := prometheus.NewTimer(nodeStoreBatchDuration)
-	defer timer.ObserveDuration()
+	defer observeSince(nodeStoreBatchDuration, time.Now())
 
 	nodeStoreBatchSize.Observe(float64(len(batch)))
 
-	nodes := make(map[types.NodeID]types.Node)
-	maps.Copy(nodes, s.data.Load().nodesByID)
+	prev := s.data.Load()
+
+	nodes := make(map[types.NodeID]types.Node, len(prev.nodesByID))
+	maps.Copy(nodes, prev.nodesByID)
+
+	// names indexes the given names of every node. It is built on first
+	// use so a batch that touches no name — the common map request
+	// update — does not pay for it, and shared by every op in the batch
+	// so the index is built once rather than per operation.
+	var names givenNames
+
+	ensureNames := func() givenNames {
+		if names == nil {
+			names = newGivenNames(nodes)
+		}
+
+		return names
+	}
 
 	// Track which work items need node results
 	nodeResultRequests := make(map[types.NodeID][]*work)
 
 	// Track rebuildPeerMaps operations
 	var rebuildOps []*work
+
+	// peersDirty is set once the batch touches an input of the peer
+	// relationship; until then the previous one is carried forward.
+	peersDirty := false
 
 	// setErrResults collects per-work errors from the setName path so
 	// they can be delivered after the snapshot swap, together with the
@@ -1047,8 +1338,17 @@ func (s *NodeStore) applyBatch(batch []work) {
 		w := &batch[i]
 		switch w.op {
 		case put:
+			peersDirty = true
 			n := w.node
-			n.GivenName = resolveGivenName(nodes, n.ID, n.GivenName)
+			taken := ensureNames()
+			old, existed := nodes[n.ID]
+
+			n.GivenName = resolveGivenName(taken, old.GivenName, n.GivenName)
+			if existed {
+				taken.release(old.GivenName)
+			}
+
+			taken.hold(n.GivenName)
 
 			nodes[w.nodeID] = n
 			if w.nodeResult != nil {
@@ -1061,22 +1361,39 @@ func (s *NodeStore) applyBatch(batch []work) {
 					continue
 				}
 
-				oldGivenName := n.GivenName
+				old := n
 				fn(&n)
 
-				if n.GivenName != oldGivenName {
-					n.GivenName = resolveGivenName(nodes, n.ID, n.GivenName)
+				if !peersDirty && peerInputsChanged(&old, &n) {
+					peersDirty = true
+				}
+
+				if oldGivenName := old.GivenName; n.GivenName != oldGivenName {
+					taken := ensureNames()
+					n.GivenName = resolveGivenName(taken, oldGivenName, n.GivenName)
+					taken.release(oldGivenName)
+					taken.hold(n.GivenName)
 				}
 
 				nodes[id] = n
 			}
 		case del:
+			peersDirty = true
+
+			if names != nil {
+				if old, exists := nodes[w.nodeID]; exists {
+					names.release(old.GivenName)
+				}
+			}
+
 			delete(nodes, w.nodeID)
 			// For delete operations, send an invalid NodeView if requested
 			if w.nodeResult != nil {
 				nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
 			}
 		case setName:
+			peersDirty = true
+
 			n, exists := nodes[w.nodeID]
 			if !exists {
 				setErrResults[w] = ErrNodeNotFound
@@ -1092,21 +1409,16 @@ func (s *NodeStore) applyBatch(batch []work) {
 				continue
 			}
 
-			taken := false
-
-			for id, other := range nodes {
-				if id != w.nodeID && other.GivenName == w.name {
-					taken = true
-					break
-				}
-			}
-
-			if taken {
+			taken := ensureNames()
+			if !taken.free(w.name, n.GivenName) {
 				setErrResults[w] = ErrGivenNameTaken
 				nodeResultRequests[w.nodeID] = append(nodeResultRequests[w.nodeID], w)
 
 				continue
 			}
+
+			taken.release(n.GivenName)
+			taken.hold(w.name)
 
 			n.GivenName = w.name
 			nodes[w.nodeID] = n
@@ -1115,17 +1427,41 @@ func (s *NodeStore) applyBatch(batch []work) {
 			// rebuildPeerMaps doesn't modify nodes, it just forces the snapshot rebuild
 			// below to recalculate peer relationships using the current peersFunc
 			rebuildOps = append(rebuildOps, w)
+			peersDirty = true
 		}
 	}
 
-	prev := s.data.Load()
-	newSnap := snapshotFromNodes(nodes, s.peersFunc, prev.ledger())
+	newSnap := s.nextSnapshot(prev, nodes, peersDirty)
 	s.data.Store(&newSnap)
 
 	// Update node count gauge
 	nodeStoreNodesCount.Set(float64(len(nodes)))
 
-	// Send the resulting nodes to all work items that requested them.
+	deliverBatchResults(batch, nodes, nodeResultRequests, setErrResults, rebuildOps)
+}
+
+// nextSnapshot builds the snapshot a batch produced, carrying the peer
+// relationship forward when the batch changed none of its inputs.
+func (s *NodeStore) nextSnapshot(prev *Snapshot, nodes map[types.NodeID]types.Node, peersDirty bool) Snapshot {
+	var keepPeers [][]int32
+	if !peersDirty {
+		keepPeers = prev.peerPositions
+	}
+
+	return snapshotFromNodes(nodes, s.peersFunc, prev.ledger(), keepPeers)
+}
+
+// deliverBatchResults unblocks every writer waiting on the batch, after
+// the new snapshot has been stored: first the work items that asked for
+// the resulting node (and, for setName, its error), then the peer map
+// rebuilds, then the rest.
+func deliverBatchResults(
+	batch []work,
+	nodes map[types.NodeID]types.Node,
+	nodeResultRequests map[types.NodeID][]*work,
+	setErrResults map[*work]error,
+	rebuildOps []*work,
+) {
 	// A zero-value NodeView{} reports Valid()==false, matching node.View()
 	// for a node that was deleted or never existed.
 	for nodeID, workItems := range nodeResultRequests {
@@ -1147,7 +1483,6 @@ func (s *NodeStore) applyBatch(batch []work) {
 		}
 	}
 
-	// Signal completion for rebuildPeerMaps operations
 	for _, w := range rebuildOps {
 		close(w.rebuildResult)
 	}
