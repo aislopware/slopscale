@@ -255,7 +255,7 @@ components:
           description: "What happened, dotted and object first: user.role.set, node.delete."
           type: string
         actorKind:
-          description: local, api_key, oauth, session or system.
+          description: local, api_key, oauth, session, node or system.
           type: string
         actorName:
           description: The actor's user name, or the credential's prefix.
@@ -1500,6 +1500,11 @@ components:
           items:
             type: string
           type: array
+        clientWarnings:
+          description: "Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup. Empty while the client reports none, and after a restart of the server until the client polls again."
+          items:
+            type: string
+          type: array
         createdAt:
           format: date-time
           type: string
@@ -1596,6 +1601,7 @@ components:
         - sharedWith
         - globalExitNode
         - ephemeral
+        - clientWarnings
       type: object
     NodeOutputBody:
       additionalProperties: false

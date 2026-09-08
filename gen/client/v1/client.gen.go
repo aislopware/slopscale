@@ -266,7 +266,7 @@ type AuditEvent struct {
 	// Action What happened, dotted and object first: user.role.set, node.delete.
 	Action string `json:"action"`
 
-	// ActorKind local, api_key, oauth, session or system.
+	// ActorKind local, api_key, oauth, session, node or system.
 	ActorKind string `json:"actorKind"`
 
 	// ActorName The actor's user name, or the credential's prefix.
@@ -915,8 +915,11 @@ type Node struct {
 	ApprovedAt      *time.Time `json:"approvedAt"`
 	ApprovedRoutes  []string   `json:"approvedRoutes"`
 	AvailableRoutes []string   `json:"availableRoutes"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	DiscoKey        string     `json:"discoKey"`
+
+	// ClientWarnings Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup. Empty while the client reports none, and after a restart of the server until the client polls again.
+	ClientWarnings []string  `json:"clientWarnings"`
+	CreatedAt      time.Time `json:"createdAt"`
+	DiscoKey       string    `json:"discoKey"`
 
 	// Ephemeral true when the node is deleted on logout or after the ephemeral timeout.
 	Ephemeral bool       `json:"ephemeral"`

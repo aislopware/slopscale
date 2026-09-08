@@ -1884,7 +1884,7 @@ export interface components {
         AuditEvent: {
             /** @description What happened, dotted and object first: user.role.set, node.delete. */
             action: string;
-            /** @description local, api_key, oauth, session or system. */
+            /** @description local, api_key, oauth, session, node or system. */
             actorKind: string;
             /** @description The actor's user name, or the credential's prefix. */
             actorName: string;
@@ -2395,6 +2395,8 @@ export interface components {
             approvedAt: string | null;
             approvedRoutes: string[];
             availableRoutes: string[];
+            /** @description Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup. Empty while the client reports none, and after a restart of the server until the client polls again. */
+            clientWarnings: string[];
             /** Format: date-time */
             createdAt: string;
             discoKey: string;
