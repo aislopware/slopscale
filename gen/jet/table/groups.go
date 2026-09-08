@@ -22,6 +22,7 @@ type groupsTable struct {
 	Description sqlite.ColumnString
 	Builtin     sqlite.ColumnString
 	Requestable sqlite.ColumnBool
+	Source      sqlite.ColumnString
 	CreatedAt   sqlite.ColumnTimestamp
 	UpdatedAt   sqlite.ColumnTimestamp
 
@@ -70,10 +71,11 @@ func newGroupsTableImpl(schemaName, tableName, alias string) groupsTable {
 		DescriptionColumn = sqlite.StringColumn("description")
 		BuiltinColumn     = sqlite.StringColumn("builtin")
 		RequestableColumn = sqlite.BoolColumn("requestable")
+		SourceColumn      = sqlite.StringColumn("source")
 		CreatedAtColumn   = sqlite.TimestampColumn("created_at")
 		UpdatedAtColumn   = sqlite.TimestampColumn("updated_at")
-		allColumns        = sqlite.ColumnList{IDColumn, NameColumn, DescriptionColumn, BuiltinColumn, RequestableColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns    = sqlite.ColumnList{NameColumn, DescriptionColumn, BuiltinColumn, RequestableColumn, CreatedAtColumn, UpdatedAtColumn}
+		allColumns        = sqlite.ColumnList{IDColumn, NameColumn, DescriptionColumn, BuiltinColumn, RequestableColumn, SourceColumn, CreatedAtColumn, UpdatedAtColumn}
+		mutableColumns    = sqlite.ColumnList{NameColumn, DescriptionColumn, BuiltinColumn, RequestableColumn, SourceColumn, CreatedAtColumn, UpdatedAtColumn}
 		defaultColumns    = sqlite.ColumnList{RequestableColumn}
 	)
 
@@ -86,6 +88,7 @@ func newGroupsTableImpl(schemaName, tableName, alias string) groupsTable {
 		Description: DescriptionColumn,
 		Builtin:     BuiltinColumn,
 		Requestable: RequestableColumn,
+		Source:      SourceColumn,
 		CreatedAt:   CreatedAtColumn,
 		UpdatedAt:   UpdatedAtColumn,
 
