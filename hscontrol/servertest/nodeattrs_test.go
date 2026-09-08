@@ -396,3 +396,62 @@ func TestNodeAttrsSuggestExitNodeOnPeerCapMap(t *testing.T) {
 			return false
 		})
 }
+
+// TestNodeAttrsDNSSubdomainResolveOnPeerCapMap covers the other cap
+// the client reads from a peer entry: with dns-subdomain-resolve on a
+// node, a peer answers *.<that node> with the node's addresses only
+// when the cap is on its peer view of the node
+// (juanfont/headscale#3322). A node without the attribute must not get
+// it on its peer view.
+func TestNodeAttrsDNSSubdomainResolveOnPeerCapMap(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	user := srv.CreateUser(t, "sub-user")
+
+	wildcard := servertest.NewClient(t, srv, "sub-wildcard", servertest.WithUser(user))
+	viewer := servertest.NewClient(t, srv, "sub-viewer", servertest.WithUser(user))
+
+	wildcard.WaitForPeers(t, 1, 10*time.Second)
+	viewer.WaitForPeers(t, 1, 10*time.Second)
+
+	wildcardNode, ok := srv.State().GetNodeByID(findNodeID(t, srv, "sub-wildcard"))
+	require.True(t, ok)
+
+	wildcardIP := wildcardNode.IPv4().Get().String()
+
+	reloadPolicy(t, srv, `{
+		"hosts": {"wildcard": "`+wildcardIP+`"},
+		"nodeAttrs": [{
+			"target": ["wildcard"],
+			"attr":   ["dns-subdomain-resolve"]
+		}]
+	}`)
+
+	wildcard.WaitForCondition(t, "self dns-subdomain-resolve", 10*time.Second,
+		func(nm *netmap.NetworkMap) bool {
+			return hasCap(nm, nodecap.DNSSubdomainResolve)
+		})
+
+	viewer.WaitForCondition(t, "peer entry carries dns-subdomain-resolve", 10*time.Second,
+		func(nm *netmap.NetworkMap) bool {
+			for _, peer := range nm.Peers {
+				if peer.ComputedName() == "sub-wildcard" {
+					return peer.CapMap().Contains(nodecap.DNSSubdomainResolve)
+				}
+			}
+
+			return false
+		})
+
+	wildcard.WaitForCondition(t, "viewer's peer entry has no cap", 5*time.Second,
+		func(nm *netmap.NetworkMap) bool {
+			for _, peer := range nm.Peers {
+				if peer.ComputedName() == "sub-viewer" {
+					return !peer.CapMap().Contains(nodecap.DNSSubdomainResolve)
+				}
+			}
+
+			return false
+		})
+}

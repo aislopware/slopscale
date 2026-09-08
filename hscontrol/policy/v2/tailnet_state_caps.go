@@ -53,6 +53,20 @@ func PeerCapMap(peer types.NodeView, peerSelfCaps tailcfg.NodeCapMap) tailcfg.No
 		}
 	}
 
+	// dns-subdomain-resolve — the client answers *.<peer name> with the
+	// peer's addresses when the peer carries the cap on its peer view
+	// (ipn/ipnlocal/node_backend.go magicDNSSubdomainHost); the self
+	// view only covers the node's own name. Nothing gates it, so it is
+	// copied whenever the policy stamps it on the peer.
+	// See juanfont/headscale#3322.
+	if v, ok := peerSelfCaps[nodecap.DNSSubdomainResolve]; ok {
+		if out == nil {
+			out = tailcfg.NodeCapMap{}
+		}
+
+		out[nodecap.DNSSubdomainResolve] = v
+	}
+
 	return out
 }
 
