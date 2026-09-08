@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { Node, User } from "~/api/queries.ts";
-import { filterNodes, statusCounts, toStatusFilter } from "~/components/machines/filters.ts";
+import {
+  filterNodes,
+  filtersFromSearch,
+  searchFromFilters,
+  statusCounts,
+  tagOptions,
+  toStatusFilter,
+} from "~/components/machines/filters.ts";
 
 const now = new Date("2026-01-01T12:00:00Z");
 const stamp = now.toISOString();
@@ -72,23 +79,29 @@ const everything = [connected, offline, pending, expired, suspended];
 
 describe(filterNodes, () => {
   it("keeps everything for the default tab", () => {
-    expect(filterNodes(everything, { status: "all", user: "" }, now)).toHaveLength(5);
+    expect(filterNodes(everything, { status: "all", user: "", tag: "" }, now)).toHaveLength(5);
   });
 
   it("counts an expired key and a suspended machine as offline, since neither is reachable", () => {
-    const ids = filterNodes(everything, { status: "offline", user: "" }, now).map((row) => row.id);
+    const ids = filterNodes(everything, { status: "offline", user: "", tag: "" }, now).map(
+      (row) => row.id,
+    );
 
     expect(ids).toStrictEqual(["2", "4", "5"]);
   });
 
   it("separates connected from waiting for approval", () => {
-    expect(filterNodes(everything, { status: "online", user: "" }, now)).toStrictEqual([connected]);
-    expect(filterNodes(everything, { status: "pending", user: "" }, now)).toStrictEqual([pending]);
+    expect(filterNodes(everything, { status: "online", user: "", tag: "" }, now)).toStrictEqual([
+      connected,
+    ]);
+    expect(filterNodes(everything, { status: "pending", user: "", tag: "" }, now)).toStrictEqual([
+      pending,
+    ]);
   });
 
   it("matches the owner and anyone the machine is shared with", () => {
     const shared = node("6", { user: { ...ada, id: "9" }, sharedWith: ["1"] });
-    const rows = filterNodes([connected, shared], { status: "all", user: "1" }, now);
+    const rows = filterNodes([connected, shared], { status: "all", user: "1", tag: "" }, now);
 
     expect(rows).toStrictEqual([connected, shared]);
   });
@@ -112,5 +125,45 @@ describe(toStatusFilter, () => {
     expect(toStatusFilter("pending")).toBe("pending");
     expect(toStatusFilter("expired")).toBe("all");
     expect(toStatusFilter(search.status)).toBe("all");
+  });
+});
+
+describe("the tag filter", () => {
+  const tagged = node("7", { tags: ["tag:prod", "tag:web"] });
+  const other = node("8", { tags: ["tag:lab"] });
+
+  it("keeps the machines carrying the tag", () => {
+    const rows = filterNodes(
+      [connected, tagged, other],
+      { status: "all", user: "", tag: "tag:prod" },
+      now,
+    );
+
+    expect(rows).toStrictEqual([tagged]);
+  });
+
+  it("offers every tag in use once, in order", () => {
+    expect(tagOptions([connected, tagged, other])).toStrictEqual([
+      "tag:lab",
+      "tag:prod",
+      "tag:web",
+    ]);
+  });
+});
+
+describe("the filters in the URL", () => {
+  it("reads an absent or unknown parameter as that filter's default", () => {
+    expect(filtersFromSearch({})).toStrictEqual({ query: "", status: "all", user: "", tag: "" });
+    expect(filtersFromSearch({ status: "sideways" }).status).toBe("all");
+  });
+
+  it("leaves a filter at its default out of the URL", () => {
+    expect(searchFromFilters({ query: "", status: "all", user: "", tag: "" })).toStrictEqual({});
+  });
+
+  it("round trips every filter", () => {
+    const search = { q: "laptop", status: "offline", user: "3", tag: "tag:prod" } as const;
+
+    expect(searchFromFilters(filtersFromSearch(search))).toStrictEqual(search);
   });
 });

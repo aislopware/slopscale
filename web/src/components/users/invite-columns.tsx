@@ -1,0 +1,129 @@
+import { Badge } from "@cloudflare/kumo/components/badge";
+import type { BadgeVariant } from "@cloudflare/kumo/components/badge";
+import type { ReactElement } from "react";
+
+import type { Invite, User } from "~/api/queries.ts";
+import { GroupChips } from "~/components/access/group-chips.tsx";
+import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { InviteMenu } from "~/components/users/invite-menu.tsx";
+import { inviteState } from "~/components/users/invites.ts";
+import type { InviteState } from "~/components/users/invites.ts";
+import { roleName, roleVariant } from "~/components/users/roles.ts";
+import { userLabel } from "~/lib/node.ts";
+
+const helper = createAppColumnHelper<Invite>();
+
+const stateLabels: Record<InviteState, string> = {
+  pending: "Waiting",
+  expired: "Expired",
+  accepted: "Accepted",
+};
+
+const stateVariants: Record<InviteState, BadgeVariant> = {
+  pending: "info",
+  expired: "warning",
+  accepted: "success",
+};
+
+/** Who sent the invitation; the id is all the API carries, so an unknown sender stays a dash. */
+function senderLabel(users: readonly User[] | undefined, id: string): string | null {
+  if (id === "" || id === "0") {
+    return null;
+  }
+
+  const user = users?.find((candidate) => candidate.id === id);
+
+  return user === undefined ? `#${id}` : userLabel(user);
+}
+
+export const inviteColumns = helper.columns([
+  helper.accessor((invite) => invite.email, {
+    id: "email",
+    header: "Email",
+    enableSorting: true,
+    cell: ({ row }) => (
+      <span className="truncate font-medium text-kumo-default">{row.original.email}</span>
+    ),
+    meta: { className: "w-[28%] min-w-52" },
+  }),
+  helper.accessor((invite) => invite.role, {
+    id: "role",
+    header: "Role",
+    enableSorting: true,
+    cell: ({ row }) => (
+      <Badge variant={roleVariant(row.original.role)}>{roleName(row.original.role)}</Badge>
+    ),
+    meta: { className: "whitespace-nowrap" },
+  }),
+  helper.display({
+    id: "groups",
+    header: "Groups",
+    cell: ({ row, table }) => {
+      const groups = table.options.meta?.groups;
+
+      return groups === undefined ? null : (
+        <GroupChips ids={row.original.groupIds} groups={groups} />
+      );
+    },
+    meta: { className: "hidden lg:table-cell" },
+  }),
+  helper.accessor((invite) => invite.expiresAt, {
+    id: "expires",
+    header: "Expires",
+    enableSorting: true,
+    enableGlobalFilter: false,
+    cell: ({ row }) => (
+      <span className="text-kumo-subtle">
+        <RelativeTime value={row.original.expiresAt} />
+      </span>
+    ),
+    meta: { className: "hidden whitespace-nowrap md:table-cell" },
+  }),
+  helper.display({
+    id: "invitedBy",
+    header: "Invited by",
+    cell: ({ row, table }) => (
+      <SenderCell invite={row.original} users={table.options.meta?.users} />
+    ),
+    meta: { className: "hidden whitespace-nowrap lg:table-cell" },
+  }),
+  helper.accessor((invite) => inviteState(invite), {
+    id: "status",
+    header: "Status",
+    enableSorting: true,
+    enableGlobalFilter: false,
+    cell: ({ row }) => {
+      const state = inviteState(row.original);
+
+      return (
+        <Badge variant={stateVariants[state]} appearance="dot">
+          {stateLabels[state]}
+        </Badge>
+      );
+    },
+    meta: { className: "whitespace-nowrap" },
+  }),
+  helper.display({
+    id: "actions",
+    header: "",
+    cell: ({ row, table }) => {
+      const { me } = table.options.meta ?? {};
+
+      return me === undefined ? null : <InviteMenu invite={row.original} me={me} />;
+    },
+    meta: { className: "w-12 text-right", sticky: "right" },
+  }),
+]);
+
+function SenderCell({
+  invite,
+  users,
+}: {
+  readonly invite: Invite;
+  readonly users: readonly User[] | undefined;
+}): ReactElement {
+  const label = senderLabel(users, invite.createdBy ?? "");
+
+  return <span className="text-kumo-subtle">{label ?? "—"}</span>;
+}

@@ -1,3 +1,4 @@
+import { ApiError } from "~/api/error.ts";
 import type { Derp } from "~/api/queries.ts";
 import type {
   DerpCustomRegion,
@@ -98,6 +99,27 @@ export function frequencyLabel(value: string): string {
   const name = unitNames.get(unit) ?? "second";
 
   return amount === 1 ? `Every ${name}` : `Every ${amount} ${name}s`;
+}
+
+/** The request init that carries an ETag; empty when the read returned none. */
+export interface IfMatchInit {
+  readonly params?: { readonly header: { readonly "If-Match": string } };
+}
+
+/**
+ * Sends the ETag of the read a change is based on, so the server refuses the change with 412 when
+ * the settings moved since then instead of overwriting what someone else stored.
+ */
+export function ifMatchInit(etag: string): IfMatchInit {
+  return etag === "" ? {} : { params: { header: { "If-Match": etag } } };
+}
+
+/** The status the server answers a change whose If-Match no longer matches. */
+const statusPreconditionFailed = 412;
+
+/** Whether a failed change was refused because the settings changed since they were read. */
+export function isStaleSettings(error: unknown): boolean {
+  return error instanceof ApiError && error.status === statusPreconditionFailed;
 }
 
 /** A copy every editor starts from, so a PUT always carries the whole configuration. */

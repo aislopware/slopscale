@@ -19,6 +19,9 @@ import { parseTime } from "~/lib/time.ts";
 
 const referenceUrl = "https://headscale.net/stable/ref/policy/";
 
+/** The external-link glyph sits after the label, where a link leaving the console shows it. */
+const externalIconSize = 14;
+
 /** The one-line state of the draft: a dot and what it means, beside the actions. */
 function DraftState({
   dirty,
@@ -59,8 +62,9 @@ function Actions({
 }): ReactElement {
   return (
     <>
-      <LinkButton href={referenceUrl} external variant="ghost" icon={ArrowSquareOutIcon}>
+      <LinkButton href={referenceUrl} external variant="ghost">
         Policy reference
+        <ArrowSquareOutIcon size={externalIconSize} aria-hidden />
       </LinkButton>
       <Button
         variant="secondary"

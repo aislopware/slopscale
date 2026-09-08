@@ -15,6 +15,7 @@ import type { ReactElement } from "react";
 import type { Node, User } from "~/api/queries.ts";
 import { expiryWorthShowing } from "~/components/machines/filters.ts";
 import { MachineMenu } from "~/components/machines/menu.tsx";
+import { SelectAllCheckbox, SelectRowCheckbox } from "~/components/machines/selection.tsx";
 import { StatusBadge } from "~/components/machines/status-badge.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
@@ -37,6 +38,17 @@ const helper = createAppColumnHelper<Node>();
 
 const statusOrder = { online: 0, pending: 1, suspended: 2, offline: 3, expired: 4 } as const;
 const markSize = 13;
+
+/**
+ * The tick box that puts a machine into a bulk action. It is a column of its own rather than part
+ * of the name cell, so the header can carry the "select everything" box.
+ */
+const selectColumn = helper.display({
+  id: "select",
+  header: () => <SelectAllCheckbox />,
+  cell: ({ row }) => <SelectRowCheckbox id={row.original.id} name={nodeName(row.original)} />,
+  meta: { className: "w-10" },
+});
 
 export const columns = helper.columns([
   helper.accessor((node) => nodeName(node), {
@@ -90,6 +102,9 @@ export const columns = helper.columns([
     meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
+
+/** The same table with the bulk-action tick boxes, for a caller that may act on a machine. */
+export const selectableColumns = helper.columns([selectColumn, ...columns]);
 
 function NameCell({ node }: { readonly node: Node }): ReactElement {
   const name = nodeName(node);

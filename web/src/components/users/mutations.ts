@@ -14,6 +14,13 @@ interface UserMutations {
   readonly approve: Mutation<"post", "/api/v1/user/{id}/approve">;
   readonly setRole: Mutation<"post", "/api/v1/user/{id}/role">;
   readonly remove: Mutation<"delete", "/api/v1/user/{id}">;
+  readonly endSessions: Mutation<"delete", "/api/v1/user/{id}/sessions">;
+}
+
+interface InviteMutations {
+  readonly create: Mutation<"post", "/api/v1/invite">;
+  readonly resend: Mutation<"post", "/api/v1/invite/{id}/resend">;
+  readonly revoke: Mutation<"delete", "/api/v1/invite/{id}">;
 }
 
 /**
@@ -59,6 +66,34 @@ export function useUserMutations(): UserMutations {
       onSuccess: async () => {
         toast.success("User deleted");
         await invalidate(queryClient, "/api/v1/user", "/api/v1/node");
+      },
+    }),
+    // Nothing the console lists changes, so there is nothing to invalidate; the caller says how
+    // many sessions went.
+    endSessions: api.useMutation("delete", "/api/v1/user/{id}/sessions"),
+  };
+}
+
+/**
+ * The invitation mutations, each refreshing the invite list. A created or re-sent invite hands back
+ * a link that is shown once, so the caller keeps the result rather than a toast doing it.
+ */
+export function useInviteMutations(): InviteMutations {
+  const queryClient = useQueryClient();
+  const refresh = async (): Promise<void> => {
+    await invalidate(queryClient, "/api/v1/invite");
+  };
+
+  return {
+    create: api.useMutation("post", "/api/v1/invite", { onSuccess: refresh }),
+    resend: api.useMutation("post", "/api/v1/invite/{id}/resend", { onSuccess: refresh }),
+    revoke: api.useMutation("delete", "/api/v1/invite/{id}", {
+      onSuccess: async () => {
+        toast.success("Invite revoked");
+        await refresh();
+      },
+      onError: (error) => {
+        toast.error("Could not revoke the invite", error);
       },
     }),
   };

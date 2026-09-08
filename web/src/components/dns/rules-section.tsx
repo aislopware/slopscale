@@ -10,7 +10,7 @@ import { GroupChips } from "~/components/access/group-chips.tsx";
 import { DnsRuleDialog } from "~/components/dns/rule-dialog.tsx";
 import type { DnsRuleMutations } from "~/components/dns/rule-mutations.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
-import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 
 const iconSize = 16;
 
@@ -60,9 +60,10 @@ export function DnsRulesSection({
         : {})}
     >
       {rules.length === 0 ? (
-        <SectionRow>
-          <p className="text-kumo-subtle">No group DNS rules.</p>
-        </SectionRow>
+        <SectionEmpty
+          title="No group DNS rules"
+          description="Every machine resolves names the same way."
+        />
       ) : (
         rules.map((rule) => (
           <SectionRow key={rule.id} className="flex items-center justify-between gap-4 py-2.5">

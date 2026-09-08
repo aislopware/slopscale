@@ -21,7 +21,7 @@ import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { ExitNodeToggle } from "~/components/dns/nameservers-section.tsx";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
-import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 const iconSize = 16;
@@ -67,9 +67,10 @@ export function SplitDnsSection({
         : {})}
     >
       {entries.length === 0 ? (
-        <SectionRow>
-          <p className="text-kumo-subtle">No split DNS domains.</p>
-        </SectionRow>
+        <SectionEmpty
+          title="No split DNS domains"
+          description="Every domain is answered by the global nameservers."
+        />
       ) : (
         entries.map(([domain, servers]) => (
           <SectionRow key={domain} className="flex items-center justify-between gap-4 py-2.5">
@@ -83,9 +84,10 @@ export function SplitDnsSection({
             </div>
             <div className="flex shrink-0 items-center gap-3">
               <ExitNodeToggle
-                name={`Use with exit node: ${domain}`}
+                name={domain}
                 checked={splitKeptWithExitNode(settings, domain)}
                 disabled={!canEdit || pending}
+                reason={canEdit ? undefined : "Your credentials may not change DNS"}
                 pending={pending}
                 onChange={(on) => {
                   mutations.apply(

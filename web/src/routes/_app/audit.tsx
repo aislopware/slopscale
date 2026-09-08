@@ -4,12 +4,13 @@ import type { TabsItem } from "@cloudflare/kumo/components/tabs";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import type { ReactElement } from "react";
-import { fallback, object, optional, picklist, string } from "valibot";
+import { fallback, object, optional, picklist, pipe, transform, unknown } from "valibot";
 
 import { auditQuery, auditRanges, usersQuery } from "~/api/queries.ts";
 import type { AuditFilters, AuditRange, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { EventsTable } from "~/components/audit/events-table.tsx";
+import { ExportMenu } from "~/components/audit/export-menu.tsx";
 import { AuditStats } from "~/components/audit/stats.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableToolbar } from "~/components/table/toolbar.tsx";
@@ -22,7 +23,19 @@ const defaultRange: AuditRange = "7d";
 /** Clearing the filters puts every control back where the page starts. */
 const clearedSearch = { action: "", actor: "", since: defaultRange } as const;
 
-const optionalText = optional(string(), "");
+/**
+ * The router parses a search value as JSON, so `?actor=2` arrives as the number 2 while the user id
+ * it names is a string. Reading it through this keeps the digits instead of dropping the filter.
+ */
+function toText(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  return typeof value === "number" ? String(value) : "";
+}
+
+const optionalText = optional(pipe(unknown(), transform(toText)), "");
 const optionalRange = optional(picklist(auditRanges), defaultRange);
 
 const searchSchema = object({
@@ -98,7 +111,20 @@ function AuditPage(): ReactElement {
       <PageHeader
         title="Audit log"
         description="Who changed what through the API and the console."
-        actions={
+      />
+      <AuditStats events={rows} />
+      <Frame>
+        <TableToolbar actions={<ExportMenu filters={filtersOf(search)} />}>
+          <SearchInput
+            value={search.action}
+            placeholder="Filter by action"
+            onValueChange={(value) => {
+              void navigate({
+                search: (previous) => ({ ...previous, action: value }),
+                replace: true,
+              });
+            }}
+          />
           <Tabs
             variant="segmented"
             aria-label="Time range"
@@ -110,21 +136,6 @@ function AuditPage(): ReactElement {
                   ...previous,
                   since: isRange(value) ? value : defaultRange,
                 }),
-              });
-            }}
-          />
-        }
-      />
-      <AuditStats events={rows} />
-      <Frame>
-        <TableToolbar>
-          <SearchInput
-            value={search.action}
-            placeholder="Filter by action"
-            onValueChange={(value) => {
-              void navigate({
-                search: (previous) => ({ ...previous, action: value }),
-                replace: true,
               });
             }}
           />

@@ -343,6 +343,13 @@ keep their copy icon in view. There is a dark mode. It signs
 in only through the configured identity
 provider (Google, or any OIDC issuer) and shows what that user's role allows.
 _Settings_ carries the IP backfill (`headscale nodes backfillips`).
+Long tables page at fifty rows under a pinned header, scroll sideways on a
+phone with the row menu kept in reach, and figures line up on the right.
+_Machines_ keeps its filters in the URL, so a filtered list can be shared,
+selects rows for approving, expiring or deleting in one go, and refreshes
+on its own every fifteen seconds while the tab is open. A disabled control
+says why on hover, the theme is a Light, Dark, System menu, and dates are
+picked with a calendar rather than the browser's own field.
 Release binaries and container images include it. When building from source,
 run `make web` before `make build`.
 See [Admin console](https://headscale.net/development/ref/console/).

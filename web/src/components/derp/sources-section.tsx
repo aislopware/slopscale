@@ -77,7 +77,10 @@ export function SourcesSection({
       <EntryList
         canEdit={canEdit}
         pending={pending}
-        empty="No map URLs. Only the relays below and the config file's map files are served."
+        empty={{
+          title: "No map URLs",
+          description: "Only the relays below and the config file's map files are served.",
+        }}
         entries={settings.urls.map((url) => ({
           key: url,
           value: url,

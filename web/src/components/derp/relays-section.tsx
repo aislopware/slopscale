@@ -9,7 +9,7 @@ import { withoutRegion } from "~/components/derp/model.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
 import { RegionForm } from "~/components/derp/region-form.tsx";
 import { DialogContent, DialogRoot } from "~/components/ui/dialog.tsx";
-import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 
 const iconSize = 16;
 
@@ -76,11 +76,10 @@ export function RelaysSection({
         : {})}
     >
       {settings.regions.length === 0 ? (
-        <SectionRow>
-          <p className="text-kumo-subtle">
-            No relays of your own. Run the derper program from Tailscale and add its region here.
-          </p>
-        </SectionRow>
+        <SectionEmpty
+          title="No relays of your own"
+          description="Run the derper program from Tailscale and add its region here."
+        />
       ) : (
         settings.regions.map((region) => (
           <SectionRow key={region.id} className="flex items-start justify-between gap-4 py-2.5">

@@ -9,6 +9,26 @@ import { Frame, FrameBand, FramePanel } from "~/components/ui/frame.tsx";
 
 const iconSize = 14;
 
+/**
+ * What an empty editor shows: the shape of a policy, so a first-time file starts from something
+ * rather than from a blank surface. "Start from a template" fills in the full version.
+ */
+const starterSnippet = `{
+  // HuJSON is JSON with comments and trailing commas.
+  "groups": {
+    "group:admin": ["alice@example.com"],
+  },
+  "grants": [
+    { "src": ["group:admin"], "dst": ["*"], "ip": ["*"] },
+  ],
+}`;
+
+/**
+ * The editor follows the window: 70vh, and never under 400px, so a laptop shows the file without
+ * the page scrolling and a short window still has room to type in.
+ */
+const editorHeightClass = "h-[70vh] min-h-[400px]";
+
 function lineCount(text: string): number {
   return text === "" ? 0 : text.split("\n").length;
 }
@@ -98,11 +118,12 @@ export function PolicyEditor({
         ) : null}
       </FrameBand>
       <FramePanel>
-        <div ref={host} className="h-[60vh] min-h-96">
+        <div ref={host} className={editorHeightClass}>
           <CodeEditor
             value={value}
             onChange={onChange}
             readOnly={readOnly}
+            placeholder={readOnly ? "" : starterSnippet}
             aria-label="Tailnet policy"
           />
         </div>

@@ -102,9 +102,9 @@ export const navGroups: readonly NavGroup[] = [
     ],
   },
   {
-    label: "Settings",
+    label: "Administration",
     items: [
-      { to: "/settings", label: "General", icon: GearSixIcon, scope: "feature_settings:read" },
+      { to: "/settings", label: "Settings", icon: GearSixIcon, scope: "feature_settings:read" },
       { to: "/keys", label: "Keys", icon: KeyIcon },
       {
         to: "/webhooks",

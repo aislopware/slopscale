@@ -14,8 +14,9 @@ export interface QuickActionsProps {
 }
 
 /**
- * The three things an operator comes here to do. Each one is hidden rather than disabled when the
- * caller has no scope for it, so the row never offers a dead end.
+ * The three things an operator comes here to do. Adding a machine is the one the page is for, so it
+ * is the only filled button; the rest are secondary. Each one is hidden rather than disabled when
+ * the caller has no scope for it, so the row never offers a dead end.
  */
 export function QuickActions({ me, onAddMachine }: QuickActionsProps): ReactElement {
   const [userOpen, setUserOpen] = useState(false);
@@ -24,7 +25,7 @@ export function QuickActions({ me, onAddMachine }: QuickActionsProps): ReactElem
   return (
     <>
       {can(me, "auth_keys") ? (
-        <Button variant="secondary" size="sm" icon={PlusIcon} onClick={onAddMachine}>
+        <Button variant="primary" size="sm" icon={PlusIcon} onClick={onAddMachine}>
           Add machine
         </Button>
       ) : null}

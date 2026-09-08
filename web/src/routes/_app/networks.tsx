@@ -75,8 +75,9 @@ function NetworksPage(): ReactElement {
         description="Subnets and exit nodes reached through routing machines. A network hands its routes only to the groups you pick. The routes tab shows everything any machine advertises."
         meta={describe(networks, nodes)}
       />
-      <div className="flex">
-        <Tabs variant="segmented" tabs={[...tabItems]} value={tab} onValueChange={setTab} />
+      {/* Underline for the page's own sections; the segmented style is for filters inside a card. */}
+      <div className="flex border-b border-kumo-hairline">
+        <Tabs variant="underline" tabs={[...tabItems]} value={tab} onValueChange={setTab} />
       </div>
       {/* Kumo's Tabs renders the controls only, so each body names itself as the panel. */}
       {tab === "networks" ? (

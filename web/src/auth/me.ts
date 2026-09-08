@@ -1,6 +1,7 @@
 import type { MethodResponse } from "openapi-react-query";
 
 import { api } from "~/api/client.ts";
+import { sharedStaleTime } from "~/api/queries.ts";
 import { roleName } from "~/components/users/roles.ts";
 
 /** The scopes the server knows; `Whoami.permissions` has one entry per scope. */
@@ -32,7 +33,13 @@ export type Scope =
 
 export type Me = MethodResponse<typeof api, "get", "/api/v1/whoami">;
 
-export const meQuery = api.queryOptions("get", "/api/v1/whoami");
+/**
+ * Who is signed in. The route guard, the account menu and the sidebar all read it, so it keeps the
+ * shared stale time; a role or profile change refetches it with `staleTime: 0`.
+ */
+export const meQuery = api.queryOptions("get", "/api/v1/whoami", undefined, {
+  staleTime: sharedStaleTime,
+});
 
 /** What the sign-in page may offer; public, so it loads before any credential. */
 export const consoleAuthQuery = api.queryOptions("get", "/api/v1/auth/console");

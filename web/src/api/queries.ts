@@ -42,14 +42,28 @@ export type Network = MethodResponse<typeof api, "get", "/api/v1/network">["netw
 export type DnsRule = MethodResponse<typeof api, "get", "/api/v1/dns/rule">["rules"][number];
 export type Webhook = MethodResponse<typeof api, "get", "/api/v1/webhook">["webhooks"][number];
 
-export const nodesQuery = api.queryOptions("get", "/api/v1/node");
-export const usersQuery = api.queryOptions("get", "/api/v1/user");
+/**
+ * How long the collections every page reads stay fresh. The sidebar badges and the command palette
+ * read the machines and the users on top of whichever page is open, so without this each of them
+ * refetched on every navigation. A mutation invalidates what it changed, so a stale minute is only
+ * about someone else's change arriving late.
+ */
+export const sharedStaleTime = 60_000;
+
+export const nodesQuery = api.queryOptions("get", "/api/v1/node", undefined, {
+  staleTime: sharedStaleTime,
+});
+export const usersQuery = api.queryOptions("get", "/api/v1/user", undefined, {
+  staleTime: sharedStaleTime,
+});
 export const preAuthKeysQuery = api.queryOptions("get", "/api/v1/preauthkey");
 export const apiKeysQuery = api.queryOptions("get", "/api/v1/apikey");
 export const oauthClientsQuery = api.queryOptions("get", "/api/v1/oauth-client");
 export const settingsQuery = api.queryOptions("get", "/api/v1/settings");
 export const serverInfoQuery = api.queryOptions("get", "/api/v1/server");
-export const groupsQuery = api.queryOptions("get", "/api/v1/group");
+export const groupsQuery = api.queryOptions("get", "/api/v1/group", undefined, {
+  staleTime: sharedStaleTime,
+});
 export const accessRulesQuery = api.queryOptions("get", "/api/v1/access-rule");
 export const posturesQuery = api.queryOptions("get", "/api/v1/posture");
 export const accessRequestsQuery = api.queryOptions("get", "/api/v1/access-request");
@@ -63,7 +77,6 @@ export type AccessRequestOptions = MethodResponse<
   "/api/v1/access-request/options"
 >;
 export const dnsQuery = api.queryOptions("get", "/api/v1/dns");
-export const derpQuery = api.queryOptions("get", "/api/v1/derp");
 export const dnsRulesQuery = api.queryOptions("get", "/api/v1/dns/rule");
 export const networksQuery = api.queryOptions("get", "/api/v1/network");
 export const webhooksQuery = api.queryOptions("get", "/api/v1/webhook");
@@ -101,6 +114,31 @@ export const policyQuery = queryOptions({
 
       throw error;
     }
+  },
+});
+
+/** The relay settings as they were read, with the ETag identifying that read. */
+export interface DerpSnapshot {
+  readonly derp: Derp;
+  /** What a change sends back as If-Match; "" when the server answered without an ETag. */
+  readonly etag: string;
+}
+
+/**
+ * The relay settings and the ETag of the read. `openapi-react-query` keeps the body only, and the
+ * ETag is what a later PUT sends as If-Match to be refused when someone else changed the settings
+ * in between, so the read goes through the raw client.
+ */
+export const derpQuery = queryOptions({
+  queryKey: ["get", "/api/v1/derp"] as const,
+  queryFn: async (): Promise<DerpSnapshot> => {
+    const { data, response } = await fetchClient.GET("/api/v1/derp");
+
+    if (data === undefined) {
+      throw new ApiError(response.status, undefined, "The server sent no relay settings.");
+    }
+
+    return { derp: data, etag: response.headers.get("ETag") ?? "" };
   },
 });
 
@@ -227,7 +265,9 @@ type Collection =
   | "/api/v1/network"
   | "/api/v1/webhook"
   | "/api/v1/log-stream"
-  | "/api/v1/ssh-recording";
+  | "/api/v1/ssh-recording"
+  | "/api/v1/auth/sessions"
+  | "/api/v1/invite";
 
 /** Refetches every query under the given paths; a node change touches the node list and its detail. */
 export async function invalidate(
@@ -243,3 +283,54 @@ export async function invalidate(
     ),
   );
 }
+
+export type ConsoleSession = MethodResponse<
+  typeof api,
+  "get",
+  "/api/v1/auth/sessions"
+>["sessions"][number];
+
+/**
+ * The console sign-ins that have not expired. The server decides the scope: a caller who may manage
+ * users gets every session, anyone else only their own.
+ */
+export const sessionsQuery = api.queryOptions("get", "/api/v1/auth/sessions");
+
+/** The file formats the audit export offers; the query parameter takes them verbatim. */
+export const auditExportFormats = ["csv", "json"] as const;
+
+export type AuditExportFormat = (typeof auditExportFormats)[number];
+
+/**
+ * Where the browser fetches the events matching `filters` as a file. The same filters the list
+ * sends, so an export holds exactly the rows on screen; the session cookie authorises it, the way
+ * it authorises a recording's cast file.
+ */
+export function auditExportUrl(filters: AuditFilters, format: AuditExportFormat): string {
+  const query = new URLSearchParams({ format });
+
+  if (filters.action !== "") {
+    query.set("action", filters.action);
+  }
+
+  if (filters.actorUserId !== "") {
+    query.set("actorUserId", filters.actorUserId);
+  }
+
+  if (filters.range !== "all") {
+    query.set("since", hoursAgo(rangeHours[filters.range]));
+  }
+
+  return `/api/v1/audit/export?${query.toString()}`;
+}
+
+export type Invite = MethodResponse<typeof api, "get", "/api/v1/invite">["invites"][number];
+
+/**
+ * Every invitation, pending and accepted; the users page filters the accepted ones out. It sits
+ * under the users table, so it keeps that table's stale window rather than asking again on every
+ * visit; sending, re-sending and revoking one invalidate it.
+ */
+export const invitesQuery = api.queryOptions("get", "/api/v1/invite", undefined, {
+  staleTime: sharedStaleTime,
+});

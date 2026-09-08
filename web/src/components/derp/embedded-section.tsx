@@ -4,7 +4,7 @@ import { Input } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { PencilSimpleIcon } from "@phosphor-icons/react";
 import { useRef, useState } from "react";
-import type { ReactElement, SubmitEvent } from "react";
+import type { ReactElement, ReactNode, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { Derp } from "~/api/queries.ts";
@@ -28,6 +28,14 @@ import { toast } from "~/components/ui/toast.ts";
 
 function Muted({ children }: { readonly children: string }): ReactElement {
   return <span className="text-kumo-subtle">{children}</span>;
+}
+
+/**
+ * A fact that runs onto a second line rather than being cut off. The list truncates by default, so
+ * a long region name or a warning has no room on a phone.
+ */
+function Wrapping({ children }: { readonly children: ReactNode }): ReactElement {
+  return <span className="whitespace-normal">{children}</span>;
 }
 
 function regionLabel(server: Derp["effective"]["server"]): string {
@@ -72,15 +80,17 @@ function regionFact(derp: Derp): Definition {
     return {
       label: "Region",
       value: (
-        <span className="flex flex-wrap items-baseline justify-end gap-x-2">
-          <span>{regionLabel(server)}</span>
-          <Muted>published by the map file, not these settings</Muted>
-        </span>
+        <Wrapping>
+          <span className="flex flex-wrap items-baseline justify-end gap-x-2">
+            <span>{regionLabel(server)}</span>
+            <Muted>published by the map file, not these settings</Muted>
+          </span>
+        </Wrapping>
       ),
     };
   }
 
-  return { label: "Region", value: regionLabel(server) };
+  return { label: "Region", value: <Wrapping>{regionLabel(server)}</Wrapping> };
 }
 
 function facts(derp: Derp): readonly Definition[] {
@@ -97,7 +107,9 @@ function facts(derp: Derp): readonly Definition[] {
             {derp.relayRunning ? "Running" : "Off"}
           </Badge>
           {insecure ? (
-            <Badge variant="warning">Published as insecure, the server URL is not https</Badge>
+            <Badge variant="warning" className="max-w-full text-left whitespace-normal">
+              Published as insecure, the server URL is not https
+            </Badge>
           ) : null}
         </span>
       ),

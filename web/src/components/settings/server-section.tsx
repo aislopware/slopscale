@@ -1,9 +1,11 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
+import { ArrowRightIcon } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import { api } from "~/api/client.ts";
 import type { ServerInfo } from "~/api/queries.ts";
+import { CopyText } from "~/components/ui/copy-text.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
@@ -16,6 +18,9 @@ const tlsLabels: Record<string, string> = {
 };
 
 const databaseLabels: Record<string, string> = { sqlite: "SQLite", postgres: "PostgreSQL" };
+
+/** The arrow that says a value leads somewhere, sized to the text beside it. */
+const linkIconSize = 12;
 
 const policyLabels: Record<string, string> = {
   file: "Policy file on disk",
@@ -76,7 +81,7 @@ function networkItems(info: ServerInfo): readonly Definition[] {
         info.oidcIssuer === "" ? (
           <Muted>None, users are created by hand</Muted>
         ) : (
-          <span className="font-mono text-[0.9em]">{info.oidcIssuer}</span>
+          <CopyText value={info.oidcIssuer} label="Copy the issuer URL" />
         ),
     },
   ];
@@ -118,10 +123,14 @@ export function ServerSection({ info }: { readonly info: ServerInfo }): ReactEle
       label: "DERP relays",
       value: (
         <span className="flex items-center gap-2">
-          <Link to="/relays" className="underline-offset-2 hover:underline">
+          <Link
+            to="/relays"
+            className="flex items-center gap-1 text-kumo-link underline decoration-kumo-line underline-offset-2 hover:decoration-current"
+          >
             {info.derpRegions === 0
               ? "No regions"
               : `${info.derpRegions} ${info.derpRegions === 1 ? "region" : "regions"}`}
+            <ArrowRightIcon size={linkIconSize} aria-hidden />
           </Link>
           <Badge variant={info.derpServer ? "info" : "neutral"}>
             {info.derpServer ? "Embedded relay running" : "Embedded relay off"}

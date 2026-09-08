@@ -36,7 +36,7 @@ export function MachinesEmpty({
         className={tableEmptyClass}
         icon={<DevicesIcon size={emptyIconSize} />}
         title="No machines yet"
-        description="Register a device with a pre-auth key or by signing in. It appears here immediately."
+        description="Register a device with a pre-auth key or by signing in. This list refreshes on its own, so a new machine appears without a reload."
         contents={
           canCreateKeys ? (
             <Button variant="secondary" icon={PlusIcon} onClick={onAddMachine}>

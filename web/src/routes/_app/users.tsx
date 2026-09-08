@@ -1,29 +1,27 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
-import { UsersIcon } from "@phosphor-icons/react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue } from "react";
 import type { ReactElement } from "react";
 import { object, optional, pipe, transform, unknown } from "valibot";
 
-import { groupsQuery, usersQuery } from "~/api/queries.ts";
+import { groupsQuery, invitesQuery, usersQuery } from "~/api/queries.ts";
 import type { User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
-import type { Me } from "~/auth/me.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
-import { AddUserButton } from "~/components/users/add-user.tsx";
+import { AddUserButton, FirstUserEmpty } from "~/components/users/add-user.tsx";
 import { columns } from "~/components/users/columns.tsx";
-import { CreateUserDialog } from "~/components/users/dialogs.tsx";
-import { useUserMutations } from "~/components/users/mutations.ts";
+import { InviteUserButton } from "~/components/users/invite-dialog.tsx";
+import { PendingInvites } from "~/components/users/invites-panel.tsx";
 import { isAdminRole } from "~/components/users/roles.ts";
 
 const filters = ["all", "admins", "pending"] as const;
@@ -72,6 +70,7 @@ export const Route = createFileRoute("/_app/users")({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.query(usersQuery),
+      can(context.me, "users:read") ? context.queryClient.query(invitesQuery) : Promise.resolve(),
       can(context.me, "policy_file:read")
         ? context.queryClient.query(groupsQuery)
         : Promise.resolve(),
@@ -125,7 +124,14 @@ function UsersPage(): ReactElement {
     <>
       <PageHeader title="Users" meta={describe(total, pending)} />
       <Frame>
-        <TableToolbar actions={<AddUserButton me={me} />}>
+        <TableToolbar
+          actions={
+            <>
+              <InviteUserButton me={me} />
+              <AddUserButton me={me} />
+            </>
+          }
+        >
           <SearchInput
             value={text}
             placeholder="Search by name, email or role"
@@ -168,36 +174,7 @@ function UsersPage(): ReactElement {
           />
         </table.AppTable>
       </Frame>
-    </>
-  );
-}
-
-/** The only empty state that can offer something: there is not a single user yet. */
-function FirstUserEmpty({ me }: { readonly me: Me }): ReactElement {
-  const [open, setOpen] = useState(false);
-  const mutations = useUserMutations();
-
-  return (
-    <>
-      <Empty
-        className={tableEmptyClass}
-        size="sm"
-        icon={<UsersIcon size={emptyIconSize} />}
-        title="No users yet"
-        description="A user appears here after their first sign-in, or you can add one now and hand out a pre-auth key."
-        contents={
-          <Button
-            variant="primary"
-            disabled={!can(me, "users")}
-            onClick={() => {
-              setOpen(true);
-            }}
-          >
-            Add user
-          </Button>
-        }
-      />
-      <CreateUserDialog open={open} onOpenChange={setOpen} mutations={mutations} />
+      <PendingInvites me={me} />
     </>
   );
 }

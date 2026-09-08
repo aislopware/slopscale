@@ -4,7 +4,7 @@ import { json } from "@codemirror/lang-json";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { Annotation, Compartment, EditorState } from "@codemirror/state";
 import type { Transaction } from "@codemirror/state";
-import { EditorView, keymap } from "@codemirror/view";
+import { EditorView, keymap, placeholder as placeholderText } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
 import { basicSetup } from "codemirror";
 import { useEffect, useRef } from "react";
@@ -50,6 +50,7 @@ const theme = EditorView.theme({
     borderRight: "1px solid var(--color-kumo-line)",
   },
   ".cm-activeLine": { backgroundColor: "var(--color-kumo-tint)" },
+  ".cm-placeholder": { color: "var(--text-color-kumo-subtle)" },
   ".cm-activeLineGutter": {
     backgroundColor: "var(--color-kumo-tint)",
     color: "var(--text-color-kumo-default)",
@@ -67,6 +68,8 @@ interface EditorOptions {
   readonly doc: string;
   readonly readOnly: boolean;
   readonly label: string;
+  /** Shown while the document is empty; "" for none. */
+  readonly placeholder: string;
   readonly emit: RefObject<(next: string) => void>;
 }
 
@@ -97,6 +100,11 @@ function createEditor(parent: HTMLElement, options: EditorOptions): Created {
     compartment.of(EditorState.readOnly.of(options.readOnly)),
     listener,
   ];
+
+  if (options.placeholder !== "") {
+    extensions.push(placeholderText(options.placeholder));
+  }
+
   const state = EditorState.create({ doc: options.doc, extensions });
 
   return { editor: new EditorView({ parent, state }), compartment };
@@ -107,6 +115,8 @@ export interface CodeEditorProps {
   readonly onChange: (next: string) => void;
   /** Keeps the caret and selection working while blocking edits. */
   readonly readOnly?: boolean;
+  /** A snippet shown while the document is empty, read once when the editor is created. */
+  readonly placeholder?: string;
   readonly className?: string;
   readonly "aria-label": string;
 }
@@ -116,6 +126,7 @@ export function CodeEditor({
   value,
   onChange,
   readOnly = false,
+  placeholder = "",
   className,
   "aria-label": label,
 }: CodeEditorProps): ReactElement {
@@ -123,7 +134,7 @@ export function CodeEditor({
   const view = useRef<EditorView>(null);
   const editable = useRef<Compartment>(null);
   const emit = useRef(onChange);
-  const initial = useRef({ doc: value, readOnly });
+  const initial = useRef({ doc: value, readOnly, placeholder });
 
   useEffect(() => {
     emit.current = onChange;
@@ -137,6 +148,7 @@ export function CodeEditor({
         : createEditor(parent, {
             doc: initial.current.doc,
             readOnly: initial.current.readOnly,
+            placeholder: initial.current.placeholder,
             label,
             emit,
           });

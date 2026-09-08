@@ -18,7 +18,9 @@ export function SettingRow({
         <span className="font-medium text-kumo-strong">{title}</span>
         <p className="max-w-prose text-kumo-subtle">{description}</p>
       </div>
-      <span className="flex h-lh shrink-0 items-center">{control}</span>
+      {/* ms-auto keeps the control at the right edge on its own line once the row wraps, so a
+          wide control ends where the narrow ones above it do. */}
+      <span className="ms-auto flex h-lh shrink-0 items-center">{control}</span>
     </SectionRow>
   );
 }

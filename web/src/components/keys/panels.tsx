@@ -2,7 +2,7 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import type { TabsItem } from "@cloudflare/kumo/components/tabs";
-import { KeyIcon, PlusIcon } from "@phosphor-icons/react";
+import { KeyIcon, PlugsConnectedIcon, PlusIcon } from "@phosphor-icons/react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useDeferredValue, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
@@ -106,7 +106,7 @@ export function PreAuthPanel({
               title="No pre-auth keys"
               description="A pre-auth key lets a machine register without anyone signing in on it."
               contents={
-                <Button variant="primary" disabled={!can(me, "auth_keys")} onClick={create}>
+                <Button variant="secondary" disabled={!can(me, "auth_keys")} onClick={create}>
                   Create key
                 </Button>
               }
@@ -173,7 +173,7 @@ export function ApiPanel({
               title="No API keys"
               description="An API key authenticates scripts and other tools against the headscale API."
               contents={
-                <Button variant="primary" onClick={create}>
+                <Button variant="secondary" onClick={create}>
                   Create API key
                 </Button>
               }
@@ -230,11 +230,11 @@ export function OAuthPanel({
             <Empty
               className={tableEmptyClass}
               size="sm"
-              icon={<KeyIcon size={emptyIconSize} />}
+              icon={<PlugsConnectedIcon size={emptyIconSize} />}
               title="No OAuth clients"
               description="An OAuth client lets automation mint short-lived tokens for the v2 API with a secret instead of an API key."
               contents={
-                <Button variant="primary" disabled={!canCreate} onClick={create}>
+                <Button variant="secondary" disabled={!canCreate} onClick={create}>
                   Create client
                 </Button>
               }

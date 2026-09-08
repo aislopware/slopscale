@@ -112,7 +112,11 @@ export function DataTable({
                           // Clicks on controls inside a row belong to the control.
                           if (
                             !(event.target instanceof Element) ||
-                            event.target.closest("button, a, input, [role=menu]") === null
+                            // Kumo's Checkbox is a span carrying the role, not a real input, so
+                            // the role is what keeps a tick box from opening the row behind it.
+                            event.target.closest(
+                              "button, a, input, [role=checkbox], [role=menu]",
+                            ) === null
                           ) {
                             onRowClick(row.id);
                           }

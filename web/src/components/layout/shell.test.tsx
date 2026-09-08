@@ -145,7 +145,7 @@ describe(Shell, () => {
 
     // The pages group used to stop at eight rows, which cut off the last group of the sidebar.
     await Promise.all(
-      ["Overview", "Audit log", "SSH sessions", "General", "Keys", "Integrations"].map(
+      ["Overview", "Audit log", "SSH sessions", "Settings", "Keys", "Integrations"].map(
         async (page) => {
           await expect.element(palette.getByText(page, { exact: true })).toBeVisible();
         },

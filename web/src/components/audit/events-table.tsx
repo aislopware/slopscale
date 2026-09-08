@@ -80,13 +80,15 @@ function EventRows({
           sticky="right"
           className={cn("w-10 text-right", overflowing && "border-l border-kumo-hairline")}
         >
+          {/* The chevron is the row's own control, not a second "Show details" button beside it:
+              it says the row opens and gives the keyboard the same reach as the click. */}
           <Button
             variant="ghost"
             shape="square"
             size="sm"
             icon={open ? CaretDownIcon : CaretRightIcon}
             aria-expanded={open}
-            aria-label={open ? "Hide details" : "Show details"}
+            aria-label={open ? "Collapse row" : "Expand row"}
             onClick={onToggle}
           />
         </Table.Cell>
@@ -141,7 +143,7 @@ export function EventsTable({
                 <Table.Head>Action</Table.Head>
                 <Table.Head>Target</Table.Head>
                 <Table.Head>Result</Table.Head>
-                <Table.Head className="hidden w-full min-w-72 lg:table-cell">Detail</Table.Head>
+                <Table.Head className="hidden w-full min-w-72 lg:table-cell">Summary</Table.Head>
                 <Table.Head
                   sticky="right"
                   className={cn("w-10", overflowing && "border-l border-kumo-hairline")}

@@ -92,7 +92,7 @@ export function NetworksTab({
                   description="A network approves a subnet or exit node on its routers and hands the routes only to the groups you pick. Machines outside those groups never see them."
                   contents={
                     <Button
-                      variant="primary"
+                      variant="secondary"
                       disabled={!canEdit}
                       onClick={() => {
                         setCreating(true);

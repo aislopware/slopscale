@@ -53,14 +53,14 @@ export const ruleColumns = helper.columns([
     header: "Rule",
     enableSorting: true,
     cell: ({ row }) => <NameCell rule={row.original} />,
-    meta: { className: "w-[26%] min-w-44" },
+    meta: { className: "w-[26%] min-w-44 align-top" },
   }),
   helper.accessor((rule) => `${rule.sourceNames} ${rule.postureNames}`, {
     id: "sources",
     header: "Sources",
     enableSorting: false,
     cell: ({ row }) => <SourcesCell rule={row.original} />,
-    meta: { className: "min-w-32" },
+    meta: { className: "min-w-32 align-top" },
   }),
   helper.accessor((rule) => (rule.bidirectional ? "both ways" : "one way"), {
     id: "direction",
@@ -68,7 +68,8 @@ export const ruleColumns = helper.columns([
     enableSorting: false,
     enableGlobalFilter: false,
     cell: ({ row }) => <DirectionCell bidirectional={row.original.bidirectional} />,
-    meta: { className: "w-10 px-0 text-center" },
+    // Its own narrow column, top aligned, so the arrow sits on the first line between the chips.
+    meta: { className: "w-10 px-0 text-center align-top" },
   }),
   helper.accessor((rule) => rule.destinationNames, {
     id: "destinations",
@@ -80,14 +81,14 @@ export const ruleColumns = helper.columns([
         groups={table.options.meta?.groups ?? []}
       />
     ),
-    meta: { className: "min-w-32" },
+    meta: { className: "min-w-32 align-top" },
   }),
   helper.accessor((rule) => protocolSummary(rule), {
     id: "protocol",
     header: "Protocol & ports",
     enableSorting: true,
     cell: ({ row }) => <ProtocolCell rule={row.original} />,
-    meta: { className: "hidden whitespace-nowrap md:table-cell" },
+    meta: { className: "hidden whitespace-nowrap align-top md:table-cell" },
   }),
   helper.accessor((rule) => (rule.enabled ? 1 : 0), {
     id: "enabled",
@@ -178,7 +179,11 @@ function DirectionCell({ bidirectional }: { readonly bidirectional: boolean }): 
   const label = bidirectional ? "Both directions" : "Sources to destinations";
 
   return (
-    <span className="inline-flex text-kumo-subtle" title={label} aria-label={label}>
+    <span
+      className="inline-flex h-lh items-center text-kumo-subtle"
+      title={label}
+      aria-label={label}
+    >
       {bidirectional ? (
         <ArrowsLeftRightIcon size={directionIconSize} />
       ) : (

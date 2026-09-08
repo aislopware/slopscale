@@ -1,11 +1,11 @@
 import { Banner } from "@cloudflare/kumo/components/banner";
 import { Button } from "@cloudflare/kumo/components/button";
-import { ClipboardText } from "@cloudflare/kumo/components/clipboard-text";
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import { JoinCommand } from "~/components/machines/join-command.tsx";
+import { CopyText } from "~/components/ui/copy-text.tsx";
 import { DialogFooter } from "~/components/ui/dialog.tsx";
 
 /**
@@ -47,12 +47,16 @@ export function CreatedKey({
         title="Copy the key now"
         description={note}
       />
-      <ClipboardText
-        size="base"
-        text={value}
-        tooltip={{ text: "Copy key", copiedText: "Copied" }}
-        labels={{ copyAction: "Copy key" }}
-      />
+      {/* The secret wraps onto as many lines as it needs: a truncated key is a lost key, and this
+          is the only moment it can be read. */}
+      <div className="rounded-lg bg-kumo-tint p-3 ring ring-kumo-line">
+        <CopyText
+          value={value}
+          label="Copy key"
+          wrap
+          className="w-full items-start justify-between gap-2 text-left"
+        />
+      </div>
       {join ? <JoinCommand authKey={value} /> : null}
       <DialogFooter>
         <Button variant="primary" onClick={onDone}>

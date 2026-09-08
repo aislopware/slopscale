@@ -70,3 +70,20 @@ describe("the users table", () => {
     await expect.element(screen.getByText("Local")).not.toBeInTheDocument();
   });
 });
+
+describe("a user without a display name", () => {
+  const dev: User = { ...alice, displayName: "", email: "", name: "dev", provider: "" };
+
+  it("names the account once, rather than repeating it under itself", async () => {
+    const screen = await render(<UsersTable users={[dev]} />);
+
+    await expect.element(screen.getByText("dev", { exact: true })).toBeVisible();
+    expect(screen.getByText("dev", { exact: true }).elements()).toHaveLength(1);
+  });
+
+  it("leaves a dash where there is no email", async () => {
+    const screen = await render(<UsersTable users={[dev]} />);
+
+    await expect.element(screen.getByText("—")).toBeVisible();
+  });
+});

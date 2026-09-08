@@ -3,6 +3,7 @@ import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { Group } from "~/api/queries.ts";
+import { isBuiltin } from "~/components/access/model.ts";
 import type { AccessMutations } from "~/components/access/mutations.ts";
 import { groupItems } from "~/components/access/pickers.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
@@ -11,6 +12,18 @@ import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.t
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { fromLocalInput } from "~/lib/time.ts";
+
+/**
+ * The note about the built-in group, for a record that is in one. The picker does not offer them,
+ * so the note belongs only to a chip that is already there.
+ */
+function builtinNote(groups: readonly Group[], selected: readonly string[]): string | undefined {
+  const present = selected.some((id) =>
+    groups.some((group) => group.id === id && isBuiltin(group)),
+  );
+
+  return present ? "The built-in group holds every machine and cannot be edited." : undefined;
+}
 
 /** Which record the dialog puts into groups; the API has one endpoint per kind. */
 export type Member = { readonly nodeId: string } | { readonly userId: string };
@@ -55,6 +68,7 @@ function MembershipForm({
   const added = selected.filter((id) => !current.includes(id));
   const removed = current.filter((id) => !selected.includes(id));
   const dirty = added.length > 0 || removed.length > 0;
+  const note = builtinNote(groups, selected);
 
   function leave(id: string): Promise<unknown> {
     return "nodeId" in member
@@ -94,7 +108,7 @@ function MembershipForm({
     <form onSubmit={submit} className="flex flex-col gap-4">
       <MultiPicker
         label="Groups"
-        description="The built-in group holds every machine and cannot be edited."
+        {...(note === undefined ? {} : { description: note })}
         placeholder="Add groups…"
         items={groupItems(groups, "membership")}
         value={selected}

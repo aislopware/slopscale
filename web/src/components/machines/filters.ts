@@ -38,6 +38,15 @@ export interface MachineFilter {
   readonly status: StatusFilter;
   /** A user id; "" keeps every machine. Matches the owner and anyone it is shared with. */
   readonly user: string;
+  /** One ACL tag, as the machine carries it (`tag:prod`); "" keeps every machine. */
+  readonly tag: string;
+}
+
+/** Every tag any machine carries, in the order the tag filter offers them. */
+export function tagOptions(nodes: readonly Node[]): string[] {
+  return [...new Set(nodes.flatMap((node) => node.tags))].toSorted((left, right) =>
+    left.localeCompare(right),
+  );
 }
 
 export function filterNodes(
@@ -51,6 +60,10 @@ export function filterNodes(
       ownerId(node) !== filter.user &&
       !node.sharedWith.includes(filter.user)
     ) {
+      return false;
+    }
+
+    if (filter.tag !== "" && !node.tags.includes(filter.tag)) {
       return false;
     }
 
@@ -79,4 +92,46 @@ export function statusCounts(
   }
 
   return counts;
+}
+
+/** A whole filter state, as the toolbar and the chips read it. */
+export interface MachineFilterState extends MachineFilter {
+  /** The free-text search; "" for none. */
+  readonly query: string;
+}
+
+/** The filters as a URL carries them; every one is optional and any of them may be nonsense. */
+export interface RawMachineSearch {
+  readonly q?: string | undefined;
+  readonly status?: string | undefined;
+  readonly user?: string | undefined;
+  readonly tag?: string | undefined;
+}
+
+/** The same parameters narrowed, which is what the page writes back. */
+export interface MachineSearch extends RawMachineSearch {
+  readonly status?: StatusFilter | undefined;
+}
+
+/** What the URL asks for. An absent or unknown parameter reads as that filter's default. */
+export function filtersFromSearch(search: RawMachineSearch): MachineFilterState {
+  return {
+    query: search.q ?? "",
+    status: toStatusFilter(search.status),
+    user: search.user ?? "",
+    tag: search.tag ?? "",
+  };
+}
+
+/**
+ * The URL for a filter state. A filter left at its default is absent, so the plain `/machines` the
+ * sidebar links to is exactly the URL the unfiltered page produces.
+ */
+export function searchFromFilters(state: MachineFilterState): MachineSearch {
+  return {
+    ...(state.query === "" ? {} : { q: state.query }),
+    ...(state.status === defaultStatus ? {} : { status: state.status }),
+    ...(state.user === "" ? {} : { user: state.user }),
+    ...(state.tag === "" ? {} : { tag: state.tag }),
+  };
 }

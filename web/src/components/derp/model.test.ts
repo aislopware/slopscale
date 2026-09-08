@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { ApiError } from "~/api/error.ts";
 import type { DerpSettings } from "~/api/schema.gen.ts";
 import {
   cloneSettings,
@@ -7,6 +8,8 @@ import {
   frequencyError,
   frequencyLabel,
   hostNameError,
+  ifMatchInit,
+  isStaleSettings,
   regionIdError,
   duplicateRelayName,
   relayDraft,
@@ -154,5 +157,19 @@ describe("validation", () => {
 
     expect(duplicateRelayName([first, second])).toBe("shared");
     expect(duplicateRelayName([first, { ...second, name: "own" }])).toBeNull();
+  });
+
+  it("sends the ETag of the read as If-Match, and nothing without one", () => {
+    expect(ifMatchInit('"a1b2"')).toStrictEqual({ params: { header: { "If-Match": '"a1b2"' } } });
+    expect(ifMatchInit("")).toStrictEqual({});
+  });
+
+  it("knows a refused change from any other failure", () => {
+    const refused = new ApiError(412, undefined, "changed");
+
+    expect(isStaleSettings(refused)).toBe(true);
+    expect(isStaleSettings(new ApiError(409, undefined, "conflict"))).toBe(false);
+    expect(isStaleSettings(new Error("offline"))).toBe(false);
+    expect(isStaleSettings("412")).toBe(false);
   });
 });

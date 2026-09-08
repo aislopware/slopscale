@@ -106,9 +106,10 @@ function PolicyPage(): ReactElement {
         description="Rules between groups of machines, and the policy file for everything else."
         meta={describe(rules, groups.length)}
       />
-      <div className="flex">
+      {/* Underline for the page's own sections; the segmented style is for filters inside a card. */}
+      <div className="flex border-b border-kumo-hairline">
         <Tabs
-          variant="segmented"
+          variant="underline"
           tabs={tabItemsWith(pendingCount(requests))}
           value={tab}
           onValueChange={setTab}

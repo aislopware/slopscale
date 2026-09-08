@@ -1,13 +1,16 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
+import { Button } from "@cloudflare/kumo/components/button";
 import { Table } from "@cloudflare/kumo/components/table";
+import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
 import type { Derp } from "~/api/queries.ts";
 import { sourceLabels } from "~/components/derp/model.ts";
 import type { RegionSource } from "~/components/derp/model.ts";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
+import { SearchInput } from "~/components/table/search-input.tsx";
 import { frameTableClass, frameTableRowClass } from "~/components/ui/frame.tsx";
-import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { Section, SectionEmpty } from "~/components/ui/section.tsx";
 
 const sourceVariants: Record<RegionSource, "secondary" | "info" | "success" | "neutral"> = {
   tailscale: "secondary",
@@ -18,19 +21,67 @@ const sourceVariants: Record<RegionSource, "secondary" | "info" | "success" | "n
   config: "neutral",
 };
 
+type Region = Derp["regions"][number];
+
+/** Matches a region on its id, code, name or where it came from, so any column can be searched. */
+function matches(region: Region, query: string): boolean {
+  const text =
+    `${region.id} ${region.code} ${region.name} ${sourceLabels[region.source]}`.toLowerCase();
+
+  return text.includes(query);
+}
+
 /** The merged map every machine receives, one row per region. */
 export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
+  const [search, setSearch] = useState("");
+  const query = useDeferredValue(search);
+  const regions = useMemo(() => {
+    const text = query.trim().toLowerCase();
+
+    return text === "" ? derp.regions : derp.regions.filter((region) => matches(region, text));
+  }, [derp.regions, query]);
+
   return (
     <Section
       title="Map machines receive"
       description="Every region after merging the sources, the relays you run and the embedded relay. A machine measures its latency to each region and keeps the closest one as home."
       bodyClassName="p-0"
+      {...(derp.regions.length === 0
+        ? {}
+        : {
+            actions: (
+              <SearchInput
+                className="max-w-56"
+                value={search}
+                placeholder="Search regions"
+                onValueChange={setSearch}
+              />
+            ),
+          })}
     >
       {derp.regions.length === 0 ? (
-        <SectionRow>
-          <p className="text-kumo-subtle">No regions. Machines must connect directly.</p>
-        </SectionRow>
-      ) : (
+        <SectionEmpty
+          title="No regions"
+          description="Machines must connect directly to each other."
+        />
+      ) : null}
+      {derp.regions.length > 0 && regions.length === 0 ? (
+        <SectionEmpty
+          title="No regions match"
+          description="No region matches this search."
+          contents={
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setSearch("");
+              }}
+            >
+              Clear search
+            </Button>
+          }
+        />
+      ) : null}
+      {regions.length === 0 ? null : (
         <TableScroll>
           {() => (
             <Table className={frameTableClass}>
@@ -44,7 +95,7 @@ export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {derp.regions.map((region) => (
+                {regions.map((region) => (
                   <Table.Row key={region.id} className={frameTableRowClass}>
                     <Table.Cell className="font-mono tabular-nums">{region.id}</Table.Cell>
                     <Table.Cell className="font-mono">{region.code}</Table.Cell>

@@ -20,7 +20,7 @@ import type { RecordType } from "~/components/dns/model.ts";
 import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
-import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 const iconSize = 16;
@@ -76,9 +76,10 @@ export function ExtraRecordsSection({
         : {})}
     >
       {settings.extraRecords.length === 0 ? (
-        <SectionRow>
-          <p className="text-kumo-subtle">No extra records.</p>
-        </SectionRow>
+        <SectionEmpty
+          title="No extra records"
+          description="Add a record to answer a name from the control server itself."
+        />
       ) : (
         settings.extraRecords.map((record, index) => (
           <SectionRow

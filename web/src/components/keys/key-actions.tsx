@@ -1,13 +1,22 @@
 import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
-import { ClockCounterClockwiseIcon, DotsThreeIcon, TrashIcon } from "@phosphor-icons/react";
+import {
+  ArrowsClockwiseIcon,
+  ClockCounterClockwiseIcon,
+  DotsThreeIcon,
+  TrashIcon,
+} from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 
 const actionsIconSize = 18;
+
+/** Why every item is unavailable when the whole menu is disabled by the caller's credentials. */
+const readOnlyReason = "Your credentials may not change keys";
 
 export interface KeyAction {
   readonly pending: boolean;
@@ -28,10 +37,22 @@ export interface DeleteAction extends KeyAction {
   readonly resourceName: string;
 }
 
+/**
+ * The rotate entry: the dialog belongs to the caller, because minting a secret ends in a one-time
+ * reveal rather than in a yes/no answer.
+ */
+export interface RotateEntry {
+  readonly onSelect: () => void;
+  /** Why the key cannot be rotated, or undefined while it can. */
+  readonly reason: string | undefined;
+}
+
 export interface KeyActionsProps {
   /** Accessible name of the trigger, such as "Actions for key tskey-abc". */
   readonly label: string;
   readonly disabled?: boolean;
+  /** Present only for a credential whose secret can be replaced in place, such as an API key. */
+  readonly rotate?: RotateEntry;
   /** Absent for a credential that cannot expire, such as an OAuth client. */
   readonly expire?: ExpireAction;
   readonly remove: DeleteAction;
@@ -43,6 +64,7 @@ type Dialog = "expire" | "delete";
 export function KeyActions({
   label,
   disabled = false,
+  rotate,
   expire,
   remove,
 }: KeyActionsProps): ReactElement {
@@ -66,6 +88,22 @@ export function KeyActions({
           }
         />
         <DropdownMenu.Content align="end">
+          {rotate === undefined ? null : (
+            <>
+              <DisabledReason reason={disabled ? readOnlyReason : rotate.reason}>
+                <DropdownMenu.Item
+                  icon={ArrowsClockwiseIcon}
+                  disabled={disabled || rotate.reason !== undefined}
+                  onClick={() => {
+                    rotate.onSelect();
+                  }}
+                >
+                  Rotate secret…
+                </DropdownMenu.Item>
+              </DisabledReason>
+              <DropdownMenu.Separator />
+            </>
+          )}
           {expire === undefined ? null : (
             <>
               <DropdownMenu.Item

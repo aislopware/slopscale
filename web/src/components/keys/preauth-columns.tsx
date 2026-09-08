@@ -54,7 +54,7 @@ export const preAuthKeyColumns = helper.columns([
     header: "User",
     enableSorting: true,
     cell: ({ row }) => <UserCell name={userLabel(row.original.user)} />,
-    meta: { className: "min-w-40" },
+    meta: { className: "min-w-36" },
   }),
   // A column of its own for tags was empty on most rows, so they ride along in this cell; the
   // accessor is what the global filter searches, which keeps "search by tag" working.
@@ -65,7 +65,7 @@ export const preAuthKeyColumns = helper.columns([
     cell: ({ row, table }) => (
       <TypeCell authKey={row.original} groups={table.options.meta?.groups ?? []} />
     ),
-    meta: { className: "min-w-44" },
+    meta: { className: "min-w-36" },
   }),
   helper.accessor((authKey) => statusOrder[preAuthKeyStatus(authKey)], {
     id: "status",

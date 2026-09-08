@@ -149,7 +149,7 @@ describe(EventsTable, () => {
     const screen = await render(app({ ...base, events: [deletion] }));
 
     await expect.element(screen.getByText("Remote address")).not.toBeInTheDocument();
-    await screen.getByRole("button", { name: "Show details" }).click();
+    await screen.getByRole("button", { name: "Expand row" }).click();
 
     await expect.element(screen.getByText("Remote address")).toBeVisible();
     await expect.element(screen.getByText("10.0.0.1")).toBeVisible();

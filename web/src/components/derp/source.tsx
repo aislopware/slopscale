@@ -87,6 +87,38 @@ export function SourceBanner({
   );
 }
 
+/**
+ * The change was refused because the stored settings had moved on since this page read them, so
+ * saving it would have overwritten what someone else changed.
+ */
+export function StaleSettingsBanner({
+  mutations,
+}: {
+  readonly mutations: DerpMutations;
+}): ReactElement | null {
+  if (!mutations.stale) {
+    return null;
+  }
+
+  return (
+    <Callout
+      tone="warning"
+      title="The relay settings changed since you loaded this page"
+      description="Your change was not applied. Reload the settings, then make it again."
+      action={
+        <Banner.Action
+          variant="ghost"
+          onClick={() => {
+            mutations.reload();
+          }}
+        >
+          Reload
+        </Banner.Action>
+      }
+    />
+  );
+}
+
 /** The last refetch failed: the map in use is the previous one. */
 export function FetchErrorBanner({ derp }: { readonly derp: Derp }): ReactElement | null {
   if (derp.fetchError === "") {

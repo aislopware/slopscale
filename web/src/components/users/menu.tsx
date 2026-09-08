@@ -7,6 +7,7 @@ import {
   IdentificationCardIcon,
   PencilSimpleIcon,
   ShieldCheckIcon,
+  SignOutIcon,
   TrashIcon,
   UsersThreeIcon,
 } from "@phosphor-icons/react";
@@ -23,13 +24,18 @@ import { MembershipDialog } from "~/components/access/membership-dialog.tsx";
 import { groupsOfUser } from "~/components/access/model.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
-import { DeleteUserDialog, RenameUserDialog, RoleDialog } from "~/components/users/dialogs.tsx";
+import {
+  DeleteUserDialog,
+  EndSessionsDialog,
+  RenameUserDialog,
+  RoleDialog,
+} from "~/components/users/dialogs.tsx";
 import { useUserMutations } from "~/components/users/mutations.ts";
 import { EditProfileDialog } from "~/components/users/profile-dialog.tsx";
 
 const actionsIconSize = 18;
 
-type Dialog = "rename" | "profile" | "role" | "groups" | "delete";
+type Dialog = "rename" | "profile" | "role" | "groups" | "sessions" | "delete";
 
 type Mutations = ReturnType<typeof useUserMutations>;
 
@@ -97,6 +103,12 @@ export function UserMenu({ user, me }: UserMenuProps): ReactElement {
         open={dialog === "groups"}
         onOpenChange={close}
         mutations={access}
+      />
+      <EndSessionsDialog
+        user={user}
+        open={dialog === "sessions"}
+        mutations={mutations}
+        onOpenChange={close}
       />
       <DeleteUserDialog
         user={user}
@@ -201,6 +213,18 @@ function UserMenuItems({
         />
       ) : null}
       <DropdownMenu.Separator />
+      {/* Ending your own sessions is allowed: it is how you drop a browser you left signed in. */}
+      <DisabledReason reason={writable ? undefined : "Your credentials may not change users"}>
+        <DropdownMenu.Item
+          icon={SignOutIcon}
+          disabled={!writable}
+          onClick={() => {
+            onOpen("sessions");
+          }}
+        >
+          Sign out everywhere…
+        </DropdownMenu.Item>
+      </DisabledReason>
       <DisabledReason reason={itemReason(writable, own, "You cannot delete your own account")}>
         <DropdownMenu.Item
           icon={TrashIcon}

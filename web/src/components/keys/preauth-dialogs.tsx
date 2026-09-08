@@ -100,7 +100,7 @@ export function CreatePreAuthKeyDialog({
         description={created === null ? descriptions[intent] : undefined}
       >
         {created === null ? (
-          <CreatePreAuthKeyForm me={me} onCreated={setCreated} />
+          <CreatePreAuthKeyForm me={me} intent={intent} onCreated={setCreated} />
         ) : (
           <CreatedKey
             value={created}
@@ -116,9 +116,11 @@ export function CreatePreAuthKeyDialog({
 
 function CreatePreAuthKeyForm({
   me,
+  intent,
   onCreated,
 }: {
   readonly me: Me;
+  readonly intent: PreAuthKeyIntent;
   readonly onCreated: (key: string) => void;
 }): ReactElement {
   const mayListUsers = can(me, "users:read");
@@ -164,6 +166,14 @@ function CreatePreAuthKeyForm({
         onChange={update}
       />
       <DialogError message={create.isError ? errorMessage(create.error) : undefined} />
+      {/* The button says "Create key" in a dialog titled "Add machine", so the line above it says
+          what the key is for before the operator has to read the button. */}
+      {intent === "add-machine" ? (
+        <p className="text-kumo-subtle">
+          Creating the key hands you the command to run on the machine. The machine joins the moment
+          it runs.
+        </p>
+      ) : null}
       <DialogFooter>
         <DialogClose render={<Button variant="secondary">Cancel</Button>} />
         <Button type="submit" variant="primary" loading={create.isPending} disabled={userId === ""}>

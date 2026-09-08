@@ -15,6 +15,7 @@ import { GroupsSection } from "~/components/machines/groups.tsx";
 import { MachineMenu } from "~/components/machines/menu.tsx";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
 import { AddressesSection, OverviewSection } from "~/components/machines/overview.tsx";
+import { machinePolling } from "~/components/machines/polling.ts";
 import { PostureSection } from "~/components/machines/posture.tsx";
 import { GlobalExitSection, RoutesSection } from "~/components/machines/routes.tsx";
 import { SharingSection } from "~/components/machines/sharing.tsx";
@@ -53,9 +54,10 @@ export const Route = createFileRoute("/_app/machines/$nodeId")({
 function MachinePage(): ReactElement {
   const { me } = Route.useRouteContext();
   const { nodeId } = Route.useParams();
-  const detail = useSuspenseQuery(
-    api.queryOptions("get", "/api/v1/node/{nodeId}", { params: { path: { nodeId } } }),
-  );
+  const detail = useSuspenseQuery({
+    ...api.queryOptions("get", "/api/v1/node/{nodeId}", { params: { path: { nodeId } } }),
+    ...machinePolling,
+  });
   const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
   const groups = useQuery({ ...groupsQuery, enabled: can(me, "policy_file:read") });
   const { node } = detail.data;

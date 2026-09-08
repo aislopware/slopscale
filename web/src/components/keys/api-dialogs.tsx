@@ -154,6 +154,108 @@ function CreateApiKeyForm({
   );
 }
 
+/** The rotate dialog's expiry choices; keeping the key's own expiry is the default. */
+type RotateExpiry = "keep" | ExpiryChoice;
+
+const keepExpiry = "keep";
+
+const rotateExpiryOptions: readonly { value: RotateExpiry; label: string }[] = [
+  { value: keepExpiry, label: "Keep the current expiry" },
+  ...expiryOptions,
+];
+
+const rotateNote = "The new key is shown this once and cannot be read again.";
+
+/**
+ * Replaces an API key's secret in place. The key keeps its id, owner, scopes and description, so
+ * anything referring to it by prefix stays where it is; only the secret changes, and it changes the
+ * moment the operator confirms.
+ */
+export function RotateApiKeyDialog({
+  prefix,
+  open,
+  onOpenChange,
+}: {
+  readonly prefix: string;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+}): ReactElement {
+  const [rotated, setRotated] = useCreatedKey(open);
+  const close = (): void => {
+    onOpenChange(false);
+  };
+
+  return (
+    <DialogRoot open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        size="base"
+        title={rotated === null ? "Rotate API key" : "API key rotated"}
+        description={
+          rotated === null
+            ? `Anything still using the current secret of ${prefix} stops being able to call the API as soon as you rotate it. The key keeps its id, owner, scopes and description.`
+            : undefined
+        }
+      >
+        {rotated === null ? (
+          <RotateApiKeyForm prefix={prefix} onRotated={setRotated} />
+        ) : (
+          <CreatedKey value={rotated} note={rotateNote} onDone={close} />
+        )}
+      </DialogContent>
+    </DialogRoot>
+  );
+}
+
+function RotateApiKeyForm({
+  prefix,
+  onRotated,
+}: {
+  readonly prefix: string;
+  readonly onRotated: (key: string) => void;
+}): ReactElement {
+  const { rotate } = useApiKeyMutations();
+  const [expiry, setExpiry] = useState<RotateExpiry>(keepExpiry);
+
+  function submit(event: SubmitEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    rotate.mutate(
+      {
+        params: { path: { prefix } },
+        body: expiry === keepExpiry ? {} : { expiration: expirationFor(expiry) },
+      },
+      {
+        onSuccess: (data) => {
+          onRotated(data.apiKey);
+        },
+      },
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <Select
+        className="w-full"
+        label="Expiration"
+        description="Rotating can move the expiry out; leave it to keep the one the key already has."
+        value={expiry}
+        items={[...rotateExpiryOptions]}
+        onValueChange={(value: RotateExpiry | null) => {
+          if (value !== null) {
+            setExpiry(value);
+          }
+        }}
+      />
+      <DialogError message={rotate.isError ? errorMessage(rotate.error) : undefined} />
+      <DialogFooter>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
+        <Button type="submit" variant="destructive" loading={rotate.isPending}>
+          Rotate key
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
 function userOptions(users: readonly User[] | undefined): { value: string; label: string }[] {
   return [
     { value: "", label: "No user (all access)" },

@@ -109,9 +109,15 @@ function KeysPage(): ReactElement {
         title="Keys"
         description="Pre-auth keys register machines without a login. API keys and OAuth clients authenticate this console and automation."
       />
-      <div className="flex">
-        <Tabs variant="segmented" tabs={tabItems} value={tab} onValueChange={handleTabChange} />
-      </div>
+      {/* Underline at page level, segmented for the filter inside the card: two controls in the
+          same style, one under the other, read as one broken segmented control. */}
+      <Tabs
+        variant="underline"
+        aria-label="Key kind"
+        tabs={tabItems}
+        value={tab}
+        onValueChange={handleTabChange}
+      />
       {tab === "preauth" ? <PreAuthPanel me={me} controls={controls} /> : null}
       {tab === "api" ? <ApiPanel me={me} controls={controls} /> : null}
       {tab === "oauth" ? <OAuthPanel me={me} controls={controls} /> : null}

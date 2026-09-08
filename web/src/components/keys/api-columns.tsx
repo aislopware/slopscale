@@ -1,12 +1,15 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
+import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { ApiKey, User } from "~/api/queries.ts";
+import { RotateApiKeyDialog } from "~/components/keys/api-dialogs.tsx";
 import { ExpiryCell, KeyPrefix } from "~/components/keys/cells.tsx";
 import { KeyActions } from "~/components/keys/key-actions.tsx";
 import { useApiKeyMutations } from "~/components/keys/mutations.ts";
 import { scopeLabel } from "~/components/keys/scopes.ts";
+import { apiKeyStatus } from "~/components/keys/status.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
@@ -31,7 +34,7 @@ export const apiKeyColumns = helper.columns([
     header: "Scopes",
     enableSorting: false,
     cell: ({ row }) => <ScopesCell scopes={row.original.scopes} />,
-    meta: { className: "hidden min-w-40 md:table-cell" },
+    meta: { className: "hidden min-w-32 md:table-cell" },
   }),
   helper.accessor((apiKey) => apiKey.userId ?? "", {
     id: "user",
@@ -138,44 +141,56 @@ function UserCell({
 
 function ApiKeyMenu({ apiKey }: { readonly apiKey: ApiKey }): ReactElement {
   const { expire, remove } = useApiKeyMutations();
+  const [rotating, setRotating] = useState(false);
+  // The server refuses a rotation on an expired key with a 409, so the menu says so first.
+  const expired = apiKeyStatus(apiKey) === "expired";
 
   return (
-    <KeyActions
-      label={`Actions for API key ${apiKey.prefix}`}
-      expire={{
-        title: "Expire API key?",
-        description: `Anything still using ${apiKey.prefix} stops being able to call the API.`,
-        pending: expire.isPending,
-        error: expire.isError ? errorMessage(expire.error) : undefined,
-        run: (done) => {
-          expire.mutate(
-            { body: { prefix: apiKey.prefix } },
-            {
-              onSuccess: () => {
-                toast.success("API key expired");
-                done();
+    <>
+      <RotateApiKeyDialog prefix={apiKey.prefix} open={rotating} onOpenChange={setRotating} />
+      <KeyActions
+        label={`Actions for API key ${apiKey.prefix}`}
+        rotate={{
+          reason: expired ? "An expired key cannot be rotated; create a new one" : undefined,
+          onSelect: () => {
+            setRotating(true);
+          },
+        }}
+        expire={{
+          title: "Expire API key?",
+          description: `Anything still using ${apiKey.prefix} stops being able to call the API.`,
+          pending: expire.isPending,
+          error: expire.isError ? errorMessage(expire.error) : undefined,
+          run: (done) => {
+            expire.mutate(
+              { body: { prefix: apiKey.prefix } },
+              {
+                onSuccess: () => {
+                  toast.success("API key expired");
+                  done();
+                },
               },
-            },
-          );
-        },
-      }}
-      remove={{
-        resourceType: "API key",
-        resourceName: apiKey.prefix,
-        pending: remove.isPending,
-        error: remove.isError ? errorMessage(remove.error) : undefined,
-        run: (done) => {
-          remove.mutate(
-            { params: { path: { prefix: apiKey.prefix } } },
-            {
-              onSuccess: () => {
-                toast.success("API key deleted");
-                done();
+            );
+          },
+        }}
+        remove={{
+          resourceType: "API key",
+          resourceName: apiKey.prefix,
+          pending: remove.isPending,
+          error: remove.isError ? errorMessage(remove.error) : undefined,
+          run: (done) => {
+            remove.mutate(
+              { params: { path: { prefix: apiKey.prefix } } },
+              {
+                onSuccess: () => {
+                  toast.success("API key deleted");
+                  done();
+                },
               },
-            },
-          );
-        },
-      }}
-    />
+            );
+          },
+        }}
+      />
+    </>
   );
 }

@@ -214,7 +214,7 @@ function NetworkForm({
       />
       <MultiPicker
         label="Handed to"
-        description="Only the machines in these groups get the routes. Pick the builtin All for everyone."
+        description="Only the machines in these groups get the routes. Pick the built in All group for everyone."
         placeholder="Groups that receive the routes…"
         items={groupItems(groups)}
         value={draft.groups}

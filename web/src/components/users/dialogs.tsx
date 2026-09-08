@@ -7,6 +7,8 @@ import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { User } from "~/api/queries.ts";
+import { plural } from "~/components/overview/plural.ts";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import {
   DialogClose,
   DialogContent,
@@ -308,6 +310,43 @@ export function DeleteUserDialog({
           { params: { path: { id: user.id } } },
           {
             onSuccess: () => {
+              onOpenChange(false);
+            },
+          },
+        );
+      }}
+    />
+  );
+}
+
+/**
+ * Ends every console session of one user. Nothing else about the account changes, so it is a plain
+ * confirmation rather than a delete; it is offered on the operator's own row too, which is how a
+ * browser left signed in somewhere else is dropped.
+ */
+export function EndSessionsDialog({
+  user,
+  open,
+  onOpenChange,
+  mutations,
+}: UserDialogProps): ReactElement {
+  const { endSessions } = mutations;
+
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={`Sign ${userLabel(user)} out everywhere?`}
+      description="Every browser signed in as this user is signed out on its next request. The account, its machines and its keys are untouched."
+      confirmLabel="Sign out everywhere"
+      loading={endSessions.isPending}
+      {...(endSessions.isError ? { error: errorMessage(endSessions.error) } : {})}
+      onConfirm={() => {
+        endSessions.mutate(
+          { params: { path: { id: user.id } } },
+          {
+            onSuccess: (data) => {
+              toast.success(`${plural(data.ended, "session")} ended`);
               onOpenChange(false);
             },
           },

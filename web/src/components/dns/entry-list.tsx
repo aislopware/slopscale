@@ -2,7 +2,8 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { TrashIcon } from "@phosphor-icons/react";
 import type { ReactElement, ReactNode } from "react";
 
-import { SectionRow } from "~/components/ui/section.tsx";
+import { SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
+import type { SectionEmptyProps } from "~/components/ui/section.tsx";
 
 const iconSize = 16;
 
@@ -26,16 +27,13 @@ export function EntryList({
   pending,
 }: {
   readonly entries: readonly Entry[];
-  readonly empty: string;
+  /** What the panel says when there is nothing in it. */
+  readonly empty: SectionEmptyProps;
   readonly canEdit: boolean;
   readonly pending: boolean;
 }): ReactElement {
   if (entries.length === 0) {
-    return (
-      <SectionRow>
-        <p className="text-kumo-subtle">{empty}</p>
-      </SectionRow>
-    );
+    return <SectionEmpty {...empty} />;
   }
 
   return (
@@ -53,7 +51,9 @@ export function EntryList({
                 <RemoveButton
                   label={entry.removeLabel ?? "Remove"}
                   disabled={pending}
-                  entry={entry}
+                  onRemove={() => {
+                    entry.onRemove?.();
+                  }}
                 />
               ) : null}
             </div>
@@ -67,11 +67,11 @@ export function EntryList({
 function RemoveButton({
   label,
   disabled,
-  entry,
+  onRemove,
 }: {
   readonly label: string;
   readonly disabled: boolean;
-  readonly entry: Entry;
+  readonly onRemove: () => void;
 }): ReactElement {
   return (
     <Button
@@ -81,9 +81,24 @@ function RemoveButton({
       icon={<TrashIcon size={iconSize} />}
       aria-label={label}
       disabled={disabled}
-      onClick={() => {
-        entry.onRemove?.();
-      }}
+      onClick={onRemove}
     />
   );
+}
+
+/**
+ * The room a row's remove button takes, for a row that has none but whose control must end on the
+ * same edge as the rows that do. It renders the button itself, hidden, so the two cannot drift
+ * apart when the button changes.
+ */
+export function EntryActionSpacer(): ReactElement {
+  return (
+    <span aria-hidden className="invisible">
+      <RemoveButton label="" disabled onRemove={noop} />
+    </span>
+  );
+}
+
+function noop(): void {
+  // The spacer is not interactive.
 }

@@ -31,6 +31,8 @@ interface ApiKeyMutations {
   readonly create: Mutation<"post", "/api/v1/apikey">;
   readonly expire: Mutation<"post", "/api/v1/apikey/expire">;
   readonly remove: Mutation<"delete", "/api/v1/apikey/{prefix}">;
+  /** Mints a new secret for the key; the old one is refused from that moment. */
+  readonly rotate: Mutation<"post", "/api/v1/apikey/{prefix}/rotate">;
 }
 
 /** API key mutations; the same shape as the pre-auth ones, on the API key collection. */
@@ -44,6 +46,7 @@ export function useApiKeyMutations(): ApiKeyMutations {
     create: api.useMutation("post", "/api/v1/apikey", { onSuccess: refresh }),
     expire: api.useMutation("post", "/api/v1/apikey/expire", { onSuccess: refresh }),
     remove: api.useMutation("delete", "/api/v1/apikey/{prefix}", { onSuccess: refresh }),
+    rotate: api.useMutation("post", "/api/v1/apikey/{prefix}/rotate", { onSuccess: refresh }),
   };
 }
 

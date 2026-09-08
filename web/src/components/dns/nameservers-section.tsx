@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { ReactElement } from "react";
 
 import type { DnsSettings } from "~/api/schema.gen.ts";
-import { EntryList } from "~/components/dns/entry-list.tsx";
+import { EntryActionSpacer, EntryList } from "~/components/dns/entry-list.tsx";
 import {
   keptWithExitNode,
   nameserverError,
@@ -21,6 +21,15 @@ import { Section, SectionRow } from "~/components/ui/section.tsx";
 
 /** The id of the override paragraph, which explains why a disabled toggle is disabled. */
 const overrideHelpId = "dns-override-local-help";
+
+/** Why "Use with exit node" is off limits, or nothing when it is not. */
+function toggleReason(canEdit: boolean, overrideLocalDns: boolean): string | undefined {
+  if (!canEdit) {
+    return "Your credentials may not change DNS";
+  }
+
+  return overrideLocalDns ? undefined : "Turn on Override local DNS to mark a nameserver";
+}
 
 export function NameserversSection({
   settings,
@@ -59,21 +68,20 @@ export function NameserversSection({
       <EntryList
         canEdit={canEdit}
         pending={pending}
-        empty="No global nameservers. Machines keep using their own resolvers."
+        empty={{
+          title: "No global nameservers",
+          description: "Machines keep using the resolvers they already have.",
+        }}
         entries={settings.nameservers.map((ns) => ({
           key: ns,
           value: ns,
           control: (
             <ExitNodeToggle
-              name={`Use with exit node: ${ns}`}
+              name={ns}
               checked={keptWithExitNode(settings, ns)}
               disabled={!canEdit || pending || !settings.overrideLocalDns}
               describedBy={settings.overrideLocalDns ? undefined : overrideHelpId}
-              reason={
-                settings.overrideLocalDns
-                  ? undefined
-                  : "Turn on Override local DNS to mark a nameserver"
-              }
+              reason={toggleReason(canEdit, settings.overrideLocalDns)}
               pending={pending}
               onChange={(on) => {
                 mutations.apply(
@@ -100,7 +108,8 @@ export function NameserversSection({
             clears the marks.
           </p>
         </div>
-        <span className="flex h-lh shrink-0 items-center">
+        {/* The spacer stands where a nameserver row's remove button is, so both toggles end together. */}
+        <span className="flex h-lh shrink-0 items-center gap-3">
           <Switch
             aria-label="Override local DNS"
             checked={settings.overrideLocalDns}
@@ -117,6 +126,7 @@ export function NameserversSection({
               );
             }}
           />
+          {canEdit ? <EntryActionSpacer /> : null}
         </span>
       </SectionRow>
       <ValueDialog
@@ -137,10 +147,10 @@ export function NameserversSection({
   );
 }
 
-/** The per-nameserver switch for keeping it while an exit node is selected. */
 /**
- * "Use with exit node" as a labelled switch: the visible label is clickable, and the accessible
- * name adds the resolver or domain it belongs to.
+ * "Use with exit node" as a labelled switch: the visible label is clickable, and a hidden part of
+ * it names the resolver or domain, because Kumo's Switch names itself by its label and would drop
+ * an aria-label.
  */
 export function ExitNodeToggle({
   name,
@@ -164,9 +174,12 @@ export function ExitNodeToggle({
     <DisabledReason reason={disabled ? reason : undefined}>
       <Switch
         size="sm"
-        label={<span className="text-sm text-kumo-subtle">Use with exit node</span>}
+        label={
+          <span className="text-sm text-kumo-subtle">
+            Use with exit node<span className="sr-only"> for {name}</span>
+          </span>
+        }
         controlFirst={false}
-        aria-label={name}
         {...(describedBy === undefined ? {} : { "aria-describedby": describedBy })}
         checked={checked}
         disabled={disabled}

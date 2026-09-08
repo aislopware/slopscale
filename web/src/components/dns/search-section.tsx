@@ -75,7 +75,10 @@ export function SearchDomainsSection({
       <EntryList
         canEdit={canEdit}
         pending={mutations.set.isPending}
-        empty="No search domains."
+        empty={{
+          title: "No search domains",
+          description: "Only the base domain is tried for a short name.",
+        }}
         entries={entries}
       />
       <ValueDialog

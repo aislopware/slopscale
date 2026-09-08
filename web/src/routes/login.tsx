@@ -9,11 +9,29 @@ import { ApiError } from "~/api/error.ts";
 import { consoleAuthQuery, meQuery } from "~/auth/me.ts";
 import { consolePath } from "~/auth/session.ts";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
+import { Callout } from "~/components/ui/callout.tsx";
 import { Frame, FramePanel } from "~/components/ui/frame.tsx";
 
 const searchSchema = object({
   redirect: optional(string()),
+  /** The token of an invitation link, which the sign-in carries through to the server. */
+  invite: optional(string()),
+  /** Why a sign-in that already started came back here. */
+  error: optional(string()),
 });
+
+/**
+ * The reasons the server sends someone back to this page. Only these are spelled out: the value
+ * comes from the URL, so an unknown one is answered with a sentence of the console's own rather
+ * than with whatever it says.
+ */
+const signInProblems: Record<string, string> = {
+  invite_expired: "That invitation has expired. Ask whoever invited you for a new link.",
+  invite_revoked: "That invitation was revoked. Ask whoever invited you for a new link.",
+  invite_used: "That invitation has already been used. Sign in with the account it created.",
+};
+
+const genericProblem = "The sign-in could not be finished. Try again.";
 
 export const Route = createFileRoute("/login")({
   validateSearch: searchSchema,
@@ -37,8 +55,9 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage(): ReactElement {
-  const { redirect: target } = Route.useSearch();
+  const { redirect: target, invite, error } = Route.useSearch();
   const { oidc } = Route.useLoaderData();
+  const problem = error === undefined ? undefined : (signInProblems[error] ?? genericProblem);
 
   return (
     <div className="flex min-h-dvh flex-col bg-kumo-canvas">
@@ -62,6 +81,12 @@ function LoginPage(): ReactElement {
                   </p>
                 </div>
               </div>
+              {problem === undefined ? null : (
+                <Banner variant="error" title="Sign-in failed" description={problem} />
+              )}
+              {invite === undefined || invite === "" ? null : (
+                <Callout title="You were invited. Sign in to accept the invitation." />
+              )}
               {oidc === undefined ? (
                 <Banner
                   variant="alert"
@@ -77,9 +102,7 @@ function LoginPage(): ReactElement {
                   onClick={() => {
                     // The provider flow is served by headscale, not routed by
                     // the console, so this is a full navigation.
-                    globalThis.location.assign(
-                      `${oidc.loginPath}?redirect=${encodeURIComponent(consolePath(target ?? "/"))}`,
-                    );
+                    globalThis.location.assign(loginUrl(oidc.loginPath, target, invite));
                   }}
                 >
                   Continue with {oidc.provider}
@@ -99,4 +122,23 @@ function LoginPage(): ReactElement {
       </main>
     </div>
   );
+}
+
+/**
+ * Where the sign-in button sends the browser: the provider flow on the server, carrying where to
+ * land afterwards and, when the operator followed an invitation link, its token. The server keeps
+ * the token under its own state and consumes it once the identity is known.
+ */
+function loginUrl(
+  loginPath: string,
+  target: string | undefined,
+  invite: string | undefined,
+): string {
+  const query = new URLSearchParams({ redirect: consolePath(target ?? "/") });
+
+  if (invite !== undefined && invite !== "") {
+    query.set("invite", invite);
+  }
+
+  return `${loginPath}?${query.toString()}`;
 }
