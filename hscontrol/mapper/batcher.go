@@ -717,10 +717,21 @@ func (b *Batcher) addToBatch(changes ...change.Change) {
 	// not nodes that are still connected but have lost visibility of certain peers.
 	//
 	// See: https://github.com/juanfont/headscale/issues/2924
+	//
+	// The node's own stream ends here too: closing its connections runs
+	// the poll's stop callback, and the poll, finding its node gone from
+	// the state, tells the client to log in again before returning.
+	// Without this a deleted node kept receiving keep-alives until the
+	// TCP session broke (juanfont/headscale#3410).
 	for _, ch := range changes {
 		for _, removedID := range ch.PeersRemoved {
-			if _, existed := b.nodes.LoadAndDelete(removedID); existed {
+			if nc, existed := b.nodes.LoadAndDelete(removedID); existed {
 				b.totalNodes.Add(-1)
+
+				if nc != nil {
+					nc.close()
+				}
+
 				log.Debug().
 					Uint64(zf.NodeID, removedID.Uint64()).
 					Msg("removed deleted node from batcher")

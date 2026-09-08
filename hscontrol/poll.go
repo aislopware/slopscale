@@ -105,6 +105,48 @@ func (m *mapSession) stopFromBatcher() {
 	}
 }
 
+// nodeGone reports whether the state no longer knows the session's node,
+// which is how a poll tells a cancel from its node's deletion apart from
+// one for a replaced stream or a shutdown.
+func (m *mapSession) nodeGone() bool {
+	_, ok := m.h.state.GetNodeByID(m.node.ID)
+
+	return !ok
+}
+
+// nodeGoneExpiry is the key expiry a deleted node is told: far enough in
+// the past that no client clock reads it as still valid.
+var nodeGoneExpiry = time.Unix(0, 0).UTC()
+
+// nodeGoneResponse is the map response for a node the server no longer
+// knows: its own entry with the key expired. tailscaled reads an expired
+// self key as NeedsLogin and stops polling, where a bare HTTP error is a
+// temporary failure it retries forever (juanfont/headscale#3410). The
+// hosted control plane answers a deleted device the same way. Only the
+// fields the client needs to recognise itself are filled in; node may be
+// a bare key when the server never knew it.
+func nodeGoneResponse(node *types.Node) *tailcfg.MapResponse {
+	now := time.Now()
+
+	return &tailcfg.MapResponse{
+		ControlTime: &now,
+		Node: &tailcfg.Node{
+			//nolint:gosec // NodeID is a database autoincrement value, int64 on SQLite/PostgreSQL, so it fits
+			ID:                tailcfg.NodeID(node.ID),
+			StableID:          node.ID.StableID(),
+			Name:              node.GivenName,
+			Key:               node.NodeKey,
+			KeyExpiry:         nodeGoneExpiry,
+			Machine:           node.MachineKey,
+			DiscoKey:          node.DiscoKey,
+			Addresses:         node.Prefixes(),
+			AllowedIPs:        node.Prefixes(),
+			MachineAuthorized: true,
+			Expired:           true,
+		},
+	}
+}
+
 // afterServeLongPoll is called when a long-polling session ends and the node
 // is disconnected.
 func (m *mapSession) afterServeLongPoll() {
@@ -152,8 +194,10 @@ func (m *mapSession) cleanupAfterLongPoll(connectGen uint64) {
 	stillConnected := m.h.mapBatcher.RemoveNode(m.node.ID, m.ch)
 
 	// This session never reached [state.State.Connect]; there is no
-	// session to release.
-	if connectGen == 0 {
+	// session to release. A deleted node has nothing to release either,
+	// and waiting for it to reconnect would only hold the stream count
+	// up, which is what kept the server from shutting down.
+	if connectGen == 0 || m.nodeGone() {
 		return
 	}
 
@@ -295,6 +339,15 @@ func (m *mapSession) serveLongPoll() {
 		case <-m.cancelCh:
 			m.log.Trace().Caller().Msg("poll cancelled received")
 			mapResponseEnded.WithLabelValues("cancelled").Inc()
+
+			// A cancel for a node the state no longer knows comes from
+			// its deletion; the client learns so from the last frame.
+			if m.nodeGone() {
+				err := m.writeMap(nodeGoneResponse(m.node))
+				if err != nil {
+					m.log.Error().Caller().Err(err).Msg("cannot write final map to deleted node")
+				}
+			}
 
 			return
 

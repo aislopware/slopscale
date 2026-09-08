@@ -482,7 +482,14 @@ func (ns *noiseServer) PollNetMapHandler(
 
 	nv, err := ns.getAndValidateNode(mapRequest)
 	if err != nil {
+		if errors.Is(err, errNodeKeyUnknown) {
+			ns.serveNodeGone(req.Context(), writer, mapRequest)
+
+			return
+		}
+
 		httpError(writer, err)
+
 		return
 	}
 
@@ -838,12 +845,36 @@ func (ns *noiseServer) sshActionFollowUp(
 	return action, nil
 }
 
+// errNodeKeyUnknown is returned by getAndValidateNode for a node key the
+// state does not know: a deleted node, or one registered elsewhere.
+var errNodeKeyUnknown = errors.New("node key unknown")
+
+// serveNodeGone answers a map request from a node key the server does not
+// know with the node's own entry expired, so the client logs in again
+// instead of retrying a 404 for good (juanfont/headscale#3410). A node
+// deleted while polling gets the same frame from its stream; this covers
+// the client that reconnects afterwards, or after the server restarted.
+func (ns *noiseServer) serveNodeGone(ctx context.Context, writer http.ResponseWriter, mapRequest tailcfg.MapRequest) {
+	sess := ns.headscale.newMapSession(ctx, mapRequest, writer, &types.Node{
+		NodeKey:    mapRequest.NodeKey,
+		MachineKey: ns.machineKey,
+		Hostname:   "unknown",
+	})
+
+	sess.log.Info().Caller().Msg("map request from an unknown node key, telling it to log in again")
+
+	err := sess.writeMap(nodeGoneResponse(sess.node))
+	if err != nil {
+		sess.log.Error().Caller().Err(err).Msg("cannot write map to unknown node")
+	}
+}
+
 // getAndValidateNode retrieves the node from the database using the NodeKey
 // and validates that it matches the MachineKey from the Noise session.
 func (ns *noiseServer) getAndValidateNode(mapRequest tailcfg.MapRequest) (types.NodeView, error) {
 	nv, ok := ns.headscale.state.GetNodeByNodeKey(mapRequest.NodeKey)
 	if !ok {
-		return types.NodeView{}, NewHTTPError(http.StatusNotFound, "node not found", nil)
+		return types.NodeView{}, errNodeKeyUnknown
 	}
 
 	// Validate that the MachineKey in the Noise session matches the one associated with the NodeKey.

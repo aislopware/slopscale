@@ -462,6 +462,12 @@ func (c *TestClient) ReconnectAfter(tb testing.TB, d time.Duration) {
 	c.Reconnect(tb)
 }
 
+// PollEnded is closed when the current long poll returns, whether the
+// server ended it or the client cancelled it.
+func (c *TestClient) PollEnded() <-chan struct{} {
+	return c.pollDone
+}
+
 // --- State accessors ---
 
 // Netmap returns the latest [netmap.NetworkMap], or nil if none received yet.
