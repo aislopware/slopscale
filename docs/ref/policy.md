@@ -263,6 +263,29 @@ configuration and attributes. At least the following node attributes are current
 }
 ```
 
+An entry's `app` field carries [application capabilities with
+data](https://tailscale.com/docs/reference/syntax/policy-file#app-capabilities): each key is a domain-qualified
+capability name and its values are JSON objects the targets receive verbatim in their node capability map. This is how
+[app connectors](https://tailscale.com/docs/features/app-connectors) are defined: the `tailscale.com/app-connectors`
+entries name the connector tags and the domains they serve, and a client that carries them routes those domains through
+the connector, which learns and advertises the routes. Approve the connector's routes with an
+[auto approver](routes.md) for its tag or by hand.
+
+```json title="policy.json"
+{
+  "nodeAttrs": [
+    {
+      "target": ["autogroup:member"],
+      "app": {
+        "tailscale.com/app-connectors": [
+          { "name": "github", "connectors": ["tag:appc"], "domains": ["github.com", "*.github.com"] }
+        ]
+      }
+    }
+  ]
+}
+```
+
 ## Network-wide policy options
 
 The following options are applied for the entire tailnet. Consider [node attributes](#node-attributes) for a more

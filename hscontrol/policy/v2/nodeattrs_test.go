@@ -129,6 +129,37 @@ func TestNodeAttrsCompile(t *testing.T) {
 			},
 		},
 		{
+			name: "app capabilities carry their values and add up across grants",
+			extra: `"nodeAttrs": [
+				{"target": ["alice@example.com"], "app": {"tailscale.com/app-connectors": [
+					{"name": "github", "connectors": ["tag:server"], "domains": ["github.com", "*.github.com"]}
+				]}},
+				{"target": ["autogroup:member"], "attr": ["randomize-client-port"], "app": {
+					"tailscale.com/app-connectors": [
+						{"name": "aws", "connectors": ["*"], "domains": ["*.amazonaws.com"]}
+					],
+					"example.com/cap/empty": []
+				}}
+			]`,
+			want: map[types.NodeID]tailcfg.NodeCapMap{
+				1: {
+					nodecap.RandomizeClientPort: nil,
+					"tailscale.com/app-connectors": {
+						`{"name": "github", "connectors": ["tag:server"], "domains": ["github.com", "*.github.com"]}`,
+						`{"name": "aws", "connectors": ["*"], "domains": ["*.amazonaws.com"]}`,
+					},
+					"example.com/cap/empty": nil,
+				},
+				2: {
+					nodecap.RandomizeClientPort: nil,
+					"tailscale.com/app-connectors": {
+						`{"name": "aws", "connectors": ["*"], "domains": ["*.amazonaws.com"]}`,
+					},
+					"example.com/cap/empty": nil,
+				},
+			},
+		},
+		{
 			name:  "autogroup:tagged hits tagged nodes only",
 			extra: `"nodeAttrs": [{"target": ["autogroup:tagged"], "attr": ["disable-captive-portal-detection"]}]`,
 			want: map[types.NodeID]tailcfg.NodeCapMap{
@@ -229,6 +260,16 @@ func TestNodeAttrsValidate(t *testing.T) {
 			name:    "funnel attr rejected as unsupported",
 			extra:   `"nodeAttrs": [{"target": ["*"], "attr": ["funnel"]}]`,
 			wantErr: ErrNodeAttrUnsupported,
+		},
+		{
+			name:    "app capability without a domain rejected",
+			extra:   `"nodeAttrs": [{"target": ["*"], "app": {"app-connectors": [{}]}}]`,
+			wantErr: ErrNodeAttrAppCapInvalid,
+		},
+		{
+			name:    "app value that is not an object rejected",
+			extra:   `"nodeAttrs": [{"target": ["*"], "app": {"tailscale.com/app-connectors": ["github"]}}]`,
+			wantErr: ErrNodeAttrAppValueInvalid,
 		},
 		{
 			name:    "ipPool set rejected as unsupported",

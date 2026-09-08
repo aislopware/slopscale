@@ -2,6 +2,7 @@ package v2
 
 import (
 	"fmt"
+	"maps"
 	"net/netip"
 	"slices"
 
@@ -169,12 +170,17 @@ func (pol *Policy) compileNodeAttrs(
 	nodes views.Slice[types.NodeView],
 ) (map[types.NodeID]tailcfg.NodeCapMap, error) {
 	result := make(map[types.NodeID]tailcfg.NodeCapMap)
-	stamp := func(id types.NodeID, attr nodecap.Cap) {
+	capMapOf := func(id types.NodeID) tailcfg.NodeCapMap {
 		capMap, ok := result[id]
 		if !ok {
 			capMap = tailcfg.NodeCapMap{}
 			result[id] = capMap
 		}
+
+		return capMap
+	}
+	stamp := func(id types.NodeID, attr nodecap.Cap) {
+		capMap := capMapOf(id)
 
 		// nil [tailcfg.RawMessage] matches the wire format from a
 		// Tailscale-hosted control plane: capabilities without companion
@@ -185,6 +191,13 @@ func (pol *Policy) compileNodeAttrs(
 			capMap[attr] = nil
 		}
 	}
+	// stampApp appends the values of an app capability, so several
+	// grants for the same capability add up, as they do on the hosted
+	// control plane.
+	stampApp := func(id types.NodeID, attr nodecap.Cap, values []tailcfg.RawMessage) {
+		capMap := capMapOf(id)
+		capMap[attr] = append(capMap[attr], values...)
+	}
 
 	stampGlobalExitNodes(nodes, stamp)
 
@@ -192,7 +205,7 @@ func (pol *Policy) compileNodeAttrs(
 		return result, nil
 	}
 
-	return result, pol.compilePolicyNodeAttrs(users, nodes, stamp)
+	return result, pol.compilePolicyNodeAttrs(users, nodes, stamp, stampApp)
 }
 
 // stampGlobalExitNodes gives every global exit node suggest-exit-node,
@@ -230,6 +243,7 @@ func (pol *Policy) compilePolicyNodeAttrs(
 	users types.Users,
 	nodes views.Slice[types.NodeView],
 	stamp func(types.NodeID, nodecap.Cap),
+	stampApp func(types.NodeID, nodecap.Cap, []tailcfg.RawMessage),
 ) error {
 	// Cache each node's IPs once per call. Without the cache, the
 	// node-attr inner loop would call [types.NodeView.IPs] once per attr
@@ -252,7 +266,7 @@ func (pol *Policy) compilePolicyNodeAttrs(
 	}
 
 	for _, na := range pol.NodeAttrs {
-		if len(na.Attrs) == 0 {
+		if !na.hasAttrs() {
 			continue
 		}
 
@@ -272,6 +286,10 @@ func (pol *Policy) compilePolicyNodeAttrs(
 
 			for _, attr := range na.Attrs {
 				stamp(ni.id, attr)
+			}
+
+			for _, attr := range slices.Sorted(maps.Keys(na.App)) {
+				stampApp(ni.id, attr, na.App[attr])
 			}
 		}
 	}

@@ -112,6 +112,10 @@ var (
 		"nodeAttrs ipPool requires the IP allocator (https://github.com/juanfont/headscale/issues/2912)",
 	)
 	ErrNodeAttrTargetUnsupported = errors.New("nodeAttrs target alias type is not supported")
+	ErrNodeAttrAppCapInvalid     = errors.New(
+		"nodeAttrs app capability must be a domain-qualified name such as example.com/cap/name",
+	)
+	ErrNodeAttrAppValueInvalid = errors.New("nodeAttrs app values must be JSON objects")
 )
 
 // nodeAttrUnsupportedCaps lists caps that headscale parses but cannot act on
@@ -2163,12 +2167,25 @@ type Grant struct {
 // resolved exactly like ACL/grant sources, so users, groups, tags, hosts,
 // prefixes, autogroup:member, autogroup:tagged, and "*" are all valid.
 //
+// App carries application capabilities with data, as Tailscale's
+// nodeAttrs "app" does: each key is a capability name such as
+// "tailscale.com/app-connectors" and its values land verbatim in the
+// targets' self CapMap, where the client reads them (the app connector
+// definitions, for one). Values from several grants for the same
+// capability are concatenated.
+//
 // IPPool is parsed and validated for forward compatibility with the IP
 // allocator; the policy compiler does not consume it yet.
 type NodeAttrGrant struct {
-	Targets Aliases        `json:"target"`
-	Attrs   []nodecap.Cap  `json:"attr,omitempty"`
-	IPPool  []netip.Prefix `json:"ipPool,omitempty"`
+	Targets Aliases                              `json:"target"`
+	Attrs   []nodecap.Cap                        `json:"attr,omitempty"`
+	App     map[nodecap.Cap][]tailcfg.RawMessage `json:"app,omitempty"`
+	IPPool  []netip.Prefix                       `json:"ipPool,omitempty"`
+}
+
+// hasAttrs reports whether the grant stamps anything on its targets.
+func (na NodeAttrGrant) hasAttrs() bool {
+	return len(na.Attrs) > 0 || len(na.App) > 0
 }
 
 // aclToGrants converts an [ACL] rule to one or more equivalent [Grant] rules.
@@ -2420,6 +2437,30 @@ func validateAutogroupForNodeAttrs(ag *AutoGroup) error {
 
 	if !slices.Contains(autogroupForNodeAttrs, *ag) {
 		return fmt.Errorf("%w: %q, can be %v", ErrNodeAttrsAutogroupNotAllowed, *ag, autogroupForNodeAttrs)
+	}
+
+	return nil
+}
+
+// validateNodeAttrApp checks one nodeAttrs app entry: the capability is
+// domain-qualified, as Tailscale requires for application capabilities,
+// and every value is a JSON object, the shape the client decodes them
+// into.
+func validateNodeAttrApp(capName nodecap.Cap, values []tailcfg.RawMessage) error {
+	name := string(capName)
+
+	host, _, ok := strings.Cut(name, "/")
+	if !ok || host == "" || !strings.Contains(host, ".") || strings.HasSuffix(name, "/") {
+		return fmt.Errorf("%w: %q", ErrNodeAttrAppCapInvalid, name)
+	}
+
+	for _, value := range values {
+		var object map[string]any
+
+		err := json.Unmarshal([]byte(value), &object)
+		if err != nil {
+			return fmt.Errorf("%w: %q for %q", ErrNodeAttrAppValueInvalid, string(value), name)
+		}
 	}
 
 	return nil
@@ -3079,6 +3120,13 @@ func (pol *Policy) validate() error {
 			issue, ok := nodeAttrUnsupportedCaps[attr]
 			if ok {
 				errs = append(errs, fmt.Errorf("%w: %q tracked in %s", ErrNodeAttrUnsupported, attr, issue))
+			}
+		}
+
+		for capName, values := range na.App {
+			err := validateNodeAttrApp(capName, values)
+			if err != nil {
+				errs = append(errs, err)
 			}
 		}
 

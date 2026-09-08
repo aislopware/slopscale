@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tailcfg/nodecap"
+	"tailscale.com/types/appctype"
 	"tailscale.com/types/netmap"
 )
 
@@ -454,4 +455,49 @@ func TestNodeAttrsDNSSubdomainResolveOnPeerCapMap(t *testing.T) {
 
 			return false
 		})
+}
+
+// TestNodeAttrsAppConnectors covers the nodeAttrs "app" field: the app
+// connector definitions land verbatim in the targets' self CapMap, where
+// the client decodes them the way it does from the hosted control plane.
+func TestNodeAttrsAppConnectors(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	user := srv.CreateUser(t, "appc-user")
+
+	client := servertest.NewClient(t, srv, "appc-client", servertest.WithUser(user))
+	connector := servertest.NewClient(t, srv, "appc-connector",
+		servertest.WithUser(user), servertest.WithTags("tag:appc"))
+
+	client.WaitForPeers(t, 1, 10*time.Second)
+	connector.WaitForPeers(t, 1, 10*time.Second)
+
+	reloadPolicy(t, srv, `{
+		"tagOwners": {"tag:appc": ["appc-user@"]},
+		"nodeAttrs": [{
+			"target": ["autogroup:member"],
+			"app": {"tailscale.com/app-connectors": [{
+				"name": "github", "connectors": ["tag:appc"], "domains": ["github.com", "*.github.com"]
+			}]}
+		}]
+	}`)
+
+	const capName = "tailscale.com/app-connectors"
+
+	client.WaitForCondition(t, "self carries the app connector attribute", 10*time.Second,
+		func(nm *netmap.NetworkMap) bool { return hasCap(nm, capName) })
+
+	attrs, err := tailcfg.UnmarshalNodeCapViewJSON[appctype.AppConnectorAttr](
+		client.Netmap().SelfNode.CapMap(),
+		capName,
+	)
+	require.NoError(t, err)
+	require.Len(t, attrs, 1)
+	assert.Equal(t, "github", attrs[0].Name)
+	assert.Equal(t, []string{"tag:appc"}, attrs[0].Connectors)
+	assert.Equal(t, []string{"github.com", "*.github.com"}, attrs[0].Domains)
+
+	connector.WaitForUpdate(t, 10*time.Second)
+	assert.False(t, hasCap(connector.Netmap(), capName), "the tagged connector is not a member")
 }
