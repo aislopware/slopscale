@@ -368,6 +368,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/derp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get DERP settings
+         * @description Returns the relay configuration the server runs with, the config file's values, whether settings set through the API replace them and the map clients receive.
+         *
+         *     Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getDERP"];
+        /**
+         * Set DERP settings
+         * @description Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+         *
+         *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        put: operations["setDERP"];
+        post?: never;
+        /**
+         * Reset DERP settings
+         * @description Drops the runtime relay settings so the config file is in force again.
+         *
+         *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["resetDERP"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/derp/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refetch the DERP maps
+         * @description Fetches the map URLs and files again and pushes the map to every client when it changed.
+         *
+         *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["refreshDERP"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dns": {
         parameters: {
             query?: never;
@@ -1942,15 +1998,101 @@ export interface components {
         DeleteNodeOutputBody: Record<string, unknown>;
         DeletePreAuthKeyOutputBody: Record<string, unknown>;
         DeleteUserOutputBody: Record<string, unknown>;
-        DERPRegion: {
+        DERP: {
+            autoAddEmbedded: boolean;
+            /** @description What the server runs with. */
+            effective: components["schemas"]["DERPSettings"];
+            /** Format: date-time */
+            fetchedAt: string;
+            fetchError: string;
+            /** @description The config file's values. */
+            fromFile: components["schemas"]["DERPSettings"];
+            /** @description Settings set through the API are in use. */
+            overridden: boolean;
+            paths: string[];
+            regions: components["schemas"]["DERPMapRegion"][];
+            relayAvailable: boolean;
+            relayRunning: boolean;
+            /** @description Where the embedded relay is reached. */
+            serverUrl: string;
+            stunAddr: string;
+        };
+        DERPCustomRegion: {
+            /** @description Short code shown by clients. */
             code: string;
-            /** @description Served by this headscale. */
-            embedded: boolean;
+            /**
+             * Format: int64
+             * @description Region ID; replaces a fetched region with the same ID.
+             */
+            id: number;
+            /** @description Empty takes the code. */
+            name?: string;
+            nodes?: components["schemas"]["DERPRelay"][];
+        };
+        DERPMapRegion: {
+            code: string;
             /** Format: int64 */
             id: number;
             name: string;
             /** Format: int64 */
             nodes: number;
+            /**
+             * @description Where it came from.
+             * @enum {string}
+             */
+            source: "tailscale" | "url" | "file" | "custom" | "embedded" | "config";
+        };
+        DERPRelay: {
+            canPort80?: boolean;
+            /**
+             * Format: int64
+             * @description HTTPS port; 0 means 443.
+             */
+            derpPort?: number;
+            /** @description DNS name the relay's certificate matches. */
+            hostName: string;
+            /** @description Fixed address, or none. */
+            ipv4?: string;
+            /** @description Fixed address, or none. */
+            ipv6?: string;
+            /** @description Unique within the region; empty takes the host name. */
+            name?: string;
+            stunOnly?: boolean;
+            /**
+             * Format: int64
+             * @description UDP STUN port; 0 means 3478.
+             */
+            stunPort?: number;
+        };
+        DERPServerSettings: {
+            enabled: boolean;
+            /** @description Public address published next to the host name. */
+            ipv4?: string;
+            /** @description Public address published next to the host name. */
+            ipv6?: string;
+            regionCode?: string;
+            /**
+             * Format: int64
+             * @description Replaces a fetched region with the same ID.
+             */
+            regionId?: number;
+            /** @description Empty takes the code. */
+            regionName?: string;
+            /** @description UDP host:port STUN listens on. */
+            stunAddr?: string;
+            /** @description Admit only this tailnet's machines. */
+            verifyClients?: boolean;
+        };
+        DERPSettings: {
+            /** @description Refetch the maps every updateFrequency. */
+            autoUpdate: boolean;
+            /** @description Relays the operator runs. */
+            regions: components["schemas"]["DERPCustomRegion"][];
+            server: components["schemas"]["DERPServerSettings"];
+            /** @description Go duration, at least 1m. */
+            updateFrequency: string;
+            /** @description Maps fetched and merged in order. */
+            urls: string[];
         };
         DNS: {
             /** @description From the config file. */
@@ -2450,9 +2592,9 @@ export interface components {
             buildTime: string;
             commit: string;
             database: string;
-            derpRegions: components["schemas"]["DERPRegion"][];
+            /** Format: int64 */
+            derpRegions: number;
             derpServer: boolean;
-            derpStun: string;
             ephemeralInactivityTimeout: string;
             goVersion: string;
             ipv4Prefix: string;
@@ -2482,6 +2624,13 @@ export interface components {
             /** Format: date-time */
             expiry?: string;
             value: unknown;
+        };
+        SetDERPRequestBody: {
+            autoUpdate?: boolean;
+            regions?: components["schemas"]["DERPCustomRegion"][] | null;
+            server: components["schemas"]["DERPServerSettings"];
+            updateFrequency?: string;
+            urls?: string[] | null;
         };
         SetDNSRequestBody: {
             extraRecords?: components["schemas"]["DNSRecord"][] | null;
@@ -2692,7 +2841,12 @@ export type DeleteApiKeyOutputBody = components['schemas']['DeleteAPIKeyOutputBo
 export type DeleteNodeOutputBody = components['schemas']['DeleteNodeOutputBody'];
 export type DeletePreAuthKeyOutputBody = components['schemas']['DeletePreAuthKeyOutputBody'];
 export type DeleteUserOutputBody = components['schemas']['DeleteUserOutputBody'];
-export type DerpRegion = components['schemas']['DERPRegion'];
+export type Derp = components['schemas']['DERP'];
+export type DerpCustomRegion = components['schemas']['DERPCustomRegion'];
+export type DerpMapRegion = components['schemas']['DERPMapRegion'];
+export type DerpRelay = components['schemas']['DERPRelay'];
+export type DerpServerSettings = components['schemas']['DERPServerSettings'];
+export type DerpSettings = components['schemas']['DERPSettings'];
 export type Dns = components['schemas']['DNS'];
 export type DnsRecord = components['schemas']['DNSRecord'];
 export type DnsRule = components['schemas']['DNSRule'];
@@ -2763,6 +2917,7 @@ export type ServerInfo = components['schemas']['ServerInfo'];
 export type SetApprovalRequestBody = components['schemas']['SetApprovalRequestBody'];
 export type SetApprovedRoutesRequestBody = components['schemas']['SetApprovedRoutesRequestBody'];
 export type SetAttributeRequestBody = components['schemas']['SetAttributeRequestBody'];
+export type SetDerpRequestBody = components['schemas']['SetDERPRequestBody'];
 export type SetDnsRequestBody = components['schemas']['SetDNSRequestBody'];
 export type SetGlobalExitNodeRequestBody = components['schemas']['SetGlobalExitNodeRequestBody'];
 export type SetSuspensionRequestBody = components['schemas']['SetSuspensionRequestBody'];
@@ -3556,6 +3711,126 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NodeOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getDERP: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DERP"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    setDERP: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetDERPRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DERP"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    resetDERP: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DERP"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    refreshDERP: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DERP"];
                 };
             };
             /** @description Error */

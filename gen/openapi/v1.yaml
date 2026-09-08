@@ -482,14 +482,82 @@ components:
         - key
         - value
       type: object
-    DERPRegion:
+    DERP:
+      additionalProperties: false
+      properties:
+        autoAddEmbedded:
+          type: boolean
+        effective:
+          $ref: "#/components/schemas/DERPSettings"
+          description: What the server runs with.
+        fetchError:
+          type: string
+        fetchedAt:
+          format: date-time
+          type: string
+        fromFile:
+          $ref: "#/components/schemas/DERPSettings"
+          description: The config file's values.
+        overridden:
+          description: Settings set through the API are in use.
+          type: boolean
+        paths:
+          items:
+            type: string
+          type: array
+        regions:
+          items:
+            $ref: "#/components/schemas/DERPMapRegion"
+          type: array
+        relayAvailable:
+          type: boolean
+        relayRunning:
+          type: boolean
+        serverUrl:
+          description: Where the embedded relay is reached.
+          type: string
+        stunAddr:
+          type: string
+      required:
+        - effective
+        - fromFile
+        - overridden
+        - paths
+        - autoAddEmbedded
+        - relayAvailable
+        - relayRunning
+        - stunAddr
+        - serverUrl
+        - regions
+        - fetchedAt
+        - fetchError
+      type: object
+    DERPCustomRegion:
+      additionalProperties: false
+      properties:
+        code:
+          description: Short code shown by clients.
+          type: string
+        id:
+          description: Region ID; replaces a fetched region with the same ID.
+          format: int64
+          type: integer
+        name:
+          description: Empty takes the code.
+          type: string
+        nodes:
+          items:
+            $ref: "#/components/schemas/DERPRelay"
+          type: array
+      required:
+        - id
+        - code
+      type: object
+    DERPMapRegion:
       additionalProperties: false
       properties:
         code:
           type: string
-        embedded:
-          description: Served by this headscale.
-          type: boolean
         id:
           format: int64
           type: integer
@@ -498,12 +566,109 @@ components:
         nodes:
           format: int64
           type: integer
+        source:
+          description: Where it came from.
+          enum:
+            - tailscale
+            - url
+            - file
+            - custom
+            - embedded
+            - config
+          type: string
       required:
         - id
         - code
         - name
         - nodes
-        - embedded
+        - source
+      type: object
+    DERPRelay:
+      additionalProperties: false
+      properties:
+        canPort80:
+          type: boolean
+        derpPort:
+          description: HTTPS port; 0 means 443.
+          format: int64
+          type: integer
+        hostName:
+          description: DNS name the relay's certificate matches.
+          type: string
+        ipv4:
+          description: Fixed address, or none.
+          type: string
+        ipv6:
+          description: Fixed address, or none.
+          type: string
+        name:
+          description: Unique within the region; empty takes the host name.
+          type: string
+        stunOnly:
+          type: boolean
+        stunPort:
+          description: UDP STUN port; 0 means 3478.
+          format: int64
+          type: integer
+      required:
+        - hostName
+      type: object
+    DERPServerSettings:
+      additionalProperties: false
+      properties:
+        enabled:
+          type: boolean
+        ipv4:
+          description: Public address published next to the host name.
+          type: string
+        ipv6:
+          description: Public address published next to the host name.
+          type: string
+        regionCode:
+          type: string
+        regionId:
+          description: Replaces a fetched region with the same ID.
+          format: int64
+          type: integer
+        regionName:
+          description: Empty takes the code.
+          type: string
+        stunAddr:
+          description: UDP host:port STUN listens on.
+          type: string
+        verifyClients:
+          description: Admit only this tailnet's machines.
+          type: boolean
+      required:
+        - enabled
+      type: object
+    DERPSettings:
+      additionalProperties: false
+      properties:
+        autoUpdate:
+          description: Refetch the maps every updateFrequency.
+          type: boolean
+        regions:
+          description: Relays the operator runs.
+          items:
+            $ref: "#/components/schemas/DERPCustomRegion"
+          type: array
+        server:
+          $ref: "#/components/schemas/DERPServerSettings"
+        updateFrequency:
+          description: Go duration, at least 1m.
+          type: string
+        urls:
+          description: Maps fetched and merged in order.
+          items:
+            type: string
+          type: array
+      required:
+        - urls
+        - regions
+        - autoUpdate
+        - updateFrequency
+        - server
       type: object
     DNS:
       additionalProperties: false
@@ -1864,13 +2029,10 @@ components:
         database:
           type: string
         derpRegions:
-          items:
-            $ref: "#/components/schemas/DERPRegion"
-          type: array
+          format: int64
+          type: integer
         derpServer:
           type: boolean
-        derpStun:
-          type: string
         ephemeralInactivityTimeout:
           type: string
         goVersion:
@@ -1924,7 +2086,6 @@ components:
         - oidcScopes
         - derpRegions
         - derpServer
-        - derpStun
         - ephemeralInactivityTimeout
         - nodeExpiry
       type: object
@@ -1957,6 +2118,30 @@ components:
         value: {}
       required:
         - value
+      type: object
+    SetDERPRequestBody:
+      additionalProperties: false
+      properties:
+        autoUpdate:
+          type: boolean
+        regions:
+          items:
+            $ref: "#/components/schemas/DERPCustomRegion"
+          type:
+            - array
+            - "null"
+        server:
+          $ref: "#/components/schemas/DERPServerSettings"
+        updateFrequency:
+          type: string
+        urls:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - server
       type: object
     SetDNSRequestBody:
       additionalProperties: false
@@ -3128,6 +3313,117 @@ paths:
         - Nodes
       x-audit-action: node.debug_create
       x-required-scope: devices:core
+  /api/v1/derp:
+    delete:
+      description: |-
+        Drops the runtime relay settings so the config file is in force again.
+
+        Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: resetDERP
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DERP"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Reset DERP settings
+      tags:
+        - DERP
+      x-audit-action: derp.reset
+      x-required-scope: feature_settings
+    get:
+      description: |-
+        Returns the relay configuration the server runs with, the config file's values, whether settings set through the API replace them and the map clients receive.
+
+        Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getDERP
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DERP"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get DERP settings
+      tags:
+        - DERP
+      x-required-scope: feature_settings:read
+    put:
+      description: |-
+        Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+
+        Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: setDERP
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetDERPRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DERP"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Set DERP settings
+      tags:
+        - DERP
+      x-audit-action: derp.set
+      x-required-scope: feature_settings
+  /api/v1/derp/refresh:
+    post:
+      description: |-
+        Fetches the map URLs and files again and pushes the map to every client when it changed.
+
+        Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: refreshDERP
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DERP"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Refetch the DERP maps
+      tags:
+        - DERP
+      x-audit-action: derp.refresh
+      x-required-scope: feature_settings
   /api/v1/dns:
     delete:
       description: |-

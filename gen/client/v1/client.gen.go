@@ -17,6 +17,36 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for DERPMapRegionSource.
+const (
+	Config    DERPMapRegionSource = "config"
+	Custom    DERPMapRegionSource = "custom"
+	Embedded  DERPMapRegionSource = "embedded"
+	File      DERPMapRegionSource = "file"
+	Tailscale DERPMapRegionSource = "tailscale"
+	Url       DERPMapRegionSource = "url"
+)
+
+// Valid indicates whether the value is a known member of the DERPMapRegionSource enum.
+func (e DERPMapRegionSource) Valid() bool {
+	switch e {
+	case Config:
+		return true
+	case Custom:
+		return true
+	case Embedded:
+		return true
+	case File:
+		return true
+	case Tailscale:
+		return true
+	case Url:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DNSRecordType.
 const (
 	DNSRecordTypeA     DNSRecordType = "A"
@@ -371,15 +401,119 @@ type CustomAttribute struct {
 	Value     interface{} `json:"value"`
 }
 
-// DERPRegion defines model for DERPRegion.
-type DERPRegion struct {
+// DERP defines model for DERP.
+type DERP struct {
+	AutoAddEmbedded bool `json:"autoAddEmbedded"`
+
+	// Effective What the server runs with.
+	Effective  DERPSettings `json:"effective"`
+	FetchError string       `json:"fetchError"`
+	FetchedAt  time.Time    `json:"fetchedAt"`
+
+	// FromFile The config file's values.
+	FromFile DERPSettings `json:"fromFile"`
+
+	// Overridden Settings set through the API are in use.
+	Overridden     bool            `json:"overridden"`
+	Paths          []string        `json:"paths"`
+	Regions        []DERPMapRegion `json:"regions"`
+	RelayAvailable bool            `json:"relayAvailable"`
+	RelayRunning   bool            `json:"relayRunning"`
+
+	// ServerUrl Where the embedded relay is reached.
+	ServerUrl string `json:"serverUrl"`
+	StunAddr  string `json:"stunAddr"`
+}
+
+// DERPCustomRegion defines model for DERPCustomRegion.
+type DERPCustomRegion struct {
+	// Code Short code shown by clients.
 	Code string `json:"code"`
 
-	// Embedded Served by this headscale.
-	Embedded bool   `json:"embedded"`
-	Id       int64  `json:"id"`
-	Name     string `json:"name"`
-	Nodes    int64  `json:"nodes"`
+	// Id Region ID; replaces a fetched region with the same ID.
+	Id int64 `json:"id"`
+
+	// Name Empty takes the code.
+	Name  *string      `json:"name,omitempty"`
+	Nodes *[]DERPRelay `json:"nodes,omitempty"`
+}
+
+// DERPMapRegion defines model for DERPMapRegion.
+type DERPMapRegion struct {
+	Code  string `json:"code"`
+	Id    int64  `json:"id"`
+	Name  string `json:"name"`
+	Nodes int64  `json:"nodes"`
+
+	// Source Where it came from.
+	Source DERPMapRegionSource `json:"source"`
+}
+
+// DERPMapRegionSource Where it came from.
+type DERPMapRegionSource string
+
+// DERPRelay defines model for DERPRelay.
+type DERPRelay struct {
+	CanPort80 *bool `json:"canPort80,omitempty"`
+
+	// DerpPort HTTPS port; 0 means 443.
+	DerpPort *int64 `json:"derpPort,omitempty"`
+
+	// HostName DNS name the relay's certificate matches.
+	HostName string `json:"hostName"`
+
+	// Ipv4 Fixed address, or none.
+	Ipv4 *string `json:"ipv4,omitempty"`
+
+	// Ipv6 Fixed address, or none.
+	Ipv6 *string `json:"ipv6,omitempty"`
+
+	// Name Unique within the region; empty takes the host name.
+	Name     *string `json:"name,omitempty"`
+	StunOnly *bool   `json:"stunOnly,omitempty"`
+
+	// StunPort UDP STUN port; 0 means 3478.
+	StunPort *int64 `json:"stunPort,omitempty"`
+}
+
+// DERPServerSettings defines model for DERPServerSettings.
+type DERPServerSettings struct {
+	Enabled bool `json:"enabled"`
+
+	// Ipv4 Public address published next to the host name.
+	Ipv4 *string `json:"ipv4,omitempty"`
+
+	// Ipv6 Public address published next to the host name.
+	Ipv6       *string `json:"ipv6,omitempty"`
+	RegionCode *string `json:"regionCode,omitempty"`
+
+	// RegionId Replaces a fetched region with the same ID.
+	RegionId *int64 `json:"regionId,omitempty"`
+
+	// RegionName Empty takes the code.
+	RegionName *string `json:"regionName,omitempty"`
+
+	// StunAddr UDP host:port STUN listens on.
+	StunAddr *string `json:"stunAddr,omitempty"`
+
+	// VerifyClients Admit only this tailnet's machines.
+	VerifyClients *bool `json:"verifyClients,omitempty"`
+}
+
+// DERPSettings defines model for DERPSettings.
+type DERPSettings struct {
+	// AutoUpdate Refetch the maps every updateFrequency.
+	AutoUpdate bool `json:"autoUpdate"`
+
+	// Regions Relays the operator runs.
+	Regions []DERPCustomRegion `json:"regions"`
+	Server  DERPServerSettings `json:"server"`
+
+	// UpdateFrequency Go duration, at least 1m.
+	UpdateFrequency string `json:"updateFrequency"`
+
+	// Urls Maps fetched and merged in order.
+	Urls []string `json:"urls"`
 }
 
 // DNS defines model for DNS.
@@ -1035,28 +1169,27 @@ type SSHRecording struct {
 
 // ServerInfo defines model for ServerInfo.
 type ServerInfo struct {
-	BaseDomain                 string       `json:"baseDomain"`
-	BuildTime                  string       `json:"buildTime"`
-	Commit                     string       `json:"commit"`
-	Database                   string       `json:"database"`
-	DerpRegions                []DERPRegion `json:"derpRegions"`
-	DerpServer                 bool         `json:"derpServer"`
-	DerpStun                   string       `json:"derpStun"`
-	EphemeralInactivityTimeout string       `json:"ephemeralInactivityTimeout"`
-	GoVersion                  string       `json:"goVersion"`
-	Ipv4Prefix                 string       `json:"ipv4Prefix"`
-	Ipv6Prefix                 string       `json:"ipv6Prefix"`
-	ListenAddr                 string       `json:"listenAddr"`
-	MagicDns                   bool         `json:"magicDns"`
-	NodeExpiry                 string       `json:"nodeExpiry"`
-	OidcIssuer                 string       `json:"oidcIssuer"`
-	OidcScopes                 []string     `json:"oidcScopes"`
-	PolicyMode                 string       `json:"policyMode"`
-	PolicyPath                 string       `json:"policyPath"`
-	ServerUrl                  string       `json:"serverUrl"`
-	StartedAt                  time.Time    `json:"startedAt"`
-	Tls                        string       `json:"tls"`
-	Version                    string       `json:"version"`
+	BaseDomain                 string    `json:"baseDomain"`
+	BuildTime                  string    `json:"buildTime"`
+	Commit                     string    `json:"commit"`
+	Database                   string    `json:"database"`
+	DerpRegions                int64     `json:"derpRegions"`
+	DerpServer                 bool      `json:"derpServer"`
+	EphemeralInactivityTimeout string    `json:"ephemeralInactivityTimeout"`
+	GoVersion                  string    `json:"goVersion"`
+	Ipv4Prefix                 string    `json:"ipv4Prefix"`
+	Ipv6Prefix                 string    `json:"ipv6Prefix"`
+	ListenAddr                 string    `json:"listenAddr"`
+	MagicDns                   bool      `json:"magicDns"`
+	NodeExpiry                 string    `json:"nodeExpiry"`
+	OidcIssuer                 string    `json:"oidcIssuer"`
+	OidcScopes                 []string  `json:"oidcScopes"`
+	PolicyMode                 string    `json:"policyMode"`
+	PolicyPath                 string    `json:"policyPath"`
+	ServerUrl                  string    `json:"serverUrl"`
+	StartedAt                  time.Time `json:"startedAt"`
+	Tls                        string    `json:"tls"`
+	Version                    string    `json:"version"`
 }
 
 // SetApprovalRequestBody defines model for SetApprovalRequestBody.
@@ -1075,6 +1208,15 @@ type SetAttributeRequestBody struct {
 	Comment *string     `json:"comment,omitempty"`
 	Expiry  *time.Time  `json:"expiry,omitempty"`
 	Value   interface{} `json:"value"`
+}
+
+// SetDERPRequestBody defines model for SetDERPRequestBody.
+type SetDERPRequestBody struct {
+	AutoUpdate      *bool               `json:"autoUpdate,omitempty"`
+	Regions         *[]DERPCustomRegion `json:"regions,omitempty"`
+	Server          DERPServerSettings  `json:"server"`
+	UpdateFrequency *string             `json:"updateFrequency,omitempty"`
+	Urls            *[]string           `json:"urls,omitempty"`
 }
 
 // SetDNSRequestBody defines model for SetDNSRequestBody.
@@ -1362,6 +1504,9 @@ type AuthRejectJSONRequestBody = AuthRejectRequestBody
 
 // DebugCreateNodeJSONRequestBody defines body for DebugCreateNode for application/json ContentType.
 type DebugCreateNodeJSONRequestBody = DebugCreateNodeRequestBody
+
+// SetDERPJSONRequestBody defines body for SetDERP for application/json ContentType.
+type SetDERPJSONRequestBody = SetDERPRequestBody
 
 // SetDNSJSONRequestBody defines body for SetDNS for application/json ContentType.
 type SetDNSJSONRequestBody = SetDNSRequestBody
@@ -1842,6 +1987,55 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/debug/node (the `DebugCreateNode` operationId).
 	DebugCreateNode(ctx context.Context, body DebugCreateNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResetDERP Reset DERP settings
+	//
+	// Drops the runtime relay settings so the config file is in force again.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v1/derp (the `ResetDERP` operationId).
+	ResetDERP(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDERP Get DERP settings
+	//
+	// Returns the relay configuration the server runs with, the config file's values, whether settings set through the API replace them and the map clients receive.
+	//
+	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/derp (the `GetDERP` operationId).
+	GetDERP(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetDERPWithBody Set DERP settings
+	//
+	// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
+	SetDERPWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetDERP Set DERP settings
+	//
+	// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
+	SetDERP(ctx context.Context, body SetDERPJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RefreshDERP Refetch the DERP maps
+	//
+	// Fetches the map URLs and files again and pushes the map to every client when it changed.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with POST /api/v1/derp/refresh (the `RefreshDERP` operationId).
+	RefreshDERP(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ResetDNS Reset DNS settings
 	//
@@ -3618,6 +3812,105 @@ func (c *Client) DebugCreateNodeWithBody(ctx context.Context, contentType string
 // Corresponds with POST /api/v1/debug/node (the `DebugCreateNode` operationId).
 func (c *Client) DebugCreateNode(ctx context.Context, body DebugCreateNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDebugCreateNodeRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResetDERP Reset DERP settings
+//
+// Drops the runtime relay settings so the config file is in force again.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v1/derp (the `ResetDERP` operationId).
+func (c *Client) ResetDERP(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResetDERPRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetDERP Get DERP settings
+//
+// Returns the relay configuration the server runs with, the config file's values, whether settings set through the API replace them and the map clients receive.
+//
+// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/derp (the `GetDERP` operationId).
+func (c *Client) GetDERP(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDERPRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetDERPWithBody Set DERP settings
+//
+// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
+func (c *Client) SetDERPWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetDERPRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetDERP Set DERP settings
+//
+// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
+func (c *Client) SetDERP(ctx context.Context, body SetDERPJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetDERPRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RefreshDERP Refetch the DERP maps
+//
+// Fetches the map URLs and files again and pushes the map to every client when it changed.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with POST /api/v1/derp/refresh (the `RefreshDERP` operationId).
+func (c *Client) RefreshDERP(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRefreshDERPRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -7008,6 +7301,127 @@ func NewDebugCreateNodeRequestWithBody(server string, contentType string, body i
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewResetDERPRequest constructs an http.Request for the ResetDERP method
+func NewResetDERPRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/derp")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetDERPRequest constructs an http.Request for the GetDERP method
+func NewGetDERPRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/derp")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetDERPRequest calls the generic SetDERP builder with application/json body
+func NewSetDERPRequest(server string, body SetDERPJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetDERPRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSetDERPRequestWithBody constructs an http.Request for the SetDERP method, with any body, and a specified content type
+func NewSetDERPRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/derp")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRefreshDERPRequest constructs an http.Request for the RefreshDERP method
+func NewRefreshDERPRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/derp/refresh")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -10818,6 +11232,61 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/debug/node (the `DebugCreateNode` operationId).
 	DebugCreateNodeWithResponse(ctx context.Context, body DebugCreateNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*DebugCreateNodeResponse, error)
 
+	// ResetDERPWithResponse Reset DERP settings
+	//
+	// Drops the runtime relay settings so the config file is in force again.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/derp (the `ResetDERP` operationId).
+	ResetDERPWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ResetDERPResponse, error)
+
+	// GetDERPWithResponse Get DERP settings
+	//
+	// Returns the relay configuration the server runs with, the config file's values, whether settings set through the API replace them and the map clients receive.
+	//
+	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/derp (the `GetDERP` operationId).
+	GetDERPWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDERPResponse, error)
+
+	// SetDERPWithBodyWithResponse Set DERP settings
+	//
+	// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
+	SetDERPWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetDERPResponse, error)
+
+	// SetDERPWithResponse Set DERP settings
+	//
+	// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
+	SetDERPWithResponse(ctx context.Context, body SetDERPJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDERPResponse, error)
+
+	// RefreshDERPWithResponse Refetch the DERP maps
+	//
+	// Fetches the map URLs and files again and pushes the map to every client when it changed.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/derp/refresh (the `RefreshDERP` operationId).
+	RefreshDERPWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RefreshDERPResponse, error)
+
 	// ResetDNSWithResponse Reset DNS settings
 	//
 	// Drops the runtime DNS settings so the config file is in force again.
@@ -13193,6 +13662,198 @@ func (r DebugCreateNodeResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r DebugCreateNodeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ResetDERPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DERP
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ResetDERPResponse) GetJSON200() *DERP {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ResetDERPResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ResetDERPResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ResetDERPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ResetDERPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ResetDERPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetDERPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DERP
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetDERPResponse) GetJSON200() *DERP {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetDERPResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetDERPResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDERPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDERPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetDERPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetDERPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DERP
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetDERPResponse) GetJSON200() *DERP {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r SetDERPResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetDERPResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetDERPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetDERPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetDERPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RefreshDERPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DERP
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RefreshDERPResponse) GetJSON200() *DERP {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r RefreshDERPResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r RefreshDERPResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RefreshDERPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RefreshDERPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RefreshDERPResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -17960,6 +18621,91 @@ func (c *ClientWithResponses) DebugCreateNodeWithResponse(ctx context.Context, b
 	return ParseDebugCreateNodeResponse(rsp)
 }
 
+// ResetDERPWithResponse Reset DERP settings
+//
+// Drops the runtime relay settings so the config file is in force again.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/derp (the `ResetDERP` operationId).
+func (c *ClientWithResponses) ResetDERPWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ResetDERPResponse, error) {
+	rsp, err := c.ResetDERP(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResetDERPResponse(rsp)
+}
+
+// GetDERPWithResponse Get DERP settings
+//
+// Returns the relay configuration the server runs with, the config file's values, whether settings set through the API replace them and the map clients receive.
+//
+// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/derp (the `GetDERP` operationId).
+func (c *ClientWithResponses) GetDERPWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetDERPResponse, error) {
+	rsp, err := c.GetDERP(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDERPResponse(rsp)
+}
+
+// SetDERPWithBodyWithResponse Set DERP settings
+//
+// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
+func (c *ClientWithResponses) SetDERPWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetDERPResponse, error) {
+	rsp, err := c.SetDERPWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetDERPResponse(rsp)
+}
+
+// SetDERPWithResponse Set DERP settings
+//
+// Replaces the runtime relay settings: the maps are fetched, the embedded relay is started or stopped, and the new map is pushed to every client. A map that cannot be fetched or that leaves no relay is refused and nothing changes. The map files in derp.paths and the relay's key stay in the config file.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/derp (the `SetDERP` operationId).
+func (c *ClientWithResponses) SetDERPWithResponse(ctx context.Context, body SetDERPJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDERPResponse, error) {
+	rsp, err := c.SetDERP(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetDERPResponse(rsp)
+}
+
+// RefreshDERPWithResponse Refetch the DERP maps
+//
+// Fetches the map URLs and files again and pushes the map to every client when it changed.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/derp/refresh (the `RefreshDERP` operationId).
+func (c *ClientWithResponses) RefreshDERPWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RefreshDERPResponse, error) {
+	rsp, err := c.RefreshDERP(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRefreshDERPResponse(rsp)
+}
+
 // ResetDNSWithResponse Reset DNS settings
 //
 // Drops the runtime DNS settings so the config file is in force again.
@@ -20704,6 +21450,138 @@ func ParseDebugCreateNodeResponse(rsp *http.Response) (*DebugCreateNodeResponse,
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest NodeOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseResetDERPResponse parses an HTTP response from a ResetDERPWithResponse call
+func ParseResetDERPResponse(rsp *http.Response) (*ResetDERPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ResetDERPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DERP
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDERPResponse parses an HTTP response from a GetDERPWithResponse call
+func ParseGetDERPResponse(rsp *http.Response) (*GetDERPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDERPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DERP
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetDERPResponse parses an HTTP response from a SetDERPWithResponse call
+func ParseSetDERPResponse(rsp *http.Response) (*SetDERPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetDERPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DERP
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRefreshDERPResponse parses an HTTP response from a RefreshDERPWithResponse call
+func ParseRefreshDERPResponse(rsp *http.Response) (*RefreshDERPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RefreshDERPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DERP
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
