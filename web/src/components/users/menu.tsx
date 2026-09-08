@@ -4,6 +4,7 @@ import {
   CheckIcon,
   DevicesIcon,
   DotsThreeIcon,
+  IdentificationCardIcon,
   PencilSimpleIcon,
   ShieldCheckIcon,
   TrashIcon,
@@ -21,12 +22,17 @@ import type { Me } from "~/auth/me.ts";
 import { MembershipDialog } from "~/components/access/membership-dialog.tsx";
 import { groupsOfUser } from "~/components/access/model.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
-import { DeleteUserDialog, RenameUserDialog, RoleDialog } from "~/components/users/dialogs.tsx";
+import {
+  DeleteUserDialog,
+  EditProfileDialog,
+  RenameUserDialog,
+  RoleDialog,
+} from "~/components/users/dialogs.tsx";
 import { useUserMutations } from "~/components/users/mutations.ts";
 
 const actionsIconSize = 18;
 
-type Dialog = "rename" | "role" | "groups" | "delete";
+type Dialog = "rename" | "profile" | "role" | "groups" | "delete";
 
 type Mutations = ReturnType<typeof useUserMutations>;
 
@@ -75,6 +81,12 @@ export function UserMenu({ user, me }: UserMenuProps): ReactElement {
       <RenameUserDialog
         user={user}
         open={dialog === "rename"}
+        mutations={mutations}
+        onOpenChange={close}
+      />
+      <EditProfileDialog
+        user={user}
+        open={dialog === "profile"}
         mutations={mutations}
         onOpenChange={close}
       />
@@ -140,6 +152,15 @@ function UserMenuItems({
         }}
       >
         Rename…
+      </DropdownMenu.Item>
+      <DropdownMenu.Item
+        icon={IdentificationCardIcon}
+        disabled={!writable}
+        onClick={() => {
+          onOpen("profile");
+        }}
+      >
+        Edit profile…
       </DropdownMenu.Item>
       <DropdownMenu.Item
         icon={ShieldCheckIcon}

@@ -205,6 +205,109 @@ function RenameUserForm({
   );
 }
 
+export function EditProfileDialog({
+  user,
+  open,
+  onOpenChange,
+  mutations,
+}: UserDialogProps): ReactElement {
+  return (
+    <DialogRoot open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        size="base"
+        title="Edit profile"
+        description="What the clients show for this user. A user who logs in through an identity provider gets these from the provider again at the next login."
+      >
+        <EditProfileForm user={user} mutations={mutations} onOpenChange={onOpenChange} />
+      </DialogContent>
+    </DialogRoot>
+  );
+}
+
+function EditProfileForm({
+  user,
+  mutations,
+  onOpenChange,
+}: {
+  readonly user: User;
+  readonly mutations: Mutations;
+  readonly onOpenChange: (open: boolean) => void;
+}): ReactElement {
+  const [displayName, setDisplayName] = useState(user.displayName);
+  const [email, setEmail] = useState(user.email);
+  const [pictureUrl, setPictureUrl] = useState(user.profilePicUrl);
+  const { update } = mutations;
+  const unchanged =
+    displayName.trim() === user.displayName &&
+    email.trim() === user.email &&
+    pictureUrl.trim() === user.profilePicUrl;
+
+  function submit(event: SubmitEvent<HTMLFormElement>): void {
+    event.preventDefault();
+    update.mutate(
+      {
+        params: { path: { id: user.id } },
+        body: {
+          displayName: displayName.trim(),
+          email: email.trim(),
+          pictureUrl: pictureUrl.trim(),
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success("Profile updated");
+          onOpenChange(false);
+        },
+      },
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-4">
+      <Input
+        label="Display name"
+        description="Shown in place of the username; empty shows the username."
+        required={false}
+        value={displayName}
+        autoComplete="off"
+        onChange={(event) => {
+          setDisplayName(event.target.value);
+        }}
+      />
+      <Input
+        label="Email"
+        required={false}
+        type="email"
+        value={email}
+        autoComplete="off"
+        onChange={(event) => {
+          setEmail(event.target.value);
+        }}
+      />
+      <Input
+        label="Picture URL"
+        description="An https URL of the picture the clients show."
+        required={false}
+        type="url"
+        value={pictureUrl}
+        spellCheck={false}
+        autoComplete="off"
+        placeholder="https://example.com/avatar.png"
+        onChange={(event) => {
+          setPictureUrl(event.target.value);
+        }}
+      />
+      <DialogError message={update.isError ? errorMessage(update.error) : undefined} />
+      <DialogFooter>
+        <DialogClose render={<Button variant="secondary">Cancel</Button>} />
+        <Button type="submit" variant="primary" loading={update.isPending} disabled={unchanged}>
+          Save
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
 export function RoleDialog({ user, open, onOpenChange, mutations }: UserDialogProps): ReactElement {
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
