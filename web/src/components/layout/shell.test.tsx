@@ -144,9 +144,9 @@ describe(Shell, () => {
     const palette = screen.getByRole("dialog");
 
     // The pages group used to stop at eight rows, which cut off the last group of the sidebar. A
-    // branch is listed as its pages, each with the branch as its hint.
+    // branch such as Settings is listed as its pages, each with the branch as its hint.
     await Promise.all(
-      ["Overview", "Audit log", "SSH sessions", "Settings", "API keys", "Log streams"].map(
+      ["Overview", "Audit log", "SSH sessions", "Tailnet", "API keys", "Log streams"].map(
         async (page) => {
           await expect.element(palette.getByText(page, { exact: true })).toBeVisible();
         },

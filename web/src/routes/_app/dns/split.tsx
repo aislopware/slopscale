@@ -4,29 +4,25 @@ import type { ReactElement } from "react";
 
 import { dnsQuery, dnsRulesQuery, groupsQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
-import { MagicDnsSection } from "~/components/dns/magic-section.tsx";
 import { editableSettings } from "~/components/dns/model.ts";
 import { useDnsMutations } from "~/components/dns/mutations.ts";
-import { NameserversSection } from "~/components/dns/nameservers-section.tsx";
-import { ExtraRecordsSection } from "~/components/dns/records-section.tsx";
 import { useDnsRuleMutations } from "~/components/dns/rule-mutations.ts";
 import { DnsRulesSection } from "~/components/dns/rules-section.tsx";
-import { SearchDomainsSection } from "~/components/dns/search-section.tsx";
 import { SourceBanner } from "~/components/dns/source.tsx";
 import { SplitDnsSection } from "~/components/dns/split-section.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
-export const Route = createFileRoute("/_app/dns")({
+export const Route = createFileRoute("/_app/dns/split")({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.query(dnsQuery),
       context.queryClient.query(dnsRulesQuery),
     ]);
   },
-  component: DnsPage,
+  component: SplitDnsPage,
 });
 
-function DnsPage(): ReactElement {
+function SplitDnsPage(): ReactElement {
   const { me } = Route.useRouteContext();
   const dns = useSuspenseQuery(dnsQuery);
   const rules = useSuspenseQuery(dnsRulesQuery);
@@ -39,17 +35,11 @@ function DnsPage(): ReactElement {
   return (
     <>
       <PageHeader
-        title="DNS"
-        description="Nameservers, split DNS, search domains and extra records every machine receives, plus split DNS only some groups get. Changes reach the machines at once."
+        title="Split DNS"
+        description="Domains answered by nameservers of their own, for every machine or only for the groups you pick."
       />
       <div className="flex flex-col gap-6">
         <SourceBanner dns={dns.data} canEdit={canEdit} mutations={mutations} />
-        <MagicDnsSection dns={dns.data} />
-        <NameserversSection
-          settings={editableSettings(dns.data)}
-          canEdit={canEdit}
-          mutations={mutations}
-        />
         <SplitDnsSection
           settings={editableSettings(dns.data)}
           canEdit={canEdit}
@@ -61,8 +51,6 @@ function DnsPage(): ReactElement {
           canEdit={canEdit}
           mutations={ruleMutations}
         />
-        <SearchDomainsSection dns={dns.data} canEdit={canEdit} mutations={mutations} />
-        <ExtraRecordsSection dns={dns.data} canEdit={canEdit} mutations={mutations} />
       </div>
     </>
   );

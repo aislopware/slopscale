@@ -121,6 +121,7 @@ function app(children: ReactNode): ReactElement {
       createRoute({ getParentRoute: () => rootRoute, path: "/machines/$nodeId" }),
       createRoute({ getParentRoute: () => rootRoute, path: "/users" }),
       createRoute({ getParentRoute: () => rootRoute, path: "/settings" }),
+      createRoute({ getParentRoute: () => rootRoute, path: "/settings/tailnet" }),
     ]),
     history: createMemoryHistory({ initialEntries: ["/"] }),
   });

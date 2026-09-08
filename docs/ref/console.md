@@ -82,7 +82,7 @@ A sign-in opens a session that lasts seven days. There is no sliding renewal,
 so a stolen cookie is bounded the same way as a fresh one, and _Sign out_ in
 the account menu ends the session it was made from.
 
-Every session is listed under _Settings → Keys_ with the user it belongs to,
+Every session is listed under _Settings → Sessions_ with the user it belongs to,
 when it was opened, when it last made a request, and the address and browser it
 came from. An administrator sees every session and can end any of them; a
 member sees and ends only their own. Ending a session takes effect on that
@@ -185,8 +185,9 @@ doing. *Tailnet* holds machines and users. *Access* holds the access controls
 and, for everyone, the page to ask for temporary access. *Connectivity* holds
 networks, routes, DNS and relays. *Logs* holds the audit log and the SSH
 session recordings. *Administration* holds the settings, the keys and the
-integrations. An item with several parts, such as _Access controls_, _Keys_
-or _Integrations_, opens into a page per part, each with its own address.
+integrations. An item with several parts, such as _Access controls_, _DNS_,
+_Relays_, _Settings_, _Keys_ or _Integrations_, opens into a page per part,
+each with its own address.
 A count next to _Machines_, _Users_, _Routes_ and _Requests_ says how many
 are waiting for approval. The arrow in the sidebar footer
 collapses it to an icon rail. *Quick search*, or ++cmd+k++ / ++ctrl+k++,
@@ -225,15 +226,25 @@ out*.
 - **Access controls**: a page each for the [rules, groups](access-control.md)
   and [postures](device-trust.md), the queue of
   [access requests](temporary-access.md), and the [policy](policy.md) file
-  in an editor with syntax highlighting. *Check* validates the draft against
-  the server without saving; *Save* applies it. Leaving the page with unsaved
-  changes asks first.
+  in an editor that colours HuJSON, underlines what the server would refuse
+  as you type (an unknown key, a group no section defines, an autogroup on
+  the wrong side, a bad port), completes section names, rule keys and the
+  names the file defines, explains a key or an autogroup on hover, and sends
+  the draft to the server for the checks only it can do once typing pauses.
+  The band above the file counts what is wrong. *Check* validates the draft
+  against the server without saving; *Save* applies it. Leaving the page
+  with unsaved changes asks first. The posture editor colours each
+  expression the same way and underlines a parse error on the line it is
+  on.
 - **Networks**: [networks](networks.md) that hand subnets and exit nodes to
   groups.
 - **Routes**: every route any machine advertises, with approval for the ones
   no network owns.
-- **DNS**: nameservers, split DNS, search domains and extra records, changed
-  at runtime; see [DNS](dns.md).
+- **DNS**: a page each for nameservers with MagicDNS and search domains, split
+  DNS for every machine or for some groups, and extra records, all changed at
+  runtime; see [DNS](dns.md).
+- **Relays**: a page each for the DERP map machines receive, the map sources
+  and refetch schedule, the relays you run yourself, and the embedded relay.
 - **Integrations**: a page for webhooks, endpoints that receive signed event
   notifications, with their subscriptions and last delivery (create, edit,
   test, rotate the secret and delete; see [Webhooks](webhooks.md)), and one
@@ -241,11 +252,13 @@ out*.
 - **Audit log**: who changed what, newest first, with filters by action, user
   and time, and _Export_ as CSV or JSON with the same filters; see
   [Audit log](audit.md).
-- **Settings**: the [device and user approval](approval.md) switches, the
-  key expiry cap, a _Maintenance_ section with the IP address backfill
-  (`headscale nodes backfillips`), the signed-in credential's role and scopes,
-  the console [sessions](#sessions) with _End_ and _Sign out everywhere_, and
-  the server's build, addresses, DERP regions and config file values.
+- **Settings**: a page each for the tailnet switches
+  ([device and user approval](approval.md), device trust, the key expiry cap,
+  SSH recording), the console [sessions](#sessions) with _End_ and _Sign out
+  everywhere_ next to the signed-in credential's role and scopes, and the
+  server's build, addresses, DERP regions and config file values with a
+  _Maintenance_ section holding the IP address backfill
+  (`headscale nodes backfillips`).
 
 ## Building from source
 

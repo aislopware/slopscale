@@ -35,13 +35,23 @@ export type NavPath =
   | "/policy/requests"
   | "/policy/file"
   | "/dns"
+  | "/dns/nameservers"
+  | "/dns/split"
+  | "/dns/records"
   | "/relays"
+  | "/relays/map"
+  | "/relays/sources"
+  | "/relays/own"
+  | "/relays/embedded"
   | "/networks"
   | "/routes"
   | "/integrations"
   | "/integrations/webhooks"
   | "/integrations/log-streams"
   | "/settings"
+  | "/settings/tailnet"
+  | "/settings/sessions"
+  | "/settings/server"
   | "/audit"
   | "/sessions";
 
@@ -130,8 +140,29 @@ export const navGroups: readonly NavGroup[] = [
         scope: "devices:routes:read",
         badge: "pendingRoutes",
       },
-      { to: "/dns", label: "DNS", icon: GlobeIcon, scope: "dns:read" },
-      { to: "/relays", label: "Relays", icon: BroadcastIcon, scope: "feature_settings:read" },
+      {
+        to: "/dns",
+        label: "DNS",
+        icon: GlobeIcon,
+        scope: "dns:read",
+        children: [
+          { to: "/dns/nameservers", label: "Nameservers" },
+          { to: "/dns/split", label: "Split DNS" },
+          { to: "/dns/records", label: "Extra records" },
+        ],
+      },
+      {
+        to: "/relays",
+        label: "Relays",
+        icon: BroadcastIcon,
+        scope: "feature_settings:read",
+        children: [
+          { to: "/relays/map", label: "Map" },
+          { to: "/relays/sources", label: "Sources" },
+          { to: "/relays/own", label: "Your relays" },
+          { to: "/relays/embedded", label: "Embedded relay" },
+        ],
+      },
     ],
   },
   {
@@ -154,7 +185,17 @@ export const navGroups: readonly NavGroup[] = [
   {
     label: "Administration",
     items: [
-      { to: "/settings", label: "Settings", icon: GearSixIcon, scope: "feature_settings:read" },
+      {
+        to: "/settings",
+        label: "Settings",
+        icon: GearSixIcon,
+        scope: "feature_settings:read",
+        children: [
+          { to: "/settings/tailnet", label: "Tailnet" },
+          { to: "/settings/sessions", label: "Sessions" },
+          { to: "/settings/server", label: "Server" },
+        ],
+      },
       {
         to: "/keys",
         label: "Keys",
