@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/hashicorp/golang-lru/v2/expirable"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/db"
 	hsstate "github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/templates"
@@ -65,8 +67,9 @@ var (
 	errOIDCAllowedDomains      = errors.New(
 		"authenticated principal does not match any allowed domain",
 	)
-	errOIDCAllowedGroups = errors.New("authenticated principal is not in any allowed group")
-	errOIDCAllowedUsers  = errors.New(
+	errOIDCAllowedGroups  = errors.New("authenticated principal is not in any allowed group")
+	errOIDCEmailAmbiguous = errors.New("several existing users carry the login's email")
+	errOIDCAllowedUsers   = errors.New(
 		"authenticated principal does not match any allowed user",
 	)
 	errOIDCUnverifiedEmail = errors.New("authenticated principal has an unverified email")
@@ -738,6 +741,13 @@ func (a *AuthProviderOIDC) createOrUpdateUserFromClaim(
 		return nil, change.Change{}, fmt.Errorf("creating or updating user: %w", err)
 	}
 
+	if user == nil {
+		user, err = a.matchUserByEmail(claims)
+		if err != nil {
+			return nil, change.Change{}, err
+		}
+	}
+
 	// if the user is still not found, create a new empty user.
 	// TODO(kradalby): This context is not inherited from the request, which is probably not ideal.
 	// However, we need a context to use the OIDC provider.
@@ -764,6 +774,60 @@ func (a *AuthProviderOIDC) createOrUpdateUserFromClaim(
 	}
 
 	return user, c, nil
+}
+
+// matchUserByEmail finds the OIDC user a login with an unknown iss/sub
+// identifier stands for when oidc.match_by_email is on: the one existing
+// user that signed in through OIDC with the same email, which the login
+// then takes over, identifier and all. The email must be verified unless
+// verification is not required. Two candidates are refused rather than
+// guessed at.
+func (a *AuthProviderOIDC) matchUserByEmail(claims *types.OIDCClaims) (*types.User, error) {
+	if !a.cfg.MatchByEmail || claims.Email == "" {
+		return nil, nil //nolint:nilnil // no match is not an error
+	}
+
+	if !claims.EmailVerified && types.FlexibleBoolean(a.cfg.EmailVerifiedRequired) {
+		return nil, nil //nolint:nilnil // no match is not an error
+	}
+
+	candidates, err := a.h.state.ListUsersWithFilter(&types.User{
+		Email:    claims.Email,
+		Provider: util.RegisterMethodOIDC,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("matching user by email: %w", err)
+	}
+
+	switch len(candidates) {
+	case 0:
+		return nil, nil //nolint:nilnil // no match is not an error
+	case 1:
+	default:
+		return nil, NewHTTPError(http.StatusConflict, "several users share this email", errOIDCEmailAmbiguous)
+	}
+
+	matched := candidates[0]
+
+	log.Info().
+		Str("user", matched.Name).
+		Str("previous", matched.ProviderIdentifier.String).
+		Str("identifier", claims.Identifier()).
+		Msg("login matched an existing user by email; the user follows the new identity provider")
+
+	audit.Record(a.h.state, &types.AuditEvent{
+		Action:     "user.provider.switch",
+		TargetKind: "user",
+		TargetID:   strconv.FormatUint(uint64(matched.ID), 10),
+		TargetName: matched.Name,
+		Detail: map[string]any{
+			"previous":   matched.ProviderIdentifier.String,
+			"identifier": claims.Identifier(),
+			"source":     "oidc.match_by_email",
+		},
+	})
+
+	return &matched, nil
 }
 
 // renderRegistrationConfirmInterstitial captures the resolved OIDC

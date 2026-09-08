@@ -334,7 +334,12 @@ type OIDCConfig struct {
 	AdminUsers []string
 	// Groups mirrors the provider's groups claim into headscale groups on
 	// every login; see [OIDCGroupsConfig].
-	Groups                OIDCGroupsConfig
+	Groups OIDCGroupsConfig
+	// MatchByEmail lets a login whose iss/sub identifier is unknown take
+	// over the one existing OIDC user with the same verified email, so a
+	// provider switch keeps users and their machines instead of failing
+	// on the taken name and email.
+	MatchByEmail          bool
 	EmailVerifiedRequired bool
 	UseExpiryFromToken    bool
 	PKCE                  PKCEConfig
@@ -1448,6 +1453,7 @@ func oidcConfig() (OIDCConfig, error) {
 			Sync:   viper.GetBool("oidc.groups.sync"),
 			Prefix: viper.GetString("oidc.groups.prefix"),
 		},
+		MatchByEmail:          viper.GetBool("oidc.match_by_email"),
 		EmailVerifiedRequired: viper.GetBool("oidc.email_verified_required"),
 		UseExpiryFromToken:    viper.GetBool("oidc.use_expiry_from_token"),
 		PKCE: PKCEConfig{

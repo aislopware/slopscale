@@ -478,6 +478,11 @@ unix_socket_permission: "0770"
 #   # not required.
 #   email_verified_required: true
 #
+#   # Match a login whose provider identifier is unknown to the existing OIDC
+#   # user with the same email and move the user to the new identifier. Turn
+#   # this on while switching identity providers and off again afterwards.
+#   # match_by_email: false
+#
 #   # Provide custom key/value pairs which get sent to the identity provider's
 #   # authorization endpoint.
 #   extra_params:

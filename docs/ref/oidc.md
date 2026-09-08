@@ -416,6 +416,8 @@ of the group name.
 
 ## Switching OIDC providers
 
-Headscale only supports a single OIDC provider in its configuration, but it does store the provider identifier of each user. When switching providers, this might lead to issues with existing users: all user details (name, email, groups) might be identical with the new provider, but the identifier will differ. Headscale will be unable to create a new user as the name and email will already be in use for the existing users.
+Headscale only supports a single OIDC provider in its configuration, but it does store the provider identifier of each user. When switching providers, all user details (name, email, groups) might be identical with the new provider, but the identifier will differ. Headscale will be unable to create a new user as the name and email will already be in use for the existing users.
 
-At this time, you will need to manually update the `provider_identifier` column in the `users` table for each user with the appropriate value for the new provider. The identifier is built from the `iss` and `sub` claims of the OIDC ID token, for example `https://id.example.com/12340987`.
+Set `oidc.match_by_email: true` while migrating. A login whose identifier is unknown is then matched to the existing OIDC user with the same email, that user takes over the new identifier, and the machines stay with it. The switch is recorded in the audit log as `user.provider.switch` with the old and the new identifier. Only a verified email (or any email when `email_verified_required` is off) is matched, and a login is refused when several users share the email. Turn the setting off again once every user has logged in through the new provider.
+
+Without the setting you need to manually update the `provider_identifier` column in the `users` table for each user with the appropriate value for the new provider. The identifier is built from the `iss` and `sub` claims of the OIDC ID token, for example `https://id.example.com/12340987`.
