@@ -1,10 +1,7 @@
-import { Button } from "@cloudflare/kumo/components/button";
 import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { Select } from "@cloudflare/kumo/components/select";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import type { TabsItem } from "@cloudflare/kumo/components/tabs";
-import { Tooltip } from "@cloudflare/kumo/components/tooltip";
-import { InfoIcon } from "@phosphor-icons/react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import type { ReactElement } from "react";
@@ -125,25 +122,13 @@ function AuditPage(): ReactElement {
           <SearchInput
             value={search.action}
             placeholder="Filter by action"
+            hint="An action ending in a dot matches a prefix: node. keeps every node action."
             onValueChange={(value) => {
               void navigate({
                 search: (previous) => ({ ...previous, action: value }),
                 replace: true,
               });
             }}
-          />
-          <Tooltip
-            side="bottom"
-            content="An action ending in a dot matches a prefix: node. keeps every node action."
-            render={
-              <Button
-                variant="ghost"
-                shape="square"
-                size="xs"
-                icon={InfoIcon}
-                aria-label="How the action filter matches"
-              />
-            }
           />
           {users.data === undefined ? null : (
             <Select

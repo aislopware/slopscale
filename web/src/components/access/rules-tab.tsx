@@ -14,11 +14,9 @@ import { ruleColumns, toRuleRows } from "~/components/access/rule-columns.tsx";
 import { RuleDialog } from "~/components/access/rule-dialogs.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
+import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-
-const emptyClass = "border-none bg-kumo-base [&>h2]:text-base";
-const emptyIconSize = 32;
 
 export interface RulesTabProps {
   readonly me: Me;
@@ -89,7 +87,7 @@ export function RulesTab({
             empty={
               total === 0 ? (
                 <Empty
-                  className={emptyClass}
+                  className={tableEmptyClass}
                   size="sm"
                   icon={<ShieldCheckIcon size={emptyIconSize} />}
                   title="No rules yet"
@@ -112,7 +110,7 @@ export function RulesTab({
                 />
               ) : (
                 <Empty
-                  className={emptyClass}
+                  className={tableEmptyClass}
                   size="sm"
                   title="No rules match"
                   description="No rule matches this search."

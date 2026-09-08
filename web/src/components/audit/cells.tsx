@@ -1,5 +1,5 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
-import { Button } from "@cloudflare/kumo/components/button";
+import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { cn } from "@cloudflare/kumo/utils";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement, ReactNode } from "react";
@@ -8,6 +8,7 @@ import type { AuditEvent } from "~/api/queries.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
+import { formatAbsolute, parseTime } from "~/lib/time.ts";
 
 /** How the API names each kind of actor, in the console's words. */
 const actorKinds: Record<string, string> = {
@@ -34,8 +35,8 @@ export const clientError = 400;
 
 /** At most this many detail fields per row; the rest are counted. */
 const maxDetailFields = 2;
-/** Longer detail values are cut, so one long field cannot push the row open. */
-const maxDetailLength = 24;
+/** A string that starts like an RFC 3339 timestamp is shown as a local date. */
+const timestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/u;
 
 /**
  * A name that leads somewhere reads as a link without turning the column blue: it only takes the
@@ -137,38 +138,47 @@ export function ResultCell({ event }: { readonly event: AuditEvent }): ReactElem
   );
 }
 
-/** A detail field as one short string; anything that is not a primitive is shown as JSON. */
+/**
+ * A detail field in the operator's words: timestamps as local dates, booleans as yes/no, lists
+ * joined, and anything else as JSON. The raw value stays available for copying.
+ */
 function detailText(value: unknown): string {
-  return primitive(value) ?? JSON.stringify(value) ?? String(value);
-}
-
-function primitive(value: unknown): string | undefined {
   if (typeof value === "string") {
-    return value;
+    const date = timestampPattern.test(value) ? parseTime(value) : null;
+
+    return date === null ? value : formatAbsolute(date);
   }
 
-  if (typeof value === "number" || typeof value === "boolean") {
+  if (typeof value === "boolean") {
+    return value ? "yes" : "no";
+  }
+
+  if (typeof value === "number") {
     return String(value);
   }
 
-  return undefined;
+  if (value === null || value === undefined) {
+    return "none";
+  }
+
+  if (Array.isArray(value)) {
+    return value.length === 0 ? "none" : value.map((item) => detailText(item)).join(", ");
+  }
+
+  return JSON.stringify(value);
 }
 
-function clip(text: string): string {
-  return text.length > maxDetailLength ? `${text.slice(0, maxDetailLength)}…` : text;
+/** The value as the server sent it, for the copy button. */
+function rawText(value: unknown): string {
+  return typeof value === "string" ? value : (JSON.stringify(value) ?? String(value));
 }
 
 /**
- * The first couple of detail fields as chips. The rest are behind "+N more", which opens the row
- * rather than widening it, so every field stays one click away and the column keeps its width.
+ * The first couple of detail fields as chips. The rest are counted in a "+N" chip that names them
+ * on hover; the row itself opens on click, so every field stays one click away and the column keeps
+ * its width.
  */
-export function DetailCell({
-  event,
-  onOpen,
-}: {
-  readonly event: AuditEvent;
-  readonly onOpen: () => void;
-}): ReactNode {
+export function DetailCell({ event }: { readonly event: AuditEvent }): ReactNode {
   const fields = Object.entries(event.detail);
 
   if (fields.length === 0) {
@@ -176,34 +186,35 @@ export function DetailCell({
   }
 
   const shown = fields.slice(0, maxDetailFields);
-  const hidden = fields.length - shown.length;
+  const hidden = fields.slice(maxDetailFields).map(([key]) => key);
 
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className="flex min-w-0 flex-wrap items-center gap-1">
       {shown.map(([key, value]) => (
         <Badge
           key={key}
           variant="secondary"
-          className="max-w-full font-mono font-normal [&>span]:truncate"
+          className="max-w-full font-mono text-[0.85em] font-normal [&>span]:truncate"
         >
-          {key}={clip(detailText(value))}
+          {`${key}=${detailText(value)}`}
         </Badge>
       ))}
-      {hidden === 0 ? null : (
-        <Button variant="ghost" size="xs" onClick={onOpen}>
-          +{hidden} more
-        </Button>
+      {hidden.length === 0 ? null : (
+        <Tooltip content={hidden.join(", ")}>
+          <Badge variant="outline">{`+${hidden.length}`}</Badge>
+        </Tooltip>
       )}
     </div>
   );
 }
 
 function detailItems(event: AuditEvent): readonly Definition[] {
-  const fields: Definition[] = Object.entries(event.detail).map(([key, value]) => {
-    const text = detailText(value);
-
-    return { key, label: key, value: text, copy: text };
-  });
+  const fields: Definition[] = Object.entries(event.detail).map(([key, value]) => ({
+    key,
+    label: key,
+    value: detailText(value),
+    copy: rawText(value),
+  }));
 
   fields.push({ key: "outcome", label: "HTTP status", value: String(event.outcome) });
 

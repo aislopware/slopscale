@@ -19,6 +19,7 @@ import {
   toStatusFilter,
 } from "~/components/machines/filters.ts";
 import { MachinesToolbar } from "~/components/machines/list-toolbar.tsx";
+import { plural } from "~/components/overview/plural.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
@@ -131,9 +132,7 @@ function MachinesPage(): ReactElement {
             }
             footer={
               machines.length === 0 ? undefined : (
-                <TableFooter>
-                  Showing {shown} of {machines.length}
-                </TableFooter>
+                <TableFooter>{`Showing ${shown} of ${plural(machines.length, "machine")}`}</TableFooter>
               )
             }
           />

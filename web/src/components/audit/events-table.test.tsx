@@ -114,13 +114,15 @@ describe(EventsTable, () => {
   it("counts the detail fields past the first two and opens the row to show them", async () => {
     const screen = await render(app({ ...base, events: [manyFields] }));
 
-    await expect
-      .element(screen.getByText("expiration=2026-09-30T00:00:00…"))
-      .not.toBeInTheDocument();
-    await screen.getByRole("button", { name: "+1 more" }).click();
+    await expect.element(screen.getByText("reusable=yes")).toBeVisible();
+    await expect.element(screen.getByText("ephemeral=no")).toBeVisible();
+    await expect.element(screen.getByText(/^expiration=/u)).not.toBeInTheDocument();
+    await expect.element(screen.getByText("+1")).toBeVisible();
+    await screen.getByRole("button", { name: "Show details" }).click();
 
     await expect.element(screen.getByText("expiration")).toBeVisible();
-    await expect.element(screen.getByText("2026-09-30T00:00:00Z")).toBeVisible();
+    await expect.element(screen.getByText("2026-09-30T00:00:00Z")).not.toBeInTheDocument();
+    await expect.element(screen.getByText(/Sep 30, 2026/u)).toBeVisible();
   });
 
   it("names the local socket after the tool that used it", async () => {

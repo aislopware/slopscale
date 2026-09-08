@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppSplatRouteImport } from './routes/_app/$'
 import { Route as AppAccessRouteImport } from './routes/_app/access'
 import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppDnsRouteImport } from './routes/_app/dns'
@@ -37,6 +38,11 @@ const LoginRoute = LoginRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSplatRoute = AppSplatRouteImport.update({
+  id: '/$',
+  path: '/$',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAccessRoute = AppAccessRouteImport.update({
@@ -103,6 +109,7 @@ const AppMachinesNodeIdRoute = AppMachinesNodeIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
+  '/$': typeof AppSplatRoute
   '/access': typeof AppAccessRoute
   '/audit': typeof AppAuditRoute
   '/dns': typeof AppDnsRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/$': typeof AppSplatRoute
   '/access': typeof AppAccessRoute
   '/audit': typeof AppAuditRoute
   '/dns': typeof AppDnsRoute
@@ -136,6 +144,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/_app/$': typeof AppSplatRoute
   '/_app/access': typeof AppAccessRoute
   '/_app/audit': typeof AppAuditRoute
   '/_app/dns': typeof AppDnsRoute
@@ -155,6 +164,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/$'
     | '/access'
     | '/audit'
     | '/dns'
@@ -170,6 +180,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/$'
     | '/access'
     | '/audit'
     | '/dns'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_app'
     | '/login'
+    | '/_app/$'
     | '/_app/access'
     | '/_app/audit'
     | '/_app/dns'
@@ -228,6 +240,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/$': {
+      id: '/_app/$'
+      path: '/$'
+      fullPath: '/$'
+      preLoaderRoute: typeof AppSplatRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/access': {
@@ -318,6 +337,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppSplatRoute: typeof AppSplatRoute
   AppAccessRoute: typeof AppAccessRoute
   AppAuditRoute: typeof AppAuditRoute
   AppDnsRoute: typeof AppDnsRoute
@@ -334,6 +354,7 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppSplatRoute: AppSplatRoute,
   AppAccessRoute: AppAccessRoute,
   AppAuditRoute: AppAuditRoute,
   AppDnsRoute: AppDnsRoute,

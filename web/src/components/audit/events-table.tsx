@@ -15,12 +15,11 @@ import {
   ResultCell,
   TargetCell,
 } from "~/components/audit/cells.tsx";
+import { plural } from "~/components/overview/plural.ts";
+import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
-const emptyIconSize = 32;
-/** The table already draws the card edge, so the empty panel drops its own. */
-const emptyClass = "border-none bg-kumo-base";
 /** Every row spans this many columns when it opens. */
 const columnCount = 7;
 /** The console's top bar is `h-12`, so the sticky header parks under it instead of behind it. */
@@ -39,14 +38,12 @@ function EventRows({
   striped,
   open,
   onToggle,
-  onOpen,
 }: {
   readonly event: AuditEvent;
   /** Zebra: the row is drawn on the elevated surface while it is closed. */
   readonly striped: boolean;
   readonly open: boolean;
   readonly onToggle: () => void;
-  readonly onOpen: () => void;
 }): ReactElement {
   return (
     <>
@@ -74,8 +71,8 @@ function EventRows({
         <Table.Cell>
           <ResultCell event={event} />
         </Table.Cell>
-        <Table.Cell className="hidden w-full max-w-0 lg:table-cell">
-          <DetailCell event={event} onOpen={onOpen} />
+        <Table.Cell className="hidden w-full max-w-0 overflow-hidden lg:table-cell">
+          <DetailCell event={event} />
         </Table.Cell>
         <Table.Cell className="w-10 text-right">
           <Button
@@ -159,9 +156,6 @@ export function EventsTable({
               onToggle={() => {
                 setOpenId((current) => (current === event.id ? null : event.id));
               }}
-              onOpen={() => {
-                setOpenId(event.id);
-              }}
             />
           ))
         )}
@@ -210,7 +204,7 @@ function Paging({
     );
   }
 
-  return <TableFooter>{`Showing all ${count} events in this range`}</TableFooter>;
+  return <TableFooter>{`Showing all ${plural(count, "event")} in this range`}</TableFooter>;
 }
 
 /**
@@ -227,7 +221,7 @@ function EmptyEvents({
   if (filtered) {
     return (
       <Empty
-        className={emptyClass}
+        className={tableEmptyClass}
         size="sm"
         title="No events match"
         description="Nothing was recorded in this range for these filters."
@@ -242,7 +236,7 @@ function EmptyEvents({
 
   return (
     <Empty
-      className={emptyClass}
+      className={tableEmptyClass}
       size="sm"
       icon={<ClockCounterClockwiseIcon size={emptyIconSize} />}
       title="No events yet"

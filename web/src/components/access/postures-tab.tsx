@@ -13,11 +13,9 @@ import { postureColumns } from "~/components/access/posture-columns.tsx";
 import { PostureDialog } from "~/components/access/posture-dialogs.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
+import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-
-const emptyClass = "border-none bg-kumo-base [&>h2]:text-base";
-const emptyIconSize = 32;
 
 export interface PosturesTabProps {
   readonly me: Me;
@@ -82,7 +80,7 @@ export function PosturesTab({
             empty={
               total === 0 ? (
                 <Empty
-                  className={emptyClass}
+                  className={tableEmptyClass}
                   size="sm"
                   icon={<ShieldCheckIcon size={emptyIconSize} />}
                   title="No postures yet"
@@ -101,7 +99,7 @@ export function PosturesTab({
                 />
               ) : (
                 <Empty
-                  className={emptyClass}
+                  className={tableEmptyClass}
                   size="sm"
                   icon={<ShieldCheckIcon size={emptyIconSize} />}
                   title="No postures match"

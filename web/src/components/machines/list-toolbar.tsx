@@ -14,6 +14,7 @@ import {
 } from "~/components/machines/filters.ts";
 import type { StatusFilter } from "~/components/machines/filters.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
+import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableToolbar } from "~/components/table/toolbar.tsx";
 import { userLabel } from "~/lib/node.ts";
 
@@ -53,10 +54,10 @@ export function MachinesToolbar({
         variant="segmented"
         size="sm"
         value={status}
-        tabs={statusFilters.map((value) => ({
-          value,
-          label: <TabLabel label={statusFilterLabels[value]} count={counts[value]} />,
-        }))}
+        tabs={countedTabs(
+          statusFilters.map((value) => ({ value, label: statusFilterLabels[value] })),
+          (value) => counts[value],
+        )}
         onValueChange={(value) => {
           onStatusChange(toStatusFilter(value));
         }}
@@ -74,21 +75,6 @@ export function MachinesToolbar({
         />
       )}
     </TableToolbar>
-  );
-}
-
-function TabLabel({
-  label,
-  count,
-}: {
-  readonly label: string;
-  readonly count: number;
-}): ReactElement {
-  return (
-    <span className="flex items-center gap-1.5">
-      {label}
-      <span className="text-kumo-subtle tabular-nums">{count}</span>
-    </span>
   );
 }
 

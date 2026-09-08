@@ -13,11 +13,9 @@ import { networkColumns, toNetworkRows } from "~/components/networks/network-col
 import { NetworkDialog } from "~/components/networks/network-dialogs.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
+import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-
-const emptyClass = "border-none bg-kumo-base [&>h2]:text-base";
-const emptyIconSize = 32;
 
 export interface NetworksTabProps {
   readonly me: Me;
@@ -87,7 +85,7 @@ export function NetworksTab({
             empty={
               total === 0 ? (
                 <Empty
-                  className={emptyClass}
+                  className={tableEmptyClass}
                   size="sm"
                   icon={<PathIcon size={emptyIconSize} />}
                   title="No networks yet"
@@ -106,7 +104,7 @@ export function NetworksTab({
                 />
               ) : (
                 <Empty
-                  className={emptyClass}
+                  className={tableEmptyClass}
                   size="sm"
                   title="No networks match"
                   description="No network matches this search."

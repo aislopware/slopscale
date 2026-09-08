@@ -5,10 +5,11 @@ import { TooltipProvider } from "@cloudflare/kumo/components/tooltip";
 import { LinkProvider } from "@cloudflare/kumo/utils";
 import { ArrowCounterClockwiseIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import type { ErrorComponentProps } from "@tanstack/react-router";
-import { createRootRouteWithContext, Link, Outlet } from "@tanstack/react-router";
+import { createRootRouteWithContext, Outlet } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
+import { NotFoundPanel } from "~/components/ui/not-found.tsx";
 import { toastManager } from "~/components/ui/toast.ts";
 import { AppLink } from "~/lib/link.tsx";
 import type { RouterContext } from "~/router.tsx";
@@ -31,18 +32,11 @@ function RootLayout(): ReactElement {
   );
 }
 
+/** Only paths outside the app layout land here; inside it the splat route keeps the shell. */
 function NotFound(): ReactElement {
   return (
     <div className="flex min-h-dvh items-center justify-center p-6">
-      <Empty
-        title="Page not found"
-        description="Nothing lives at this address."
-        contents={
-          <Link to="/">
-            <Button variant="secondary">Back to overview</Button>
-          </Link>
-        }
-      />
+      <NotFoundPanel />
     </div>
   );
 }

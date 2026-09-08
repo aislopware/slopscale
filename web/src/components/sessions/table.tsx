@@ -11,6 +11,7 @@ import type { ReactElement, ReactNode } from "react";
 import { errorMessage } from "~/api/error.ts";
 import type { SSHRecording } from "~/api/queries.ts";
 import { sshRecordingCastUrl } from "~/api/queries.ts";
+import { plural } from "~/components/overview/plural.ts";
 import {
   castFileName,
   formatBytes,
@@ -20,11 +21,10 @@ import {
 } from "~/components/sessions/model.ts";
 import type { RecordingState } from "~/components/sessions/model.ts";
 import { useDeleteRecording } from "~/components/sessions/mutations.ts";
+import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
-const emptyIconSize = 32;
-const emptyClass = "border-none bg-kumo-base";
 const columnCount = 7;
 const stickyHeader = "[&_th]:top-12";
 
@@ -213,13 +213,13 @@ function Paging({
     );
   }
 
-  return <TableFooter>{`Showing all ${count} recordings`}</TableFooter>;
+  return <TableFooter>{`Showing all ${plural(count, "recording")}`}</TableFooter>;
 }
 
 function EmptySessions({ embeddedRecorder }: { readonly embeddedRecorder: boolean }): ReactElement {
   return (
     <Empty
-      className={emptyClass}
+      className={tableEmptyClass}
       size="sm"
       icon={<TerminalWindowIcon size={emptyIconSize} />}
       title="No recorded sessions"

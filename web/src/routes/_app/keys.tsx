@@ -2,6 +2,7 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
+import type { TabsItem } from "@cloudflare/kumo/components/tabs";
 import { KeyIcon, PlusIcon } from "@phosphor-icons/react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -19,13 +20,11 @@ import { CreatePreAuthKeyDialog } from "~/components/keys/preauth-dialogs.tsx";
 import { apiKeyStatus, preAuthKeyStatus } from "~/components/keys/status.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
+import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
+import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
-
-/** The table already draws the card edge, and a row of the table is no place for a page-sized title. */
-const emptyClass = "border-none bg-kumo-base [&>h2]:text-base";
-const emptyIconSize = 32;
 
 const tabs = ["preauth", "api"] as const;
 type TabValue = (typeof tabs)[number];
@@ -132,14 +131,14 @@ function KeysPage(): ReactElement {
         title="Keys"
         description="Pre-auth keys register machines without a login; API keys authenticate this console and automation."
       />
-      <div className="flex flex-col gap-4">
-        <Tabs variant="underline" tabs={tabItems} value={tab} onValueChange={handleTabChange} />
-        {tab === "preauth" && mayReadPreAuth ? (
-          <PreAuthPanel me={me} controls={controls} />
-        ) : (
-          <ApiPanel me={me} controls={controls} />
-        )}
+      <div className="flex">
+        <Tabs variant="segmented" tabs={tabItems} value={tab} onValueChange={handleTabChange} />
       </div>
+      {tab === "preauth" && mayReadPreAuth ? (
+        <PreAuthPanel me={me} controls={controls} />
+      ) : (
+        <ApiPanel me={me} controls={controls} />
+      )}
     </>
   );
 }
@@ -165,6 +164,10 @@ function PreAuthPanel({
   const groups = useQuery({ ...groupsQuery, enabled: can(me, "policy_file:read") });
   const [creating, setCreating] = useState(false);
   const filter = useDeferredValue(controls.query);
+  const statusOf = (status: StatusFilter): number =>
+    keys.data.preAuthKeys.filter(
+      (authKey) => status === "all" || preAuthKeyStatus(authKey) === status,
+    ).length;
   const rows = keys.data.preAuthKeys.filter(
     (authKey) => controls.status === "all" || preAuthKeyStatus(authKey) === controls.status,
   );
@@ -183,7 +186,7 @@ function PreAuthPanel({
   return (
     <KeyPanel
       controls={controls}
-      statusTabs={preAuthStatusTabs}
+      statusTabs={countedTabs(preAuthStatusTabs, statusOf)}
       placeholder="Search by key, user or tag"
       action={
         <Button variant="primary" icon={PlusIcon} disabled={!can(me, "auth_keys")} onClick={create}>
@@ -199,7 +202,7 @@ function PreAuthPanel({
           noun="pre-auth key"
           firstEmpty={
             <Empty
-              className={emptyClass}
+              className={tableEmptyClass}
               size="sm"
               icon={<KeyIcon size={emptyIconSize} />}
               title="No pre-auth keys"
@@ -229,6 +232,9 @@ function ApiPanel({
   const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
   const [creating, setCreating] = useState(false);
   const filter = useDeferredValue(controls.query);
+  const statusOf = (status: StatusFilter): number =>
+    keys.data.apiKeys.filter((apiKey) => status === "all" || apiKeyStatus(apiKey) === status)
+      .length;
   const rows = keys.data.apiKeys.filter(
     (apiKey) => controls.status === "all" || apiKeyStatus(apiKey) === controls.status,
   );
@@ -247,7 +253,7 @@ function ApiPanel({
   return (
     <KeyPanel
       controls={controls}
-      statusTabs={apiStatusTabs}
+      statusTabs={countedTabs(apiStatusTabs, statusOf)}
       placeholder="Search by prefix"
       action={
         <Button variant="primary" icon={PlusIcon} onClick={create}>
@@ -263,7 +269,7 @@ function ApiPanel({
           noun="API key"
           firstEmpty={
             <Empty
-              className={emptyClass}
+              className={tableEmptyClass}
               size="sm"
               icon={<KeyIcon size={emptyIconSize} />}
               title="No API keys"
@@ -291,7 +297,7 @@ function KeyPanel({
   children,
 }: {
   readonly controls: PanelControls;
-  readonly statusTabs: readonly { value: StatusFilter; label: string }[];
+  readonly statusTabs: readonly TabsItem[];
   readonly placeholder: string;
   readonly action: ReactNode;
   readonly children: ReactNode;
@@ -343,7 +349,7 @@ function PanelTable({
           firstEmpty
         ) : (
           <Empty
-            className={emptyClass}
+            className={tableEmptyClass}
             size="sm"
             title="No keys match"
             description="No key matches this search and filter."

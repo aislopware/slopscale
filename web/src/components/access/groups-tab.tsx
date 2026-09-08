@@ -12,13 +12,12 @@ import { groupColumns, toGroupRows } from "~/components/access/group-columns.tsx
 import { GroupDialog } from "~/components/access/group-dialogs.tsx";
 import { isBuiltin } from "~/components/access/model.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
+import { plural } from "~/components/overview/plural.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
+import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-
-const emptyClass = "border-none bg-kumo-base [&>h2]:text-base";
-const emptyIconSize = 32;
 
 export interface GroupsTabProps {
   readonly me: Me;
@@ -91,7 +90,7 @@ export function GroupsTab({
           <DataTable
             empty={
               <Empty
-                className={emptyClass}
+                className={tableEmptyClass}
                 size="sm"
                 icon={<UsersThreeIcon size={emptyIconSize} />}
                 title="No groups match"
@@ -112,7 +111,7 @@ export function GroupsTab({
               <TableFooter>
                 {own === 0
                   ? "Only the built-in group so far. Create one to name a set of machines."
-                  : `Showing ${shown} of ${groups.length} groups`}
+                  : `Showing ${shown} of ${plural(groups.length, "group")}`}
               </TableFooter>
             }
           />

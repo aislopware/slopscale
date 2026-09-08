@@ -10,14 +10,12 @@ import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
+import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 import { useWebhookMutations } from "~/components/webhooks/mutations.ts";
 import { webhookColumns } from "~/components/webhooks/webhook-columns.tsx";
 import { WebhookDialog } from "~/components/webhooks/webhook-dialogs.tsx";
-
-const emptyClass = "border-none bg-kumo-base [&>h2]:text-base";
-const emptyIconSize = 32;
 
 export function WebhooksTab({
   me,
@@ -77,7 +75,7 @@ export function WebhooksTab({
             empty={
               total === 0 ? (
                 <Empty
-                  className={emptyClass}
+                  className={tableEmptyClass}
                   size="sm"
                   icon={<WebhooksLogoIcon size={emptyIconSize} />}
                   title="No webhooks yet"
@@ -96,7 +94,7 @@ export function WebhooksTab({
                 />
               ) : (
                 <Empty
-                  className={emptyClass}
+                  className={tableEmptyClass}
                   size="sm"
                   title="No webhooks match"
                   description="No webhook matches this search."

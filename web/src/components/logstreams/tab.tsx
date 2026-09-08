@@ -13,11 +13,9 @@ import { LogStreamDialog } from "~/components/logstreams/dialogs.tsx";
 import { useLogStreamMutations } from "~/components/logstreams/mutations.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
+import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-
-const emptyClass = "border-none bg-kumo-base [&>h2]:text-base";
-const emptyIconSize = 32;
 
 export function LogStreamsTab({
   me,
@@ -75,7 +73,7 @@ export function LogStreamsTab({
             empty={
               total === 0 ? (
                 <Empty
-                  className={emptyClass}
+                  className={tableEmptyClass}
                   size="sm"
                   icon={<ShippingContainerIcon size={emptyIconSize} />}
                   title="No log streams yet"
@@ -94,7 +92,7 @@ export function LogStreamsTab({
                 />
               ) : (
                 <Empty
-                  className={emptyClass}
+                  className={tableEmptyClass}
                   size="sm"
                   title="No log streams match"
                   description="No log stream matches this search."

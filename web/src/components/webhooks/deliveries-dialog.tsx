@@ -10,6 +10,7 @@ import type { ReactElement } from "react";
 import { api } from "~/api/client.ts";
 import { errorMessage } from "~/api/error.ts";
 import type { Webhook, WebhookDelivery } from "~/api/queries.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import {
   DialogClose,
   DialogContent,
@@ -22,7 +23,6 @@ import { formatDuration, urlHost } from "~/components/webhooks/model.ts";
 
 const columnCount = 5;
 const skeletonRows = 3;
-const emptyClass = "border-none bg-kumo-base [&>h2]:text-base";
 
 /** The newest deliveries of one webhook, newest first, with how each went. */
 export function DeliveriesDialog({
@@ -67,7 +67,7 @@ function DeliveriesBody({ webhook }: { readonly webhook: Webhook }): ReactElemen
   if (deliveries.isSuccess && rows.length === 0) {
     return (
       <Empty
-        className={emptyClass}
+        className={tableEmptyClass}
         size="sm"
         title="No deliveries yet"
         description="Nothing has been sent to this endpoint. Send a test event to check it."

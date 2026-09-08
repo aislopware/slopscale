@@ -156,7 +156,7 @@ function Trail({ current }: { readonly current: NavItem | undefined }): ReactEle
       <Sidebar.Trigger className="md:hidden" />
       <Breadcrumbs>
         {current === undefined || leaf === null ? (
-          <Breadcrumbs.Current>{current?.label ?? "headscale"}</Breadcrumbs.Current>
+          <Breadcrumbs.Current>{current?.label ?? leaf ?? "headscale"}</Breadcrumbs.Current>
         ) : (
           <>
             <Breadcrumbs.Link href={current.to}>{current.label}</Breadcrumbs.Link>

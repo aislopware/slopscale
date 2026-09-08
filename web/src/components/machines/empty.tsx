@@ -4,10 +4,7 @@ import { DevicesIcon, PlusIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 import type { StatusFilter } from "~/components/machines/filters.ts";
-
-const iconSize = 40;
-/** The table already draws the card edge, and the heading belongs to the row, not the page. */
-const emptyClass = "border-none bg-kumo-base [&>h2]:text-base";
+import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 
 export interface MachinesEmptyProps {
   /** How many machines exist at all, before any filter. */
@@ -36,8 +33,8 @@ export function MachinesEmpty({
     return (
       <Empty
         size="sm"
-        className={emptyClass}
-        icon={<DevicesIcon size={iconSize} />}
+        className={tableEmptyClass}
+        icon={<DevicesIcon size={emptyIconSize} />}
         title="No machines yet"
         description="Register a device with a pre-auth key or by signing in; it appears here immediately."
         contents={
@@ -55,7 +52,7 @@ export function MachinesEmpty({
     return (
       <Empty
         size="sm"
-        className={emptyClass}
+        className={tableEmptyClass}
         title="No machines need approval"
         description="Every machine on the tailnet has been approved."
         contents={
@@ -70,7 +67,7 @@ export function MachinesEmpty({
   return (
     <Empty
       size="sm"
-      className={emptyClass}
+      className={tableEmptyClass}
       title="No machines match"
       description="Try a different search or filter."
       contents={

@@ -72,9 +72,18 @@ export function PostureSection({
   );
 }
 
+/** A derived attribute in words: the policy sees `true`, the operator reads "Yes". */
+function derivedText(value: unknown): string {
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+
+  return attributeText(value);
+}
+
 function derived(posture: NodePosture): Definition[] {
   return shownAttributes.flatMap(({ key, label }) => {
-    const text = attributeText(posture.attributes[key]);
+    const text = derivedText(posture.attributes[key]);
 
     return text === "" ? [] : [{ key, label, value: text, copy: text }];
   });

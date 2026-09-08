@@ -12,11 +12,9 @@ import { requestColumns } from "~/components/access/request-columns.tsx";
 import { requestNames, toRequestRows } from "~/components/access/request-model.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
+import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
-
-const emptyClass = "border-none bg-kumo-base [&>h2]:text-base";
-const emptyIconSize = 32;
 
 const filters = ["pending", "all"] as const;
 type Filter = (typeof filters)[number];
@@ -96,7 +94,7 @@ export function RequestsTab({
         <DataTable
           empty={
             <Empty
-              className={emptyClass}
+              className={tableEmptyClass}
               size="sm"
               icon={<HandWavingIcon size={emptyIconSize} />}
               title={filter === "pending" ? "Nothing to decide" : "No requests"}
