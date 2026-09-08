@@ -2,8 +2,12 @@ package apiv1
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -133,11 +137,18 @@ type DERP struct {
 
 type (
 	derpOutput struct {
+		// ETag identifies the effective settings the response reports, for
+		// a later If-Match on setDERP.
+		ETag string `header:"ETag"`
 		Body DERP
 	}
 
 	setDERPInput struct {
-		Body SetDERPRequestBody
+		// IfMatch is an ETag an earlier read returned. Left out, the request
+		// writes whatever it finds; set, it is refused with 412 when the
+		// settings changed since that read. "*" always matches.
+		IfMatch string `header:"If-Match"`
+		Body    SetDERPRequestBody
 	}
 )
 
@@ -303,6 +314,39 @@ func derpFrom(st state.DERPStatus) DERP {
 	}
 }
 
+// derpResponse is the status as a response body plus the ETag of the
+// effective settings it reports, which every DERP operation returns.
+func derpResponse(st state.DERPStatus) *derpOutput {
+	body := derpFrom(st)
+
+	return &derpOutput{ETag: derpETag(body.Effective), Body: body}
+}
+
+// derpETag is the quoted hex SHA-256 of the effective settings' JSON, whose
+// field order is fixed by the struct: stable across reads, changes iff the
+// settings change.
+func derpETag(settings DERPSettings) string {
+	data, err := json.Marshal(settings)
+	if err != nil {
+		return ""
+	}
+
+	sum := sha256.Sum256(data)
+
+	return `"` + hex.EncodeToString(sum[:]) + `"`
+}
+
+// derpETagMatches reports whether an If-Match header satisfies the settings
+// in force. "*" matches anything that exists, which the settings always do.
+func derpETagMatches(ifMatch string, current types.DERPSettings) bool {
+	ifMatch = strings.TrimSpace(ifMatch)
+	if ifMatch == "*" {
+		return true
+	}
+
+	return ifMatch == derpETag(derpSettingsFrom(current))
+}
+
 func registerDERP(api huma.API, b Backend) {
 	huma.Register(api, withScope(huma.Operation{
 		OperationID: "getDERP",
@@ -314,7 +358,7 @@ func registerDERP(api huma.API, b Backend) {
 		Tags:     []string{tagDERP},
 		Security: bearerAuth,
 	}, scope.FeatureSettingsRead), func(_ context.Context, _ *struct{}) (*derpOutput, error) {
-		return &derpOutput{Body: derpFrom(b.State.DERP())}, nil
+		return derpResponse(b.State.DERP()), nil
 	})
 
 	huma.Register(api, audited(withScope(huma.Operation{
@@ -325,10 +369,17 @@ func registerDERP(api huma.API, b Backend) {
 		Description: "Replaces the runtime relay settings: the maps are fetched, the embedded relay is " +
 			"started or stopped, and the new map is pushed to every client. A map that cannot be " +
 			"fetched or that leaves no relay is refused and nothing changes. The map files in " +
-			"derp.paths and the relay's key stay in the config file.",
+			"derp.paths and the relay's key stay in the config file. Send the ETag a read returned " +
+			"as If-Match to have the request refused with 412 when the settings changed since that read.",
 		Tags:     []string{tagDERP},
 		Security: bearerAuth,
 	}, scope.FeatureSettings), "derp.set", "", ""), func(ctx context.Context, in *setDERPInput) (*derpOutput, error) {
+		if in.IfMatch != "" && !derpETagMatches(in.IfMatch, b.State.EffectiveDERP()) {
+			return nil, huma.Error412PreconditionFailed(
+				"the DERP settings changed since they were read; read them again and retry with the new ETag",
+			)
+		}
+
 		settings, err := derpSettingsTo(in.Body)
 		if err != nil {
 			return nil, err
@@ -345,7 +396,7 @@ func registerDERP(api huma.API, b Backend) {
 
 		b.Change(c)
 
-		return &derpOutput{Body: derpFrom(st)}, nil
+		return derpResponse(st), nil
 	})
 
 	huma.Register(api, audited(withScope(huma.Operation{
@@ -364,7 +415,7 @@ func registerDERP(api huma.API, b Backend) {
 
 		b.Change(c)
 
-		return &derpOutput{Body: derpFrom(st)}, nil
+		return derpResponse(st), nil
 	})
 
 	huma.Register(api, audited(withScope(huma.Operation{
@@ -385,7 +436,7 @@ func registerDERP(api huma.API, b Backend) {
 			b.Change(change.DERPMap())
 		}
 
-		return &derpOutput{Body: derpFrom(b.State.DERP())}, nil
+		return derpResponse(b.State.DERP()), nil
 	})
 }
 
