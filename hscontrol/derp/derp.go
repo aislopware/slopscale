@@ -74,9 +74,9 @@ func loadDERPMapFromURL(addr url.URL) (*tailcfg.DERPMap, error) {
 }
 
 // mergeDERPMaps naively merges a list of [tailcfg.DERPMap] values into a single
-// [tailcfg.DERPMap], it will _only_ look at the Regions, an integer.
-// If a region exists in two of the given [tailcfg.DERPMap] values, the region
-// form the _last_ [tailcfg.DERPMap] will be preserved.
+// [tailcfg.DERPMap]: the Regions by ID and the HomeParams region scores.
+// If a region or a score exists in two of the given [tailcfg.DERPMap]
+// values, the one from the _last_ [tailcfg.DERPMap] will be preserved.
 // An empty [tailcfg.DERPMap] list will result in a [tailcfg.DERPMap] with no regions.
 func mergeDERPMaps(derpMaps []*tailcfg.DERPMap) *tailcfg.DERPMap {
 	result := tailcfg.DERPMap{
@@ -92,6 +92,26 @@ func mergeDERPMaps(derpMaps []*tailcfg.DERPMap) *tailcfg.DERPMap {
 			if cloned := region.Clone(); cloned != nil {
 				result.Regions[id] = cloned
 			}
+		}
+
+		if derpMap.HomeParams == nil {
+			continue
+		}
+
+		// A score scales the region's measured latency when the client
+		// picks its home DERP; below 1 prefers the region, above 1 avoids
+		// it. The client ignores zero and negative scores, so drop them
+		// here rather than send them.
+		for id, score := range derpMap.HomeParams.RegionScore {
+			if score <= 0 {
+				continue
+			}
+
+			if result.HomeParams == nil {
+				result.HomeParams = &tailcfg.DERPHomeParams{RegionScore: map[tailcfg.DERPRegionID]float64{}}
+			}
+
+			result.HomeParams.RegionScore[id] = score
 		}
 	}
 

@@ -132,6 +132,23 @@ maps fetched via URL or to offer your own, custom DERP servers to nodes.
         - /etc/headscale/derp.yaml
     ```
 
+=== "Prefer or avoid a region"
+
+    A client picks its home DERP by measured latency. A region score scales that latency before the pick: a score
+    below 1 makes the region proportionally more likely to be chosen, above 1 less, and 1 is neutral. The following
+    `derp.yaml` steers clients to the custom region 900 unless it is more than twice as slow as the best other region,
+    and away from region 1:
+
+    ```yaml title="derp.yaml"
+    homeparams:
+      regionscore:
+        900: 0.5
+        1: 3
+    ```
+
+    Scores from every loaded map are merged with the regions, later files winning, so a file with only `homeparams`
+    can be added next to the fetched default map. Zero and negative scores are ignored, as the client would.
+
 Independent of the custom DERP map, you may choose to [enable the embedded DERP server and have it automatically added
 to the custom DERP map](#enable-embedded-derp).
 

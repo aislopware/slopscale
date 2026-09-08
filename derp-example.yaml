@@ -15,3 +15,10 @@ regions:
         stunport: 0
         stunonly: false
         derpport: 0
+
+# Scores scale a region's measured latency when a client picks its home
+# DERP: below 1 prefers the region, above 1 avoids it, 1 is neutral. The
+# scores of every loaded map are merged, later files win.
+homeparams:
+  regionscore:
+    900: 0.5 # prefer the custom region unless it is twice as slow
