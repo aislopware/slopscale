@@ -40,6 +40,12 @@ user[^1]:
 headscale users create <USER>
 ```
 
+The display name and profile picture the clients show can be set at creation or later:
+
+```console
+headscale users set --name <USER> --display-name "Alice Liddell" --picture-url https://example.com/alice.png
+```
+
 === "Personal devices"
 
     Run `tailscale up` to login your personal device:

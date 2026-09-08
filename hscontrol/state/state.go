@@ -487,13 +487,30 @@ func (s *State) UpdateUser(userID types.UserID, updateFn func(*types.User) error
 		return nil, change.Change{}, err
 	}
 
+	// The nodes carry a copy of their user, loaded once, and the map
+	// response takes the user profiles from it; refresh the copies so
+	// the new name, display name or picture reaches the clients.
+	updates := make(map[types.NodeID]UpdateNodeFunc)
+
+	for _, n := range s.nodeStore.ListNodesByUser(userID).All() {
+		updates[n.ID()] = func(node *types.Node) {
+			node.User = user
+		}
+	}
+
+	s.nodeStore.UpdateNodes(updates)
+
 	// Check if policy manager needs updating
 	c, err := s.updatePolicyManagerUsers()
 	if err != nil {
 		return user, change.Change{}, fmt.Errorf("updating policy manager after user update: %w", err)
 	}
 
-	// TODO(kradalby): We might want to update nodestore with the user data
+	// A change to the profile alone does not move the policy, but every
+	// client showing the user's nodes needs the new profile.
+	if c.IsEmpty() {
+		c = change.UserAdded()
+	}
 
 	return user, c, nil
 }

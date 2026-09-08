@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	registrations = append(registrations, registerUsers, registerUserRole)
+	registrations = append(registrations, registerUsers, registerUserProfile, registerUserLifecycle, registerUserRole)
 }
 
 // CreateUserRequestBody mirrors v1.CreateUserRequest.
@@ -36,6 +36,19 @@ type (
 		}
 	}
 )
+
+// UpdateUserRequestBody is the body of updateUser. A field left out keeps
+// its value; an empty string clears it.
+type UpdateUserRequestBody struct {
+	DisplayName *string `doc:"The name shown in the clients in place of the username." json:"displayName,omitempty"`
+	Email       *string `json:"email,omitempty"`
+	PictureURL  *string `doc:"The URL of the profile picture shown in the clients."    json:"pictureUrl,omitempty"`
+}
+
+type updateUserInput struct {
+	ID   string `format:"uint64" path:"id"`
+	Body UpdateUserRequestBody
+}
 
 // SetUserRoleRequestBody is the body of setUserRole.
 type SetUserRoleRequestBody struct {
@@ -154,7 +167,29 @@ func registerUsers(api huma.API, b Backend) {
 
 		return out, nil
 	})
+}
 
+// registerUserProfile registers the operation that edits a user's profile.
+func registerUserProfile(api huma.API, b Backend) {
+	huma.Register(api, audited(withScope(huma.Operation{
+		OperationID: "updateUser",
+		Method:      http.MethodPatch,
+		Path:        "/api/v1/user/{id}",
+		Summary:     "Update user profile",
+		Description: "Sets the display name, email or profile picture of a user. A field left out keeps its value; " +
+			"an empty string clears it. The clients show the new profile on their next map update. " +
+			"A user who logs in through OIDC gets the values from the provider again at the next login.",
+		Tags:     []string{"Users"},
+		Security: bearerAuth,
+	}, scope.Users), "user.update", "user", "id"), func(
+		ctx context.Context, in *updateUserInput,
+	) (*userOutput, error) {
+		return handleUpdateUser(ctx, b, in)
+	})
+}
+
+// registerUserLifecycle registers the operations that delete and list users.
+func registerUserLifecycle(api huma.API, b Backend) {
 	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "deleteUser",
 		Method:      http.MethodDelete,
@@ -297,4 +332,46 @@ func registerUserRole(api huma.API, b Backend) {
 
 		return out, nil
 	})
+}
+
+// handleUpdateUser applies the profile fields the request carries and
+// tells every client, whose map response takes the profile from the
+// node's copy of its user.
+func handleUpdateUser(ctx context.Context, b Backend, in *updateUserInput) (*userOutput, error) {
+	id, err := parseUserID(in.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if in.Body.DisplayName == nil && in.Body.Email == nil && in.Body.PictureURL == nil {
+		return nil, huma.Error400BadRequest("nothing to update")
+	}
+
+	user, c, err := b.State.UpdateUser(id, func(user *types.User) error {
+		if in.Body.DisplayName != nil {
+			user.DisplayName = *in.Body.DisplayName
+		}
+
+		if in.Body.Email != nil {
+			user.Email = *in.Body.Email
+		}
+
+		if in.Body.PictureURL != nil {
+			user.ProfilePicURL = *in.Body.PictureURL
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, mapError("updating user", err)
+	}
+
+	audit.Target(ctx, "", formatID(user.ID), user.Name)
+
+	b.Change(c)
+
+	out := &userOutput{}
+	out.Body.User = userFromView(user.View())
+
+	return out, nil
 }
