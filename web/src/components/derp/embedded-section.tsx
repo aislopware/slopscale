@@ -170,7 +170,6 @@ export function EmbeddedSection({
             actions: (
               <Button
                 variant="secondary"
-                size="sm"
                 icon={PencilSimpleIcon}
                 onClick={() => {
                   setEditing(true);

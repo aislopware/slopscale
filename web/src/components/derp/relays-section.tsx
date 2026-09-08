@@ -63,7 +63,6 @@ export function RelaysSection({
             actions: (
               <Button
                 variant="secondary"
-                size="sm"
                 icon={PlusIcon}
                 onClick={() => {
                   setDialog("new");

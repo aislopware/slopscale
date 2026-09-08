@@ -37,7 +37,6 @@ export function SharingSection({
           canEdit ? (
             <Button
               variant="secondary"
-              size="sm"
               icon={ShareNetworkIcon}
               onClick={() => {
                 setSharing(true);

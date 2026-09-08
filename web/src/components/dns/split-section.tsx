@@ -54,7 +54,6 @@ export function SplitDnsSection({
             actions: (
               <Button
                 variant="secondary"
-                size="sm"
                 icon={PlusIcon}
                 onClick={() => {
                   setDialog("new");

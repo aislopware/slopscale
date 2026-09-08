@@ -14,9 +14,10 @@ export interface QuickActionsProps {
 }
 
 /**
- * The three things an operator comes here to do. Adding a machine is the one the page is for, so it
- * is the only filled button; the rest are secondary. Each one is hidden rather than disabled when
- * the caller has no scope for it, so the row never offers a dead end.
+ * The three things an operator comes here to do: Access controls, Add user, and Add machine. Adding
+ * a machine is the one the page is for, so it is the only filled button, rightmost in the group;
+ * the rest are secondary. Each one is hidden rather than disabled when the caller has no scope for
+ * it, so the row never offers a dead end.
  */
 export function QuickActions({ me, onAddMachine }: QuickActionsProps): ReactElement {
   const [userOpen, setUserOpen] = useState(false);
@@ -24,16 +25,15 @@ export function QuickActions({ me, onAddMachine }: QuickActionsProps): ReactElem
 
   return (
     <>
-      {can(me, "auth_keys") ? (
-        <Button variant="primary" size="sm" icon={PlusIcon} onClick={onAddMachine}>
-          Add machine
-        </Button>
+      {can(me, "policy_file") ? (
+        <LinkButton href="/policy/rules" variant="secondary" icon={ShieldCheckIcon}>
+          Access controls
+        </LinkButton>
       ) : null}
       {can(me, "users") ? (
         <>
           <Button
             variant="secondary"
-            size="sm"
             icon={UserPlusIcon}
             onClick={() => {
               setUserOpen(true);
@@ -44,10 +44,10 @@ export function QuickActions({ me, onAddMachine }: QuickActionsProps): ReactElem
           <CreateUserDialog open={userOpen} onOpenChange={setUserOpen} mutations={userMutations} />
         </>
       ) : null}
-      {can(me, "policy_file") ? (
-        <LinkButton href="/policy/rules" variant="secondary" size="sm" icon={ShieldCheckIcon}>
-          Access controls
-        </LinkButton>
+      {can(me, "auth_keys") ? (
+        <Button variant="primary" icon={PlusIcon} onClick={onAddMachine}>
+          Add machine
+        </Button>
       ) : null}
     </>
   );

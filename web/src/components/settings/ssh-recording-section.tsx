@@ -83,7 +83,6 @@ export function SSHRecordingSection({
             <Button
               type="submit"
               variant="secondary"
-              size="sm"
               disabled={!canEdit || !dirty}
               loading={update.isPending}
             >

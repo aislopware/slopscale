@@ -115,8 +115,8 @@ function MachineHeader({
       meta={<MachineFacts node={node} />}
       actions={
         <>
-          {!node.approved && can(me, "devices:core") ? <ApproveButton node={node} /> : null}
           <MachineMenu node={node} me={me} users={users} labelled hideDestructive />
+          {!node.approved && can(me, "devices:core") ? <ApproveButton node={node} /> : null}
         </>
       }
     />

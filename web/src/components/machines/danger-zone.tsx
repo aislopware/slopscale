@@ -33,7 +33,6 @@ export function DangerZone({ node }: { readonly node: Node }): ReactElement {
           action={
             <Button
               variant="secondary"
-              size="sm"
               loading={mutations.suspend.isPending}
               onClick={() => {
                 if (node.suspended) {
@@ -63,7 +62,6 @@ export function DangerZone({ node }: { readonly node: Node }): ReactElement {
           action={
             <Button
               variant="secondary"
-              size="sm"
               onClick={() => {
                 setPending("expire");
               }}
@@ -78,7 +76,6 @@ export function DangerZone({ node }: { readonly node: Node }): ReactElement {
           action={
             <Button
               variant="destructive"
-              size="sm"
               onClick={() => {
                 setPending("delete");
               }}

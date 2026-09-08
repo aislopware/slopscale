@@ -45,7 +45,6 @@ export function GroupsSection({
           canEdit ? (
             <Button
               variant="secondary"
-              size="sm"
               icon={UsersThreeIcon}
               onClick={() => {
                 setEditing(true);

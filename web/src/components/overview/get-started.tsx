@@ -61,13 +61,7 @@ export function GetStarted({ me, onAddMachine }: GetStartedProps): ReactElement 
         index={1}
         title="Install Tailscale"
         action={
-          <LinkButton
-            href={downloadUrl}
-            external
-            variant="secondary"
-            size="sm"
-            icon={DownloadSimpleIcon}
-          >
+          <LinkButton href={downloadUrl} external variant="secondary" icon={DownloadSimpleIcon}>
             Download
           </LinkButton>
         }
@@ -82,7 +76,6 @@ export function GetStarted({ me, onAddMachine }: GetStartedProps): ReactElement 
         action={
           <Button
             variant="secondary"
-            size="sm"
             icon={KeyIcon}
             disabled={!can(me, "auth_keys")}
             onClick={onAddMachine}
