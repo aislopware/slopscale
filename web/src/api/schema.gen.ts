@@ -1480,7 +1480,13 @@ export interface paths {
         delete: operations["deleteUser"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update user profile
+         * @description Sets the display name, email or profile picture of a user. A field left out keeps its value; an empty string clears it. The clients show the new profile on their next map update. A user who logs in through OIDC gets the values from the provider again at the next login.
+         *
+         *     Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        patch: operations["updateUser"];
         trace?: never;
     };
     "/api/v1/user/{id}/approve": {
@@ -2546,6 +2552,13 @@ export interface components {
             sshRecordingEnforce?: boolean;
             usersApprovalOn?: boolean;
         };
+        UpdateUserRequestBody: {
+            /** @description The name shown in the clients in place of the username. */
+            displayName?: string;
+            email?: string;
+            /** @description The URL of the profile picture shown in the clients. */
+            pictureUrl?: string;
+        };
         User: {
             /** @description false while the user waits for an administrator. */
             approved: boolean;
@@ -2748,6 +2761,7 @@ export type ShareNodeRequestBody = components['schemas']['ShareNodeRequestBody']
 export type SshRecording = components['schemas']['SSHRecording'];
 export type SshRecordingOutputBody = components['schemas']['SshRecordingOutputBody'];
 export type UpdateSettingsRequestBody = components['schemas']['UpdateSettingsRequestBody'];
+export type UpdateUserRequestBody = components['schemas']['UpdateUserRequestBody'];
 export type User = components['schemas']['User'];
 export type UserOutputBody = components['schemas']['UserOutputBody'];
 export type Webhook = components['schemas']['Webhook'];
@@ -5898,6 +5912,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteUserOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOutputBody"];
                 };
             };
             /** @description Error */

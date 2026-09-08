@@ -2075,6 +2075,18 @@ components:
         usersApprovalOn:
           type: boolean
       type: object
+    UpdateUserRequestBody:
+      additionalProperties: false
+      properties:
+        displayName:
+          description: The name shown in the clients in place of the username.
+          type: string
+        email:
+          type: string
+        pictureUrl:
+          description: The URL of the profile picture shown in the clients.
+          type: string
+      type: object
     User:
       additionalProperties: false
       properties:
@@ -5459,6 +5471,45 @@ paths:
       tags:
         - Users
       x-audit-action: user.delete
+      x-required-scope: users
+    patch:
+      description: |-
+        Sets the display name, email or profile picture of a user. A field left out keeps its value; an empty string clears it. The clients show the new profile on their next map update. A user who logs in through OIDC gets the values from the provider again at the next login.
+
+        Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateUser
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Update user profile
+      tags:
+        - Users
+      x-audit-action: user.update
       x-required-scope: users
   /api/v1/user/{id}/approve:
     post:

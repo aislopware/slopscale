@@ -176,6 +176,7 @@ type AccessRequestOption struct {
 // AccessRule defines model for AccessRule.
 type AccessRule struct {
 	Bidirectional       bool       `json:"bidirectional"`
+	Builtin             string     `json:"builtin"`
 	CreatedAt           time.Time  `json:"createdAt"`
 	Description         string     `json:"description"`
 	DestinationGroupIds []string   `json:"destinationGroupIds"`
@@ -319,6 +320,24 @@ type CreateApiKeyRequestBody struct {
 
 	// UserId Owning user id; empty for a legacy all-access key.
 	UserId *string `json:"userId,omitempty"`
+}
+
+// CreateOAuthClientOutputBody defines model for CreateOAuthClientOutputBody.
+type CreateOAuthClientOutputBody struct {
+	ClientSecret string      `json:"clientSecret"`
+	OauthClient  OAuthClient `json:"oauthClient"`
+}
+
+// CreateOAuthClientRequestBody defines model for CreateOAuthClientRequestBody.
+type CreateOAuthClientRequestBody struct {
+	// Description What the client is for.
+	Description *string `json:"description,omitempty"`
+
+	// Scopes Scopes the client may grant; at least one.
+	Scopes []string `json:"scopes"`
+
+	// Tags Tags the client may put on its tokens.
+	Tags *[]string `json:"tags,omitempty"`
 }
 
 // CreatePreAuthKeyRequestBody defines model for CreatePreAuthKeyRequestBody.
@@ -543,7 +562,7 @@ type ExpirePreAuthKeyRequestBody struct {
 
 // Group defines model for Group.
 type Group struct {
-	// Builtin Empty for operator-made groups, "all" for the builtin group.
+	// Builtin Empty for operator-made groups, else "all" or "self".
 	Builtin     string              `json:"builtin"`
 	CreatedAt   time.Time           `json:"createdAt"`
 	Description string              `json:"description"`
@@ -552,7 +571,7 @@ type Group struct {
 	Name        string              `json:"name"`
 	NodeIds     []string            `json:"nodeIds"`
 
-	// Requestable Whether members may request to join the group for a while.
+	// Requestable Whether members may ask to join the group for a while.
 	Requestable bool      `json:"requestable"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 	UserIds     []string  `json:"userIds"`
@@ -630,6 +649,11 @@ type ListNetworksOutputBody struct {
 // ListNodesOutputBody defines model for ListNodesOutputBody.
 type ListNodesOutputBody struct {
 	Nodes []Node `json:"nodes"`
+}
+
+// ListOAuthClientsOutputBody defines model for ListOAuthClientsOutputBody.
+type ListOAuthClientsOutputBody struct {
+	OauthClients []OAuthClient `json:"oauthClients"`
 }
 
 // ListPosturesOutputBody defines model for ListPosturesOutputBody.
@@ -853,6 +877,22 @@ type NodePreAuthKey struct {
 	User          User       `json:"user"`
 }
 
+// OAuthClient defines model for OAuthClient.
+type OAuthClient struct {
+	ClientId    string     `json:"clientId"`
+	CreatedAt   *time.Time `json:"createdAt"`
+	Description string     `json:"description"`
+
+	// Scopes Scopes the client may grant its tokens.
+	Scopes []string `json:"scopes"`
+
+	// Tags Tags the client may put on its tokens.
+	Tags []string `json:"tags"`
+
+	// UserId Creating user id; null for the socket.
+	UserId *string `json:"userId"`
+}
+
 // PolicyRequestBody defines model for PolicyRequestBody.
 type PolicyRequestBody struct {
 	Policy *string `json:"policy,omitempty"`
@@ -954,6 +994,9 @@ type RequestOptionsOutputBody struct {
 type RequestOutputBody struct {
 	Request AccessRequest `json:"request"`
 }
+
+// RevokeOAuthClientOutputBody defines model for RevokeOAuthClientOutputBody.
+type RevokeOAuthClientOutputBody = map[string]interface{}
 
 // RuleEnabledInputBody defines model for RuleEnabledInputBody.
 type RuleEnabledInputBody struct {
@@ -1093,6 +1136,16 @@ type UpdateSettingsRequestBody struct {
 	SshRecorders        *[]string `json:"sshRecorders,omitempty"`
 	SshRecordingEnforce *bool     `json:"sshRecordingEnforce,omitempty"`
 	UsersApprovalOn     *bool     `json:"usersApprovalOn,omitempty"`
+}
+
+// UpdateUserRequestBody defines model for UpdateUserRequestBody.
+type UpdateUserRequestBody struct {
+	// DisplayName The name shown in the clients in place of the username.
+	DisplayName *string `json:"displayName,omitempty"`
+	Email       *string `json:"email,omitempty"`
+
+	// PictureUrl The URL of the profile picture shown in the clients.
+	PictureUrl *string `json:"pictureUrl,omitempty"`
 }
 
 // User defines model for User.
@@ -1357,6 +1410,9 @@ type SuspendNodeJSONRequestBody = SetSuspensionRequestBody
 // SetTagsJSONRequestBody defines body for SetTags for application/json ContentType.
 type SetTagsJSONRequestBody = SetTagsRequestBody
 
+// CreateOAuthClientJSONRequestBody defines body for CreateOAuthClient for application/json ContentType.
+type CreateOAuthClientJSONRequestBody = CreateOAuthClientRequestBody
+
 // SetPolicyJSONRequestBody defines body for SetPolicy for application/json ContentType.
 type SetPolicyJSONRequestBody = PolicyRequestBody
 
@@ -1383,6 +1439,9 @@ type UpdateSettingsJSONRequestBody = UpdateSettingsRequestBody
 
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = CreateUserRequestBody
+
+// UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
+type UpdateUserJSONRequestBody = UpdateUserRequestBody
 
 // ApproveUserJSONRequestBody defines body for ApproveUser for application/json ContentType.
 type ApproveUserJSONRequestBody = SetApprovalRequestBody
@@ -1879,7 +1938,7 @@ type ClientInterface interface {
 
 	// ListGroups List groups
 	//
-	// Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none.
+	// Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none; the builtin "self" group is a rule destination meaning the machines owned by the same user as the source.
 	//
 	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -1926,7 +1985,7 @@ type ClientInterface interface {
 
 	// UpdateGroupWithBody Update group
 	//
-	// Renames or re-describes a group and replaces its machines and users when given. The builtin group cannot be changed.
+	// Renames or re-describes a group and replaces its machines and users when given. The builtin groups cannot be changed.
 	//
 	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -1937,7 +1996,7 @@ type ClientInterface interface {
 
 	// UpdateGroup Update group
 	//
-	// Renames or re-describes a group and replaces its machines and users when given. The builtin group cannot be changed.
+	// Renames or re-describes a group and replaces its machines and users when given. The builtin groups cannot be changed.
 	//
 	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -2387,6 +2446,46 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/node/{nodeId}/tags (the `SetTags` operationId).
 	SetTags(ctx context.Context, nodeId string, body SetTagsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListOAuthClients List OAuth clients
+	//
+	// Every client that can mint v2 API tokens; revoked clients are gone.
+	//
+	// Requires the `oauth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/oauth-client (the `ListOAuthClients` operationId).
+	ListOAuthClients(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateOAuthClientWithBody Create OAuth client
+	//
+	// The client secret is in this response only. Scopes may not exceed the caller's own.
+	//
+	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/oauth-client (the `CreateOAuthClient` operationId).
+	CreateOAuthClientWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateOAuthClient Create OAuth client
+	//
+	// The client secret is in this response only. Scopes may not exceed the caller's own.
+	//
+	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/oauth-client (the `CreateOAuthClient` operationId).
+	CreateOAuthClient(ctx context.Context, body CreateOAuthClientJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeOAuthClient Revoke OAuth client
+	//
+	// Deletes the client and every access token it issued.
+	//
+	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v1/oauth-client/{clientId} (the `RevokeOAuthClient` operationId).
+	RevokeOAuthClient(ctx context.Context, clientId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetPolicy Get policy
 	//
 	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -2672,6 +2771,28 @@ type ClientInterface interface {
 	//
 	// Corresponds with DELETE /api/v1/user/{id} (the `DeleteUser` operationId).
 	DeleteUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateUserWithBody Update user profile
+	//
+	// Sets the display name, email or profile picture of a user. A field left out keeps its value; an empty string clears it. The clients show the new profile on their next map update. A user who logs in through OIDC gets the values from the provider again at the next login.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/user/{id} (the `UpdateUser` operationId).
+	UpdateUserWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateUser Update user profile
+	//
+	// Sets the display name, email or profile picture of a user. A field left out keeps its value; an empty string clears it. The clients show the new profile on their next map update. A user who logs in through OIDC gets the values from the provider again at the next login.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/user/{id} (the `UpdateUser` operationId).
+	UpdateUser(ctx context.Context, id string, body UpdateUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ApproveUserWithBody Approve user
 	//
@@ -3712,7 +3833,7 @@ func (c *Client) UpdateDNSRule(ctx context.Context, id string, body UpdateDNSRul
 
 // ListGroups List groups
 //
-// Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none.
+// Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none; the builtin "self" group is a rule destination meaning the machines owned by the same user as the source.
 //
 // Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -3809,7 +3930,7 @@ func (c *Client) GetGroup(ctx context.Context, id string, reqEditors ...RequestE
 
 // UpdateGroupWithBody Update group
 //
-// Renames or re-describes a group and replaces its machines and users when given. The builtin group cannot be changed.
+// Renames or re-describes a group and replaces its machines and users when given. The builtin groups cannot be changed.
 //
 // Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -3830,7 +3951,7 @@ func (c *Client) UpdateGroupWithBody(ctx context.Context, id string, contentType
 
 // UpdateGroup Update group
 //
-// Renames or re-describes a group and replaces its machines and users when given. The builtin group cannot be changed.
+// Renames or re-describes a group and replaces its machines and users when given. The builtin groups cannot be changed.
 //
 // Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -4780,6 +4901,86 @@ func (c *Client) SetTags(ctx context.Context, nodeId string, body SetTagsJSONReq
 	return c.Client.Do(req)
 }
 
+// ListOAuthClients List OAuth clients
+//
+// Every client that can mint v2 API tokens; revoked clients are gone.
+//
+// Requires the `oauth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/oauth-client (the `ListOAuthClients` operationId).
+func (c *Client) ListOAuthClients(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListOAuthClientsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateOAuthClientWithBody Create OAuth client
+//
+// The client secret is in this response only. Scopes may not exceed the caller's own.
+//
+// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/oauth-client (the `CreateOAuthClient` operationId).
+func (c *Client) CreateOAuthClientWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateOAuthClientRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateOAuthClient Create OAuth client
+//
+// The client secret is in this response only. Scopes may not exceed the caller's own.
+//
+// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/oauth-client (the `CreateOAuthClient` operationId).
+func (c *Client) CreateOAuthClient(ctx context.Context, body CreateOAuthClientJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateOAuthClientRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeOAuthClient Revoke OAuth client
+//
+// Deletes the client and every access token it issued.
+//
+// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v1/oauth-client/{clientId} (the `RevokeOAuthClient` operationId).
+func (c *Client) RevokeOAuthClient(ctx context.Context, clientId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeOAuthClientRequest(c.Server, clientId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetPolicy Get policy
 //
 // Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -5376,6 +5577,48 @@ func (c *Client) CreateUser(ctx context.Context, body CreateUserJSONRequestBody,
 // Corresponds with DELETE /api/v1/user/{id} (the `DeleteUser` operationId).
 func (c *Client) DeleteUser(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteUserRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateUserWithBody Update user profile
+//
+// Sets the display name, email or profile picture of a user. A field left out keeps its value; an empty string clears it. The clients show the new profile on their next map update. A user who logs in through OIDC gets the values from the provider again at the next login.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/user/{id} (the `UpdateUser` operationId).
+func (c *Client) UpdateUserWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateUserRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateUser Update user profile
+//
+// Sets the display name, email or profile picture of a user. A field left out keeps its value; an empty string clears it. The clients show the new profile on their next map update. A user who logs in through OIDC gets the values from the provider again at the next login.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/user/{id} (the `UpdateUser` operationId).
+func (c *Client) UpdateUser(ctx context.Context, id string, body UpdateUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateUserRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -8668,6 +8911,107 @@ func NewSetTagsRequestWithBody(server string, nodeId string, contentType string,
 	return req, nil
 }
 
+// NewListOAuthClientsRequest constructs an http.Request for the ListOAuthClients method
+func NewListOAuthClientsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/oauth-client")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateOAuthClientRequest calls the generic CreateOAuthClient builder with application/json body
+func NewCreateOAuthClientRequest(server string, body CreateOAuthClientJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateOAuthClientRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateOAuthClientRequestWithBody constructs an http.Request for the CreateOAuthClient method, with any body, and a specified content type
+func NewCreateOAuthClientRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/oauth-client")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRevokeOAuthClientRequest constructs an http.Request for the RevokeOAuthClient method
+func NewRevokeOAuthClientRequest(server string, clientId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "clientId", clientId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/oauth-client/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetPolicyRequest constructs an http.Request for the GetPolicy method
 func NewGetPolicyRequest(server string) (*http.Request, error) {
 	var err error
@@ -9568,6 +9912,53 @@ func NewDeleteUserRequest(server string, id string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewUpdateUserRequest calls the generic UpdateUser builder with application/json body
+func NewUpdateUserRequest(server string, id string, body UpdateUserJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateUserRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdateUserRequestWithBody constructs an http.Request for the UpdateUser method, with any body, and a specified content type
+func NewUpdateUserRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/user/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -10532,7 +10923,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListGroupsWithResponse List groups
 	//
-	// Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none.
+	// Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none; the builtin "self" group is a rule destination meaning the machines owned by the same user as the source.
 	//
 	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -10585,7 +10976,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateGroupWithBodyWithResponse Update group
 	//
-	// Renames or re-describes a group and replaces its machines and users when given. The builtin group cannot be changed.
+	// Renames or re-describes a group and replaces its machines and users when given. The builtin groups cannot be changed.
 	//
 	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -10596,7 +10987,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateGroupWithResponse Update group
 	//
-	// Renames or re-describes a group and replaces its machines and users when given. The builtin group cannot be changed.
+	// Renames or re-describes a group and replaces its machines and users when given. The builtin groups cannot be changed.
 	//
 	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -11088,6 +11479,50 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/node/{nodeId}/tags (the `SetTags` operationId).
 	SetTagsWithResponse(ctx context.Context, nodeId string, body SetTagsJSONRequestBody, reqEditors ...RequestEditorFn) (*SetTagsResponse, error)
 
+	// ListOAuthClientsWithResponse List OAuth clients
+	//
+	// Every client that can mint v2 API tokens; revoked clients are gone.
+	//
+	// Requires the `oauth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/oauth-client (the `ListOAuthClients` operationId).
+	ListOAuthClientsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOAuthClientsResponse, error)
+
+	// CreateOAuthClientWithBodyWithResponse Create OAuth client
+	//
+	// The client secret is in this response only. Scopes may not exceed the caller's own.
+	//
+	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/oauth-client (the `CreateOAuthClient` operationId).
+	CreateOAuthClientWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateOAuthClientResponse, error)
+
+	// CreateOAuthClientWithResponse Create OAuth client
+	//
+	// The client secret is in this response only. Scopes may not exceed the caller's own.
+	//
+	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/oauth-client (the `CreateOAuthClient` operationId).
+	CreateOAuthClientWithResponse(ctx context.Context, body CreateOAuthClientJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOAuthClientResponse, error)
+
+	// RevokeOAuthClientWithResponse Revoke OAuth client
+	//
+	// Deletes the client and every access token it issued.
+	//
+	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/oauth-client/{clientId} (the `RevokeOAuthClient` operationId).
+	RevokeOAuthClientWithResponse(ctx context.Context, clientId string, reqEditors ...RequestEditorFn) (*RevokeOAuthClientResponse, error)
+
 	// GetPolicyWithResponse Get policy
 	//
 	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -11401,6 +11836,28 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with DELETE /api/v1/user/{id} (the `DeleteUser` operationId).
 	DeleteUserWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteUserResponse, error)
+
+	// UpdateUserWithBodyWithResponse Update user profile
+	//
+	// Sets the display name, email or profile picture of a user. A field left out keeps its value; an empty string clears it. The clients show the new profile on their next map update. A user who logs in through OIDC gets the values from the provider again at the next login.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/user/{id} (the `UpdateUser` operationId).
+	UpdateUserWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateUserResponse, error)
+
+	// UpdateUserWithResponse Update user profile
+	//
+	// Sets the display name, email or profile picture of a user. A field left out keeps its value; an empty string clears it. The clients show the new profile on their next map update. A user who logs in through OIDC gets the values from the provider again at the next login.
+	//
+	// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/user/{id} (the `UpdateUser` operationId).
+	UpdateUserWithResponse(ctx context.Context, id string, body UpdateUserJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateUserResponse, error)
 
 	// ApproveUserWithBodyWithResponse Approve user
 	//
@@ -15036,6 +15493,150 @@ func (r SetTagsResponse) ContentType() string {
 	return ""
 }
 
+type ListOAuthClientsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListOAuthClientsOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListOAuthClientsResponse) GetJSON200() *ListOAuthClientsOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListOAuthClientsResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListOAuthClientsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListOAuthClientsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListOAuthClientsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListOAuthClientsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateOAuthClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CreateOAuthClientOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CreateOAuthClientResponse) GetJSON200() *CreateOAuthClientOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CreateOAuthClientResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateOAuthClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateOAuthClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateOAuthClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateOAuthClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RevokeOAuthClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RevokeOAuthClientOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RevokeOAuthClientResponse) GetJSON200() *RevokeOAuthClientOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r RevokeOAuthClientResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeOAuthClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeOAuthClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeOAuthClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeOAuthClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetPolicyResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -16127,6 +16728,54 @@ func (r DeleteUserResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r DeleteUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UserOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateUserResponse) GetJSON200() *UserOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateUserResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateUserResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateUserResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -17482,7 +18131,7 @@ func (c *ClientWithResponses) UpdateDNSRuleWithResponse(ctx context.Context, id 
 
 // ListGroupsWithResponse List groups
 //
-// Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none.
+// Every group with the IDs of its member machines and users. The builtin "all" group holds every machine and lists none; the builtin "self" group is a rule destination meaning the machines owned by the same user as the source.
 //
 // Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -17565,7 +18214,7 @@ func (c *ClientWithResponses) GetGroupWithResponse(ctx context.Context, id strin
 
 // UpdateGroupWithBodyWithResponse Update group
 //
-// Renames or re-describes a group and replaces its machines and users when given. The builtin group cannot be changed.
+// Renames or re-describes a group and replaces its machines and users when given. The builtin groups cannot be changed.
 //
 // Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -17582,7 +18231,7 @@ func (c *ClientWithResponses) UpdateGroupWithBodyWithResponse(ctx context.Contex
 
 // UpdateGroupWithResponse Update group
 //
-// Renames or re-describes a group and replaces its machines and users when given. The builtin group cannot be changed.
+// Renames or re-describes a group and replaces its machines and users when given. The builtin groups cannot be changed.
 //
 // Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -18374,6 +19023,74 @@ func (c *ClientWithResponses) SetTagsWithResponse(ctx context.Context, nodeId st
 	return ParseSetTagsResponse(rsp)
 }
 
+// ListOAuthClientsWithResponse List OAuth clients
+//
+// Every client that can mint v2 API tokens; revoked clients are gone.
+//
+// Requires the `oauth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/oauth-client (the `ListOAuthClients` operationId).
+func (c *ClientWithResponses) ListOAuthClientsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListOAuthClientsResponse, error) {
+	rsp, err := c.ListOAuthClients(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListOAuthClientsResponse(rsp)
+}
+
+// CreateOAuthClientWithBodyWithResponse Create OAuth client
+//
+// The client secret is in this response only. Scopes may not exceed the caller's own.
+//
+// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/oauth-client (the `CreateOAuthClient` operationId).
+func (c *ClientWithResponses) CreateOAuthClientWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateOAuthClientResponse, error) {
+	rsp, err := c.CreateOAuthClientWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateOAuthClientResponse(rsp)
+}
+
+// CreateOAuthClientWithResponse Create OAuth client
+//
+// The client secret is in this response only. Scopes may not exceed the caller's own.
+//
+// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/oauth-client (the `CreateOAuthClient` operationId).
+func (c *ClientWithResponses) CreateOAuthClientWithResponse(ctx context.Context, body CreateOAuthClientJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOAuthClientResponse, error) {
+	rsp, err := c.CreateOAuthClient(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateOAuthClientResponse(rsp)
+}
+
+// RevokeOAuthClientWithResponse Revoke OAuth client
+//
+// Deletes the client and every access token it issued.
+//
+// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/oauth-client/{clientId} (the `RevokeOAuthClient` operationId).
+func (c *ClientWithResponses) RevokeOAuthClientWithResponse(ctx context.Context, clientId string, reqEditors ...RequestEditorFn) (*RevokeOAuthClientResponse, error) {
+	rsp, err := c.RevokeOAuthClient(ctx, clientId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeOAuthClientResponse(rsp)
+}
+
 // GetPolicyWithResponse Get policy
 //
 // Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -18878,6 +19595,40 @@ func (c *ClientWithResponses) DeleteUserWithResponse(ctx context.Context, id str
 		return nil, err
 	}
 	return ParseDeleteUserResponse(rsp)
+}
+
+// UpdateUserWithBodyWithResponse Update user profile
+//
+// Sets the display name, email or profile picture of a user. A field left out keeps its value; an empty string clears it. The clients show the new profile on their next map update. A user who logs in through OIDC gets the values from the provider again at the next login.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/user/{id} (the `UpdateUser` operationId).
+func (c *ClientWithResponses) UpdateUserWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateUserResponse, error) {
+	rsp, err := c.UpdateUserWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateUserResponse(rsp)
+}
+
+// UpdateUserWithResponse Update user profile
+//
+// Sets the display name, email or profile picture of a user. A field left out keeps its value; an empty string clears it. The clients show the new profile on their next map update. A user who logs in through OIDC gets the values from the provider again at the next login.
+//
+// Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/user/{id} (the `UpdateUser` operationId).
+func (c *ClientWithResponses) UpdateUserWithResponse(ctx context.Context, id string, body UpdateUserJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateUserResponse, error) {
+	rsp, err := c.UpdateUser(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateUserResponse(rsp)
 }
 
 // ApproveUserWithBodyWithResponse Approve user
@@ -21544,6 +22295,105 @@ func ParseSetTagsResponse(rsp *http.Response) (*SetTagsResponse, error) {
 	return response, nil
 }
 
+// ParseListOAuthClientsResponse parses an HTTP response from a ListOAuthClientsWithResponse call
+func ParseListOAuthClientsResponse(rsp *http.Response) (*ListOAuthClientsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListOAuthClientsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListOAuthClientsOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateOAuthClientResponse parses an HTTP response from a CreateOAuthClientWithResponse call
+func ParseCreateOAuthClientResponse(rsp *http.Response) (*CreateOAuthClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateOAuthClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CreateOAuthClientOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRevokeOAuthClientResponse parses an HTTP response from a RevokeOAuthClientWithResponse call
+func ParseRevokeOAuthClientResponse(rsp *http.Response) (*RevokeOAuthClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeOAuthClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RevokeOAuthClientOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetPolicyResponse parses an HTTP response from a GetPolicyWithResponse call
 func ParseGetPolicyResponse(rsp *http.Response) (*GetPolicyResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -22279,6 +23129,39 @@ func ParseDeleteUserResponse(rsp *http.Response) (*DeleteUserResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest DeleteUserOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateUserResponse parses an HTTP response from a UpdateUserWithResponse call
+func ParseUpdateUserResponse(rsp *http.Response) (*UpdateUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UserOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
