@@ -40,7 +40,7 @@ export function Shell({
             <Brand />
           </Sidebar.Header>
           <Sidebar.Content>
-            <Sidebar.Group className="pb-2">
+            <Sidebar.Group className="pb-4">
               <Sidebar.Menu>
                 <Sidebar.MenuButton
                   icon={MagnifyingGlassIcon}
