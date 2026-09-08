@@ -34,6 +34,10 @@ const GroupBuiltinAll = "all"
 // GroupAllName is the name of the builtin group that holds every node.
 const GroupAllName = "All"
 
+// GroupSourceOIDC marks a group mirrored from the identity provider's
+// groups claim; see [AccessGroup.Source].
+const GroupSourceOIDC = "oidc"
+
 // GroupBuiltinSelf marks the group that, as a rule's destination, holds
 // the machines owned by the same user as the source. It is Tailscale's
 // autogroup:self: relational, so it has no members of its own, cannot be
@@ -65,8 +69,12 @@ type AccessGroup struct {
 	// Requestable lets members ask to join the group for a while; see
 	// [AccessRequest].
 	Requestable bool
-	NodeIDs     []NodeID
-	UserIDs     []UserID
+	// Source is [GroupSourceOIDC] for a group mirrored from the identity
+	// provider's groups claim: its user members follow the claim on every
+	// login and are not edited by hand. Empty for an operator-made group.
+	Source  string
+	NodeIDs []NodeID
+	UserIDs []UserID
 	// NodeExpiries and UserExpiries hold the end of the temporary
 	// memberships; a member absent from them is permanent.
 	NodeExpiries map[NodeID]time.Time
@@ -363,12 +371,15 @@ var (
 	ErrGroupNameInvalid = errors.New(
 		"group name may only contain letters, digits, spaces, dots, dashes and underscores",
 	)
-	ErrGroupNameTooLong   = errors.New("group name must be at most 64 characters")
-	ErrGroupBuiltin       = errors.New("builtin group cannot be changed")
-	ErrGroupInUse         = errors.New("group is used by an access rule")
-	ErrGroupNotFound      = errors.New("group not found")
-	ErrGroupNameTaken     = errors.New("group name already exists")
-	ErrGroupMemberExists  = errors.New("already a member of the group")
+	ErrGroupNameTooLong  = errors.New("group name must be at most 64 characters")
+	ErrGroupBuiltin      = errors.New("builtin group cannot be changed")
+	ErrGroupInUse        = errors.New("group is used by an access rule")
+	ErrGroupNotFound     = errors.New("group not found")
+	ErrGroupNameTaken    = errors.New("group name already exists")
+	ErrGroupMemberExists = errors.New("already a member of the group")
+	ErrGroupSyncedUsers  = errors.New(
+		"the users of a group synced from the identity provider follow its groups claim and cannot be edited",
+	)
 	ErrGroupMemberMissing = errors.New("not a member of the group")
 	ErrRuleNameEmpty      = errors.New("rule name must not be empty")
 	ErrRuleNameTooLong    = errors.New("rule name must be at most 64 characters")

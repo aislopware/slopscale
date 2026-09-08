@@ -504,6 +504,15 @@ unix_socket_permission: "0770"
 #   admin_users:
 #     - alice@example.com
 #
+#   # Mirror the groups claim into headscale groups on every sign-in: each
+#   # claimed group becomes a group of the same name with the user in it,
+#   # and the user leaves the synced groups the claim no longer lists. A
+#   # prefix limits the sync to the claims that carry it and is stripped
+#   # from the name. Operator-made groups are never taken over by name.
+#   groups:
+#     sync: false
+#     prefix: ""
+#
 #   # Optional: PKCE (Proof Key for Code Exchange) configuration
 #   # PKCE adds an additional layer of security to the OAuth 2.0 authorization code flow
 #   # by preventing authorization code interception attacks

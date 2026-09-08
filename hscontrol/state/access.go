@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -9,6 +10,7 @@ import (
 	hsdb "github.com/juanfont/headscale/hscontrol/db"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog/log"
 )
 
@@ -198,6 +200,11 @@ func (s *State) SetGroupMembers(
 		}
 	}
 
+	err = s.requireEditableGroupUsers(id, userIDs)
+	if err != nil {
+		return types.AccessGroup{}, change.Change{}, err
+	}
+
 	group, err := s.db.SetGroupMembers(id, nodeIDs, userIDs)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
@@ -258,7 +265,7 @@ func (s *State) RemoveGroupNode(id types.GroupID, nodeID types.NodeID) (types.Ac
 func (s *State) AddGroupUser(
 	id types.GroupID, userID types.UserID, expiresAt *time.Time,
 ) (types.AccessGroup, change.Change, error) {
-	err := s.requireEditableGroup(id)
+	err := s.requireEditableGroupUsers(id, nil)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
 	}
@@ -283,7 +290,7 @@ func (s *State) AddGroupUser(
 
 // RemoveGroupUser drops the user's membership.
 func (s *State) RemoveGroupUser(id types.GroupID, userID types.UserID) (types.AccessGroup, change.Change, error) {
-	err := s.requireEditableGroup(id)
+	err := s.requireEditableGroupUsers(id, nil)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
 	}
@@ -317,6 +324,69 @@ func (s *State) requireEditableGroup(id types.GroupID) error {
 	}
 
 	return nil
+}
+
+// requireEditableGroupUsers is [State.requireEditableGroup] plus the rule
+// that a group synced from the identity provider keeps the users its
+// claim gives it: a nil userIDs means the caller changes the users, and a
+// list is accepted only when it equals the current members.
+func (s *State) requireEditableGroupUsers(id types.GroupID, userIDs []types.UserID) error {
+	group, err := s.GetGroup(id)
+	if err != nil {
+		return err
+	}
+
+	if group.IsBuiltin() {
+		return types.ErrGroupBuiltin
+	}
+
+	if group.Source != types.GroupSourceOIDC {
+		return nil
+	}
+
+	if userIDs == nil || !sameUserSet(group.UserIDs, userIDs) {
+		return types.ErrGroupSyncedUsers
+	}
+
+	return nil
+}
+
+func sameUserSet(a, b []types.UserID) bool {
+	set := make(map[types.UserID]bool, len(a))
+	for _, id := range a {
+		set[id] = true
+	}
+
+	other := make(map[types.UserID]bool, len(b))
+	for _, id := range b {
+		other[id] = true
+	}
+
+	return maps.Equal(set, other)
+}
+
+// SyncUserGroups mirrors the identity provider's groups claim of one
+// user into the groups with [types.GroupSourceOIDC], creating the ones
+// that do not exist, and returns the change when a membership moved. A
+// claimed name held by an operator-made group is logged and left alone.
+func (s *State) SyncUserGroups(userID types.UserID, names []string) (change.Change, error) {
+	changed, skipped, err := s.db.SyncUserGroups(userID, names)
+	if err != nil {
+		return change.Change{}, err
+	}
+
+	if len(skipped) > 0 {
+		log.Warn().
+			Uint64(zf.UserID, uint64(userID)).
+			Strs("groups", skipped).
+			Msg("identity provider groups share a name with operator-made groups and were not synced")
+	}
+
+	if len(changed) == 0 {
+		return change.Change{}, nil
+	}
+
+	return s.loadAccessModel()
 }
 
 func (s *State) groupAfterChange(id types.GroupID) (types.AccessGroup, change.Change, error) {

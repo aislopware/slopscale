@@ -205,3 +205,38 @@ func (a *AuthProviderOIDC) isConfiguredAdmin(claims *types.OIDCClaims) bool {
 
 	return false
 }
+
+// syncConfiguredGroups mirrors the login's groups claim into headscale
+// groups when oidc.groups.sync is on. It runs on every login, so a person
+// added to or removed from a group at the identity provider gets or loses
+// the group's access the next time they sign in.
+func (a *AuthProviderOIDC) syncConfiguredGroups(user *types.User, claims *types.OIDCClaims) error {
+	if !a.cfg.Groups.Sync {
+		return nil
+	}
+
+	names := a.cfg.Groups.SyncedNames(claims.Groups)
+
+	c, err := a.h.state.SyncUserGroups(types.UserID(user.ID), names)
+	if err != nil {
+		return fmt.Errorf("syncing groups of %s: %w", user.Name, err)
+	}
+
+	if c.IsEmpty() {
+		return nil
+	}
+
+	a.h.Change(c)
+
+	audit.Record(a.h.state, &types.AuditEvent{
+		Action:     "group.sync",
+		TargetKind: "user",
+		TargetID:   strconv.FormatUint(uint64(user.ID), 10),
+		TargetName: user.Name,
+		Detail:     map[string]any{"groups": names, "source": "oidc.groups"},
+	})
+
+	log.Info().Str("user", user.Name).Strs("groups", names).Msg("groups synced from the identity provider")
+
+	return nil
+}

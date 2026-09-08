@@ -31,13 +31,16 @@ func init() {
 // every machine and lists none; the builtin "self" group is only a rule
 // destination and means the machines of the source's own user.
 type Group struct {
-	ID          string   `format:"uint64"                                                 json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Builtin     string   `doc:"Empty for operator-made groups, else \"all\" or \"self\"." json:"builtin"`
-	Requestable bool     `doc:"Whether members may ask to join the group for a while."    json:"requestable"`
-	NodeIDs     []string `json:"nodeIds"                                                  nullable:"false"`
-	UserIDs     []string `json:"userIds"                                                  nullable:"false"`
+	ID          string `format:"uint64"                                                 json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Builtin     string `doc:"Empty for operator-made groups, else \"all\" or \"self\"." json:"builtin"`
+	Requestable bool   `doc:"Whether members may ask to join the group for a while."    json:"requestable"`
+	// Source is "oidc" for a group mirrored from the identity provider's groups claim; its users
+	// follow the claim and cannot be edited.
+	Source  string   `doc:"Empty for operator-made groups, else \"oidc\"." json:"source"`
+	NodeIDs []string `json:"nodeIds"                                       nullable:"false"`
+	UserIDs []string `json:"userIds"                                       nullable:"false"`
 	// Expiries lists the temporary memberships; a member absent from it
 	// is permanent.
 	Expiries  []GroupMemberExpiry `json:"expiries"  nullable:"false"`
@@ -187,6 +190,7 @@ func groupFrom(g types.AccessGroup) Group {
 		Description: g.Description,
 		Builtin:     g.Builtin,
 		Requestable: g.Requestable,
+		Source:      g.Source,
 		NodeIDs:     make([]string, 0, len(g.NodeIDs)),
 		UserIDs:     make([]string, 0, len(g.UserIDs)),
 		Expiries:    []GroupMemberExpiry{},

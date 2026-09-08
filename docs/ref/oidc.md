@@ -143,6 +143,29 @@ are configured, a user needs to pass all of them.
         - "headscale_users"
     ```
 
+=== "Synced groups"
+
+    - With `groups.sync` on, every group in the user's `groups` claim becomes a headscale
+      [group](access-control.md#groups) of the same name with the user as a member, and the user leaves the synced
+      groups the claim no longer lists. The claim is read at every sign-in, so a change at the identity provider
+      takes effect the next time the person signs in, the way Tailscale's user and group provisioning does.
+    - `groups.prefix` limits the sync to the claims that start with it and strips it from the name, so `hs-eng`
+      becomes `eng` and a provider's other groups stay out.
+    - A synced group carries `source: oidc`; its users cannot be edited by hand, while machines can still be added
+      directly and the group can be renamed, described, used in rules and deleted. A group an operator made is never
+      taken over by name; a claim that collides with one is logged and skipped.
+
+    ```yaml hl_lines="5-8"
+    oidc:
+      issuer: "https://sso.example.com"
+      client_id: "headscale"
+      client_secret: "generated-secret"
+      scope: ["openid", "profile", "email", "groups"]
+      groups:
+        sync: true
+        prefix: "hs-"
+    ```
+
 ### Control email verification
 
 Headscale uses the `email` claim from the identity provider to synchronize the email address to its user profile. By

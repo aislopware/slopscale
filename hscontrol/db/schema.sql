@@ -207,6 +207,10 @@ CREATE TABLE groups(
   -- requestable lets members ask to join the group for a while; see
   -- access_requests.
   requestable numeric DEFAULT false,
+  -- source is "oidc" for a group mirrored from the identity provider's
+  -- groups claim (oidc.groups.sync): its user members follow the claim
+  -- on every login and cannot be edited by hand.
+  source text,
   created_at datetime,
   updated_at datetime
 );

@@ -274,6 +274,43 @@ type LetsEncryptConfig struct {
 	ChallengeType string
 }
 
+// OIDCGroupsConfig is oidc.groups: when Sync is on, every group in the
+// login's groups claim that starts with Prefix becomes a headscale group
+// of the same name (prefix stripped) with the user as a member, and the
+// user leaves the synced groups the claim no longer lists. Groups made by
+// an operator are never taken over by name.
+type OIDCGroupsConfig struct {
+	Sync   bool
+	Prefix string
+}
+
+// SyncedNames returns the group names to mirror for a login's groups
+// claim: those with the prefix, stripped, trimmed, valid as a group name
+// and deduplicated, in claim order.
+func (c OIDCGroupsConfig) SyncedNames(claimed []string) []string {
+	if !c.Sync {
+		return nil
+	}
+
+	var names []string
+
+	for _, claim := range claimed {
+		name, ok := strings.CutPrefix(claim, c.Prefix)
+		if !ok {
+			continue
+		}
+
+		name = strings.TrimSpace(name)
+		if ValidateGroupName(name) != nil || slices.Contains(names, name) {
+			continue
+		}
+
+		names = append(names, name)
+	}
+
+	return names
+}
+
 type PKCEConfig struct {
 	Enabled bool
 	Method  string
@@ -294,7 +331,10 @@ type OIDCConfig struct {
 	// every login, so a fresh deployment can name its administrators in
 	// configuration. The owner and users who already hold a higher role
 	// are left alone.
-	AdminUsers            []string
+	AdminUsers []string
+	// Groups mirrors the provider's groups claim into headscale groups on
+	// every login; see [OIDCGroupsConfig].
+	Groups                OIDCGroupsConfig
 	EmailVerifiedRequired bool
 	UseExpiryFromToken    bool
 	PKCE                  PKCEConfig
@@ -1395,15 +1435,19 @@ func oidcConfig() (OIDCConfig, error) {
 		OnlyStartIfOIDCIsAvailable: viper.GetBool(
 			"oidc.only_start_if_oidc_is_available",
 		),
-		Issuer:                viper.GetString("oidc.issuer"),
-		ClientID:              viper.GetString("oidc.client_id"),
-		ClientSecret:          clientSecret,
-		Scope:                 viper.GetStringSlice("oidc.scope"),
-		ExtraParams:           viper.GetStringMapString("oidc.extra_params"),
-		AllowedDomains:        viper.GetStringSlice("oidc.allowed_domains"),
-		AllowedUsers:          viper.GetStringSlice("oidc.allowed_users"),
-		AllowedGroups:         viper.GetStringSlice("oidc.allowed_groups"),
-		AdminUsers:            viper.GetStringSlice("oidc.admin_users"),
+		Issuer:         viper.GetString("oidc.issuer"),
+		ClientID:       viper.GetString("oidc.client_id"),
+		ClientSecret:   clientSecret,
+		Scope:          viper.GetStringSlice("oidc.scope"),
+		ExtraParams:    viper.GetStringMapString("oidc.extra_params"),
+		AllowedDomains: viper.GetStringSlice("oidc.allowed_domains"),
+		AllowedUsers:   viper.GetStringSlice("oidc.allowed_users"),
+		AllowedGroups:  viper.GetStringSlice("oidc.allowed_groups"),
+		AdminUsers:     viper.GetStringSlice("oidc.admin_users"),
+		Groups: OIDCGroupsConfig{
+			Sync:   viper.GetBool("oidc.groups.sync"),
+			Prefix: viper.GetString("oidc.groups.prefix"),
+		},
 		EmailVerifiedRequired: viper.GetBool("oidc.email_verified_required"),
 		UseExpiryFromToken:    viper.GetBool("oidc.use_expiry_from_token"),
 		PKCE: PKCEConfig{

@@ -249,6 +249,13 @@ func (a *AuthProviderOIDC) OIDCCallbackHandler(
 		return
 	}
 
+	err = a.syncConfiguredGroups(user, claims)
+	if err != nil {
+		httpUserError(writer, NewHTTPError(http.StatusInternalServerError, "could not sync groups", err))
+
+		return
+	}
+
 	// TODO(kradalby): Is this comment right?
 	// If the node exists, then the node should be reauthenticated,
 	// if the node does not exist, and the machine key exists, then

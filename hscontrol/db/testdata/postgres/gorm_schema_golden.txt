@@ -80,6 +80,7 @@ COL groups.builtin text null=YES
 COL groups.requestable boolean null=YES default=false
 COL groups.created_at timestamp with time zone null=YES
 COL groups.updated_at timestamp with time zone null=YES
+COL groups.source text null=YES
 COL log_streams.id bigint null=NO default=nextval('log_streams_id_seq'::regclass)
 COL log_streams.name text null=NO
 COL log_streams.destination text null=NO

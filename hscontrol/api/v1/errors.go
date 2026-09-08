@@ -56,6 +56,7 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrGroupNameInvalid),
 		errors.Is(err, types.ErrGroupNameTooLong),
 		errors.Is(err, types.ErrGroupBuiltin),
+		errors.Is(err, types.ErrGroupSyncedUsers),
 		errors.Is(err, types.ErrGroupSelfMembers),
 		errors.Is(err, types.ErrRuleBuiltin),
 		errors.Is(err, types.ErrRuleSelfSource),

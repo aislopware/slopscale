@@ -22,6 +22,7 @@ type (
 		Description string
 		Builtin     string
 		Requestable bool
+		Source      string
 		CreatedAt   *time.Time
 		UpdatedAt   *time.Time
 	}
@@ -117,6 +118,7 @@ func (r groupRow) group() types.AccessGroup {
 		Description: r.Description,
 		Builtin:     r.Builtin,
 		Requestable: r.Requestable,
+		Source:      r.Source,
 	}
 
 	if r.CreatedAt != nil {
@@ -383,6 +385,7 @@ func insertGroup(q Querier, group types.AccessGroup) (types.AccessGroup, error) 
 		Description: group.Description,
 		Builtin:     group.Builtin,
 		Requestable: group.Requestable,
+		Source:      group.Source,
 		CreatedAt:   &now,
 		UpdatedAt:   &now,
 	}
@@ -1019,4 +1022,124 @@ func isUniqueViolation(err error) bool {
 	}
 
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
+}
+
+// SyncUserGroups makes the user's identity provider groups exactly names:
+// a missing group is created with [types.GroupSourceOIDC] and the user
+// joins every listed group they are not in, while every other group with
+// that source drops them. A listed name held by an operator-made group is
+// left alone and reported, so the provider never takes over a group by
+// name. It returns the ids of the groups it changed.
+func (hsdb *HSDatabase) SyncUserGroups(userID types.UserID, names []string) ([]types.GroupID, []string, error) {
+	var (
+		changed []types.GroupID
+		skipped []string
+	)
+
+	err := hsdb.Write(func(tx *Tx) error {
+		var err error
+
+		changed, skipped, err = syncUserGroups(tx, userID, names)
+
+		return err
+	})
+
+	return changed, skipped, err
+}
+
+func syncUserGroups(q Querier, userID types.UserID, names []string) ([]types.GroupID, []string, error) {
+	var groups []groupRecord
+
+	err := q.executor().query(
+		jet.SELECT(table.Groups.AllColumns).FROM(table.Groups).ORDER_BY(table.Groups.ID.ASC()), &groups,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("loading groups: %w", err)
+	}
+
+	var memberships []groupUserRecord
+
+	err = q.executor().query(
+		jet.SELECT(table.GroupUsers.AllColumns).FROM(table.GroupUsers).
+			WHERE(table.GroupUsers.UserID.EQ(jet.Uint64(uint64(userID)))),
+		&memberships,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("loading groups of user %d: %w", userID, err)
+	}
+
+	member := make(map[types.GroupID]bool, len(memberships))
+	for _, m := range memberships {
+		member[types.GroupID(m.GroupUser.GroupID)] = true
+	}
+
+	byName := make(map[string]types.AccessGroup, len(groups))
+	for _, g := range groups {
+		byName[g.Group.Name] = g.Group.group()
+	}
+
+	var (
+		changed []types.GroupID
+		skipped []string
+		wanted  = make(map[types.GroupID]bool, len(names))
+	)
+
+	for _, name := range names {
+		group, exists := byName[name]
+
+		switch {
+		case exists && group.Source != types.GroupSourceOIDC:
+			skipped = append(skipped, name)
+
+			continue
+		case !exists:
+			group, err = insertGroup(q, types.AccessGroup{Name: name, Source: types.GroupSourceOIDC})
+			if err != nil {
+				return nil, nil, err
+			}
+
+			byName[name] = group
+		}
+
+		wanted[group.ID] = true
+
+		if member[group.ID] {
+			continue
+		}
+
+		err = AddGroupUser(q, group.ID, userID, nil)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		changed = append(changed, group.ID)
+	}
+
+	for _, g := range groups {
+		group := g.Group.group()
+		if group.Source != types.GroupSourceOIDC || wanted[group.ID] || !member[group.ID] {
+			continue
+		}
+
+		_, err = q.executor().exec(
+			table.GroupUsers.DELETE().WHERE(
+				table.GroupUsers.GroupID.EQ(jet.Uint64(uint64(group.ID))).
+					AND(table.GroupUsers.UserID.EQ(jet.Uint64(uint64(userID)))),
+			),
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("removing user %d from group %d: %w", userID, group.ID, err)
+		}
+
+		changed = append(changed, group.ID)
+	}
+
+	for _, id := range changed {
+		err = touchGroup(q, id)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return changed, skipped, nil
 }

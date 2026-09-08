@@ -143,7 +143,8 @@ CREATE TABLE groups(
   builtin text,
   requestable boolean DEFAULT false,
   created_at timestamptz,
-  updated_at timestamptz
+  updated_at timestamptz,
+  source text
 );
 CREATE UNIQUE INDEX idx_groups_name ON groups(name);
 

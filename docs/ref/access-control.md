@@ -27,6 +27,11 @@ members of its own, cannot be a source, cannot be in a bidirectional rule
 and cannot be given to a network, a DNS rule or a pre-auth key. Tagged
 machines have no user and are never reached through it.
 
+Groups can also come from the identity provider: with `oidc.groups.sync`
+on, a user's `groups` claim is mirrored into groups of the same name at every
+sign-in, and those groups show _Synced_ in the console. Their users follow
+the claim and cannot be edited by hand; see [OIDC](oidc.md#authorize-users-with-filters).
+
 Pre-auth keys carry groups too. A key created with `groupIds` enrols every
 machine it registers into those groups, the way a NetBird setup key does with
 its auto-groups. A group that has been deleted since is skipped.

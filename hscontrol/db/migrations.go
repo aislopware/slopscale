@@ -602,6 +602,15 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 				return nil
 			},
 		},
+		{
+			// Identity provider groups: a group mirrored from the OIDC
+			// groups claim carries its source. Existing groups are all
+			// operator-made.
+			id: "202609151100-group-source",
+			run: func(tx *Tx) error {
+				return tx.ex.addColumnIfMissing("groups", "source", typeText)
+			},
+		},
 	}
 }
 
