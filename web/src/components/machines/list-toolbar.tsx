@@ -52,7 +52,6 @@ export function MachinesToolbar({
       <SearchInput value={query} placeholder="Search machines" onValueChange={onQueryChange} />
       <Tabs
         variant="segmented"
-        size="sm"
         value={status}
         tabs={countedTabs(
           statusFilters.map((value) => ({ value, label: statusFilterLabels[value] })),
@@ -64,7 +63,6 @@ export function MachinesToolbar({
       />
       {users === undefined ? null : (
         <Select
-          size="sm"
           aria-label="Filter by user"
           className="w-40"
           value={user}

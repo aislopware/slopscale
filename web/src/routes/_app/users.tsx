@@ -133,7 +133,6 @@ function UsersPage(): ReactElement {
           />
           <Tabs
             variant="segmented"
-            size="sm"
             tabs={countedTabs(
               filterTabs,
               (value) => users.data.users.filter((user) => matchesFilter(user, value)).length,

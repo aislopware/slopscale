@@ -312,7 +312,6 @@ function KeyPanel({
         />
         <Tabs
           variant="segmented"
-          size="sm"
           tabs={[...statusTabs]}
           value={controls.status}
           onValueChange={controls.handleStatusChange}

@@ -101,7 +101,6 @@ function AuditPage(): ReactElement {
         actions={
           <Tabs
             variant="segmented"
-            size="sm"
             aria-label="Time range"
             tabs={rangeTabs}
             value={search.since}
@@ -132,7 +131,6 @@ function AuditPage(): ReactElement {
           />
           {users.data === undefined ? null : (
             <Select
-              size="sm"
               aria-label="Filter by user"
               className="w-44"
               value={search.actor}

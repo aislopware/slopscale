@@ -81,7 +81,6 @@ export function RequestsTab({
         />
         <Tabs
           variant="segmented"
-          size="sm"
           tabs={countedTabs(filterItems, (value) => (value === "pending" ? pending : rows.length))}
           value={filter}
           onValueChange={(value) => {
