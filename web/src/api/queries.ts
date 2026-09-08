@@ -37,6 +37,7 @@ export type AccessRequest = MethodResponse<
   "/api/v1/access-request"
 >["requests"][number];
 export type Dns = MethodResponse<typeof api, "get", "/api/v1/dns">;
+export type Derp = MethodResponse<typeof api, "get", "/api/v1/derp">;
 export type Network = MethodResponse<typeof api, "get", "/api/v1/network">["networks"][number];
 export type DnsRule = MethodResponse<typeof api, "get", "/api/v1/dns/rule">["rules"][number];
 export type Webhook = MethodResponse<typeof api, "get", "/api/v1/webhook">["webhooks"][number];
@@ -62,6 +63,7 @@ export type AccessRequestOptions = MethodResponse<
   "/api/v1/access-request/options"
 >;
 export const dnsQuery = api.queryOptions("get", "/api/v1/dns");
+export const derpQuery = api.queryOptions("get", "/api/v1/derp");
 export const dnsRulesQuery = api.queryOptions("get", "/api/v1/dns/rule");
 export const networksQuery = api.queryOptions("get", "/api/v1/network");
 export const webhooksQuery = api.queryOptions("get", "/api/v1/webhook");
@@ -220,6 +222,8 @@ type Collection =
   | "/api/v1/access-request"
   | "/api/v1/dns"
   | "/api/v1/dns/rule"
+  | "/api/v1/derp"
+  | "/api/v1/server"
   | "/api/v1/network"
   | "/api/v1/webhook"
   | "/api/v1/log-stream"

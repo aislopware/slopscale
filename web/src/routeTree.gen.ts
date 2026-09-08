@@ -19,6 +19,7 @@ import { Route as AppDnsRouteImport } from './routes/_app/dns'
 import { Route as AppKeysRouteImport } from './routes/_app/keys'
 import { Route as AppNetworksRouteImport } from './routes/_app/networks'
 import { Route as AppPolicyRouteImport } from './routes/_app/policy'
+import { Route as AppRelaysRouteImport } from './routes/_app/relays'
 import { Route as AppSessionsRouteImport } from './routes/_app/sessions'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppUsersRouteImport } from './routes/_app/users'
@@ -75,6 +76,11 @@ const AppPolicyRoute = AppPolicyRouteImport.update({
   path: '/policy',
   getParentRoute: () => AppRoute,
 } as any)
+const AppRelaysRoute = AppRelaysRouteImport.update({
+  id: '/relays',
+  path: '/relays',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSessionsRoute = AppSessionsRouteImport.update({
   id: '/sessions',
   path: '/sessions',
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/keys': typeof AppKeysRoute
   '/networks': typeof AppNetworksRoute
   '/policy': typeof AppPolicyRoute
+  '/relays': typeof AppRelaysRoute
   '/sessions': typeof AppSessionsRoute
   '/settings': typeof AppSettingsRoute
   '/users': typeof AppUsersRoute
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   '/keys': typeof AppKeysRoute
   '/networks': typeof AppNetworksRoute
   '/policy': typeof AppPolicyRoute
+  '/relays': typeof AppRelaysRoute
   '/sessions': typeof AppSessionsRoute
   '/settings': typeof AppSettingsRoute
   '/users': typeof AppUsersRoute
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/_app/keys': typeof AppKeysRoute
   '/_app/networks': typeof AppNetworksRoute
   '/_app/policy': typeof AppPolicyRoute
+  '/_app/relays': typeof AppRelaysRoute
   '/_app/sessions': typeof AppSessionsRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/users': typeof AppUsersRoute
@@ -171,6 +180,7 @@ export interface FileRouteTypes {
     | '/keys'
     | '/networks'
     | '/policy'
+    | '/relays'
     | '/sessions'
     | '/settings'
     | '/users'
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/keys'
     | '/networks'
     | '/policy'
+    | '/relays'
     | '/sessions'
     | '/settings'
     | '/users'
@@ -205,6 +216,7 @@ export interface FileRouteTypes {
     | '/_app/keys'
     | '/_app/networks'
     | '/_app/policy'
+    | '/_app/relays'
     | '/_app/sessions'
     | '/_app/settings'
     | '/_app/users'
@@ -291,6 +303,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPolicyRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/relays': {
+      id: '/_app/relays'
+      path: '/relays'
+      fullPath: '/relays'
+      preLoaderRoute: typeof AppRelaysRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/sessions': {
       id: '/_app/sessions'
       path: '/sessions'
@@ -344,6 +363,7 @@ interface AppRouteChildren {
   AppKeysRoute: typeof AppKeysRoute
   AppNetworksRoute: typeof AppNetworksRoute
   AppPolicyRoute: typeof AppPolicyRoute
+  AppRelaysRoute: typeof AppRelaysRoute
   AppSessionsRoute: typeof AppSessionsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppUsersRoute: typeof AppUsersRoute
@@ -361,6 +381,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppKeysRoute: AppKeysRoute,
   AppNetworksRoute: AppNetworksRoute,
   AppPolicyRoute: AppPolicyRoute,
+  AppRelaysRoute: AppRelaysRoute,
   AppSessionsRoute: AppSessionsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppUsersRoute: AppUsersRoute,

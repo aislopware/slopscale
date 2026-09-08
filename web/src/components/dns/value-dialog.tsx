@@ -3,7 +3,6 @@ import { useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
-import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { toast } from "~/components/ui/toast.ts";
@@ -22,14 +21,22 @@ export interface ValueDialogProps {
   /** Sends the value; resolves through the mutation the dialog watches. */
   readonly onSubmit: (value: string, done: () => void) => void;
   readonly successMessage: string;
-  readonly mutations: DnsMutations;
+  /** The request the dialog watches for its pending state and error. */
+  readonly mutation: PendingMutation;
+}
+
+/** What a dialog needs to know about the request it sends. */
+export interface PendingMutation {
+  readonly isPending: boolean;
+  readonly isError: boolean;
+  readonly error: unknown;
 }
 
 const trim = (value: string): string => value.trim();
 
 /**
- * A one-field dialog: nameserver, search domain. The form mounts with the dialog so it starts
- * empty.
+ * A one-field dialog: nameserver, search domain, map URL. The form mounts with the dialog so it
+ * starts empty.
  */
 export function ValueDialog(props: ValueDialogProps): ReactElement {
   return (
@@ -48,7 +55,7 @@ function ValueForm({
   normalize = trim,
   onSubmit,
   successMessage,
-  mutations,
+  mutation,
   onOpenChange,
 }: Omit<ValueDialogProps, "open" | "title" | "description">): ReactElement {
   const [value, setValue] = useState("");
@@ -86,10 +93,8 @@ function ValueForm({
         }}
         {...(touched && issue !== null ? { error: issue } : {})}
       />
-      <DialogError
-        message={mutations.set.isError ? errorMessage(mutations.set.error) : undefined}
-      />
-      <FormFooter label="Add" pending={mutations.set.isPending} disabled={clean === ""} />
+      <DialogError message={mutation.isError ? errorMessage(mutation.error) : undefined} />
+      <FormFooter label="Add" pending={mutation.isPending} disabled={clean === ""} />
     </form>
   );
 }

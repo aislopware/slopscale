@@ -1,4 +1,5 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
+import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import { api } from "~/api/client.ts";
@@ -105,23 +106,6 @@ function policyItems(info: ServerInfo): readonly Definition[] {
   ];
 }
 
-function DerpList({ info }: { readonly info: ServerInfo }): ReactElement {
-  if (info.derpRegions.length === 0) {
-    return <Muted>No DERP map, machines must connect directly</Muted>;
-  }
-
-  return (
-    <span className="flex flex-wrap justify-end gap-1">
-      {info.derpRegions.map((region) => (
-        <Badge key={region.id} variant={region.embedded ? "info" : "secondary"}>
-          {region.code === "" ? `Region ${region.id}` : region.code}
-          {region.embedded ? " · embedded" : ""}
-        </Badge>
-      ))}
-    </span>
-  );
-}
-
 /** The build, addresses and config file values of the running server. */
 export function ServerSection({ info }: { readonly info: ServerInfo }): ReactElement {
   const health = api.useQuery("get", "/api/v1/health");
@@ -130,8 +114,21 @@ export function ServerSection({ info }: { readonly info: ServerInfo }): ReactEle
     ...buildItems(info, reachable),
     ...networkItems(info),
     ...policyItems(info),
-    { label: "DERP relays", value: <DerpList info={info} /> },
-    ...(info.derpServer ? [{ label: "STUN", value: info.derpStun, copy: info.derpStun }] : []),
+    {
+      label: "DERP relays",
+      value: (
+        <span className="flex items-center gap-2">
+          <Link to="/relays" className="underline-offset-2 hover:underline">
+            {info.derpRegions === 0
+              ? "No regions"
+              : `${info.derpRegions} ${info.derpRegions === 1 ? "region" : "regions"}`}
+          </Link>
+          <Badge variant={info.derpServer ? "info" : "neutral"}>
+            {info.derpServer ? "Embedded relay running" : "Embedded relay off"}
+          </Badge>
+        </span>
+      ),
+    },
   ];
 
   return (

@@ -122,7 +122,7 @@ export function NameserversSection({
         placeholder="1.1.1.1"
         validate={nameserverError}
         successMessage="Nameserver added"
-        mutations={mutations}
+        mutation={mutations.set}
         onSubmit={(value, done) => {
           mutations.set.mutate({ body: withNameserver(settings, value) }, { onSuccess: done });
         }}

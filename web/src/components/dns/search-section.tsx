@@ -88,7 +88,7 @@ export function SearchDomainsSection({
         normalize={normalizeDomain}
         validate={domainError}
         successMessage="Search domain added"
-        mutations={mutations}
+        mutation={mutations.set}
         onSubmit={(value, done) => {
           mutations.set.mutate({ body: withSearchDomain(settings, value) }, { onSuccess: done });
         }}
