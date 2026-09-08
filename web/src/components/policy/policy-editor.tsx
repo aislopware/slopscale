@@ -1,11 +1,18 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { EditorView } from "@codemirror/view";
-import { FileCodeIcon } from "@phosphor-icons/react";
-import { useImperativeHandle, useRef } from "react";
-import type { ReactElement, Ref } from "react";
+import {
+  CheckCircleIcon,
+  FileCodeIcon,
+  WarningCircleIcon,
+  WarningIcon,
+} from "@phosphor-icons/react";
+import { useImperativeHandle, useMemo, useRef } from "react";
+import type { ReactElement, ReactNode, Ref } from "react";
 
+import { policyLanguage } from "~/components/policy/policy-language.ts";
 import { CodeEditor } from "~/components/ui/code-editor.tsx";
 import { Frame, FrameBand, FramePanel } from "~/components/ui/frame.tsx";
+import type { EditorProblem } from "~/lib/editor/problems.ts";
 
 const iconSize = 14;
 
@@ -70,7 +77,61 @@ export interface PolicyEditorProps {
   /** Shows the Discard action; the draft differs from the stored policy. */
   readonly dirty: boolean;
   readonly onDiscard: () => void;
+  /** What is wrong with the draft, from the linter and the server, shown in the gutter and here. */
+  readonly problems: readonly EditorProblem[];
+  /** The draft is with the server for its quiet check. */
+  readonly verifying: boolean;
+  /** The users of the tailnet as the policy names them, offered where a user fits. */
+  readonly users: readonly string[];
   readonly ref?: Ref<PolicyEditorHandle>;
+}
+
+function count(number: number, noun: string): string {
+  return `${number} ${noun}${number === 1 ? "" : "s"}`;
+}
+
+/** The state of the draft in a few words: what is wrong, or that nothing is. */
+function ProblemsSummary({
+  problems,
+  verifying,
+  empty,
+}: {
+  readonly problems: readonly EditorProblem[];
+  readonly verifying: boolean;
+  readonly empty: boolean;
+}): ReactNode {
+  const errors = problems.filter((problem) => problem.severity === "error").length;
+  const warnings = problems.filter((problem) => problem.severity === "warning").length;
+
+  if (errors > 0) {
+    return (
+      <span className="flex items-center gap-1 text-kumo-danger">
+        <WarningCircleIcon size={iconSize} weight="fill" aria-hidden />
+        {count(errors, "error")}
+        {warnings > 0 ? `, ${count(warnings, "warning")}` : null}
+      </span>
+    );
+  }
+
+  if (warnings > 0) {
+    return (
+      <span className="flex items-center gap-1 text-kumo-warning">
+        <WarningIcon size={iconSize} weight="fill" aria-hidden />
+        {count(warnings, "warning")}
+      </span>
+    );
+  }
+
+  if (verifying) {
+    return <span>Checking…</span>;
+  }
+
+  return empty ? null : (
+    <span className="flex items-center gap-1">
+      <CheckCircleIcon size={iconSize} weight="fill" className="text-kumo-success" aria-hidden />
+      No problems
+    </span>
+  );
 }
 
 /**
@@ -83,10 +144,16 @@ export function PolicyEditor({
   readOnly,
   dirty,
   onDiscard,
+  problems,
+  verifying,
+  users,
   ref,
 }: PolicyEditorProps): ReactElement {
   const lines = lineCount(value);
   const host = useRef<HTMLDivElement>(null);
+  // The users are read once, when the editor is created; a list that arrives later is missed, so
+  // the editor waits for the query before it mounts (the page does this by rendering it after).
+  const extensions = useMemo(() => policyLanguage(users), [users]);
 
   useImperativeHandle(ref, () => ({
     reveal: (text: string): void => {
@@ -110,6 +177,8 @@ export function PolicyEditor({
               <span>Read only</span>
             </>
           ) : null}
+          <span aria-hidden>·</span>
+          <ProblemsSummary problems={problems} verifying={verifying} empty={value.trim() === ""} />
         </div>
         {dirty ? (
           <Button variant="ghost" size="xs" onClick={onDiscard}>
@@ -124,6 +193,8 @@ export function PolicyEditor({
             onChange={onChange}
             readOnly={readOnly}
             placeholder={readOnly ? "" : starterSnippet}
+            extensions={extensions}
+            problems={problems}
             aria-label="Tailnet policy"
           />
         </div>

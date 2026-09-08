@@ -1,5 +1,6 @@
 import type { Dns } from "~/api/queries.ts";
 import type { DnsRecord, DnsSettings } from "~/api/schema.gen.ts";
+import { isIp, isIpv4, isIpv6 } from "~/lib/ip.ts";
 
 export type RecordType = DnsRecord["type"];
 
@@ -76,43 +77,9 @@ export function cloneSettings(settings: DnsSettings): DnsSettings {
   };
 }
 
-const octet = /^\d{1,3}$/v;
-const hexGroup = /^[0-9a-f]{1,4}$/iv;
-const maxIpv6Groups = 8;
-const maxOctet = 255;
 const maxPort = 65_535;
 const label = /^[a-z0-9_](?:[a-z0-9_\-]{0,61}[a-z0-9_])?$/v;
 const maxDomainLength = 253;
-const ipv4Parts = 4;
-
-export function isIpv4(value: string): boolean {
-  const parts = value.split(".");
-
-  return (
-    parts.length === ipv4Parts &&
-    parts.every((part) => octet.test(part) && Number(part) <= maxOctet)
-  );
-}
-
-export function isIpv6(value: string): boolean {
-  const halves = value.split("::");
-
-  if (halves.length > 2 || !value.includes(":")) {
-    return false;
-  }
-
-  const groups = halves.flatMap((half) => (half === "" ? [] : half.split(":")));
-
-  if (!groups.every((group) => hexGroup.test(group))) {
-    return false;
-  }
-
-  return halves.length === 2 ? groups.length < maxIpv6Groups : groups.length === maxIpv6Groups;
-}
-
-export function isIp(value: string): boolean {
-  return isIpv4(value) || isIpv6(value);
-}
 
 function isPort(value: string): boolean {
   const port = Number(value);

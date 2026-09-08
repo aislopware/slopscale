@@ -45,8 +45,8 @@ jobs:
         if: steps.changed-files.outputs.files == 'true'
         run: |
           make web-generate
-          if ! git diff --exit-code -- gen/openapi web/src/api; then
-            echo "❌ Console API types are not up to date; run 'make web-generate' and commit."
+          if ! git diff --exit-code -- gen/openapi web/src/api web/src/lib/hujson; then
+            echo "❌ Console API types or the HuJSON parser are not up to date; run 'make web-generate' and commit."
             exit 1
           fi
 

@@ -98,6 +98,7 @@ export function PolicyFileTab({
   canEdit,
   hasRules,
   enforces,
+  users,
 }: {
   readonly policy: Policy;
   readonly canEdit: boolean;
@@ -105,6 +106,8 @@ export function PolicyFileTab({
   readonly hasRules: boolean;
   /** Whether the stored file has acls or grants; an empty or tags-only file does not. */
   readonly enforces: boolean;
+  /** The users of the tailnet as the policy names them; empty when the caller may not list them. */
+  readonly users: readonly string[];
 }): ReactElement {
   const draft = usePolicyDraft({ policy, canEdit });
   const unset = policy.policy === "";
@@ -172,6 +175,9 @@ export function PolicyFileTab({
           }}
           readOnly={!canEdit}
           dirty={draft.dirty}
+          problems={draft.problems}
+          verifying={draft.verifying}
+          users={users}
           onDiscard={() => {
             draft.discard();
           }}

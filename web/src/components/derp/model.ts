@@ -7,7 +7,7 @@ import type {
   DerpSettings,
   SetDerpRequestBody,
 } from "~/api/schema.gen.ts";
-import { isIpv4, isIpv6 } from "~/components/dns/model.ts";
+import { isIpv4, isIpv6 } from "~/lib/ip.ts";
 
 /** Where a region of the map came from, as the server reports it. */
 export type RegionSource = Derp["regions"][number]["source"];

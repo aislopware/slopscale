@@ -1,5 +1,5 @@
 import type { Network, Node } from "~/api/queries.ts";
-import { isIpv4, isIpv6 } from "~/components/dns/model.ts";
+import { isIpv4, isIpv6 } from "~/lib/ip.ts";
 import { exitRoutes, isExitRoute, nodeName } from "~/lib/node.ts";
 
 const maxIpv4Bits = 32;

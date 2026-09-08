@@ -1,11 +1,14 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "~/api/client.ts";
 import { errorMessage } from "~/api/error.ts";
 import { invalidate } from "~/api/queries.ts";
 import type { Policy } from "~/api/queries.ts";
+import { lintPolicy } from "~/components/policy/lint.ts";
+import { serverProblems } from "~/components/policy/server-problems.ts";
 import { toast } from "~/components/ui/toast.ts";
+import type { EditorProblem } from "~/lib/editor/problems.ts";
 
 export interface PolicyIssue {
   readonly title: string;
@@ -36,12 +39,19 @@ export const starterPolicy = `{
 }
 `;
 
+/** How long typing pauses before the draft goes to the server for the checks only it can do. */
+const verifyDelayMs = 800;
+
 export interface PolicyDraft {
   readonly text: string;
   readonly setText: (next: string) => void;
   /** The draft differs from the stored policy, so Save and the leave guard are live. */
   readonly dirty: boolean;
   readonly issue: PolicyIssue | null;
+  /** Everything wrong with the draft: what the linter sees as it is typed, plus the server's word. */
+  readonly problems: readonly EditorProblem[];
+  /** The draft is on its way to the server for the quiet check. */
+  readonly verifying: boolean;
   readonly checking: boolean;
   readonly saving: boolean;
   readonly check: () => void;
@@ -54,9 +64,23 @@ function isSaveShortcut(event: KeyboardEvent): boolean {
   return event.key.toLowerCase() === "s" && (event.metaKey || event.ctrlKey);
 }
 
+/** What the server said about a draft, kept with the draft it was about. */
+interface Verdict {
+  readonly text: string;
+  readonly problems: readonly EditorProblem[];
+}
+
+const noProblems: readonly EditorProblem[] = [];
+
+function noCleanup(): void {
+  // Nothing was started, so there is nothing to stop.
+}
+
 /**
  * The draft of the HuJSON policy, with the check and save calls that act on it. The server copy
- * stays the reference the "Unsaved changes" state and the leave guard compare against.
+ * stays the reference the "Unsaved changes" state and the leave guard compare against. The linter
+ * runs on every change; once it is satisfied and typing pauses, the draft goes to the server
+ * quietly, for the checks that need the tailnet: users that exist, tags in use.
  */
 export function usePolicyDraft({
   policy,
@@ -68,7 +92,10 @@ export function usePolicyDraft({
   const queryClient = useQueryClient();
   const [text, setText] = useState(policy.policy);
   const [issue, setIssue] = useState<PolicyIssue | null>(null);
+  const [verdict, setVerdict] = useState<Verdict | null>(null);
   const dirty = text !== policy.policy;
+  const lint = useMemo(() => lintPolicy(text), [text]);
+  const clean = lint.problems.every((problem) => problem.severity !== "error");
 
   const check = api.useMutation("post", "/api/v1/policy/check", {
     onSuccess: () => {
@@ -79,6 +106,38 @@ export function usePolicyDraft({
       setIssue({ title: "Policy is not valid", message: errorMessage(error) });
     },
   });
+
+  const verify = api.useMutation("post", "/api/v1/policy/check");
+  const { mutate: sendForVerdict } = verify;
+
+  useEffect(() => {
+    if (!clean || text.trim() === "") {
+      return noCleanup;
+    }
+
+    const timer = setTimeout(() => {
+      sendForVerdict(
+        { body: { policy: text } },
+        {
+          onSuccess: () => {
+            setVerdict({ text, problems: noProblems });
+          },
+          onError: (error) => {
+            setVerdict({ text, problems: serverProblems(text, errorMessage(error)) });
+          },
+        },
+      );
+    }, verifyDelayMs);
+
+    return (): void => {
+      clearTimeout(timer);
+    };
+  }, [text, clean, sendForVerdict]);
+
+  const problems = useMemo(
+    () => [...lint.problems, ...(verdict?.text === text ? verdict.problems : noProblems)],
+    [lint, verdict, text],
+  );
 
   const save = api.useMutation("put", "/api/v1/policy", {
     onSuccess: async (saved) => {
@@ -124,6 +183,8 @@ export function usePolicyDraft({
     setText,
     dirty,
     issue,
+    problems,
+    verifying: verify.isPending,
     checking: check.isPending,
     saving: save.isPending,
     check: () => {
