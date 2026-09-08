@@ -9,21 +9,23 @@ import { errorMessage } from "~/api/error.ts";
 import { invalidate } from "~/api/queries.ts";
 import { SettingRow } from "~/components/settings/setting-row.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
-import { Section } from "~/components/ui/section.tsx";
+import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 /** Server-side repairs an operator runs on purpose, each behind a confirmation. */
 export function MaintenanceSection({ canRun }: { readonly canRun: boolean }): ReactElement {
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
+  const [changes, setChanges] = useState<readonly string[] | null>(null);
   const backfill = api.useMutation("post", "/api/v1/node/backfillips", {
     onSuccess: async (data) => {
       await invalidate(queryClient, "/api/v1/node");
       setConfirming(false);
+      setChanges(data.changes);
       toast.success(
         data.changes.length === 0
-          ? "Every machine already has its addresses"
-          : `Assigned addresses to ${data.changes.length === 1 ? "1 machine" : `${data.changes.length} machines`}`,
+          ? "Nothing to change"
+          : `Backfill made ${changeCount(data.changes)}`,
       );
     },
   });
@@ -36,7 +38,7 @@ export function MaintenanceSection({ canRun }: { readonly canRun: boolean }): Re
     >
       <SettingRow
         title="Backfill IP addresses"
-        description="Gives an IPv4 or IPv6 address to every machine missing one, for example after enabling a second address family in the server config."
+        description="Aligns every machine with the address families in the server config: a machine missing an IPv4 or IPv6 address gets one, and an address in a family no longer configured is removed."
         control={
           <Button
             variant="secondary"
@@ -50,11 +52,12 @@ export function MaintenanceSection({ canRun }: { readonly canRun: boolean }): Re
           </Button>
         }
       />
+      {changes === null ? null : <BackfillResult changes={changes} />}
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
         title="Backfill IP addresses?"
-        description="Every machine without an address in a configured family gets one now. Existing addresses are kept."
+        description="Every machine missing an address in a configured family gets one, and addresses in a family that is no longer configured are removed. Each change is listed afterwards."
         confirmLabel="Backfill"
         loading={backfill.isPending}
         error={backfill.isError ? errorMessage(backfill.error) : undefined}
@@ -63,5 +66,29 @@ export function MaintenanceSection({ canRun }: { readonly canRun: boolean }): Re
         }}
       />
     </Section>
+  );
+}
+
+function changeCount(changes: readonly string[]): string {
+  return changes.length === 1 ? "1 change" : `${changes.length} changes`;
+}
+
+/** What the last run did, one line per address as the server reported it. */
+function BackfillResult({ changes }: { readonly changes: readonly string[] }): ReactElement {
+  return (
+    <SectionRow className="flex flex-col gap-2">
+      <span className="text-kumo-subtle">
+        {changes.length === 0
+          ? "Last run: every machine already matched the configured address families."
+          : `Last run: ${changeCount(changes)}.`}
+      </span>
+      {changes.length === 0 ? null : (
+        <ul className="flex flex-col gap-1 font-mono text-xs text-kumo-default">
+          {changes.map((change) => (
+            <li key={change}>{change}</li>
+          ))}
+        </ul>
+      )}
+    </SectionRow>
   );
 }

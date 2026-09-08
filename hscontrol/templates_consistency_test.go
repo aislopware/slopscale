@@ -40,8 +40,6 @@ func TestTemplateHTMLConsistency(t *testing.T) {
 				"Machine registration",
 				"Run the command below in the headscale server to add this machine to your network:",
 				"headscale auth register --auth-id test-key-123 --user USERNAME",
-				"",
-				"",
 			).Render(),
 		},
 		{
@@ -50,8 +48,6 @@ func TestTemplateHTMLConsistency(t *testing.T) {
 				"Authentication check",
 				"Run the command below in the headscale server to approve this authentication request:",
 				"headscale auth approve --auth-id test-key-123",
-				"",
-				"",
 			).Render(),
 		},
 		{
@@ -130,8 +126,6 @@ func TestTemplateModernHTMLFeatures(t *testing.T) {
 				"Machine registration",
 				"Run the command below in the headscale server to add this machine to your network:",
 				"headscale auth register --auth-id test-key-123 --user USERNAME",
-				"",
-				"",
 			).Render(),
 		},
 		{
@@ -140,8 +134,6 @@ func TestTemplateModernHTMLFeatures(t *testing.T) {
 				"Authentication check",
 				"Run the command below in the headscale server to approve this authentication request:",
 				"headscale auth approve --auth-id test-key-123",
-				"",
-				"",
 			).Render(),
 		},
 		{
@@ -213,8 +205,6 @@ func TestTemplateExternalLinkSecurity(t *testing.T) {
 				"Machine registration",
 				"Run the command below in the headscale server to add this machine to your network:",
 				"headscale auth register --auth-id test-key-123 --user USERNAME",
-				"",
-				"",
 			).Render(),
 			externalURLs: []string{}, // No external links
 		},
@@ -224,8 +214,6 @@ func TestTemplateExternalLinkSecurity(t *testing.T) {
 				"Authentication check",
 				"Run the command below in the headscale server to approve this authentication request:",
 				"headscale auth approve --auth-id test-key-123",
-				"",
-				"",
 			).Render(),
 			externalURLs: []string{}, // No external links
 		},
@@ -313,8 +301,6 @@ func TestTemplateAccessibilityAttributes(t *testing.T) {
 				"Machine registration",
 				"Run the command below in the headscale server to add this machine to your network:",
 				"headscale auth register --auth-id test-key-123 --user USERNAME",
-				"",
-				"",
 			).Render(),
 		},
 		{
@@ -323,8 +309,6 @@ func TestTemplateAccessibilityAttributes(t *testing.T) {
 				"Authentication check",
 				"Run the command below in the headscale server to approve this authentication request:",
 				"headscale auth approve --auth-id test-key-123",
-				"",
-				"",
 			).Render(),
 		},
 		{

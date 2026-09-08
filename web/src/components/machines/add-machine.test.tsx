@@ -1,10 +1,4 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  createMemoryHistory,
-  createRootRoute,
-  createRouter,
-  RouterProvider,
-} from "@tanstack/react-router";
 import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
@@ -23,18 +17,11 @@ const operator: Me = {
   permissions: { auth_keys: true, "devices:core": true },
 };
 
-/** The dialog links to the register page, so it needs a router around it. */
-function routed(element: ReactElement): ReactElement {
+/** The dialog loads users and groups when allowed, so it needs a query client around it. */
+function queried(element: ReactElement): ReactElement {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const rootRoute = createRootRoute({
-    component: () => <QueryClientProvider client={client}>{element}</QueryClientProvider>,
-  });
-  const router = createRouter({
-    routeTree: rootRoute,
-    history: createMemoryHistory({ initialEntries: ["/"] }),
-  });
 
-  return <RouterProvider router={router} />;
+  return <QueryClientProvider client={client}>{element}</QueryClientProvider>;
 }
 
 describe(connectCommand, () => {
@@ -48,7 +35,7 @@ describe(connectCommand, () => {
 describe(CreatePreAuthKeyDialog, () => {
   it("is titled for the machine, not the key, when adding a machine", async () => {
     const screen = await render(
-      routed(
+      queried(
         <CreatePreAuthKeyDialog
           me={operator}
           intent="add-machine"
@@ -61,14 +48,11 @@ describe(CreatePreAuthKeyDialog, () => {
     );
 
     await expect.element(screen.getByRole("dialog", { name: "Add machine" })).toBeVisible();
-    await expect
-      .element(screen.getByRole("link", { name: "Register it with that key" }))
-      .toBeVisible();
   });
 
   it("keeps the key wording for the keys page", async () => {
     const screen = await render(
-      routed(
+      queried(
         <CreatePreAuthKeyDialog
           me={operator}
           open
@@ -80,9 +64,6 @@ describe(CreatePreAuthKeyDialog, () => {
     );
 
     await expect.element(screen.getByRole("dialog", { name: "Create pre-auth key" })).toBeVisible();
-    await expect
-      .element(screen.getByRole("link", { name: "Register it with that key" }))
-      .not.toBeInTheDocument();
   });
 });
 

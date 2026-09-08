@@ -49,9 +49,7 @@ headscale users create <USER>
     ```
 
     Usually, a browser window with further instructions is opened. This page explains how to complete the registration
-    on your Headscale server and it also prints the Auth ID required to approve the node. When the binary carries the
-    [admin console](console.md), the page links to its _Register a machine_ form with the Auth ID filled in; otherwise
-    run:
+    on your Headscale server and it also prints the Auth ID required to approve the node:
 
     ```console
     headscale auth register --user <USER> --auth-id <AUTH_ID>

@@ -99,13 +99,6 @@ account menu with *Sign out*.
   Linux, macOS, Windows and Docker, next to a QR code carrying the same line
   so a phone or a machine without a shared clipboard can pick it up; the
   iOS and Android tab gives the server address and where the app takes it.
-  _Register a machine_ (`/admin/machines/register`) completes an interactive
-  login instead: a machine that signed in without a key or an identity
-  provider shows a registration key, and the server's registration page links
-  here with it filled in; see [Registration](registration.md).
-  _Authentication check_ (`/admin/machines/auth-check`) approves or rejects an
-  SSH session held by a check-mode rule, linked from the page the SSH client
-  opens.
 - **Users**: create, rename, approve, change the [role](roles.md) and delete
   users.
 - **Keys**: pre-auth keys (create with reusable, ephemeral, pre-authorized and

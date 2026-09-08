@@ -25,8 +25,6 @@ import { Route as AppUsersRouteImport } from './routes/_app/users'
 import { Route as AppWebhooksRouteImport } from './routes/_app/webhooks'
 import { Route as AppMachinesIndexRouteImport } from './routes/_app/machines/index'
 import { Route as AppMachinesNodeIdRouteImport } from './routes/_app/machines/$nodeId'
-import { Route as AppMachinesAuthCheckRouteImport } from './routes/_app/machines/auth-check'
-import { Route as AppMachinesRegisterRouteImport } from './routes/_app/machines/register'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -107,16 +105,6 @@ const AppMachinesNodeIdRoute = AppMachinesNodeIdRouteImport.update({
   path: '/machines/$nodeId',
   getParentRoute: () => AppRoute,
 } as any)
-const AppMachinesAuthCheckRoute = AppMachinesAuthCheckRouteImport.update({
-  id: '/machines/auth-check',
-  path: '/machines/auth-check',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppMachinesRegisterRoute = AppMachinesRegisterRouteImport.update({
-  id: '/machines/register',
-  path: '/machines/register',
-  getParentRoute: () => AppRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -133,8 +121,6 @@ export interface FileRoutesByFullPath {
   '/users': typeof AppUsersRoute
   '/webhooks': typeof AppWebhooksRoute
   '/machines/$nodeId': typeof AppMachinesNodeIdRoute
-  '/machines/auth-check': typeof AppMachinesAuthCheckRoute
-  '/machines/register': typeof AppMachinesRegisterRoute
   '/machines/': typeof AppMachinesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -152,8 +138,6 @@ export interface FileRoutesByTo {
   '/webhooks': typeof AppWebhooksRoute
   '/': typeof AppIndexRoute
   '/machines/$nodeId': typeof AppMachinesNodeIdRoute
-  '/machines/auth-check': typeof AppMachinesAuthCheckRoute
-  '/machines/register': typeof AppMachinesRegisterRoute
   '/machines': typeof AppMachinesIndexRoute
 }
 export interface FileRoutesById {
@@ -173,8 +157,6 @@ export interface FileRoutesById {
   '/_app/webhooks': typeof AppWebhooksRoute
   '/_app/': typeof AppIndexRoute
   '/_app/machines/$nodeId': typeof AppMachinesNodeIdRoute
-  '/_app/machines/auth-check': typeof AppMachinesAuthCheckRoute
-  '/_app/machines/register': typeof AppMachinesRegisterRoute
   '/_app/machines/': typeof AppMachinesIndexRoute
 }
 export interface FileRouteTypes {
@@ -194,8 +176,6 @@ export interface FileRouteTypes {
     | '/users'
     | '/webhooks'
     | '/machines/$nodeId'
-    | '/machines/auth-check'
-    | '/machines/register'
     | '/machines/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -213,8 +193,6 @@ export interface FileRouteTypes {
     | '/webhooks'
     | '/'
     | '/machines/$nodeId'
-    | '/machines/auth-check'
-    | '/machines/register'
     | '/machines'
   id:
     | '__root__'
@@ -233,8 +211,6 @@ export interface FileRouteTypes {
     | '/_app/webhooks'
     | '/_app/'
     | '/_app/machines/$nodeId'
-    | '/_app/machines/auth-check'
-    | '/_app/machines/register'
     | '/_app/machines/'
   fileRoutesById: FileRoutesById
 }
@@ -357,20 +333,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMachinesNodeIdRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/machines/auth-check': {
-      id: '/_app/machines/auth-check'
-      path: '/machines/auth-check'
-      fullPath: '/machines/auth-check'
-      preLoaderRoute: typeof AppMachinesAuthCheckRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/machines/register': {
-      id: '/_app/machines/register'
-      path: '/machines/register'
-      fullPath: '/machines/register'
-      preLoaderRoute: typeof AppMachinesRegisterRouteImport
-      parentRoute: typeof AppRoute
-    }
   }
 }
 
@@ -388,8 +350,6 @@ interface AppRouteChildren {
   AppWebhooksRoute: typeof AppWebhooksRoute
   AppIndexRoute: typeof AppIndexRoute
   AppMachinesNodeIdRoute: typeof AppMachinesNodeIdRoute
-  AppMachinesAuthCheckRoute: typeof AppMachinesAuthCheckRoute
-  AppMachinesRegisterRoute: typeof AppMachinesRegisterRoute
   AppMachinesIndexRoute: typeof AppMachinesIndexRoute
 }
 
@@ -407,8 +367,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppWebhooksRoute: AppWebhooksRoute,
   AppIndexRoute: AppIndexRoute,
   AppMachinesNodeIdRoute: AppMachinesNodeIdRoute,
-  AppMachinesAuthCheckRoute: AppMachinesAuthCheckRoute,
-  AppMachinesRegisterRoute: AppMachinesRegisterRoute,
   AppMachinesIndexRoute: AppMachinesIndexRoute,
 }
 

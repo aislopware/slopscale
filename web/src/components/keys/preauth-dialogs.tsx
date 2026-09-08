@@ -3,7 +3,6 @@ import { Input, InputArea } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import type { ReactElement, ReactNode, SubmitEvent } from "react";
 
@@ -100,10 +99,7 @@ export function CreatePreAuthKeyDialog({
         description={created === null ? descriptions[intent] : undefined}
       >
         {created === null ? (
-          <>
-            {intent === "add-machine" && can(me, "devices:core") ? <RegisterHint /> : null}
-            <CreatePreAuthKeyForm me={me} onCreated={setCreated} />
-          </>
+          <CreatePreAuthKeyForm me={me} onCreated={setCreated} />
         ) : (
           <CreatedKey
             value={created}
@@ -275,19 +271,6 @@ function PreAuthKeyFields({
         />
       )}
     </>
-  );
-}
-
-/** The other way in: a machine that already signed in interactively is waiting with a key. */
-function RegisterHint(): ReactElement {
-  return (
-    <p className="text-sm text-kumo-subtle">
-      Machine already signed in and showing a registration key?{" "}
-      <Link to="/machines/register" search={{ key: "" }} className="text-kumo-link hover:underline">
-        Register it with that key
-      </Link>
-      .
-    </p>
   );
 }
 

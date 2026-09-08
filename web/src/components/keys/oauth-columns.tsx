@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { OAuthClient, User } from "~/api/queries.ts";
+import { can } from "~/auth/me.ts";
 import { emptyUsers } from "~/components/keys/api-columns.tsx";
 import { KeyPrefix } from "~/components/keys/cells.tsx";
 import { KeyActions } from "~/components/keys/key-actions.tsx";
@@ -30,7 +31,7 @@ export const oauthClientColumns = helper.columns([
     header: "Scopes",
     enableSorting: false,
     cell: ({ row }) => <Chips values={row.original.scopes} />,
-    meta: { className: "hidden min-w-40 md:table-cell" },
+    meta: { className: "min-w-40" },
   }),
   helper.accessor((client) => client.tags.join(" "), {
     id: "tags",
@@ -42,7 +43,7 @@ export const oauthClientColumns = helper.columns([
       ) : (
         <Chips values={row.original.tags} mono />
       ),
-    meta: { className: "hidden lg:table-cell" },
+    meta: { className: "hidden md:table-cell" },
   }),
   helper.accessor((client) => client.userId ?? "", {
     id: "user",
@@ -70,7 +71,12 @@ export const oauthClientColumns = helper.columns([
   helper.display({
     id: "actions",
     header: "",
-    cell: ({ row }) => <ClientMenu client={row.original} />,
+    cell: ({ row, table }) => (
+      <ClientMenu
+        client={row.original}
+        disabled={table.options.meta?.me === undefined || !can(table.options.meta.me, "oauth_keys")}
+      />
+    ),
     meta: { className: "w-12 text-right" },
   }),
 ]);
@@ -134,12 +140,19 @@ function CreatorCell({
   );
 }
 
-function ClientMenu({ client }: { readonly client: OAuthClient }): ReactElement {
+function ClientMenu({
+  client,
+  disabled,
+}: {
+  readonly client: OAuthClient;
+  readonly disabled: boolean;
+}): ReactElement {
   const { revoke } = useOAuthClientMutations();
 
   return (
     <KeyActions
       label={`Actions for OAuth client ${client.clientId}`}
+      disabled={disabled}
       remove={{
         resourceType: "OAuth client",
         resourceName: client.clientId,

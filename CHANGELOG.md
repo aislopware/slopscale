@@ -290,9 +290,7 @@ Windows, Docker, the phone apps) with a QR code carrying the same line, so a
 machine without a shared clipboard can scan it. There is a dark mode. It signs
 in only through the configured identity
 provider (Google, or any OIDC issuer) and shows what that user's role allows.
-The server's registration and authentication-check pages link to console
-forms that finish the flow, so `headscale auth register` and `headscale auth
-approve` are no longer the only way; _Settings_ carries the IP backfill.
+_Settings_ carries the IP backfill (`headscale nodes backfillips`).
 Release binaries and container images include it. When building from source,
 run `make web` before `make build`.
 See [Admin console](https://headscale.net/development/ref/console/).
