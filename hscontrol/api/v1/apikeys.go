@@ -19,6 +19,8 @@ func init() {
 	registrations = append(registrations, registerAPIKeys)
 }
 
+const tagAPIKeys = "ApiKeys"
+
 // ApiKey is the v1 ApiKey message. Timestamps are pointers so a nil source is
 // emitted as JSON null, matching protojson's unset Timestamp (e.g. lastSeen on
 // a fresh key).
@@ -63,6 +65,15 @@ type ExpireApiKeyRequestBody struct {
 	ID     string `format:"uint64"         json:"id,omitempty"`
 }
 
+// RotateApiKeyRequestBody is the optional body of a rotation.
+//
+//nolint:staticcheck,revive // ST1003: name is the OpenAPI schema name
+type RotateApiKeyRequestBody struct {
+	// Expiration replaces the key's expiry; omitting it keeps the one the
+	// key has, so rotating a key does not silently extend its life.
+	Expiration *time.Time `doc:"New expiry; omit to keep the key's current one." json:"expiration,omitempty"`
+}
+
 type (
 	createAPIKeyInput struct {
 		Body CreateApiKeyRequestBody
@@ -80,6 +91,22 @@ type (
 	}
 	expireAPIKeyOutput struct {
 		Body struct{}
+	}
+)
+
+type (
+	rotateAPIKeyInput struct {
+		Prefix string                   `path:"prefix"`
+		Body   *RotateApiKeyRequestBody `required:"false"`
+	}
+	rotateAPIKeyOutput struct {
+		Body struct {
+			// APIKey is the whole new key, shown once.
+			APIKey string `json:"apiKey"`
+			// Prefix is the key's new masked prefix, as listApiKeys
+			// reports it, so a caller can find the row it just rotated.
+			Prefix string `json:"prefix"`
+		}
 	}
 )
 
@@ -109,7 +136,7 @@ func registerAPIKeys(api huma.API, b Backend) {
 		Summary:     "Create API key",
 		Description: "Any authenticated caller may mint a key for itself; a key for another user, or " +
 			"a legacy key without a user, needs the owner, an admin or the socket.",
-		Tags:     []string{"ApiKeys"},
+		Tags:     []string{tagAPIKeys},
 		Security: bearerAuth,
 	}, "apikey.create", "apikey", ""), func(ctx context.Context, in *createAPIKeyInput) (*createAPIKeyOutput, error) {
 		return createAPIKey(ctx, b, in)
@@ -120,7 +147,7 @@ func registerAPIKeys(api huma.API, b Backend) {
 		Method:      http.MethodPost,
 		Path:        "/api/v1/apikey/expire",
 		Summary:     "Expire API key",
-		Tags:        []string{"ApiKeys"},
+		Tags:        []string{tagAPIKeys},
 		Security:    bearerAuth,
 	}, "apikey.expire", "apikey", ""), func(ctx context.Context, in *expireAPIKeyInput) (*expireAPIKeyOutput, error) {
 		key, err := lookupAPIKey(b, in.Body.ID, in.Body.Prefix)
@@ -148,7 +175,7 @@ func registerAPIKeys(api huma.API, b Backend) {
 		Method:      http.MethodGet,
 		Path:        "/api/v1/apikey",
 		Summary:     "List API keys",
-		Tags:        []string{"ApiKeys"},
+		Tags:        []string{tagAPIKeys},
 		Security:    bearerAuth,
 	}, func(ctx context.Context, _ *struct{}) (*listAPIKeysOutput, error) {
 		keys, err := b.State.ListAPIKeys()
@@ -179,11 +206,27 @@ func registerAPIKeys(api huma.API, b Backend) {
 	})
 
 	huma.Register(api, audited(huma.Operation{
+		OperationID: "rotateApiKey",
+		Method:      http.MethodPost,
+		Path:        "/api/v1/apikey/{prefix}/rotate",
+		Summary:     "Rotate API key",
+		Description: "Mints a new secret for the key and returns it once. The key keeps its id, owner, " +
+			"scopes and description, and its expiry unless the body carries a new one; the old secret " +
+			"is refused from that moment. An expired key cannot be rotated.",
+		Tags:     []string{tagAPIKeys},
+		Security: bearerAuth,
+	}, "apikey.rotate", "apikey", "prefix"), func(
+		ctx context.Context, in *rotateAPIKeyInput,
+	) (*rotateAPIKeyOutput, error) {
+		return rotateAPIKey(ctx, b, in)
+	})
+
+	huma.Register(api, audited(huma.Operation{
 		OperationID: "deleteApiKey",
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/apikey/{prefix}",
 		Summary:     "Delete API key",
-		Tags:        []string{"ApiKeys"},
+		Tags:        []string{tagAPIKeys},
 		Security:    bearerAuth,
 	}, "apikey.delete", "apikey", "prefix"), func(
 		ctx context.Context, in *deleteAPIKeyInput,
@@ -444,4 +487,87 @@ func createAPIKey(ctx context.Context, b Backend, in *createAPIKeyInput) (*creat
 	out.Body.APIKey = keyStr
 
 	return out, nil
+}
+
+// rotateAPIKey replaces a key's secret in place. Rotation mints a working
+// credential, so it is bounded like creation is: an OAuth token may not do
+// it at all, a role-limited caller only for its own keys, and a scoped
+// caller only for a key whose authority it could have minted itself.
+func rotateAPIKey(ctx context.Context, b Backend, in *rotateAPIKeyInput) (*rotateAPIKeyOutput, error) {
+	if caller(ctx).IsOAuth() {
+		return nil, huma.Error403Forbidden("an OAuth access token cannot mint API keys")
+	}
+
+	key, err := lookupAPIKey(b, "", in.Prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	err = requireKeyAccess(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+
+	err = requireRotateAuthority(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+
+	// Expiring a key is how it is revoked, so rotation must not revive one:
+	// mint a fresh key instead.
+	if key.Expiration != nil && key.Expiration.Before(time.Now()) {
+		return nil, huma.Error409Conflict("this api key has expired; create a new one instead of rotating it")
+	}
+
+	var expiration *time.Time
+	if in.Body != nil {
+		expiration = in.Body.Expiration
+	}
+
+	// The prefix names the key; audit the one the request addressed, and
+	// the one it now answers to.
+	audit.Target(ctx, "", key.Prefix, "")
+
+	keyStr, err := b.State.RotateAPIKey(key, expiration)
+	if err != nil {
+		return nil, mapError("rotating api key", err)
+	}
+
+	audit.Detail(ctx, "newPrefix", key.Prefix)
+
+	if expiration != nil {
+		audit.Detail(ctx, "expiration", expiration.Format(time.RFC3339))
+	}
+
+	out := &rotateAPIKeyOutput{}
+	out.Body.APIKey = keyStr
+	out.Body.Prefix = apiKeyMaskedPrefix(key.Prefix)
+
+	return out, nil
+}
+
+// requireRotateAuthority refuses a rotation that would hand the caller a
+// working secret for authority it does not itself hold. Ownership alone is
+// enough to expire or delete a key, but rotation returns the key, so a
+// credential that carries its own scopes may only rotate a key it could
+// have minted: one with scopes, all of them within its own. A caller
+// standing for its user's whole role may rotate that user's keys, which
+// are bounded by the same role.
+func requireRotateAuthority(ctx context.Context, key *types.APIKey) error {
+	p := caller(ctx)
+	if !p.Scoped {
+		return nil
+	}
+
+	if len(key.Scopes) == 0 {
+		return huma.Error403Forbidden("a scoped credential cannot rotate a key that carries its owner's whole role")
+	}
+
+	for _, s := range scope.Parse(key.Scopes) {
+		if !p.Allows(s) {
+			return huma.Error403Forbidden("this credential cannot rotate a key wider than itself")
+		}
+	}
+
+	return nil
 }

@@ -36,6 +36,22 @@ func (hsdb *HSDatabase) CreateAPIKey(
 	return hsdb.CreateScopedAPIKey(expiration, nil, "")
 }
 
+// newAPIKeySecret mints the credential material for a key and returns, in
+// order, the whole key string shown once to the operator, the public prefix
+// it is looked up by, and the bcrypt hash of its secret.
+func newAPIKeySecret() (string, string, []byte, error) {
+	// Public prefix (12 chars) and secret (64 chars).
+	prefix := rands.HexString(apiKeyPrefixLength)
+	secret := rands.HexString(apiKeyHashLength)
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(secret), bcryptCost)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("hashing API key secret: %w", err)
+	}
+
+	return apiKeyPrefix + prefix + "-" + secret, prefix, hash, nil
+}
+
 // CreateScopedAPIKey creates a key that carries scopes and a description.
 // The caller has already narrowed the scopes to what it may delegate.
 func (hsdb *HSDatabase) CreateScopedAPIKey(
@@ -43,19 +59,9 @@ func (hsdb *HSDatabase) CreateScopedAPIKey(
 	scopes []string,
 	description string,
 ) (string, *types.APIKey, error) {
-	// Generate public prefix (12 chars)
-	prefix := rands.HexString(apiKeyPrefixLength)
-
-	// Generate secret (64 chars)
-	secret := rands.HexString(apiKeyHashLength)
-
-	// Full key string (shown ONCE to user)
-	keyStr := apiKeyPrefix + prefix + "-" + secret
-
-	// bcrypt hash of secret
-	hash, err := bcrypt.GenerateFromPassword([]byte(secret), bcryptCost)
+	keyStr, prefix, hash, err := newAPIKeySecret()
 	if err != nil {
-		return "", nil, fmt.Errorf("hashing API key secret: %w", err)
+		return "", nil, err
 	}
 
 	now := time.Now()
@@ -183,6 +189,53 @@ func (hsdb *HSDatabase) ExpireAPIKey(key *types.APIKey) error {
 	key.Expiration = &now
 
 	return nil
+}
+
+// RotateAPIKey mints a new secret for an existing key and returns the new key
+// string, shown once. The row is rewritten in place rather than replaced by a
+// new one: the key keeps its id, owner, scopes and description, so the audit
+// trail and the key list stay attached to one credential instead of forking
+// into a new row plus an expired husk that operators then have to reap. The
+// old secret stops working the moment the hash lands, because every request
+// looks a key up by its prefix and compares the stored hash. last_seen is
+// cleared, since it described the secret that has just been retired. A nil
+// expiration keeps the one the key already has.
+func (hsdb *HSDatabase) RotateAPIKey(key *types.APIKey, expiration *time.Time) (string, error) {
+	keyStr, prefix, hash, err := newAPIKeySecret()
+	if err != nil {
+		return "", err
+	}
+
+	newExpiration := key.Expiration
+	if expiration != nil {
+		newExpiration = expiration
+	}
+
+	var expirationValue any = jet.NULL
+	if newExpiration != nil {
+		expirationValue = *newExpiration
+	}
+
+	affected, err := hsdb.ex.exec(
+		table.APIKeys.
+			UPDATE(table.APIKeys.Prefix, table.APIKeys.Hash, table.APIKeys.Expiration, table.APIKeys.LastSeen).
+			SET(prefix, hash, expirationValue, jet.NULL).
+			WHERE(table.APIKeys.ID.EQ(jet.Uint64(key.ID))),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	if affected == 0 {
+		return "", ErrNotFound
+	}
+
+	key.Prefix = prefix
+	key.Hash = hash
+	key.Expiration = newExpiration
+	key.LastSeen = nil
+
+	return keyStr, nil
 }
 
 func (hsdb *HSDatabase) ValidateAPIKey(keyStr string) (bool, error) {

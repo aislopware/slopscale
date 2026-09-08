@@ -15,13 +15,14 @@ import (
 // the handler (apiKeyOwner, requireKeyAccess). Every other authenticated
 // operation must declare a scope.
 var selfEnforcedOps = map[string]bool{
-	"GET /api/v1/health":             true,
-	"GET /api/v1/whoami":             true,
-	"DELETE /api/v1/auth/session":    true,
-	"POST /api/v1/apikey":            true,
-	"POST /api/v1/apikey/expire":     true,
-	"GET /api/v1/apikey":             true,
-	"DELETE /api/v1/apikey/{prefix}": true,
+	"GET /api/v1/health":                  true,
+	"GET /api/v1/whoami":                  true,
+	"DELETE /api/v1/auth/session":         true,
+	"POST /api/v1/apikey":                 true,
+	"POST /api/v1/apikey/expire":          true,
+	"POST /api/v1/apikey/{prefix}/rotate": true,
+	"GET /api/v1/apikey":                  true,
+	"DELETE /api/v1/apikey/{prefix}":      true,
 
 	// Sharing lets a member act on the nodes they own (requireShareAccess).
 	"POST /api/v1/node/{nodeId}/share":            true,
@@ -34,6 +35,11 @@ var selfEnforcedOps = map[string]bool{
 	"GET /api/v1/access-request/{id}":    true,
 	"POST /api/v1/access-request":        true,
 	"DELETE /api/v1/access-request/{id}": true,
+
+	// A member holds no scope but must still see and end their own
+	// console sign-ins (sessionAudience).
+	"GET /api/v1/auth/sessions":         true,
+	"DELETE /api/v1/auth/sessions/{id}": true,
 }
 
 // TestEveryAuthenticatedOperationDeclaresScope guarantees no v1 operation

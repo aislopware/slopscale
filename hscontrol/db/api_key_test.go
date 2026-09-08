@@ -291,3 +291,72 @@ func TestGetAPIKeyByIDNotFound(t *testing.T) {
 	require.Error(t, err)
 	assert.Nil(t, key)
 }
+
+// TestRotateAPIKey proves rotation replaces the secret in place: the old key
+// string stops authenticating, the new one works, and the row keeps its id,
+// owner, scopes, description and expiry.
+func TestRotateAPIKey(t *testing.T) {
+	t.Parallel()
+
+	db, err := newSQLiteTestDB()
+	require.NoError(t, err)
+
+	expiration := time.Now().Add(2 * time.Hour)
+
+	oldStr, key, err := db.CreateScopedAPIKey(&expiration, []string{"dns"}, "Resolver sync")
+	require.NoError(t, err)
+	require.NoError(t, db.SetAPIKeyUser(key.ID, types.UserID(7)))
+
+	oldPrefix := key.Prefix
+
+	newStr, err := db.RotateAPIKey(key, nil)
+	require.NoError(t, err)
+	assert.NotEqual(t, oldStr, newStr)
+	assert.NotEqual(t, oldPrefix, key.Prefix)
+
+	_, err = db.AuthenticateAPIKey(oldStr)
+	require.Error(t, err, "the old secret is refused at once")
+
+	rotated, err := db.AuthenticateAPIKey(newStr)
+	require.NoError(t, err)
+	assert.Equal(t, key.ID, rotated.ID, "rotation keeps the row")
+	assert.Equal(t, []string{"dns"}, rotated.Scopes)
+	assert.Equal(t, "Resolver sync", rotated.Description)
+	require.NotNil(t, rotated.UserID)
+	assert.Equal(t, uint(7), *rotated.UserID)
+	require.NotNil(t, rotated.Expiration)
+	assert.WithinDuration(t, expiration, *rotated.Expiration, time.Second)
+	assert.Nil(t, rotated.LastSeen, "last seen described the retired secret")
+
+	// A new expiration replaces the old one; a key that never expires
+	// stores NULL rather than the zero time.
+	later := time.Now().Add(48 * time.Hour)
+
+	_, err = db.RotateAPIKey(key, &later)
+	require.NoError(t, err)
+
+	stored, err := db.GetAPIKeyByID(key.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stored.Expiration)
+	assert.WithinDuration(t, later, *stored.Expiration, time.Second)
+}
+
+// TestRotateAPIKeyClearsExpirationOfNeverExpiringKey pins that a key minted
+// without an expiry keeps NULL through a rotation, so it does not come back
+// expired.
+func TestRotateAPIKeyKeepsNoExpiration(t *testing.T) {
+	t.Parallel()
+
+	db, err := newSQLiteTestDB()
+	require.NoError(t, err)
+
+	_, key, err := db.CreateAPIKey(nil)
+	require.NoError(t, err)
+
+	newStr, err := db.RotateAPIKey(key, nil)
+	require.NoError(t, err)
+
+	stored, err := db.AuthenticateAPIKey(newStr)
+	require.NoError(t, err)
+	assert.Nil(t, stored.Expiration)
+}
