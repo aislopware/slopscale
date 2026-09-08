@@ -57,6 +57,7 @@ type serverConfig struct {
 	smtp             *types.SMTPConfig
 	sshRecording     *types.SSHRecordingConfig
 	httpsCerts       *types.HTTPSCertsConfig
+	seededRule       bool
 }
 
 func defaultServerConfig() *serverConfig {
@@ -71,6 +72,14 @@ func defaultServerConfig() *serverConfig {
 		// that wait, so use the same short window the state tests use.
 		nodeStoreBatch: state.TestBatchTimeout,
 	}
+}
+
+// WithSeededRule keeps the rule a fresh database is seeded with, so the
+// tailnet starts closed the way a new production server does. The harness
+// deletes it otherwise: most tests describe access with a policy file or
+// with rules of their own and want nothing implicit next to them.
+func WithSeededRule() ServerOption {
+	return func(c *serverConfig) { c.seededRule = true }
 }
 
 // WithBatchDelay sets the batcher's change coalescing delay.
@@ -229,6 +238,10 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 	app, err := hscontrol.NewHeadscale(&cfg)
 	if err != nil {
 		tb.Fatalf("servertest: NewHeadscale: %v", err)
+	}
+
+	if !sc.seededRule {
+		deleteSeededRule(tb, app.GetState())
 	}
 
 	// Set a minimal DERP map so MapResponse generation works.
@@ -468,4 +481,20 @@ func (s *TestServer) createPreAuthKey(
 	}
 
 	return pak.Key
+}
+
+// deleteSeededRule removes the rule a fresh database is seeded with.
+func deleteSeededRule(tb testing.TB, st *state.State) {
+	tb.Helper()
+
+	for _, rule := range st.AccessModel().Rules {
+		if rule.Name != types.DefaultRuleName {
+			continue
+		}
+
+		_, err := st.DeleteAccessRule(rule.ID)
+		if err != nil {
+			tb.Fatalf("servertest: deleting the seeded rule: %v", err)
+		}
+	}
 }

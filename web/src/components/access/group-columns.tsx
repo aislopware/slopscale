@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 
 import type { Group, Node } from "~/api/queries.ts";
 import { GroupMenu } from "~/components/access/group-menu.tsx";
-import { isBuiltin, machineCount, rulesUsingGroup } from "~/components/access/model.ts";
+import { isBuiltin, isSelf, machineCount, rulesUsingGroup } from "~/components/access/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
@@ -98,9 +98,7 @@ export const groupColumns = helper.columns([
 ]);
 
 function NameCell({ group }: { readonly group: Group }): ReactElement {
-  const description = isBuiltin(group)
-    ? "Every machine in the tailnet, kept up to date by the server."
-    : group.description;
+  const description = builtinDescription(group) ?? group.description;
 
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
@@ -144,6 +142,10 @@ function MachinesCell({ group }: { readonly group: GroupRow }): ReactElement {
     );
   }
 
+  if (isSelf(group)) {
+    return <span className="text-kumo-inactive">—</span>;
+  }
+
   if (isBuiltin(group)) {
     return <span className="text-kumo-default">{group.machines}</span>;
   }
@@ -158,4 +160,13 @@ function MachinesCell({ group }: { readonly group: GroupRow }): ReactElement {
       )}
     </span>
   );
+}
+
+/** What a builtin group stands for, or null for a group the operator described. */
+function builtinDescription(group: Group): string | null {
+  if (isSelf(group)) {
+    return "In a rule's destination, the machines owned by the same user as the source. Tailscale's autogroup:self.";
+  }
+
+  return isBuiltin(group) ? "Every machine in the tailnet, kept up to date by the server." : null;
 }

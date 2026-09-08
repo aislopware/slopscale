@@ -290,31 +290,87 @@ func LoadAccessModel(q Querier) (types.AccessModel, error) {
 	return model, nil
 }
 
-// EnsureAllGroup creates the builtin group that holds every node when it
-// is missing and returns it.
-func (hsdb *HSDatabase) EnsureAllGroup() (types.AccessGroup, error) {
-	return Write(hsdb, func(tx *Tx) (types.AccessGroup, error) {
-		var existing []groupRecord
-
-		err := tx.executor().query(
-			jet.SELECT(table.Groups.AllColumns).FROM(table.Groups).
-				WHERE(table.Groups.Builtin.EQ(jet.String(types.GroupBuiltinAll))),
-			&existing,
-		)
-		if err != nil {
-			return types.AccessGroup{}, fmt.Errorf("looking up the builtin all group: %w", err)
-		}
-
-		if len(existing) > 0 {
-			return existing[0].Group.group(), nil
-		}
-
-		return insertGroup(tx, types.AccessGroup{
+// EnsureBuiltinGroups creates the builtin groups when they are missing.
+// The first time the self group is created the default rule comes with
+// it: every machine reaches the other machines of its own user. The rule
+// is enabled on a database without nodes, so a new tailnet starts closed,
+// and disabled on one that already has nodes, so an upgrade does not cut
+// an open tailnet off; it is an ordinary rule afterwards and the self
+// group, which cannot be deleted, is the marker that seeding happened.
+func (hsdb *HSDatabase) EnsureBuiltinGroups() error {
+	_, err := Write(hsdb, func(tx *Tx) (struct{}, error) {
+		all, err := ensureGroup(tx, types.AccessGroup{
 			Name:        types.GroupAllName,
 			Description: "Every machine in the tailnet.",
 			Builtin:     types.GroupBuiltinAll,
 		})
+		if err != nil {
+			return struct{}{}, err
+		}
+
+		self, created, err := ensureGroupCreated(tx, types.AccessGroup{
+			Name:        types.GroupSelfName,
+			Description: "The machines owned by the same user as the source. Only a destination.",
+			Builtin:     types.GroupBuiltinSelf,
+		})
+		if err != nil || !created {
+			return struct{}{}, err
+		}
+
+		var count struct{ Count int64 }
+
+		err = tx.executor().query(jet.SELECT(jet.COUNT(jet.STAR).AS("count")).FROM(table.Nodes), &count)
+		if err != nil {
+			return struct{}{}, fmt.Errorf("counting nodes before seeding the default rule: %w", err)
+		}
+
+		_, err = createAccessRule(tx, types.AccessRule{
+			Name:                types.DefaultRuleName,
+			Description:         "Each machine reaches the other machines of its own user.",
+			Enabled:             count.Count == 0,
+			Protocol:            types.AccessProtocolAll,
+			SourceGroupIDs:      []types.GroupID{all.ID},
+			DestinationGroupIDs: []types.GroupID{self.ID},
+		})
+
+		return struct{}{}, err
 	})
+
+	return err
+}
+
+// ensureGroup returns the builtin group with the marker, creating it when
+// missing.
+func ensureGroup(q Querier, group types.AccessGroup) (types.AccessGroup, error) {
+	got, _, err := ensureGroupCreated(q, group)
+
+	return got, err
+}
+
+// ensureGroupCreated is [ensureGroup] reporting whether it had to create
+// the group.
+func ensureGroupCreated(q Querier, group types.AccessGroup) (types.AccessGroup, bool, error) {
+	var existing []groupRecord
+
+	err := q.executor().query(
+		jet.SELECT(table.Groups.AllColumns).FROM(table.Groups).
+			WHERE(table.Groups.Builtin.EQ(jet.String(group.Builtin))),
+		&existing,
+	)
+	if err != nil {
+		return types.AccessGroup{}, false, fmt.Errorf("looking up the builtin %s group: %w", group.Builtin, err)
+	}
+
+	if len(existing) > 0 {
+		return existing[0].Group.group(), false, nil
+	}
+
+	created, err := insertGroup(q, group)
+	if err != nil {
+		return types.AccessGroup{}, false, err
+	}
+
+	return created, true, nil
 }
 
 func insertGroup(q Querier, group types.AccessGroup) (types.AccessGroup, error) {
@@ -753,44 +809,48 @@ func AddNodeToGroups(q Querier, nodeID types.NodeID, groupIDs []types.GroupID) e
 // CreateAccessRule stores a rule with its sides. The caller validated it.
 func (hsdb *HSDatabase) CreateAccessRule(rule types.AccessRule) (types.AccessRule, error) {
 	return Write(hsdb, func(tx *Tx) (types.AccessRule, error) {
-		now := time.Now().UTC()
-		row := accessRuleRow{
-			Name:          rule.Name,
-			Description:   rule.Description,
-			Enabled:       rule.Enabled,
-			Protocol:      string(rule.Protocol),
-			Ports:         rule.Ports,
-			Bidirectional: rule.Bidirectional,
-			ExpiresAt:     utcPtr(rule.ExpiresAt),
-			CreatedAt:     &now,
-			UpdatedAt:     &now,
-		}
-
-		var inserted idRow
-
-		err := tx.executor().query(
-			table.AccessRules.INSERT(table.AccessRules.MutableColumns).MODEL(&row).
-				RETURNING(table.AccessRules.ID.AS("id_row.id")),
-			&inserted,
-		)
-		if err != nil {
-			return types.AccessRule{}, fmt.Errorf("creating access rule: %w", err)
-		}
-
-		id := types.AccessRuleID(inserted.ID)
-
-		err = setRuleSides(tx, id, rule.SourceGroupIDs, rule.DestinationGroupIDs)
-		if err != nil {
-			return types.AccessRule{}, err
-		}
-
-		err = setRulePostures(tx, id, rule.PostureIDs)
-		if err != nil {
-			return types.AccessRule{}, err
-		}
-
-		return getAccessRule(tx, id)
+		return createAccessRule(tx, rule)
 	})
+}
+
+func createAccessRule(tx Querier, rule types.AccessRule) (types.AccessRule, error) {
+	now := time.Now().UTC()
+	row := accessRuleRow{
+		Name:          rule.Name,
+		Description:   rule.Description,
+		Enabled:       rule.Enabled,
+		Protocol:      string(rule.Protocol),
+		Ports:         rule.Ports,
+		Bidirectional: rule.Bidirectional,
+		ExpiresAt:     utcPtr(rule.ExpiresAt),
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+
+	var inserted idRow
+
+	err := tx.executor().query(
+		table.AccessRules.INSERT(table.AccessRules.MutableColumns).MODEL(&row).
+			RETURNING(table.AccessRules.ID.AS("id_row.id")),
+		&inserted,
+	)
+	if err != nil {
+		return types.AccessRule{}, fmt.Errorf("creating access rule: %w", err)
+	}
+
+	id := types.AccessRuleID(inserted.ID)
+
+	err = setRuleSides(tx, id, rule.SourceGroupIDs, rule.DestinationGroupIDs)
+	if err != nil {
+		return types.AccessRule{}, err
+	}
+
+	err = setRulePostures(tx, id, rule.PostureIDs)
+	if err != nil {
+		return types.AccessRule{}, err
+	}
+
+	return getAccessRule(tx, id)
 }
 
 // UpdateAccessRule replaces every field of the rule.

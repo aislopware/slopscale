@@ -28,15 +28,16 @@ func init() {
 
 // Group is a named set of machines: the machines listed directly and
 // every machine owned by the users listed. The builtin "all" group holds
-// every machine and lists none.
+// every machine and lists none; the builtin "self" group is only a rule
+// destination and means the machines of the source's own user.
 type Group struct {
-	ID          string   `format:"uint64"                                                      json:"id"`
+	ID          string   `format:"uint64"                                                 json:"id"`
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
-	Builtin     string   `doc:"Empty for operator-made groups, \"all\" for the builtin group." json:"builtin"`
-	Requestable bool     `doc:"Whether members may request to join the group for a while."     json:"requestable"`
-	NodeIDs     []string `json:"nodeIds"                                                       nullable:"false"`
-	UserIDs     []string `json:"userIds"                                                       nullable:"false"`
+	Builtin     string   `doc:"Empty for operator-made groups, else \"all\" or \"self\"." json:"builtin"`
+	Requestable bool     `doc:"Whether members may ask to join the group for a while."    json:"requestable"`
+	NodeIDs     []string `json:"nodeIds"                                                  nullable:"false"`
+	UserIDs     []string `json:"userIds"                                                  nullable:"false"`
 	// Expiries lists the temporary memberships; a member absent from it
 	// is permanent.
 	Expiries  []GroupMemberExpiry `json:"expiries"  nullable:"false"`
@@ -342,7 +343,8 @@ func registerGroups(api huma.API, b Backend) {
 		Path:        "/api/v1/group",
 		Summary:     "List groups",
 		Description: "Every group with the IDs of its member machines and users. The builtin " +
-			"\"all\" group holds every machine and lists none.",
+			"\"all\" group holds every machine and lists none; the builtin \"self\" group is a rule " +
+			"destination meaning the machines owned by the same user as the source.",
 		Tags:     []string{"Access control"},
 		Security: bearerAuth,
 	}, scope.PolicyFileRead), func(_ context.Context, _ *struct{}) (*listGroupsOutput, error) {
@@ -423,7 +425,7 @@ func registerGroups(api huma.API, b Backend) {
 		Path:        "/api/v1/group/{id}",
 		Summary:     "Update group",
 		Description: "Renames or re-describes a group and replaces its machines and users when " +
-			"given. The builtin group cannot be changed.",
+			"given. The builtin groups cannot be changed.",
 		Tags:     []string{"Access control"},
 		Security: bearerAuth,
 	}, scope.PolicyFile), "group.update", "group", "id"), func(

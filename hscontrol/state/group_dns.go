@@ -141,8 +141,13 @@ func (s *State) validateGroupDNSRule(rule types.GroupDNSRule) error {
 	model := s.AccessModel()
 
 	for _, id := range rule.GroupIDs {
-		if _, ok := model.Group(id); !ok {
+		group, ok := model.Group(id)
+		if !ok {
 			return fmt.Errorf("%w: %d", types.ErrGroupNotFound, id)
+		}
+
+		if group.IsSelf() {
+			return types.ErrGroupSelfMembers
 		}
 	}
 

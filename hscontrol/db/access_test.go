@@ -8,6 +8,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestBuiltinGroupsSeedAClosedTailnet(t *testing.T) {
+	t.Parallel()
+
+	db, err := newSQLiteTestDB()
+	require.NoError(t, err)
+
+	require.NoError(t, db.EnsureBuiltinGroups())
+
+	model, err := db.LoadAccessModel()
+	require.NoError(t, err)
+	require.Len(t, model.Rules, 1)
+	assert.True(t, model.Rules[0].Enabled, "a database without nodes starts closed")
+	assert.Equal(t, types.AccessProtocolAll, model.Rules[0].Protocol)
+}
+
 func TestAccessGroupsAndRules(t *testing.T) {
 	t.Parallel()
 
@@ -19,13 +34,30 @@ func TestAccessGroupsAndRules(t *testing.T) {
 
 	node := db.CreateNodeForTest(alice, "laptop")
 
-	all, err := db.EnsureAllGroup()
-	require.NoError(t, err)
-	assert.Equal(t, types.GroupBuiltinAll, all.Builtin)
+	require.NoError(t, db.EnsureBuiltinGroups())
 
-	again, err := db.EnsureAllGroup()
+	model, err := db.LoadAccessModel()
 	require.NoError(t, err)
-	assert.Equal(t, all.ID, again.ID, "the builtin group is created once")
+	require.Len(t, model.Groups, 2)
+	require.Len(t, model.Rules, 1)
+
+	all, self := model.Groups[0], model.Groups[1]
+	assert.Equal(t, types.GroupBuiltinAll, all.Builtin)
+	assert.Equal(t, types.GroupBuiltinSelf, self.Builtin)
+
+	seeded := model.Rules[0]
+	assert.Equal(t, types.DefaultRuleName, seeded.Name)
+	assert.False(t, seeded.Enabled, "a database that already has nodes keeps its open tailnet")
+	assert.Equal(t, []types.GroupID{all.ID}, seeded.SourceGroupIDs)
+	assert.Equal(t, []types.GroupID{self.ID}, seeded.DestinationGroupIDs)
+
+	require.NoError(t, db.DeleteAccessRule(seeded.ID))
+	require.NoError(t, db.EnsureBuiltinGroups())
+
+	model, err = db.LoadAccessModel()
+	require.NoError(t, err)
+	assert.Len(t, model.Groups, 2, "the builtin groups are created once")
+	assert.Empty(t, model.Rules, "the default rule is seeded once and stays deleted")
 
 	eng, err := db.CreateGroup("Engineering", "The engineers", false)
 	require.NoError(t, err)
@@ -58,9 +90,9 @@ func TestAccessGroupsAndRules(t *testing.T) {
 	assert.Equal(t, []types.GroupID{eng.ID}, rule.SourceGroupIDs)
 	assert.Equal(t, []types.GroupID{servers.ID}, rule.DestinationGroupIDs)
 
-	model, err := db.LoadAccessModel()
+	model, err = db.LoadAccessModel()
 	require.NoError(t, err)
-	require.Len(t, model.Groups, 3)
+	require.Len(t, model.Groups, 4)
 	require.Len(t, model.Rules, 1)
 	assert.Len(t, model.RulesUsingGroup(servers.ID), 1)
 

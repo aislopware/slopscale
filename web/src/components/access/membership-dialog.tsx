@@ -96,7 +96,7 @@ function MembershipForm({
         label="Groups"
         description="The built-in group holds every machine and cannot be edited."
         placeholder="Add groups…"
-        items={groupItems(groups, { builtin: false })}
+        items={groupItems(groups, "membership")}
         value={selected}
         onValueChange={setSelected}
         empty="No group matches. Create one under Access controls."

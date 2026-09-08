@@ -119,12 +119,22 @@ func rulePostureNames(model types.AccessModel, rule types.AccessRule) []string {
 	return names
 }
 
+// groupAliases turns the group IDs into aliases. The builtin self group
+// is autogroup:self, which the compiler resolves per destination node;
+// the rule validation keeps it out of sources.
 func groupAliases(model types.AccessModel, ids []types.GroupID) Aliases {
 	aliases := make(Aliases, 0, len(ids))
 
 	for _, id := range ids {
 		group, ok := model.Group(id)
 		if !ok {
+			continue
+		}
+
+		if group.IsSelf() {
+			self := AutoGroupSelf
+			aliases = append(aliases, &self)
+
 			continue
 		}
 

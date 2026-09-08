@@ -34,6 +34,20 @@ const GroupBuiltinAll = "all"
 // GroupAllName is the name of the builtin group that holds every node.
 const GroupAllName = "All"
 
+// GroupBuiltinSelf marks the group that, as a rule's destination, holds
+// the machines owned by the same user as the source. It is Tailscale's
+// autogroup:self: relational, so it has no members of its own, cannot be
+// a source and is never joined.
+const GroupBuiltinSelf = "self"
+
+// GroupSelfName is the name of the builtin self group.
+const GroupSelfName = "Own machines"
+
+// DefaultRuleName names the rule the server seeds once per database: every
+// machine reaches the other machines of its own user, and nothing else
+// until an operator adds rules.
+const DefaultRuleName = "Own machines"
+
 // AccessGroup is a named set of nodes. Nodes belong to it directly or
 // through their owner: every user-owned node of a user in UserIDs is a
 // member. Tagged nodes have no owner and join directly.
@@ -108,6 +122,12 @@ func memberAt(expiry, now time.Time) bool {
 // IsBuiltin reports whether the server owns the group.
 func (g AccessGroup) IsBuiltin() bool {
 	return g.Builtin != ""
+}
+
+// IsSelf reports whether the group is the builtin self group, which
+// resolves per destination rather than to a member list.
+func (g AccessGroup) IsSelf() bool {
+	return g.Builtin == GroupBuiltinSelf
 }
 
 // Contains reports whether the node is a member now, through its owner
@@ -341,6 +361,9 @@ var (
 	ErrRuleNameTooLong    = errors.New("rule name must be at most 64 characters")
 	ErrRuleNoSources      = errors.New("rule needs at least one source group")
 	ErrRuleNoDestinations = errors.New("rule needs at least one destination group")
+	ErrRuleSelfSource     = errors.New("the builtin self group can only be a destination")
+	ErrRuleSelfBoth       = errors.New("a rule with the builtin self group cannot run both directions")
+	ErrGroupSelfMembers   = errors.New("the builtin self group has no members of its own")
 	ErrRuleNotFound       = errors.New("access rule not found")
 	ErrRulePortsWithout   = errors.New("ports apply only to tcp and udp")
 	ErrRulePortsInvalid   = errors.New("ports must be a comma-separated list of ports or ranges between 1 and 65535")

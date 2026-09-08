@@ -262,7 +262,7 @@ function PreAuthKeyFields({
           label="Groups"
           description="Every machine registered with this key joins these groups."
           placeholder="Add groups…"
-          items={groupItems(groups, { builtin: false })}
+          items={groupItems(groups, "membership")}
           value={draft.groupIds}
           onValueChange={(groupIds) => {
             onChange({ groupIds });

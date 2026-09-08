@@ -5,17 +5,27 @@ import { isTagged } from "~/lib/node.ts";
 /** The server's marker for the group that holds every machine. */
 export const builtinAll = "all";
 
+/**
+ * The server's marker for the group that, as a rule's destination, means the machines owned by the
+ * same user as the source. It has no members and is never a source.
+ */
+export const builtinSelf = "self";
+
 export function isBuiltin(group: Group): boolean {
   return group.builtin !== "";
 }
 
-/** The groups a machine is in: directly, through its owner, and always the builtin group. */
+export function isSelf(group: Group): boolean {
+  return group.builtin === builtinSelf;
+}
+
+/** The groups a machine is in: directly, through its owner, and always the builtin All group. */
 export function groupsOfNode(groups: readonly Group[], node: Node): Group[] {
   const owner = isTagged(node) ? null : ownerId(node);
 
   return groups.filter(
     (group) =>
-      isBuiltin(group) ||
+      group.builtin === builtinAll ||
       group.nodeIds.includes(node.id) ||
       (owner !== null && group.userIds.includes(owner)),
   );
@@ -28,6 +38,10 @@ export function groupsOfUser(groups: readonly Group[], user: User): Group[] {
 
 /** How many machines a group resolves to, counting each machine once. */
 export function machineCount(group: Group, nodes: readonly Node[]): number {
+  if (isSelf(group)) {
+    return 0;
+  }
+
   if (isBuiltin(group)) {
     return nodes.length;
   }

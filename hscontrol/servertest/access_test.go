@@ -48,18 +48,23 @@ func TestAccessRulesEndToEnd(t *testing.T) {
 
 	var engID, serversID string
 
-	t.Run("the builtin group exists and cannot change", func(t *testing.T) {
+	t.Run("the builtin groups exist and cannot change", func(t *testing.T) {
 		status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/group", nil)
 		require.Equal(t, http.StatusOK, status, body)
 
 		groups, ok := body["groups"].([]any)
 		require.True(t, ok)
-		require.Len(t, groups, 1)
+		require.Len(t, groups, 2)
 
 		all, ok := groups[0].(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, "All", all["name"])
 		assert.Equal(t, types.GroupBuiltinAll, all["builtin"])
+
+		self, ok := groups[1].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, types.GroupSelfName, self["name"])
+		assert.Equal(t, types.GroupBuiltinSelf, self["builtin"])
 
 		allID, ok := all["id"].(string)
 		require.True(t, ok)
@@ -242,4 +247,56 @@ func TestPreAuthKeyGroupsEnrolNode(t *testing.T) {
 	status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/group/"+group.ID.String(), nil)
 	require.Equal(t, http.StatusOK, status, body)
 	assert.Equal(t, []any{node.NodeIDString()}, field(t, body, "group", "nodeIds"))
+}
+
+// TestSeededRuleClosesANewTailnet proves the rule a fresh database is
+// seeded with: each machine reaches the other machines of its own user and
+// nothing else, so a new server starts closed. Disabling the rule opens the
+// tailnet the way it was before the rule existed.
+func TestSeededRuleClosesANewTailnet(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t, servertest.WithSeededRule())
+
+	alice := srv.CreateUser(t, "seed-alice")
+	bob := srv.CreateUser(t, "seed-bob")
+
+	alice1 := servertest.NewClient(t, srv, "seed-alice-1", servertest.WithUser(alice))
+	alice2 := servertest.NewClient(t, srv, "seed-alice-2", servertest.WithUser(alice))
+	bob1 := servertest.NewClient(t, srv, "seed-bob-1", servertest.WithUser(bob))
+	tagged := servertest.NewClient(t, srv, "seed-tagged", servertest.WithTags("tag:seed"))
+
+	// Alice's machines see each other, and only each other.
+	for _, c := range []*servertest.TestClient{alice1, alice2} {
+		c.WaitForCondition(t, "the other machine of the same user", accessWait, func(nm *netmap.NetworkMap) bool {
+			return nm.SelfNode.Valid() && len(nm.Peers) == 1 && len(nm.PacketFilter) == 1
+		})
+	}
+
+	assert.Equal(t, alice2.Netmap().SelfNode.StableID(), alice1.Netmap().Peers[0].StableID())
+	assert.Equal(t, alice1.Netmap().SelfNode.StableID(), alice2.Netmap().Peers[0].StableID())
+
+	// Bob's only machine and the tagged one have nobody to reach.
+	for _, c := range []*servertest.TestClient{bob1, tagged} {
+		c.WaitForCondition(t, "self only", accessWait, func(nm *netmap.NetworkMap) bool {
+			return nm.SelfNode.Valid() && len(nm.Peers) == 0
+		})
+	}
+
+	// Disabling the rule opens the tailnet.
+	model := srv.State().AccessModel()
+	require.Len(t, model.Rules, 1)
+
+	rule := model.Rules[0]
+	rule.Enabled = false
+
+	_, ch, err := srv.State().UpdateAccessRule(rule)
+	require.NoError(t, err)
+	srv.App.Change(ch)
+
+	for _, c := range []*servertest.TestClient{alice1, alice2, bob1, tagged} {
+		c.WaitForCondition(t, "every peer", accessWait, func(nm *netmap.NetworkMap) bool {
+			return len(nm.Peers) == 3
+		})
+	}
 }

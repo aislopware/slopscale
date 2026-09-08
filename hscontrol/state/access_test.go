@@ -25,12 +25,37 @@ func TestAccessGroupsAndRules(t *testing.T) {
 	_, err := s.updatePolicyManagerNodes()
 	require.NoError(t, err)
 
-	// The builtin group exists from the start and is fixed.
+	// The builtin groups exist from the start and are fixed.
 	model := s.AccessModel()
-	require.Len(t, model.Groups, 1)
-	all := model.Groups[0]
+	require.Len(t, model.Groups, 2)
+	all, self := model.Groups[0], model.Groups[1]
 	assert.Equal(t, types.GroupAllName, all.Name)
 	assert.True(t, all.IsBuiltin())
+	assert.Equal(t, types.GroupSelfName, self.Name)
+	assert.True(t, self.IsSelf())
+
+	// A fresh database is seeded with the own-machines rule, enabled.
+	require.Len(t, model.Rules, 1)
+	assert.Equal(t, types.DefaultRuleName, model.Rules[0].Name)
+	assert.True(t, model.Rules[0].Enabled)
+	assert.Equal(t, []types.GroupID{all.ID}, model.Rules[0].SourceGroupIDs)
+	assert.Equal(t, []types.GroupID{self.ID}, model.Rules[0].DestinationGroupIDs)
+
+	// Self is a destination only, never a member set.
+	_, _, err = s.CreateAccessRule(types.AccessRule{
+		Name: "self as source", Enabled: true, Protocol: types.AccessProtocolAll,
+		SourceGroupIDs: []types.GroupID{self.ID}, DestinationGroupIDs: []types.GroupID{all.ID},
+	})
+	require.ErrorIs(t, err, types.ErrRuleSelfSource)
+
+	_, _, err = s.CreateAccessRule(types.AccessRule{
+		Name: "self both ways", Enabled: true, Protocol: types.AccessProtocolAll, Bidirectional: true,
+		SourceGroupIDs: []types.GroupID{all.ID}, DestinationGroupIDs: []types.GroupID{self.ID},
+	})
+	require.ErrorIs(t, err, types.ErrRuleSelfBoth)
+
+	_, err = s.DeleteAccessRule(model.Rules[0].ID)
+	require.NoError(t, err)
 
 	_, _, err = s.UpdateGroup(all.ID, "Everyone", "", false)
 	require.ErrorIs(t, err, types.ErrGroupBuiltin)

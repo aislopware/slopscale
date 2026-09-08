@@ -9,6 +9,8 @@ import {
   protocolSummary,
   rulesUsingGroup,
 } from "~/components/access/model.ts";
+import { groupItems } from "~/components/access/pickers.ts";
+import type { GroupPickerRole } from "~/components/access/pickers.ts";
 
 const stamp = "2026-01-01T12:00:00Z";
 
@@ -113,11 +115,17 @@ const all = group("1", { builtin: "all", name: "All" });
 const engineers = group("2", { userIds: [ada.id] });
 const servers = group("3", { nodeIds: [server.id] });
 const mixed = group("4", { nodeIds: [laptop.id], userIds: [ada.id] });
-const groups = [all, engineers, servers, mixed];
+const self = group("5", { builtin: "self", name: "Own machines" });
+const groups = [all, engineers, servers, mixed, self];
 
 describe(groupsOfNode, () => {
-  it("includes the builtin group, direct membership and the owner's groups", () => {
+  it("includes the builtin All group, direct membership and the owner's groups", () => {
     expect(groupsOfNode(groups, laptop).map((item) => item.id)).toStrictEqual(["1", "2", "4"]);
+  });
+
+  it("never lists Own machines, which has no members", () => {
+    expect(groupsOfNode(groups, laptop).map((item) => item.id)).not.toContain(self.id);
+    expect(machineCount(self, [laptop, server, adaSecond])).toBe(0);
   });
 
   it("ignores the owner of a tagged machine", () => {
@@ -178,5 +186,16 @@ describe(portsError, () => {
     expect(portsError("0")).not.toBeNull();
     expect(portsError("70000")).not.toBeNull();
     expect(portsError("90-80")).not.toBeNull();
+  });
+});
+
+describe(groupItems, () => {
+  it("offers Own machines only as a destination and no builtin group for membership", () => {
+    const values = (role: GroupPickerRole): string[] =>
+      groupItems(groups, role).map((item) => item.value);
+
+    expect(values("destination")).toStrictEqual(["1", "5", "2", "3", "4"]);
+    expect(values("members")).toStrictEqual(["1", "2", "3", "4"]);
+    expect(values("membership")).toStrictEqual(["2", "3", "4"]);
   });
 });

@@ -110,7 +110,7 @@ export function GroupsTab({
             footer={
               <TableFooter>
                 {own === 0
-                  ? "Only the built-in group so far. Create one to name a set of machines."
+                  ? "Only the built-in groups so far. Create one to name a set of machines."
                   : `Showing ${shown} of ${plural(groups.length, "group")}`}
               </TableFooter>
             }

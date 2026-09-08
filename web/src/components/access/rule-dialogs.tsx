@@ -6,7 +6,7 @@ import type { ReactElement, ReactNode, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { AccessRule, Group, Posture } from "~/api/queries.ts";
-import { hasPorts, portsError, toProtocol } from "~/components/access/model.ts";
+import { hasPorts, isSelf, portsError, toProtocol } from "~/components/access/model.ts";
 import type { Protocol } from "~/components/access/model.ts";
 import type { AccessMutations } from "~/components/access/mutations.ts";
 import { groupItems, postureItems } from "~/components/access/pickers.ts";
@@ -107,13 +107,16 @@ function RuleForm({
     event.preventDefault();
 
     const expiresAt = fromLocalInput(draft.expires);
+    const toOwnMachines = groups.some(
+      (group) => isSelf(group) && draft.destinations.includes(group.id),
+    );
     const body = {
       name: draft.name.trim(),
       description: draft.description.trim(),
       enabled: draft.enabled,
       protocol: draft.protocol,
       ports: hasPorts(draft.protocol) ? draft.ports.trim() : "",
-      bidirectional: draft.bidirectional,
+      bidirectional: draft.bidirectional && !toOwnMachines,
       sourceGroupIds: [...draft.sources],
       destinationGroupIds: [...draft.destinations],
       postureIds: [...draft.postures],
@@ -157,7 +160,11 @@ function RuleFields({
   readonly postures: readonly Posture[];
   readonly onChange: (patch: Partial<Draft>) => void;
 }): ReactElement {
-  const items = groupItems(groups);
+  const sourceItems = groupItems(groups, "members");
+  const destinationItems = groupItems(groups, "destination");
+  const toOwnMachines = groups.some(
+    (group) => isSelf(group) && draft.destinations.includes(group.id),
+  );
 
   return (
     <>
@@ -183,7 +190,7 @@ function RuleFields({
       <MultiPicker
         label="Sources"
         placeholder="Groups that may open the connection…"
-        items={items}
+        items={sourceItems}
         value={draft.sources}
         onValueChange={(sources) => {
           onChange({ sources });
@@ -193,7 +200,7 @@ function RuleFields({
       <MultiPicker
         label="Destinations"
         placeholder="Groups that accept it…"
-        items={items}
+        items={destinationItems}
         value={draft.destinations}
         onValueChange={(destinations) => {
           onChange({ destinations });
@@ -228,8 +235,13 @@ function RuleFields({
         <Switch.Legend>Options</Switch.Legend>
         <OptionSwitch
           label="Both directions"
-          description="Destinations may open connections to sources too."
-          checked={draft.bidirectional}
+          description={
+            toOwnMachines
+              ? "Not with Own machines as a destination: it is defined by the source."
+              : "Destinations may open connections to sources too."
+          }
+          checked={draft.bidirectional && !toOwnMachines}
+          disabled={toOwnMachines}
           onChange={(bidirectional) => {
             onChange({ bidirectional });
           }}
@@ -251,16 +263,19 @@ function OptionSwitch({
   label,
   description,
   checked,
+  disabled = false,
   onChange,
 }: {
   readonly label: string;
   readonly description: ReactNode;
   readonly checked: boolean;
+  readonly disabled?: boolean;
   readonly onChange: (checked: boolean) => void;
 }): ReactElement {
   return (
     <Switch
       checked={checked}
+      disabled={disabled}
       onCheckedChange={onChange}
       label={
         <span className="flex flex-col gap-0.5">

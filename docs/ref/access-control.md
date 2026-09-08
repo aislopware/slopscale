@@ -19,8 +19,13 @@ ways:
   registers later.
 
 Tagged machines have no owner, so they join groups directly. A machine can be
-in any number of groups. The builtin group _All_ holds every machine, lists
-no members and cannot be renamed, edited or deleted.
+in any number of groups. Two builtin groups cannot be renamed, edited or
+deleted: _All_ holds every machine and lists no members, and _Own machines_
+is a rule destination only. It is Tailscale's `autogroup:self`: in a rule it
+means the machines owned by the same user as the source, so it has no
+members of its own, cannot be a source, cannot be in a bidirectional rule
+and cannot be given to a network, a DNS rule or a pre-auth key. Tagged
+machines have no user and are never reached through it.
 
 Pre-auth keys carry groups too. A key created with `groupIds` enrols every
 machine it registers into those groups, the way a NetBird setup key does with
@@ -44,6 +49,15 @@ everything not allowed by a rule (or by the policy file) unreachable, so
 create the rules a tailnet needs before turning them on, or start with one
 rule from _All_ to _All_ and narrow it down. The console asks before the
 last enabled rule is disabled or deleted when that would open the tailnet.
+
+A new server does not start open. The first time it runs it seeds one rule,
+_Own machines_, from _All_ to _Own machines_ on every protocol: each machine
+reaches the other machines of its own user and nothing else, and machines of
+different users do not see each other. It is an ordinary rule afterwards;
+disable or delete it to open the tailnet, or add rules next to it. On a
+database that already has machines when it is upgraded the rule is seeded
+disabled, so an open tailnet stays open until an operator turns it on. The
+rule is seeded once; a deleted rule does not come back.
 
 Rules and the policy file combine: the rules compile into grants that sit next
 to the file's own, and a connection is allowed when either admits it. The

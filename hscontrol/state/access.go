@@ -22,13 +22,13 @@ func (s *State) AccessModel() types.AccessModel {
 	return *model
 }
 
-// loadAccessModel creates the builtin group when missing, reads the
+// loadAccessModel creates the builtin groups when missing, reads the
 // model from the database and hands it to the policy manager. It runs
 // at start and after every mutation.
 func (s *State) loadAccessModel() (change.Change, error) {
-	_, err := s.db.EnsureAllGroup()
+	err := s.db.EnsureBuiltinGroups()
 	if err != nil {
-		return change.Change{}, fmt.Errorf("ensuring the builtin all group: %w", err)
+		return change.Change{}, fmt.Errorf("ensuring the builtin groups: %w", err)
 	}
 
 	model, err := s.db.LoadAccessModel()
@@ -523,9 +523,25 @@ func (s *State) normalizeAccessRule(rule types.AccessRule) (types.AccessRule, er
 
 	model := s.AccessModel()
 
-	for _, id := range append(append([]types.GroupID{}, rule.SourceGroupIDs...), rule.DestinationGroupIDs...) {
-		if _, ok := model.Group(id); !ok {
+	for _, id := range rule.SourceGroupIDs {
+		group, ok := model.Group(id)
+		if !ok {
 			return types.AccessRule{}, fmt.Errorf("%w: %d", types.ErrGroupNotFound, id)
+		}
+
+		if group.IsSelf() {
+			return types.AccessRule{}, types.ErrRuleSelfSource
+		}
+	}
+
+	for _, id := range rule.DestinationGroupIDs {
+		group, ok := model.Group(id)
+		if !ok {
+			return types.AccessRule{}, fmt.Errorf("%w: %d", types.ErrGroupNotFound, id)
+		}
+
+		if group.IsSelf() && rule.Bidirectional {
+			return types.AccessRule{}, types.ErrRuleSelfBoth
 		}
 	}
 
