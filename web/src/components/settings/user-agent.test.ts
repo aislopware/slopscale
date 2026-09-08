@@ -11,6 +11,11 @@ describe(describeUserAgent, () => {
     ).toBe("Chrome on macOS");
     expect(
       describeUserAgent(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/150.0.0.0 Safari/537.36",
+      ),
+    ).toBe("Chrome on macOS");
+    expect(
+      describeUserAgent(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0",
       ),
     ).toBe("Firefox on Windows");

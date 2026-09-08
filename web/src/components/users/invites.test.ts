@@ -9,6 +9,7 @@ import {
   inviteState,
   openInvites,
   toInviteExpiry,
+  sentence,
 } from "~/components/users/invites.ts";
 
 const stamp = "2026-01-01T00:00:00Z";
@@ -77,5 +78,13 @@ describe(openInvites, () => {
     expect(inviteState(invite("1"))).toBe("pending");
     expect(inviteState(invite("2", { expired: true }))).toBe("expired");
     expect(inviteState(invite("3", { accepted: true, expired: true }))).toBe("accepted");
+  });
+});
+
+describe(sentence, () => {
+  it("turns a server error into a sentence", () => {
+    expect(sentence("no mail server is configured")).toBe("No mail server is configured.");
+    expect(sentence("Refused by the relay.")).toBe("Refused by the relay.");
+    expect(sentence("  ")).toBe("");
   });
 });

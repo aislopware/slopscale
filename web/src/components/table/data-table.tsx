@@ -8,7 +8,12 @@ import type { ReactElement, ReactNode } from "react";
 
 import { useTableContext } from "~/components/table/app-table.tsx";
 import { TableScrollPanel } from "~/components/table/scroll-panel.tsx";
-import { FrameBand, frameTableClass, frameTableRowClass } from "~/components/ui/frame.tsx";
+import {
+  FrameBand,
+  frameTableClass,
+  frameTableRowClass,
+  pinnedEdgeClass,
+} from "~/components/ui/frame.tsx";
 
 export interface DataTableProps {
   /** Rendered in place of the body when the (filtered) model is empty. */
@@ -158,7 +163,7 @@ function cellClass(
     meta?.numeric === true && "text-right tabular-nums",
     // The hairline reads as the pinned column's edge, so it appears only while there is something
     // scrolled behind it.
-    meta?.sticky === "right" && overflowing && "border-l border-kumo-hairline",
+    meta?.sticky === "right" && overflowing && pinnedEdgeClass,
     meta?.className,
   );
 }
@@ -189,7 +194,7 @@ function PageBand({ fallback }: { readonly fallback: ReactNode }): ReactNode {
           table.setPageIndex(page - 1);
         }}
       >
-        <Pagination.Info className="text-xs">
+        <Pagination.Info className="text-sm">
           {() => `Showing ${first}–${last} of ${total}`}
         </Pagination.Info>
         <Pagination.Controls controls="simple" />

@@ -19,7 +19,7 @@ import { plural } from "~/components/overview/plural.ts";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { TableScrollPanel } from "~/components/table/scroll-panel.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
-import { frameTableClass, frameTableRowClass } from "~/components/ui/frame.tsx";
+import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
 /** Every row spans this many columns when it opens. */
@@ -73,13 +73,10 @@ function EventRows({
         <Table.Cell>
           <ResultCell event={event} />
         </Table.Cell>
-        <Table.Cell className="hidden w-full min-w-72 lg:table-cell">
+        <Table.Cell className="hidden lg:table-cell">
           <DetailCell event={event} onOpen={onOpen} />
         </Table.Cell>
-        <Table.Cell
-          sticky="right"
-          className={cn("w-10 text-right", overflowing && "border-l border-kumo-hairline")}
-        >
+        <Table.Cell sticky="right" className={cn("text-right", overflowing && pinnedEdgeClass)}>
           {/* The chevron is the row's own control, not a second "Show details" button beside it:
               it says the row opens and gives the keyboard the same reach as the click. */}
           <Button
@@ -135,19 +132,19 @@ export function EventsTable({
     <>
       <TableScrollPanel pinnedRight>
         {(overflowing) => (
-          <Table className={frameTableClass}>
+          // Fixed layout: every column but Summary has a set width, so Summary takes what is left
+          // of the panel and its chips wrap inside it instead of stretching the table past the
+          // panel. The minimum keeps the columns readable on a phone, where the panel scrolls.
+          <Table className={cn(frameTableClass, "min-w-[800px] table-fixed")}>
             <Table.Header variant="compact" sticky>
               <Table.Row>
-                <Table.Head>Time</Table.Head>
-                <Table.Head>Actor</Table.Head>
-                <Table.Head>Action</Table.Head>
-                <Table.Head>Target</Table.Head>
-                <Table.Head>Result</Table.Head>
-                <Table.Head className="hidden w-full min-w-72 lg:table-cell">Summary</Table.Head>
-                <Table.Head
-                  sticky="right"
-                  className={cn("w-10", overflowing && "border-l border-kumo-hairline")}
-                >
+                <Table.Head className="w-32">Time</Table.Head>
+                <Table.Head className="w-40">Actor</Table.Head>
+                <Table.Head className="w-48">Action</Table.Head>
+                <Table.Head className="w-44">Target</Table.Head>
+                <Table.Head className="w-28">Result</Table.Head>
+                <Table.Head className="hidden lg:table-cell">Summary</Table.Head>
+                <Table.Head sticky="right" className={cn("w-12", overflowing && pinnedEdgeClass)}>
                   <span className="sr-only">Details</span>
                 </Table.Head>
               </Table.Row>

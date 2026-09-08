@@ -224,7 +224,7 @@ export function DetailCell({
         <Badge
           key={key}
           variant="secondary"
-          className="max-w-full font-mono text-[0.85em] font-normal"
+          className="max-w-full shrink-0 font-mono text-[0.85em] font-normal"
         >
           <span className="min-w-0 truncate">{`${key}=${detailText(value)}`}</span>
         </Badge>

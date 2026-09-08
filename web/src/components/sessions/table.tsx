@@ -24,7 +24,7 @@ import { useDeleteRecording } from "~/components/sessions/mutations.ts";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { TableScrollPanel } from "~/components/table/scroll-panel.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
-import { frameTableClass, frameTableRowClass } from "~/components/ui/frame.tsx";
+import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 
 const columnCount = 7;
@@ -75,10 +75,7 @@ function RecordingRow({
       </Table.Cell>
       <Table.Cell
         sticky="right"
-        className={cn(
-          "w-24 text-right whitespace-nowrap",
-          overflowing && "border-l border-kumo-hairline",
-        )}
+        className={cn("w-24 text-right whitespace-nowrap", overflowing && pinnedEdgeClass)}
       >
         <LinkButton
           variant="ghost"
@@ -157,10 +154,7 @@ export function SessionsTable({
                 <Table.Head>Command</Table.Head>
                 <Table.Head>Size</Table.Head>
                 <Table.Head>State</Table.Head>
-                <Table.Head
-                  sticky="right"
-                  className={cn("w-24", overflowing && "border-l border-kumo-hairline")}
-                >
+                <Table.Head sticky="right" className={cn("w-24", overflowing && pinnedEdgeClass)}>
                   <span className="sr-only">Actions</span>
                 </Table.Head>
               </Table.Row>

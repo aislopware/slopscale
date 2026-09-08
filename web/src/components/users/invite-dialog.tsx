@@ -27,6 +27,7 @@ import {
   defaultInviteExpiry,
   invitableRoles,
   inviteExpiryOptions,
+  sentence,
   toInviteExpiry,
 } from "~/components/users/invites.ts";
 import type { InviteExpiry } from "~/components/users/invites.ts";
@@ -272,7 +273,11 @@ function MailOutcome({ result }: { readonly result: InviteResult }): ReactNode {
 
   if (result.emailError !== undefined && result.emailError !== "") {
     return (
-      <Callout tone="warning" title="The email was not sent" description={result.emailError} />
+      <Callout
+        tone="warning"
+        title="The email was not sent"
+        description={`${sentence(result.emailError)} Send the link yourself.`}
+      />
     );
   }
 

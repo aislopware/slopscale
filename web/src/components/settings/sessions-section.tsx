@@ -17,7 +17,7 @@ import { describeUserAgent } from "~/components/settings/user-agent.ts";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
-import { frameTableClass, frameTableRowClass } from "~/components/ui/frame.tsx";
+import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
@@ -115,7 +115,7 @@ export function SessionsBody({
 
 /** The pinned column draws its own edge, but only while something is scrolled behind it. */
 function cellEdge(base: string, overflowing: boolean): string {
-  return overflowing ? `${base} border-l border-kumo-hairline` : base;
+  return overflowing ? `${base} ${pinnedEdgeClass}` : base;
 }
 
 function SessionRow({

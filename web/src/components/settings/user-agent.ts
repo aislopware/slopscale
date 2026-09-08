@@ -17,7 +17,7 @@ const browsers: readonly Rule[] = [
   { label: "Brave", pattern: /\bBrave\//v },
   { label: "Vivaldi", pattern: /\bVivaldi\//v },
   { label: "Firefox", pattern: /\bFirefox\/|\bFxiOS\//v },
-  { label: "Chrome", pattern: /\bChrome\/|\bCriOS\/|\bChromium\//v },
+  { label: "Chrome", pattern: /Chrome\/|\bCriOS\/|\bChromium\//v },
   { label: "Safari", pattern: /\bSafari\//v },
   { label: "curl", pattern: /^curl\//v },
 ];

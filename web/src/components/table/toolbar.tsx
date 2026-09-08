@@ -37,7 +37,7 @@ export function TableFooter({
   readonly actions?: ReactNode;
 }): ReactElement {
   return (
-    <div className="flex items-center justify-between gap-3 px-5 py-1.5 text-xs text-kumo-subtle">
+    <div className="flex items-center justify-between gap-3 px-5 py-1.5 text-sm text-kumo-subtle">
       <span>{children}</span>
       {actions === undefined ? null : <span className="flex items-center gap-2">{actions}</span>}
     </div>

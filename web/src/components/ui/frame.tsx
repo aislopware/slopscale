@@ -64,6 +64,14 @@ export const frameTableRowClass =
   "even:bg-kumo-base even:[--kumo-table-row-bg:var(--color-kumo-base)] hover:bg-kumo-tint hover:[--kumo-table-row-bg:var(--color-kumo-tint)] even:hover:bg-kumo-tint even:hover:[--kumo-table-row-bg:var(--color-kumo-tint)]";
 
 /**
+ * The edge of a column pinned to the right of a table while something is scrolled behind it: a
+ * hairline plus a soft shadow cast leftwards, which is what tells a reader on a phone that the row
+ * goes on under the pinned cell. Without anything behind it the pinned column draws nothing.
+ */
+export const pinnedEdgeClass =
+  "border-l border-kumo-hairline shadow-[-10px_0_10px_-8px_var(--color-kumo-line)]";
+
+/**
  * A row of text on the band above or below the panel, such as a title or a count. Its inset plus
  * the frame's 4px must put the text where the panel's own text starts: 12px for a panel that draws
  * its content flush, px-5 for the 20px of a `SectionRow` or a `frameTableClass` table.

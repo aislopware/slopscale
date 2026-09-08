@@ -61,3 +61,18 @@ export function inviteState(invite: Invite): InviteState {
 export function openInvites(invites: readonly Invite[]): Invite[] {
   return invites.filter((invite) => !invite.accepted);
 }
+
+/**
+ * A server error as a sentence: the first letter up, a full stop at the end, so it can sit in a
+ * callout next to a sentence of the console's own.
+ */
+export function sentence(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed === "") {
+    return "";
+  }
+
+  const capitalised = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+
+  return /[.!?]$/v.test(capitalised) ? capitalised : `${capitalised}.`;
+}

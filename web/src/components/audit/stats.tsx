@@ -24,7 +24,7 @@ function Stat({
 }): ReactElement {
   return (
     <div className={cn(framePanelClass, "flex flex-col gap-1 px-5 py-4")}>
-      <span className="text-xs text-kumo-subtle">{label}</span>
+      <span className="text-sm text-kumo-subtle">{label}</span>
       <span
         className={cn(
           "text-xl font-semibold tabular-nums",
@@ -33,7 +33,7 @@ function Stat({
       >
         {value}
       </span>
-      <span className="text-xs text-kumo-subtle">{hint}</span>
+      <span className="text-sm text-kumo-subtle">{hint}</span>
     </div>
   );
 }
@@ -47,9 +47,9 @@ export function AuditStats({ events }: { readonly events: readonly AuditEvent[] 
   const failures = events.filter((event) => event.outcome >= clientError).length;
 
   return (
-    <Frame className="grid grid-cols-3 gap-1">
+    <Frame className="grid gap-1 sm:grid-cols-3">
       <Stat label="Events loaded" value={events.length} hint="In the selected range" />
-      <Stat label="Distinct actors" value={actors.size} hint="Users, keys and the CLI" />
+      <Stat label="Distinct actors" value={actors.size} hint="Users, machines, keys and sessions" />
       <Stat label="Failures" value={failures} hint="Outcome 400 or worse" alert />
     </Frame>
   );

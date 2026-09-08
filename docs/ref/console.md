@@ -198,7 +198,10 @@ out*.
   in place), the machines seen most recently, and a getting-started
   checklist while the tailnet is empty.
 - **Machines**: every node with its owner or tags, addresses, status and
-  routes. Search by name, address, user or tag and filter by status or user.
+  routes. Search by name, address, user or tag and filter by status, user or
+  tag; the filters live in the URL, so a filtered list can be shared. Tick
+  rows to approve, expire or delete them in one go. The list refreshes on
+  its own every fifteen seconds while the tab is open.
   Each machine has a detail page with its keys, routes (approve with a switch),
   sharing and the global exit node switch, plus rename, tag, expire and remove.
   A warning the client reports about itself, such as a subnet router whose
@@ -214,8 +217,9 @@ out*.
   groups the person gets on their first login.
 - **Keys**: pre-auth keys (create with reusable, ephemeral, pre-authorized and
   tags; expire; delete), API keys and OAuth clients for the v2 API (create
-  with scopes and tags; revoke). New keys and client secrets are shown once,
-  with a copy button.
+  with scopes and tags; revoke; _Rotate secret_ mints a new secret for an
+  API key that keeps its id and scopes). New keys and client secrets are
+  shown once, with a copy button.
 - **Access controls**: [groups and access rules](access-control.md), and the
   [policy](policy.md) file in an editor with syntax highlighting. *Check*
   validates the draft against the server without saving; *Save* applies it.
@@ -229,11 +233,13 @@ out*.
   their subscriptions and last delivery; create, edit, test, rotate the
   secret and delete; see [Webhooks](webhooks.md).
 - **Audit log**: who changed what, newest first, with filters by action, user
-  and time; see [Audit log](audit.md).
+  and time, and _Export_ as CSV or JSON with the same filters; see
+  [Audit log](audit.md).
 - **Settings**: the [device and user approval](approval.md) switches, the
   key expiry cap, a _Maintenance_ section with the IP address backfill
   (`headscale nodes backfillips`), the signed-in credential's role and scopes,
-  and the server's build, addresses, DERP regions and config file values.
+  the console [sessions](#sessions) with _End_ and _Sign out everywhere_, and
+  the server's build, addresses, DERP regions and config file values.
 
 ## Building from source
 
