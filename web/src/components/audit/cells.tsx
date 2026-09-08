@@ -15,6 +15,7 @@ import { formatAbsolute, parseTime } from "~/lib/time.ts";
 const actorKinds: Record<string, string> = {
   api_key: "API key",
   local: "CLI",
+  node: "Machine",
   oauth: "OAuth token",
   session: "Console session",
   system: "System",

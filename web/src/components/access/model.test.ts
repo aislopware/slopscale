@@ -39,6 +39,7 @@ function node(id: string, owner: User, tags: string[] = []): Node {
     approvedAt: stamp,
     approvedRoutes: [],
     availableRoutes: [],
+    clientWarnings: [],
     createdAt: stamp,
     discoKey: "discokey:1",
     expiry: null,

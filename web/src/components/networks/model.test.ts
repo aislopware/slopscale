@@ -30,6 +30,7 @@ function node(id: string, available: string[], approved: string[]): Node {
     approvedAt: stamp,
     approvedRoutes: approved,
     availableRoutes: available,
+    clientWarnings: [],
     createdAt: stamp,
     discoKey: "discokey:1",
     expiry: null,

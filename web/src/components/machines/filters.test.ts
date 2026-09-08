@@ -26,6 +26,7 @@ function node(id: string, overrides: Partial<Node> = {}): Node {
     approvedAt: stamp,
     approvedRoutes: [],
     availableRoutes: [],
+    clientWarnings: [],
     createdAt: stamp,
     discoKey: "discokey:1",
     expiry: null,

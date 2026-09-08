@@ -69,6 +69,7 @@ const laptop: Node = {
   givenName: "laptop-alice",
   globalExitNode: false,
   ephemeral: false,
+  clientWarnings: [],
   id: "1",
   ipAddresses: ["100.64.0.1"],
   lastSeen: new Date().toISOString(),

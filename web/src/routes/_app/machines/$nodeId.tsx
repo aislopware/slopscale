@@ -19,6 +19,7 @@ import { PostureSection } from "~/components/machines/posture.tsx";
 import { GlobalExitSection, RoutesSection } from "~/components/machines/routes.tsx";
 import { SharingSection } from "~/components/machines/sharing.tsx";
 import { StatusBadge } from "~/components/machines/status-badge.tsx";
+import { ClientWarnings } from "~/components/machines/warnings.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
@@ -66,6 +67,7 @@ function MachinePage(): ReactElement {
   return (
     <>
       <MachineHeader node={node} me={me} users={userList} />
+      <ClientWarnings node={node} />
       <div className="grid items-start gap-6 min-[1200px]:grid-cols-[minmax(0,2fr)_minmax(0,22rem)]">
         <div className="flex flex-col gap-6">
           <OverviewSection node={node} />
