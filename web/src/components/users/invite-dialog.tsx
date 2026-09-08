@@ -23,6 +23,7 @@ import {
   DialogRoot,
 } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
+import { UrlText } from "~/components/ui/url-text.tsx";
 import {
   defaultInviteExpiry,
   invitableRoles,
@@ -250,6 +251,7 @@ export function InviteResultView({
             unless it starts at the left edge with the icon on its first line. */}
         <CopyText
           value={result.url}
+          display={<UrlText url={result.url} />}
           wrap
           label="Copy invitation link"
           className="max-w-none items-start text-left"

@@ -12,7 +12,7 @@ import {
 } from "~/components/logstreams/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { urlHost } from "~/components/webhooks/model.ts";
+import { UrlText } from "~/components/ui/url-text.tsx";
 
 const helper = createAppColumnHelper<LogStream>();
 
@@ -66,7 +66,7 @@ function StreamCell({ stream }: { readonly stream: LogStream }): ReactElement {
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="truncate font-medium text-kumo-default">{stream.name}</span>
       <Tooltip content={stream.url}>
-        <span className="truncate text-xs text-kumo-subtle">{urlHost(stream.url)}</span>
+        <UrlText url={stream.url} className="truncate text-xs" />
       </Tooltip>
       {/* The destination and counters are hidden on small screens, so the stream carries them there. */}
       <span className="truncate text-xs text-kumo-subtle md:hidden">

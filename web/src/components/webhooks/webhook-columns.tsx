@@ -5,12 +5,12 @@ import type { ReactElement } from "react";
 import type { Webhook } from "~/api/queries.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { UrlText } from "~/components/ui/url-text.tsx";
 import {
   countEvents,
   deliveryLabel,
   deliveryState,
   providerLabel,
-  urlHost,
 } from "~/components/webhooks/model.ts";
 import { WebhookMenu } from "~/components/webhooks/webhook-menu.tsx";
 
@@ -66,11 +66,11 @@ function EndpointCell({ webhook }: { readonly webhook: Webhook }): ReactElement 
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <Tooltip content={webhook.url}>
-        <span className="truncate font-medium text-kumo-default">{urlHost(webhook.url)}</span>
+        <UrlText url={webhook.url} className="truncate text-sm [&>span:nth-child(2)]:font-medium" />
       </Tooltip>
-      <span className="truncate text-xs text-kumo-subtle">
-        {webhook.description === "" ? webhook.url : webhook.description}
-      </span>
+      {webhook.description === "" ? null : (
+        <span className="truncate text-xs text-kumo-subtle">{webhook.description}</span>
+      )}
       {/* The provider and events columns are hidden on small screens, so the endpoint carries them there. */}
       <span className="truncate text-xs text-kumo-subtle md:hidden">
         {`${providerLabel(webhook.providerType)} · ${countEvents(webhook.subscriptions.length)}`}

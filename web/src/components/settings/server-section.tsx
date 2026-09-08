@@ -10,6 +10,7 @@ import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section } from "~/components/ui/section.tsx";
+import { UrlText } from "~/components/ui/url-text.tsx";
 
 const tlsLabels: Record<string, string> = {
   letsencrypt: "Let's Encrypt",
@@ -81,7 +82,11 @@ function networkItems(info: ServerInfo): readonly Definition[] {
         info.oidcIssuer === "" ? (
           <Muted>None, users are created by hand</Muted>
         ) : (
-          <CopyText value={info.oidcIssuer} label="Copy the issuer URL" />
+          <CopyText
+            value={info.oidcIssuer}
+            display={<UrlText url={info.oidcIssuer} />}
+            label="Copy the issuer URL"
+          />
         ),
     },
   ];
@@ -124,7 +129,7 @@ export function ServerSection({ info }: { readonly info: ServerInfo }): ReactEle
       value: (
         <span className="flex items-center gap-2">
           <Link
-            to="/relays"
+            to="/relays/map"
             className="flex items-center gap-1 text-kumo-link underline decoration-kumo-line underline-offset-2 hover:decoration-current"
           >
             {info.derpRegions === 0

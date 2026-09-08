@@ -24,6 +24,7 @@ import { ValueDialog } from "~/components/dns/value-dialog.tsx";
 import { SettingRow } from "~/components/settings/setting-row.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { UrlText } from "~/components/ui/url-text.tsx";
 
 /** The maps the server fetches and merges, and how often. */
 export function SourcesSection({
@@ -83,7 +84,7 @@ export function SourcesSection({
         }}
         entries={settings.urls.map((url) => ({
           key: url,
-          value: url,
+          value: <UrlText url={url} />,
           aside: url === tailscaleMapUrl ? <Badge variant="secondary">Tailscale</Badge> : undefined,
           removeLabel: `Remove map URL ${url}`,
           onRemove: () => {

@@ -1,7 +1,7 @@
 import { cn } from "@cloudflare/kumo/utils";
 import { CheckIcon, CopyIcon } from "@phosphor-icons/react";
 import { useState } from "react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import { copyText } from "~/lib/copy.ts";
 
@@ -11,11 +11,13 @@ const resetAfterMs = 1500;
 /**
  * A monospace value that copies itself when clicked. The copy icon is always there, small and
  * muted, so a copyable value ends where every other value ends and a row stays as tall as its text.
- * Hiding the icon until hover left a hole beside every copyable value.
+ * Hiding the icon until hover left a hole beside every copyable value. The icon's ink is centred on
+ * the line box, which puts it a pixel above the centre of lowercase text, so it steps down one.
  */
 export function CopyText({
   value,
   copy = value,
+  display,
   label,
   wrap = false,
   className,
@@ -23,6 +25,8 @@ export function CopyText({
   readonly value: string;
   /** What goes on the clipboard when it differs from the shown text, such as a whole secret. */
   readonly copy?: string;
+  /** What to show in place of the plain value, such as a URL with its host picked out. */
+  readonly display?: ReactNode;
   /** The tooltip and accessible name of the control. */
   readonly label?: string;
   /** Let a long value wrap onto several lines instead of truncating it. */
@@ -54,14 +58,14 @@ export function CopyText({
         className,
       )}
     >
-      <span className={cn("min-w-0", wrap ? "break-all" : "truncate")}>{value}</span>
+      <span className={cn("min-w-0", wrap ? "break-all" : "truncate")}>{display ?? value}</span>
       {copied ? (
-        <CheckIcon size={iconSize} className="shrink-0 text-kumo-success" />
+        <CheckIcon size={iconSize} className="relative top-px shrink-0 text-kumo-success" />
       ) : (
         <CopyIcon
           size={iconSize}
           aria-hidden
-          className="shrink-0 text-kumo-subtle group-hover/copy:text-kumo-default"
+          className="relative top-px shrink-0 text-kumo-subtle group-hover/copy:text-kumo-default"
         />
       )}
     </button>
