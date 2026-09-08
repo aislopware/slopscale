@@ -656,6 +656,12 @@ func describeNetmap(nm *netmap.NetworkMap) string {
 	return nm.Concise() + fmt.Sprintf("filter: %d rules\n", len(nm.PacketFilter))
 }
 
+// NodePrivateKey is the client's node key, what a relay client
+// identifies itself with.
+func (c *TestClient) NodePrivateKey() key.NodePrivate {
+	return c.direct.GetPersist().PrivateNodeKey()
+}
+
 // Direct returns the underlying [controlclient.Direct] for
 // advanced operations like [controlclient.Direct.SetHostinfo] or SendUpdate.
 func (c *TestClient) Direct() *controlclient.Direct {

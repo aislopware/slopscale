@@ -57,6 +57,7 @@ type serverConfig struct {
 	smtp             *types.SMTPConfig
 	sshRecording     *types.SSHRecordingConfig
 	httpsCerts       *types.HTTPSCertsConfig
+	embeddedDERP     bool
 	seededRule       bool
 }
 
@@ -108,6 +109,12 @@ func WithEphemeralTimeout(d time.Duration) ServerOption {
 // WithNodeExpiry sets the default node key expiry duration.
 func WithNodeExpiry(d time.Duration) ServerOption {
 	return func(c *serverConfig) { c.nodeExpiry = d }
+}
+
+// WithEmbeddedDERP turns the embedded relay on from the config file, as
+// derp.server.enabled would.
+func WithEmbeddedDERP() ServerOption {
+	return func(sc *serverConfig) { sc.embeddedDERP = true }
 }
 
 // WithRealListener binds the HTTP API to a real loopback TCP port instead of
@@ -182,6 +189,35 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 		// Placeholder; updated below once the in-memory server starts.
 		ServerURL:           "http://localhost:0",
 		NoisePrivateKeyPath: tmpDir + "/noise_private.key",
+		DERP: types.DERPConfig{
+			// A minimal inline map so MapResponse generation works; the
+			// embedded relay has a key and is off until a test or the
+			// settings turn it on. Its STUN port is picked at bind time.
+			DERPMap: &tailcfg.DERPMap{
+				Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
+					900: {
+						RegionID:   900,
+						RegionCode: "test",
+						RegionName: "Test Region",
+						Nodes: []*tailcfg.DERPNode{{
+							Name:     "test0",
+							RegionID: 900,
+							HostName: "127.0.0.1",
+							IPv4:     "127.0.0.1",
+							DERPPort: -1, // not a real DERP, just needed for MapResponse
+						}},
+					},
+				},
+			},
+			ServerEnabled:                      sc.embeddedDERP,
+			ServerPrivateKeyPath:               tmpDir + "/derp_private.key",
+			ServerRegionID:                     999,
+			ServerRegionCode:                   "headscale",
+			ServerRegionName:                   "Headscale Embedded DERP",
+			ServerVerifyClients:                true,
+			STUNAddr:                           "127.0.0.1:0",
+			AutomaticallyAddEmbeddedDerpRegion: true,
+		},
 		Node: types.NodeConfig{
 			Expiry: sc.nodeExpiry,
 			Ephemeral: types.EphemeralConfig{
@@ -245,23 +281,7 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 		disableSeededRule(tb, app.GetState())
 	}
 
-	// Set a minimal DERP map so MapResponse generation works.
-	app.GetState().SetDERPMap(&tailcfg.DERPMap{
-		Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
-			900: {
-				RegionID:   900,
-				RegionCode: "test",
-				RegionName: "Test Region",
-				Nodes: []*tailcfg.DERPNode{{
-					Name:     "test0",
-					RegionID: 900,
-					HostName: "127.0.0.1",
-					IPv4:     "127.0.0.1",
-					DERPPort: -1, // not a real DERP, just needed for MapResponse
-				}},
-			},
-		},
-	})
+	app.StartDERPForTest(tb)
 
 	// Start subsystems.
 	app.StartBatcherForTest(tb)
@@ -325,6 +345,11 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 // nodes, and pre-auth keys.
 func (s *TestServer) State() *state.State {
 	return s.st
+}
+
+// DERP reports the relay configuration in force and the live map.
+func (s *TestServer) DERP() state.DERPStatus {
+	return s.st.DERP()
 }
 
 // Close shuts down the in-memory HTTP server and listener.

@@ -72,11 +72,20 @@ prefixes:
 # https://tailscale.com/blog/how-tailscale-works/#encrypted-tcp-relays-derp
 #
 # Headscale needs a list of DERP servers that can be presented to the clients.
+# DERP relays carry traffic between machines that cannot connect directly
+# and help them find each other (STUN). Everything below except `paths`,
+# `private_key_path` and `automatically_add_embedded_derp_region` can also
+# be changed while the server runs, from the admin console's Relays page,
+# `headscale derp set` or PUT /api/v1/derp; settings set that way are stored
+# in the database and replace this section until `headscale derp reset`.
 derp:
   server:
-    # If enabled, runs the embedded DERP server and merges it into the rest of the DERP config
-    # The Headscale server_url defined above MUST be using https, DERP requires TLS to be in place
-    enabled: false
+    # Runs the embedded DERP relay on the server_url and publishes it to
+    # every machine next to the relays from `urls` and `paths`, so there
+    # is always a relay near the control server. On by default. The
+    # server_url should use https: with http the relay is published as
+    # insecure and clients reach it in plain HTTP.
+    enabled: true
 
     # Region ID to use for the embedded DERP server.
     # The local DERP prevails if the region ID collides with other region ID coming from
@@ -91,13 +100,14 @@ derp:
     verify_clients: true
 
     # Listens over UDP at the configured address for STUN connections - to help with NAT traversal.
-    # When the embedded DERP server is enabled stun_listen_addr MUST be defined.
+    # Required while the embedded DERP server is enabled.
     #
     # For more details on how this works, check this great article: https://tailscale.com/blog/how-tailscale-works/
     stun_listen_addr: "0.0.0.0:3478"
 
     # Private key used to encrypt the traffic between headscale DERP and
     # Tailscale clients. A missing key will be automatically generated.
+    # Defaults to derp_server_private.key next to the noise private key.
     private_key_path: /var/lib/headscale/derp_server_private.key
 
     # This flag can be used, so the DERP map entry for the embedded DERP server is not written automatically,
@@ -107,10 +117,13 @@ derp:
 
     # For better connection stability (especially when using an Exit-Node and DNS is not working),
     # it is possible to optionally add the public IPv4 and IPv6 address to the Derp-Map using:
-    ipv4: 198.51.100.1
-    ipv6: 2001:db8::1
+    # ipv4: 198.51.100.1
+    # ipv6: 2001:db8::1
 
-  # List of externally available DERP maps encoded in JSON
+  # List of externally available DERP maps encoded in JSON. The default is
+  # Tailscale's public relays, which are merged with the embedded relay;
+  # machines pick the closest one by latency. Set to [] to serve only your
+  # own relays.
   urls:
     - https://controlplane.tailscale.com/derpmap/default
 
@@ -119,6 +132,10 @@ derp:
   # This option is mostly interesting for people hosting their own DERP servers:
   # https://tailscale.com/docs/reference/derp-servers/custom-derp-servers
   # https://headscale.net/stable/ref/derp/
+  #
+  # Relays you run can also be added at runtime from the console, so a
+  # file is only needed for what the console cannot express (region
+  # scores, removing one of Tailscale's regions).
   #
   # paths:
   #   - /etc/headscale/derp-example.yaml

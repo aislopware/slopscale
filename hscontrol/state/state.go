@@ -118,6 +118,11 @@ type State struct {
 	ipAlloc *hsdb.IPAllocator
 	// derpMap contains the current DERP relay configuration
 	derpMap atomic.Pointer[tailcfg.DERPMap]
+	// derpMu serialises DERP writes and guards derp.
+	derpMu sync.Mutex
+	// derp holds the settings override, the embedded relay and the
+	// fetched map sources; see [State.DERP].
+	derp derpState
 	// settings holds the tailnet-wide switches; see [State.Settings].
 	settings atomic.Pointer[types.Settings]
 	// webhooks delivers events to the registered endpoints.
@@ -297,6 +302,11 @@ func NewState(cfg *types.Config) (*State, error) {
 	}
 
 	err = s.loadDNS()
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.loadDERP()
 	if err != nil {
 		return nil, err
 	}

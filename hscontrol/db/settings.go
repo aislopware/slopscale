@@ -70,8 +70,8 @@ func (hsdb *HSDatabase) LoadSettings() (types.Settings, error) {
 			settings.KeyExpiry = d
 
 			continue
-		case types.SettingDNS:
-			// Holds JSON and is read by LoadDNSSettings.
+		case types.SettingDNS, types.SettingDERP:
+			// Hold JSON and are read by LoadDNSSettings and LoadDERPSettings.
 			continue
 		default:
 			continue
@@ -139,6 +139,63 @@ func (hsdb *HSDatabase) DeleteDNSSettings() error {
 		)
 		if err != nil {
 			return fmt.Errorf("deleting dns settings: %w", err)
+		}
+
+		return nil
+	})
+}
+
+// LoadDERPSettings reads the DERP override. It returns nil without error
+// when no override is stored and the config file is in force.
+func (hsdb *HSDatabase) LoadDERPSettings() (*types.DERPSettings, error) {
+	var records []settingRecord
+
+	err := hsdb.ex.query(
+		jet.SELECT(table.Settings.AllColumns).
+			FROM(table.Settings).
+			WHERE(table.Settings.Key.EQ(jet.String(string(types.SettingDERP)))),
+		&records,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("loading derp settings: %w", err)
+	}
+
+	if len(records) == 0 {
+		return nil, nil //nolint:nilnil // no row means no override, which is not an error
+	}
+
+	var settings types.DERPSettings
+
+	err = json.Unmarshal([]byte(records[0].Setting.Value), &settings)
+	if err != nil {
+		return nil, fmt.Errorf("decoding derp settings: %w", err)
+	}
+
+	return &settings, nil
+}
+
+// SaveDERPSettings writes the DERP override as JSON, inserting its row on
+// first use.
+func (hsdb *HSDatabase) SaveDERPSettings(settings types.DERPSettings) error {
+	value, err := json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("encoding derp settings: %w", err)
+	}
+
+	return hsdb.Write(func(tx *Tx) error {
+		return saveSettingValue(tx, types.SettingDERP, string(value))
+	})
+}
+
+// DeleteDERPSettings removes the DERP override so the config file is in
+// force again. Deleting a missing row is not an error.
+func (hsdb *HSDatabase) DeleteDERPSettings() error {
+	return hsdb.Write(func(tx *Tx) error {
+		_, err := tx.executor().exec(
+			table.Settings.DELETE().WHERE(table.Settings.Key.EQ(jet.String(string(types.SettingDERP)))),
+		)
+		if err != nil {
+			return fmt.Errorf("deleting derp settings: %w", err)
 		}
 
 		return nil

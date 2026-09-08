@@ -22,10 +22,10 @@ The ports in use vary with the intended scenario and enabled features. Some of t
 - tcp/443
     - Expose publicly: yes
     - HTTPS, required to make Headscale available to Tailscale clients[^1]
-    - Required if the [embedded DERP server](../ref/derp.md) is enabled
+    - Required for the [embedded DERP server](../ref/derp.md), which is on by default
 - udp/3478
     - Expose publicly: yes
-    - STUN, required if the [embedded DERP server](../ref/derp.md) is enabled
+    - STUN, required for the [embedded DERP server](../ref/derp.md), which is on by default
 - tcp/9090
     - Expose publicly: no
     - [Metrics and debug endpoint](../ref/debug.md#metrics-and-debug-endpoint)

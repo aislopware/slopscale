@@ -76,7 +76,8 @@ database:
 
 derp:
   server:
-    enabled: false
+    enabled: true
+    stun_listen_addr: 127.0.0.1:3478
   urls:
     - https://controlplane.tailscale.com/derpmap/default
   auto_update_enabled: false

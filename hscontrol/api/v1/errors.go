@@ -70,6 +70,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrRulePortsInvalid),
 		errors.Is(err, types.ErrInvalidAccessProtocol),
 		errors.Is(err, types.ErrDNSSettingsInvalid),
+		errors.Is(err, types.ErrDERPSettingsInvalid),
+		errors.Is(err, state.ErrDERPRelayUnavailable),
 		errors.Is(err, types.ErrNetworkNameEmpty),
 		errors.Is(err, types.ErrNetworkNameTooLong),
 		errors.Is(err, types.ErrNetworkNoPrefixes),
@@ -147,6 +149,9 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrAccessRequestOwn),
 		errors.Is(err, db.ErrCannotDeleteOwner):
 		return huma.Error403Forbidden(msg, err)
+
+	case errors.Is(err, state.ErrDERPSourceUnreachable):
+		return huma.Error502BadGateway(msg, err)
 
 	default:
 		return huma.Error500InternalServerError(msg, err)

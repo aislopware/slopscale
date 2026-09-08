@@ -8,17 +8,21 @@ import (
 	"hash/crc64"
 	"io"
 	"math/rand/v2"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"reflect"
 	"slices"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 	"go.yaml.in/yaml/v3"
+	"tailscale.com/envknob"
 	"tailscale.com/tailcfg"
 )
 
@@ -38,8 +42,8 @@ func loadDERPMapFromPath(path string) (*tailcfg.DERPMap, error) {
 	return &derpMap, nil
 }
 
-func loadDERPMapFromURL(addr url.URL) (*tailcfg.DERPMap, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), types.HTTPTimeout)
+func loadDERPMapFromURL(ctx context.Context, addr url.URL) (*tailcfg.DERPMap, error) {
+	ctx, cancel := context.WithTimeout(ctx, types.HTTPTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, addr.String(), http.NoBody)
@@ -118,34 +122,131 @@ func mergeDERPMaps(derpMaps []*tailcfg.DERPMap) *tailcfg.DERPMap {
 	return &result
 }
 
-func GetDERPMap(cfg types.DERPConfig) (*tailcfg.DERPMap, error) {
-	var derpMaps []*tailcfg.DERPMap
-	if cfg.DERPMap != nil {
-		derpMaps = append(derpMaps, cfg.DERPMap)
+// GetDERPMap builds the map the config file alone describes: its URLs,
+// files and inline map, without the embedded relay. The server builds its
+// live map through [State] from the effective settings; this stays for
+// callers that only have a config.
+func GetDERPMap(ctx context.Context, cfg types.DERPConfig) (*tailcfg.DERPMap, error) {
+	sources, err := FetchSources(ctx, cfg.Settings().URLs, cfg.Paths)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, addr := range cfg.URLs {
-		derpMap, err := loadDERPMapFromURL(addr)
+	if cfg.DERPMap != nil {
+		sources = append([]*tailcfg.DERPMap{cfg.DERPMap}, sources...)
+	}
+
+	return Build(sources...), nil
+}
+
+// FetchSources loads the maps behind every URL and file path, in that
+// order. One unreachable source fails the whole fetch, so a refresh never
+// applies a partial map.
+func FetchSources(ctx context.Context, urls, paths []string) ([]*tailcfg.DERPMap, error) {
+	maps := make([]*tailcfg.DERPMap, 0, len(urls)+len(paths))
+
+	for _, u := range urls {
+		addr, err := url.Parse(u)
+		if err != nil {
+			return nil, fmt.Errorf("parsing DERP map URL %q: %w", u, err)
+		}
+
+		derpMap, err := loadDERPMapFromURL(ctx, *addr)
 		if err != nil {
 			return nil, err
 		}
 
-		derpMaps = append(derpMaps, derpMap)
+		maps = append(maps, derpMap)
 	}
 
-	for _, path := range cfg.Paths {
+	for _, path := range paths {
 		derpMap, err := loadDERPMapFromPath(path)
 		if err != nil {
 			return nil, err
 		}
 
-		derpMaps = append(derpMaps, derpMap)
+		maps = append(maps, derpMap)
 	}
 
-	derpMap := mergeDERPMaps(derpMaps)
+	return maps, nil
+}
+
+// Build merges the maps in order, a later region replacing an earlier one
+// with the same ID, and shuffles the relays within each region so clients
+// do not all start with the same one.
+func Build(maps ...*tailcfg.DERPMap) *tailcfg.DERPMap {
+	derpMap := mergeDERPMaps(maps)
 	shuffleDERPMap(derpMap)
 
-	return derpMap, nil
+	return derpMap
+}
+
+// debugUseDERPIP makes the embedded relay's region carry the server's IP
+// instead of its host name, for integration tests whose DNS is unreliable.
+var debugUseDERPIP = envknob.Bool("HEADSCALE_DEBUG_DERP_USE_IP")
+
+// EmbeddedRegion is the region the embedded relay is published as: one
+// relay at the server URL's host and port, STUN on the settings' port.
+func EmbeddedRegion(ctx context.Context, serverURL string, s types.DERPServerSettings) (tailcfg.DERPRegion, error) {
+	parsed, err := url.Parse(serverURL)
+	if err != nil {
+		return tailcfg.DERPRegion{}, fmt.Errorf("parsing server URL %q: %w", serverURL, err)
+	}
+
+	host, portStr, err := net.SplitHostPort(parsed.Host)
+
+	var port int
+
+	if err != nil {
+		host = parsed.Host
+		if parsed.Scheme == "https" {
+			port = 443
+		} else {
+			port = 80
+		}
+	} else {
+		port, err = strconv.Atoi(portStr)
+		if err != nil {
+			return tailcfg.DERPRegion{}, fmt.Errorf("parsing server URL port %q: %w", portStr, err)
+		}
+	}
+
+	if debugUseDERPIP {
+		ips, resolveErr := new(net.Resolver).LookupIPAddr(ctx, host)
+		if resolveErr != nil {
+			log.Error().Caller().Err(resolveErr).Msgf("failed to resolve DERP hostname %s to IP, using hostname", host)
+		} else if len(ips) > 0 {
+			ip := ips[0].IP.String()
+			log.Info().Caller().Msgf("HEADSCALE_DEBUG_DERP_USE_IP: resolved %s to %s", host, ip)
+			host = ip
+		}
+	}
+
+	_, stunPortStr, err := net.SplitHostPort(s.STUNAddr)
+	if err != nil {
+		return tailcfg.DERPRegion{}, fmt.Errorf("splitting STUN address %q: %w", s.STUNAddr, err)
+	}
+
+	stunPort, err := strconv.Atoi(stunPortStr)
+	if err != nil {
+		return tailcfg.DERPRegion{}, fmt.Errorf("parsing STUN port %q: %w", stunPortStr, err)
+	}
+
+	return tailcfg.DERPRegion{
+		RegionID:   s.RegionID,
+		RegionCode: s.RegionCode,
+		RegionName: s.RegionName,
+		Nodes: []*tailcfg.DERPNode{{
+			Name:             s.RegionID.String(),
+			RegionID:         s.RegionID,
+			HostName:         host,
+			DERPPort:         port,
+			STUNPort:         stunPort,
+			IPv4:             s.IPv4,
+			IPv6:             s.IPv6,
+			InsecureForTests: parsed.Scheme != "https",
+		}},
+	}, nil
 }
 
 func shuffleDERPMap(dm *tailcfg.DERPMap) {

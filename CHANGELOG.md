@@ -95,6 +95,33 @@ domains, nameservers and the groups whose machines receive them, from the
 console's _DNS_ page, `headscale dns rules` or `/api/v1/dns/rule`. See
 [DNS](https://headscale.net/development/ref/dns/).
 
+### DERP relays at runtime, embedded relay on by default
+
+The embedded DERP relay is on by default, so every tailnet has a relay next
+to its control server and a machine that cannot connect directly still has
+a nearby path. It is published as region 999 next to Tailscale's public
+relays; machines pick the closest region by latency. Its key is created
+next to the noise key unless `derp.server.private_key_path` says otherwise,
+and STUN listens on udp/3478. Set `derp.server.enabled: false` to keep the
+old behaviour. The relay settings no longer need a restart either: the map
+URLs, the refetch schedule, the embedded relay (on, off, region, STUN
+address, published addresses, client verification) and relays you run
+yourself can be changed from the admin console's _Relays_ page,
+`headscale derp set`, `headscale derp relay add`, or `PUT /api/v1/derp`,
+and reach every machine at once. Settings set this way are stored in the
+database, replace the file's `derp` section until `headscale derp reset`
+(or `DELETE /api/v1/derp`) returns to it, and are logged as `derp.set`,
+`derp.refresh` and `derp.reset`. The `feature_settings` and
+`feature_settings:read` scopes gate them. A change fetches the maps first
+and is refused, leaving everything as it was, when a map cannot be fetched;
+`POST /api/v1/derp/refresh` refetches on demand. The map files in
+`derp.paths`, the relay's key and
+`automatically_add_embedded_derp_region` stay in the configuration file.
+`GET /api/v1/server` now reports the region count and whether the relay
+runs instead of listing the regions; the list, with where each region came
+from, is at `GET /api/v1/derp`. See
+[DERP](https://headscale.net/development/ref/derp/).
+
 ### Groups and access rules
 
 Access can now be managed without a policy file, the way NetBird does it.

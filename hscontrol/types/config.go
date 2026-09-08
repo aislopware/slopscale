@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -705,10 +706,16 @@ func LoadConfig(path string, isFile bool) error {
 	viper.SetDefault("dns.nameservers.use_with_exit_node.split", map[string]string{})
 	viper.SetDefault("dns.search_domains", []string{})
 
-	viper.SetDefault("derp.server.enabled", false)
+	viper.SetDefault("derp.server.enabled", true)
+	viper.SetDefault("derp.server.region_id", 999)
+	viper.SetDefault("derp.server.region_code", "headscale")
+	viper.SetDefault("derp.server.region_name", "Headscale Embedded DERP")
 	viper.SetDefault("derp.server.verify_clients", true)
 	viper.SetDefault("derp.server.stun.enabled", true)
+	viper.SetDefault("derp.server.stun_listen_addr", "0.0.0.0:3478")
 	viper.SetDefault("derp.server.automatically_add_embedded_derp_region", true)
+	viper.SetDefault("derp.urls", []string{TailscaleDERPMapURL})
+	viper.SetDefault("derp.auto_update_enabled", true)
 	viper.SetDefault("derp.update_frequency", "3h")
 
 	viper.SetDefault("unix_socket", "/var/run/headscale/headscale.sock")
@@ -1006,6 +1013,14 @@ func derpConfig() DERPConfig {
 	privateKeyPath := util.AbsolutePathFromConfigPath(
 		viper.GetString("derp.server.private_key_path"),
 	)
+	// The relay key lives next to the noise key unless the file says
+	// otherwise, so the embedded relay works with no derp section at all.
+	if privateKeyPath == "" {
+		if noisePath := util.AbsolutePathFromConfigPath(viper.GetString("noise.private_key_path")); noisePath != "" {
+			privateKeyPath = filepath.Join(filepath.Dir(noisePath), "derp_server_private.key")
+		}
+	}
+
 	ipv4 := viper.GetString("derp.server.ipv4")
 	ipv6 := viper.GetString("derp.server.ipv6")
 	automaticallyAddEmbeddedDerpRegion := viper.GetBool(

@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -29,66 +30,57 @@ import (
 
 const testTimeout = 10 * time.Second
 
-// allowedDERPClients is consulted by the package-wide verify transport.
-// The transport is registered on http.DefaultTransport, which is process
-// global, so it is installed once and dispatches on the client key.
-var (
-	allowedDERPClients   sync.Map // key.NodePublic -> struct{}
-	registerVerifyOnce   sync.Once
-	errVerifyUnavailable = errors.New("verify handler unavailable")
-)
+// allowedDERPClients is what the test verify function admits.
+var allowedDERPClients sync.Map // key.NodePublic -> struct{}
 
-func registerTestVerifyTransport(t *testing.T) {
-	t.Helper()
+var errVerifyUnavailable = errors.New("verify handler unavailable")
 
-	registerVerifyOnce.Do(func() {
-		transport, ok := http.DefaultTransport.(*http.Transport)
-		require.True(t, ok)
+func testVerify(req *http.Request, w io.Writer) error {
+	var admit tailcfg.DERPAdmitClientRequest
 
-		transport.RegisterProtocol(DerpVerifyScheme, NewDERPVerifyTransport(
-			func(req *http.Request, w io.Writer) error {
-				var admit tailcfg.DERPAdmitClientRequest
+	err := json.NewDecoder(req.Body).Decode(&admit)
+	if err != nil {
+		return err
+	}
 
-				err := json.NewDecoder(req.Body).Decode(&admit)
-				if err != nil {
-					return err
-				}
+	_, allow := allowedDERPClients.Load(admit.NodePublic)
 
-				_, allow := allowedDERPClients.Load(admit.NodePublic)
-
-				return json.NewEncoder(w).Encode(tailcfg.DERPAdmitClientResponse{Allow: allow})
-			},
-		))
-	})
+	return json.NewEncoder(w).Encode(tailcfg.DERPAdmitClientResponse{Allow: allow})
 }
 
-func testDERPConfig() *types.DERPConfig {
-	return &types.DERPConfig{
-		ServerRegionID:   999,
-		ServerRegionCode: "headscale",
-		ServerRegionName: "Headscale Embedded DERP",
-		STUNAddr:         "0.0.0.0:3478",
+// testServerSettings turns the relay on with STUN on a free loopback port.
+func testServerSettings() types.DERPServerSettings {
+	return types.DERPServerSettings{
+		Enabled:    true,
+		RegionID:   999,
+		RegionCode: "headscale",
+		RegionName: "Headscale Embedded DERP",
+		STUNAddr:   "127.0.0.1:0",
 	}
 }
 
-func newTestDERPServer(t *testing.T, serverURL string, cfg *types.DERPConfig) *DERPServer {
+// newTestDERPServer creates a relay and applies the settings.
+func newTestDERPServer(t *testing.T, settings types.DERPServerSettings) *DERPServer {
 	t.Helper()
 
-	srv, err := NewDERPServer(serverURL, key.NewNode(), cfg)
-	require.NoError(t, err)
+	srv := NewDERPServer(key.NewNode(), testVerify)
+
+	t.Cleanup(func() { _ = srv.Close() })
+
+	require.NoError(t, srv.Apply(settings))
 
 	return srv
 }
 
 // startDERPServer serves DERPHandler at /derp and returns the base URL.
-func startDERPServer(t *testing.T, cfg *types.DERPConfig) (*DERPServer, string) {
+func startDERPServer(t *testing.T, settings types.DERPServerSettings) (*DERPServer, string) {
 	t.Helper()
 
 	mux := http.NewServeMux()
 	httpSrv := httptest.NewServer(mux)
 	t.Cleanup(httpSrv.Close)
 
-	srv := newTestDERPServer(t, httpSrv.URL, cfg)
+	srv := newTestDERPServer(t, settings)
 	mux.HandleFunc("/derp", srv.DERPHandler)
 
 	return srv, httpSrv.URL
@@ -153,139 +145,101 @@ func recvOf[T derp.ReceivedMessage](t *testing.T, recv func() (derp.ReceivedMess
 func TestNewDERPServer(t *testing.T) {
 	t.Parallel()
 
-	for _, verify := range []bool{false, true} {
-		cfg := testDERPConfig()
-		cfg.ServerVerifyClients = verify
+	priv := key.NewNode()
 
-		priv := key.NewNode()
+	srv := NewDERPServer(priv, testVerify)
 
-		srv, err := NewDERPServer("https://headscale.example.com", priv, cfg)
-		require.NoError(t, err)
-		assert.Equal(t, "https://headscale.example.com", srv.serverURL)
-		assert.True(t, srv.key.Equal(priv))
-		assert.Same(t, cfg, srv.cfg)
-		assert.NotNil(t, srv.tailscaleDERP)
-	}
+	t.Cleanup(func() { _ = srv.Close() })
+
+	assert.True(t, srv.key.Equal(priv))
+	assert.NotNil(t, srv.tailscaleDERP)
+	assert.False(t, srv.Enabled(), "a new relay is off until settings turn it on")
+	assert.Empty(t, srv.STUNAddr())
 }
 
-func TestGenerateRegion(t *testing.T) {
+func TestDERPServerApply(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name      string
-		serverURL string
-		stunAddr  string
-		wantHost  string
-		wantPort  int
-		wantSTUN  int
-		wantErr   bool
-	}{
-		{
-			name:      "https hostname defaults to 443",
-			serverURL: "https://headscale.example.com",
-			stunAddr:  "0.0.0.0:3478",
-			wantHost:  "headscale.example.com",
-			wantPort:  443,
-			wantSTUN:  3478,
-		},
-		{
-			name:      "http hostname defaults to 80",
-			serverURL: "http://headscale.example.com",
-			stunAddr:  "0.0.0.0:3478",
-			wantHost:  "headscale.example.com",
-			wantPort:  80,
-			wantSTUN:  3478,
-		},
-		{
-			name:      "hostname with explicit port",
-			serverURL: "https://headscale.example.com:8443",
-			stunAddr:  "[::]:3479",
-			wantHost:  "headscale.example.com",
-			wantPort:  8443,
-			wantSTUN:  3479,
-		},
-		{
-			name:      "ipv4 with port",
-			serverURL: "http://192.0.2.10:8080",
-			stunAddr:  "192.0.2.10:3478",
-			wantHost:  "192.0.2.10",
-			wantPort:  8080,
-			wantSTUN:  3478,
-		},
-		{
-			name:      "ipv6 with port",
-			serverURL: "https://[2001:db8::1]:8443",
-			stunAddr:  "[2001:db8::1]:3478",
-			wantHost:  "2001:db8::1",
-			wantPort:  8443,
-			wantSTUN:  3478,
-		},
-		{
-			name:      "unparseable server url",
-			serverURL: "://bad",
-			stunAddr:  "0.0.0.0:3478",
-			wantErr:   true,
-		},
-		{
-			name:      "non numeric server port",
-			serverURL: "https://headscale.example.com:derp",
-			stunAddr:  "0.0.0.0:3478",
-			wantErr:   true,
-		},
-		{
-			name:      "stun addr without port",
-			serverURL: "https://headscale.example.com",
-			stunAddr:  "0.0.0.0",
-			wantErr:   true,
-		},
-		{
-			name:      "non numeric stun port",
-			serverURL: "https://headscale.example.com",
-			stunAddr:  "0.0.0.0:stun",
-			wantErr:   true,
-		},
-	}
+	srv := NewDERPServer(key.NewNode(), testVerify)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	t.Cleanup(func() { _ = srv.Close() })
 
-			cfg := testDERPConfig()
-			cfg.STUNAddr = tt.stunAddr
-			cfg.IPv4 = "198.51.100.7"
-			cfg.IPv6 = "2001:db8::7"
+	settings := testServerSettings()
+	require.NoError(t, srv.Apply(settings))
+	assert.True(t, srv.Enabled())
+	assert.False(t, srv.VerifyClients())
 
-			srv := newTestDERPServer(t, tt.serverURL, cfg)
+	first := srv.STUNAddr()
+	require.NotEmpty(t, first)
 
-			region, err := srv.GenerateRegion()
-			if tt.wantErr {
-				require.Error(t, err)
+	// The same address keeps the listener; verification follows the settings.
+	settings.VerifyClients = true
+	require.NoError(t, srv.Apply(settings))
+	assert.True(t, srv.VerifyClients())
+	assert.Equal(t, first, srv.STUNAddr(), "unchanged STUN address keeps the socket")
 
-				return
-			}
+	// A new address rebinds.
+	settings.STUNAddr = "127.0.0.1:0"
+	require.NoError(t, srv.Apply(settings))
+	assert.NotEmpty(t, srv.STUNAddr())
 
-			require.NoError(t, err)
-			assert.Equal(t, cfg.ServerRegionID, region.RegionID)
-			assert.Equal(t, cfg.ServerRegionCode, region.RegionCode)
-			assert.Equal(t, cfg.ServerRegionName, region.RegionName)
-			require.Len(t, region.Nodes, 1)
+	// Off stops STUN and closes the handler.
+	settings.Enabled = false
+	require.NoError(t, srv.Apply(settings))
+	assert.False(t, srv.Enabled())
+	assert.Empty(t, srv.STUNAddr())
 
-			node := region.Nodes[0]
-			assert.Equal(t, cfg.ServerRegionID.String(), node.Name)
-			assert.Equal(t, cfg.ServerRegionID, node.RegionID)
-			assert.Equal(t, tt.wantHost, node.HostName)
-			assert.Equal(t, tt.wantPort, node.DERPPort)
-			assert.Equal(t, tt.wantSTUN, node.STUNPort)
-			assert.Equal(t, cfg.IPv4, node.IPv4)
-			assert.Equal(t, cfg.IPv6, node.IPv6)
-		})
-	}
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/derp", nil)
+	req.Header.Set("Upgrade", "DERP")
+	srv.DERPHandler(rec, req)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestDERPServerApplyBadSTUNAddrKeepsState(t *testing.T) {
+	t.Parallel()
+
+	srv := newTestDERPServer(t, testServerSettings())
+	before := srv.STUNAddr()
+
+	bad := testServerSettings()
+	bad.STUNAddr = "256.0.0.1:0"
+	require.Error(t, srv.Apply(bad))
+
+	assert.True(t, srv.Enabled())
+	assert.Equal(t, before, srv.STUNAddr())
+}
+
+func TestDERPServerSTUNAnswers(t *testing.T) {
+	t.Parallel()
+
+	srv := newTestDERPServer(t, testServerSettings())
+
+	addr, err := net.ResolveUDPAddr("udp", srv.STUNAddr())
+	require.NoError(t, err)
+
+	clientConn, err := net.DialUDP("udp", nil, addr)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = clientConn.Close() })
+	require.NoError(t, clientConn.SetDeadline(time.Now().Add(testTimeout)))
+
+	txID := stun.NewTxID()
+	_, err = clientConn.Write(stun.Request(txID))
+	require.NoError(t, err)
+
+	buf := make([]byte, 1500)
+	n, err := clientConn.Read(buf)
+	require.NoError(t, err)
+
+	gotTxID, _, err := stun.ParseResponse(buf[:n])
+	require.NoError(t, err)
+	assert.Equal(t, txID, gotTxID)
 }
 
 func TestDERPHandlerRejectsNonUpgradeRequests(t *testing.T) {
 	t.Parallel()
 
-	srv := newTestDERPServer(t, "http://localhost:8080", testDERPConfig())
+	srv := newTestDERPServer(t, testServerSettings())
 
 	for _, upgrade := range []string{"", "h2c"} {
 		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/derp", nil)
@@ -305,7 +259,7 @@ func TestDERPHandlerRejectsNonUpgradeRequests(t *testing.T) {
 func TestDERPHandlerPlainRequiresHijacker(t *testing.T) {
 	t.Parallel()
 
-	srv := newTestDERPServer(t, "http://localhost:8080", testDERPConfig())
+	srv := newTestDERPServer(t, testServerSettings())
 
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/derp", nil)
 	req.Header.Set("Upgrade", "DERP")
@@ -321,7 +275,7 @@ func TestDERPHandlerPlainRequiresHijacker(t *testing.T) {
 func TestDERPHandlerPlainUpgradeResponse(t *testing.T) {
 	t.Parallel()
 
-	srv, baseURL := startDERPServer(t, testDERPConfig())
+	srv, baseURL := startDERPServer(t, testServerSettings())
 
 	dialer := &net.Dialer{Timeout: testTimeout}
 
@@ -357,7 +311,7 @@ func TestDERPHandlerPlainHandshakeAndRelay(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
-	srv, baseURL := startDERPServer(t, testDERPConfig())
+	srv, baseURL := startDERPServer(t, testServerSettings())
 
 	alicePriv, bobPriv := key.NewNode(), key.NewNode()
 	alice := newDERPClient(ctx, t, alicePriv, baseURL)
@@ -386,7 +340,7 @@ func TestDERPHandlerWebsocketHandshake(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
-	srv, baseURL := startDERPServer(t, testDERPConfig())
+	srv, baseURL := startDERPServer(t, testServerSettings())
 	wsURL := "ws://" + strings.TrimPrefix(baseURL, "http://") + "/derp"
 
 	wsConn, resp, err := websocket.Dial( //nolint:bodyclose // coder/websocket nils resp.Body on success
@@ -422,7 +376,7 @@ func TestDERPHandlerWebsocketRejectsWrongSubprotocol(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
-	_, baseURL := startDERPServer(t, testDERPConfig())
+	_, baseURL := startDERPServer(t, testServerSettings())
 	wsURL := "ws://" + strings.TrimPrefix(baseURL, "http://") + "/derp"
 
 	// "derp-v2" routes into serveWebsocket (the header contains "derp") but
@@ -448,15 +402,13 @@ func TestDERPHandlerWebsocketRejectsWrongSubprotocol(t *testing.T) {
 func TestDERPHandlerVerifyClients(t *testing.T) {
 	t.Parallel()
 
-	registerTestVerifyTransport(t)
-
 	ctx, cancel := context.WithTimeout(t.Context(), testTimeout)
 	defer cancel()
 
-	cfg := testDERPConfig()
-	cfg.ServerVerifyClients = true
+	settings := testServerSettings()
+	settings.VerifyClients = true
 
-	_, baseURL := startDERPServer(t, cfg)
+	_, baseURL := startDERPServer(t, settings)
 
 	allowed := key.NewNode()
 	allowedDERPClients.Store(allowed.Public(), struct{}{})
@@ -577,48 +529,80 @@ func TestServerSTUNListener(t *testing.T) {
 	assert.Equal(t, clientAddr.AddrPort(), mapped)
 }
 
-func TestDERPVerifyTransportRoundTrip(t *testing.T) {
+func TestVerifyTransportRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	t.Run("handler output becomes the response body", func(t *testing.T) {
-		t.Parallel()
+	admitReq := func(t *testing.T, id string) *http.Request {
+		t.Helper()
 
-		var gotURL string
-
-		transport := NewDERPVerifyTransport(func(req *http.Request, w io.Writer) error {
-			gotURL = req.URL.String()
-
-			return json.NewEncoder(w).Encode(tailcfg.DERPAdmitClientResponse{Allow: true})
-		})
-
-		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, DerpVerifyScheme+"://verify", http.NoBody)
+		body, err := json.Marshal(tailcfg.DERPAdmitClientRequest{NodePublic: key.NewNode().Public()})
 		require.NoError(t, err)
 
-		resp, err := transport.RoundTrip(req)
+		req, err := http.NewRequestWithContext(
+			t.Context(), http.MethodPost, DerpVerifyScheme+"://"+id+"/verify", bytes.NewReader(body),
+		)
 		require.NoError(t, err)
+
+		return req
+	}
+
+	decode := func(t *testing.T, resp *http.Response) bool {
+		t.Helper()
 
 		defer resp.Body.Close()
 
-		assert.Equal(t, http.StatusOK, resp.StatusCode)
-		assert.Equal(t, DerpVerifyScheme+"://verify", gotURL)
-
 		var admit tailcfg.DERPAdmitClientResponse
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&admit))
-		assert.True(t, admit.Allow)
-	})
 
-	t.Run("handler error is returned without a response", func(t *testing.T) {
+		return admit.Allow
+	}
+
+	t.Run("allows every client while verification is off", func(t *testing.T) {
 		t.Parallel()
 
-		transport := NewDERPVerifyTransport(func(*http.Request, io.Writer) error {
+		srv := newTestDERPServer(t, testServerSettings())
+
+		resp, err := verifyTransport{}.RoundTrip(admitReq(t, srv.id)) //nolint:bodyclose // decode closes it
+		require.NoError(t, err)
+		assert.True(t, decode(t, resp))
+	})
+
+	t.Run("asks the verify function while verification is on", func(t *testing.T) {
+		t.Parallel()
+
+		settings := testServerSettings()
+		settings.VerifyClients = true
+		srv := newTestDERPServer(t, settings)
+
+		resp, err := verifyTransport{}.RoundTrip(admitReq(t, srv.id)) //nolint:bodyclose // decode closes it
+		require.NoError(t, err)
+		assert.False(t, decode(t, resp), "an unknown key is refused")
+	})
+
+	t.Run("verify error is returned without a response", func(t *testing.T) {
+		t.Parallel()
+
+		srv := NewDERPServer(key.NewNode(), func(*http.Request, io.Writer) error {
 			return errVerifyUnavailable
 		})
 
-		req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, DerpVerifyScheme+"://verify", http.NoBody)
-		require.NoError(t, err)
+		t.Cleanup(func() { _ = srv.Close() })
 
-		resp, err := transport.RoundTrip(req) //nolint:bodyclose // resp is nil on error
+		settings := testServerSettings()
+		settings.VerifyClients = true
+
+		require.NoError(t, srv.Apply(settings))
+
+		resp, err := verifyTransport{}.RoundTrip(admitReq(t, srv.id)) //nolint:bodyclose // resp is nil on error
 		require.ErrorIs(t, err, errVerifyUnavailable)
+		assert.Nil(t, resp)
+	})
+
+	t.Run("unknown server is refused", func(t *testing.T) {
+		t.Parallel()
+
+		resp, err := verifyTransport{}.RoundTrip(admitReq(t, "nobody")) //nolint:bodyclose // resp is nil on error
+		require.ErrorIs(t, err, errVerifyUnknownServer)
 		assert.Nil(t, resp)
 	})
 }

@@ -9,21 +9,12 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/scope"
+	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
-	"tailscale.com/tailcfg"
 )
 
 func init() {
 	registrations = append(registrations, registerServer)
-}
-
-// DERPRegion is one region of the DERP map the server hands to clients.
-type DERPRegion struct {
-	ID       int    `json:"id"`
-	Code     string `json:"code"`
-	Name     string `json:"name"`
-	Nodes    int    `json:"nodes"`
-	Embedded bool   `doc:"Served by this headscale." json:"embedded"`
 }
 
 // ServerInfo is what an operator needs to know about the running server
@@ -51,12 +42,13 @@ type ServerInfo struct {
 	// terminates it).
 	TLS string `json:"tls"`
 	// OIDCIssuer is empty without an identity provider.
-	OIDCIssuer  string       `json:"oidcIssuer"`
-	OIDCScopes  []string     `json:"oidcScopes"  nullable:"false"`
-	DERPRegions []DERPRegion `json:"derpRegions" nullable:"false"`
-	// DERPServer reports whether the embedded DERP server is on.
-	DERPServer bool   `json:"derpServer"`
-	DERPSTUN   string `json:"derpStun"`
+	OIDCIssuer string   `json:"oidcIssuer"`
+	OIDCScopes []string `json:"oidcScopes" nullable:"false"`
+	// DERPRegions counts the regions of the map clients receive; the
+	// relay settings themselves are at /api/v1/derp.
+	DERPRegions int `json:"derpRegions"`
+	// DERPServer reports whether the embedded DERP relay is serving.
+	DERPServer bool `json:"derpServer"`
 	// EphemeralInactivityTimeout is how long an ephemeral node may stay
 	// offline before it is deleted.
 	EphemeralInactivityTimeout string `json:"ephemeralInactivityTimeout"`
@@ -80,11 +72,11 @@ func registerServer(api huma.API, b Backend) {
 		Tags:        []string{"Settings"},
 		Security:    bearerAuth,
 	}, scope.FeatureSettingsRead), func(_ context.Context, _ *struct{}) (*serverInfoOutput, error) {
-		return &serverInfoOutput{Body: serverInfoFrom(b.Cfg, b.State.DERPMap())}, nil
+		return &serverInfoOutput{Body: serverInfoFrom(b.Cfg, b.State.DERP())}, nil
 	})
 }
 
-func serverInfoFrom(cfg *types.Config, derpMap tailcfg.DERPMapView) ServerInfo {
+func serverInfoFrom(cfg *types.Config, derp state.DERPStatus) ServerInfo {
 	version := types.GetVersionInfo()
 	info := ServerInfo{
 		Version:     version.Version,
@@ -93,7 +85,8 @@ func serverInfoFrom(cfg *types.Config, derpMap tailcfg.DERPMapView) ServerInfo {
 		GoVersion:   version.Go.Version,
 		StartedAt:   startedAt,
 		OIDCScopes:  []string{},
-		DERPRegions: derpRegions(cfg, derpMap),
+		DERPRegions: len(derp.Regions),
+		DERPServer:  derp.RelayRunning,
 	}
 
 	if cfg == nil {
@@ -110,8 +103,6 @@ func serverInfoFrom(cfg *types.Config, derpMap tailcfg.DERPMapView) ServerInfo {
 	info.TLS = tlsMode(cfg)
 	info.OIDCIssuer = cfg.OIDC.Issuer
 	info.OIDCScopes = slices.Clone(cfg.OIDC.Scope)
-	info.DERPServer = cfg.DERP.ServerEnabled
-	info.DERPSTUN = cfg.DERP.STUNAddr
 	info.EphemeralInactivityTimeout = cfg.Node.Ephemeral.InactivityTimeout.String()
 
 	if cfg.PrefixV4 != nil {
@@ -142,36 +133,4 @@ func tlsMode(cfg *types.Config) string {
 	default:
 		return "none"
 	}
-}
-
-// derpRegions lists the regions in ID order; the embedded one is marked
-// so the operator can tell it from the regions a map file or URL added.
-func derpRegions(cfg *types.Config, derpMap tailcfg.DERPMapView) []DERPRegion {
-	regions := []DERPRegion{}
-	if !derpMap.Valid() {
-		return regions
-	}
-
-	var embedded tailcfg.DERPRegionID
-	if cfg != nil && cfg.DERP.ServerEnabled {
-		embedded = cfg.DERP.ServerRegionID
-	}
-
-	for id, region := range derpMap.Regions().All() {
-		if !region.Valid() {
-			continue
-		}
-
-		regions = append(regions, DERPRegion{
-			ID:       int(id),
-			Code:     region.RegionCode(),
-			Name:     region.RegionName(),
-			Nodes:    region.Nodes().Len(),
-			Embedded: cfg != nil && cfg.DERP.ServerEnabled && id == embedded,
-		})
-	}
-
-	slices.SortFunc(regions, func(a, b DERPRegion) int { return a.ID - b.ID })
-
-	return regions
 }

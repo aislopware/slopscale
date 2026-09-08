@@ -27,7 +27,6 @@ import (
 	apiv2 "github.com/juanfont/headscale/hscontrol/api/v2"
 	"github.com/juanfont/headscale/hscontrol/capver"
 	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/derp"
 	derpServer "github.com/juanfont/headscale/hscontrol/derp/server"
 	"github.com/juanfont/headscale/hscontrol/dns"
 	"github.com/juanfont/headscale/hscontrol/dnsprovider"
@@ -49,14 +48,8 @@ import (
 	"tailscale.com/types/key"
 )
 
-var (
-	errSTUNAddressNotSet                   = errors.New("STUN address not set")
-	errUnsupportedLetsEncryptChallengeType = errors.New(
-		"unknown value for Lets Encrypt challenge type",
-	)
-	errEmptyInitialDERPMap = errors.New(
-		"initial DERPMap is empty, Headscale requires at least one entry",
-	)
+var errUnsupportedLetsEncryptChallengeType = errors.New(
+	"unknown value for Lets Encrypt challenge type",
 )
 
 const (
@@ -64,8 +57,6 @@ const (
 	privateKeyFileMode = 0o600
 	headscaleDirPerm   = 0o700
 )
-
-var errDefaultTransportNotHTTP = errors.New("http.DefaultTransport is not an *http.Transport")
 
 // Headscale represents the base app of the service.
 type Headscale struct {
@@ -221,17 +212,16 @@ func setupAuthProvider(cfg *types.Config, app *Headscale) (AuthProvider, error) 
 	return oidcProvider, nil
 }
 
-// setupEmbeddedDERPServer creates the embedded DERP server when
-// cfg.DERP.ServerEnabled, registering a verify-client transport on
-// [http.DefaultTransport] when cfg.DERP.ServerVerifyClients is set. Returns a
-// nil server, nil error when the embedded DERP server is not enabled.
+// setupEmbeddedDERPServer creates the embedded DERP relay, off, from the
+// key at cfg.DERP.ServerPrivateKeyPath; the settings turn it on. Without
+// a key path there is no relay and the settings cannot enable it.
 func setupEmbeddedDERPServer(
 	cfg *types.Config,
 	noisePrivateKey *key.MachinePrivate,
 	app *Headscale,
 ) (*derpServer.DERPServer, error) {
-	if !cfg.DERP.ServerEnabled {
-		return nil, nil //nolint:nilnil // intentional: no embedded DERP server configured
+	if cfg.DERP.ServerPrivateKeyPath == "" {
+		return nil, nil //nolint:nilnil // intentional: no relay key, no embedded relay
 	}
 
 	derpServerKey, err := readOrCreatePrivateKey(cfg.DERP.ServerPrivateKeyPath)
@@ -240,39 +230,14 @@ func setupEmbeddedDERPServer(
 	}
 
 	if derpServerKey.Equal(*noisePrivateKey) {
-		return nil, fmt.Errorf(
-			"DERP server private key and noise private key are the same: %w",
-			err,
-		)
+		return nil, errDERPKeyIsNoiseKey
 	}
 
-	if cfg.DERP.ServerVerifyClients {
-		t, ok := http.DefaultTransport.(*http.Transport)
-		if !ok {
-			return nil, errDefaultTransportNotHTTP
-		}
-
-		t.RegisterProtocol(
-			derpServer.DerpVerifyScheme,
-			derpServer.NewDERPVerifyTransport(app.handleVerifyRequest),
-		)
-	}
-
-	embeddedDERPServer, err := derpServer.NewDERPServer(
-		cfg.ServerURL,
-		key.NodePrivate(*derpServerKey),
-		&cfg.DERP,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return embeddedDERPServer, nil
+	return derpServer.NewDERPServer(key.NodePrivate(*derpServerKey), app.handleVerifyRequest), nil
 }
 
-// securityHeaders sets baseline response headers on every HTTP response:
-// deny framing (clickjacking), forbid MIME-type sniffing, drop the Referer
-// header on outbound navigation. Cheap defense-in-depth for HTML surfaces.
+var errDERPKeyIsNoiseKey = errors.New("DERP server private key and noise private key are the same")
+
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -331,30 +296,18 @@ func (h *Headscale) Serve() error {
 	h.mapBatcher.Start()
 	defer h.mapBatcher.Close()
 
-	if h.cfg.DERP.ServerEnabled {
-		// When embedded DERP is enabled we always need a STUN server
-		if h.cfg.DERP.STUNAddr == "" {
-			return errSTUNAddressNotSet
-		}
+	h.state.SetDERPRelay(h.DERPServer)
 
-		go h.DERPServer.ServeSTUN()
-	}
-
-	derpMap, err := derp.GetDERPMap(h.cfg.DERP)
+	err = h.state.LoadDERPMap(context.Background())
 	if err != nil {
-		return fmt.Errorf("getting DERPMap: %w", err)
+		return fmt.Errorf("building DERP map: %w", err)
 	}
 
-	if h.cfg.DERP.ServerEnabled && h.cfg.DERP.AutomaticallyAddEmbeddedDerpRegion {
-		region, _ := h.DERPServer.GenerateRegion()
-		derpMap.Regions[region.RegionID] = &region
-	}
+	h.state.LogDERPMap()
 
-	if len(derpMap.Regions) == 0 {
-		return errEmptyInitialDERPMap
+	if h.DERPServer != nil {
+		defer h.DERPServer.Close()
 	}
-
-	h.state.SetDERPMap(derpMap)
 
 	// Start ephemeral node garbage collector and schedule all nodes
 	// that are already in the database and ephemeral. If they are still
@@ -794,6 +747,23 @@ func (h *Headscale) MapBatcher() *mapper.Batcher {
 	return h.mapBatcher
 }
 
+// StartDERPForTest hands the state the embedded relay and builds the map
+// from the effective settings, as [Headscale.Serve] does.
+func (h *Headscale) StartDERPForTest(tb testing.TB) {
+	tb.Helper()
+
+	h.state.SetDERPRelay(h.DERPServer)
+
+	err := h.state.LoadDERPMap(tb.Context())
+	if err != nil {
+		tb.Fatalf("loading DERP map: %v", err)
+	}
+
+	if h.DERPServer != nil {
+		tb.Cleanup(func() { _ = h.DERPServer.Close() })
+	}
+}
+
 // StartEphemeralGCForTest starts the ephemeral node garbage collector.
 // It registers a cleanup function on tb to stop the collector.
 // It panics when called outside of tests.
@@ -844,14 +814,11 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 
 	lastExpiryCheck := time.Unix(0, 0)
 
-	var derpTickerChan <-chan time.Time
-
-	if h.cfg.DERP.AutoUpdate && h.cfg.DERP.UpdateFrequency != 0 {
-		derpTicker := time.NewTicker(h.cfg.DERP.UpdateFrequency)
-		defer derpTicker.Stop()
-
-		derpTickerChan = derpTicker.C
-	}
+	// The DERP refresh interval follows the effective settings, which
+	// can change at runtime, so a timer is re-armed after every tick and
+	// every settings change instead of a fixed ticker.
+	derpTimer := time.NewTimer(h.derpRefreshInterval())
+	defer derpTimer.Stop()
 
 	var extraRecordsUpdate <-chan []tailcfg.DNSRecord
 	if h.extraRecordMan != nil {
@@ -926,12 +893,23 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 		case <-expireTicker.C:
 			lastExpiryCheck = h.expireNodesTick(lastExpiryCheck)
 
-		case <-derpTickerChan:
+		case <-derpTimer.C:
 			err := h.refreshDERPMap(ctx)
 			if err != nil {
 				log.Error().Err(err).Msg("failed to build new DERPMap, retrying later")
-				continue
 			}
+
+			derpTimer.Reset(h.derpRefreshInterval())
+
+		case <-h.state.DERPChanged():
+			if !derpTimer.Stop() {
+				select {
+				case <-derpTimer.C:
+				default:
+				}
+			}
+
+			derpTimer.Reset(h.derpRefreshInterval())
 
 		case records, ok := <-extraRecordsUpdate:
 			if !h.applyExtraRecords(records, ok) {
@@ -1110,33 +1088,36 @@ func (h *Headscale) expireNodesTick(lastExpiryCheck time.Time) time.Time {
 	return lastExpiryCheck
 }
 
-// refreshDERPMap fetches an updated DERPMap, folding in the embedded DERP
-// region when enabled, and applies it via [Headscale.Change]. It returns an
-// error rather than applying a partial map when the fetch fails.
+// derpRefreshInterval is how long until the map sources are refetched:
+// the effective settings' frequency, or a day's wait while auto update
+// is off so the timer still fires and re-reads the settings.
+func (h *Headscale) derpRefreshInterval() time.Duration {
+	settings := h.state.EffectiveDERP()
+	if !settings.AutoUpdate || settings.UpdateFrequency < types.DERPMinUpdateFrequency {
+		return derpRefreshIdle
+	}
+
+	return settings.UpdateFrequency
+}
+
+const derpRefreshIdle = 24 * time.Hour
+
+// refreshDERPMap refetches the map sources, retrying with backoff until
+// ctx ends, and pushes the map when it changed. It returns an error
+// rather than applying a partial map when the fetch keeps failing.
 func (h *Headscale) refreshDERPMap(ctx context.Context) error {
 	log.Info().Msg("fetching DERPMap updates")
 
-	//nolint:contextcheck // derp.GetDERPMap does not accept a context; ctx is used by backoff.Retry for timeout
-	derpMap, err := backoff.Retry(ctx, func() (*tailcfg.DERPMap, error) {
-		derpMap, err := derp.GetDERPMap(h.cfg.DERP)
-		if err != nil {
-			return nil, err
-		}
-
-		if h.cfg.DERP.ServerEnabled && h.cfg.DERP.AutomaticallyAddEmbeddedDerpRegion {
-			region, _ := h.DERPServer.GenerateRegion()
-			derpMap.Regions[region.RegionID] = &region
-		}
-
-		return derpMap, nil
+	changed, err := backoff.Retry(ctx, func() (bool, error) {
+		return h.state.RefreshDERPMap(ctx)
 	}, backoff.WithBackOff(backoff.NewExponentialBackOff()))
 	if err != nil {
 		return fmt.Errorf("fetching DERP map: %w", err)
 	}
 
-	h.state.SetDERPMap(derpMap)
-
-	h.Change(change.DERPMap())
+	if changed {
+		h.Change(change.DERPMap())
+	}
 
 	return nil
 }
@@ -1218,12 +1199,16 @@ func (h *Headscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 
 	r.Post("/verify", h.VerifyHandler)
 
-	if h.cfg.DERP.ServerEnabled {
+	// The relay routes are always mounted: the handler answers 404 while
+	// the settings keep the embedded relay off, so turning it on at
+	// runtime needs no restart.
+	if h.DERPServer != nil {
 		r.HandleFunc("/derp", h.DERPServer.DERPHandler)
 		r.HandleFunc("/derp/probe", derpServer.DERPProbeHandler)
 		r.HandleFunc("/derp/latency-check", derpServer.DERPProbeHandler)
-		r.Handle("/bootstrap-dns", derpServer.NewBootstrapDNS(h.state.DERPMap, h.cfg.ServerURL))
 	}
+
+	r.Handle("/bootstrap-dns", derpServer.NewBootstrapDNS(h.state.DERPMap, h.cfg.ServerURL))
 
 	// Auth is enforced inside each Huma mux per-operation, so the whole API
 	// mounts as one handler per version: operations need an API key while the

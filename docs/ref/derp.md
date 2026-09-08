@@ -6,15 +6,16 @@ DERP server to ensure seamless connectivity between nodes.
 
 ## Configuration
 
-DERP related settings are configured within the `derp` section of the [configuration file](configuration.md). The
-following sections only use a few of the available settings, check the [example configuration](configuration.md) for
-all available configuration options.
+DERP related settings are configured within the `derp` section of the [configuration file](configuration.md), and
+most of them can be changed while the server runs. The following sections only use a few of the available settings,
+check the [example configuration](configuration.md) for all available configuration options.
 
-### Enable embedded DERP
+### Embedded DERP
 
-Headscale ships with an embedded DERP server which allows to run your own self-hosted DERP server easily. The embedded
-DERP server is disabled by default and needs to be enabled. In addition, you should configure the public IPv4 and public
-IPv6 address of your Headscale server for improved connection stability:
+Headscale ships with an embedded DERP server, on by default, so every tailnet has a relay next to its control
+server. It is published to the machines as region 999 together with Tailscale's public relays, and each machine
+picks the closest region by measured latency. For improved connection stability configure the public IPv4 and
+public IPv6 address of your Headscale server; the machines then reach the relay while their DNS is down:
 
 ```yaml title="config.yaml" hl_lines="3-5"
 derp:
@@ -24,9 +25,12 @@ derp:
     ipv6: 2001:db8::1
 ```
 
-Keep in mind that [additional ports are needed to run a DERP server](../setup/requirements.md#ports-in-use). Besides
-relaying traffic, it also uses STUN (udp/3478) to help clients discover their public IP addresses and perform NAT
-traversal. [Check DERP server connectivity](#check-derp-server-connectivity) to see if everything works.
+The relay listens on the `server_url`, which should use HTTPS; on an HTTP `server_url` it is published as insecure
+and the machines reach it in plain HTTP. Keep in mind that [additional ports are needed to run a DERP
+server](../setup/requirements.md#ports-in-use). Besides relaying traffic, it also uses STUN (udp/3478) to help clients
+discover their public IP addresses and perform NAT traversal. [Check DERP server
+connectivity](#check-derp-server-connectivity) to see if everything works. The relay's key is created next to the noise
+key unless `derp.server.private_key_path` says otherwise.
 
 The embedded DERP server also answers `/bootstrap-dns`, the endpoint a client asks when its own DNS is broken, for
 example while `tailscale switch` moves it between servers and `/etc/resolv.conf` still points at the old tailnet's
@@ -34,11 +38,33 @@ MagicDNS. The answer is the addresses of every DERP node and of this server, res
 `q` parameter narrows it to the name asked for. External DERP servers answer that endpoint only when run with
 `derper --bootstrap-dns-names`.
 
+### Change relays at runtime
+
+The map URLs, the refetch schedule, the embedded relay and relays you run yourself can be changed without a restart
+from the admin console's _Relays_ page, with `headscale derp`, or through `PUT /api/v1/derp`. Settings set this way are
+stored in the database and replace the file's `derp` section until `headscale derp reset` returns to it. A change
+fetches the maps, starts or stops the embedded relay and pushes the new map to every machine at once; a map that
+cannot be fetched is refused and nothing changes.
+
+```console
+$ headscale derp show
+$ headscale derp set --ipv4 198.51.100.1 --ipv6 2001:db8::1
+$ headscale derp set --url ""            # only your own relays
+$ headscale derp relay add --region 900 --code custom-east --host derp900a.example.com --ipv4 198.51.100.1
+$ headscale derp relay remove --region 900
+$ headscale derp refresh                 # refetch the maps now
+$ headscale derp reset
+```
+
+`headscale derp set` starts from the settings in force and replaces only the fields whose flags were given. What the
+file alone can express stays in the file: the map files in `derp.paths`, the relay's key and
+`automatically_add_embedded_derp_region`.
+
 ### Remove Tailscale's DERP servers
 
-Once enabled, Headscale's embedded DERP is added to the list of free-to-use [DERP
+Headscale's embedded DERP is added to the list of free-to-use [DERP
 servers](https://tailscale.com/docs/reference/derp-servers) offered by Tailscale Inc. To only use Headscale's embedded
-DERP server, disable the loading of the default DERP map:
+DERP server, disable the loading of the default DERP map (or clear the map URLs on the console's _Relays_ page):
 
 ```yaml title="config.yaml" hl_lines="6"
 derp:

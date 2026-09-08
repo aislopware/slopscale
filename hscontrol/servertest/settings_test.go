@@ -55,5 +55,5 @@ func TestKeyExpirySetting(t *testing.T) {
 	assert.Equal(t, "2160h0m0s", body["nodeExpiry"])
 	assert.NotEmpty(t, body["version"])
 	assert.NotEmpty(t, body["ipv4Prefix"])
-	assert.IsType(t, []any{}, body["derpRegions"])
+	assert.InDelta(t, 1, body["derpRegions"], 0)
 }

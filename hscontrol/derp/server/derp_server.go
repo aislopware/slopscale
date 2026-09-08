@@ -4,14 +4,17 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/netip"
-	"net/url"
-	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -20,7 +23,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"tailscale.com/derp"
 	"tailscale.com/derp/derpserver"
-	"tailscale.com/envknob"
 	"tailscale.com/net/stun"
 	"tailscale.com/net/wsconn"
 	"tailscale.com/tailcfg"
@@ -36,110 +38,147 @@ const (
 	DerpVerifyScheme = "headscale-derp-verify"
 )
 
-// debugUseDERPIP is a debug-only flag that causes the DERP server to resolve
-// hostnames to IP addresses when generating the DERP region configuration.
-// This is useful for integration testing where DNS resolution may be unreliable.
-var debugUseDERPIP = envknob.Bool("HEADSCALE_DEBUG_DERP_USE_IP")
+// VerifyFunc answers the relay's admission check for one client: it reads
+// a [tailcfg.DERPAdmitClientRequest] from the request and writes a
+// [tailcfg.DERPAdmitClientResponse].
+type VerifyFunc func(*http.Request, io.Writer) error
 
+// DERPServer is the embedded relay. It is created once with the server's
+// key and brought up or down at runtime with [DERPServer.Apply]: the HTTP
+// handler answers only while enabled and STUN listens only then.
 type DERPServer struct {
-	serverURL     string
 	key           key.NodePrivate
-	cfg           *types.DERPConfig
 	tailscaleDERP *derpserver.Server
+	verify        VerifyFunc
+	// id keys the verify transport's registry, so several servers in one
+	// process (tests) each verify against their own tailnet.
+	id string
+
+	enabled       atomic.Bool
+	verifyClients atomic.Bool
+
+	mu       sync.Mutex
+	stunAddr string
+	stunConn *net.UDPConn
+	stunStop context.CancelFunc
+	stunDone chan struct{}
 }
 
-func NewDERPServer(
-	serverURL string,
-	derpKey key.NodePrivate,
-	cfg *types.DERPConfig,
-) (*DERPServer, error) {
+// NewDERPServer creates the relay, off. verify decides which clients the
+// relay admits while verification is on; nil admits every client.
+func NewDERPServer(derpKey key.NodePrivate, verify VerifyFunc) *DERPServer {
 	log.Trace().Caller().Msg("creating new embedded DERP server")
 
 	server := derpserver.New(derpKey, util.TSLogfWrapper())
 
-	if cfg.ServerVerifyClients {
-		server.SetVerifyClientURL(DerpVerifyScheme + "://verify")
-		server.SetVerifyClientURLFailOpen(false)
+	d := &DERPServer{
+		key:           derpKey,
+		tailscaleDERP: server,
+		verify:        verify,
+		id:            verifyID(derpKey.Public()),
 	}
 
-	return &DERPServer{
-		serverURL:     serverURL,
-		key:           derpKey,
-		cfg:           cfg,
-		tailscaleDERP: server,
-	}, nil
+	// The relay always asks; the transport answers "allow" while
+	// verification is off. The Tailscale server reads its verify URL
+	// without a lock, so it is set once here rather than toggled.
+	registerVerifyTransport()
+	verifyServers.Store(d.id, d)
+	server.SetVerifyClientURL(DerpVerifyScheme + "://" + d.id + "/verify")
+	server.SetVerifyClientURLFailOpen(false)
+
+	return d
 }
 
-func (d *DERPServer) GenerateRegion() (tailcfg.DERPRegion, error) {
-	serverURL, err := url.Parse(d.serverURL)
-	if err != nil {
-		return tailcfg.DERPRegion{}, fmt.Errorf("parsing DERP server URL %q: %w", d.serverURL, err)
+// Apply brings the relay to the settings: it starts STUN on the settings'
+// address (rebinding when the address changed), turns client verification
+// on or off and opens the handler; or, when the settings turn the relay
+// off, stops STUN and closes the handler. A STUN bind failure leaves the
+// relay as it was and is returned.
+func (d *DERPServer) Apply(s types.DERPServerSettings) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if !s.Enabled {
+		d.enabled.Store(false)
+		d.stopSTUNLocked()
+
+		return nil
 	}
 
-	// Extract hostname and port from URL
-	host, portStr, err := net.SplitHostPort(serverURL.Host)
-
-	var port int
-
-	if err != nil {
-		host = serverURL.Host
-		if serverURL.Scheme == "https" {
-			port = 443
-		} else {
-			port = 80
-		}
-	} else {
-		port, err = strconv.Atoi(portStr)
+	if d.stunConn == nil || d.stunAddr != s.STUNAddr {
+		packetConn, err := new(net.ListenConfig).ListenPacket(context.Background(), "udp", s.STUNAddr)
 		if err != nil {
-			return tailcfg.DERPRegion{}, fmt.Errorf("parsing DERP port %q: %w", portStr, err)
+			return fmt.Errorf("opening STUN listener on %s: %w", s.STUNAddr, err)
 		}
-	}
 
-	// If debug flag is set, resolve hostname to IP address
-	if debugUseDERPIP {
-		ips, resolveErr := new(net.Resolver).LookupIPAddr(context.Background(), host)
-		if resolveErr != nil {
-			log.Error().Caller().Err(resolveErr).Msgf("failed to resolve DERP hostname %s to IP, using hostname", host)
-		} else if len(ips) > 0 {
-			// Use the first IP address
-			ipStr := ips[0].IP.String()
-			log.Info().Caller().Msgf("HEADSCALE_DEBUG_DERP_USE_IP: resolved %s to %s", host, ipStr)
-			host = ipStr
+		udpConn, ok := packetConn.(*net.UDPConn)
+		if !ok {
+			_ = packetConn.Close()
+
+			return errSTUNNotUDP
 		}
+
+		d.stopSTUNLocked()
+		d.startSTUNLocked(udpConn, s.STUNAddr)
 	}
 
-	localDERPregion := tailcfg.DERPRegion{
-		RegionID:   d.cfg.ServerRegionID,
-		RegionCode: d.cfg.ServerRegionCode,
-		RegionName: d.cfg.ServerRegionName,
-		Nodes: []*tailcfg.DERPNode{
-			{
-				Name:     d.cfg.ServerRegionID.String(),
-				RegionID: d.cfg.ServerRegionID,
-				HostName: host,
-				DERPPort: port,
-				IPv4:     d.cfg.IPv4,
-				IPv6:     d.cfg.IPv6,
-			},
-		},
-	}
+	d.verifyClients.Store(s.VerifyClients)
+	d.enabled.Store(true)
 
-	_, portSTUNStr, err := net.SplitHostPort(d.cfg.STUNAddr)
+	return nil
+}
+
+var errSTUNNotUDP = errors.New("stun listener is not a UDP listener")
+
+// verifyID is the host the relay's verify URL carries: the public key as
+// lowercase hex, which url.Parse accepts as a host name.
+func verifyID(pub key.NodePublic) string {
+	text, err := pub.MarshalText()
 	if err != nil {
-		return tailcfg.DERPRegion{}, fmt.Errorf("splitting STUN address %q: %w", d.cfg.STUNAddr, err)
+		return "relay"
 	}
 
-	portSTUN, err := strconv.Atoi(portSTUNStr)
+	return hex.EncodeToString(text)
+}
+
+// Close stops STUN and the relay; every connected client is dropped.
+func (d *DERPServer) Close() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	d.enabled.Store(false)
+	d.stopSTUNLocked()
+	verifyServers.Delete(d.id)
+
+	err := d.tailscaleDERP.Close()
 	if err != nil {
-		return tailcfg.DERPRegion{}, fmt.Errorf("parsing STUN port %q: %w", portSTUNStr, err)
+		return fmt.Errorf("closing DERP server: %w", err)
 	}
 
-	localDERPregion.Nodes[0].STUNPort = portSTUN
+	return nil
+}
 
-	log.Info().Caller().Msgf("derp region: %+v", localDERPregion)
-	log.Info().Caller().Msgf("derp nodes[0]: %+v", localDERPregion.Nodes[0])
+// Enabled reports whether the relay is serving.
+func (d *DERPServer) Enabled() bool {
+	return d.enabled.Load()
+}
 
-	return localDERPregion, nil
+// VerifyClients reports whether the relay admits only this tailnet's nodes.
+func (d *DERPServer) VerifyClients() bool {
+	return d.verifyClients.Load()
+}
+
+// STUNAddr is the address STUN is bound to, empty while the relay is off.
+// It differs from the settings' address when that asked for port 0.
+func (d *DERPServer) STUNAddr() string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if d.stunConn == nil {
+		return ""
+	}
+
+	return d.stunConn.LocalAddr().String()
 }
 
 func (d *DERPServer) DERPHandler(
@@ -147,6 +186,13 @@ func (d *DERPServer) DERPHandler(
 	req *http.Request,
 ) {
 	log.Trace().Caller().Msgf("/derp request from %v", req.RemoteAddr)
+
+	if !d.enabled.Load() {
+		http.Error(writer, "embedded DERP server is off", http.StatusNotFound)
+
+		return
+	}
+
 	upgrade := strings.ToLower(req.Header.Get("Upgrade"))
 
 	if upgrade != "websocket" && upgrade != "derp" {
@@ -199,23 +245,6 @@ func DERPProbeHandler(
 				Msg("Failed to write HTTP response")
 		}
 	}
-}
-
-// ServeSTUN starts a STUN server on the configured addr.
-func (d *DERPServer) ServeSTUN() {
-	packetConn, err := new(net.ListenConfig).ListenPacket(context.Background(), "udp", d.cfg.STUNAddr)
-	if err != nil {
-		log.Fatal().Msgf("failed to open STUN listener: %v", err)
-	}
-
-	log.Info().Msgf("stun server started at %s", packetConn.LocalAddr())
-
-	udpConn, ok := packetConn.(*net.UDPConn)
-	if !ok {
-		log.Fatal().Msg("stun listener is not a UDP listener")
-	}
-
-	serverSTUNListener(context.Background(), udpConn)
 }
 
 func (d *DERPServer) serveWebsocket(writer http.ResponseWriter, req *http.Request) {
@@ -315,6 +344,43 @@ func (d *DERPServer) servePlain(writer http.ResponseWriter, req *http.Request) {
 	d.tailscaleDERP.Accept(req.Context(), netConn, conn, netConn.RemoteAddr().String())
 }
 
+func (d *DERPServer) startSTUNLocked(conn *net.UDPConn, addr string) {
+	// The listener outlives the request that turned the relay on, so it
+	// gets its own context, cancelled by stopSTUNLocked.
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+
+	d.stunAddr = addr
+	d.stunConn = conn
+	d.stunStop = cancel
+	d.stunDone = done
+
+	log.Info().Msgf("stun server started at %s", conn.LocalAddr())
+
+	go func() {
+		defer close(done)
+
+		serverSTUNListener(ctx, conn)
+	}()
+}
+
+func (d *DERPServer) stopSTUNLocked() {
+	if d.stunConn == nil {
+		return
+	}
+
+	d.stunStop()
+	_ = d.stunConn.Close()
+	<-d.stunDone
+
+	log.Info().Msgf("stun server stopped at %s", d.stunAddr)
+
+	d.stunAddr = ""
+	d.stunConn = nil
+	d.stunStop = nil
+	d.stunDone = nil
+}
+
 func serverSTUNListener(ctx context.Context, packetConn *net.UDPConn) {
 	var buf [64 << 10]byte
 
@@ -368,30 +434,66 @@ func serverSTUNListener(ctx context.Context, packetConn *net.UDPConn) {
 	}
 }
 
-type DERPVerifyTransport struct {
-	handleVerifyRequest func(*http.Request, io.Writer) error
+// verifyServers maps a relay's id to it, for the verify transport. The
+// transport is registered on [http.DefaultTransport], which is process
+// global, so it is installed once and dispatches on the URL's host.
+var (
+	verifyServers      sync.Map // string -> *DERPServer
+	verifyRegisterOnce sync.Once
+)
+
+var (
+	errVerifyUnknownServer  = errors.New("derp verify: unknown server")
+	errDefaultTransportType = errors.New("http.DefaultTransport is not an *http.Transport")
+)
+
+func registerVerifyTransport() {
+	verifyRegisterOnce.Do(func() {
+		t, ok := http.DefaultTransport.(*http.Transport)
+		if !ok {
+			log.Error().Err(errDefaultTransportType).Msg("embedded DERP cannot verify clients")
+
+			return
+		}
+
+		t.RegisterProtocol(DerpVerifyScheme, verifyTransport{})
+	})
 }
 
-func NewDERPVerifyTransport(handleVerifyRequest func(*http.Request, io.Writer) error) *DERPVerifyTransport {
-	return &DERPVerifyTransport{
-		handleVerifyRequest: handleVerifyRequest,
+// verifyTransport answers the relay's admission requests in process: allow
+// while the relay does not verify clients, otherwise the relay's
+// [VerifyFunc] decides.
+type verifyTransport struct{}
+
+func (verifyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	v, ok := verifyServers.Load(req.URL.Host)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", errVerifyUnknownServer, req.URL.Host)
 	}
-}
 
-func (t *DERPVerifyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	d, ok := v.(*DERPServer)
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", errVerifyUnknownServer, req.URL.Host)
+	}
+
 	buf := new(bytes.Buffer)
 
-	err := t.handleVerifyRequest(req, buf)
-	if err != nil {
-		log.Error().Caller().Err(err).Msg("failed to handle client verify request")
+	if !d.verifyClients.Load() || d.verify == nil {
+		err := json.NewEncoder(buf).Encode(tailcfg.DERPAdmitClientResponse{Allow: true})
+		if err != nil {
+			return nil, fmt.Errorf("encoding DERP admit response: %w", err)
+		}
+	} else {
+		err := d.verify(req, buf)
+		if err != nil {
+			log.Error().Caller().Err(err).Msg("failed to handle client verify request")
 
-		return nil, err
+			return nil, err
+		}
 	}
 
-	resp := &http.Response{
+	return &http.Response{
 		StatusCode: http.StatusOK,
 		Body:       io.NopCloser(buf),
-	}
-
-	return resp, nil
+	}, nil
 }

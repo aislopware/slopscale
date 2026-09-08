@@ -234,7 +234,7 @@ func setupBatcherWithTestData(
 		tb.Fatalf("Failed to create state: %v", err)
 	}
 
-	derpMap, err := derp.GetDERPMap(cfg.DERP)
+	derpMap, err := derp.GetDERPMap(tb.Context(), cfg.DERP)
 	require.NoError(tb, err)
 	require.NotNil(tb, derpMap)
 
