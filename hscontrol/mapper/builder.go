@@ -28,6 +28,9 @@ type MapResponseBuilder struct {
 	errs   []error
 
 	debugType debugType
+	// visiblePeers is the peer set the last [buildTailPeers] admitted,
+	// for [WithUserProfilesOfPeers].
+	visiblePeers views.Slice[types.NodeView]
 }
 
 type debugType string
@@ -130,9 +133,11 @@ func (b *MapResponseBuilder) WithDebugType(t debugType) *MapResponseBuilder {
 	return b
 }
 
-// WithDERPMap adds the DERP map to the response.
+// WithDERPMap adds the DERP map to the response. The map is shared with
+// the state, not cloned: a response is serialised and dropped, and nothing
+// on that path writes to it.
 func (b *MapResponseBuilder) WithDERPMap() *MapResponseBuilder {
-	b.resp.DERPMap = b.mapper.state.DERPMap().AsStruct()
+	b.resp.DERPMap = b.mapper.state.SharedDERPMap()
 	return b
 }
 
@@ -208,6 +213,15 @@ func (b *MapResponseBuilder) WithUserProfiles(peers views.Slice[types.NodeView])
 	b.resp.UserProfiles = generateUserProfiles(node, peers)
 
 	return b
+}
+
+// WithUserProfilesOfPeers adds the profiles of the node's own user and of
+// the users of the peers the response carries. Call it after [WithPeers]
+// or [WithPeerChanges]: those run the policy over the peers once and keep
+// the visible ones, so no user is named whose node the response leaves
+// out, and the policy is not run a second time for the profiles.
+func (b *MapResponseBuilder) WithUserProfilesOfPeers() *MapResponseBuilder {
+	return b.WithUserProfiles(b.visiblePeers)
 }
 
 // WithPacketFilters adds packet filter rules based on policy.
@@ -334,6 +348,7 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 	// The policy decides which of the candidates the node may see, by
 	// the same rule that built the full map's peer list.
 	changedViews := b.mapper.state.VisiblePeers(node, peers)
+	b.visiblePeers = changedViews
 
 	// The node's unreduced matchers (every rule where it is source or
 	// destination) drive the per-peer route computation below.

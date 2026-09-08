@@ -384,6 +384,14 @@ func (s *State) DERPMap() tailcfg.DERPMapView {
 	return s.derpMap.Load().View()
 }
 
+// SharedDERPMap returns the current DERP map itself, for a map response
+// to carry as it is. The map is replaced, never edited in place, so the
+// pointer stays valid and read-only; anything that changes it must clone
+// [State.DERPMap] instead.
+func (s *State) SharedDERPMap() *tailcfg.DERPMap {
+	return s.derpMap.Load()
+}
+
 // ReloadPolicy reloads the access control policy and triggers auto-approval if changed.
 // Returns the resulting [change.Change] slice when the policy or routes changed.
 func (s *State) ReloadPolicy() ([]change.Change, error) {
@@ -896,7 +904,7 @@ func (s *State) ListPeers(nodeID types.NodeID, peerIDs ...types.NodeID) views.Sl
 	// This path is used for incremental updates (NodeAdded, NodeChanged)
 	// where the caller already knows which peer IDs are involved.
 	// Peer visibility filtering happens in the mapper against the live
-	// policy (buildTailPeers and the shared visiblePeerIDs filter), because
+	// policy (buildTailPeers and filterVisiblePeerPatches), because
 	// the snapshot peer map is not rebuilt on policy changes. Approval is
 	// applied here as the snapshot peer map applies it: a node waiting for
 	// approval, or suspended, has no peers and is nobody's peer.
