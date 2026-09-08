@@ -427,93 +427,55 @@ type DERP struct {
 
 // DERPCustomRegion defines model for DERPCustomRegion.
 type DERPCustomRegion struct {
-	// Code Short code shown by clients.
-	Code string `json:"code"`
-
-	// Id Region ID; replaces a fetched region with the same ID.
-	Id int64 `json:"id"`
-
-	// Name Empty takes the code.
+	Code  string       `json:"code"`
+	Id    int64        `json:"id"`
 	Name  *string      `json:"name,omitempty"`
 	Nodes *[]DERPRelay `json:"nodes,omitempty"`
 }
 
 // DERPMapRegion defines model for DERPMapRegion.
 type DERPMapRegion struct {
-	Code  string `json:"code"`
-	Id    int64  `json:"id"`
-	Name  string `json:"name"`
-	Nodes int64  `json:"nodes"`
-
-	// Source Where it came from.
+	Code   string              `json:"code"`
+	Id     int64               `json:"id"`
+	Name   string              `json:"name"`
+	Nodes  int64               `json:"nodes"`
 	Source DERPMapRegionSource `json:"source"`
 }
 
-// DERPMapRegionSource Where it came from.
+// DERPMapRegionSource defines model for DERPMapRegion.Source.
 type DERPMapRegionSource string
 
 // DERPRelay defines model for DERPRelay.
 type DERPRelay struct {
-	CanPort80 *bool `json:"canPort80,omitempty"`
-
-	// DerpPort HTTPS port; 0 means 443.
-	DerpPort *int64 `json:"derpPort,omitempty"`
-
-	// HostName DNS name the relay's certificate matches.
-	HostName string `json:"hostName"`
-
-	// Ipv4 Fixed address, or none.
-	Ipv4 *string `json:"ipv4,omitempty"`
-
-	// Ipv6 Fixed address, or none.
-	Ipv6 *string `json:"ipv6,omitempty"`
-
-	// Name Unique within the region; empty takes the host name.
-	Name     *string `json:"name,omitempty"`
-	StunOnly *bool   `json:"stunOnly,omitempty"`
-
-	// StunPort UDP STUN port; 0 means 3478.
-	StunPort *int64 `json:"stunPort,omitempty"`
+	CanPort80 *bool   `json:"canPort80,omitempty"`
+	DerpPort  *int64  `json:"derpPort,omitempty"`
+	HostName  string  `json:"hostName"`
+	Ipv4      *string `json:"ipv4,omitempty"`
+	Ipv6      *string `json:"ipv6,omitempty"`
+	Name      *string `json:"name,omitempty"`
+	StunOnly  *bool   `json:"stunOnly,omitempty"`
+	StunPort  *int64  `json:"stunPort,omitempty"`
 }
 
 // DERPServerSettings defines model for DERPServerSettings.
 type DERPServerSettings struct {
-	Enabled bool `json:"enabled"`
-
-	// Ipv4 Public address published next to the host name.
-	Ipv4 *string `json:"ipv4,omitempty"`
-
-	// Ipv6 Public address published next to the host name.
-	Ipv6       *string `json:"ipv6,omitempty"`
-	RegionCode *string `json:"regionCode,omitempty"`
-
-	// RegionId Replaces a fetched region with the same ID.
-	RegionId *int64 `json:"regionId,omitempty"`
-
-	// RegionName Empty takes the code.
-	RegionName *string `json:"regionName,omitempty"`
-
-	// StunAddr UDP host:port STUN listens on.
-	StunAddr *string `json:"stunAddr,omitempty"`
-
-	// VerifyClients Admit only this tailnet's machines.
-	VerifyClients *bool `json:"verifyClients,omitempty"`
+	Enabled       bool    `json:"enabled"`
+	Ipv4          *string `json:"ipv4,omitempty"`
+	Ipv6          *string `json:"ipv6,omitempty"`
+	RegionCode    *string `json:"regionCode,omitempty"`
+	RegionId      *int64  `json:"regionId,omitempty"`
+	RegionName    *string `json:"regionName,omitempty"`
+	StunAddr      *string `json:"stunAddr,omitempty"`
+	VerifyClients *bool   `json:"verifyClients,omitempty"`
 }
 
 // DERPSettings defines model for DERPSettings.
 type DERPSettings struct {
-	// AutoUpdate Refetch the maps every updateFrequency.
-	AutoUpdate bool `json:"autoUpdate"`
-
-	// Regions Relays the operator runs.
-	Regions []DERPCustomRegion `json:"regions"`
-	Server  DERPServerSettings `json:"server"`
-
-	// UpdateFrequency Go duration, at least 1m.
-	UpdateFrequency string `json:"updateFrequency"`
-
-	// Urls Maps fetched and merged in order.
-	Urls []string `json:"urls"`
+	AutoUpdate      bool               `json:"autoUpdate"`
+	Regions         []DERPCustomRegion `json:"regions"`
+	Server          DERPServerSettings `json:"server"`
+	UpdateFrequency string             `json:"updateFrequency"`
+	Urls            []string           `json:"urls"`
 }
 
 // DNS defines model for DNS.

@@ -2018,14 +2018,9 @@ export interface components {
             stunAddr: string;
         };
         DERPCustomRegion: {
-            /** @description Short code shown by clients. */
             code: string;
-            /**
-             * Format: int64
-             * @description Region ID; replaces a fetched region with the same ID.
-             */
+            /** Format: int64 */
             id: number;
-            /** @description Empty takes the code. */
             name?: string;
             nodes?: components["schemas"]["DERPRelay"][];
         };
@@ -2036,62 +2031,37 @@ export interface components {
             name: string;
             /** Format: int64 */
             nodes: number;
-            /**
-             * @description Where it came from.
-             * @enum {string}
-             */
+            /** @enum {string} */
             source: "tailscale" | "url" | "file" | "custom" | "embedded" | "config";
         };
         DERPRelay: {
             canPort80?: boolean;
-            /**
-             * Format: int64
-             * @description HTTPS port; 0 means 443.
-             */
+            /** Format: int64 */
             derpPort?: number;
-            /** @description DNS name the relay's certificate matches. */
             hostName: string;
-            /** @description Fixed address, or none. */
             ipv4?: string;
-            /** @description Fixed address, or none. */
             ipv6?: string;
-            /** @description Unique within the region; empty takes the host name. */
             name?: string;
             stunOnly?: boolean;
-            /**
-             * Format: int64
-             * @description UDP STUN port; 0 means 3478.
-             */
+            /** Format: int64 */
             stunPort?: number;
         };
         DERPServerSettings: {
             enabled: boolean;
-            /** @description Public address published next to the host name. */
             ipv4?: string;
-            /** @description Public address published next to the host name. */
             ipv6?: string;
             regionCode?: string;
-            /**
-             * Format: int64
-             * @description Replaces a fetched region with the same ID.
-             */
+            /** Format: int64 */
             regionId?: number;
-            /** @description Empty takes the code. */
             regionName?: string;
-            /** @description UDP host:port STUN listens on. */
             stunAddr?: string;
-            /** @description Admit only this tailnet's machines. */
             verifyClients?: boolean;
         };
         DERPSettings: {
-            /** @description Refetch the maps every updateFrequency. */
             autoUpdate: boolean;
-            /** @description Relays the operator runs. */
             regions: components["schemas"]["DERPCustomRegion"][];
             server: components["schemas"]["DERPServerSettings"];
-            /** @description Go duration, at least 1m. */
             updateFrequency: string;
-            /** @description Maps fetched and merged in order. */
             urls: string[];
         };
         DNS: {
