@@ -1,6 +1,13 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
-import { GlobeIcon, PathIcon, ShareNetworkIcon, StarIcon, TagIcon } from "@phosphor-icons/react";
+import {
+  GlobeIcon,
+  HourglassIcon,
+  PathIcon,
+  ShareNetworkIcon,
+  StarIcon,
+  TagIcon,
+} from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
@@ -142,6 +149,14 @@ function Attributes({ node }: { readonly node: Node }): ReactElement | null {
     marks.push(
       <Mark key="shared" hint="Shared with other users">
         <ShareNetworkIcon size={markSize} />
+      </Mark>,
+    );
+  }
+
+  if (node.ephemeral) {
+    marks.push(
+      <Mark key="ephemeral" hint="Ephemeral: deleted when it logs out or stays offline">
+        <HourglassIcon size={markSize} />
       </Mark>,
     );
   }

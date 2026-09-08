@@ -44,6 +44,7 @@ function node(id: string, owner: User, tags: string[] = []): Node {
     expiry: null,
     givenName: `machine-${id}`,
     globalExitNode: false,
+    ephemeral: false,
     id,
     ipAddresses: [],
     lastSeen: stamp,

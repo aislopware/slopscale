@@ -68,6 +68,7 @@ const laptop: Node = {
   expiry: null,
   givenName: "laptop-alice",
   globalExitNode: false,
+  ephemeral: false,
   id: "1",
   ipAddresses: ["100.64.0.1"],
   lastSeen: new Date().toISOString(),

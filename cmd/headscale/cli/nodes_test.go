@@ -66,6 +66,7 @@ func routerNode() clientv1.Node {
 		IpAddresses:     []string{"100.64.0.8"},
 		Expiry:          &expiry,
 		PreAuthKey:      clientv1.NodePreAuthKey{Id: "3", Ephemeral: true},
+		Ephemeral:       true,
 		ApprovedRoutes:  []string{"10.0.0.0/8"},
 		AvailableRoutes: []string{"10.0.0.0/8", "192.168.1.0/24"},
 		SubnetRoutes:    []string{"10.0.0.0/8"},

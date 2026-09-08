@@ -35,6 +35,7 @@ function node(id: string, available: string[], approved: string[]): Node {
     expiry: null,
     givenName: `machine-${id}`,
     globalExitNode: false,
+    ephemeral: false,
     id,
     ipAddresses: [],
     lastSeen: stamp,

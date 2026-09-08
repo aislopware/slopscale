@@ -31,6 +31,7 @@ function node(id: string, overrides: Partial<Node> = {}): Node {
     expiry: null,
     givenName: `machine-${id}`,
     globalExitNode: false,
+    ephemeral: false,
     id,
     ipAddresses: [],
     lastSeen: stamp,
