@@ -147,4 +147,12 @@ Its best suited for automation.
     `headscale nodes list`. The "User" column displays `tagged-devices` as the owner of the node. See the "Tags" column for the list of
     assigned tags.
 
+## Ephemeral nodes
+
+An ephemeral node is deleted when it logs out and, once it has been offline for `node.ephemeral.inactivity_timeout`,
+by the server on its own. A node is ephemeral in either of two ways: it registered with an ephemeral pre-auth key
+(`headscale preauthkeys create --ephemeral`), or it asked to be ephemeral in its register request, which a `tailscaled`
+with in-memory state (`--state=mem:`), a `tsnet` program with `Ephemeral` set and the browser client do whatever key
+they use, or with none at all through an interactive login. `headscale nodes list` and the console mark both alike.
+
 [^1]: [Ensure that the Headscale username does not end with `@`.](oidc.md#reference-a-user-in-the-policy)

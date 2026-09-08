@@ -450,6 +450,7 @@ func registrationDataFromRequest(
 		NodeKey:    req.NodeKey,
 		Hostname:   hostname,
 		Hostinfo:   req.Hostinfo,
+		Ephemeral:  req.Ephemeral,
 	}
 
 	if !req.Expiry.IsZero() {

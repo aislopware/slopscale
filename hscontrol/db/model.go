@@ -45,6 +45,7 @@ type nodeRow struct {
 	SuspendedAt    *time.Time
 	Posture        *string
 	GlobalExitNode bool
+	Ephemeral      bool
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	DeletedAt      *time.Time
@@ -108,6 +109,7 @@ func (r *nodeRow) node() (*types.Node, error) {
 		ApprovedAt:     r.ApprovedAt,
 		SuspendedAt:    r.SuspendedAt,
 		GlobalExitNode: r.GlobalExitNode,
+		Ephemeral:      r.Ephemeral,
 		CreatedAt:      r.CreatedAt,
 		UpdatedAt:      r.UpdatedAt,
 		DeletedAt:      r.DeletedAt,
@@ -193,6 +195,7 @@ func nodeRowFrom(node *types.Node) (nodeRow, error) {
 		ApprovedAt:     node.ApprovedAt,
 		SuspendedAt:    node.SuspendedAt,
 		GlobalExitNode: node.GlobalExitNode,
+		Ephemeral:      node.Ephemeral,
 		CreatedAt:      node.CreatedAt,
 		UpdatedAt:      node.UpdatedAt,
 		DeletedAt:      node.DeletedAt,

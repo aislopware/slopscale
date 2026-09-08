@@ -259,10 +259,13 @@ func ListNodes(q Querier, nodeIDs ...types.NodeID) (types.Nodes, error) {
 	return fixedNodes(q, allNodes)
 }
 
-// ListEphemeralNodes returns the nodes registered with an ephemeral pre-auth key.
+// ListEphemeralNodes returns the nodes registered with an ephemeral
+// pre-auth key or ephemeral by their own request.
 func (hsdb *HSDatabase) ListEphemeralNodes() (types.Nodes, error) {
 	return Read(hsdb, func(rx *Tx) (types.Nodes, error) {
-		return queryNodes(rx, selectNodes().WHERE(authKeyTable.Ephemeral.EQ(jet.Bool(true))))
+		return queryNodes(rx, selectNodes().WHERE(
+			authKeyTable.Ephemeral.EQ(jet.Bool(true)).OR(table.Nodes.Ephemeral.EQ(jet.Bool(true))),
+		))
 	})
 }
 

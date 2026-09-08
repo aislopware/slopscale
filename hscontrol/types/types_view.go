@@ -318,6 +318,11 @@ func (v NodeView) SharedWith() views.Slice[UserID] { return views.SliceOf(v.ж.S
 // while at least one global exit node exists. Its exit routes are
 // approved when it is set. Only [State.SetGlobalExitNode] writes it.
 func (v NodeView) GlobalExitNode() bool { return v.ж.GlobalExitNode }
+
+// Ephemeral is set when the client asked to be ephemeral in its
+// register request rather than through an ephemeral pre-auth key.
+// [NodeView.IsEphemeral] reads both; only registration writes it.
+func (v NodeView) Ephemeral() bool { return v.ж.Ephemeral }
 func (v NodeView) CreatedAt() time.Time { return v.ж.CreatedAt }
 func (v NodeView) UpdatedAt() time.Time { return v.ж.UpdatedAt }
 func (v NodeView) DeletedAt() views.ValuePointer[time.Time] {
@@ -376,6 +381,7 @@ var _NodeViewNeedsRegeneration = Node(struct {
 	SourceAddr     netip.Addr
 	SharedWith     []UserID
 	GlobalExitNode bool
+	Ephemeral      bool
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	DeletedAt      *time.Time

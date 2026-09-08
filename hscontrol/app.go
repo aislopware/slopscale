@@ -766,12 +766,15 @@ func (h *Headscale) SetServerURLForTest(tb testing.TB, url string) {
 
 	h.cfg.ServerURL = url
 
-	// The OIDC provider captured the placeholder URL at construction, both
-	// as the base of its auth URLs and as the OAuth redirect URL, so the
-	// interactive login only works if it follows the update.
-	if provider, ok := h.authProvider.(*AuthProviderOIDC); ok {
+	// Both providers captured the placeholder URL at construction as the
+	// base of their auth URLs, the OIDC one also as the OAuth redirect
+	// URL, so the interactive login only works if they follow the update.
+	switch provider := h.authProvider.(type) {
+	case *AuthProviderOIDC:
 		provider.serverURL = url
 		provider.oauth2Config.RedirectURL = strings.TrimSuffix(url, "/") + "/oidc/callback"
+	case *AuthProviderWeb:
+		provider.serverURL = url
 	}
 }
 

@@ -40,10 +40,11 @@ type TestClient struct {
 	// Name is a human-readable identifier for this client.
 	Name string
 
-	server  *TestServer
-	direct  *controlclient.Direct
-	authKey string
-	user    *types.User
+	server     *TestServer
+	direct     *controlclient.Direct
+	authKey    string
+	loginFlags controlclient.LoginFlags
+	user       *types.User
 
 	// Connection lifecycle.
 	pollCtx    context.Context //nolint:containedctx // test-only; context stored for cancel control
@@ -69,13 +70,16 @@ type ClientOption func(*clientConfig)
 
 type clientConfig struct {
 	ephemeral bool
-	hostname  string
-	tags      []string
-	user      *types.User
-	authKey   string
-	hostinfo  func(*tailcfg.Hostinfo)
-	serials   []string
-	posture   bool
+	// loginFlags go with every register request; LoginEphemeral asks the
+	// server to make the node ephemeral, as a tailscaled with mem: state does.
+	loginFlags controlclient.LoginFlags
+	hostname   string
+	tags       []string
+	user       *types.User
+	authKey    string
+	hostinfo   func(*tailcfg.Hostinfo)
+	serials    []string
+	posture    bool
 }
 
 // WithHostinfo lets a test shape the [tailcfg.Hostinfo] the client
@@ -102,9 +106,17 @@ func WithAuthKey(authKey string) ClientOption {
 	return func(cc *clientConfig) { cc.authKey = authKey }
 }
 
-// WithEphemeral makes the client register as an ephemeral node.
+// WithEphemeral makes the client register as an ephemeral node through
+// an ephemeral pre-auth key.
 func WithEphemeral() ClientOption {
 	return func(c *clientConfig) { c.ephemeral = true }
+}
+
+// WithEphemeralLogin makes the client ask to be ephemeral in its register
+// request ([tailcfg.RegisterRequest.Ephemeral]), as a tailscaled with mem:
+// state or a tsnet server with Ephemeral does, whatever key it uses.
+func WithEphemeralLogin() ClientOption {
+	return func(c *clientConfig) { c.loginFlags |= controlclient.LoginEphemeral }
 }
 
 // WithHostname sets the client's hostname in [tailcfg.Hostinfo].
@@ -221,14 +233,15 @@ func newTestClient(tb testing.TB, server *TestServer, name, hostname, authKey st
 	}
 
 	tc := &TestClient{
-		Name:    name,
-		server:  server,
-		direct:  direct,
-		authKey: authKey,
-		updates: make(chan *netmap.NetworkMap, 64),
-		bus:     bus,
-		dialer:  dialer,
-		tracker: tracker,
+		Name:       name,
+		server:     server,
+		direct:     direct,
+		authKey:    authKey,
+		loginFlags: cc.loginFlags,
+		updates:    make(chan *netmap.NetworkMap, 64),
+		bus:        bus,
+		dialer:     dialer,
+		tracker:    tracker,
 	}
 
 	tb.Cleanup(func() {
@@ -267,10 +280,15 @@ type loginResult struct {
 // does while `tailscale up` prints the login URL. Complete the registration
 // (for example by driving the OIDC flow with [TestServer.HTTPClient]) and
 // call [PendingLogin.Wait] to obtain the connected client.
-func NewPendingLogin(tb testing.TB, server *TestServer, name string) *PendingLogin {
+func NewPendingLogin(tb testing.TB, server *TestServer, name string, opts ...ClientOption) *PendingLogin {
 	tb.Helper()
 
-	tc := newTestClient(tb, server, name, name, "", nil)
+	cc := &clientConfig{hostname: name}
+	for _, o := range opts {
+		o(cc)
+	}
+
+	tc := newTestClient(tb, server, name, cc.hostname, "", cc)
 
 	return tc.startPendingLogin(tb)
 }
@@ -663,7 +681,7 @@ func (c *TestClient) startPendingLogin(tb testing.TB) *PendingLogin {
 	ctx, cancel := context.WithTimeout(tb.Context(), 10*time.Second)
 	defer cancel()
 
-	authURL, err := c.direct.TryLogin(ctx, controlclient.LoginDefault)
+	authURL, err := c.direct.TryLogin(ctx, c.loginFlags)
 	if err != nil {
 		tb.Fatalf("servertest: TryLogin(%s): %v", c.Name, err)
 	}
@@ -702,7 +720,7 @@ func (c *TestClient) register(tb testing.TB) {
 	ctx, cancel := context.WithTimeout(tb.Context(), 10*time.Second)
 	defer cancel()
 
-	url, err := c.direct.TryLogin(ctx, controlclient.LoginDefault)
+	url, err := c.direct.TryLogin(ctx, c.loginFlags)
 	if err != nil {
 		tb.Fatalf("servertest: TryLogin(%s): %v", c.Name, err)
 	}

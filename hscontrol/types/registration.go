@@ -52,4 +52,8 @@ type RegistrationData struct {
 	// Expiry is the optional client-requested expiry for this node.
 	// May be nil if the client did not request a specific expiry.
 	Expiry *time.Time
+
+	// Ephemeral is [tailcfg.RegisterRequest.Ephemeral]: the client asks
+	// to be deleted once it stops being active.
+	Ephemeral bool
 }

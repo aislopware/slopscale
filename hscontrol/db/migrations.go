@@ -583,6 +583,25 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 				return tx.ex.addColumnIfMissing("access_rules", "builtin", typeText)
 			},
 		},
+		{
+			// Ephemeral from the register request: a client that asks to
+			// be ephemeral without an ephemeral pre-auth key is recorded
+			// on the node. Everything that exists stays as it was.
+			id: "202609151000-node-ephemeral",
+			run: func(tx *Tx) error {
+				err := tx.ex.addColumnIfMissing("nodes", "ephemeral", typeBoolFalse)
+				if err != nil {
+					return err
+				}
+
+				_, err = tx.ex.execRaw(`UPDATE nodes SET ephemeral = false WHERE ephemeral IS NULL`)
+				if err != nil {
+					return fmt.Errorf("backfilling nodes.ephemeral: %w", err)
+				}
+
+				return nil
+			},
+		},
 	}
 }
 

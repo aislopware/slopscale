@@ -573,19 +573,37 @@ func TestListEphemeralNodes(t *testing.T) {
 	err = CreateNode(db, &nodeEph)
 	require.NoError(t, err)
 
+	// Ephemeral by its own request, with no pre-auth key at all.
+	nodeAsked := types.Node{
+		MachineKey:     key.NewMachine().Public(),
+		NodeKey:        key.NewNode().Public(),
+		Hostname:       "asked",
+		UserID:         &user.ID,
+		RegisterMethod: util.RegisterMethodCLI,
+		Ephemeral:      true,
+	}
+
+	err = CreateNode(db, &nodeAsked)
+	require.NoError(t, err)
+
 	nodes, err := db.ListNodes()
 	require.NoError(t, err)
 
 	ephemeralNodes, err := db.ListEphemeralNodes()
 	require.NoError(t, err)
 
-	assert.Len(t, nodes, 2)
-	assert.Len(t, ephemeralNodes, 1)
+	assert.Len(t, nodes, 3)
+	require.Len(t, ephemeralNodes, 2)
 
 	assert.Equal(t, nodeEph.ID, ephemeralNodes[0].ID)
 	assert.Equal(t, nodeEph.AuthKeyID, ephemeralNodes[0].AuthKeyID)
 	assert.Equal(t, nodeEph.UserID, ephemeralNodes[0].UserID)
 	assert.Equal(t, nodeEph.Hostname, ephemeralNodes[0].Hostname)
+
+	assert.Equal(t, nodeAsked.ID, ephemeralNodes[1].ID)
+	assert.True(t, ephemeralNodes[1].Ephemeral, "the flag survives the round trip")
+	assert.True(t, ephemeralNodes[1].IsEphemeral())
+	assert.False(t, nodes[0].IsEphemeral())
 }
 
 func TestListPeers(t *testing.T) {

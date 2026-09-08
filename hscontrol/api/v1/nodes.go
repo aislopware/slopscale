@@ -68,6 +68,10 @@ type Node struct {
 	SharedWith []string `doc:"IDs of the users the node is shared with." json:"sharedWith" nullable:"false"`
 
 	GlobalExitNode bool `doc:"true when every client is told to prefer this exit node." json:"globalExitNode"`
+
+	// Ephemeral covers both an ephemeral pre-auth key and a client that asked
+	// to be ephemeral when it registered.
+	Ephemeral bool `doc:"true when the node is deleted on logout or after the ephemeral timeout." json:"ephemeral"`
 }
 
 // NodePreAuthKey is the PreAuthKey shape embedded in a Node response. The
@@ -686,6 +690,7 @@ func nodeFromView(view types.NodeView) Node {
 		Approved:        view.IsApproved(),
 		SharedWith:      sharedWithIDs(view),
 		GlobalExitNode:  view.IsGlobalExitNode(),
+		Ephemeral:       view.IsEphemeral(),
 	}
 
 	if view.ApprovedAt().Valid() {

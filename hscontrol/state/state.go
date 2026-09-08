@@ -916,8 +916,7 @@ func (s *State) ListEphemeralNodes() views.Slice[types.NodeView] {
 	var ephemeralNodes []types.NodeView
 
 	for _, node := range allNodes.All() {
-		// Check if node is ephemeral by checking its AuthKey
-		if node.AuthKey().Valid() && node.AuthKey().Ephemeral() {
+		if node.IsEphemeral() {
 			ephemeralNodes = append(ephemeralNodes, node)
 		}
 	}
@@ -1787,6 +1786,10 @@ type newNodeParams struct {
 	Expiry         *time.Time
 	RegisterMethod string
 
+	// Ephemeral is what the client asked for in its register request; an
+	// ephemeral pre-auth key makes the node ephemeral on its own.
+	Ephemeral bool
+
 	// Optional: Pre-auth key specific fields
 	PreAuthKey *types.PreAuthKey
 
@@ -2358,6 +2361,7 @@ func (s *State) HandleNodeFromPreAuthKey(
 			Endpoints:              nil, // Endpoints not available in RegisterRequest
 			Expiry:                 reqExpiry,
 			RegisterMethod:         util.RegisterMethodAuthKey,
+			Ephemeral:              regReq.Ephemeral,
 			PreAuthKey:             pak,
 			ExistingNodeForNetinfo: differentUserNode,
 		})
@@ -3096,6 +3100,7 @@ func (s *State) createNewNodeFromAuth(
 		Endpoints:              regData.Endpoints,
 		Expiry:                 cmp.Or(expiry, regData.Expiry),
 		RegisterMethod:         registrationMethod,
+		Ephemeral:              regData.Ephemeral,
 		ExistingNodeForNetinfo: existingNodeForNetinfo,
 	})
 }
@@ -3541,6 +3546,7 @@ func (s *State) createAndSaveNewNode(params newNodeParams) (types.NodeView, erro
 		RegisterMethod: params.RegisterMethod,
 		Expiry:         params.Expiry,
 		ApprovedAt:     s.approvedAtRegistration(params.PreAuthKey),
+		Ephemeral:      params.Ephemeral,
 	}
 
 	assignNodeOwnership(&nodeToRegister, params)

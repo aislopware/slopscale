@@ -149,6 +149,12 @@ CREATE TABLE nodes(
   -- global_exit_node marks an exit node every client is told to prefer:
   -- it gets suggest-exit-node and every node auto-exit-node.
   global_exit_node numeric DEFAULT false,
+  -- ephemeral is set when the client asked to be ephemeral in its register
+  -- request (RegisterRequest.Ephemeral, as a tailscaled with mem: state or
+  -- a tsnet Server with Ephemeral does), without an ephemeral pre-auth
+  -- key. Either makes the node ephemeral: deleted on logout and after
+  -- node.ephemeral.inactivity_timeout offline.
+  ephemeral numeric DEFAULT false,
 
   created_at datetime,
   updated_at datetime,

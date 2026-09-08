@@ -207,6 +207,12 @@ type Node struct {
 	// approved when it is set. Only [State.SetGlobalExitNode] writes it.
 	GlobalExitNode bool
 
+	// Ephemeral is set when the client asked to be ephemeral in its
+	// register request (a tailscaled with mem: state, a tsnet Server
+	// with Ephemeral) rather than through an ephemeral pre-auth key.
+	// [Node.IsEphemeral] reads both; only registration writes it.
+	Ephemeral bool
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time
@@ -293,10 +299,11 @@ func (node *Node) IsSharedWith(uid UserID) bool {
 	return slices.Contains(node.SharedWith, uid)
 }
 
-// IsEphemeral returns if the node is registered as an Ephemeral node.
+// IsEphemeral returns if the node is registered as an Ephemeral node,
+// through an ephemeral pre-auth key or by asking in its register request.
 // https://tailscale.com/docs/features/ephemeral-nodes
 func (node *Node) IsEphemeral() bool {
-	return node.AuthKey != nil && node.AuthKey.Ephemeral
+	return node.Ephemeral || (node.AuthKey != nil && node.AuthKey.Ephemeral)
 }
 
 // IPs returns the node's allocated Tailscale addresses. Order is

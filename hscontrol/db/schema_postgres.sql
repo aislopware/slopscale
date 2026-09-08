@@ -107,6 +107,7 @@ CREATE TABLE nodes(
   global_exit_node boolean DEFAULT false,
   suspended_at timestamptz,
   posture text,
+  ephemeral boolean DEFAULT false,
   CONSTRAINT fk_nodes_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_nodes_auth_key FOREIGN KEY(auth_key_id) REFERENCES pre_auth_keys(id)
 );
