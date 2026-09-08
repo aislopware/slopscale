@@ -640,62 +640,60 @@ func (pm *PolicyManager) BuildPeerMap(nodes views.Slice[types.NodeView]) map[typ
 
 	// Precompute each node's subnet routes and exit-node status once; the
 	// O(n^2) pair scans below would otherwise recompute them for every pair.
-	routeInfo := make(map[types.NodeID]nodeRoutes, nodes.Len())
-	for _, n := range nodes.All() {
-		routeInfo[n.ID()] = routesOf(n)
+	// Both scans index by loop position rather than node ID, so a pair costs
+	// two slice loads instead of four map lookups, and the result map is
+	// built once at the end instead of on every match.
+	routes := make([]nodeRoutes, nodes.Len())
+	for i := range nodes.Len() {
+		routes[i] = routesOf(nodes.At(i))
 	}
 
 	// If we have a global filter, use it for all nodes (normal case).
 	// Via grants require the per-node path because the global filter
 	// skips via grants (compileFilterRules: if len(grant.Via) > 0 { continue }).
-	if !pm.needsPerNodeFilter {
-		ret := make(map[types.NodeID][]types.NodeView, nodes.Len())
+	return peerMapOf(nodes, pm.peerPositionsLocked(nodes, routes))
+}
 
-		// Build the map of all peers according to the matchers.
-		for i := range nodes.Len() {
-			for j := i + 1; j < nodes.Len(); j++ {
-				if nodes.At(i).ID() == nodes.At(j).ID() {
-					continue
-				}
-
-				ri, rj := routeInfo[nodes.At(i).ID()], routeInfo[nodes.At(j).ID()]
-				if pm.globalPeersLocked(nodes.At(i), nodes.At(j), ri, rj) {
-					ret[nodes.At(i).ID()] = append(ret[nodes.At(i).ID()], nodes.At(j))
-					ret[nodes.At(j).ID()] = append(ret[nodes.At(j).ID()], nodes.At(i))
-				}
-			}
-		}
-
-		return ret
+// BuildPeerPositions is [PolicyManager.BuildPeerMap] with the result as
+// positions into nodes: out[i] lists the positions of node i's peers, nil
+// for a node without any. The node store keeps this form so it can carry
+// the relationship across batches that change none of its inputs.
+func (pm *PolicyManager) BuildPeerPositions(nodes views.Slice[types.NodeView]) [][]int32 {
+	if pm == nil {
+		return nil
 	}
 
-	// For autogroup:self or via grants, build per-node peer relationships
-	ret := make(map[types.NodeID][]types.NodeView, nodes.Len())
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
 
-	// Pre-compute per-node matchers using unreduced compiled rules
-	// We need unreduced rules to determine peer relationships correctly.
-	// Reduced rules only show destinations where the node is the target,
-	// but peer relationships require the full bidirectional access rules.
-	nodeMatchers := make(map[types.NodeID][]matcher.Match, nodes.Len())
-	for _, node := range nodes.All() {
-		unreduced := pm.filterRulesForNodeLocked(node)
-		nodeMatchers[node.ID()] = matcher.MatchesFromFilterRules(unreduced)
-	}
-
-	// Check each node pair for peer relationships.
-	// Start j at i+1 to avoid checking the same pair twice and creating duplicates.
+	routes := make([]nodeRoutes, nodes.Len())
 	for i := range nodes.Len() {
-		nodeI := nodes.At(i)
+		routes[i] = routesOf(nodes.At(i))
+	}
 
-		for j := i + 1; j < nodes.Len(); j++ {
-			nodeJ := nodes.At(j)
+	return pm.peerPositionsLocked(nodes, routes)
+}
 
-			if perNodePeers(nodeI, nodeJ, nodeMatchers[nodeI.ID()], nodeMatchers[nodeJ.ID()],
-				routeInfo[nodeI.ID()], routeInfo[nodeJ.ID()]) {
-				ret[nodeI.ID()] = append(ret[nodeI.ID()], nodeJ)
-				ret[nodeJ.ID()] = append(ret[nodeJ.ID()], nodeI)
-			}
+// peerMapOf keys the position-indexed peer lists by node ID, dropping the
+// nodes that ended up with no peers, as the pair scans never gave them a
+// map entry.
+func peerMapOf(nodes views.Slice[types.NodeView], peers [][]int32) map[types.NodeID][]types.NodeView {
+	ret := make(map[types.NodeID][]types.NodeView, len(peers))
+
+	for i, p := range peers {
+		if len(p) == 0 {
+			continue
 		}
+
+		list := make([]types.NodeView, 0, len(p))
+		for _, pos := range p {
+			list = append(list, nodes.At(int(pos)))
+		}
+
+		// Two entries can carry the same ID; the pair scans skip such a
+		// pair but still fill both positions, so merge them here.
+		id := nodes.At(i).ID()
+		ret[id] = append(ret[id], list...)
 	}
 
 	return ret
@@ -1681,6 +1679,79 @@ func (pm *PolicyManager) NodesWithChangedCapMap() []types.NodeID {
 	pm.nodeAttrsChanged = nil
 
 	return out
+}
+
+// peerPositionsLocked runs the pair scan that fits the policy: the global
+// filter serves every node unless via grants or autogroup:self need a
+// filter per node (compileFilterRules skips via grants).
+func (pm *PolicyManager) peerPositionsLocked(nodes views.Slice[types.NodeView], routes []nodeRoutes) [][]int32 {
+	if !pm.needsPerNodeFilter {
+		return pm.globalPeerListsLocked(nodes, routes)
+	}
+
+	return pm.perNodePeerListsLocked(nodes, routes)
+}
+
+// globalPeerListsLocked scans every node pair under the global filter and
+// returns each node's peers, indexed by the node's position in nodes.
+func (pm *PolicyManager) globalPeerListsLocked(
+	nodes views.Slice[types.NodeView],
+	routes []nodeRoutes,
+) [][]int32 {
+	peers := make([][]int32, nodes.Len())
+
+	for i := range nodes.Len() {
+		nodeI, ri := nodes.At(i), routes[i]
+
+		for j := i + 1; j < nodes.Len(); j++ {
+			nodeJ := nodes.At(j)
+			if nodeI.ID() == nodeJ.ID() {
+				continue
+			}
+
+			if pm.globalPeersLocked(nodeI, nodeJ, ri, routes[j]) {
+				peers[i] = append(peers[i], int32(j))
+				peers[j] = append(peers[j], int32(i))
+			}
+		}
+	}
+
+	return peers
+}
+
+// perNodePeerListsLocked does the same scan for autogroup:self and via
+// grants, where each node has its own filter.
+func (pm *PolicyManager) perNodePeerListsLocked(
+	nodes views.Slice[types.NodeView],
+	routes []nodeRoutes,
+) [][]int32 {
+	// Pre-compute per-node matchers using unreduced compiled rules
+	// We need unreduced rules to determine peer relationships correctly.
+	// Reduced rules only show destinations where the node is the target,
+	// but peer relationships require the full bidirectional access rules.
+	nodeMatchers := make([][]matcher.Match, nodes.Len())
+	for i := range nodes.Len() {
+		nodeMatchers[i] = matcher.MatchesFromFilterRules(pm.filterRulesForNodeLocked(nodes.At(i)))
+	}
+
+	peers := make([][]int32, nodes.Len())
+
+	// Check each node pair for peer relationships.
+	// Start j at i+1 to avoid checking the same pair twice and creating duplicates.
+	for i := range nodes.Len() {
+		nodeI, mi, ri := nodes.At(i), nodeMatchers[i], routes[i]
+
+		for j := i + 1; j < nodes.Len(); j++ {
+			nodeJ := nodes.At(j)
+
+			if perNodePeers(nodeI, nodeJ, mi, nodeMatchers[j], ri, routes[j]) {
+				peers[i] = append(peers[i], int32(j))
+				peers[j] = append(peers[j], int32(i))
+			}
+		}
+	}
+
+	return peers
 }
 
 // globalPeersLocked reports whether a and b see each other under the

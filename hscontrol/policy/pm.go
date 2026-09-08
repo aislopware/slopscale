@@ -29,6 +29,9 @@ type PolicyManager interface {
 	VisiblePeers(node types.NodeView, candidates views.Slice[types.NodeView]) views.Slice[types.NodeView]
 	// BuildPeerMap constructs peer relationship maps for the given nodes
 	BuildPeerMap(nodes views.Slice[types.NodeView]) map[types.NodeID][]types.NodeView
+	// BuildPeerPositions is BuildPeerMap with the result as positions into
+	// nodes: out[i] lists the positions of node i's peers.
+	BuildPeerPositions(nodes views.Slice[types.NodeView]) [][]int32
 	SSHPolicy(baseURL string, node types.NodeView) (*tailcfg.SSHPolicy, error)
 	// SSHCheckParams resolves the SSH check period for a (src, dst) pair
 	// from the current policy, avoiding trust of client-provided URL params.
