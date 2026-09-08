@@ -99,11 +99,19 @@ account menu with *Sign out*.
   Linux, macOS, Windows and Docker, next to a QR code carrying the same line
   so a phone or a machine without a shared clipboard can pick it up; the
   iOS and Android tab gives the server address and where the app takes it.
+  _Register a machine_ (`/admin/machines/register`) completes an interactive
+  login instead: a machine that signed in without a key or an identity
+  provider shows a registration key, and the server's registration page links
+  here with it filled in; see [Registration](registration.md).
+  _Authentication check_ (`/admin/machines/auth-check`) approves or rejects an
+  SSH session held by a check-mode rule, linked from the page the SSH client
+  opens.
 - **Users**: create, rename, approve, change the [role](roles.md) and delete
   users.
 - **Keys**: pre-auth keys (create with reusable, ephemeral, pre-authorized and
-  tags; expire; delete) and API keys. New keys are shown once, with a copy
-  button.
+  tags; expire; delete), API keys and OAuth clients for the v2 API (create
+  with scopes and tags; revoke). New keys and client secrets are shown once,
+  with a copy button.
 - **Access controls**: [groups and access rules](access-control.md), and the
   [policy](policy.md) file in an editor with syntax highlighting. *Check*
   validates the draft against the server without saving; *Save* applies it.
@@ -119,8 +127,9 @@ account menu with *Sign out*.
 - **Audit log**: who changed what, newest first, with filters by action, user
   and time; see [Audit log](audit.md).
 - **Settings**: the [device and user approval](approval.md) switches, the
-  key expiry cap, the signed-in credential's role and scopes, and the server's
-  build, addresses, DERP regions and config file values.
+  key expiry cap, a _Maintenance_ section with the IP address backfill
+  (`headscale nodes backfillips`), the signed-in credential's role and scopes,
+  and the server's build, addresses, DERP regions and config file values.
 
 ## Building from source
 

@@ -5,13 +5,19 @@ import (
 )
 
 // AuthWeb renders a page that instructs an administrator to run a CLI command
-// to complete an authentication or registration flow.
-// It is used by both the registration and auth-approve web handlers.
-func AuthWeb(title, description, command string) *elem.Element {
-	return page(
-		title+" - Headscale",
+// to complete an authentication or registration flow. consoleURL, when not
+// empty, links to the admin console page that does the same under consoleText,
+// so an operator with a browser open need not reach for a terminal.
+func AuthWeb(title, description, command, consoleURL, consoleText string) *elem.Element {
+	content := []elem.Node{
 		H1(elem.Text(title)),
-		P(elem.Text(description)),
-		codeBlockText(command),
-	)
+	}
+
+	if consoleURL != "" {
+		content = append(content, P(A(consoleURL, elem.Text(consoleText)), elem.Text(", or:")))
+	}
+
+	content = append(content, P(elem.Text(description)), codeBlockText(command))
+
+	return page(title+" - Headscale", content...)
 }

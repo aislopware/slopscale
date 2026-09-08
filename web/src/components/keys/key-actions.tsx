@@ -32,13 +32,14 @@ export interface KeyActionsProps {
   /** Accessible name of the trigger, such as "Actions for key tskey-abc". */
   readonly label: string;
   readonly disabled?: boolean;
-  readonly expire: ExpireAction;
+  /** Absent for a credential that cannot expire, such as an OAuth client. */
+  readonly expire?: ExpireAction;
   readonly remove: DeleteAction;
 }
 
 type Dialog = "expire" | "delete";
 
-/** The row menu both key tables use: expire the key, or delete it outright. */
+/** The row menu the key tables use: expire the key, or delete it outright. */
 export function KeyActions({
   label,
   disabled = false,
@@ -65,17 +66,21 @@ export function KeyActions({
           }
         />
         <DropdownMenu.Content align="end">
-          <DropdownMenu.Item
-            icon={ClockCounterClockwiseIcon}
-            variant="danger"
-            disabled={disabled}
-            onClick={() => {
-              setDialog("expire");
-            }}
-          >
-            Expire…
-          </DropdownMenu.Item>
-          <DropdownMenu.Separator />
+          {expire === undefined ? null : (
+            <>
+              <DropdownMenu.Item
+                icon={ClockCounterClockwiseIcon}
+                variant="danger"
+                disabled={disabled}
+                onClick={() => {
+                  setDialog("expire");
+                }}
+              >
+                Expire…
+              </DropdownMenu.Item>
+              <DropdownMenu.Separator />
+            </>
+          )}
           <DropdownMenu.Item
             icon={TrashIcon}
             variant="danger"
@@ -88,22 +93,24 @@ export function KeyActions({
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu>
-      <ConfirmDialog
-        open={dialog === "expire"}
-        onOpenChange={(next) => {
-          if (!next) {
-            close();
-          }
-        }}
-        title={expire.title}
-        description={expire.description}
-        confirmLabel="Expire key"
-        loading={expire.pending}
-        error={expire.error}
-        onConfirm={() => {
-          expire.run(close);
-        }}
-      />
+      {expire === undefined ? null : (
+        <ConfirmDialog
+          open={dialog === "expire"}
+          onOpenChange={(next) => {
+            if (!next) {
+              close();
+            }
+          }}
+          title={expire.title}
+          description={expire.description}
+          confirmLabel="Expire key"
+          loading={expire.pending}
+          error={expire.error}
+          onConfirm={() => {
+            expire.run(close);
+          }}
+        />
+      )}
       <DeleteResource
         open={dialog === "delete"}
         onOpenChange={(next) => {

@@ -6,6 +6,7 @@ import { serverInfoQuery, settingsQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { ApprovalSection, DeviceTrustSection } from "~/components/settings/approval-section.tsx";
 import { KeyExpirySection } from "~/components/settings/key-expiry-section.tsx";
+import { MaintenanceSection } from "~/components/settings/maintenance-section.tsx";
 import { ServerSection } from "~/components/settings/server-section.tsx";
 import { SessionSection } from "~/components/settings/session-section.tsx";
 import { SSHRecordingSection } from "~/components/settings/ssh-recording-section.tsx";
@@ -38,6 +39,7 @@ function SettingsPage(): ReactElement {
         <DeviceTrustSection settings={settings} canEdit={canEdit} />
         <KeyExpirySection settings={settings} canEdit={canEdit} />
         <SSHRecordingSection settings={settings} canEdit={canEdit} />
+        <MaintenanceSection canRun={can(me, "devices:core")} />
         <SessionSection me={me} />
         <ServerSection info={info} />
       </div>

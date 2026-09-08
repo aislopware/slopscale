@@ -46,3 +46,21 @@ export function useApiKeyMutations(): ApiKeyMutations {
     remove: api.useMutation("delete", "/api/v1/apikey/{prefix}", { onSuccess: refresh }),
   };
 }
+
+interface OAuthClientMutations {
+  readonly create: Mutation<"post", "/api/v1/oauth-client">;
+  readonly revoke: Mutation<"delete", "/api/v1/oauth-client/{clientId}">;
+}
+
+/** OAuth client mutations; revoking deletes the client and every token it issued. */
+export function useOAuthClientMutations(): OAuthClientMutations {
+  const queryClient = useQueryClient();
+  const refresh = async (): Promise<void> => {
+    await invalidate(queryClient, "/api/v1/oauth-client");
+  };
+
+  return {
+    create: api.useMutation("post", "/api/v1/oauth-client", { onSuccess: refresh }),
+    revoke: api.useMutation("delete", "/api/v1/oauth-client/{clientId}", { onSuccess: refresh }),
+  };
+}

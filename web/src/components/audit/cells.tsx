@@ -25,6 +25,7 @@ const targetKinds: Record<string, string> = {
   apikey: "API key",
   key: "Key",
   node: "Node",
+  oauthclient: "OAuth client",
   policy: "Policy",
   preauthkey: "Pre-auth key",
   session: "Session",

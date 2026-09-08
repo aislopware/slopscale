@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/juanfont/headscale/hscontrol/templates"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/wire"
+	"github.com/juanfont/headscale/web"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 )
@@ -355,6 +357,8 @@ func (a *AuthProviderWeb) AuthHandler(
 		"Authentication check",
 		"Run the command below in the headscale server to approve this authentication request:",
 		"headscale auth approve --auth-id "+authID.String(),
+		consolePage("machines/auth-check?id=", authID),
+		"Approve or reject it in the admin console",
 	).Render()))
 	if err != nil {
 		log.Error().Err(err).Msg("failed to write auth response")
@@ -408,10 +412,22 @@ func (a *AuthProviderWeb) RegisterHandler(
 		"Node registration",
 		"Run the command below in the headscale server to add this node to your network:",
 		fmt.Sprintf("headscale auth register --auth-id %s --user USERNAME", authID.String()),
+		consolePage("machines/register?key=", authID),
+		"Register it in the admin console",
 	).Render()))
 	if err != nil {
 		log.Error().Err(err).Msg("failed to write register response")
 	}
+}
+
+// consolePage is the admin console page that completes an auth flow for
+// authID, or empty when the binary carries no console.
+func consolePage(path string, authID types.AuthID) string {
+	if !web.Built() {
+		return ""
+	}
+
+	return web.Prefix + path + url.QueryEscape(authID.String())
 }
 
 func FaviconHandler(writer http.ResponseWriter, req *http.Request) {

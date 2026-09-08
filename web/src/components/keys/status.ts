@@ -4,6 +4,10 @@ import { isPast, parseTime } from "~/lib/time.ts";
 /** A key is spent, past its expiry, or still good for a registration. */
 export type KeyStatus = "active" | "used" | "expired";
 
+/** The key tables' status filter: every status, or all of them. */
+export const statusFilters = ["all", "active", "used", "expired"] as const;
+export type StatusFilter = (typeof statusFilters)[number];
+
 /** Active first: the rows an operator can still act on belong at the top. */
 export const statusOrder: Record<KeyStatus, number> = { active: 0, used: 1, expired: 2 };
 

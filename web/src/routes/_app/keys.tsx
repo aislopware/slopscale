@@ -1,45 +1,18 @@
-import { Button } from "@cloudflare/kumo/components/button";
-import { Empty } from "@cloudflare/kumo/components/empty";
-import { LayerCard } from "@cloudflare/kumo/components/layer-card";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
-import type { TabsItem } from "@cloudflare/kumo/components/tabs";
-import { KeyIcon, PlusIcon } from "@phosphor-icons/react";
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useDeferredValue, useState } from "react";
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement } from "react";
 import { object, optional, pipe, transform, unknown } from "valibot";
 
-import { apiKeysQuery, groupsQuery, preAuthKeysQuery, usersQuery } from "~/api/queries.ts";
+import { apiKeysQuery, oauthClientsQuery, preAuthKeysQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
-import type { Me } from "~/auth/me.ts";
-import { apiKeyColumns, emptyUsers } from "~/components/keys/api-columns.tsx";
-import { CreateApiKeyDialog } from "~/components/keys/api-dialogs.tsx";
-import { preAuthKeyColumns } from "~/components/keys/preauth-columns.tsx";
-import { CreatePreAuthKeyDialog } from "~/components/keys/preauth-dialogs.tsx";
-import { apiKeyStatus, preAuthKeyStatus } from "~/components/keys/status.ts";
-import { useAppTable } from "~/components/table/app-table.tsx";
-import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
-import { SearchInput } from "~/components/table/search-input.tsx";
-import { countedTabs } from "~/components/table/tab-count.tsx";
-import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
+import { ApiPanel, OAuthPanel, PreAuthPanel } from "~/components/keys/panels.tsx";
+import type { PanelControls } from "~/components/keys/panels.tsx";
+import { statusFilters } from "~/components/keys/status.ts";
+import type { StatusFilter } from "~/components/keys/status.ts";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
-const tabs = ["preauth", "api"] as const;
+const tabs = ["preauth", "api", "oauth"] as const;
 type TabValue = (typeof tabs)[number];
-
-const statuses = ["all", "active", "used", "expired"] as const;
-type StatusFilter = (typeof statuses)[number];
-
-const preAuthStatusTabs: readonly { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "active", label: "Active" },
-  { value: "used", label: "Used" },
-  { value: "expired", label: "Expired" },
-];
-
-const apiStatusTabs = preAuthStatusTabs.filter((tab) => tab.value !== "used");
 
 function toTab(value: unknown): TabValue | undefined {
   return tabs.find((known) => known === value);
@@ -50,7 +23,7 @@ function toText(value: unknown): string | undefined {
 }
 
 function toStatus(value: unknown): StatusFilter | undefined {
-  return statuses.find((known) => known === value);
+  return statusFilters.find((known) => known === value);
 }
 
 /**
@@ -89,6 +62,9 @@ export const Route = createFileRoute("/_app/keys")({
         ? context.queryClient.query(preAuthKeysQuery)
         : Promise.resolve(),
       context.queryClient.query(apiKeysQuery),
+      can(context.me, "oauth_keys:read")
+        ? context.queryClient.query(oauthClientsQuery)
+        : Promise.resolve(),
     ]);
   },
   component: KeysPage,
@@ -99,7 +75,8 @@ function KeysPage(): ReactElement {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const mayReadPreAuth = can(me, "auth_keys:read");
-  const tab: TabValue = mayReadPreAuth ? (search.tab ?? "preauth") : "api";
+  const mayReadOAuth = can(me, "oauth_keys:read");
+  const tab = visibleTab(search.tab, mayReadPreAuth, mayReadOAuth);
 
   const controls: PanelControls = {
     query: search.q ?? "",
@@ -117,254 +94,44 @@ function KeysPage(): ReactElement {
 
   // Filters belong to the table below, so switching tables clears them.
   const handleTabChange = (next: string): void => {
-    void navigate({ search: () => searchFor(next === "api" ? "api" : "preauth", "", "all") });
+    void navigate({ search: () => searchFor(toTab(next) ?? "preauth", "", "all") });
   };
 
   const tabItems = [
     ...(mayReadPreAuth ? [{ value: "preauth", label: "Pre-auth keys" }] : []),
     { value: "api", label: "API keys" },
+    ...(mayReadOAuth ? [{ value: "oauth", label: "OAuth clients" }] : []),
   ];
 
   return (
     <>
       <PageHeader
         title="Keys"
-        description="Pre-auth keys register machines without a login; API keys authenticate this console and automation."
+        description="Pre-auth keys register machines without a login; API keys and OAuth clients authenticate this console and automation."
       />
       <div className="flex">
         <Tabs variant="segmented" tabs={tabItems} value={tab} onValueChange={handleTabChange} />
       </div>
-      {tab === "preauth" && mayReadPreAuth ? (
-        <PreAuthPanel me={me} controls={controls} />
-      ) : (
-        <ApiPanel me={me} controls={controls} />
-      )}
+      {tab === "preauth" ? <PreAuthPanel me={me} controls={controls} /> : null}
+      {tab === "api" ? <ApiPanel me={me} controls={controls} /> : null}
+      {tab === "oauth" ? <OAuthPanel me={me} controls={controls} /> : null}
     </>
   );
 }
 
-interface PanelControls {
-  readonly query: string;
-  readonly status: StatusFilter;
-  readonly handleQueryChange: (value: string) => void;
-  readonly handleStatusChange: (value: string) => void;
-  /** Clears search and status, keeping the open tab. */
-  readonly handleClear: () => void;
-}
+/** The tab to show: the one asked for if the caller may read it, else the first it may. */
+function visibleTab(asked: TabValue | undefined, preAuth: boolean, oauth: boolean): TabValue {
+  if (asked === "preauth" && preAuth) {
+    return "preauth";
+  }
 
-function PreAuthPanel({
-  me,
-  controls,
-}: {
-  readonly me: Me;
-  readonly controls: PanelControls;
-}): ReactElement {
-  const keys = useSuspenseQuery(preAuthKeysQuery);
-  // Group names for the type cell; without the scope the cell shows the ids.
-  const groups = useQuery({ ...groupsQuery, enabled: can(me, "policy_file:read") });
-  const [creating, setCreating] = useState(false);
-  const filter = useDeferredValue(controls.query);
-  const statusOf = (status: StatusFilter): number =>
-    keys.data.preAuthKeys.filter(
-      (authKey) => status === "all" || preAuthKeyStatus(authKey) === status,
-    ).length;
-  const rows = keys.data.preAuthKeys.filter(
-    (authKey) => controls.status === "all" || preAuthKeyStatus(authKey) === controls.status,
-  );
-  const table = useAppTable({
-    data: rows,
-    columns: preAuthKeyColumns,
-    getRowId: (authKey) => authKey.id,
-    state: { globalFilter: filter },
-    initialState: { sorting: [{ id: "created", desc: true }] },
-    meta: { me, ...(groups.data === undefined ? {} : { groups: groups.data.groups }) },
-  });
-  const create = (): void => {
-    setCreating(true);
-  };
+  if (asked === "oauth" && oauth) {
+    return "oauth";
+  }
 
-  return (
-    <KeyPanel
-      controls={controls}
-      statusTabs={countedTabs(preAuthStatusTabs, statusOf)}
-      placeholder="Search by key, user or tag"
-      action={
-        <Button variant="primary" icon={PlusIcon} disabled={!can(me, "auth_keys")} onClick={create}>
-          Create key
-        </Button>
-      }
-    >
-      <table.AppTable>
-        <PanelTable
-          controls={controls}
-          total={keys.data.preAuthKeys.length}
-          shown={table.getRowModel().rows.length}
-          noun="pre-auth key"
-          firstEmpty={
-            <Empty
-              className={tableEmptyClass}
-              size="sm"
-              icon={<KeyIcon size={emptyIconSize} />}
-              title="No pre-auth keys"
-              description="A pre-auth key lets a machine register without anyone signing in on it."
-              contents={
-                <Button variant="primary" disabled={!can(me, "auth_keys")} onClick={create}>
-                  Create key
-                </Button>
-              }
-            />
-          }
-        />
-      </table.AppTable>
-      <CreatePreAuthKeyDialog me={me} open={creating} onOpenChange={setCreating} />
-    </KeyPanel>
-  );
-}
+  if (asked === undefined && preAuth) {
+    return "preauth";
+  }
 
-function ApiPanel({
-  me,
-  controls,
-}: {
-  readonly me: Me;
-  readonly controls: PanelControls;
-}): ReactElement {
-  const keys = useSuspenseQuery(apiKeysQuery);
-  const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
-  const [creating, setCreating] = useState(false);
-  const filter = useDeferredValue(controls.query);
-  const statusOf = (status: StatusFilter): number =>
-    keys.data.apiKeys.filter((apiKey) => status === "all" || apiKeyStatus(apiKey) === status)
-      .length;
-  const rows = keys.data.apiKeys.filter(
-    (apiKey) => controls.status === "all" || apiKeyStatus(apiKey) === controls.status,
-  );
-  const table = useAppTable({
-    data: rows,
-    columns: apiKeyColumns,
-    getRowId: (apiKey) => apiKey.id,
-    state: { globalFilter: filter },
-    initialState: { sorting: [{ id: "created", desc: true }] },
-    meta: { me, users: users.data?.users ?? emptyUsers },
-  });
-  const create = (): void => {
-    setCreating(true);
-  };
-
-  return (
-    <KeyPanel
-      controls={controls}
-      statusTabs={countedTabs(apiStatusTabs, statusOf)}
-      placeholder="Search by prefix"
-      action={
-        <Button variant="primary" icon={PlusIcon} onClick={create}>
-          Create API key
-        </Button>
-      }
-    >
-      <table.AppTable>
-        <PanelTable
-          controls={controls}
-          total={keys.data.apiKeys.length}
-          shown={table.getRowModel().rows.length}
-          noun="API key"
-          firstEmpty={
-            <Empty
-              className={tableEmptyClass}
-              size="sm"
-              icon={<KeyIcon size={emptyIconSize} />}
-              title="No API keys"
-              description="An API key authenticates scripts and other tools against the headscale API."
-              contents={
-                <Button variant="primary" onClick={create}>
-                  Create API key
-                </Button>
-              }
-            />
-          }
-        />
-      </table.AppTable>
-      <CreateApiKeyDialog me={me} open={creating} onOpenChange={setCreating} />
-    </KeyPanel>
-  );
-}
-
-/** Card, toolbar and the panel's own table: the shape both key tables share. */
-function KeyPanel({
-  controls,
-  statusTabs,
-  placeholder,
-  action,
-  children,
-}: {
-  readonly controls: PanelControls;
-  readonly statusTabs: readonly TabsItem[];
-  readonly placeholder: string;
-  readonly action: ReactNode;
-  readonly children: ReactNode;
-}): ReactElement {
-  return (
-    <LayerCard className="overflow-hidden">
-      <TableToolbar actions={action}>
-        <SearchInput
-          value={controls.query}
-          placeholder={placeholder}
-          onValueChange={controls.handleQueryChange}
-        />
-        <Tabs
-          variant="segmented"
-          tabs={[...statusTabs]}
-          value={controls.status}
-          onValueChange={controls.handleStatusChange}
-        />
-      </TableToolbar>
-      {children}
-    </LayerCard>
-  );
-}
-
-/** "1 API key" / "3 API keys": the footer counts the rows an operator can see. */
-function count(total: number, noun: string): string {
-  return total === 1 ? `1 ${noun}` : `${total} ${noun}s`;
-}
-
-function PanelTable({
-  controls,
-  total,
-  shown,
-  noun,
-  firstEmpty,
-}: {
-  readonly controls: PanelControls;
-  readonly total: number;
-  readonly shown: number;
-  readonly noun: string;
-  readonly firstEmpty: ReactNode;
-}): ReactElement {
-  return (
-    <DataTable
-      rowClassName="group/row"
-      empty={
-        total === 0 ? (
-          firstEmpty
-        ) : (
-          <Empty
-            className={tableEmptyClass}
-            size="sm"
-            title="No keys match"
-            description="No key matches this search and filter."
-            contents={
-              <Button variant="secondary" onClick={controls.handleClear}>
-                Clear filters
-              </Button>
-            }
-          />
-        )
-      }
-      footer={
-        total === 0 ? undefined : (
-          <TableFooter>{`Showing ${shown} of ${count(total, noun)}`}</TableFooter>
-        )
-      }
-    />
-  );
+  return "api";
 }
