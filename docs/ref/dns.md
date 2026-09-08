@@ -45,6 +45,24 @@ ControlD and the other entries of Tailscale's `publicdns` list); the client does
 to an arbitrary host, so `tls://` URLs and unknown `https://` URLs are refused. Extra records are `A` or `AAAA`; the
 client serves nothing else.
 
+## Keeping nameservers while an exit node is in use
+
+A machine that routes through an exit node sends its DNS through the exit node as well, and drops the tailnet's
+nameservers. Tailscale's admin console has a per-nameserver "Use with exit node" setting that keeps a nameserver in
+use during that time; headscale has the same, since clients from Tailscale 1.88.1 honour it:
+
+- in the configuration file, `dns.nameservers.use_with_exit_node.global` lists the global nameservers to keep and
+  `dns.nameservers.use_with_exit_node.split` the split DNS nameservers per domain,
+- on the console's _DNS_ page, the switch next to each nameserver and each split DNS domain,
+- `headscale dns set --use-with-exit-node 1.1.1.1 --split-use-with-exit-node corp.example=10.0.0.53`, and
+- `useWithExitNode` and `splitUseWithExitNode` in `PUT /api/v1/dns`.
+
+Two client rules shape what is accepted. The client honours the flag only on the resolvers it uses for every query,
+so a global nameserver can be kept only while `override_local_dns` is on; turning the override off drops the marks.
+A split DNS domain survives the exit node only when every one of its nameservers is kept, so the console marks the
+whole domain at once. A nameserver must be one of the configured ones; removing it, or replacing the nameservers
+through the v2 API, drops its mark.
+
 ## Split DNS per group
 
 The split DNS above reaches every machine. A group DNS rule hands domains and nameservers to the machines of some

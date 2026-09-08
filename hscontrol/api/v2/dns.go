@@ -97,6 +97,10 @@ func updateDNS(b Backend, edit func(*types.DNSSettings)) (types.DNSSettings, cha
 	}
 
 	edit(&settings)
+	// The v2 endpoints edit one aspect at a time and know nothing of the
+	// exit node flags, so drop the ones their edit made stale instead of
+	// rejecting the edit.
+	settings = settings.PruneUseWithExitNode()
 
 	st, c, err := b.State.SetDNS(settings)
 	if err != nil {

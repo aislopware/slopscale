@@ -90,6 +90,49 @@ func TestDNSSettingsValidate(t *testing.T) {
 			settings: DNSSettings{SearchDomains: []string{"-bad"}},
 			wantErr:  ErrDNSDomainInvalid,
 		},
+		{
+			name: "use with exit node",
+			settings: DNSSettings{
+				Nameservers:          []string{"1.1.1.1", "8.8.8.8"},
+				OverrideLocalDNS:     true,
+				SplitNameservers:     map[string][]string{"corp.example": {"10.0.0.1"}},
+				UseWithExitNode:      []string{"1.1.1.1"},
+				SplitUseWithExitNode: map[string][]string{"corp.example": {"10.0.0.1"}},
+			},
+		},
+		{
+			name: "use with exit node without override",
+			settings: DNSSettings{
+				Nameservers:     []string{"1.1.1.1"},
+				UseWithExitNode: []string{"1.1.1.1"},
+			},
+			wantErr: ErrDNSUseWithExitNodeNeedsOverride,
+		},
+		{
+			name: "use with exit node unknown nameserver",
+			settings: DNSSettings{
+				Nameservers:      []string{"1.1.1.1"},
+				OverrideLocalDNS: true,
+				UseWithExitNode:  []string{"8.8.8.8"},
+			},
+			wantErr: ErrDNSUseWithExitNodeUnknown,
+		},
+		{
+			name: "split use with exit node unknown nameserver",
+			settings: DNSSettings{
+				SplitNameservers:     map[string][]string{"corp.example": {"10.0.0.1"}},
+				SplitUseWithExitNode: map[string][]string{"corp.example": {"10.0.0.2"}},
+			},
+			wantErr: ErrDNSUseWithExitNodeUnknown,
+		},
+		{
+			name: "split use with exit node unknown domain",
+			settings: DNSSettings{
+				SplitNameservers:     map[string][]string{"corp.example": {"10.0.0.1"}},
+				SplitUseWithExitNode: map[string][]string{"lab.example": {"10.0.0.1"}},
+			},
+			wantErr: ErrDNSUseWithExitNodeUnknown,
+		},
 		{name: "record without name", settings: rec("", "", "1.1.1.1"), wantErr: ErrDNSRecordNameEmpty},
 		{name: "record without value", settings: rec("a.corp", "", ""), wantErr: ErrDNSRecordValueEmpty},
 		{name: "untyped record not ip", settings: rec("a.corp", "", "x"), wantErr: ErrDNSRecordValueNotIP},
@@ -118,6 +161,32 @@ func TestDNSSettingsValidate(t *testing.T) {
 			assert.ErrorIs(t, err, ErrDNSSettingsInvalid)
 		})
 	}
+}
+
+func TestDNSSettingsPruneUseWithExitNode(t *testing.T) {
+	t.Parallel()
+
+	got := DNSSettings{
+		Nameservers:      []string{"1.1.1.1"},
+		OverrideLocalDNS: true,
+		SplitNameservers: map[string][]string{"corp.example": {"10.0.0.1"}},
+		UseWithExitNode:  []string{"1.1.1.1", "8.8.8.8"},
+		SplitUseWithExitNode: map[string][]string{
+			"corp.example": {"10.0.0.1", "10.0.0.2"},
+			"lab.example":  {"10.0.0.3"},
+		},
+	}.PruneUseWithExitNode()
+
+	assert.Equal(t, []string{"1.1.1.1"}, got.UseWithExitNode)
+	assert.Equal(t, map[string][]string{"corp.example": {"10.0.0.1"}}, got.SplitUseWithExitNode)
+	require.NoError(t, got.Validate())
+
+	noOverride := DNSSettings{
+		Nameservers:     []string{"1.1.1.1"},
+		UseWithExitNode: []string{"1.1.1.1"},
+	}.PruneUseWithExitNode()
+	assert.Empty(t, noOverride.UseWithExitNode, "the client ignores the flag without override")
+	require.NoError(t, noOverride.Validate())
 }
 
 // TestConfigDNSOverride proves the rebuild: the override replaces the

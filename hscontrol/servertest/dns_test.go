@@ -103,6 +103,68 @@ func TestDNSSettingsEndToEnd(t *testing.T) {
 		assert.True(t, nm.DNS.Proxied)
 	})
 
+	t.Run("nameservers kept with an exit node reach the client", func(t *testing.T) {
+		status, body := apiCall(t, client, netKey, http.MethodPut, v1+"/dns", map[string]any{
+			"nameservers":          []string{"9.9.9.9", "1.1.1.1"},
+			"overrideLocalDns":     true,
+			"splitNameservers":     map[string][]string{"corp.example": {"10.0.0.1"}, "lab.example": {"10.0.0.3"}},
+			"useWithExitNode":      []string{"1.1.1.1"},
+			"splitUseWithExitNode": map[string][]string{"corp.example": {"10.0.0.1"}},
+			"searchDomains":        []string{"api.example"},
+			"extraRecords": []map[string]string{
+				{"name": "grafana.ts.example", "type": "A", "value": "100.64.0.9"},
+			},
+		})
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, []any{"1.1.1.1"}, field(t, body, "effective", "useWithExitNode"))
+
+		node.WaitForCondition(t, "netmap with the kept resolvers", dnsWait, func(nm *netmap.NetworkMap) bool {
+			return len(nm.DNS.Resolvers) == 2 && nm.DNS.Resolvers[1].UseWithExitNode
+		})
+
+		nm := node.Netmap()
+		assert.False(t, nm.DNS.Resolvers[0].UseWithExitNode, "9.9.9.9 is dropped with an exit node")
+		assert.Equal(t, "1.1.1.1", nm.DNS.Resolvers[1].Addr)
+		require.Len(t, nm.DNS.Routes["corp.example"], 1)
+		assert.True(t, nm.DNS.Routes["corp.example"][0].UseWithExitNode)
+		require.Len(t, nm.DNS.Routes["lab.example"], 1)
+		assert.False(t, nm.DNS.Routes["lab.example"][0].UseWithExitNode)
+
+		status, body = apiCall(t, client, netKey, http.MethodPut, v1+"/dns", map[string]any{
+			"nameservers":     []string{"9.9.9.9"},
+			"useWithExitNode": []string{"9.9.9.9"},
+		})
+		assert.Equal(t, http.StatusBadRequest, status, "the client ignores the flag without override: %v", body)
+
+		status, body = apiCall(t, client, netKey, http.MethodPut, v1+"/dns", map[string]any{
+			"nameservers":      []string{"9.9.9.9"},
+			"overrideLocalDns": true,
+			"useWithExitNode":  []string{"1.1.1.1"},
+		})
+		assert.Equal(t, http.StatusBadRequest, status, "only a configured nameserver can be kept: %v", body)
+
+		// A v2 edit knows nothing of the flags and drops the ones it makes stale.
+		status, body = apiCall(t, client, netKey, http.MethodPost, v2+"/nameservers", map[string]any{
+			"dns": []string{"9.9.9.9", "https://dns.nextdns.io/abc123"},
+		})
+		require.Equal(t, http.StatusOK, status, body)
+
+		status, body = apiCall(t, client, netKey, http.MethodGet, v1+"/dns", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, []any{}, field(t, body, "effective", "useWithExitNode"), "1.1.1.1 is gone")
+		assert.Equal(t, map[string]any{"corp.example": []any{"10.0.0.1"}},
+			field(t, body, "effective", "splitUseWithExitNode"), "the split entry still refers to its nameserver")
+
+		status, body = apiCall(t, client, netKey, http.MethodPut, v2+"/split-dns", map[string]any{
+			"corp.example": []string{"10.0.0.1:5353"},
+		})
+		require.Equal(t, http.StatusOK, status, body)
+
+		status, body = apiCall(t, client, netKey, http.MethodGet, v1+"/dns", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, map[string]any{}, field(t, body, "effective", "splitUseWithExitNode"))
+	})
+
 	t.Run("bad input is rejected", func(t *testing.T) {
 		status, body := apiCall(t, client, netKey, http.MethodPut, v1+"/dns", map[string]any{
 			"nameservers": []string{"one.one.one.one"},

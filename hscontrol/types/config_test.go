@@ -221,6 +221,46 @@ func TestReadConfig(t *testing.T) {
 			},
 		},
 		{
+			name:       "dns-use-with-exit-node",
+			configPath: "testdata/dns_use_with_exit_node.yaml",
+			setup: func(_ *testing.T) (any, error) {
+				_, err := LoadServerConfig()
+				if err != nil {
+					return nil, err
+				}
+
+				dns, err := dns()
+				if err != nil {
+					return nil, err
+				}
+
+				return dnsToTailcfgDNS(dns), nil
+			},
+			want: &tailcfg.DNSConfig{
+				Proxied: true,
+				Domains: []string{"example.com"},
+				Resolvers: []*dnstype.Resolver{
+					{Addr: "1.1.1.1", UseWithExitNode: true},
+					{Addr: "8.8.8.8"},
+				},
+				Routes: map[string][]*dnstype.Resolver{
+					"corp.example": {
+						{Addr: "10.0.0.1", UseWithExitNode: true},
+						{Addr: "10.0.0.2", UseWithExitNode: true},
+					},
+					"lab.example": {{Addr: "10.0.0.3"}},
+				},
+			},
+		},
+		{
+			name:       "dns-use-with-exit-node-needs-override",
+			configPath: "testdata/dns_use_with_exit_node_no_override.yaml",
+			setup: func(_ *testing.T) (any, error) {
+				return LoadServerConfig()
+			},
+			wantErr: "Fatal config error: " + ErrDNSUseWithExitNodeNeedsOverride.Error(),
+		},
+		{
 			name:       "policy-path-is-loaded",
 			configPath: "testdata/policy-path-is-loaded.yaml",
 			setup: func(_ *testing.T) (any, error) {

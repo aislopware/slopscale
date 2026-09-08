@@ -31,6 +31,15 @@ type DNSSettings struct {
 	OverrideLocalDNS bool `json:"overrideLocalDNS"`
 	// SplitNameservers maps a domain to the resolvers that serve it.
 	SplitNameservers map[string][]string `json:"splitNameservers"`
+	// UseWithExitNode lists the global nameservers a client keeps using
+	// while it has an exit node selected, each one of Nameservers;
+	// needs OverrideLocalDNS, as the client only honours it for the
+	// resolvers it uses for every query.
+	UseWithExitNode []string `json:"useWithExitNode"`
+	// SplitUseWithExitNode is the same per split DNS domain: the
+	// domain's route survives the exit node only when every one of
+	// its nameservers is listed.
+	SplitUseWithExitNode map[string][]string `json:"splitUseWithExitNode"`
 	// SearchDomains are appended to the base domain in the client's
 	// search list.
 	SearchDomains []string `json:"searchDomains"`
@@ -42,22 +51,26 @@ type DNSSettings struct {
 // section, the starting point for an override.
 func (d *DNSConfig) Settings() DNSSettings {
 	return DNSSettings{
-		Nameservers:      slices.Clone(d.Nameservers.Global),
-		OverrideLocalDNS: d.OverrideLocalDNS,
-		SplitNameservers: cloneSplit(d.Nameservers.Split),
-		SearchDomains:    slices.Clone(d.SearchDomains),
-		ExtraRecords:     slices.Clone(d.ExtraRecords),
+		Nameservers:          slices.Clone(d.Nameservers.Global),
+		OverrideLocalDNS:     d.OverrideLocalDNS,
+		SplitNameservers:     cloneSplit(d.Nameservers.Split),
+		UseWithExitNode:      slices.Clone(d.Nameservers.UseWithExitNode),
+		SplitUseWithExitNode: cloneSplit(d.Nameservers.SplitUseWithExitNode),
+		SearchDomains:        slices.Clone(d.SearchDomains),
+		ExtraRecords:         slices.Clone(d.ExtraRecords),
 	}
 }
 
 // Clone returns a deep copy.
 func (s DNSSettings) Clone() DNSSettings {
 	return DNSSettings{
-		Nameservers:      slices.Clone(s.Nameservers),
-		OverrideLocalDNS: s.OverrideLocalDNS,
-		SplitNameservers: cloneSplit(s.SplitNameservers),
-		SearchDomains:    slices.Clone(s.SearchDomains),
-		ExtraRecords:     slices.Clone(s.ExtraRecords),
+		Nameservers:          slices.Clone(s.Nameservers),
+		OverrideLocalDNS:     s.OverrideLocalDNS,
+		SplitNameservers:     cloneSplit(s.SplitNameservers),
+		UseWithExitNode:      slices.Clone(s.UseWithExitNode),
+		SplitUseWithExitNode: cloneSplit(s.SplitUseWithExitNode),
+		SearchDomains:        slices.Clone(s.SearchDomains),
+		ExtraRecords:         slices.Clone(s.ExtraRecords),
 	}
 }
 
@@ -96,6 +109,13 @@ var (
 	ErrDNSSplitNoNameservers = fmt.Errorf(
 		"%w: split DNS domain needs at least one nameserver", ErrDNSSettingsInvalid,
 	)
+	ErrDNSUseWithExitNodeUnknown = fmt.Errorf(
+		"%w: a nameserver to use with an exit node must be one of the configured nameservers", ErrDNSSettingsInvalid,
+	)
+	ErrDNSUseWithExitNodeNeedsOverride = fmt.Errorf(
+		"%w: global nameservers to use with an exit node need override local DNS, "+
+			"as the client only keeps the resolvers it uses for every query", ErrDNSSettingsInvalid,
+	)
 	ErrDNSRecordNameEmpty   = fmt.Errorf("%w: record name must not be empty", ErrDNSSettingsInvalid)
 	ErrDNSRecordTypeInvalid = fmt.Errorf(
 		"%w: record type must be A, AAAA or empty; the client serves only address records", ErrDNSSettingsInvalid,
@@ -126,11 +146,23 @@ func (s DNSSettings) Normalize() DNSSettings {
 		SearchDomains:    normalizeList(s.SearchDomains, normalizeDomain),
 	}
 
+	if len(s.UseWithExitNode) > 0 {
+		out.UseWithExitNode = normalizeList(s.UseWithExitNode, strings.TrimSpace)
+	}
+
 	if len(s.SplitNameservers) > 0 {
 		out.SplitNameservers = make(map[string][]string, len(s.SplitNameservers))
 
 		for domain, servers := range s.SplitNameservers {
 			out.SplitNameservers[normalizeDomain(domain)] = normalizeList(servers, strings.TrimSpace)
+		}
+	}
+
+	if len(s.SplitUseWithExitNode) > 0 {
+		out.SplitUseWithExitNode = make(map[string][]string, len(s.SplitUseWithExitNode))
+
+		for domain, servers := range s.SplitUseWithExitNode {
+			out.SplitUseWithExitNode[normalizeDomain(domain)] = normalizeList(servers, strings.TrimSpace)
 		}
 	}
 
@@ -214,6 +246,11 @@ func (s DNSSettings) Validate() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	err := s.validateUseWithExitNode()
+	if err != nil {
+		return err
 	}
 
 	for _, r := range s.ExtraRecords {
@@ -323,11 +360,81 @@ func validateRecord(r tailcfg.DNSRecord) error {
 	return nil
 }
 
+// PruneUseWithExitNode returns the settings with every exit node entry
+// that no longer refers to a configured nameserver dropped, and the
+// global ones dropped when OverrideLocalDNS is off, so an edit of the
+// nameservers alone never fails [DNSSettings.Validate] on them.
+func (s DNSSettings) PruneUseWithExitNode() DNSSettings {
+	out := s.Clone()
+	out.UseWithExitNode = nil
+	out.SplitUseWithExitNode = nil
+
+	if s.OverrideLocalDNS {
+		for _, ns := range s.UseWithExitNode {
+			if slices.Contains(s.Nameservers, ns) {
+				out.UseWithExitNode = append(out.UseWithExitNode, ns)
+			}
+		}
+	}
+
+	for domain, servers := range s.SplitUseWithExitNode {
+		var kept []string
+
+		for _, ns := range servers {
+			if slices.Contains(s.SplitNameservers[domain], ns) {
+				kept = append(kept, ns)
+			}
+		}
+
+		if len(kept) == 0 {
+			continue
+		}
+
+		if out.SplitUseWithExitNode == nil {
+			out.SplitUseWithExitNode = map[string][]string{}
+		}
+
+		out.SplitUseWithExitNode[domain] = kept
+	}
+
+	return out
+}
+
+// validateUseWithExitNode checks that every nameserver to keep with an
+// exit node is configured, and that the global ones are used for every
+// query, without which the client ignores the flag.
+func (s DNSSettings) validateUseWithExitNode() error {
+	if len(s.UseWithExitNode) > 0 && !s.OverrideLocalDNS {
+		return ErrDNSUseWithExitNodeNeedsOverride
+	}
+
+	for _, ns := range s.UseWithExitNode {
+		if !slices.Contains(s.Nameservers, ns) {
+			return fmt.Errorf("%w: %q", ErrDNSUseWithExitNodeUnknown, ns)
+		}
+	}
+
+	for domain, servers := range s.SplitUseWithExitNode {
+		for _, ns := range servers {
+			if !slices.Contains(s.SplitNameservers[domain], ns) {
+				return fmt.Errorf("%w: %q for %q", ErrDNSUseWithExitNodeUnknown, ns, domain)
+			}
+		}
+	}
+
+	return nil
+}
+
 // apply returns the config with the settings in place of the file's
 // values.
 func (s DNSSettings) apply(d DNSConfig) DNSConfig {
 	d.OverrideLocalDNS = s.OverrideLocalDNS
-	d.Nameservers = Nameservers{Global: slices.Clone(s.Nameservers), Split: cloneSplit(s.SplitNameservers)}
+	d.Nameservers = Nameservers{
+		Global:               slices.Clone(s.Nameservers),
+		Split:                cloneSplit(s.SplitNameservers),
+		UseWithExitNode:      slices.Clone(s.UseWithExitNode),
+		SplitUseWithExitNode: cloneSplit(s.SplitUseWithExitNode),
+	}
 	d.SearchDomains = slices.Clone(s.SearchDomains)
 	d.ExtraRecords = slices.Clone(s.ExtraRecords)
 

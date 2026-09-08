@@ -205,6 +205,16 @@ type DNSConfig struct {
 type Nameservers struct {
 	Global []string
 	Split  map[string][]string
+
+	// UseWithExitNode lists the global nameservers a client keeps using
+	// while it has an exit node selected; the rest of its DNS goes
+	// through the exit node then. The client only honours it for the
+	// resolvers it is told to use for every query, so it needs
+	// override_local_dns. SplitUseWithExitNode is the same per split
+	// DNS domain: a domain's route survives the exit node only when
+	// every one of its nameservers is listed.
+	UseWithExitNode      []string
+	SplitUseWithExitNode map[string][]string
 }
 
 type SqliteConfig struct {
@@ -646,6 +656,8 @@ func LoadConfig(path string, isFile bool) error {
 	viper.SetDefault("dns.override_local_dns", true)
 	viper.SetDefault("dns.nameservers.global", []string{})
 	viper.SetDefault("dns.nameservers.split", map[string]string{})
+	viper.SetDefault("dns.nameservers.use_with_exit_node.global", []string{})
+	viper.SetDefault("dns.nameservers.use_with_exit_node.split", map[string]string{})
 	viper.SetDefault("dns.search_domains", []string{})
 
 	viper.SetDefault("derp.server.enabled", false)
@@ -865,6 +877,8 @@ func validateServerConfig() error {
 			errorText += "Fatal config error: dns.nameservers.global must be set when dns.override_local_dns is true\n"
 		}
 	}
+
+	errorText += useWithExitNodeConfigErrors()
 
 	// Validate HA health probing parameters
 	if haInterval := viper.GetDuration(
@@ -1143,6 +1157,16 @@ func dns() (DNSConfig, error) {
 	dns.OverrideLocalDNS = viper.GetBool("dns.override_local_dns")
 	dns.Nameservers.Global = viper.GetStringSlice("dns.nameservers.global")
 	dns.Nameservers.Split = viper.GetStringMapStringSlice("dns.nameservers.split")
+	// Unset stays nil, so a config without the key compares equal to one
+	// built from the settings API.
+	if global := viper.GetStringSlice("dns.nameservers.use_with_exit_node.global"); len(global) > 0 {
+		dns.Nameservers.UseWithExitNode = global
+	}
+
+	if split := viper.GetStringMapStringSlice("dns.nameservers.use_with_exit_node.split"); len(split) > 0 {
+		dns.Nameservers.SplitUseWithExitNode = split
+	}
+
 	dns.SearchDomains = viper.GetStringSlice("dns.search_domains")
 	dns.ExtraRecordsPath = viper.GetString("dns.extra_records_path")
 
@@ -1164,7 +1188,7 @@ func dns() (DNSConfig, error) {
 // with [ParseResolver]. An entry the client could not use is logged and
 // left out; the API validates the same rule up front instead. When domain
 // is non-empty, it is included in the warning.
-func parseResolvers(nameservers []string, domain string) []*dnstype.Resolver {
+func parseResolvers(nameservers []string, domain string, useWithExitNode []string) []*dnstype.Resolver {
 	var resolvers []*dnstype.Resolver
 
 	for _, nsStr := range nameservers {
@@ -1180,6 +1204,8 @@ func parseResolvers(nameservers []string, domain string) []*dnstype.Resolver {
 			continue
 		}
 
+		resolver.UseWithExitNode = slices.Contains(useWithExitNode, nsStr)
+
 		resolvers = append(resolvers, resolver)
 	}
 
@@ -1189,7 +1215,7 @@ func parseResolvers(nameservers []string, domain string) []*dnstype.Resolver {
 // globalResolvers returns the global DNS resolvers
 // defined in the config file.
 func (d *DNSConfig) globalResolvers() []*dnstype.Resolver {
-	return parseResolvers(d.Nameservers.Global, "")
+	return parseResolvers(d.Nameservers.Global, "", d.Nameservers.UseWithExitNode)
 }
 
 // splitResolvers returns a map of domain to DNS resolvers.
@@ -1197,10 +1223,30 @@ func (d *DNSConfig) splitResolvers() map[string][]*dnstype.Resolver {
 	routes := make(map[string][]*dnstype.Resolver)
 
 	for domain, nameservers := range d.Nameservers.Split {
-		routes[domain] = parseResolvers(nameservers, domain)
+		routes[domain] = parseResolvers(nameservers, domain, d.Nameservers.SplitUseWithExitNode[domain])
 	}
 
 	return routes
+}
+
+// useWithExitNodeConfigErrors checks dns.nameservers.use_with_exit_node
+// against the nameservers it refers to, the way [DNSSettings.Validate]
+// does for the runtime settings.
+func useWithExitNodeConfigErrors() string {
+	settings := DNSSettings{
+		Nameservers:          viper.GetStringSlice("dns.nameservers.global"),
+		OverrideLocalDNS:     viper.GetBool("dns.override_local_dns"),
+		SplitNameservers:     viper.GetStringMapStringSlice("dns.nameservers.split"),
+		UseWithExitNode:      viper.GetStringSlice("dns.nameservers.use_with_exit_node.global"),
+		SplitUseWithExitNode: viper.GetStringMapStringSlice("dns.nameservers.use_with_exit_node.split"),
+	}
+
+	err := settings.validateUseWithExitNode()
+	if err != nil {
+		return "Fatal config error: " + err.Error() + "\n"
+	}
+
+	return ""
 }
 
 func dnsToTailcfgDNS(dns DNSConfig) *tailcfg.DNSConfig {

@@ -32,6 +32,12 @@ type DNSSettings struct {
 	OverrideLocalDNS bool     `doc:"Used for every query."          json:"overrideLocalDns"`
 	// SplitNameservers are the resolvers per domain.
 	SplitNameservers map[string][]string `json:"splitNameservers" nullable:"false"`
+	// UseWithExitNode lists the global nameservers a machine keeps using while it has an exit node
+	// selected; needs overrideLocalDns.
+	UseWithExitNode []string `json:"useWithExitNode" nullable:"false"`
+	// SplitUseWithExitNode is the same per split DNS domain; the domain's route survives the exit node
+	// only when every one of its nameservers is listed.
+	SplitUseWithExitNode map[string][]string `json:"splitUseWithExitNode" nullable:"false"`
 	// SearchDomains are added after the base domain.
 	SearchDomains []string `json:"searchDomains" nullable:"false"`
 	// ExtraRecords are served by MagicDNS.
@@ -44,8 +50,13 @@ type SetDNSRequestBody struct {
 	Nameservers      []string            `json:"nameservers,omitempty"      required:"false"`
 	OverrideLocalDNS bool                `json:"overrideLocalDns,omitempty" required:"false"`
 	SplitNameservers map[string][]string `json:"splitNameservers,omitempty" required:"false"`
-	SearchDomains    []string            `json:"searchDomains,omitempty"    required:"false"`
-	ExtraRecords     []DNSRecord         `json:"extraRecords,omitempty"     required:"false"`
+	// UseWithExitNode lists the global nameservers a machine keeps using while it has an exit node
+	// selected; needs overrideLocalDns.
+	UseWithExitNode []string `json:"useWithExitNode,omitempty" required:"false"`
+	// SplitUseWithExitNode is the same per split DNS domain.
+	SplitUseWithExitNode map[string][]string `json:"splitUseWithExitNode,omitempty" required:"false"`
+	SearchDomains        []string            `json:"searchDomains,omitempty"        required:"false"`
+	ExtraRecords         []DNSRecord         `json:"extraRecords,omitempty"         required:"false"`
 }
 
 // DNS is the DNS configuration in force and where it comes from.
@@ -88,11 +99,13 @@ func dnsRecordsTo(records []DNSRecord) []tailcfg.DNSRecord {
 
 func dnsSettingsFrom(s types.DNSSettings) DNSSettings {
 	out := DNSSettings{
-		Nameservers:      s.Nameservers,
-		OverrideLocalDNS: s.OverrideLocalDNS,
-		SplitNameservers: s.SplitNameservers,
-		SearchDomains:    s.SearchDomains,
-		ExtraRecords:     dnsRecordsFrom(s.ExtraRecords),
+		Nameservers:          s.Nameservers,
+		OverrideLocalDNS:     s.OverrideLocalDNS,
+		SplitNameservers:     s.SplitNameservers,
+		UseWithExitNode:      s.UseWithExitNode,
+		SplitUseWithExitNode: s.SplitUseWithExitNode,
+		SearchDomains:        s.SearchDomains,
+		ExtraRecords:         dnsRecordsFrom(s.ExtraRecords),
 	}
 
 	if out.Nameservers == nil {
@@ -101,6 +114,14 @@ func dnsSettingsFrom(s types.DNSSettings) DNSSettings {
 
 	if out.SplitNameservers == nil {
 		out.SplitNameservers = map[string][]string{}
+	}
+
+	if out.UseWithExitNode == nil {
+		out.UseWithExitNode = []string{}
+	}
+
+	if out.SplitUseWithExitNode == nil {
+		out.SplitUseWithExitNode = map[string][]string{}
 	}
 
 	if out.SearchDomains == nil {
@@ -112,11 +133,13 @@ func dnsSettingsFrom(s types.DNSSettings) DNSSettings {
 
 func dnsSettingsTo(s SetDNSRequestBody) types.DNSSettings {
 	return types.DNSSettings{
-		Nameservers:      s.Nameservers,
-		OverrideLocalDNS: s.OverrideLocalDNS,
-		SplitNameservers: s.SplitNameservers,
-		SearchDomains:    s.SearchDomains,
-		ExtraRecords:     dnsRecordsTo(s.ExtraRecords),
+		Nameservers:          s.Nameservers,
+		OverrideLocalDNS:     s.OverrideLocalDNS,
+		SplitNameservers:     s.SplitNameservers,
+		UseWithExitNode:      s.UseWithExitNode,
+		SplitUseWithExitNode: s.SplitUseWithExitNode,
+		SearchDomains:        s.SearchDomains,
+		ExtraRecords:         dnsRecordsTo(s.ExtraRecords),
 	}
 }
 

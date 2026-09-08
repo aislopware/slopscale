@@ -398,6 +398,22 @@ dns:
       #   - 1.1.1.1
       #   - 8.8.8.8
 
+    # Nameservers a machine keeps using while it has an exit node selected
+    # (Tailscale's per-nameserver "Use with exit node"); the rest of its
+    # DNS goes through the exit node. `global` lists entries of
+    # `nameservers.global` and needs `override_local_dns: true`, as the
+    # client only honours the flag on resolvers it uses for every query.
+    # `split` lists, per domain, entries of `nameservers.split`; a domain
+    # survives the exit node only when every one of its nameservers is
+    # listed. Needs Tailscale 1.88.1 or later on the client.
+    use_with_exit_node:
+      global: []
+      # - 1.1.1.1
+      split: {}
+      # darp.headscale.net:
+      #   - 1.1.1.1
+      #   - 8.8.8.8
+
   # Set custom DNS search domains. With MagicDNS enabled,
   # your tailnet base_domain is always the first search domain.
   search_domains: []
