@@ -9,7 +9,7 @@ import type { AccessRule, Group, Posture } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { GroupChips } from "~/components/access/group-chips.tsx";
-import { groupName, protocolSummary } from "~/components/access/model.ts";
+import { groupName, isBuiltinRule, protocolSummary } from "~/components/access/model.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
 import { postureName } from "~/components/access/posture-model.ts";
 import { RuleMenu } from "~/components/access/rule-menu.tsx";
@@ -107,7 +107,7 @@ export const ruleColumns = helper.columns([
     cell: ({ row, table }) => {
       const { me, groups, postures, rules, policyFileEnforces } = table.options.meta ?? {};
 
-      return me === undefined ? null : (
+      return me === undefined || isBuiltinRule(row.original) ? null : (
         <RuleMenu
           rule={row.original}
           groups={groups ?? []}
@@ -125,7 +125,10 @@ export const ruleColumns = helper.columns([
 function NameCell({ rule }: { readonly rule: AccessRule }): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="truncate font-medium text-kumo-default">{rule.name}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="truncate font-medium text-kumo-default">{rule.name}</span>
+        {isBuiltinRule(rule) ? <Badge variant="outline">Built in</Badge> : null}
+      </span>
       {rule.description === "" ? null : (
         <span className="truncate text-xs text-kumo-subtle">{rule.description}</span>
       )}

@@ -48,6 +48,10 @@ const GroupSelfName = "Own machines"
 // until an operator adds rules.
 const DefaultRuleName = "Own machines"
 
+// RuleBuiltinOwnMachines marks the seeded rule. A builtin rule can be
+// switched on and off but not edited or deleted.
+const RuleBuiltinOwnMachines = "own-machines"
+
 // AccessGroup is a named set of nodes. Nodes belong to it directly or
 // through their owner: every user-owned node of a user in UserIDs is a
 // member. Tagged nodes have no owner and join directly.
@@ -207,8 +211,17 @@ type AccessRule struct {
 	// expired rule is kept, shown as expired, until it is extended or
 	// deleted.
 	ExpiresAt *time.Time
+	// Builtin is empty for rules an operator made and
+	// [RuleBuiltinOwnMachines] for the seeded one, which only its enabled
+	// switch can change.
+	Builtin   string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+}
+
+// IsBuiltin reports whether the server owns the rule.
+func (r AccessRule) IsBuiltin() bool {
+	return r.Builtin != ""
 }
 
 // Active reports whether the rule applies at the instant: enabled and
@@ -361,6 +374,7 @@ var (
 	ErrRuleNameTooLong    = errors.New("rule name must be at most 64 characters")
 	ErrRuleNoSources      = errors.New("rule needs at least one source group")
 	ErrRuleNoDestinations = errors.New("rule needs at least one destination group")
+	ErrRuleBuiltin        = errors.New("a builtin rule can only be switched on or off")
 	ErrRuleSelfSource     = errors.New("the builtin self group can only be a destination")
 	ErrRuleSelfBoth       = errors.New("a rule with the builtin self group cannot run both directions")
 	ErrGroupSelfMembers   = errors.New("the builtin self group has no members of its own")

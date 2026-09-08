@@ -70,8 +70,11 @@ type AccessRule struct {
 	PostureIDs []string `json:"postureIds" nullable:"false"`
 	// ExpiresAt is when the rule stops applying; null never does.
 	ExpiresAt *time.Time `json:"expiresAt" nullable:"true"`
-	CreatedAt time.Time  `json:"createdAt"`
-	UpdatedAt time.Time  `json:"updatedAt"`
+	// Builtin is empty for operator-made rules and "own-machines" for the
+	// seeded rule, which can only be switched on or off.
+	Builtin   string    `json:"builtin"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 // GroupRequestBody creates or updates a group. Members are replaced when
@@ -219,6 +222,7 @@ func ruleFrom(r types.AccessRule) AccessRule {
 		Protocol:            string(r.Protocol),
 		Ports:               r.Ports,
 		Bidirectional:       r.Bidirectional,
+		Builtin:             r.Builtin,
 		SourceGroupIDs:      make([]string, 0, len(r.SourceGroupIDs)),
 		DestinationGroupIDs: make([]string, 0, len(r.DestinationGroupIDs)),
 		PostureIDs:          make([]string, 0, len(r.PostureIDs)),

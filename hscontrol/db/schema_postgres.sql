@@ -178,7 +178,8 @@ CREATE TABLE access_rules(
   bidirectional boolean DEFAULT false,
   expires_at timestamptz,
   created_at timestamptz,
-  updated_at timestamptz
+  updated_at timestamptz,
+  builtin text
 );
 
 CREATE TABLE access_rule_groups(

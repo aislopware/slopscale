@@ -92,6 +92,7 @@ function group(id: string, overrides: Partial<Group> = {}): Group {
 function rule(id: string, sources: string[], destinations: string[]): AccessRule {
   return {
     bidirectional: false,
+    builtin: "",
     createdAt: stamp,
     description: "",
     destinationGroupIds: destinations,

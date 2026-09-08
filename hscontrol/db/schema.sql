@@ -246,7 +246,10 @@ CREATE TABLE access_rules(
   -- expired rule is kept so it can be extended or deleted.
   expires_at datetime,
   created_at datetime,
-  updated_at datetime
+  updated_at datetime,
+  -- builtin marks a rule the server seeded; it can be switched off but
+  -- not edited or deleted.
+  builtin text
 );
 
 CREATE TABLE access_rule_groups(

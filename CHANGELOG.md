@@ -111,12 +111,13 @@ and `/api/v1/access-rule`. See
 
 A new server no longer starts open. The builtin group _Own machines_ is
 Tailscale's `autogroup:self`, a rule destination meaning the machines owned
-by the same user as the source, and the first start seeds one enabled rule
-from _All_ to it: each machine reaches the other machines of its own user and
-nothing else, so machines of different users do not see each other until an
-operator adds a rule. Disable or delete the rule to open the tailnet. On a
-database that already has machines the rule is seeded disabled, so an
-upgrade does not cut anything off.
+by the same user as the source, and the first start seeds one builtin rule
+from _All_ to it, enabled: each machine reaches the other machines of its
+own user and nothing else, so machines of different users do not see each
+other until an operator adds a rule. The builtin rule can be switched off,
+which opens the tailnet, but not edited or deleted. On a database that
+already has machines the rule is seeded switched off, so an upgrade does not
+cut anything off.
 
 ### Key expiry setting and server info
 

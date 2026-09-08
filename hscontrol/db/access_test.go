@@ -47,17 +47,17 @@ func TestAccessGroupsAndRules(t *testing.T) {
 
 	seeded := model.Rules[0]
 	assert.Equal(t, types.DefaultRuleName, seeded.Name)
+	assert.Equal(t, types.RuleBuiltinOwnMachines, seeded.Builtin)
 	assert.False(t, seeded.Enabled, "a database that already has nodes keeps its open tailnet")
 	assert.Equal(t, []types.GroupID{all.ID}, seeded.SourceGroupIDs)
 	assert.Equal(t, []types.GroupID{self.ID}, seeded.DestinationGroupIDs)
 
-	require.NoError(t, db.DeleteAccessRule(seeded.ID))
 	require.NoError(t, db.EnsureBuiltinGroups())
 
 	model, err = db.LoadAccessModel()
 	require.NoError(t, err)
 	assert.Len(t, model.Groups, 2, "the builtin groups are created once")
-	assert.Empty(t, model.Rules, "the default rule is seeded once and stays deleted")
+	assert.Len(t, model.Rules, 1, "the builtin rule is seeded once")
 
 	eng, err := db.CreateGroup("Engineering", "The engineers", false)
 	require.NoError(t, err)
@@ -93,7 +93,7 @@ func TestAccessGroupsAndRules(t *testing.T) {
 	model, err = db.LoadAccessModel()
 	require.NoError(t, err)
 	require.Len(t, model.Groups, 4)
-	require.Len(t, model.Rules, 1)
+	require.Len(t, model.Rules, 2)
 	assert.Len(t, model.RulesUsingGroup(servers.ID), 1)
 
 	engFromModel, ok := model.Group(eng.ID)

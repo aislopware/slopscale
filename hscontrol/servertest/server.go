@@ -74,10 +74,11 @@ func defaultServerConfig() *serverConfig {
 	}
 }
 
-// WithSeededRule keeps the rule a fresh database is seeded with, so the
-// tailnet starts closed the way a new production server does. The harness
-// deletes it otherwise: most tests describe access with a policy file or
-// with rules of their own and want nothing implicit next to them.
+// WithSeededRule keeps the rule a fresh database is seeded with enabled,
+// so the tailnet starts closed the way a new production server does. The
+// harness switches it off otherwise: most tests describe access with a
+// policy file or with rules of their own and want nothing implicit next
+// to them.
 func WithSeededRule() ServerOption {
 	return func(c *serverConfig) { c.seededRule = true }
 }
@@ -241,7 +242,7 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 	}
 
 	if !sc.seededRule {
-		deleteSeededRule(tb, app.GetState())
+		disableSeededRule(tb, app.GetState())
 	}
 
 	// Set a minimal DERP map so MapResponse generation works.
@@ -483,18 +484,20 @@ func (s *TestServer) createPreAuthKey(
 	return pak.Key
 }
 
-// deleteSeededRule removes the rule a fresh database is seeded with.
-func deleteSeededRule(tb testing.TB, st *state.State) {
+// disableSeededRule switches the rule a fresh database is seeded with off.
+func disableSeededRule(tb testing.TB, st *state.State) {
 	tb.Helper()
 
 	for _, rule := range st.AccessModel().Rules {
-		if rule.Name != types.DefaultRuleName {
+		if !rule.IsBuiltin() {
 			continue
 		}
 
-		_, err := st.DeleteAccessRule(rule.ID)
+		rule.Enabled = false
+
+		_, _, err := st.UpdateAccessRule(rule)
 		if err != nil {
-			tb.Fatalf("servertest: deleting the seeded rule: %v", err)
+			tb.Fatalf("servertest: disabling the seeded rule: %v", err)
 		}
 	}
 }

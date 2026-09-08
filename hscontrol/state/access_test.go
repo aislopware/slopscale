@@ -36,10 +36,35 @@ func TestAccessGroupsAndRules(t *testing.T) {
 
 	// A fresh database is seeded with the own-machines rule, enabled.
 	require.Len(t, model.Rules, 1)
-	assert.Equal(t, types.DefaultRuleName, model.Rules[0].Name)
-	assert.True(t, model.Rules[0].Enabled)
-	assert.Equal(t, []types.GroupID{all.ID}, model.Rules[0].SourceGroupIDs)
-	assert.Equal(t, []types.GroupID{self.ID}, model.Rules[0].DestinationGroupIDs)
+	seeded := model.Rules[0]
+	assert.Equal(t, types.DefaultRuleName, seeded.Name)
+	assert.True(t, seeded.IsBuiltin())
+	assert.True(t, seeded.Enabled)
+	assert.Equal(t, []types.GroupID{all.ID}, seeded.SourceGroupIDs)
+	assert.Equal(t, []types.GroupID{self.ID}, seeded.DestinationGroupIDs)
+
+	// The builtin rule takes its switch and nothing else.
+	_, err = s.DeleteAccessRule(seeded.ID)
+	require.ErrorIs(t, err, types.ErrRuleBuiltin)
+
+	renamed := seeded
+	renamed.Name = "Everyone"
+	_, _, err = s.UpdateAccessRule(renamed)
+	require.ErrorIs(t, err, types.ErrRuleBuiltin)
+
+	narrowed := seeded
+	narrowed.Protocol = types.AccessProtocolTCP
+	narrowed.Ports = "22"
+	_, _, err = s.UpdateAccessRule(narrowed)
+	require.ErrorIs(t, err, types.ErrRuleBuiltin)
+
+	off := seeded
+	off.Enabled = false
+	off.Builtin = ""
+	updated, _, err := s.UpdateAccessRule(off)
+	require.NoError(t, err)
+	assert.False(t, updated.Enabled)
+	assert.Equal(t, types.RuleBuiltinOwnMachines, updated.Builtin, "the marker cannot be cleared")
 
 	// Self is a destination only, never a member set.
 	_, _, err = s.CreateAccessRule(types.AccessRule{
@@ -53,9 +78,6 @@ func TestAccessGroupsAndRules(t *testing.T) {
 		SourceGroupIDs: []types.GroupID{all.ID}, DestinationGroupIDs: []types.GroupID{self.ID},
 	})
 	require.ErrorIs(t, err, types.ErrRuleSelfBoth)
-
-	_, err = s.DeleteAccessRule(model.Rules[0].ID)
-	require.NoError(t, err)
 
 	_, _, err = s.UpdateGroup(all.ID, "Everyone", "", false)
 	require.ErrorIs(t, err, types.ErrGroupBuiltin)

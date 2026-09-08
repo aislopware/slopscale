@@ -575,6 +575,14 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609141100-api-key-scopes",
 			run: migrateAPIKeyScopes,
 		},
+		{
+			// Builtin access rules: the rule the server seeds carries a
+			// marker so it can be switched off but not edited or deleted.
+			id: "202609150900-builtin-access-rules",
+			run: func(tx *Tx) error {
+				return tx.ex.addColumnIfMissing("access_rules", "builtin", typeText)
+			},
+		},
 	}
 }
 

@@ -50,14 +50,14 @@ create the rules a tailnet needs before turning them on, or start with one
 rule from _All_ to _All_ and narrow it down. The console asks before the
 last enabled rule is disabled or deleted when that would open the tailnet.
 
-A new server does not start open. The first time it runs it seeds one rule,
-_Own machines_, from _All_ to _Own machines_ on every protocol: each machine
-reaches the other machines of its own user and nothing else, and machines of
-different users do not see each other. It is an ordinary rule afterwards;
-disable or delete it to open the tailnet, or add rules next to it. On a
+A new server does not start open. The first time it runs it seeds one
+builtin rule, _Own machines_, from _All_ to _Own machines_ on every
+protocol: each machine reaches the other machines of its own user and
+nothing else, and machines of different users do not see each other. A
+builtin rule has only its enabled switch: it cannot be renamed, narrowed or
+deleted. Switch it off to open the tailnet, or add rules next to it. On a
 database that already has machines when it is upgraded the rule is seeded
-disabled, so an open tailnet stays open until an operator turns it on. The
-rule is seeded once; a deleted rule does not come back.
+switched off, so an open tailnet stays open until an operator turns it on.
 
 Rules and the policy file combine: the rules compile into grants that sit next
 to the file's own, and a connection is allowed when either admits it. The

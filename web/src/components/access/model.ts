@@ -19,6 +19,11 @@ export function isSelf(group: Group): boolean {
   return group.builtin === builtinSelf;
 }
 
+/** Whether the server owns the rule: it can be switched off, not edited or deleted. */
+export function isBuiltinRule(rule: AccessRule): boolean {
+  return rule.builtin !== "";
+}
+
 /** The groups a machine is in: directly, through its owner, and always the builtin All group. */
 export function groupsOfNode(groups: readonly Group[], node: Node): Group[] {
   const owner = isTagged(node) ? null : ownerId(node);

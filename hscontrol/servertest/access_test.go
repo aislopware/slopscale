@@ -48,6 +48,35 @@ func TestAccessRulesEndToEnd(t *testing.T) {
 
 	var engID, serversID string
 
+	t.Run("the builtin rule takes only its switch", func(t *testing.T) {
+		status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/access-rule", nil)
+		require.Equal(t, http.StatusOK, status, body)
+
+		rules, ok := body["rules"].([]any)
+		require.True(t, ok)
+		require.Len(t, rules, 1)
+
+		seeded, ok := rules[0].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, types.DefaultRuleName, seeded["name"])
+		assert.Equal(t, types.RuleBuiltinOwnMachines, seeded["builtin"])
+		assert.Equal(t, false, seeded["enabled"], "the harness switches it off")
+
+		id, ok := seeded["id"].(string)
+		require.True(t, ok)
+
+		status, body = apiCall(t, client, ownerKey, http.MethodDelete, v1+"/access-rule/"+id, nil)
+		assert.Equal(t, http.StatusBadRequest, status, body)
+
+		status, body = apiCall(t, client, ownerKey, http.MethodPut, v1+"/access-rule/"+id, map[string]any{
+			"name":                "Everyone",
+			"protocol":            "all",
+			"sourceGroupIds":      seeded["sourceGroupIds"],
+			"destinationGroupIds": seeded["destinationGroupIds"],
+		})
+		assert.Equal(t, http.StatusBadRequest, status, body)
+	})
+
 	t.Run("the builtin groups exist and cannot change", func(t *testing.T) {
 		status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/group", nil)
 		require.Equal(t, http.StatusOK, status, body)

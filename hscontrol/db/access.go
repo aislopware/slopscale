@@ -50,6 +50,7 @@ type (
 		ExpiresAt     *time.Time
 		CreatedAt     *time.Time
 		UpdatedAt     *time.Time
+		Builtin       string
 	}
 	accessRuleGroupRow struct {
 		ID      uint64 `sql:"primary_key"`
@@ -138,6 +139,7 @@ func (r accessRuleRow) rule() types.AccessRule {
 		Protocol:      types.AccessProtocol(r.Protocol),
 		Ports:         r.Ports,
 		Bidirectional: r.Bidirectional,
+		Builtin:       r.Builtin,
 	}
 
 	if r.ExpiresAt != nil {
@@ -291,12 +293,12 @@ func LoadAccessModel(q Querier) (types.AccessModel, error) {
 }
 
 // EnsureBuiltinGroups creates the builtin groups when they are missing.
-// The first time the self group is created the default rule comes with
+// The first time the self group is created the builtin rule comes with
 // it: every machine reaches the other machines of its own user. The rule
 // is enabled on a database without nodes, so a new tailnet starts closed,
 // and disabled on one that already has nodes, so an upgrade does not cut
-// an open tailnet off; it is an ordinary rule afterwards and the self
-// group, which cannot be deleted, is the marker that seeding happened.
+// an open tailnet off. The rule can be switched off but not edited or
+// deleted, and the self group is the marker that seeding happened.
 func (hsdb *HSDatabase) EnsureBuiltinGroups() error {
 	_, err := Write(hsdb, func(tx *Tx) (struct{}, error) {
 		all, err := ensureGroup(tx, types.AccessGroup{
@@ -327,6 +329,7 @@ func (hsdb *HSDatabase) EnsureBuiltinGroups() error {
 		_, err = createAccessRule(tx, types.AccessRule{
 			Name:                types.DefaultRuleName,
 			Description:         "Each machine reaches the other machines of its own user.",
+			Builtin:             types.RuleBuiltinOwnMachines,
 			Enabled:             count.Count == 0,
 			Protocol:            types.AccessProtocolAll,
 			SourceGroupIDs:      []types.GroupID{all.ID},
@@ -825,6 +828,7 @@ func createAccessRule(tx Querier, rule types.AccessRule) (types.AccessRule, erro
 		ExpiresAt:     utcPtr(rule.ExpiresAt),
 		CreatedAt:     &now,
 		UpdatedAt:     &now,
+		Builtin:       rule.Builtin,
 	}
 
 	var inserted idRow

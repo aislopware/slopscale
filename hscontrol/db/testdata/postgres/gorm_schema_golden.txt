@@ -27,6 +27,7 @@ COL access_rules.bidirectional boolean null=YES default=false
 COL access_rules.expires_at timestamp with time zone null=YES
 COL access_rules.created_at timestamp with time zone null=YES
 COL access_rules.updated_at timestamp with time zone null=YES
+COL access_rules.builtin text null=YES
 COL api_keys.id bigint null=NO default=nextval('api_keys_id_seq'::regclass)
 COL api_keys.prefix text null=YES
 COL api_keys.hash bytea null=YES

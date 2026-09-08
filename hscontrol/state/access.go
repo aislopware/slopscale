@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -426,7 +427,8 @@ func (s *State) CreateAccessRule(rule types.AccessRule) (types.AccessRule, chang
 
 // UpdateAccessRule replaces every field of a rule. An expiry that has
 // passed is refused when it is new; an expired rule may be edited as
-// long as its expiry is kept, extended or cleared.
+// long as its expiry is kept, extended or cleared. A builtin rule takes
+// only its enabled switch; everything else must come back as it is.
 func (s *State) UpdateAccessRule(rule types.AccessRule) (types.AccessRule, change.Change, error) {
 	existing, err := s.GetAccessRule(rule.ID)
 	if err != nil {
@@ -436,6 +438,14 @@ func (s *State) UpdateAccessRule(rule types.AccessRule) (types.AccessRule, chang
 	rule, err = s.normalizeAccessRule(rule)
 	if err != nil {
 		return types.AccessRule{}, change.Change{}, err
+	}
+
+	if existing.IsBuiltin() {
+		if !sameRuleButEnabled(existing, rule) {
+			return types.AccessRule{}, change.Change{}, types.ErrRuleBuiltin
+		}
+
+		rule.Builtin = existing.Builtin
 	}
 
 	if !sameExpiry(existing.ExpiresAt, rule.ExpiresAt) && rule.Expired(time.Now()) {
@@ -455,11 +465,15 @@ func (s *State) UpdateAccessRule(rule types.AccessRule) (types.AccessRule, chang
 	return updated, c, nil
 }
 
-// DeleteAccessRule removes a rule.
+// DeleteAccessRule removes a rule; the builtin one stays.
 func (s *State) DeleteAccessRule(id types.AccessRuleID) (change.Change, error) {
 	rule, err := s.GetAccessRule(id)
 	if err != nil {
 		return change.Change{}, err
+	}
+
+	if rule.IsBuiltin() {
+		return change.Change{}, types.ErrRuleBuiltin
 	}
 
 	err = s.db.DeleteAccessRule(id)
@@ -552,4 +566,18 @@ func (s *State) normalizeAccessRule(rule types.AccessRule) (types.AccessRule, er
 	}
 
 	return rule, nil
+}
+
+// sameRuleButEnabled reports whether the update leaves every field of the
+// rule as it is except the enabled switch.
+func sameRuleButEnabled(existing, update types.AccessRule) bool {
+	return existing.Name == update.Name &&
+		existing.Description == update.Description &&
+		existing.Protocol == update.Protocol &&
+		existing.Ports == update.Ports &&
+		existing.Bidirectional == update.Bidirectional &&
+		slices.Equal(existing.SourceGroupIDs, update.SourceGroupIDs) &&
+		slices.Equal(existing.DestinationGroupIDs, update.DestinationGroupIDs) &&
+		slices.Equal(existing.PostureIDs, update.PostureIDs) &&
+		sameExpiry(existing.ExpiresAt, update.ExpiresAt)
 }
