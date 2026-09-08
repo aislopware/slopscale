@@ -56,7 +56,7 @@ func TestWriteMapFramesBody(t *testing.T) {
 			session := &mapSession{
 				req:  tailcfg.MapRequest{Compress: compress},
 				w:    rec,
-				node: &types.Node{},
+				node: (&types.Node{}).View(),
 				log:  zerolog.Nop(),
 			}
 
@@ -84,7 +84,7 @@ func TestWriteMapConcurrentSessions(t *testing.T) {
 			session := &mapSession{
 				req:  tailcfg.MapRequest{Compress: util.ZstdCompression},
 				w:    rec,
-				node: &types.Node{},
+				node: (&types.Node{}).View(),
 				log:  zerolog.Nop(),
 			}
 			name := string(rune('a'+i)) + ".example.ts.net."

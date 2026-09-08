@@ -502,7 +502,7 @@ func (ns *noiseServer) PollNetMapHandler(
 		ns.headscale.Change(ns.headscale.state.NoteNodeSourceAddr(nv.ID(), addrPort.Addr()))
 	}
 
-	sess := ns.headscale.newMapSession(req.Context(), mapRequest, writer, nv.AsStruct())
+	sess := ns.headscale.newMapSession(req.Context(), mapRequest, writer, nv)
 	sess.log.Trace().Caller().Msg("a node sending a MapRequest with Noise protocol")
 
 	if !sess.isStreaming() {
@@ -849,11 +849,12 @@ var errNodeKeyUnknown = errors.New("node key unknown")
 // deleted while polling gets the same frame from its stream; this covers
 // the client that reconnects afterwards, or after the server restarted.
 func (ns *noiseServer) serveNodeGone(ctx context.Context, writer http.ResponseWriter, mapRequest tailcfg.MapRequest) {
-	sess := ns.headscale.newMapSession(ctx, mapRequest, writer, &types.Node{
+	unknown := types.Node{
 		NodeKey:    mapRequest.NodeKey,
 		MachineKey: ns.machineKey,
 		Hostname:   "unknown",
-	})
+	}
+	sess := ns.headscale.newMapSession(ctx, mapRequest, writer, unknown.View())
 
 	sess.log.Info().Caller().Msg("map request from an unknown node key, telling it to log in again")
 

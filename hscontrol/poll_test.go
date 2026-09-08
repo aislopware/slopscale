@@ -180,14 +180,12 @@ func TestServeLongPollWritesErrorWhenInitialMapFails(t *testing.T) {
 	nodeView, ok := app.state.GetNodeByID(createdNode.ID)
 	require.True(t, ok)
 
-	node := nodeView.AsStruct()
-
 	ctx, cancel := context.WithCancel(t.Context())
 	writer := &recordingResponseWriter{}
 	session := app.newMapSession(ctx, tailcfg.MapRequest{
 		Stream:  true,
 		Version: tailcfg.CapabilityVersion(100),
-	}, writer, node)
+	}, writer, nodeView)
 
 	serveDone := make(chan struct{})
 
@@ -199,7 +197,7 @@ func TestServeLongPollWritesErrorWhenInitialMapFails(t *testing.T) {
 	t.Cleanup(func() {
 		// Break the post-disconnect reconnect wait so the goroutine exits.
 		dummyCh := make(chan *tailcfg.MapResponse, 1)
-		_ = app.mapBatcher.AddNode(node.ID, dummyCh, tailcfg.CapabilityVersion(100), nil)
+		_ = app.mapBatcher.AddNode(nodeView.ID(), dummyCh, tailcfg.CapabilityVersion(100), nil)
 
 		cancel()
 
@@ -208,7 +206,7 @@ func TestServeLongPollWritesErrorWhenInitialMapFails(t *testing.T) {
 		case <-time.After(2 * time.Second):
 		}
 
-		_ = app.mapBatcher.RemoveNode(node.ID, dummyCh)
+		_ = app.mapBatcher.RemoveNode(nodeView.ID(), dummyCh)
 	})
 
 	assert.Eventually(t, func() bool {
@@ -251,30 +249,28 @@ func TestFailedReconnectDoesNotCancelEphemeralGC(t *testing.T) {
 	require.True(t, ok)
 	require.True(t, nodeView.IsEphemeral(), "node must be ephemeral so Cancel would arm on long-poll")
 
-	node := nodeView.AsStruct()
-
 	// Arm a long-lived deletion timer — the state after a normal disconnect
 	// has called afterServeLongPoll. A long expiry avoids racing the
 	// fail-before-Connect path below.
-	app.ephemeralGC.Schedule(node.ID, time.Hour)
-	require.True(t, app.ephemeralGC.IsScheduled(node.ID), "test sanity: GC timer must be armed")
+	app.ephemeralGC.Schedule(nodeView.ID(), time.Hour)
+	require.True(t, app.ephemeralGC.IsScheduled(nodeView.ID()), "test sanity: GC timer must be armed")
 
 	// Drop the node from the NodeStore so UpdateNodeFromMapRequest fails before
 	// Connect, while the session still carries an ephemeral AuthKey (so the
 	// old Cancel-on-entry path would clear the timer).
-	app.state.DeleteNodeFromStoreForTest(node.ID)
+	app.state.DeleteNodeFromStoreForTest(nodeView.ID())
 
 	writer := &recordingResponseWriter{}
 	session := app.newMapSession(t.Context(), tailcfg.MapRequest{
 		Stream:  true,
 		Version: tailcfg.CapabilityVersion(100),
-	}, writer, node)
+	}, writer, nodeView)
 
 	session.serveLongPoll()
 
 	assert.GreaterOrEqual(t, writer.statusCode(), http.StatusInternalServerError,
 		"failed reconnect must write an HTTP error before Connect")
-	assert.True(t, app.ephemeralGC.IsScheduled(node.ID),
+	assert.True(t, app.ephemeralGC.IsScheduled(nodeView.ID()),
 		"failed reconnect must not cancel the ephemeral GC timer (issue #3382)")
 }
 
@@ -323,14 +319,12 @@ func TestGitHubIssue3129_TransientlyBlockedWriteDoesNotLeaveLiveStaleSession(t *
 	nodeView, ok := app.state.GetNodeByID(createdNode.ID)
 	require.True(t, ok, "expected node to be present in NodeStore after reload")
 	require.True(t, nodeView.Valid(), "expected valid node view after reload")
-	node := nodeView.AsStruct()
-
 	ctx, cancel := context.WithCancel(t.Context())
 	writer := newDelayedSuccessResponseWriter(250 * time.Millisecond)
 	session := app.newMapSession(ctx, tailcfg.MapRequest{
 		Stream:  true,
 		Version: tailcfg.CapabilityVersion(100),
-	}, writer, node)
+	}, writer, nodeView)
 
 	serveDone := make(chan struct{})
 
@@ -341,7 +335,7 @@ func TestGitHubIssue3129_TransientlyBlockedWriteDoesNotLeaveLiveStaleSession(t *
 
 	t.Cleanup(func() {
 		dummyCh := make(chan *tailcfg.MapResponse, 1)
-		_ = app.mapBatcher.AddNode(node.ID, dummyCh, tailcfg.CapabilityVersion(100), nil)
+		_ = app.mapBatcher.AddNode(nodeView.ID(), dummyCh, tailcfg.CapabilityVersion(100), nil)
 
 		cancel()
 
@@ -350,7 +344,7 @@ func TestGitHubIssue3129_TransientlyBlockedWriteDoesNotLeaveLiveStaleSession(t *
 		case <-time.After(2 * time.Second):
 		}
 
-		_ = app.mapBatcher.RemoveNode(node.ID, dummyCh)
+		_ = app.mapBatcher.RemoveNode(nodeView.ID(), dummyCh)
 	})
 
 	select {
@@ -369,7 +363,7 @@ func TestGitHubIssue3129_TransientlyBlockedWriteDoesNotLeaveLiveStaleSession(t *
 	// One update fills the buffered session channel while the first write is blocked.
 	// The second update then hits the 50ms stale-send timeout, so the batcher prunes
 	// the stale connection and triggers its stop hook.
-	app.mapBatcher.AddWork(change.SelfUpdate(node.ID), change.SelfUpdate(node.ID))
+	app.mapBatcher.AddWork(change.SelfUpdate(nodeView.ID()), change.SelfUpdate(nodeView.ID()))
 
 	select {
 	case <-writer.FirstWriteFinished():

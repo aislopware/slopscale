@@ -49,7 +49,7 @@ type mapSession struct {
 	keepAlive       time.Duration
 	keepAliveTicker *time.Ticker
 
-	node *types.Node
+	node types.NodeView
 	w    http.ResponseWriter
 
 	log zerolog.Logger
@@ -59,7 +59,7 @@ func (h *Headscale) newMapSession(
 	ctx context.Context,
 	req tailcfg.MapRequest,
 	w http.ResponseWriter,
-	node *types.Node,
+	node types.NodeView,
 ) *mapSession {
 	//nolint:gosec // weak random is fine for jitter
 	ka := keepAliveInterval + (time.Duration(rand.IntN(9000)) * time.Millisecond)
@@ -78,9 +78,13 @@ func (h *Headscale) newMapSession(
 		keepAlive:       ka,
 		keepAliveTicker: nil,
 
+		// The node is identified by id and name only: embedding the whole
+		// record renders every key on every request, whether or not the
+		// session ever logs.
 		log: log.With().
 			Str(zf.Component, "poll").
-			EmbedObject(node).
+			Uint64(zf.NodeID, node.ID().Uint64()).
+			Str(zf.NodeName, node.Hostname()).
 			Bool(zf.OmitPeers, req.OmitPeers).
 			Bool(zf.Stream, req.Stream).
 			Logger(),
@@ -109,7 +113,7 @@ func (m *mapSession) stopFromBatcher() {
 // which is how a poll tells a cancel from its node's deletion apart from
 // one for a replaced stream or a shutdown.
 func (m *mapSession) nodeGone() bool {
-	_, ok := m.h.state.GetNodeByID(m.node.ID)
+	_, ok := m.h.state.GetNodeByID(m.node.ID())
 
 	return !ok
 }
@@ -125,20 +129,20 @@ var nodeGoneExpiry = time.Unix(0, 0).UTC()
 // hosted control plane answers a deleted device the same way. Only the
 // fields the client needs to recognise itself are filled in; node may be
 // a bare key when the server never knew it.
-func nodeGoneResponse(node *types.Node) *tailcfg.MapResponse {
+func nodeGoneResponse(node types.NodeView) *tailcfg.MapResponse {
 	now := time.Now()
 
 	return &tailcfg.MapResponse{
 		ControlTime: &now,
 		Node: &tailcfg.Node{
 			//nolint:gosec // NodeID is a database autoincrement value, int64 on SQLite/PostgreSQL, so it fits
-			ID:                tailcfg.NodeID(node.ID),
-			StableID:          node.ID.StableID(),
-			Name:              node.GivenName,
-			Key:               node.NodeKey,
+			ID:                tailcfg.NodeID(node.ID()),
+			StableID:          node.ID().StableID(),
+			Name:              node.GivenName(),
+			Key:               node.NodeKey(),
 			KeyExpiry:         nodeGoneExpiry,
-			Machine:           node.MachineKey,
-			DiscoKey:          node.DiscoKey,
+			Machine:           node.MachineKey(),
+			DiscoKey:          node.DiscoKey(),
 			Addresses:         node.Prefixes(),
 			AllowedIPs:        node.Prefixes(),
 			MachineAuthorized: true,
@@ -151,7 +155,7 @@ func nodeGoneResponse(node *types.Node) *tailcfg.MapResponse {
 // is disconnected.
 func (m *mapSession) afterServeLongPoll() {
 	if m.node.IsEphemeral() {
-		m.h.ephemeralGC.Schedule(m.node.ID, m.h.cfg.Node.Ephemeral.InactivityTimeout)
+		m.h.ephemeralGC.Schedule(m.node.ID(), m.h.cfg.Node.Ephemeral.InactivityTimeout)
 	}
 }
 
@@ -161,7 +165,7 @@ func (m *mapSession) serve() {
 	// current configuration.
 	//
 	// Process the [tailcfg.MapRequest] to update node state (endpoints, hostinfo, etc.)
-	c, err := m.h.state.UpdateNodeFromMapRequest(m.node.ID, m.req)
+	c, err := m.h.state.UpdateNodeFromMapRequest(m.node.ID(), m.req)
 	if err != nil {
 		httpError(m.w, err)
 		return
@@ -188,7 +192,7 @@ func (m *mapSession) serve() {
 	// Stream off without OmitPeers asks for one MapResponse and then the
 	// end of the connection ([tailcfg.MapRequest.Stream]); an empty 200
 	// reads as EOF on the client's size prefix.
-	resp, err := m.h.mapBatcher.FullMapResponse(m.node.ID, m.capVer)
+	resp, err := m.h.mapBatcher.FullMapResponse(m.node.ID(), m.capVer)
 	if err != nil {
 		httpError(m.w, err)
 
@@ -208,7 +212,7 @@ func (m *mapSession) serve() {
 func (m *mapSession) cleanupAfterLongPoll(connectGen uint64) {
 	m.stopFromBatcher()
 
-	stillConnected := m.h.mapBatcher.RemoveNode(m.node.ID, m.ch)
+	stillConnected := m.h.mapBatcher.RemoveNode(m.node.ID(), m.ch)
 
 	// This session never reached [state.State.Connect]; there is no
 	// session to release. A deleted node has nothing to release either,
@@ -238,7 +242,7 @@ func (m *mapSession) cleanupAfterLongPoll(connectGen uint64) {
 		defer ticker.Stop()
 
 		for range 10 {
-			if m.h.mapBatcher.IsConnected(m.node.ID) {
+			if m.h.mapBatcher.IsConnected(m.node.ID()) {
 				break
 			}
 
@@ -249,7 +253,7 @@ func (m *mapSession) cleanupAfterLongPoll(connectGen uint64) {
 	// Release this session. The node goes offline exactly when the last
 	// live session is released, so releases from replaced or stale
 	// sessions are harmless regardless of the order they run in.
-	disconnectChanges, err := m.h.state.Disconnect(m.node.ID, connectGen)
+	disconnectChanges, err := m.h.state.Disconnect(m.node.ID(), connectGen)
 	if err != nil {
 		m.log.Error().Caller().Err(err).Msg("failed to disconnect node")
 	}
@@ -283,7 +287,7 @@ func (m *mapSession) serveLongPoll() {
 	m.h.clientStreamsOpen.Add(1)
 	defer m.h.clientStreamsOpen.Done()
 
-	ctx, cancel := context.WithCancel(context.WithValue(m.ctx, nodeNameContextKey, m.node.Hostname))
+	ctx, cancel := context.WithCancel(context.WithValue(m.ctx, nodeNameContextKey, m.node.Hostname()))
 	defer cancel()
 
 	m.keepAliveTicker = time.NewTicker(m.keepAlive)
@@ -295,7 +299,7 @@ func (m *mapSession) serveLongPoll() {
 	// [types.NodeView.SubnetRoutes] calculates the intersection of announced and approved routes. If we
 	// call [state.State.Connect] first, [types.NodeView.SubnetRoutes] returns empty (no announced routes yet), causing
 	// the node to be incorrectly removed from AvailableRoutes.
-	mapReqChange, err := m.h.state.UpdateNodeFromMapRequest(m.node.ID, m.req)
+	mapReqChange, err := m.h.state.UpdateNodeFromMapRequest(m.node.ID(), m.req)
 	if err != nil {
 		m.log.Error().Caller().Err(err).Msg("failed to update node from initial MapRequest")
 		// Write an explicit error rather than returning silently: a bare
@@ -314,13 +318,13 @@ func (m *mapSession) serveLongPoll() {
 	// primary route selection occurs, which is critical for proper HA subnet router failover.
 	var connectChanges []change.Change
 
-	connectChanges, connectGen = m.h.state.Connect(m.node.ID)
+	connectChanges, connectGen = m.h.state.Connect(m.node.ID())
 
 	// Cancel ephemeral GC only after Connect succeeds. Cancelling at the start
 	// of serveLongPoll left departed nodes without a deletion timer when a
 	// reconnect attempt failed before Connect (issue #3382).
 	if m.node.IsEphemeral() {
-		m.h.ephemeralGC.Cancel(m.node.ID)
+		m.h.ephemeralGC.Cancel(m.node.ID())
 	}
 
 	m.log.Info().Caller().Str(zf.Chan, fmt.Sprintf("%p", m.ch)).Msg("node has connected")
@@ -330,7 +334,7 @@ func (m *mapSession) serveLongPoll() {
 	// adding this before connecting it to the state ensure that
 	// it does not miss any updates that might be sent in the split
 	// time between the node connecting and the batcher being ready.
-	err = m.h.mapBatcher.AddNode(m.node.ID, m.ch, m.capVer, m.stopFromBatcher)
+	err = m.h.mapBatcher.AddNode(m.node.ID(), m.ch, m.capVer, m.stopFromBatcher)
 	if err != nil {
 		m.log.Error().Caller().Err(err).Msg("failed to add node to batcher")
 		// Write an explicit error rather than returning silently: a bare
@@ -346,7 +350,7 @@ func (m *mapSession) serveLongPoll() {
 	m.h.Change(mapReqChange)
 	m.h.Change(connectChanges...)
 
-	m.h.collectPostureOnConnect(ctx, m.node.ID)
+	m.h.collectPostureOnConnect(ctx, m.node.ID())
 
 	// Loop through updates and continuously send them to the
 	// client.
@@ -400,7 +404,7 @@ func (m *mapSession) serveLongPoll() {
 			}
 
 			if debugHighCardinalityMetrics {
-				mapResponseLastSentSeconds.WithLabelValues("keepalive", m.node.ID.String()).
+				mapResponseLastSentSeconds.WithLabelValues("keepalive", m.node.ID().String()).
 					Set(float64(time.Now().Unix()))
 			}
 
@@ -416,8 +420,10 @@ func (m *mapSession) serveLongPoll() {
 var mapBuffers = sync.Pool{New: func() any { return new(bytes.Buffer) }}
 
 // maxPooledMapBuffer keeps one unusually large netmap from pinning memory
-// for the life of the process: a buffer that grew past it is dropped.
-const maxPooledMapBuffer = 1 << 20
+// for the life of the process: a buffer that grew past it is dropped. A
+// full map is about a kilobyte per peer, so the cap sits well above the
+// largest tailnet the pool is meant to serve.
+const maxPooledMapBuffer = 8 << 20
 
 var mapHeaderPlaceholder [reservedResponseHeaderSize]byte
 
@@ -503,7 +509,7 @@ func (m *mapSession) writeMap(msg *tailcfg.MapResponse) error {
 		e.Caller().
 			Str(zf.Chan, fmt.Sprintf("%p", m.ch)).
 			TimeDiff("timeSpent", time.Now(), startWrite).
-			Str(zf.MachineKey, m.node.MachineKey.String()).
+			Str(zf.MachineKey, m.node.MachineKey().String()).
 			Bool("keepalive", msg.KeepAlive).
 			Msg("finished writing mapresp to node")
 	}

@@ -57,7 +57,9 @@ func (hsdb *HSDatabase) runMigrations(migrations []migration) error {
 		return hsdb.runSQLiteMigrations(migrations, applied)
 	}
 
-	return hsdb.applyPending(migrations, applied)
+	_, err = hsdb.applyPending(migrations, applied)
+
+	return err
 }
 
 func validateMigrationIDs(migrations []migration) error {
@@ -179,7 +181,7 @@ func (hsdb *HSDatabase) runSQLiteMigrations(migrations []migration, applied map[
 		return fmt.Errorf("disabling foreign keys: %w", err)
 	}
 
-	err = hsdb.applyPending(migrations[:split], applied)
+	ranWithoutFKs, err := hsdb.applyPending(migrations[:split], applied)
 	if err != nil {
 		return err
 	}
@@ -189,17 +191,26 @@ func (hsdb *HSDatabase) runSQLiteMigrations(migrations []migration, applied map[
 		return fmt.Errorf("restoring foreign keys: %w", err)
 	}
 
-	err = hsdb.applyPending(migrations[split:], applied)
+	ranWithFKs, err := hsdb.applyPending(migrations[split:], applied)
 	if err != nil {
 		return err
+	}
+
+	// The check scans every table that carries a foreign key, so a start
+	// that ran no migration skips it: the previous start already checked.
+	if ranWithoutFKs == 0 && ranWithFKs == 0 {
+		return nil
 	}
 
 	return hsdb.checkForeignKeyViolations()
 }
 
 // applyPending runs, in order, every migration not yet recorded as applied,
-// each inside its own transaction together with its history row.
-func (hsdb *HSDatabase) applyPending(migrations []migration, applied map[string]struct{}) error {
+// each inside its own transaction together with its history row, and
+// reports how many ran.
+func (hsdb *HSDatabase) applyPending(migrations []migration, applied map[string]struct{}) (int, error) {
+	ran := 0
+
 	for _, m := range migrations {
 		if _, done := applied[m.id]; done {
 			continue
@@ -216,13 +227,14 @@ func (hsdb *HSDatabase) applyPending(migrations []migration, applied map[string]
 			return tx.markApplied(m.id)
 		})
 		if err != nil {
-			return fmt.Errorf("migration %s: %w", m.id, err)
+			return 0, fmt.Errorf("migration %s: %w", m.id, err)
 		}
 
 		applied[m.id] = struct{}{}
+		ran++
 	}
 
-	return nil
+	return ran, nil
 }
 
 func (t *Tx) markApplied(id string) error {
