@@ -37,7 +37,11 @@ export function TableScroll({
       <div ref={ref} className="overflow-x-auto">
         {children(edges.left || edges.right)}
       </div>
-      {below === null || below === undefined ? null : <FramePanel>{below}</FramePanel>}
+      {below === null || below === undefined ? null : (
+        // The header cells are positioned, so they would paint over the panel's top ring; the
+        // panel is positioned too, and later in the tree, so its edge stays on top.
+        <FramePanel className="relative">{below}</FramePanel>
+      )}
       {edges.left ? <ScrollFade side="left" /> : null}
       {edges.right && !pinnedRight ? <ScrollFade side="right" /> : null}
     </div>
