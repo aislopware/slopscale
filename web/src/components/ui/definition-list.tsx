@@ -46,6 +46,7 @@ export function DefinitionList({
             ) : (
               <CopyText
                 value={typeof item.value === "string" ? item.value : item.copy}
+                {...(typeof item.value === "string" ? {} : { display: item.value })}
                 copy={item.copy}
                 wrap={wrap}
               />

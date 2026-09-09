@@ -57,7 +57,7 @@ function buildItems(info: ServerInfo, reachable: boolean): readonly Definition[]
 
 function networkItems(info: ServerInfo): readonly Definition[] {
   return [
-    { label: "Server URL", value: info.serverUrl, copy: info.serverUrl },
+    { label: "Server URL", value: <UrlText url={info.serverUrl} />, copy: info.serverUrl },
     { label: "Listening on", value: info.listenAddr, copy: info.listenAddr },
     { label: "IPv4 range", value: info.ipv4Prefix, copy: info.ipv4Prefix },
     { label: "IPv6 range", value: info.ipv6Prefix, copy: info.ipv6Prefix },

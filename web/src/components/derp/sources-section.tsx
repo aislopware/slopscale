@@ -51,7 +51,6 @@ export function SourcesSection({
               <>
                 <Button
                   variant="ghost"
-                  size="sm"
                   icon={ArrowsClockwiseIcon}
                   loading={mutations.refresh.isPending}
                   onClick={() => {
@@ -62,7 +61,6 @@ export function SourcesSection({
                 </Button>
                 <Button
                   variant="secondary"
-                  size="sm"
                   icon={PlusIcon}
                   onClick={() => {
                     setAdding(true);

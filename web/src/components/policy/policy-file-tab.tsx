@@ -90,7 +90,7 @@ function Actions({
 }
 
 /**
- * The HuJSON policy editor. Rules from the Rules tab are added to whatever this file grants, so an
+ * The HuJSON policy editor. Rules from the Rules page are added to whatever this file grants, so an
  * empty file is no longer the only way to leave the tailnet open.
  */
 export function PolicyFileTab({
@@ -119,7 +119,7 @@ export function PolicyFileTab({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div className="flex min-w-0 flex-col gap-1">
           <p className="text-sm text-kumo-subtle">
-            Grants, tags, SSH rules and autogroups written by hand. Rules from the Rules tab are
+            Grants, tags, SSH rules and autogroups written by hand. Rules from the Rules page are
             added on top.
           </p>
           <DraftState dirty={draft.dirty} updatedAt={policy.updatedAt} />
