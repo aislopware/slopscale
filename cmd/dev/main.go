@@ -100,8 +100,20 @@ log:
 policy:
   mode: database
 
+# The dev server's webhook, log stream and DERP receivers all run on this
+# host, and the seed script mints nodes through the debug endpoint.
+egress:
+  allow_loopback_targets: true
+
+debug:
+  node_api_enabled: true
+
 unix_socket: %s/headscale.sock
 unix_socket_permission: "0770"
+
+# Recordings land under the state directory so the console can serve them.
+ssh_recording:
+  dir: %s/recordings
 
 # A mock identity provider runs inside cmd/dev; the console signs in
 # through it and the user below comes out an admin.
@@ -168,7 +180,7 @@ func run() error {
 	configContent := fmt.Sprintf(
 		devConfig,
 		publicURL, *port, metricsPort,
-		tmpDir, tmpDir, tmpDir,
+		tmpDir, tmpDir, tmpDir, tmpDir,
 		provider.Issuer(), provider.ClientID, provider.ClientSecret, oidcUser,
 	)
 
