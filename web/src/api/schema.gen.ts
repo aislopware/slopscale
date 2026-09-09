@@ -4,6 +4,28 @@
  */
 
 export interface paths {
+    "/api/v1/access-graph": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Access graph
+         * @description Who can reach what: one edge per ordered pair of machines the packet filter or the SSH policy opens, computed from the rules the server hands each machine.
+         *
+         *     Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getAccessGraph"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/access-request": {
         parameters: {
             query?: never;
@@ -246,6 +268,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get app
+         * @description Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getApp"];
+        /**
+         * Update app
+         * @description Replaces the app's definition.
+         *
+         *     Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        put: operations["updateApp"];
+        post?: never;
+        /**
+         * Delete app
+         * @description Removes the app. Routes its connectors already had approved stay approved on the nodes.
+         *
+         *     Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["deleteApp"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/apps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List apps
+         * @description Apps are domains reached through app connectors: the connector nodes resolve the domains, advertise a route for every address they learn and forward the traffic.
+         *
+         *     Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listApps"];
+        put?: never;
+        /**
+         * Create app
+         * @description Creates an app. Its connectors get the definition at once and may approve learned routes.
+         *
+         *     Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["createApp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/audit": {
         parameters: {
             query?: never;
@@ -479,6 +561,28 @@ export interface paths {
          *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         delete: operations["resetDERP"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/derp/latency": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Relay latency report
+         * @description What the machines measure to each relay region: how many home on it and the round trips they see, from the network report every client sends when it connects.
+         *
+         *     Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getDERPLatency"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1453,6 +1557,132 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/posture-integration/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get posture integration
+         * @description Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getPostureIntegration"];
+        /**
+         * Update posture integration
+         * @description Replaces the definition; an empty secret keeps the stored one. Disabling drops the attributes the provider wrote.
+         *
+         *     Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        put: operations["updatePostureIntegration"];
+        post?: never;
+        /**
+         * Delete posture integration
+         * @description Removes the integration and the attributes its provider wrote.
+         *
+         *     Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["deletePostureIntegration"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture-integration/{id}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync posture integration
+         * @description Asks the provider now instead of at the next scheduled sync. A provider failure is recorded on the integration, not returned.
+         *
+         *     Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["syncPostureIntegration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture-integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List posture integrations
+         * @description Posture integrations ask a device management or endpoint security service about every machine by serial number and write the answer as prefixed posture attributes.
+         *
+         *     Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listPostureIntegrations"];
+        put?: never;
+        /**
+         * Create posture integration
+         * @description Stores the integration and, when enabled, syncs it at once. One enabled integration per provider.
+         *
+         *     Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["createPostureIntegration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture-integrations/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check posture integration credentials
+         * @description Tries the credentials against the provider without storing anything. A rejected credential or unreachable provider is a 502 with the provider's answer.
+         *
+         *     Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["checkPostureIntegration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/posture-integrations/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List posture providers
+         * @description The supported device management and endpoint security services, with the fields each needs and the attributes it writes.
+         *
+         *     Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listPostureProviders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/posture/{id}": {
         parameters: {
             query?: never;
@@ -1723,6 +1953,26 @@ export interface paths {
         get: operations["downloadSSHRecording"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ssh-session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a browser SSH session
+         * @description Mints a one-time key for an ephemeral node owned by the caller, which the console's in-browser client joins the tailnet with to open Tailscale SSH to the target. Whether the session is allowed is the SSH policy's call, as for any other machine of the caller's; the credential must belong to a user, and without the devices:core:read scope the target must be a node of the caller's own or one their machines can already reach.
+         */
+        post: operations["createSSHSession"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2082,6 +2332,35 @@ export interface components {
             durationSeconds?: number;
             note?: string;
         };
+        AccessGraph: {
+            edges: components["schemas"]["AccessGraphEdge"][];
+            /** @description Whether a packet filter is in force; without one every machine reaches every other. */
+            enforcing: boolean;
+            nodes: components["schemas"]["AccessGraphNode"][];
+            reachable: components["schemas"]["AccessGraphEdge"][];
+            reachedBy: components["schemas"]["AccessGraphEdge"][];
+        };
+        AccessGraphEdge: {
+            capabilities: string[];
+            /** Format: uint64 */
+            dst: string;
+            ports: string[];
+            routes: string[];
+            /** Format: uint64 */
+            src: string;
+            sshCheck: boolean;
+            sshUsers: string[];
+        };
+        AccessGraphNode: {
+            /** Format: uint64 */
+            id: string;
+            name: string;
+            online: boolean;
+            routes: string[];
+            tags: string[];
+            /** @description The owner's login, empty when tagged. */
+            user: string;
+        };
         AccessRequest: {
             /** Format: date-time */
             createdAt: string;
@@ -2180,6 +2459,56 @@ export interface components {
              * @description Owning user id; null for a legacy key.
              */
             userId: string | null;
+        };
+        App: {
+            /** @description The tags of the connector nodes, or * for every node running the connector. */
+            connectors: string[];
+            /** Format: date-time */
+            createdAt: string;
+            description: string;
+            /** @description The domains the connectors resolve and route, example.com or *.example.com. */
+            domains: string[];
+            /** Format: uint64 */
+            id: string;
+            name: string;
+            /** @description The connector nodes the selectors pick, with the routes they advertise. */
+            nodes: components["schemas"]["AppNode"][];
+            /** @description Routes the connectors always advertise, next to the addresses they learn. */
+            routes: string[];
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        AppNode: {
+            /** @description true while the client reports running the connector service. */
+            connector: boolean;
+            /**
+             * Format: int64
+             * @description Single-address routes the node advertises.
+             */
+            learnedRoutes: number;
+            /** @description The node's given name. */
+            name: string;
+            /** Format: uint64 */
+            nodeId: string;
+            online: boolean;
+            /**
+             * Format: int64
+             * @description Advertised routes that are not approved yet.
+             */
+            pending: number;
+        };
+        AppOutputBody: {
+            app: components["schemas"]["App"];
+        };
+        AppRequestBody: {
+            /** @description Tags of the connector nodes; empty means all connectors. */
+            connectors?: string[] | null;
+            description?: string;
+            /** @description example.com or *.example.com. */
+            domains?: string[] | null;
+            name: string;
+            /** @description CIDRs the connectors always advertise; no default routes. */
+            routes?: string[] | null;
         };
         AuditEvent: {
             /** @description What happened, dotted and object first: user.role.set, node.delete. */
@@ -2313,6 +2642,13 @@ export interface components {
             /** @description tcp:443, udp:53-60 or tcp:*. */
             ports?: string[] | null;
         };
+        CreateSSHSessionRequestBody: {
+            /**
+             * Format: uint64
+             * @description The node to open a session to.
+             */
+            nodeId: string;
+        };
         CreateUserRequestBody: {
             displayName?: string;
             email?: string;
@@ -2362,6 +2698,79 @@ export interface components {
             id: number;
             name?: string;
             nodes?: components["schemas"]["DERPRelay"][];
+        };
+        DERPLatencyMachine: {
+            /** @description true behind a NAT whose mapping varies by destination. */
+            hardNat: boolean;
+            /**
+             * Format: double
+             * @description The round trip to the home region, 0 when unmeasured.
+             */
+            homeMs: number;
+            linkType: string;
+            name: string;
+            /** Format: uint64 */
+            nodeId: string;
+            online: boolean;
+            /** Format: int64 */
+            preferredDerp: number;
+        };
+        DERPLatencyRegion: {
+            code: string;
+            /** @description Whether the relay map still has the region. */
+            inMap: boolean;
+            /**
+             * Format: double
+             * @description The worst round trip.
+             */
+            maxMs: number;
+            /**
+             * Format: double
+             * @description The median round trip.
+             */
+            medianMs: number;
+            /**
+             * Format: double
+             * @description The best round trip among them.
+             */
+            minMs: number;
+            name: string;
+            /**
+             * Format: double
+             * @description The 90th percentile round trip.
+             */
+            p90Ms: number;
+            /**
+             * Format: int64
+             * @description Machines that home on the region.
+             */
+            preferredBy: number;
+            /** Format: int64 */
+            regionId: number;
+            /**
+             * Format: int64
+             * @description Machines that measured the region.
+             */
+            samples: number;
+        };
+        DERPLatencyReport: {
+            /**
+             * Format: int64
+             * @description Machines behind a hard NAT, which relay most of their traffic.
+             */
+            hardNat: number;
+            machines: components["schemas"]["DERPLatencyMachine"][];
+            regions: components["schemas"]["DERPLatencyRegion"][];
+            /**
+             * Format: int64
+             * @description Machines that reported a measurement.
+             */
+            reporting: number;
+            /**
+             * Format: int64
+             * @description Machines that reported none.
+             */
+            silent: number;
         };
         DERPMapRegion: {
             code: string;
@@ -2646,6 +3055,9 @@ export interface components {
         ListAPIKeysOutputBody: {
             apiKeys: components["schemas"]["ApiKey"][];
         };
+        ListAppsOutputBody: {
+            apps: components["schemas"]["App"][];
+        };
         ListAuditOutputBody: {
             events: components["schemas"]["AuditEvent"][];
             nextBefore: string;
@@ -2672,6 +3084,9 @@ export interface components {
         };
         ListOAuthClientsOutputBody: {
             oauthClients: components["schemas"]["OAuthClient"][];
+        };
+        ListPostureIntegrationsOutputBody: {
+            integrations: components["schemas"]["PostureIntegration"][];
         };
         ListPosturesOutputBody: {
             geoIpAvailable: boolean;
@@ -2798,6 +3213,8 @@ export interface components {
         Node: {
             /** @description The services in the node's serve configuration, as it last reported them. */
             announcedServices: components["schemas"]["NodeService"][];
+            /** @description true while the client runs the app connector service (tailscale set --advertise-connector). */
+            appConnector: boolean;
             /** @description false while the node waits for an administrator. */
             approved: boolean;
             /** Format: date-time */
@@ -2829,6 +3246,8 @@ export interface components {
             lastSeen: string | null;
             machineKey: string;
             name: string;
+            /** @description The client's last network report; absent until it connects. */
+            netInfo?: components["schemas"]["NodeNetInfo"];
             nodeKey: string;
             online: boolean;
             preAuthKey: components["schemas"]["NodePreAuthKey"];
@@ -2836,6 +3255,8 @@ export interface components {
             registerMethod: "REGISTER_METHOD_UNSPECIFIED" | "REGISTER_METHOD_AUTH_KEY" | "REGISTER_METHOD_CLI" | "REGISTER_METHOD_OIDC";
             /** @description IDs of the users the node is shared with. */
             sharedWith: string[];
+            /** @description true while the client runs Tailscale SSH (tailscale set --ssh). */
+            sshServer: boolean;
             subnetRoutes: string[];
             /** @description true while an administrator has suspended the node. */
             suspended: boolean;
@@ -2845,6 +3266,53 @@ export interface components {
             /** @description true when a newer stable Tailscale client exists than the one the node runs; see latestClientVersion on the server info. */
             updateAvailable: boolean;
             user: components["schemas"]["User"];
+        };
+        NodeDERPLatency: {
+            code: string;
+            /**
+             * Format: double
+             * @description Over IPv4, 0 when not measured.
+             */
+            ipv4Ms: number;
+            /**
+             * Format: double
+             * @description Over IPv6, 0 when not measured.
+             */
+            ipv6Ms: number;
+            /**
+             * Format: double
+             * @description The fastest recent round trip in milliseconds, over IPv4 or IPv6.
+             */
+            ms: number;
+            name: string;
+            /** Format: int64 */
+            regionId: number;
+        };
+        NodeNetInfo: {
+            /** @description Whether a UPnP, NAT-PMP or PCP mapping is open. */
+            havePortMap: boolean;
+            latency: components["schemas"]["NodeDERPLatency"][];
+            /** @description wired, wifi or mobile, when the client knows. */
+            linkType: string;
+            /** @description true behind a hard NAT: a mapping per destination. */
+            mappingVariesByDestIp: boolean | null;
+            /** @description Whether PCP was seen on the LAN. */
+            pcp: boolean | null;
+            /** @description Whether NAT-PMP was seen on the LAN. */
+            pmp: boolean | null;
+            /**
+             * Format: int64
+             * @description The relay region the client homes on, 0 while unknown.
+             */
+            preferredDerp: number;
+            /** @description That region's name from the relay map. */
+            preferredDerpName: string;
+            /** @description Whether UPnP was seen on the LAN. */
+            upnp: boolean | null;
+            /** @description Whether the client reaches the internet over IPv6. */
+            workingIpv6: boolean | null;
+            /** @description Whether UDP reaches the internet. */
+            workingUdp: boolean | null;
         };
         NodeOutputBody: {
             node: components["schemas"]["Node"];
@@ -2856,6 +3324,7 @@ export interface components {
             custom: components["schemas"]["CustomAttribute"][];
             identity?: components["schemas"]["PostureIdentity"];
             identityCollectionOn: boolean;
+            integration: components["schemas"]["CustomAttribute"][];
         };
         NodePosturesOutputBody: {
             postures: components["schemas"]["Posture"][];
@@ -2930,8 +3399,104 @@ export interface components {
             disabled: boolean;
             serialNumbers: string[];
         };
+        PostureIntegration: {
+            config: components["schemas"]["PostureIntegrationConfig"];
+            /** Format: date-time */
+            createdAt: string;
+            enabled: boolean;
+            hasSecret: boolean;
+            /** Format: uint64 */
+            id: string;
+            /** @description What the last sync failed with; empty after a good one. */
+            lastError: string;
+            /**
+             * Format: int64
+             * @description How many machines the provider knew at the last sync.
+             */
+            lastMatched: number;
+            /**
+             * Format: date-time
+             * @description When the provider was last asked; absent before the first sync.
+             */
+            lastSyncAt?: string;
+            name: string;
+            prefix: string;
+            /**
+             * @description falcon, sentinelone, intune, jamf, kandji or kolide.
+             * @enum {string}
+             */
+            provider: "falcon" | "sentinelone" | "intune" | "jamf" | "kandji" | "kolide";
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        PostureIntegrationCheckBody: {
+            /** @description API token (SentinelOne, Kandji, Kolide). */
+            apiToken?: string;
+            baseUrl?: string;
+            clientId?: string;
+            /** @description OAuth client secret (Falcon, Intune, Jamf Pro). */
+            clientSecret?: string;
+            /** @description Defaults to true. */
+            enabled?: boolean;
+            /**
+             * Format: uint64
+             * @description A stored integration whose secret to use when none is given.
+             */
+            id?: string;
+            name: string;
+            /** @enum {string} */
+            provider: "falcon" | "sentinelone" | "intune" | "jamf" | "kandji" | "kolide";
+            tenantId?: string;
+        };
+        PostureIntegrationCheckOutputBody: {
+            ok: boolean;
+        };
+        PostureIntegrationConfig: {
+            /** @description The API origin: the Falcon cloud, the SentinelOne console, the Jamf Pro server or the Kandji tenant. Intune and Kolide have fixed endpoints. */
+            baseUrl?: string;
+            /** @description OAuth client id (Falcon, Intune, Jamf Pro). */
+            clientId?: string;
+            /** @description Entra tenant id (Intune). */
+            tenantId?: string;
+        };
+        PostureIntegrationOutputBody: {
+            integration: components["schemas"]["PostureIntegration"];
+        };
+        PostureIntegrationRequestBody: {
+            /** @description API token (SentinelOne, Kandji, Kolide). */
+            apiToken?: string;
+            baseUrl?: string;
+            clientId?: string;
+            /** @description OAuth client secret (Falcon, Intune, Jamf Pro). */
+            clientSecret?: string;
+            /** @description Defaults to true. */
+            enabled?: boolean;
+            name: string;
+            /** @enum {string} */
+            provider: "falcon" | "sentinelone" | "intune" | "jamf" | "kandji" | "kolide";
+            tenantId?: string;
+        };
         PostureOutputBody: {
             posture: components["schemas"]["Posture"];
+        };
+        PostureProvider: {
+            attributes: components["schemas"]["PostureProviderAttribute"][];
+            baseUrlDefault?: string;
+            fields: string[];
+            help: string;
+            label: string;
+            prefix: string;
+            provider: string;
+        };
+        PostureProviderAttribute: {
+            description: string;
+            /** @description The attribute name with the prefix, falcon:ztaScore. */
+            name: string;
+            /** @enum {string} */
+            type: "string" | "number" | "boolean";
+        };
+        PostureProvidersOutputBody: {
+            providers: components["schemas"]["PostureProvider"][];
         };
         PostureRequestBody: {
             description?: string;
@@ -3154,6 +3719,34 @@ export interface components {
         SshRecordingOutputBody: {
             recording: components["schemas"]["SSHRecording"];
         };
+        SSHSession: {
+            /** @description One-time key for the browser's ephemeral node, valid five minutes. */
+            authKey: string;
+            /** @description The control URL the browser connects to. */
+            controlUrl: string;
+            /**
+             * Format: date-time
+             * @description When the key stops working.
+             */
+            expiresAt: string;
+            /** @description The hostname the browser node registers under. */
+            hostname: string;
+            target: components["schemas"]["SSHSessionTarget"];
+        };
+        SSHSessionTarget: {
+            addresses: string[];
+            /** @description The node's MagicDNS name, empty without a base domain. */
+            dnsName: string;
+            /** @description The node's given name, which the browser dials. */
+            name: string;
+            /** Format: uint64 */
+            nodeId: string;
+            online: boolean;
+            /** @description true while the target runs Tailscale SSH (tailscale set --ssh). */
+            sshServer: boolean;
+            /** @description A suggested login name. */
+            username: string;
+        };
         TailnetLock: {
             /**
              * Format: date-time
@@ -3303,12 +3896,19 @@ export interface components {
     pathItems: never;
 }
 export type AccessDecisionBody = components['schemas']['AccessDecisionBody'];
+export type AccessGraph = components['schemas']['AccessGraph'];
+export type AccessGraphEdge = components['schemas']['AccessGraphEdge'];
+export type AccessGraphNode = components['schemas']['AccessGraphNode'];
 export type AccessRequest = components['schemas']['AccessRequest'];
 export type AccessRequestBody = components['schemas']['AccessRequestBody'];
 export type AccessRequestOption = components['schemas']['AccessRequestOption'];
 export type AccessRule = components['schemas']['AccessRule'];
 export type AccessRuleRequestBody = components['schemas']['AccessRuleRequestBody'];
 export type ApiKey = components['schemas']['ApiKey'];
+export type App = components['schemas']['App'];
+export type AppNode = components['schemas']['AppNode'];
+export type AppOutputBody = components['schemas']['AppOutputBody'];
+export type AppRequestBody = components['schemas']['AppRequestBody'];
 export type AuditEvent = components['schemas']['AuditEvent'];
 export type AuthApproveOutputBody = components['schemas']['AuthApproveOutputBody'];
 export type AuthApproveRequestBody = components['schemas']['AuthApproveRequestBody'];
@@ -3328,6 +3928,7 @@ export type CreateOAuthClientOutputBody = components['schemas']['CreateOAuthClie
 export type CreateOAuthClientRequestBody = components['schemas']['CreateOAuthClientRequestBody'];
 export type CreatePreAuthKeyRequestBody = components['schemas']['CreatePreAuthKeyRequestBody'];
 export type CreateServiceRequestBody = components['schemas']['CreateServiceRequestBody'];
+export type CreateSshSessionRequestBody = components['schemas']['CreateSSHSessionRequestBody'];
 export type CreateUserRequestBody = components['schemas']['CreateUserRequestBody'];
 export type CustomAttribute = components['schemas']['CustomAttribute'];
 export type DebugCreateNodeRequestBody = components['schemas']['DebugCreateNodeRequestBody'];
@@ -3338,6 +3939,9 @@ export type DeletePreAuthKeyOutputBody = components['schemas']['DeletePreAuthKey
 export type DeleteUserOutputBody = components['schemas']['DeleteUserOutputBody'];
 export type Derp = components['schemas']['DERP'];
 export type DerpCustomRegion = components['schemas']['DERPCustomRegion'];
+export type DerpLatencyMachine = components['schemas']['DERPLatencyMachine'];
+export type DerpLatencyRegion = components['schemas']['DERPLatencyRegion'];
+export type DerpLatencyReport = components['schemas']['DERPLatencyReport'];
 export type DerpMapRegion = components['schemas']['DERPMapRegion'];
 export type DerpRelay = components['schemas']['DERPRelay'];
 export type DerpServerSettings = components['schemas']['DERPServerSettings'];
@@ -3367,6 +3971,7 @@ export type Host = components['schemas']['Host'];
 export type Invite = components['schemas']['Invite'];
 export type InviteOutputBody = components['schemas']['InviteOutputBody'];
 export type ListApiKeysOutputBody = components['schemas']['ListAPIKeysOutputBody'];
+export type ListAppsOutputBody = components['schemas']['ListAppsOutputBody'];
 export type ListAuditOutputBody = components['schemas']['ListAuditOutputBody'];
 export type ListDnsRulesOutputBody = components['schemas']['ListDNSRulesOutputBody'];
 export type ListGroupsOutputBody = components['schemas']['ListGroupsOutputBody'];
@@ -3375,6 +3980,7 @@ export type ListLogStreamsOutputBody = components['schemas']['ListLogStreamsOutp
 export type ListNetworksOutputBody = components['schemas']['ListNetworksOutputBody'];
 export type ListNodesOutputBody = components['schemas']['ListNodesOutputBody'];
 export type ListOAuthClientsOutputBody = components['schemas']['ListOAuthClientsOutputBody'];
+export type ListPostureIntegrationsOutputBody = components['schemas']['ListPostureIntegrationsOutputBody'];
 export type ListPosturesOutputBody = components['schemas']['ListPosturesOutputBody'];
 export type ListPreAuthKeysOutputBody = components['schemas']['ListPreAuthKeysOutputBody'];
 export type ListRequestsOutputBody = components['schemas']['ListRequestsOutputBody'];
@@ -3394,6 +4000,8 @@ export type NetworkOutputBody = components['schemas']['NetworkOutputBody'];
 export type NetworkRequestBody = components['schemas']['NetworkRequestBody'];
 export type NetworkRouter = components['schemas']['NetworkRouter'];
 export type Node = components['schemas']['Node'];
+export type NodeDerpLatency = components['schemas']['NodeDERPLatency'];
+export type NodeNetInfo = components['schemas']['NodeNetInfo'];
 export type NodeOutputBody = components['schemas']['NodeOutputBody'];
 export type NodePosture = components['schemas']['NodePosture'];
 export type NodePosturesOutputBody = components['schemas']['NodePosturesOutputBody'];
@@ -3406,7 +4014,16 @@ export type Posture = components['schemas']['Posture'];
 export type PostureCheckInputBody = components['schemas']['PostureCheckInputBody'];
 export type PostureCheckOutputBody = components['schemas']['PostureCheckOutputBody'];
 export type PostureIdentity = components['schemas']['PostureIdentity'];
+export type PostureIntegration = components['schemas']['PostureIntegration'];
+export type PostureIntegrationCheckBody = components['schemas']['PostureIntegrationCheckBody'];
+export type PostureIntegrationCheckOutputBody = components['schemas']['PostureIntegrationCheckOutputBody'];
+export type PostureIntegrationConfig = components['schemas']['PostureIntegrationConfig'];
+export type PostureIntegrationOutputBody = components['schemas']['PostureIntegrationOutputBody'];
+export type PostureIntegrationRequestBody = components['schemas']['PostureIntegrationRequestBody'];
 export type PostureOutputBody = components['schemas']['PostureOutputBody'];
+export type PostureProvider = components['schemas']['PostureProvider'];
+export type PostureProviderAttribute = components['schemas']['PostureProviderAttribute'];
+export type PostureProvidersOutputBody = components['schemas']['PostureProvidersOutputBody'];
 export type PostureRequestBody = components['schemas']['PostureRequestBody'];
 export type PostureSchedule = components['schemas']['PostureSchedule'];
 export type PreAuthKey = components['schemas']['PreAuthKey'];
@@ -3436,6 +4053,8 @@ export type SetUserRoleRequestBody = components['schemas']['SetUserRoleRequestBo
 export type ShareNodeRequestBody = components['schemas']['ShareNodeRequestBody'];
 export type SshRecording = components['schemas']['SSHRecording'];
 export type SshRecordingOutputBody = components['schemas']['SshRecordingOutputBody'];
+export type SshSession = components['schemas']['SSHSession'];
+export type SshSessionTarget = components['schemas']['SSHSessionTarget'];
 export type TailnetLock = components['schemas']['TailnetLock'];
 export type TailnetLockKey = components['schemas']['TailnetLockKey'];
 export type UpdateServiceRequestBody = components['schemas']['UpdateServiceRequestBody'];
@@ -3453,6 +4072,38 @@ export type WebhookTestOutputBody = components['schemas']['WebhookTestOutputBody
 export type Whoami = components['schemas']['Whoami'];
 export type $defs = Record<string, never>;
 export interface operations {
+    getAccessGraph: {
+        parameters: {
+            query?: {
+                /** @description A node id; only edges from or to it. */
+                node?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessGraph"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     listAccessRequests: {
         parameters: {
             query?: {
@@ -4038,6 +4689,163 @@ export interface operations {
             };
         };
     };
+    getApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updateApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listApps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListAppsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createApp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppRequestBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     listAuditEvents: {
         parameters: {
             query?: {
@@ -4457,6 +5265,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DERP"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getDERPLatency: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DERPLatencyReport"];
                 };
             };
             /** @description Error */
@@ -6460,6 +7297,256 @@ export interface operations {
             };
         };
     };
+    getPostureIntegration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostureIntegrationOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updatePostureIntegration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostureIntegrationRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostureIntegrationOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deletePostureIntegration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    syncPostureIntegration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostureIntegrationOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listPostureIntegrations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListPostureIntegrationsOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createPostureIntegration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostureIntegrationRequestBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostureIntegrationOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    checkPostureIntegration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostureIntegrationCheckBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostureIntegrationCheckOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listPostureProviders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostureProvidersOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     getPosture: {
         parameters: {
             query?: never;
@@ -7080,6 +8167,39 @@ export interface operations {
                 };
                 content: {
                     "application/x-asciicast": string;
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createSSHSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSSHSessionRequestBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SSHSession"];
                 };
             };
             /** @description Error */

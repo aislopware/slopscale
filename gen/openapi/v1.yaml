@@ -9,6 +9,100 @@ components:
         note:
           type: string
       type: object
+    AccessGraph:
+      additionalProperties: false
+      properties:
+        edges:
+          items:
+            $ref: "#/components/schemas/AccessGraphEdge"
+          type: array
+        enforcing:
+          description: Whether a packet filter is in force; without one every machine reaches every other.
+          type: boolean
+        nodes:
+          items:
+            $ref: "#/components/schemas/AccessGraphNode"
+          type: array
+        reachable:
+          items:
+            $ref: "#/components/schemas/AccessGraphEdge"
+          type: array
+        reachedBy:
+          items:
+            $ref: "#/components/schemas/AccessGraphEdge"
+          type: array
+      required:
+        - nodes
+        - edges
+        - reachable
+        - reachedBy
+        - enforcing
+      type: object
+    AccessGraphEdge:
+      additionalProperties: false
+      properties:
+        capabilities:
+          items:
+            type: string
+          type: array
+        dst:
+          format: uint64
+          type: string
+        ports:
+          items:
+            type: string
+          type: array
+        routes:
+          items:
+            type: string
+          type: array
+        src:
+          format: uint64
+          type: string
+        sshCheck:
+          type: boolean
+        sshUsers:
+          items:
+            type: string
+          type: array
+      required:
+        - src
+        - dst
+        - ports
+        - routes
+        - sshUsers
+        - sshCheck
+        - capabilities
+      type: object
+    AccessGraphNode:
+      additionalProperties: false
+      properties:
+        id:
+          format: uint64
+          type: string
+        name:
+          type: string
+        online:
+          type: boolean
+        routes:
+          items:
+            type: string
+          type: array
+        tags:
+          items:
+            type: string
+          type: array
+        user:
+          description: The owner's login, empty when tagged.
+          type: string
+      required:
+        - id
+        - name
+        - user
+        - tags
+        - online
+        - routes
+      type: object
     AccessRequest:
       additionalProperties: false
       properties:
@@ -247,6 +341,123 @@ components:
         - userId
         - scopes
         - description
+      type: object
+    App:
+      additionalProperties: false
+      properties:
+        connectors:
+          description: The tags of the connector nodes, or * for every node running the connector.
+          items:
+            type: string
+          type: array
+        createdAt:
+          format: date-time
+          type: string
+        description:
+          type: string
+        domains:
+          description: The domains the connectors resolve and route, example.com or *.example.com.
+          items:
+            type: string
+          type: array
+        id:
+          format: uint64
+          type: string
+        name:
+          type: string
+        nodes:
+          description: The connector nodes the selectors pick, with the routes they advertise.
+          items:
+            $ref: "#/components/schemas/AppNode"
+          type: array
+        routes:
+          description: Routes the connectors always advertise, next to the addresses they learn.
+          items:
+            type: string
+          type: array
+        updatedAt:
+          format: date-time
+          type: string
+      required:
+        - id
+        - name
+        - description
+        - domains
+        - connectors
+        - routes
+        - nodes
+        - createdAt
+        - updatedAt
+      type: object
+    AppNode:
+      additionalProperties: false
+      properties:
+        connector:
+          description: true while the client reports running the connector service.
+          type: boolean
+        learnedRoutes:
+          description: Single-address routes the node advertises.
+          format: int64
+          type: integer
+        name:
+          description: The node's given name.
+          type: string
+        nodeId:
+          format: uint64
+          type: string
+        online:
+          type: boolean
+        pending:
+          description: Advertised routes that are not approved yet.
+          format: int64
+          type: integer
+      required:
+        - nodeId
+        - name
+        - online
+        - connector
+        - learnedRoutes
+        - pending
+      type: object
+    AppOutputBody:
+      additionalProperties: false
+      properties:
+        app:
+          $ref: "#/components/schemas/App"
+      required:
+        - app
+      type: object
+    AppRequestBody:
+      additionalProperties: false
+      properties:
+        connectors:
+          description: Tags of the connector nodes; empty means all connectors.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        description:
+          type: string
+        domains:
+          description: example.com or *.example.com.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        name:
+          minLength: 1
+          type: string
+        routes:
+          description: CIDRs the connectors always advertise; no default routes.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - name
       type: object
     AuditEvent:
       additionalProperties: false
@@ -512,6 +723,16 @@ components:
           format: uint64
           type: string
       type: object
+    CreateSSHSessionRequestBody:
+      additionalProperties: false
+      properties:
+        nodeId:
+          description: The node to open a session to.
+          format: uint64
+          type: string
+      required:
+        - nodeId
+      type: object
     CreateServiceRequestBody:
       additionalProperties: false
       properties:
@@ -627,6 +848,116 @@ components:
       required:
         - id
         - code
+      type: object
+    DERPLatencyMachine:
+      additionalProperties: false
+      properties:
+        hardNat:
+          description: true behind a NAT whose mapping varies by destination.
+          type: boolean
+        homeMs:
+          description: The round trip to the home region, 0 when unmeasured.
+          format: double
+          type: number
+        linkType:
+          type: string
+        name:
+          type: string
+        nodeId:
+          format: uint64
+          type: string
+        online:
+          type: boolean
+        preferredDerp:
+          format: int64
+          type: integer
+      required:
+        - nodeId
+        - name
+        - online
+        - preferredDerp
+        - homeMs
+        - hardNat
+        - linkType
+      type: object
+    DERPLatencyRegion:
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+        inMap:
+          description: Whether the relay map still has the region.
+          type: boolean
+        maxMs:
+          description: The worst round trip.
+          format: double
+          type: number
+        medianMs:
+          description: The median round trip.
+          format: double
+          type: number
+        minMs:
+          description: The best round trip among them.
+          format: double
+          type: number
+        name:
+          type: string
+        p90Ms:
+          description: The 90th percentile round trip.
+          format: double
+          type: number
+        preferredBy:
+          description: Machines that home on the region.
+          format: int64
+          type: integer
+        regionId:
+          format: int64
+          type: integer
+        samples:
+          description: Machines that measured the region.
+          format: int64
+          type: integer
+      required:
+        - regionId
+        - code
+        - name
+        - preferredBy
+        - samples
+        - minMs
+        - medianMs
+        - p90Ms
+        - maxMs
+        - inMap
+      type: object
+    DERPLatencyReport:
+      additionalProperties: false
+      properties:
+        hardNat:
+          description: Machines behind a hard NAT, which relay most of their traffic.
+          format: int64
+          type: integer
+        machines:
+          items:
+            $ref: "#/components/schemas/DERPLatencyMachine"
+          type: array
+        regions:
+          items:
+            $ref: "#/components/schemas/DERPLatencyRegion"
+          type: array
+        reporting:
+          description: Machines that reported a measurement.
+          format: int64
+          type: integer
+        silent:
+          description: Machines that reported none.
+          format: int64
+          type: integer
+      required:
+        - regions
+        - reporting
+        - silent
+        - hardNat
+        - machines
       type: object
     DERPMapRegion:
       additionalProperties: false
@@ -1271,6 +1602,16 @@ components:
       required:
         - apiKeys
       type: object
+    ListAppsOutputBody:
+      additionalProperties: false
+      properties:
+        apps:
+          items:
+            $ref: "#/components/schemas/App"
+          type: array
+      required:
+        - apps
+      type: object
     ListAuditOutputBody:
       additionalProperties: false
       properties:
@@ -1357,6 +1698,16 @@ components:
           type: array
       required:
         - oauthClients
+      type: object
+    ListPostureIntegrationsOutputBody:
+      additionalProperties: false
+      properties:
+        integrations:
+          items:
+            $ref: "#/components/schemas/PostureIntegration"
+          type: array
+      required:
+        - integrations
       type: object
     ListPosturesOutputBody:
       additionalProperties: false
@@ -1714,6 +2065,9 @@ components:
           items:
             $ref: "#/components/schemas/NodeService"
           type: array
+        appConnector:
+          description: true while the client runs the app connector service (tailscale set --advertise-connector).
+          type: boolean
         approved:
           description: false while the node waits for an administrator.
           type: boolean
@@ -1780,6 +2134,9 @@ components:
           type: string
         name:
           type: string
+        netInfo:
+          $ref: "#/components/schemas/NodeNetInfo"
+          description: The client's last network report; absent until it connects.
         nodeKey:
           type: string
         online:
@@ -1798,6 +2155,9 @@ components:
           items:
             type: string
           type: array
+        sshServer:
+          description: true while the client runs Tailscale SSH (tailscale set --ssh).
+          type: boolean
         subnetRoutes:
           items:
             type: string
@@ -1850,7 +2210,102 @@ components:
         - clientVersion
         - updateAvailable
         - ephemeral
+        - appConnector
+        - sshServer
         - clientWarnings
+      type: object
+    NodeDERPLatency:
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+        ipv4Ms:
+          description: Over IPv4, 0 when not measured.
+          format: double
+          type: number
+        ipv6Ms:
+          description: Over IPv6, 0 when not measured.
+          format: double
+          type: number
+        ms:
+          description: The fastest recent round trip in milliseconds, over IPv4 or IPv6.
+          format: double
+          type: number
+        name:
+          type: string
+        regionId:
+          format: int64
+          type: integer
+      required:
+        - regionId
+        - code
+        - name
+        - ms
+        - ipv4Ms
+        - ipv6Ms
+      type: object
+    NodeNetInfo:
+      additionalProperties: false
+      properties:
+        havePortMap:
+          description: Whether a UPnP, NAT-PMP or PCP mapping is open.
+          type: boolean
+        latency:
+          items:
+            $ref: "#/components/schemas/NodeDERPLatency"
+          type: array
+        linkType:
+          description: wired, wifi or mobile, when the client knows.
+          type: string
+        mappingVariesByDestIp:
+          description: "true behind a hard NAT: a mapping per destination."
+          type:
+            - boolean
+            - "null"
+        pcp:
+          description: Whether PCP was seen on the LAN.
+          type:
+            - boolean
+            - "null"
+        pmp:
+          description: Whether NAT-PMP was seen on the LAN.
+          type:
+            - boolean
+            - "null"
+        preferredDerp:
+          description: The relay region the client homes on, 0 while unknown.
+          format: int64
+          type: integer
+        preferredDerpName:
+          description: That region's name from the relay map.
+          type: string
+        upnp:
+          description: Whether UPnP was seen on the LAN.
+          type:
+            - boolean
+            - "null"
+        workingIpv6:
+          description: Whether the client reaches the internet over IPv6.
+          type:
+            - boolean
+            - "null"
+        workingUdp:
+          description: Whether UDP reaches the internet.
+          type:
+            - boolean
+            - "null"
+      required:
+        - preferredDerp
+        - preferredDerpName
+        - latency
+        - mappingVariesByDestIp
+        - workingIpv6
+        - workingUdp
+        - havePortMap
+        - upnp
+        - pmp
+        - pcp
+        - linkType
       type: object
     NodeOutputBody:
       additionalProperties: false
@@ -1874,9 +2329,14 @@ components:
           $ref: "#/components/schemas/PostureIdentity"
         identityCollectionOn:
           type: boolean
+        integration:
+          items:
+            $ref: "#/components/schemas/CustomAttribute"
+          type: array
       required:
         - attributes
         - custom
+        - integration
         - identityCollectionOn
       type: object
     NodePosturesOutputBody:
@@ -2075,6 +2535,163 @@ components:
         - disabled
         - collectedAt
       type: object
+    PostureIntegration:
+      additionalProperties: false
+      properties:
+        config:
+          $ref: "#/components/schemas/PostureIntegrationConfig"
+        createdAt:
+          format: date-time
+          type: string
+        enabled:
+          type: boolean
+        hasSecret:
+          type: boolean
+        id:
+          format: uint64
+          type: string
+        lastError:
+          description: What the last sync failed with; empty after a good one.
+          type: string
+        lastMatched:
+          description: How many machines the provider knew at the last sync.
+          format: int64
+          type: integer
+        lastSyncAt:
+          description: When the provider was last asked; absent before the first sync.
+          format: date-time
+          type: string
+        name:
+          type: string
+        prefix:
+          type: string
+        provider:
+          description: falcon, sentinelone, intune, jamf, kandji or kolide.
+          enum:
+            - falcon
+            - sentinelone
+            - intune
+            - jamf
+            - kandji
+            - kolide
+          type: string
+        updatedAt:
+          format: date-time
+          type: string
+      required:
+        - id
+        - provider
+        - name
+        - prefix
+        - enabled
+        - config
+        - hasSecret
+        - lastError
+        - lastMatched
+        - createdAt
+        - updatedAt
+      type: object
+    PostureIntegrationCheckBody:
+      additionalProperties: false
+      properties:
+        apiToken:
+          description: API token (SentinelOne, Kandji, Kolide).
+          type: string
+        baseUrl:
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          description: OAuth client secret (Falcon, Intune, Jamf Pro).
+          type: string
+        enabled:
+          description: Defaults to true.
+          type: boolean
+        id:
+          description: A stored integration whose secret to use when none is given.
+          format: uint64
+          type: string
+        name:
+          minLength: 1
+          type: string
+        provider:
+          enum:
+            - falcon
+            - sentinelone
+            - intune
+            - jamf
+            - kandji
+            - kolide
+          type: string
+        tenantId:
+          type: string
+      required:
+        - provider
+        - name
+      type: object
+    PostureIntegrationCheckOutputBody:
+      additionalProperties: false
+      properties:
+        ok:
+          type: boolean
+      required:
+        - ok
+      type: object
+    PostureIntegrationConfig:
+      additionalProperties: false
+      properties:
+        baseUrl:
+          description: "The API origin: the Falcon cloud, the SentinelOne console, the Jamf Pro server or the Kandji tenant. Intune and Kolide have fixed endpoints."
+          type: string
+        clientId:
+          description: OAuth client id (Falcon, Intune, Jamf Pro).
+          type: string
+        tenantId:
+          description: Entra tenant id (Intune).
+          type: string
+      type: object
+    PostureIntegrationOutputBody:
+      additionalProperties: false
+      properties:
+        integration:
+          $ref: "#/components/schemas/PostureIntegration"
+      required:
+        - integration
+      type: object
+    PostureIntegrationRequestBody:
+      additionalProperties: false
+      properties:
+        apiToken:
+          description: API token (SentinelOne, Kandji, Kolide).
+          type: string
+        baseUrl:
+          type: string
+        clientId:
+          type: string
+        clientSecret:
+          description: OAuth client secret (Falcon, Intune, Jamf Pro).
+          type: string
+        enabled:
+          description: Defaults to true.
+          type: boolean
+        name:
+          minLength: 1
+          type: string
+        provider:
+          enum:
+            - falcon
+            - sentinelone
+            - intune
+            - jamf
+            - kandji
+            - kolide
+          type: string
+        tenantId:
+          type: string
+      required:
+        - provider
+        - name
+      type: object
     PostureOutputBody:
       additionalProperties: false
       properties:
@@ -2082,6 +2699,64 @@ components:
           $ref: "#/components/schemas/Posture"
       required:
         - posture
+      type: object
+    PostureProvider:
+      additionalProperties: false
+      properties:
+        attributes:
+          items:
+            $ref: "#/components/schemas/PostureProviderAttribute"
+          type: array
+        baseUrlDefault:
+          type: string
+        fields:
+          items:
+            type: string
+          type: array
+        help:
+          type: string
+        label:
+          type: string
+        prefix:
+          type: string
+        provider:
+          type: string
+      required:
+        - provider
+        - label
+        - prefix
+        - fields
+        - attributes
+        - help
+      type: object
+    PostureProviderAttribute:
+      additionalProperties: false
+      properties:
+        description:
+          type: string
+        name:
+          description: The attribute name with the prefix, falcon:ztaScore.
+          type: string
+        type:
+          enum:
+            - string
+            - number
+            - boolean
+          type: string
+      required:
+        - name
+        - type
+        - description
+      type: object
+    PostureProvidersOutputBody:
+      additionalProperties: false
+      properties:
+        providers:
+          items:
+            $ref: "#/components/schemas/PostureProvider"
+          type: array
+      required:
+        - providers
       type: object
     PostureRequestBody:
       additionalProperties: false
@@ -2296,6 +2971,64 @@ components:
         - command
         - size
         - complete
+      type: object
+    SSHSession:
+      additionalProperties: false
+      properties:
+        authKey:
+          description: One-time key for the browser's ephemeral node, valid five minutes.
+          type: string
+        controlUrl:
+          description: The control URL the browser connects to.
+          type: string
+        expiresAt:
+          description: When the key stops working.
+          format: date-time
+          type: string
+        hostname:
+          description: The hostname the browser node registers under.
+          type: string
+        target:
+          $ref: "#/components/schemas/SSHSessionTarget"
+      required:
+        - authKey
+        - controlUrl
+        - hostname
+        - expiresAt
+        - target
+      type: object
+    SSHSessionTarget:
+      additionalProperties: false
+      properties:
+        addresses:
+          items:
+            type: string
+          type: array
+        dnsName:
+          description: The node's MagicDNS name, empty without a base domain.
+          type: string
+        name:
+          description: The node's given name, which the browser dials.
+          type: string
+        nodeId:
+          format: uint64
+          type: string
+        online:
+          type: boolean
+        sshServer:
+          description: true while the target runs Tailscale SSH (tailscale set --ssh).
+          type: boolean
+        username:
+          description: A suggested login name.
+          type: string
+      required:
+        - nodeId
+        - name
+        - dnsName
+        - addresses
+        - online
+        - sshServer
+        - username
       type: object
     ServerInfo:
       additionalProperties: false
@@ -3001,6 +3734,41 @@ info:
   version: v1
 openapi: 3.1.0
 paths:
+  /api/v1/access-graph:
+    get:
+      description: |-
+        Who can reach what: one edge per ordered pair of machines the packet filter or the SSH policy opens, computed from the rules the server hands each machine.
+
+        Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getAccessGraph
+      parameters:
+        - description: A node id; only edges from or to it.
+          explode: false
+          in: query
+          name: node
+          schema:
+            description: A node id; only edges from or to it.
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessGraph"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Access graph
+      tags:
+        - Access control
+      x-required-scope: policy_file:read
   /api/v1/access-request:
     get:
       description: Every request, newest first, for a caller with policy_file:read; a caller without it sees its own.
@@ -3557,6 +4325,162 @@ paths:
       tags:
         - ApiKeys
       x-audit-action: apikey.rotate
+  /api/v1/app/{id}:
+    delete:
+      description: |-
+        Removes the app. Routes its connectors already had approved stay approved on the nodes.
+
+        Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteApp
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete app
+      tags:
+        - Apps
+      x-audit-action: app.delete
+      x-required-scope: policy_file
+    get:
+      description: Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getApp
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get app
+      tags:
+        - Apps
+      x-required-scope: policy_file:read
+    put:
+      description: |-
+        Replaces the app's definition.
+
+        Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateApp
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Update app
+      tags:
+        - Apps
+      x-audit-action: app.update
+      x-required-scope: policy_file
+  /api/v1/apps:
+    get:
+      description: |-
+        Apps are domains reached through app connectors: the connector nodes resolve the domains, advertise a route for every address they learn and forward the traffic.
+
+        Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listApps
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListAppsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List apps
+      tags:
+        - Apps
+      x-required-scope: policy_file:read
+    post:
+      description: |-
+        Creates an app. Its connectors get the definition at once and may approve learned routes.
+
+        Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createApp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppRequestBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppOutputBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create app
+      tags:
+        - Apps
+      x-audit-action: app.create
+      x-required-scope: policy_file
   /api/v1/audit:
     get:
       description: |-
@@ -4046,6 +4970,32 @@ paths:
         - DERP
       x-audit-action: derp.set
       x-required-scope: feature_settings
+  /api/v1/derp/latency:
+    get:
+      description: |-
+        What the machines measure to each relay region: how many home on it and the round trips they see, from the network report every client sends when it connects.
+
+        Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getDERPLatency
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DERPLatencyReport"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Relay latency report
+      tags:
+        - DERP
+      x-required-scope: devices:core:read
   /api/v1/derp/refresh:
     post:
       description: |-
@@ -6062,6 +7012,254 @@ paths:
         - Access control
       x-audit-action: posture.create
       x-required-scope: policy_file
+  /api/v1/posture-integration/{id}:
+    delete:
+      description: |-
+        Removes the integration and the attributes its provider wrote.
+
+        Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deletePostureIntegration
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete posture integration
+      tags:
+        - Posture integrations
+      x-audit-action: posture_integration.delete
+      x-required-scope: devices:posture_attributes
+    get:
+      description: Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getPostureIntegration
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostureIntegrationOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get posture integration
+      tags:
+        - Posture integrations
+      x-required-scope: devices:posture_attributes:read
+    put:
+      description: |-
+        Replaces the definition; an empty secret keeps the stored one. Disabling drops the attributes the provider wrote.
+
+        Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updatePostureIntegration
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostureIntegrationRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostureIntegrationOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Update posture integration
+      tags:
+        - Posture integrations
+      x-audit-action: posture_integration.update
+      x-required-scope: devices:posture_attributes
+  /api/v1/posture-integration/{id}/sync:
+    post:
+      description: |-
+        Asks the provider now instead of at the next scheduled sync. A provider failure is recorded on the integration, not returned.
+
+        Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: syncPostureIntegration
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostureIntegrationOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Sync posture integration
+      tags:
+        - Posture integrations
+      x-audit-action: posture_integration.sync
+      x-required-scope: devices:posture_attributes
+  /api/v1/posture-integrations:
+    get:
+      description: |-
+        Posture integrations ask a device management or endpoint security service about every machine by serial number and write the answer as prefixed posture attributes.
+
+        Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listPostureIntegrations
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListPostureIntegrationsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List posture integrations
+      tags:
+        - Posture integrations
+      x-required-scope: devices:posture_attributes:read
+    post:
+      description: |-
+        Stores the integration and, when enabled, syncs it at once. One enabled integration per provider.
+
+        Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createPostureIntegration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostureIntegrationRequestBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostureIntegrationOutputBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create posture integration
+      tags:
+        - Posture integrations
+      x-audit-action: posture_integration.create
+      x-required-scope: devices:posture_attributes
+  /api/v1/posture-integrations/check:
+    post:
+      description: |-
+        Tries the credentials against the provider without storing anything. A rejected credential or unreachable provider is a 502 with the provider's answer.
+
+        Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: checkPostureIntegration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostureIntegrationCheckBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostureIntegrationCheckOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Check posture integration credentials
+      tags:
+        - Posture integrations
+      x-required-scope: devices:posture_attributes
+  /api/v1/posture-integrations/providers:
+    get:
+      description: |-
+        The supported device management and endpoint security services, with the fields each needs and the attributes it writes.
+
+        Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listPostureProviders
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PostureProvidersOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List posture providers
+      tags:
+        - Posture integrations
+      x-required-scope: devices:posture_attributes:read
   /api/v1/posture/check:
     post:
       description: |-
@@ -6683,6 +7881,35 @@ paths:
       tags:
         - SSH recordings
       x-required-scope: logs:configuration:read
+  /api/v1/ssh-session:
+    post:
+      description: Mints a one-time key for an ephemeral node owned by the caller, which the console's in-browser client joins the tailnet with to open Tailscale SSH to the target. Whether the session is allowed is the SSH policy's call, as for any other machine of the caller's; the credential must belong to a user, and without the devices:core:read scope the target must be a node of the caller's own or one their machines can already reach.
+      operationId: createSSHSession
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSSHSessionRequestBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SSHSession"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Start a browser SSH session
+      tags:
+        - Nodes
+      x-audit-action: ssh.session.start
   /api/v1/tailnet-lock:
     get:
       description: |-
