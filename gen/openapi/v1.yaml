@@ -3285,12 +3285,12 @@ paths:
           schema:
             description: Keep events by this user.
             type: string
-        - description: One action, or a prefix ending in a dot.
+        - description: "An action prefix: node. keeps every node action."
           explode: false
           in: query
           name: action
           schema:
-            description: One action, or a prefix ending in a dot.
+            description: "An action prefix: node. keeps every node action."
             type: string
         - explode: false
           in: query
@@ -3370,12 +3370,12 @@ paths:
           schema:
             description: Keep events by this user.
             type: string
-        - description: One action, or a prefix ending in a dot.
+        - description: "An action prefix: node. keeps every node action."
           explode: false
           in: query
           name: action
           schema:
-            description: One action, or a prefix ending in a dot.
+            description: "An action prefix: node. keeps every node action."
             type: string
         - explode: false
           in: query

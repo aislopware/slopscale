@@ -3783,7 +3783,7 @@ export interface operations {
     listAuditEvents: {
         parameters: {
             query?: {
-                /** @description One action, or a prefix ending in a dot. */
+                /** @description An action prefix: node. keeps every node action. */
                 action?: string;
                 /** @description Keep events by this user. */
                 actorUserId?: string;
@@ -3827,7 +3827,7 @@ export interface operations {
     exportAuditEvents: {
         parameters: {
             query?: {
-                /** @description One action, or a prefix ending in a dot. */
+                /** @description An action prefix: node. keeps every node action. */
                 action?: string;
                 /** @description Keep events by this user. */
                 actorUserId?: string;
