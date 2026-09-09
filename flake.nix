@@ -204,7 +204,14 @@
           vendorHash = (builtins.fromJSON (builtins.readFile ./flakehashes.json)).vendor.sri;
           goPkg = pkgs.go_latest;
           # //go:embed targets and test-read files outside the default whitelist.
-          embedDirs = [ ./hscontrol/assets ./hscontrol/db/schema.sql ./config-example.yaml ];
+          embedDirs = [
+            ./hscontrol/assets
+            ./hscontrol/db/schema.sql
+            ./hscontrol/db/schema_postgres.sql
+            ./config-example.yaml
+            # The console embed needs its directory even when only .gitkeep is in it.
+            ./web/dist
+          ];
           extraSrc = [
             ./hscontrol/testdata
             ./hscontrol/types/testdata
