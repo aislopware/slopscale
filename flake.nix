@@ -211,6 +211,7 @@
             ./config-example.yaml
             # The console embed needs its directory even when only .gitkeep is in it.
             ./web/dist
+            ./web/unbuilt.html
           ];
           extraSrc = [
             ./hscontrol/testdata
@@ -248,6 +249,7 @@
           # the sandboxed check cannot fetch.
           formatting = fc.goFormat (common // {
             goFmt = "off";
+            nixFmt = "nixpkgs-fmt";
             prettier = false;
             fmtExclude = [ ./gen ./docs ./web ];
           });
