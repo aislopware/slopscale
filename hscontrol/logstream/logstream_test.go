@@ -313,15 +313,17 @@ func TestPublishBatchesAndRetries(t *testing.T) {
 		s.Publish(event(uint64(i+1), "node.delete"))
 	}
 
+	// The sink sees the batch before the publisher has written the delivery
+	// record, so wait for the record, not only for the request.
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		assert.Equal(c, 3, target.count())
+		assert.True(c, store.last(1).OK)
 	}, 5*time.Second, 5*time.Millisecond)
 
 	assert.Equal(t, 1, target.batchCount(), "three events within the flush wait make one batch")
 	assert.Equal(t, "Bearer tok", target.auth[0])
 
 	last := store.last(1)
-	assert.True(t, last.OK)
 	assert.Equal(t, 3, last.Entries)
 	assert.Equal(t, 2, last.Attempts, "the first attempt got a 503")
 	assert.Equal(t, "200", last.Status)
