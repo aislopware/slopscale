@@ -636,7 +636,55 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609161000-user-invites",
 			run: migrateUserInvites,
 		},
+		{
+			// Tailscale Services: the vip_services table and the columns
+			// that record what each node reports hosting and may host.
+			id:  "202609170900-vip-services",
+			run: migrateVIPServices,
+		},
 	}
+}
+
+// migrateVIPServices (202609170900) creates the vip_services table and
+// adds the nodes columns for reported and approved services.
+func migrateVIPServices(tx *Tx) error {
+	for _, col := range []string{"vip_services", "approved_services"} {
+		err := tx.ex.addColumnIfMissing("nodes", col, typeText)
+		if err != nil {
+			return err
+		}
+	}
+
+	return createTables(tx, []tableDefinition{
+		{
+			name: "vip_services",
+			sqlite: `CREATE TABLE vip_services(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  display_name text,
+  comment text,
+  ports text,
+  ipv4 text,
+  ipv6 text,
+  created_at datetime,
+  updated_at datetime
+)`,
+			postgres: `CREATE TABLE vip_services(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  display_name text,
+  comment text,
+  ports text,
+  ipv4 text,
+  ipv6 text,
+  created_at timestamptz,
+  updated_at timestamptz
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_vip_services_name ON vip_services(name)`,
+			},
+		},
+	})
 }
 
 // migrateSessionClient (202609160900) adds the remote_addr and user_agent

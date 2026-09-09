@@ -2,6 +2,8 @@ package servertest
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -83,6 +85,9 @@ type clientConfig struct {
 	debugFlags []string
 	serials    []string
 	posture    bool
+	// services is what the client answers to the server's c2n
+	// /vip-services request, with the hash it stamps in its Hostinfo.
+	services []tailcfg.VIPService
 }
 
 // WithHostinfo lets a test shape the [tailcfg.Hostinfo] the client
@@ -99,6 +104,15 @@ func WithSerialNumbers(serials ...string) ClientOption {
 	return func(c *clientConfig) {
 		c.serials = serials
 		c.posture = true
+	}
+}
+
+// WithVIPServices makes the client report the services as its serve
+// configuration: it stamps their hash in its Hostinfo, the way tailscaled
+// does, and answers the server's c2n request with the list.
+func WithVIPServices(services ...tailcfg.VIPService) ClientOption {
+	return func(c *clientConfig) {
+		c.services = services
 	}
 }
 
@@ -222,6 +236,10 @@ func newTestClient(tb testing.TB, server *TestServer, name, hostname, authKey st
 	}
 	if cc.hostinfo != nil {
 		cc.hostinfo(hostinfo)
+	}
+
+	if len(cc.services) > 0 {
+		hostinfo.ServicesHash = VIPServicesHash(cc.services)
 	}
 
 	direct, err := controlclient.NewDirect(controlclient.Options{
@@ -855,6 +873,16 @@ func (c *TestClient) waitForPeers(
 // posture identity request.
 func c2nHandler(cc *clientConfig) http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /vip-services", func(w http.ResponseWriter, _ *http.Request) {
+		resp := tailcfg.C2NVIPServicesResponse{ServicesHash: VIPServicesHash(cc.services)}
+		for i := range cc.services {
+			resp.VIPServices = append(resp.VIPServices, &cc.services[i])
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+
+		_ = json.NewEncoder(w).Encode(resp)
+	})
 	mux.HandleFunc("GET /posture/identity", func(w http.ResponseWriter, _ *http.Request) {
 		resp := tailcfg.C2NPostureIdentityResponse{PostureDisabled: !cc.posture}
 		if cc.posture {
@@ -867,4 +895,24 @@ func c2nHandler(cc *clientConfig) http.Handler {
 	})
 
 	return mux
+}
+
+// VIPServicesHash is the hash tailscaled stamps in Hostinfo.ServicesHash
+// for a service list: the SHA-256 of its JSON encoding, hex encoded, and
+// empty for no services.
+func VIPServicesHash(services []tailcfg.VIPService) string {
+	if len(services) == 0 {
+		return ""
+	}
+
+	ptrs := make([]*tailcfg.VIPService, 0, len(services))
+	for i := range services {
+		ptrs = append(ptrs, &services[i])
+	}
+
+	h := sha256.New()
+
+	_ = json.NewEncoder(h).Encode(ptrs)
+
+	return hex.EncodeToString(h.Sum(nil))
 }

@@ -1,7 +1,7 @@
-//go:generate go tool viewer --type=User,Node,PreAuthKey,PostureIdentity,NodeAttribute
+//go:generate go tool viewer --type=User,Node,PreAuthKey,PostureIdentity,NodeAttribute,NodeServices
 package types
 
-//go:generate go run tailscale.com/cmd/viewer --type=User,Node,PreAuthKey,PostureIdentity,NodeAttribute
+//go:generate go run tailscale.com/cmd/viewer --type=User,Node,PreAuthKey,PostureIdentity,NodeAttribute,NodeServices
 
 import (
 	"errors"

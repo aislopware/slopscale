@@ -156,6 +156,12 @@ CREATE TABLE nodes(
   -- key. Either makes the node ephemeral: deleted on logout and after
   -- node.ephemeral.inactivity_timeout offline.
   ephemeral numeric DEFAULT false,
+  -- vip_services is what the node last reported hosting over c2n as
+  -- JSON (types.NodeServices), NULL until the server asked;
+  -- approved_services is the JSON list of service names an operator or
+  -- an auto-approver let it host. The node hosts the intersection.
+  vip_services text,
+  approved_services text,
 
   created_at datetime,
   updated_at datetime,
@@ -567,3 +573,20 @@ CREATE TABLE ssh_recordings(
   complete boolean NOT NULL DEFAULT false
 );
 CREATE INDEX idx_ssh_recordings_started ON ssh_recordings(started_at);
+
+-- vip_services are the tailnet's services (Tailscale Services), each with
+-- a pair of addresses of its own from the tailnet prefixes; see
+-- docs/ref/services.md. ports is a JSON list such as ["tcp:443"]. Which
+-- nodes host one is on the nodes (vip_services, approved_services).
+CREATE TABLE vip_services(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  display_name text,
+  comment text,
+  ports text,
+  ipv4 text,
+  ipv6 text,
+  created_at datetime,
+  updated_at datetime
+);
+CREATE UNIQUE INDEX idx_vip_services_name ON vip_services(name);

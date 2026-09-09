@@ -46,6 +46,14 @@ var ErrAutogroupSharedRequiresPerNodeResolution = errors.New(
 
 var ErrUndefinedTagReference = errors.New("references undefined tag")
 
+// ErrInvalidServiceFormat is returned for a svc: alias that is not a
+// service name.
+var ErrInvalidServiceFormat = errors.New("service must be svc:<dns-label>")
+
+// ErrServiceAsSource is returned for a svc: alias used as a source: a
+// service is reached, it does not reach out.
+var ErrServiceAsSource = errors.New("a service can only be a destination")
+
 // SSH validation errors.
 var (
 	ErrSSHTagSourceToUserDest      = errors.New("tags in SSH source cannot access user-owned devices")
@@ -1244,6 +1252,15 @@ func parseAlias(vs string) (Alias, error) {
 		return new(Tag(vs)), nil
 	case isAutoGroup(vs):
 		return new(AutoGroup(vs)), nil
+	case isService(vs):
+		svc := Service(vs)
+
+		err := svc.Validate()
+		if err != nil {
+			return nil, err
+		}
+
+		return &svc, nil
 	}
 
 	if isHost(vs) {
@@ -1716,12 +1733,15 @@ func (to TagOwners) Contains(tagOwner *Tag) error {
 type AutoApproverPolicy struct {
 	Routes   map[netip.Prefix]AutoApprovers `json:"routes,omitempty"`
 	ExitNode AutoApprovers                  `json:"exitNode,omitempty"`
+	// Services maps a service name to who may host it without an
+	// operator's approval, the way routes work; see docs/ref/services.md.
+	Services map[tailcfg.ServiceName]AutoApprovers `json:"services,omitempty"`
 }
 
 // MarshalJSON marshals the AutoApproverPolicy to JSON.
 func (ap AutoApproverPolicy) MarshalJSON() ([]byte, error) {
 	// Marshal empty policies as empty object
-	if ap.Routes == nil && ap.ExitNode == nil {
+	if ap.Routes == nil && ap.ExitNode == nil && ap.Services == nil {
 		return []byte("{}"), nil
 	}
 
@@ -2295,6 +2315,10 @@ type Policy struct {
 	// recording is the tailnet's default session recording, attached by
 	// the policy manager; its recorders get a grant of their own.
 	recording SSHRecording
+
+	// services are the tailnet's services by name, attached by the
+	// policy manager; svc: aliases resolve to their addresses.
+	services map[tailcfg.ServiceName]types.VIPService
 }
 
 // postureContext is what this compile evaluates postures with.
@@ -2733,6 +2757,56 @@ func validateGrantSrcDstCombination(sources, destinations Aliases) error {
 //
 // legacy: comprehensive policy validation walks every rule kind in one pass.
 //
+// validateSourceAliases checks a rule's source aliases against the policy:
+// a service can only be a destination, a host must be defined, a group or
+// tag must exist, and an autogroup must be one this position supports.
+// ACLs and grants share this shape for their Sources field.
+func (pol *Policy) validateSourceAliases(sources Aliases) []error {
+	var errs []error
+
+	for _, src := range sources {
+		switch src := src.(type) {
+		case *Service:
+			errs = append(errs, fmt.Errorf("%w: %q", ErrServiceAsSource, *src))
+		case *Host:
+			h := src
+			if !pol.Hosts.exist(*h) {
+				errs = append(errs, fmt.Errorf("%w: %q", ErrHostNotDefined, *h))
+			}
+		case *AutoGroup:
+			ag := src
+
+			err := validateAutogroupSupported(ag)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+
+			err = validateAutogroupForSrc(ag)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+		case *Group:
+			g := src
+
+			err := pol.Groups.Contains(g)
+			if err != nil {
+				errs = append(errs, err)
+			}
+		case *Tag:
+			tagOwner := src
+
+			err := pol.TagOwners.Contains(tagOwner)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("src=%w", err))
+			}
+		}
+	}
+
+	return errs
+}
+
 //nolint:gocyclo,gocognit,cyclop,funlen,maintidx // see above
 func (pol *Policy) validate() error {
 	if pol == nil {
@@ -2744,43 +2818,7 @@ func (pol *Policy) validate() error {
 	var errs []error
 
 	for _, acl := range pol.ACLs {
-		for _, src := range acl.Sources {
-			switch src := src.(type) {
-			case *Host:
-				h := src
-				if !pol.Hosts.exist(*h) {
-					errs = append(errs, fmt.Errorf("%w: %q", ErrHostNotDefined, *h))
-				}
-			case *AutoGroup:
-				ag := src
-
-				err := validateAutogroupSupported(ag)
-				if err != nil {
-					errs = append(errs, err)
-					continue
-				}
-
-				err = validateAutogroupForSrc(ag)
-				if err != nil {
-					errs = append(errs, err)
-					continue
-				}
-			case *Group:
-				g := src
-
-				err := pol.Groups.Contains(g)
-				if err != nil {
-					errs = append(errs, err)
-				}
-			case *Tag:
-				tagOwner := src
-
-				err := pol.TagOwners.Contains(tagOwner)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("src=%w", err))
-				}
-			}
-		}
+		errs = append(errs, pol.validateSourceAliases(acl.Sources)...)
 
 		for _, dst := range acl.Destinations {
 			switch h := dst.Alias.(type) {
@@ -2984,43 +3022,7 @@ func (pol *Policy) validate() error {
 		}
 
 		// Validate sources (empty arrays are allowed — they produce no rules)
-		for _, src := range grant.Sources {
-			switch src := src.(type) {
-			case *Host:
-				h := src
-				if !pol.Hosts.exist(*h) {
-					errs = append(errs, fmt.Errorf("%w: %q", ErrHostNotDefined, *h))
-				}
-			case *AutoGroup:
-				ag := src
-
-				err := validateAutogroupSupported(ag)
-				if err != nil {
-					errs = append(errs, err)
-					continue
-				}
-
-				err = validateAutogroupForSrc(ag)
-				if err != nil {
-					errs = append(errs, err)
-					continue
-				}
-			case *Group:
-				g := src
-
-				err := pol.Groups.Contains(g)
-				if err != nil {
-					errs = append(errs, err)
-				}
-			case *Tag:
-				tagOwner := src
-
-				err := pol.TagOwners.Contains(tagOwner)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("src=%w", err))
-				}
-			}
-		}
+		errs = append(errs, pol.validateSourceAliases(grant.Sources)...)
 
 		// Validate destinations (empty arrays are allowed — they produce no rules)
 		for _, dst := range grant.Destinations {
@@ -3185,6 +3187,28 @@ func (pol *Policy) validate() error {
 				tagOwner := approver
 
 				err := pol.TagOwners.Contains(tagOwner)
+				if err != nil {
+					errs = append(errs, err)
+				}
+			}
+		}
+	}
+
+	for name, approvers := range pol.AutoApprovers.Services {
+		err := name.Validate()
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%w: %w", ErrInvalidServiceFormat, err))
+		}
+
+		for _, approver := range approvers {
+			switch approver := approver.(type) {
+			case *Group:
+				err := pol.Groups.Contains(approver)
+				if err != nil {
+					errs = append(errs, err)
+				}
+			case *Tag:
+				err := pol.TagOwners.Contains(approver)
 				if err != nil {
 					errs = append(errs, err)
 				}

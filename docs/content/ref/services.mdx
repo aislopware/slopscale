@@ -1,0 +1,103 @@
+---
+title: "Services"
+---
+
+A service is a name with addresses of its own, served by one or more
+tagged machines, the way
+[Tailscale Services](https://tailscale.com/kb/1552/tailscale-services) work:
+`https://web.example.ts.net` reaches whichever machine serves `svc:web`
+right now, and the policy opens the service, not the machines behind it.
+Moving the service to another machine, or running it on two for
+redundancy, changes nothing for the people using it.
+
+## How it works
+
+The server owns the service: it allocates an IPv4 and an IPv6 address
+from the tailnet's prefixes when the service is created, keeps the name
+in MagicDNS and decides which machine answers. A machine hosts a service
+in three steps.
+
+1. **Announce.** On the machine, `tailscale serve --service=svc:web
+   --https=443 localhost:8080` puts the service in the machine's serve
+   configuration. The client tells the server the configuration changed,
+   the server asks the machine over its control connection what it
+   serves, and the machine shows up as a host waiting for approval.
+2. **Approve.** An operator approves the machine for the service, or the
+   policy's `autoApprovers.services` does it. Only a tagged machine can
+   host a service; a user-owned one is refused.
+3. **Advertise.** `tailscale serve advertise svc:web` on the machine
+   marks it active. The client waits for the approval before it lets the
+   user advertise, so the order between the last two steps does not
+   matter.
+
+Once a machine is approved, announced and active, the server tells it the
+service's addresses so it binds them, adds them to the machine's
+`AllowedIPs` on every peer, publishes `web.<base domain>` in MagicDNS and
+hands every client the service's name, display name and ports so the
+Tailscale apps can list it. When several machines host the same service,
+every peer is routed to one of them, an online one first and the oldest
+among those, and to the next when it goes away. A service's addresses
+never appear as a subnet route: the machine's `PrimaryRoutes` stay what
+they were.
+
+The ports clients are told about are what the hosts serve, unless the
+service sets its own. A host's certificate names include the service's
+DNS name, so `tailscale serve` can obtain a certificate for it when
+[HTTPS certificates](/ref/https-certificates) are on.
+
+## Managing services
+
+```console
+slopscale services create --name web --display-name "Web" --port tcp:443
+slopscale services list
+slopscale services show --name web
+slopscale services approve --identifier 7 --service svc:web
+slopscale services approve --identifier 7            # withdraws every approval
+slopscale services update --name web --port tcp:443 --port tcp:8443
+slopscale services delete --name web
+```
+
+A name is a DNS label, `web` or `svc:web`; the server stores it with the
+prefix. Ports are `tcp:443`, `udp:53-60` or `tcp:*`. Deleting a service
+frees its addresses and withdraws every approval for it.
+
+Through the API, `GET` and `POST /api/v1/services`, `GET`, `PUT` and
+`DELETE /api/v1/service/{name}`, and
+`POST /api/v1/node/{id}/approve_services` with `{"services": ["svc:web"]}`
+to replace what a machine may host. A service object lists its addresses,
+DNS name and hosts, each with whether it is announced, active, approved
+and the one clients are routed to right now; the node object carries
+`announcedServices` and `approvedServices`. The v2 API has Tailscale's
+`GET`, `PUT` and `DELETE /api/v2/tailnet/-/vip-services[/{name}]`, so the
+Terraform provider's `tailscale_tailnet_service` works. Writes need the
+`services` scope, reads `services:read`; the owner, admins and network
+admins hold the first, IT admins the second. The audit log records
+`service.create`, `service.update`, `service.delete` and
+`node.services.set`.
+
+The console has a _Services_ page under _Connectivity_, with the hosts of
+each service and an approval switch per host, and a _Services_ section on
+a machine's page.
+
+## Services in the policy
+
+A service is a destination, `svc:web`, that resolves to the service's own
+addresses, so a rule opens the service wherever it runs. It is never a
+source; the traffic comes from the machines using the service, not from
+the service. `autoApprovers.services` names who may host a service without
+an operator's approval, in the same form as `autoApprovers.routes`:
+
+```json title="policy.json"
+{
+  "tagOwners": { "tag:web": ["autogroup:admin"] },
+  "autoApprovers": {
+    "services": { "svc:web": ["tag:web"] }
+  },
+  "grants": [{ "src": ["autogroup:member"], "dst": ["svc:web"], "ip": ["tcp:443"] }]
+}
+```
+
+While the tailnet has a packet filter, a client is told about a service
+only when some rule lets it reach the service's addresses; an open
+tailnet lists every service on every client. A service in a rule that
+does not exist yet opens nothing until it is created.

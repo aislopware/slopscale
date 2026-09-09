@@ -146,6 +146,8 @@ type State struct {
 
 	// access holds the groups and access rules; see [State.AccessModel].
 	access atomic.Pointer[types.AccessModel]
+	// vipServices holds the tailnet's services; see [State.VIPServices].
+	vipServices atomic.Pointer[[]types.VIPService]
 	// accessSwept marks that [State.ExpireAccess] has run once; see there.
 	accessSwept atomic.Bool
 	// polMan handles policy evaluation and management
@@ -319,6 +321,11 @@ func NewState(cfg *types.Config) (*State, error) {
 	}
 
 	_, err = s.loadAccessModel()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = s.loadVIPServices()
 	if err != nil {
 		return nil, err
 	}

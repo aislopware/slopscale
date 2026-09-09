@@ -405,6 +405,8 @@ func nodeUpdateColumns(update NodeUpdate) jet.ColumnList {
 		table.Nodes.Tags,
 		table.Nodes.LastSeen,
 		table.Nodes.ApprovedRoutes,
+		table.Nodes.VipServices,
+		table.Nodes.ApprovedServices,
 		table.Nodes.UpdatedAt,
 	}
 
@@ -452,6 +454,8 @@ func (r *nodeRow) updateArgs(update NodeUpdate) []any {
 		r.Tags,
 		optional(r.LastSeen),
 		r.ApprovedRoutes,
+		optional(r.VipServices),
+		optional(r.ApprovedServices),
 		r.UpdatedAt,
 	}
 
@@ -591,6 +595,42 @@ func (hsdb *HSDatabase) NodeSetPosture(nodeID types.NodeID, posture *types.Postu
 
 	return hsdb.Write(func(tx *Tx) error {
 		return updateNodeColumn(tx, nodeID, table.Nodes.Posture, column)
+	})
+}
+
+// NodeSetServices stores what the node reported hosting over c2n.
+func (hsdb *HSDatabase) NodeSetServices(nodeID types.NodeID, services *types.NodeServices) error {
+	var column *string
+
+	if services != nil {
+		encoded, err := marshalJSONColumn(services)
+		if err != nil {
+			return err
+		}
+
+		column = &encoded
+	}
+
+	return hsdb.Write(func(tx *Tx) error {
+		return updateNodeColumn(tx, nodeID, table.Nodes.VipServices, column)
+	})
+}
+
+// NodeSetApprovedServices records the services the node may host.
+func (hsdb *HSDatabase) NodeSetApprovedServices(nodeID types.NodeID, names []string) error {
+	var column *string
+
+	if len(names) > 0 {
+		encoded, err := marshalJSONColumn(names)
+		if err != nil {
+			return err
+		}
+
+		column = &encoded
+	}
+
+	return hsdb.Write(func(tx *Tx) error {
+		return updateNodeColumn(tx, nodeID, table.Nodes.ApprovedServices, column)
 	})
 }
 

@@ -3,9 +3,11 @@
   "body": {
     "nodes": [
       {
+        "announcedServices": [],
         "approved": true,
         "approvedAt": "\u003ctimestamp\u003e",
         "approvedRoutes": [],
+        "approvedServices": [],
         "availableRoutes": [],
         "clientVersion": "",
         "clientWarnings": [],
@@ -69,9 +71,11 @@
         }
       },
       {
+        "announcedServices": [],
         "approved": true,
         "approvedAt": "\u003ctimestamp\u003e",
         "approvedRoutes": [],
+        "approvedServices": [],
         "availableRoutes": [],
         "clientVersion": "",
         "clientWarnings": [],

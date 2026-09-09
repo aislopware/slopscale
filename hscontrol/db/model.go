@@ -46,9 +46,13 @@ type nodeRow struct {
 	Posture        *string
 	GlobalExitNode bool
 	Ephemeral      bool
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	DeletedAt      *time.Time
+	// VipServices is the JSON of [types.NodeServices]; ApprovedServices
+	// the JSON list of names. See schema.sql.
+	VipServices      *string
+	ApprovedServices *string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	DeletedAt        *time.Time
 }
 
 // nodeRecord is the destination of node queries: the node with its owning
@@ -173,6 +177,22 @@ func (r *nodeRow) node() (*types.Node, error) {
 		return nil, fmt.Errorf("node %d approved_routes: %w", r.ID, err)
 	}
 
+	if r.VipServices != nil && hasJSONValue(*r.VipServices) {
+		node.Services = new(types.NodeServices)
+
+		err = unmarshalJSONColumn(*r.VipServices, node.Services)
+		if err != nil {
+			return nil, fmt.Errorf("node %d vip_services: %w", r.ID, err)
+		}
+	}
+
+	if r.ApprovedServices != nil && hasJSONValue(*r.ApprovedServices) {
+		err = unmarshalJSONColumn(*r.ApprovedServices, &node.ApprovedServices)
+		if err != nil {
+			return nil, fmt.Errorf("node %d approved_services: %w", r.ID, err)
+		}
+	}
+
 	return node, nil
 }
 
@@ -232,6 +252,28 @@ func nodeRowFrom(node *types.Node) (nodeRow, error) {
 	row.ApprovedRoutes, err = marshalJSONColumn(node.ApprovedRoutes)
 	if err != nil {
 		return nodeRow{}, fmt.Errorf("approved_routes: %w", err)
+	}
+
+	if node.Services != nil {
+		var services string
+
+		services, err = marshalJSONColumn(node.Services)
+		if err != nil {
+			return nodeRow{}, fmt.Errorf("vip_services: %w", err)
+		}
+
+		row.VipServices = &services
+	}
+
+	if len(node.ApprovedServices) > 0 {
+		var approved string
+
+		approved, err = marshalJSONColumn(node.ApprovedServices)
+		if err != nil {
+			return nodeRow{}, fmt.Errorf("approved_services: %w", err)
+		}
+
+		row.ApprovedServices = &approved
 	}
 
 	return row, nil

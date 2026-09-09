@@ -109,6 +109,8 @@ CREATE TABLE nodes(
   suspended_at timestamptz,
   posture text,
   ephemeral boolean DEFAULT false,
+  vip_services text,
+  approved_services text,
   CONSTRAINT fk_nodes_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_nodes_auth_key FOREIGN KEY(auth_key_id) REFERENCES pre_auth_keys(id)
 );
@@ -437,3 +439,16 @@ CREATE TABLE ssh_recordings(
   complete boolean NOT NULL DEFAULT false
 );
 CREATE INDEX idx_ssh_recordings_started ON ssh_recordings(started_at);
+
+CREATE TABLE vip_services(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  display_name text,
+  comment text,
+  ports text,
+  ipv4 text,
+  ipv6 text,
+  created_at timestamptz,
+  updated_at timestamptz
+);
+CREATE UNIQUE INDEX idx_vip_services_name ON vip_services(name);

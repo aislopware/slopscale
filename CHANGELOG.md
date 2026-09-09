@@ -467,6 +467,29 @@ policy. The console marks Funnel machines on the machines list and page,
 and the Server page shows the ingress nodes. See
 [Funnel](https://aislopware.github.io/slopscale/ref/funnel/).
 
+### Tailscale Services
+
+A service is a name with addresses of its own, served by one or more
+tagged machines, the way Tailscale Services work: `tailscale serve
+--service=svc:web` on a machine announces it, an operator approves the
+machine (or `autoApprovers.services` in the policy does), `tailscale serve
+advertise svc:web` makes it active, and `https://web.<base domain>` reaches
+whichever approved machine is serving, an online one first, so a service
+can move or run on two machines without anyone noticing. The server
+allocates the service's addresses, learns what each machine serves over
+its control connection, routes every peer to one host, publishes the name
+in MagicDNS and lists the service in the Tailscale apps. The policy takes
+`svc:web` as a destination. `slopscale services` manages them, the console
+has a _Services_ page and a section on each machine's page, the v1 API has
+`/api/v1/services` and `/api/v1/node/{id}/approve_services` under the new
+`services` scope, and the v2 API has Tailscale's `/vip-services`, so the
+Terraform provider's `tailscale_tailnet_service` works. See
+[Services](https://aislopware.github.io/slopscale/ref/services/).
+
+A policy change and an approval or service change landing in the same
+batch no longer lose the self node the second one asked for: the batcher
+folds what a dropped repeat asked for into the change it keeps.
+
 ### Identity tokens
 
 `tailscale id-token <audience>` works: the server signs a JSON Web Token

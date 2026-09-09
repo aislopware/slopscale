@@ -67,6 +67,9 @@ type Slopscale struct {
 	state           *state.State
 	noisePrivateKey *key.MachinePrivate
 	ephemeralGC     *db.EphemeralGarbageCollector
+	// servicesFetching holds the nodes a service report is being
+	// fetched from; see collectServicesIfStale.
+	servicesFetching sync.Map
 
 	DERPServer *derpServer.DERPServer
 
@@ -1049,6 +1052,46 @@ func (h *Slopscale) collectPostureOnConnect(ctx context.Context, nodeID types.No
 		_, c, err := h.state.CollectPosture(ctx, nodeID, h.mapBatcher.IsConnected(nodeID), h.Change)
 		if err != nil {
 			log.Debug().Err(err).Uint64(zf.NodeID, nodeID.Uint64()).Msg("posture collection on connect failed")
+
+			return
+		}
+
+		if !c.IsEmpty() {
+			h.Change(c)
+		}
+	})
+}
+
+// c2nFetchTimeout bounds a service fetch, the c2n round trip included.
+const c2nFetchTimeout = 30 * time.Second
+
+// collectServicesIfStale asks a node for the services in its serve
+// configuration when its Hostinfo names a newer list than the server
+// holds: the client changes the hash whenever the list changes and the
+// server fetches the list over c2n, as Tailscale's control plane does.
+// One fetch per node is in flight at a time; the map stream that carries
+// the request has to be up, so a fresh connection waits a moment.
+func (h *Slopscale) collectServicesIfStale(ctx context.Context, nodeID types.NodeID) {
+	if !h.state.ServicesReportStale(nodeID) {
+		return
+	}
+
+	if _, loaded := h.servicesFetching.LoadOrStore(nodeID, struct{}{}); loaded {
+		return
+	}
+
+	// The request's context ends with the request; the fetch outlives it.
+	ctx = context.WithoutCancel(ctx)
+
+	time.AfterFunc(postureConnectDelay, func() {
+		defer h.servicesFetching.Delete(nodeID)
+
+		fetchCtx, cancel := context.WithTimeout(ctx, c2nFetchTimeout)
+		defer cancel()
+
+		c, err := h.state.CollectVIPServices(fetchCtx, nodeID, h.mapBatcher.IsConnected(nodeID), h.Change)
+		if err != nil {
+			log.Debug().Err(err).Uint64(zf.NodeID, nodeID.Uint64()).Msg("service collection failed")
 
 			return
 		}

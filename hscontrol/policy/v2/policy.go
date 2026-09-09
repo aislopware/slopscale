@@ -61,6 +61,13 @@ type PolicyManager struct {
 	autoApproveMapHash deephash.Sum
 	autoApproveMap     map[netip.Prefix]*netipx.IPSet
 
+	// vipServices are the tailnet's services; see
+	// [PolicyManager.SetVIPServices]. autoApproveServices is
+	// autoApprovers.services resolved to the addresses of the nodes each
+	// entry lets host the service.
+	vipServices         []types.VIPService
+	autoApproveServices map[tailcfg.ServiceName]*netipx.IPSet
+
 	// relayTargetIPs holds the IPs of nodes that are destinations of a
 	// tailscale.com/cap/relay grant; viaTargetTags holds the tags used as
 	// via targets. A node matching either, or that is a subnet router,
@@ -117,9 +124,10 @@ type PolicyManager struct {
 // This ensures filterHash changes when policy changes, even for autogroup:self where
 // the compiled filter is always empty.
 type filterAndPolicy struct {
-	Filter []tailcfg.FilterRule
-	Policy *Policy
-	Access types.AccessModel
+	Filter   []tailcfg.FilterRule
+	Policy   *Policy
+	Access   types.AccessModel
+	Services []types.VIPService
 }
 
 // checkUsernameRef resolves a single user@ token and records an error in
@@ -176,6 +184,14 @@ func validateAutoApproverUserReferences(pol *Policy, users types.Users, errs *[]
 	for _, aa := range pol.AutoApprovers.ExitNode {
 		if u, ok := aa.(*Username); ok {
 			checkUsernameRef(u, users, errs)
+		}
+	}
+
+	for _, approvers := range pol.AutoApprovers.Services {
+		for _, aa := range approvers {
+			if u, ok := aa.(*Username); ok {
+				checkUsernameRef(u, users, errs)
+			}
 		}
 	}
 }
@@ -299,9 +315,9 @@ func (pm *PolicyManager) NodeNeedsPeerRecompute(node types.NodeView) bool {
 		return false
 	}
 
-	// Subnet-router status is intrinsic to the node, so it needs no policy
-	// state and is checked without the lock.
-	if node.IsSubnetRouter() {
+	// Subnet-router status and hosting a service are intrinsic to the
+	// node, so they need no policy state and are checked without the lock.
+	if node.IsSubnetRouter() || len(node.HostedServices()) > 0 {
 		return true
 	}
 
@@ -1795,6 +1811,51 @@ func (pm *PolicyManager) matchersForNodeLocked(node types.NodeView) []matcher.Ma
 	return matchers
 }
 
+// refreshAutoApproversLocked recomputes the route and service auto-approver
+// maps and the exit node set, updating pm's cached hashes in place, and
+// reports whether each changed since the last call. The lock must be held.
+func (pm *PolicyManager) refreshAutoApproversLocked() (bool, bool, error) {
+	autoMap, exitSet, err := resolveAutoApprovers(pm.pol, pm.users, pm.nodes)
+	if err != nil {
+		return false, false, fmt.Errorf("resolving auto approvers map: %w", err)
+	}
+
+	pm.autoApproveServices, err = resolveServiceAutoApprovers(pm.pol, pm.users, pm.nodes)
+	if err != nil {
+		return false, false, fmt.Errorf("resolving service auto approvers: %w", err)
+	}
+
+	autoApproveMapHash := deephash.Hash(&autoMap)
+
+	autoApproveChanged := autoApproveMapHash != pm.autoApproveMapHash
+	if autoApproveChanged {
+		log.Debug().
+			Str("autoApprove.hash.old", pm.autoApproveMapHash.String()[:8]).
+			Str("autoApprove.hash.new", autoApproveMapHash.String()[:8]).
+			Int("autoApprovers.old", len(pm.autoApproveMap)).
+			Int("autoApprovers.new", len(autoMap)).
+			Msg("Auto-approvers hash changed")
+	}
+
+	pm.autoApproveMap = autoMap
+	pm.autoApproveMapHash = autoApproveMapHash
+
+	exitSetHash := deephash.Hash(&exitSet)
+
+	exitSetChanged := exitSetHash != pm.exitSetHash
+	if exitSetChanged {
+		log.Debug().
+			Str("exitSet.hash.old", pm.exitSetHash.String()[:8]).
+			Str("exitSet.hash.new", exitSetHash.String()[:8]).
+			Msg("Exit node set hash changed")
+	}
+
+	pm.exitSet = exitSet
+	pm.exitSetHash = exitSetHash
+
+	return autoApproveChanged, exitSetChanged, nil
+}
+
 // updateLocked updates the filter rules based on the current policy and nodes.
 // It must be called with the lock held.
 func (pm *PolicyManager) updateLocked() (bool, error) {
@@ -1805,10 +1866,15 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 		pm.pol = &Policy{}
 	}
 
+	if pm.pol == nil && len(pm.vipServices) > 0 {
+		pm.pol = &Policy{}
+	}
+
 	if pm.pol != nil {
 		pm.pol.access = pm.access
 		pm.pol.country = pm.country
 		pm.pol.recording = pm.sshRecording
+		pm.pol.services = servicesByName(pm.vipServices)
 	}
 
 	pm.usesSourceAddress = pm.pol.usesSourceAddress()
@@ -1846,9 +1912,10 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 	// where the compiled filter is always empty. This eliminates the need for
 	// a separate policyHash field.
 	filterHash := deephash.Hash(&filterAndPolicy{
-		Filter: filter,
-		Policy: pm.pol,
-		Access: pm.access,
+		Filter:   filter,
+		Policy:   pm.pol,
+		Access:   pm.access,
+		Services: pm.vipServices,
 	})
 
 	filterChanged := filterHash != pm.filterHash
@@ -1891,38 +1958,10 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 	pm.tagOwnerMap = tagMap
 	pm.tagOwnerMapHash = tagOwnerMapHash
 
-	autoMap, exitSet, err := resolveAutoApprovers(pm.pol, pm.users, pm.nodes)
+	autoApproveChanged, exitSetChanged, err := pm.refreshAutoApproversLocked()
 	if err != nil {
-		return false, fmt.Errorf("resolving auto approvers map: %w", err)
+		return false, err
 	}
-
-	autoApproveMapHash := deephash.Hash(&autoMap)
-
-	autoApproveChanged := autoApproveMapHash != pm.autoApproveMapHash
-	if autoApproveChanged {
-		log.Debug().
-			Str("autoApprove.hash.old", pm.autoApproveMapHash.String()[:8]).
-			Str("autoApprove.hash.new", autoApproveMapHash.String()[:8]).
-			Int("autoApprovers.old", len(pm.autoApproveMap)).
-			Int("autoApprovers.new", len(autoMap)).
-			Msg("Auto-approvers hash changed")
-	}
-
-	pm.autoApproveMap = autoMap
-	pm.autoApproveMapHash = autoApproveMapHash
-
-	exitSetHash := deephash.Hash(&exitSet)
-
-	exitSetChanged := exitSetHash != pm.exitSetHash
-	if exitSetChanged {
-		log.Debug().
-			Str("exitSet.hash.old", pm.exitSetHash.String()[:8]).
-			Str("exitSet.hash.new", exitSetHash.String()[:8]).
-			Msg("Exit node set hash changed")
-	}
-
-	pm.exitSet = exitSet
-	pm.exitSetHash = exitSetHash
 
 	// Recompile per-node nodeAttrs CapMap and append the diff to
 	// pm.nodeAttrsChanged. The drain (NodesWithChangedCapMap) returns
@@ -2311,7 +2350,8 @@ func (pm *PolicyManager) refreshNodeAttrsLocked() error {
 		!pm.pol.RandomizeClientPort &&
 		len(pm.nodeAttrsHashes) == 0 &&
 		!usersHaveAdmin(pm.users) &&
-		!NodesHaveGlobalExitNode(pm.nodes) {
+		!NodesHaveGlobalExitNode(pm.nodes) &&
+		len(pm.vipServices) == 0 {
 		return nil
 	}
 
@@ -2321,6 +2361,7 @@ func (pm *PolicyManager) refreshNodeAttrsLocked() error {
 	}
 
 	stampRoleCaps(pm.users, pm.nodes, newMap)
+	stampServiceCaps(pm.vipServices, pm.nodes, serviceReachable(pm.pol.enforces(), pm.matchers), newMap)
 
 	newHashes := make(map[types.NodeID]deephash.Sum, len(newMap))
 	for id, capMap := range newMap {

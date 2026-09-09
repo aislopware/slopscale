@@ -19,7 +19,7 @@ import (
 	"tailscale.com/types/views"
 )
 
-//go:generate go run tailscale.com/cmd/cloner  -clonefunc=false -type=User,Node,PreAuthKey,PostureIdentity,NodeAttribute
+//go:generate go run tailscale.com/cmd/cloner  -clonefunc=false -type=User,Node,PreAuthKey,PostureIdentity,NodeAttribute,NodeServices
 
 // View returns a read-only view of User.
 func (p *User) View() UserView {
@@ -302,6 +302,17 @@ func (v NodeView) Posture() PostureIdentityView { return v.ж.Posture.View() }
 // Only the attribute operations on State write them.
 func (v NodeView) Attributes() views.Slice[NodeAttribute] { return views.SliceOf(v.ж.Attributes) }
 
+// Services is what the node last reported hosting over c2n, nil
+// until the server asked; see [NodeServices]. Only
+// [State.CollectVIPServices] writes it.
+func (v NodeView) Services() NodeServicesView { return v.ж.Services.View() }
+
+// ApprovedServices are the names of the services the node may host,
+// in name order: an operator or a policy auto-approver put them
+// there, the way [Node.ApprovedRoutes] works for routes. The node
+// hosts the ones it also reports.
+func (v NodeView) ApprovedServices() views.Slice[string] { return views.SliceOf(v.ж.ApprovedServices) }
+
 // SourceAddr is the address the node's control connection last came
 // from, as the trusted-proxy middleware resolved it. It is runtime
 // state, never stored, and feeds the ip: posture attributes.
@@ -372,42 +383,44 @@ func (v NodeView) String() string                      { return v.ж.String() }
 
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _NodeViewNeedsRegeneration = Node(struct {
-	ID             NodeID
-	MachineKey     key.MachinePublic
-	NodeKey        key.NodePublic
-	DiscoKey       key.DiscoPublic
-	Endpoints      AddrPorts
-	Hostinfo       *tailcfg.Hostinfo
-	IPv4           *netip.Addr
-	IPv6           *netip.Addr
-	Hostname       string
-	GivenName      string
-	UserID         *uint
-	User           *User
-	RegisterMethod string
-	Tags           Strings
-	AuthKeyID      *uint64
-	AuthKey        *PreAuthKey
-	Expiry         *time.Time
-	LastSeen       *time.Time
-	ApprovedRoutes Prefixes
-	ApprovedAt     *time.Time
-	SuspendedAt    *time.Time
-	Posture        *PostureIdentity
-	Attributes     []NodeAttribute
-	SourceAddr     netip.Addr
-	SharedWith     []UserID
-	GlobalExitNode bool
-	Ephemeral      bool
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	DeletedAt      *time.Time
-	IsOnline       *bool
-	Unhealthy      bool
-	ActiveSessions int
-	SessionEpoch   uint64
-	CapVer         tailcfg.CapabilityVersion
-	ClientWarnings []string
+	ID               NodeID
+	MachineKey       key.MachinePublic
+	NodeKey          key.NodePublic
+	DiscoKey         key.DiscoPublic
+	Endpoints        AddrPorts
+	Hostinfo         *tailcfg.Hostinfo
+	IPv4             *netip.Addr
+	IPv6             *netip.Addr
+	Hostname         string
+	GivenName        string
+	UserID           *uint
+	User             *User
+	RegisterMethod   string
+	Tags             Strings
+	AuthKeyID        *uint64
+	AuthKey          *PreAuthKey
+	Expiry           *time.Time
+	LastSeen         *time.Time
+	ApprovedRoutes   Prefixes
+	ApprovedAt       *time.Time
+	SuspendedAt      *time.Time
+	Posture          *PostureIdentity
+	Attributes       []NodeAttribute
+	Services         *NodeServices
+	ApprovedServices []string
+	SourceAddr       netip.Addr
+	SharedWith       []UserID
+	GlobalExitNode   bool
+	Ephemeral        bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	DeletedAt        *time.Time
+	IsOnline         *bool
+	Unhealthy        bool
+	ActiveSessions   int
+	SessionEpoch     uint64
+	CapVer           tailcfg.CapabilityVersion
+	ClientWarnings   []string
 }{})
 
 // View returns a read-only view of PreAuthKey.
@@ -719,4 +732,84 @@ var _NodeAttributeViewNeedsRegeneration = NodeAttribute(struct {
 	Value     AttributeValue
 	ExpiresAt time.Time
 	Comment   string
+}{})
+
+// View returns a read-only view of NodeServices.
+func (p *NodeServices) View() NodeServicesView {
+	return NodeServicesView{ж: p}
+}
+
+// NodeServicesView provides a read-only view over NodeServices.
+//
+// Its methods should only be called if `Valid()` returns true.
+type NodeServicesView struct {
+	// ж is the underlying mutable value, named with a hard-to-type
+	// character that looks pointy like a pointer.
+	// It is named distinctively to make you think of how dangerous it is to escape
+	// to callers. You must not let callers be able to mutate it.
+	ж *NodeServices
+}
+
+// Valid reports whether v's underlying value is non-nil.
+func (v NodeServicesView) Valid() bool { return v.ж != nil }
+
+// AsStruct returns a clone of the underlying value which aliases no memory with
+// the original.
+func (v NodeServicesView) AsStruct() *NodeServices {
+	if v.ж == nil {
+		return nil
+	}
+	return v.ж.Clone()
+}
+
+// MarshalJSON implements [jsonv1.Marshaler].
+func (v NodeServicesView) MarshalJSON() ([]byte, error) {
+	return jsonv1.Marshal(v.ж)
+}
+
+// MarshalJSONTo implements [jsonv2.MarshalerTo].
+func (v NodeServicesView) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return jsonv2.MarshalEncode(enc, v.ж)
+}
+
+// UnmarshalJSON implements [jsonv1.Unmarshaler].
+func (v *NodeServicesView) UnmarshalJSON(b []byte) error {
+	if v.ж != nil {
+		return errors.New("already initialized")
+	}
+	if len(b) == 0 {
+		return nil
+	}
+	var x NodeServices
+	if err := jsonv1.Unmarshal(b, &x); err != nil {
+		return err
+	}
+	v.ж = &x
+	return nil
+}
+
+// UnmarshalJSONFrom implements [jsonv2.UnmarshalerFrom].
+func (v *NodeServicesView) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if v.ж != nil {
+		return errors.New("already initialized")
+	}
+	var x NodeServices
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
+		return err
+	}
+	v.ж = &x
+	return nil
+}
+
+// Hash is the client's own hash of the list, as in
+// [tailcfg.Hostinfo.ServicesHash].
+func (v NodeServicesView) Hash() string { return v.ж.Hash }
+
+// Services are the reported services, sorted by name.
+func (v NodeServicesView) Services() tailcfg.VIPService { panic("unsupported") }
+
+// A compilation failure here means this code must be regenerated, with the command at the top of this file.
+var _NodeServicesViewNeedsRegeneration = NodeServices(struct {
+	Hash     string
+	Services []tailcfg.VIPService
 }{})

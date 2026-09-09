@@ -120,6 +120,7 @@ func generateDNSConfig(
 	node types.NodeView,
 	capMap tailcfg.NodeCapMap,
 	groupRoutes map[string][]*dnstype.Resolver,
+	serviceRecords []tailcfg.DNSRecord,
 ) *tailcfg.DNSConfig {
 	dnsConfig := cfg.CloneTailcfgDNSConfig()
 	if dnsConfig == nil {
@@ -127,6 +128,12 @@ func generateDNSConfig(
 	}
 
 	dnsConfig.CertDomains = node.CertDomains(cfg)
+
+	// A service with a host answers by name under the base domain, the
+	// way MagicDNS answers for nodes.
+	if len(serviceRecords) > 0 {
+		dnsConfig.ExtraRecords = append(slices.Clone(dnsConfig.ExtraRecords), serviceRecords...)
+	}
 
 	// The node's groups add split DNS on top of the tailnet's: a domain
 	// both name gets the group's resolvers after the global ones. A

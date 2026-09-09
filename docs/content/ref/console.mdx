@@ -207,8 +207,9 @@ out*.
   tag; the filters live in the URL, so a filtered list can be shared. Tick
   rows to approve, expire or delete them in one go. The list refreshes on
   its own every fifteen seconds while the tab is open.
-  Each machine has a detail page with its keys, routes (approve with a switch),
-  sharing and the global exit node switch, plus rename, tag, expire and remove.
+  Each machine has a detail page with its keys, routes and services (approve
+  with a switch), sharing and the global exit node switch, plus rename, tag,
+  expire and remove.
   A warning the client reports about itself, such as a subnet router whose
   kernel drops forwarded packets, shows at the top of the page until the client
   stops reporting it or goes offline.
@@ -242,6 +243,8 @@ out*.
   groups.
 - **Routes**: every route any machine advertises, with approval for the ones
   no network owns.
+- **Services**: [services](/ref/services) with their addresses, DNS name and
+  hosts, and a switch to approve each host.
 - **DNS**: a page each for nameservers with MagicDNS and search domains, split
   DNS for every machine or for some groups, and extra records, all changed at
   runtime; see [DNS](/ref/dns).

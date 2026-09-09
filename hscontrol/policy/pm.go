@@ -93,6 +93,14 @@ type PolicyManager interface {
 	// NodeCanApproveRoute reports whether the given node can approve the given route.
 	NodeCanApproveRoute(node types.NodeView, route netip.Prefix) bool
 
+	// NodeCanApproveService reports whether autoApprovers.services lets
+	// the node host the service without an operator.
+	NodeCanApproveService(node types.NodeView, name tailcfg.ServiceName) bool
+
+	// SetVIPServices replaces the tailnet's services, which svc: aliases
+	// resolve against and the service caps are stamped from.
+	SetVIPServices(services []types.VIPService) (bool, error)
+
 	// NodeNeedsPeerRecompute reports whether peers must recompute their
 	// netmap when the node's online state changes. True for subnet
 	// routers, relay targets (tailscale.com/cap/relay), and via targets;

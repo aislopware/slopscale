@@ -69,6 +69,11 @@ const (
 	// written by the server.
 	LogsConfiguration     Scope = "logs:configuration"
 	LogsConfigurationRead Scope = "logs:configuration:read"
+
+	// Services gates the tailnet's services (Tailscale Services): the
+	// services themselves and which nodes are approved to host them.
+	Services     Scope = "services"
+	ServicesRead Scope = "services:read"
 )
 
 const readSuffix = ":read"
@@ -89,6 +94,7 @@ func Known() []Scope {
 		DNS, DNSRead,
 		Webhooks, WebhooksRead,
 		LogsConfiguration, LogsConfigurationRead,
+		Services, ServicesRead,
 	}
 }
 
@@ -166,14 +172,14 @@ func ForRole(role types.Role) []Scope {
 		return []Scope{All}
 	case types.RoleNetworkAdmin:
 		return []Scope{
-			PolicyFile, DevicesRoutes, DevicesPostureAttributes, DNS, Webhooks, LogsConfiguration,
+			PolicyFile, DevicesRoutes, DevicesPostureAttributes, DNS, Webhooks, LogsConfiguration, Services,
 			UsersRead, DevicesCoreRead, AuthKeysRead, OAuthKeysRead, FeatureSettingsRead,
 		}
 	case types.RoleITAdmin:
 		return []Scope{
 			Users, DevicesCore, DevicesPostureAttributes, AuthKeys, OAuthKeys, FeatureSettings, Webhooks,
 			LogsConfiguration,
-			PolicyFileRead, DevicesRoutesRead, DNSRead,
+			PolicyFileRead, DevicesRoutesRead, DNSRead, ServicesRead,
 		}
 	case types.RoleAuditor:
 		return []Scope{AllRead}

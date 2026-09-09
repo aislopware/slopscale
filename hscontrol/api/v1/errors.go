@@ -39,7 +39,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrAccessRequestNotFound),
 		errors.Is(err, types.ErrWebhookNotFound),
 		errors.Is(err, types.ErrLogStreamNotFound),
-		errors.Is(err, types.ErrSSHRecordingNotFound):
+		errors.Is(err, types.ErrSSHRecordingNotFound),
+		errors.Is(err, types.ErrVIPServiceNotFound):
 		return huma.Error404NotFound(msg, err)
 
 	case errors.Is(err, state.ErrGivenNameInvalid),
@@ -128,7 +129,11 @@ func mapError(msg string, err error) error {
 		errors.Is(err, posture.ErrUnknownPrefix),
 		errors.Is(err, posture.ErrScheduleDays),
 		errors.Is(err, posture.ErrScheduleTime),
-		errors.Is(err, posture.ErrScheduleTimezone):
+		errors.Is(err, posture.ErrScheduleTimezone),
+		errors.Is(err, types.ErrVIPServiceName),
+		errors.Is(err, types.ErrVIPServiceHostTagged),
+		errors.Is(err, state.ErrVIPServiceUnknownName),
+		errors.Is(err, types.ErrVIPServicePorts):
 		return huma.Error400BadRequest(msg, err)
 
 	case errors.Is(err, state.ErrNodeKeyInUse),
@@ -143,7 +148,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrPostureNameTaken),
 		errors.Is(err, types.ErrPostureInUse),
 		errors.Is(err, types.ErrAccessRequestDecided),
-		errors.Is(err, types.ErrAccessRequestPendingExists):
+		errors.Is(err, types.ErrAccessRequestPendingExists),
+		errors.Is(err, types.ErrVIPServiceNameTaken):
 		return huma.Error409Conflict(msg, err)
 
 	case errors.Is(err, state.ErrCannotChangeOwnRole),

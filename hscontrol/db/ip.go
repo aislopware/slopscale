@@ -75,26 +75,19 @@ func NewIPAllocator(
 
 	if db != nil {
 		err := db.Read(func(rx *Tx) error {
-			rows, err := rx.ex.queryRaw("SELECT ipv4, ipv6 FROM nodes")
-			if err != nil {
-				return err
-			}
-
-			defer rows.Close()
-
-			for rows.Next() {
-				var v4, v6 sql.NullString
-
-				err := rows.Scan(&v4, &v6)
+			// Services hold addresses from the same prefixes as nodes, so
+			// both tables reserve them.
+			for _, query := range []string{
+				"SELECT ipv4, ipv6 FROM nodes",
+				"SELECT ipv4, ipv6 FROM vip_services",
+			} {
+				err := scanReservedAddrs(rx, query, &v4s, &v6s)
 				if err != nil {
-					return fmt.Errorf("scanning node addresses: %w", err)
+					return err
 				}
-
-				v4s = append(v4s, v4)
-				v6s = append(v6s, v6)
 			}
 
-			return rows.Err()
+			return nil
 		})
 		if err != nil {
 			return nil, fmt.Errorf("reading IP addresses from database: %w", err)
@@ -149,6 +142,37 @@ func NewIPAllocator(
 	ret.usedIPs = ips
 
 	return &ret, nil
+}
+
+// scanReservedAddrs runs a "SELECT ipv4, ipv6 FROM ..." query and appends
+// each row's addresses to v4s and v6s, so the nodes and vip_services tables
+// (both hand out from the same prefixes) can share one scanning loop.
+func scanReservedAddrs(rx *Tx, query string, v4s, v6s *[]sql.NullString) error {
+	rows, err := rx.ex.queryRaw(query)
+	if err != nil {
+		return err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var v4, v6 sql.NullString
+
+		scanErr := rows.Scan(&v4, &v6)
+		if scanErr != nil {
+			return fmt.Errorf("scanning addresses: %w", scanErr)
+		}
+
+		*v4s = append(*v4s, v4)
+		*v6s = append(*v6s, v6)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return fmt.Errorf("scanning addresses: %w", err)
+	}
+
+	return nil
 }
 
 func (i *IPAllocator) Next() (*netip.Addr, *netip.Addr, error) {

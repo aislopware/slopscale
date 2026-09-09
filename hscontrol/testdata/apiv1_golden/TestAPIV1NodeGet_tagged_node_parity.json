@@ -2,9 +2,11 @@
   "status": 200,
   "body": {
     "node": {
+      "announcedServices": [],
       "approved": true,
       "approvedAt": "\u003ctimestamp\u003e",
       "approvedRoutes": [],
+      "approvedServices": [],
       "availableRoutes": [],
       "clientVersion": "",
       "clientWarnings": [],

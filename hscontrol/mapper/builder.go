@@ -74,13 +74,16 @@ func (b *MapResponseBuilder) WithSelfNode() *MapResponseBuilder {
 
 	_, matchers := b.mapper.state.Filter()
 
+	serviceHosts := b.mapper.state.ServiceHosts()
+
 	tailnode, err := nv.TailNode(
 		b.capVer,
 		func(id types.NodeID) []netip.Prefix {
-			// Self node: include own primaries + exit routes (no via steering for self).
+			// Self node: include own primaries + exit routes (no via steering for self),
+			// and the addresses of the services it is the elected host of.
 			primaries := policy.ReduceRoutes(nv, b.mapper.state.GetNodePrimaryRoutes(id), matchers)
 
-			return slices.Concat(primaries, nv.ExitRoutes())
+			return slices.Concat(primaries, nv.ExitRoutes(), b.mapper.state.ServiceRoutesFor(id, serviceHosts))
 		},
 		b.mapper.cfg,
 		b.mapper.state.NodeCapMap(nv.ID()),
@@ -236,6 +239,7 @@ func (b *MapResponseBuilder) WithDNSConfig() *MapResponseBuilder {
 
 	b.resp.DNSConfig = generateDNSConfig(
 		b.mapper.cfg, node, b.mapper.state.NodeCapMap(node.ID()), b.mapper.state.GroupDNSRoutes(node),
+		b.mapper.state.ServiceDNSRecords(b.mapper.cfg.BaseDomain),
 	)
 
 	return b
@@ -400,6 +404,7 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 	// path used to take pm.mu N times for an N-peer response.
 	allCapMaps := b.mapper.state.NodeCapMaps()
 	globalExitNodes := b.mapper.state.HasGlobalExitNode()
+	serviceHosts := b.mapper.state.ServiceHosts()
 
 	// Build tail nodes with per-peer via-aware route function.
 	tailPeers := make([]*tailcfg.Node, 0, changedViews.Len())
@@ -408,8 +413,13 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 		// Pass the peer's policy CapMap so per-peer address-shape rules
 		// (today: disable-ipv4) apply consistently in the viewer's
 		// netmap; the entry's own CapMap is set by PeerCapMap below.
-		tn, err := peer.PeerTailNode(func(_ types.NodeID) []netip.Prefix {
-			return b.mapper.state.RoutesForPeer(node, peer, matchers)
+		tn, err := peer.PeerTailNode(func(id types.NodeID) []netip.Prefix {
+			// The elected host of a service carries its addresses so the
+			// viewer routes them to it.
+			return slices.Concat(
+				b.mapper.state.RoutesForPeer(node, peer, matchers),
+				b.mapper.state.ServiceRoutesFor(id, serviceHosts),
+			)
 		}, b.mapper.cfg, allCapMaps[peer.ID()])
 		if err == nil {
 			markShared(tn, node, peer)

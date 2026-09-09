@@ -72,7 +72,8 @@ func mapError(msg string, err error) error {
 		errors.Is(err, db.ErrPreAuthKeyNotFound),
 		errors.Is(err, db.ErrUserNotFound),
 		errors.Is(err, state.ErrNodeNotFound),
-		errors.Is(err, types.ErrWebhookNotFound):
+		errors.Is(err, types.ErrWebhookNotFound),
+		errors.Is(err, types.ErrVIPServiceNotFound):
 		return huma.Error404NotFound(msg, err)
 
 	case errors.Is(err, db.ErrPreAuthKeyNotTaggedOrOwned),
@@ -89,7 +90,10 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrWebhookEventUnknown),
 		errors.Is(err, egress.ErrBlocked),
 		errors.Is(err, types.ErrWebhookProviderUnknown),
-		errors.Is(err, types.ErrWebhookDescriptionLong):
+		errors.Is(err, types.ErrWebhookDescriptionLong),
+		errors.Is(err, types.ErrVIPServiceName),
+		errors.Is(err, types.ErrVIPServicePorts),
+		errors.Is(err, types.ErrVIPServiceNameTaken):
 		return huma.Error400BadRequest(msg, err)
 
 	default:

@@ -26,12 +26,12 @@ func TestGenerateDNSConfigGroupRoutes(t *testing.T) {
 		cfg := &types.Config{TailcfgDNSConfig: &tailcfg.DNSConfig{Domains: []string{"example.ts.net"}}}
 		node := (&types.Node{Hostname: "laptop"}).View()
 
-		got := generateDNSConfig(cfg, node, nil, map[string][]*dnstype.Resolver{"corp.example.com": {corp}})
+		got := generateDNSConfig(cfg, node, nil, map[string][]*dnstype.Resolver{"corp.example.com": {corp}}, nil)
 		require.NotNil(t, got)
 		assert.Equal(t, map[string][]*dnstype.Resolver{"corp.example.com": {corp}}, got.Routes)
 
 		// Nothing applies: the tailnet's own routes stay as they were.
-		got = generateDNSConfig(cfg, node, nil, nil)
+		got = generateDNSConfig(cfg, node, nil, nil, nil)
 		require.NotNil(t, got)
 		assert.Nil(t, got.Routes)
 	})
@@ -47,14 +47,14 @@ func TestGenerateDNSConfigGroupRoutes(t *testing.T) {
 		got := generateDNSConfig(cfg, node, nil, map[string][]*dnstype.Resolver{
 			"corp.example.com": {corp},
 			"lab.example.com":  {lab},
-		})
+		}, nil)
 		require.NotNil(t, got)
 		assert.Equal(t, []*dnstype.Resolver{global, corp}, got.Routes["corp.example.com"])
 		assert.Equal(t, []*dnstype.Resolver{lab}, got.Routes["lab.example.com"])
 
 		// The clone protects the config: a second node without the
 		// group sees the tailnet's routes alone.
-		got = generateDNSConfig(cfg, node, nil, nil)
+		got = generateDNSConfig(cfg, node, nil, nil, nil)
 		require.NotNil(t, got)
 		assert.Equal(t, map[string][]*dnstype.Resolver{"corp.example.com": {global}}, got.Routes)
 	})
@@ -71,7 +71,7 @@ func TestGenerateDNSConfigGroupRoutes(t *testing.T) {
 		got := generateDNSConfig(cfg, node, nil, map[string][]*dnstype.Resolver{
 			"64.100.in-addr.arpa": {corp},
 			"lab.example.com":     {lab},
-		})
+		}, nil)
 		require.NotNil(t, got)
 		assert.Empty(t, got.Routes["64.100.in-addr.arpa"], "the reverse zone still resolves locally")
 		assert.NotNil(t, got.Routes["64.100.in-addr.arpa"], "and stays an empty list, not nil")

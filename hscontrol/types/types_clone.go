@@ -87,6 +87,8 @@ func (src *Node) Clone() *Node {
 	}
 	dst.Posture = src.Posture.Clone()
 	dst.Attributes = append(src.Attributes[:0:0], src.Attributes...)
+	dst.Services = src.Services.Clone()
+	dst.ApprovedServices = append(src.ApprovedServices[:0:0], src.ApprovedServices...)
 	dst.SharedWith = append(src.SharedWith[:0:0], src.SharedWith...)
 	if dst.DeletedAt != nil {
 		dst.DeletedAt = new(*src.DeletedAt)
@@ -100,42 +102,44 @@ func (src *Node) Clone() *Node {
 
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _NodeCloneNeedsRegeneration = Node(struct {
-	ID             NodeID
-	MachineKey     key.MachinePublic
-	NodeKey        key.NodePublic
-	DiscoKey       key.DiscoPublic
-	Endpoints      AddrPorts
-	Hostinfo       *tailcfg.Hostinfo
-	IPv4           *netip.Addr
-	IPv6           *netip.Addr
-	Hostname       string
-	GivenName      string
-	UserID         *uint
-	User           *User
-	RegisterMethod string
-	Tags           Strings
-	AuthKeyID      *uint64
-	AuthKey        *PreAuthKey
-	Expiry         *time.Time
-	LastSeen       *time.Time
-	ApprovedRoutes Prefixes
-	ApprovedAt     *time.Time
-	SuspendedAt    *time.Time
-	Posture        *PostureIdentity
-	Attributes     []NodeAttribute
-	SourceAddr     netip.Addr
-	SharedWith     []UserID
-	GlobalExitNode bool
-	Ephemeral      bool
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	DeletedAt      *time.Time
-	IsOnline       *bool
-	Unhealthy      bool
-	ActiveSessions int
-	SessionEpoch   uint64
-	CapVer         tailcfg.CapabilityVersion
-	ClientWarnings []string
+	ID               NodeID
+	MachineKey       key.MachinePublic
+	NodeKey          key.NodePublic
+	DiscoKey         key.DiscoPublic
+	Endpoints        AddrPorts
+	Hostinfo         *tailcfg.Hostinfo
+	IPv4             *netip.Addr
+	IPv6             *netip.Addr
+	Hostname         string
+	GivenName        string
+	UserID           *uint
+	User             *User
+	RegisterMethod   string
+	Tags             Strings
+	AuthKeyID        *uint64
+	AuthKey          *PreAuthKey
+	Expiry           *time.Time
+	LastSeen         *time.Time
+	ApprovedRoutes   Prefixes
+	ApprovedAt       *time.Time
+	SuspendedAt      *time.Time
+	Posture          *PostureIdentity
+	Attributes       []NodeAttribute
+	Services         *NodeServices
+	ApprovedServices []string
+	SourceAddr       netip.Addr
+	SharedWith       []UserID
+	GlobalExitNode   bool
+	Ephemeral        bool
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	DeletedAt        *time.Time
+	IsOnline         *bool
+	Unhealthy        bool
+	ActiveSessions   int
+	SessionEpoch     uint64
+	CapVer           tailcfg.CapabilityVersion
+	ClientWarnings   []string
 }{})
 
 // Clone makes a deep copy of PreAuthKey.
@@ -221,4 +225,27 @@ var _NodeAttributeCloneNeedsRegeneration = NodeAttribute(struct {
 	Value     AttributeValue
 	ExpiresAt time.Time
 	Comment   string
+}{})
+
+// Clone makes a deep copy of NodeServices.
+// The result aliases no memory with the original.
+func (src *NodeServices) Clone() *NodeServices {
+	if src == nil {
+		return nil
+	}
+	dst := new(NodeServices)
+	*dst = *src
+	if src.Services != nil {
+		dst.Services = make([]tailcfg.VIPService, len(src.Services))
+		for i := range dst.Services {
+			dst.Services[i] = *src.Services[i].Clone()
+		}
+	}
+	return dst
+}
+
+// A compilation failure here means this code must be regenerated, with the command at the top of this file.
+var _NodeServicesCloneNeedsRegeneration = NodeServices(struct {
+	Hash     string
+	Services []tailcfg.VIPService
 }{})

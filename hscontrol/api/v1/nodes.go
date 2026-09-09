@@ -71,6 +71,11 @@ type Node struct {
 
 	GlobalExitNode bool `doc:"true when every client is told to prefer this exit node." json:"globalExitNode"`
 
+	// AnnouncedServices is what the node reports hosting; ApprovedServices
+	// the names an operator or the policy let it host. See /api/v1/services.
+	AnnouncedServices []NodeService `doc:"The services in the node's serve configuration, as it last reported them." json:"announcedServices" nullable:"false"` //nolint:lll // struct tag
+	ApprovedServices  []string      `doc:"The services the node may host; it hosts the ones it also announces."      json:"approvedServices"  nullable:"false"` //nolint:lll // struct tag
+
 	// FunnelEnabled is what the client reports in its Hostinfo once a
 	// Funnel endpoint is on; the console marks such machines.
 	FunnelEnabled bool `doc:"true while the client has a Funnel endpoint on, exposing a service to the internet through the ingress." json:"funnelEnabled"` //nolint:lll // struct tag
@@ -89,6 +94,13 @@ type Node struct {
 	// from the warn-* flags of its last map request.
 	//nolint:lll // doc tag
 	ClientWarnings []string `doc:"Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup, etc-apt-source-disabled when the Tailscale apt source is commented out. A newer client may report flags not listed here. Empty while the client reports none, while it is offline, and after a restart of the server until it polls again." json:"clientWarnings" nullable:"false"`
+}
+
+// NodeService is one service a node reports hosting.
+type NodeService struct {
+	Name   string   `doc:"The service name, svc:<label>."                json:"name"`
+	Ports  []string `doc:"The protocol and ports the node serves it on." json:"ports"  nullable:"false"`
+	Active bool     `doc:"true when the node advertises the service."    json:"active"`
 }
 
 // NodePreAuthKey is the PreAuthKey shape embedded in a Node response. The
@@ -748,25 +760,27 @@ func (b Backend) nodeFromView(view types.NodeView) Node {
 // nodeFromView is [Backend.nodeFromView] without what needs the state.
 func nodeFromView(view types.NodeView) Node {
 	n := Node{
-		ID:              view.StringID(),
-		MachineKey:      view.MachineKey().String(),
-		NodeKey:         view.NodeKey().String(),
-		DiscoKey:        view.DiscoKey().String(),
-		IPAddresses:     nonNilStrings(view.IPsAsString()),
-		Name:            view.Hostname(),
-		CreatedAt:       view.CreatedAt(),
-		RegisterMethod:  registerMethodEnum(view.RegisterMethod()),
-		GivenName:       view.GivenName(),
-		Online:          view.IsOnline().Valid() && view.IsOnline().Get(),
-		ApprovedRoutes:  nonNilStrings(util.PrefixesToString(view.ApprovedRoutes().AsSlice())),
-		AvailableRoutes: nonNilStrings(util.PrefixesToString(view.AnnouncedRoutes())),
-		SubnetRoutes:    []string{},
-		Tags:            nonNilStrings(view.Tags().AsSlice()),
-		Approved:        view.IsApproved(),
-		SharedWith:      sharedWithIDs(view),
-		GlobalExitNode:  view.IsGlobalExitNode(),
-		FunnelEnabled:   view.FunnelEnabled(),
-		Ephemeral:       view.IsEphemeral(),
+		ID:                view.StringID(),
+		MachineKey:        view.MachineKey().String(),
+		NodeKey:           view.NodeKey().String(),
+		DiscoKey:          view.DiscoKey().String(),
+		IPAddresses:       nonNilStrings(view.IPsAsString()),
+		Name:              view.Hostname(),
+		CreatedAt:         view.CreatedAt(),
+		RegisterMethod:    registerMethodEnum(view.RegisterMethod()),
+		GivenName:         view.GivenName(),
+		Online:            view.IsOnline().Valid() && view.IsOnline().Get(),
+		ApprovedRoutes:    nonNilStrings(util.PrefixesToString(view.ApprovedRoutes().AsSlice())),
+		AvailableRoutes:   nonNilStrings(util.PrefixesToString(view.AnnouncedRoutes())),
+		AnnouncedServices: nodeServicesFrom(view),
+		ApprovedServices:  nonNilStrings(view.ApprovedServices().AsSlice()),
+		SubnetRoutes:      []string{},
+		Tags:              nonNilStrings(view.Tags().AsSlice()),
+		Approved:          view.IsApproved(),
+		SharedWith:        sharedWithIDs(view),
+		GlobalExitNode:    view.IsGlobalExitNode(),
+		FunnelEnabled:     view.FunnelEnabled(),
+		Ephemeral:         view.IsEphemeral(),
 	}
 
 	if view.ApprovedAt().Valid() {

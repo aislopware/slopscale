@@ -192,6 +192,17 @@ type Node struct {
 	// Only the attribute operations on State write them.
 	Attributes []NodeAttribute
 
+	// Services is what the node last reported hosting over c2n, nil
+	// until the server asked; see [NodeServices]. Only
+	// [State.CollectVIPServices] writes it.
+	Services *NodeServices
+
+	// ApprovedServices are the names of the services the node may host,
+	// in name order: an operator or a policy auto-approver put them
+	// there, the way [Node.ApprovedRoutes] works for routes. The node
+	// hosts the ones it also reports.
+	ApprovedServices []string
+
 	// SourceAddr is the address the node's control connection last came
 	// from, as the trusted-proxy middleware resolved it. It is runtime
 	// state, never stored, and feeds the ip: posture attributes.
@@ -1270,6 +1281,12 @@ func (nv NodeView) HasPolicyChange(other NodeView) bool {
 		return true
 	}
 
+	// The services a node hosts put addresses on it and caps on every
+	// node that can reach them.
+	if !nv.ж.servicesEqual(other.ж) {
+		return true
+	}
+
 	// The policy's postures read the attribute map, so what feeds it
 	// counts: the reported OS and versions, the serials and the custom
 	// attributes.
@@ -1372,10 +1389,12 @@ func (nv NodeView) tailNode(
 	slices.SortFunc(allowedIPs, netip.Prefix.Compare)
 
 	// PrimaryRoutes only includes non-exit subnet routes for HA tracking.
+	// A service address the node hosts rides in AllowedIPs like a route
+	// but is not a subnet route.
 	var primaryRoutes []netip.Prefix
 
 	for _, r := range allRoutes {
-		if !tsaddr.IsExitRoute(r) {
+		if !tsaddr.IsExitRoute(r) && !cfg.IsServiceAddress(r) {
 			primaryRoutes = append(primaryRoutes, r)
 		}
 	}

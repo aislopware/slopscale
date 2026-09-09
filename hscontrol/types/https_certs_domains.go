@@ -10,7 +10,16 @@ func (nv NodeView) CertDomains(cfg *Config) []string {
 		return nil
 	}
 
-	return []string{strings.ToLower(nv.GivenName() + "." + strings.TrimSuffix(cfg.BaseDomain, "."))}
+	base := strings.TrimSuffix(cfg.BaseDomain, ".")
+	domains := []string{strings.ToLower(nv.GivenName() + "." + base)}
+
+	// A node approved to host a service serves it under the service's
+	// name, so it may get a certificate for that name too.
+	for _, name := range nv.HostedServices() {
+		domains = append(domains, strings.ToLower(name.WithoutPrefix()+"."+base))
+	}
+
+	return domains
 }
 
 // ACMEChallengeAllowed reports whether name is the DNS-01 challenge

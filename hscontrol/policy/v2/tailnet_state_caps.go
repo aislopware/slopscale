@@ -107,7 +107,9 @@ var unmodelledTailnetStateCaps = []nodecap.Cap{
 	// [tailcfg.NodeAttrServiceHost]: marks a node as approved to host
 	// VIP services (Tailscale Services). Client reads via
 	// UnmarshalNodeCapViewJSON at ipn/ipnlocal/local.go:2704.
-	// Slopscale does not implement Tailscale Services.
+	// Slopscale stamps it from the services table (see
+	// stampServiceCaps), but the anonymised captures carry no
+	// services, so the replayed tailnet cannot reproduce the mapping.
 	nodecap.ServiceHost,
 
 	// [tailcfg.NodeAttrStoreAppCRoutes]: tells an app-connector node
