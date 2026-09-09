@@ -72,22 +72,29 @@ type NodeLookup func(addr netip.Addr) (types.NodeView, bool)
 
 // Recorder receives session uploads and keeps the files.
 type Recorder struct {
-	dir       string
-	retention time.Duration
-	store     Store
-	nodes     NodeLookup
+	dir        string
+	retention  time.Duration
+	maxSession int64
+	store      Store
+	nodes      NodeLookup
 }
 
 // New builds a recorder writing to dir. The directory is created when
 // the first session arrives, so a server that only reads old
 // recordings never touches it; without one, uploads and downloads
-// fail with [ErrNoDir].
-func New(dir string, retention time.Duration, store Store, nodes NodeLookup) *Recorder {
+// fail with [ErrNoDir]. maxSession bounds one upload, zero meaning
+// [types.DefaultMaxSessionBytes]. Without a lookup nothing may upload,
+// because an upload is only accepted from a node.
+func New(dir string, retention time.Duration, maxSession int64, store Store, nodes NodeLookup) *Recorder {
 	if nodes == nil {
 		nodes = func(netip.Addr) (types.NodeView, bool) { return types.NodeView{}, false }
 	}
 
-	return &Recorder{dir: dir, retention: retention, store: store, nodes: nodes}
+	if maxSession <= 0 {
+		maxSession = types.DefaultMaxSessionBytes
+	}
+
+	return &Recorder{dir: dir, retention: retention, maxSession: maxSession, store: store, nodes: nodes}
 }
 
 // Handler is the upload service. It answers the v2 probe with 404 so
@@ -255,7 +262,22 @@ func (r *Recorder) RunSweeper(ctx context.Context) {
 // record takes one upload: the header line names the session, the rest
 // is the terminal stream, written to the file as it arrives.
 func (r *Recorder) record(w http.ResponseWriter, req *http.Request) {
-	body := bufio.NewReaderSize(req.Body, headerLimit)
+	// The recorder listens on the tailnet, so an upload comes from a node.
+	// One whose address resolves to nothing is not a session this server
+	// can attribute, and taking it would let anything that reaches the port
+	// write files here.
+	node, known := r.nodes(remoteAddr(req.RemoteAddr))
+	if !known {
+		log.Warn().Str("remote", req.RemoteAddr).
+			Msg("refusing SSH recording upload from an address that is not a node")
+		http.Error(w, "upload from an unknown node", http.StatusForbidden)
+
+		return
+	}
+
+	// A session streams for as long as it lasts, so nothing else bounds
+	// what one upload writes to disk.
+	body := bufio.NewReaderSize(http.MaxBytesReader(w, req.Body, r.maxSession), headerLimit)
 
 	line, err := body.ReadSlice('\n')
 	if err != nil {
@@ -277,7 +299,7 @@ func (r *Recorder) record(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	rec, file, err := r.begin(header, req.RemoteAddr)
+	rec, file, err := r.begin(header, node)
 	if err != nil {
 		log.Error().Err(err).Str("srcNode", header.SrcNode).Msg("starting SSH recording")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -289,6 +311,10 @@ func (r *Recorder) record(w http.ResponseWriter, req *http.Request) {
 	closeErr := file.Close()
 
 	complete := copyErr == nil && closeErr == nil
+
+	var capped *http.MaxBytesError
+
+	overLimit := errors.As(copyErr, &capped)
 
 	err = r.store.FinishSSHRecording(rec.ID, written, complete)
 	if err != nil {
@@ -306,7 +332,19 @@ func (r *Recorder) record(w http.ResponseWriter, req *http.Request) {
 		e = e.AnErr("uploadError", copyErr)
 	}
 
+	if overLimit {
+		e = e.Int64("limit", r.maxSession)
+	}
+
 	e.Msg("SSH session recorded")
+
+	if overLimit {
+		// The session ran past the cap: what arrived is kept and marked
+		// incomplete.
+		http.Error(w, "recording exceeded the session limit", http.StatusRequestEntityTooLarge)
+
+		return
+	}
 
 	if !complete {
 		// The upload broke off; the client has gone, so the status is
@@ -319,8 +357,11 @@ func (r *Recorder) record(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// begin indexes the session and opens its file.
-func (r *Recorder) begin(header sessionrecording.CastHeader, remote string) (types.SSHRecording, *os.File, error) {
+// begin indexes the session and opens its file. node is the node the
+// upload came from, which is the node the session ran on.
+func (r *Recorder) begin(
+	header sessionrecording.CastHeader, node types.NodeView,
+) (types.SSHRecording, *os.File, error) {
 	rec := types.SSHRecording{
 		StartedAt: time.Now().UTC(),
 		SrcNode:   header.SrcNode,
@@ -336,7 +377,7 @@ func (r *Recorder) begin(header sessionrecording.CastHeader, remote string) (typ
 		rec.StartedAt = time.Unix(header.Timestamp, 0).UTC()
 	}
 
-	if node, ok := r.nodes(remoteAddr(remote)); ok {
+	if node.Valid() {
 		rec.DstNodeID = node.ID()
 		rec.DstNode = node.GivenName()
 	}

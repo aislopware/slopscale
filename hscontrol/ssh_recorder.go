@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"testing"
 	"time"
@@ -29,7 +30,13 @@ const recorderBackoff = 30 * time.Second
 // It exists whether or not the embedded node runs, so old recordings
 // stay reachable after the node is switched off.
 func newRecorder(cfg *types.Config, st recorder.Store, nodes recorder.NodeLookup) *recorder.Recorder {
-	return recorder.New(cfg.SSHRecording.Dir, cfg.SSHRecording.Retention, st, nodes)
+	return recorder.New(
+		cfg.SSHRecording.Dir,
+		cfg.SSHRecording.Retention,
+		cfg.SSHRecording.SessionLimit(),
+		st,
+		nodes,
+	)
 }
 
 // runSSHRecorder joins the tailnet as the embedded recorder node and
@@ -132,9 +139,22 @@ func (h *Headscale) recorderAuthKey() (string, error) {
 }
 
 // SSHRecorderHandlerForTest is the upload service the embedded node
-// serves, for tests that post a session without a tailnet.
+// serves, for tests that post a session without a tailnet. Such a test
+// posts from loopback, which is no node, and the recorder takes uploads
+// from nodes only; this handler admits the source without naming a node, so
+// the recording is attributed to nothing exactly as it would be in
+// production when the source cannot be named.
 func (h *Headscale) SSHRecorderHandlerForTest() http.Handler {
-	return h.recorder.Handler()
+	lookup := func(addr netip.Addr) (types.NodeView, bool) {
+		node, ok := h.state.NodeByIP(addr)
+		if ok {
+			return node, true
+		}
+
+		return types.NodeView{}, true
+	}
+
+	return newRecorder(h.cfg, h.state, lookup).Handler()
 }
 
 // StartSSHRecorderForTest joins the tailnet as the embedded recorder,

@@ -140,6 +140,21 @@ func dial(ctx context.Context, network, address string) (net.Conn, error) {
 	return (&net.Dialer{}).DialContext(ctx, network, address)
 }
 
+// nodeLookup resolves the loopback address the test server uploads from to a
+// node, which the recorder now requires: an upload from an address that is
+// not a node is refused.
+func nodeLookup() recorder.NodeLookup {
+	node := types.Node{ID: 7, GivenName: "prod-db"}
+
+	return func(addr netip.Addr) (types.NodeView, bool) {
+		if addr.IsLoopback() {
+			return node.View(), true
+		}
+
+		return types.NodeView{}, false
+	}
+}
+
 func header() sessionrecording.CastHeader {
 	return sessionrecording.CastHeader{
 		Version:     2,
@@ -165,16 +180,7 @@ func TestRecordSession(t *testing.T) {
 
 	dir := t.TempDir()
 	store := newMemStore()
-	server := types.Node{ID: 7, GivenName: "prod-db"}
-	lookup := func(addr netip.Addr) (types.NodeView, bool) {
-		if addr.IsLoopback() {
-			return server.View(), true
-		}
-
-		return types.NodeView{}, false
-	}
-
-	rec := recorder.New(dir, 0, store, lookup)
+	rec := recorder.New(dir, 0, 0, store, nodeLookup())
 
 	addr := serve(t, rec)
 
@@ -252,7 +258,7 @@ func TestInterruptedUpload(t *testing.T) {
 	dir := t.TempDir()
 	store := newMemStore()
 
-	rec := recorder.New(dir, 0, store, nil)
+	rec := recorder.New(dir, 0, 0, store, nodeLookup())
 
 	addr := serve(t, rec)
 
@@ -298,6 +304,80 @@ func TestInterruptedUpload(t *testing.T) {
 	}, 5*time.Second, 10*time.Millisecond)
 }
 
+// TestUploadFromUnknownAddressIsRefused proves the recorder only takes a
+// session from a node: an address the node lookup does not know gets a 403
+// and leaves nothing behind.
+func TestUploadFromUnknownAddressIsRefused(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	store := newMemStore()
+
+	unknown := func(netip.Addr) (types.NodeView, bool) { return types.NodeView{}, false }
+	rec := recorder.New(dir, 0, 0, store, unknown)
+
+	srv := httptest.NewServer(rec.Handler())
+	t.Cleanup(srv.Close)
+
+	head, err := json.Marshal(header())
+	require.NoError(t, err)
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, srv.URL+recorder.RecordPath,
+		strings.NewReader(string(head)+"\n"+`[0.1,"o","hi"]`+"\n"))
+	require.NoError(t, err)
+
+	resp, err := srv.Client().Do(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+
+	rows, err := store.ListSSHRecordings(0, 10)
+	require.NoError(t, err)
+	assert.Empty(t, rows, "no row for a refused upload")
+}
+
+// TestUploadOverSessionLimitIsCapped proves a session that runs past the cap
+// is kept with what arrived, marked incomplete, and the upload is refused.
+func TestUploadOverSessionLimitIsCapped(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	store := newMemStore()
+
+	head, err := json.Marshal(header())
+	require.NoError(t, err)
+
+	// Room for the header and a little of the stream, then the cap trips.
+	limit := int64(len(head) + 1 + 32)
+
+	rec := recorder.New(dir, 0, limit, store, nodeLookup())
+
+	srv := httptest.NewServer(rec.Handler())
+	t.Cleanup(srv.Close)
+
+	body := string(head) + "\n" + strings.Repeat(`[0.1,"o","hello"]`+"\n", 100)
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, srv.URL+recorder.RecordPath,
+		strings.NewReader(body))
+	require.NoError(t, err)
+
+	resp, err := srv.Client().Do(req)
+	require.NoError(t, err)
+
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, resp.StatusCode)
+
+	rows, err := store.ListSSHRecordings(0, 10)
+	require.NoError(t, err)
+	require.Len(t, rows, 1, "the session is kept")
+	assert.False(t, rows[0].Complete, "and marked incomplete")
+	assert.Positive(t, rows[0].Size)
+	assert.LessOrEqual(t, rows[0].Size, limit+int64(len(head)))
+}
+
 // TestBadHeader proves an upload without a JSON header line is refused
 // and leaves nothing behind.
 func TestBadHeader(t *testing.T) {
@@ -306,7 +386,7 @@ func TestBadHeader(t *testing.T) {
 	dir := t.TempDir()
 	store := newMemStore()
 
-	rec := recorder.New(dir, 0, store, nil)
+	rec := recorder.New(dir, 0, 0, store, nodeLookup())
 
 	srv := httptest.NewServer(rec.Handler())
 	t.Cleanup(srv.Close)
@@ -341,7 +421,7 @@ func TestSweep(t *testing.T) {
 	dir := t.TempDir()
 	store := newMemStore()
 
-	rec := recorder.New(dir, time.Hour, store, nil)
+	rec := recorder.New(dir, time.Hour, 0, store, nil)
 
 	old, err := store.CreateSSHRecording(types.SSHRecording{
 		StartedAt: time.Now().Add(-2 * time.Hour), Path: "old.cast",
