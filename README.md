@@ -5,8 +5,13 @@
 
 # slopscale
 
-A fork of [headscale](https://github.com/juanfont/headscale) with these
-improvements:
+An open source, self-hosted implementation of the Tailscale control server.
+It hands out WireGuard keys and IP addresses to the machines of a single
+tailnet, applies the access policy, and runs the DNS, DERP relay and
+admin console the tailnet needs. Any Tailscale client can log in to it.
+
+slopscale is a fork of [headscale](https://github.com/juanfont/headscale)
+with these improvements:
 
 - Faster map responses, lower memory use, a smaller database footprint
 - Built-in admin console at `/admin/`
