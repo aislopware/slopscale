@@ -1,4 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
+import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Table } from "@cloudflare/kumo/components/table";
 import { SignOutIcon } from "@phosphor-icons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,11 +19,10 @@ import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { userLabel } from "~/lib/node.ts";
-
-const actionsIconSize = 18;
 
 /**
  * Every console sign-in that has not expired. The server decides the scope: a caller who may manage
@@ -161,16 +161,17 @@ function SessionRow({
         </span>
       </Table.Cell>
       <Table.Cell sticky="right" className={cellEdge("w-12 text-right", overflowing)}>
-        <Button
-          variant="ghost"
-          shape="square"
-          size="sm"
-          icon={<SignOutIcon size={actionsIconSize} />}
-          aria-label={`End the session of ${userLabel(session.user)}`}
-          onClick={() => {
-            setEnding(true);
-          }}
-        />
+        <RowMenu label={`Actions for the session of ${userLabel(session.user)}`}>
+          <DropdownMenu.Item
+            icon={SignOutIcon}
+            variant="danger"
+            onClick={() => {
+              setEnding(true);
+            }}
+          >
+            End session…
+          </DropdownMenu.Item>
+        </RowMenu>
         <ConfirmDialog
           open={ending}
           onOpenChange={setEnding}

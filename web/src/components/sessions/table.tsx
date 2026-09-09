@@ -1,5 +1,5 @@
 import { DeleteResource } from "@cloudflare/kumo";
-import { Button, LinkButton } from "@cloudflare/kumo/components/button";
+import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { Table } from "@cloudflare/kumo/components/table";
 import { cn } from "@cloudflare/kumo/utils";
@@ -24,8 +24,10 @@ import type { CursorPaging } from "~/components/table/page-window.ts";
 import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
 import { Code } from "~/components/ui/code.tsx";
+import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
 import { Status } from "~/components/ui/status.tsx";
 
@@ -70,31 +72,33 @@ function RecordingRow({
       <Table.Cell>
         <StateBadge recording={recording} />
       </Table.Cell>
-      <Table.Cell
-        sticky="right"
-        className={cn("w-24 text-right whitespace-nowrap", overflowing && pinnedEdgeClass)}
-      >
-        <LinkButton
-          variant="ghost"
-          shape="square"
-          size="sm"
-          icon={DownloadSimpleIcon}
-          aria-label={`Download ${castFileName(recording)}`}
-          href={sshRecordingCastUrl(recording.id)}
-          download={castFileName(recording)}
-          linksExternal
-        />
-        <Button
-          variant="ghost"
-          shape="square"
-          size="sm"
-          icon={TrashIcon}
-          aria-label="Delete recording"
-          disabled={!writable}
-          onClick={() => {
-            setDeleting(true);
-          }}
-        />
+      <Table.Cell sticky="right" className={cn("w-12 text-right", overflowing && pinnedEdgeClass)}>
+        <RowMenu label={`Actions for the recording of ${sessionTarget(recording)}`}>
+          <DropdownMenu.Item
+            // A rendered item drops the item's own icon and children, so the link carries both.
+            render={
+              <a href={sshRecordingCastUrl(recording.id)} download={castFileName(recording)}>
+                <DownloadSimpleIcon className="mr-2 size-4" />
+                Download
+              </a>
+            }
+          />
+          <DropdownMenu.Separator />
+          <DisabledReason
+            reason={writable ? undefined : "Your credentials may not delete recordings"}
+          >
+            <DropdownMenu.Item
+              icon={TrashIcon}
+              variant="danger"
+              disabled={!writable}
+              onClick={() => {
+                setDeleting(true);
+              }}
+            >
+              Delete…
+            </DropdownMenu.Item>
+          </DisabledReason>
+        </RowMenu>
         <DeleteResource
           open={deleting}
           onOpenChange={setDeleting}
@@ -152,7 +156,7 @@ export function SessionsTable({
                 <Table.Head>Command</Table.Head>
                 <Table.Head>Size</Table.Head>
                 <Table.Head>Status</Table.Head>
-                <Table.Head sticky="right" className={cn("w-24", overflowing && pinnedEdgeClass)}>
+                <Table.Head sticky="right" className={cn("w-12", overflowing && pinnedEdgeClass)}>
                   <span className="sr-only">Actions</span>
                 </Table.Head>
               </Table.Row>

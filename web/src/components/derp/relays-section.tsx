@@ -1,4 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
+import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
@@ -9,9 +10,8 @@ import { withoutRegion } from "~/components/derp/model.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
 import { RegionForm } from "~/components/derp/region-form.tsx";
 import { DialogContent, DialogRoot } from "~/components/ui/dialog.tsx";
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
-
-const iconSize = 16;
 
 function relaySummary(relay: DerpRelay): string {
   const parts = [relay.hostName];
@@ -105,30 +105,26 @@ export function RelaysSection({
               </ul>
             </div>
             {canEdit ? (
-              <span className="flex shrink-0 items-center">
-                <Button
-                  variant="ghost"
-                  shape="square"
-                  size="sm"
-                  icon={<PencilSimpleIcon size={iconSize} />}
-                  aria-label={`Edit region ${region.code}`}
-                  disabled={pending}
+              <RowMenu label={`Actions for region ${region.code}`} disabled={pending}>
+                <DropdownMenu.Item
+                  icon={PencilSimpleIcon}
                   onClick={() => {
                     setDialog(region);
                   }}
-                />
-                <Button
-                  variant="ghost"
-                  shape="square"
-                  size="sm"
-                  icon={<TrashIcon size={iconSize} />}
-                  aria-label={`Remove region ${region.code}`}
-                  disabled={pending}
+                >
+                  Edit…
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator />
+                <DropdownMenu.Item
+                  icon={TrashIcon}
+                  variant="danger"
                   onClick={() => {
                     mutations.apply(withoutRegion(settings, region.id), `Removed ${region.code}`);
                   }}
-                />
-              </span>
+                >
+                  Remove
+                </DropdownMenu.Item>
+              </RowMenu>
             ) : null}
           </SectionRow>
         ))

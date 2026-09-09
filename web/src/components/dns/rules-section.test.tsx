@@ -74,7 +74,8 @@ describe(DnsRulesSection, () => {
   it("opens the editor from a rule and the creator from the header", async () => {
     const screen = await renderSection([rule], true);
 
-    await screen.getByRole("button", { name: "Edit DNS rule Corp DNS" }).click();
+    await screen.getByRole("button", { name: "Actions for DNS rule Corp DNS" }).click();
+    await screen.getByRole("menuitem", { name: "Edit…" }).click();
     await expect.element(screen.getByRole("dialog", { name: "Edit DNS rule" })).toBeVisible();
     await expect.element(screen.getByLabelText("Name")).toHaveValue("Corp DNS");
   });

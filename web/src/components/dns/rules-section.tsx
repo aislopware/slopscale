@@ -1,4 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
+import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
@@ -9,9 +10,8 @@ import { GroupChips } from "~/components/access/group-chips.tsx";
 import { DnsRuleDialog } from "~/components/dns/rule-dialog.tsx";
 import type { DnsRuleMutations } from "~/components/dns/rule-mutations.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
-
-const iconSize = 16;
 
 type Dialog = "closed" | "new" | { readonly edit: DnsRule } | { readonly remove: DnsRule };
 
@@ -67,28 +67,26 @@ export function DnsRulesSection({
           <SectionRow key={rule.id} className="flex items-center justify-between gap-4 py-2.5">
             <RuleSummary rule={rule} groups={groups} />
             {canEdit ? (
-              <span className="flex shrink-0 items-center">
-                <Button
-                  variant="ghost"
-                  shape="square"
-                  size="sm"
-                  icon={<PencilSimpleIcon size={iconSize} />}
-                  aria-label={`Edit DNS rule ${rule.name}`}
+              <RowMenu label={`Actions for DNS rule ${rule.name}`}>
+                <DropdownMenu.Item
+                  icon={PencilSimpleIcon}
                   onClick={() => {
                     setDialog({ edit: rule });
                   }}
-                />
-                <Button
-                  variant="ghost"
-                  shape="square"
-                  size="sm"
-                  icon={<TrashIcon size={iconSize} />}
-                  aria-label={`Delete DNS rule ${rule.name}`}
+                >
+                  Edit…
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator />
+                <DropdownMenu.Item
+                  icon={TrashIcon}
+                  variant="danger"
                   onClick={() => {
                     setDialog({ remove: rule });
                   }}
-                />
-              </span>
+                >
+                  Delete…
+                </DropdownMenu.Item>
+              </RowMenu>
             ) : null}
           </SectionRow>
         ))

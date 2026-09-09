@@ -1,4 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
+import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
 import { PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
@@ -19,10 +20,9 @@ import type { RecordType } from "~/components/dns/model.ts";
 import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
-
-const iconSize = 16;
 
 interface Editing {
   readonly index: number;
@@ -98,30 +98,26 @@ export function ExtraRecordsSection({
               </span>
             </div>
             {editable ? (
-              <span className="flex shrink-0 items-center">
-                <Button
-                  variant="ghost"
-                  shape="square"
-                  size="sm"
-                  icon={<PencilSimpleIcon size={iconSize} />}
-                  aria-label={`Edit record ${record.name}`}
-                  disabled={pending}
+              <RowMenu label={`Actions for record ${record.name}`} disabled={pending}>
+                <DropdownMenu.Item
+                  icon={PencilSimpleIcon}
                   onClick={() => {
                     setDialog({ index, record });
                   }}
-                />
-                <Button
-                  variant="ghost"
-                  shape="square"
-                  size="sm"
-                  icon={<TrashIcon size={iconSize} />}
-                  aria-label={`Remove record ${record.name}`}
-                  disabled={pending}
+                >
+                  Edit…
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator />
+                <DropdownMenu.Item
+                  icon={TrashIcon}
+                  variant="danger"
                   onClick={() => {
                     mutations.apply(withoutRecord(settings, index), `Removed ${record.name}`);
                   }}
-                />
-              </span>
+                >
+                  Remove
+                </DropdownMenu.Item>
+              </RowMenu>
             ) : null}
           </SectionRow>
         ))

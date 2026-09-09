@@ -58,7 +58,9 @@ describe(SessionsBody, () => {
     await expect.element(screen.getByText("10.0.0.9")).toBeVisible();
     await expect.element(screen.getByText("This browser")).toBeVisible();
     await expect
-      .element(screen.getByRole("button", { name: "End the session of Ada Lovelace" }).first())
+      .element(
+        screen.getByRole("button", { name: "Actions for the session of Ada Lovelace" }).first(),
+      )
       .toBeVisible();
   });
 
@@ -73,7 +75,8 @@ describe(SessionsBody, () => {
   it("warns that ending the current session signs this browser out", async () => {
     const screen = await render(app(<SessionsBody sessions={[mine]} error={undefined} />));
 
-    await screen.getByRole("button", { name: "End the session of Ada Lovelace" }).click();
+    await screen.getByRole("button", { name: "Actions for the session of Ada Lovelace" }).click();
+    await screen.getByRole("menuitem", { name: "End session…" }).click();
 
     await expect.element(screen.getByRole("alertdialog")).toBeVisible();
     await expect.element(screen.getByText(/lands back on the sign-in page/u)).toBeVisible();

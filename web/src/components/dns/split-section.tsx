@@ -1,4 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
+import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Input, Textarea } from "@cloudflare/kumo/components/input";
 import { PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
@@ -21,10 +22,9 @@ import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { ExitNodeToggle } from "~/components/dns/nameservers-section.tsx";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
-
-const iconSize = 16;
 
 interface Editing {
   readonly domain: string;
@@ -96,30 +96,26 @@ export function SplitDnsSection({
                 }}
               />
               {canEdit ? (
-                <span className="flex shrink-0 items-center">
-                  <Button
-                    variant="ghost"
-                    shape="square"
-                    size="sm"
-                    icon={<PencilSimpleIcon size={iconSize} />}
-                    aria-label={`Edit split DNS for ${domain}`}
-                    disabled={pending}
+                <RowMenu label={`Actions for split DNS ${domain}`} disabled={pending}>
+                  <DropdownMenu.Item
+                    icon={PencilSimpleIcon}
                     onClick={() => {
                       setDialog({ domain, servers });
                     }}
-                  />
-                  <Button
-                    variant="ghost"
-                    shape="square"
-                    size="sm"
-                    icon={<TrashIcon size={iconSize} />}
-                    aria-label={`Remove split DNS for ${domain}`}
-                    disabled={pending}
+                  >
+                    Edit…
+                  </DropdownMenu.Item>
+                  <DropdownMenu.Separator />
+                  <DropdownMenu.Item
+                    icon={TrashIcon}
+                    variant="danger"
                     onClick={() => {
                       mutations.apply(withoutSplit(settings, domain), `Removed ${domain}`);
                     }}
-                  />
-                </span>
+                  >
+                    Remove
+                  </DropdownMenu.Item>
+                </RowMenu>
               ) : null}
             </div>
           </SectionRow>
