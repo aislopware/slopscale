@@ -1025,6 +1025,9 @@ type Node struct {
 	ApprovedRoutes  []string   `json:"approvedRoutes"`
 	AvailableRoutes []string   `json:"availableRoutes"`
 
+	// ClientVersion The Tailscale client version the node last reported, such as 1.86.2; empty until it connects.
+	ClientVersion string `json:"clientVersion"`
+
 	// ClientWarnings Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup, etc-apt-source-disabled when the Tailscale apt source is commented out. A newer client may report flags not listed here. Empty while the client reports none, while it is offline, and after a restart of the server until it polls again.
 	ClientWarnings []string  `json:"clientWarnings"`
 	CreatedAt      time.Time `json:"createdAt"`
@@ -1033,7 +1036,10 @@ type Node struct {
 	// Ephemeral true when the node is deleted on logout or after the ephemeral timeout.
 	Ephemeral bool       `json:"ephemeral"`
 	Expiry    *time.Time `json:"expiry"`
-	GivenName string     `json:"givenName"`
+
+	// FunnelEnabled true while the client has a Funnel endpoint on, exposing a service to the internet through the ingress.
+	FunnelEnabled bool   `json:"funnelEnabled"`
+	GivenName     string `json:"givenName"`
 
 	// GlobalExitNode true when every client is told to prefer this exit node.
 	GlobalExitNode bool               `json:"globalExitNode"`
@@ -1055,7 +1061,10 @@ type Node struct {
 	Suspended   bool       `json:"suspended"`
 	SuspendedAt *time.Time `json:"suspendedAt"`
 	Tags        []string   `json:"tags"`
-	User        User       `json:"user"`
+
+	// UpdateAvailable true when a newer stable Tailscale client exists than the one the node runs; see latestClientVersion on the server info.
+	UpdateAvailable bool `json:"updateAvailable"`
+	User            User `json:"user"`
 }
 
 // NodeRegisterMethod defines model for Node.RegisterMethod.
@@ -1263,14 +1272,21 @@ type SSHRecording struct {
 type ServerInfo struct {
 	BaseDomain                 string    `json:"baseDomain"`
 	BuildTime                  string    `json:"buildTime"`
+	ClientUpdatesCheck         bool      `json:"clientUpdatesCheck"`
 	Commit                     string    `json:"commit"`
+	ControlDialPlan            []string  `json:"controlDialPlan"`
 	Database                   string    `json:"database"`
 	DerpRegions                int64     `json:"derpRegions"`
 	DerpServer                 bool      `json:"derpServer"`
 	EphemeralInactivityTimeout string    `json:"ephemeralInactivityTimeout"`
+	FunnelIngress              bool      `json:"funnelIngress"`
+	FunnelIngressNodes         int64     `json:"funnelIngressNodes"`
+	FunnelListenAddrs          []string  `json:"funnelListenAddrs"`
+	FunnelPorts                []int64   `json:"funnelPorts"`
 	GoVersion                  string    `json:"goVersion"`
 	Ipv4Prefix                 string    `json:"ipv4Prefix"`
 	Ipv6Prefix                 string    `json:"ipv6Prefix"`
+	LatestClientVersion        string    `json:"latestClientVersion"`
 	ListenAddr                 string    `json:"listenAddr"`
 	MagicDns                   bool      `json:"magicDns"`
 	NodeExpiry                 string    `json:"nodeExpiry"`
@@ -1348,6 +1364,7 @@ type SetUserRoleRequestBody struct {
 // Settings defines model for Settings.
 type Settings struct {
 	DefaultKeyExpiryDays int64 `json:"defaultKeyExpiryDays"`
+	DeviceAttributesOn   bool  `json:"deviceAttributesOn"`
 
 	// DevicesApprovalOn New nodes wait for an administrator unless they register with a preauthorized key.
 	DevicesApprovalOn   bool     `json:"devicesApprovalOn"`
@@ -1374,6 +1391,7 @@ type SshRecordingOutputBody struct {
 
 // UpdateSettingsRequestBody defines model for UpdateSettingsRequestBody.
 type UpdateSettingsRequestBody struct {
+	DeviceAttributesOn  *bool     `json:"deviceAttributesOn,omitempty"`
 	DevicesApprovalOn   *bool     `json:"devicesApprovalOn,omitempty"`
 	KeyExpiryDays       *int64    `json:"keyExpiryDays,omitempty"`
 	PostureIdentityOn   *bool     `json:"postureIdentityOn,omitempty"`

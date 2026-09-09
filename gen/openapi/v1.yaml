@@ -1659,6 +1659,9 @@ components:
           items:
             type: string
           type: array
+        clientVersion:
+          description: The Tailscale client version the node last reported, such as 1.86.2; empty until it connects.
+          type: string
         clientWarnings:
           description: "Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup, etc-apt-source-disabled when the Tailscale apt source is commented out. A newer client may report flags not listed here. Empty while the client reports none, while it is offline, and after a restart of the server until it polls again."
           items:
@@ -1677,6 +1680,9 @@ components:
           type:
             - string
             - "null"
+        funnelEnabled:
+          description: true while the client has a Funnel endpoint on, exposing a service to the internet through the ingress.
+          type: boolean
         givenName:
           type: string
         globalExitNode:
@@ -1732,6 +1738,9 @@ components:
           items:
             type: string
           type: array
+        updateAvailable:
+          description: true when a newer stable Tailscale client exists than the one the node runs; see latestClientVersion on the server info.
+          type: boolean
         user:
           $ref: "#/components/schemas/User"
       required:
@@ -1759,6 +1768,9 @@ components:
         - tags
         - sharedWith
         - globalExitNode
+        - funnelEnabled
+        - clientVersion
+        - updateAvailable
         - ephemeral
         - clientWarnings
       type: object
@@ -2195,8 +2207,14 @@ components:
           type: string
         buildTime:
           type: string
+        clientUpdatesCheck:
+          type: boolean
         commit:
           type: string
+        controlDialPlan:
+          items:
+            type: string
+          type: array
         database:
           type: string
         derpRegions:
@@ -2206,11 +2224,27 @@ components:
           type: boolean
         ephemeralInactivityTimeout:
           type: string
+        funnelIngress:
+          type: boolean
+        funnelIngressNodes:
+          format: int64
+          type: integer
+        funnelListenAddrs:
+          items:
+            type: string
+          type: array
+        funnelPorts:
+          items:
+            format: int64
+            type: integer
+          type: array
         goVersion:
           type: string
         ipv4Prefix:
           type: string
         ipv6Prefix:
+          type: string
+        latestClientVersion:
           type: string
         listenAddr:
           type: string
@@ -2257,6 +2291,13 @@ components:
         - oidcScopes
         - derpRegions
         - derpServer
+        - funnelIngress
+        - funnelListenAddrs
+        - funnelPorts
+        - funnelIngressNodes
+        - latestClientVersion
+        - clientUpdatesCheck
+        - controlDialPlan
         - ephemeralInactivityTimeout
         - nodeExpiry
       type: object
@@ -2399,6 +2440,8 @@ components:
         defaultKeyExpiryDays:
           format: int64
           type: integer
+        deviceAttributesOn:
+          type: boolean
         devicesApprovalOn:
           description: New nodes wait for an administrator unless they register with a preauthorized key.
           type: boolean
@@ -2422,6 +2465,7 @@ components:
         - devicesApprovalOn
         - usersApprovalOn
         - postureIdentityOn
+        - deviceAttributesOn
         - keyExpiryDays
         - defaultKeyExpiryDays
         - sshRecorders
@@ -2449,6 +2493,8 @@ components:
     UpdateSettingsRequestBody:
       additionalProperties: false
       properties:
+        deviceAttributesOn:
+          type: boolean
         devicesApprovalOn:
           type: boolean
         keyExpiryDays:

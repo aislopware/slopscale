@@ -2651,6 +2651,8 @@ export interface components {
             approvedAt: string | null;
             approvedRoutes: string[];
             availableRoutes: string[];
+            /** @description The Tailscale client version the node last reported, such as 1.86.2; empty until it connects. */
+            clientVersion: string;
             /** @description Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup, etc-apt-source-disabled when the Tailscale apt source is commented out. A newer client may report flags not listed here. Empty while the client reports none, while it is offline, and after a restart of the server until it polls again. */
             clientWarnings: string[];
             /** Format: date-time */
@@ -2660,6 +2662,8 @@ export interface components {
             ephemeral: boolean;
             /** Format: date-time */
             expiry: string | null;
+            /** @description true while the client has a Funnel endpoint on, exposing a service to the internet through the ingress. */
+            funnelEnabled: boolean;
             givenName: string;
             /** @description true when every client is told to prefer this exit node. */
             globalExitNode: boolean;
@@ -2683,6 +2687,8 @@ export interface components {
             /** Format: date-time */
             suspendedAt: string | null;
             tags: string[];
+            /** @description true when a newer stable Tailscale client exists than the one the node runs; see latestClientVersion on the server info. */
+            updateAvailable: boolean;
             user: components["schemas"]["User"];
         };
         NodeOutputBody: {
@@ -2833,15 +2839,23 @@ export interface components {
         ServerInfo: {
             baseDomain: string;
             buildTime: string;
+            clientUpdatesCheck: boolean;
             commit: string;
+            controlDialPlan: string[];
             database: string;
             /** Format: int64 */
             derpRegions: number;
             derpServer: boolean;
             ephemeralInactivityTimeout: string;
+            funnelIngress: boolean;
+            /** Format: int64 */
+            funnelIngressNodes: number;
+            funnelListenAddrs: string[];
+            funnelPorts: number[];
             goVersion: string;
             ipv4Prefix: string;
             ipv6Prefix: string;
+            latestClientVersion: string;
             listenAddr: string;
             magicDns: boolean;
             nodeExpiry: string;
@@ -2902,6 +2916,7 @@ export interface components {
         Settings: {
             /** Format: int64 */
             defaultKeyExpiryDays: number;
+            deviceAttributesOn: boolean;
             /** @description New nodes wait for an administrator unless they register with a preauthorized key. */
             devicesApprovalOn: boolean;
             embeddedRecorder: boolean;
@@ -2948,6 +2963,7 @@ export interface components {
             recording: components["schemas"]["SSHRecording"];
         };
         UpdateSettingsRequestBody: {
+            deviceAttributesOn?: boolean;
             devicesApprovalOn?: boolean;
             /** Format: int64 */
             keyExpiryDays?: number;
