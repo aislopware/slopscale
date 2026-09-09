@@ -79,7 +79,7 @@ var listDNSRulesCmd = &cobra.Command{
 					})
 				}
 
-				return renderTable([]string{"ID", "Name", "Enabled", "Domains", "Nameservers", "Groups"}, rows)
+				return renderTable([]string{"ID", "Name", colEnabled, "Domains", "Nameservers", "Groups"}, rows)
 			})
 		},
 	),

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -85,6 +86,10 @@ func init() {
 	mustMarkRequired(globalExitNodeCmd, "identifier")
 	globalExitNodeCmd.Flags().Bool("revoke", false, "Clear the mark instead of setting it")
 	nodeCmd.AddCommand(globalExitNodeCmd)
+
+	accessGraphCmd.Flags().Uint64P("node", "n", 0, "Node identifier (ID)")
+	mustMarkRequired(accessGraphCmd, "node")
+	nodeCmd.AddCommand(accessGraphCmd)
 
 	nodeCmd.AddCommand(backfillNodeIPsCmd)
 }
@@ -758,4 +763,123 @@ var approveRoutesCmd = &cobra.Command{
 			return printOutput(cmd, resp.JSON200.Node, "Node updated")
 		},
 	),
+}
+
+var accessGraphCmd = &cobra.Command{
+	Use:   "access-graph",
+	Short: "Show what a node can reach and what can reach it",
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			nodeID, _ := cmd.Flags().GetUint64("node")
+			nodeIDStr := strconv.FormatUint(nodeID, util.Base10)
+
+			params := &clientv1.GetAccessGraphParams{
+				Node: &nodeIDStr,
+			}
+
+			resp, err := client.GetAccessGraphWithResponse(ctx, params)
+			if err != nil {
+				return fmt.Errorf("getting access graph: %w", err)
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			graph := resp.JSON200
+
+			return printListOutput(cmd, graph, func() error {
+				return printAccessGraphHuman(graph, nodeIDStr)
+			})
+		},
+	),
+}
+
+func printAccessGraphHuman(graph *clientv1.AccessGraph, nodeID string) error {
+	nodeMap := make(map[string]clientv1.AccessGraphNode, len(graph.Nodes))
+	for _, n := range graph.Nodes {
+		nodeMap[n.Id] = n
+	}
+
+	var canReachEdges, reachedByEdges []clientv1.AccessGraphEdge
+
+	for _, edge := range graph.Edges {
+		if edge.Src == nodeID {
+			canReachEdges = append(canReachEdges, edge)
+		}
+
+		if edge.Dst == nodeID {
+			reachedByEdges = append(reachedByEdges, edge)
+		}
+	}
+
+	slices.SortFunc(canReachEdges, func(a, b clientv1.AccessGraphEdge) int {
+		return strings.Compare(a.Dst, b.Dst)
+	})
+	slices.SortFunc(reachedByEdges, func(a, b clientv1.AccessGraphEdge) int {
+		return strings.Compare(a.Src, b.Src)
+	})
+
+	fmt.Println("Can reach:")
+
+	err := renderTable([]string{"Peer", "Name", "Ports/protocols"}, accessGraphRows(canReachEdges, true, nodeMap))
+	if err != nil {
+		return err
+	}
+
+	fmt.Println()
+	fmt.Println("Reached by:")
+
+	return renderTable([]string{"Peer", "Name", "Ports/protocols"}, accessGraphRows(reachedByEdges, false, nodeMap))
+}
+
+func accessGraphRows(
+	edges []clientv1.AccessGraphEdge,
+	isCanReach bool,
+	nodeMap map[string]clientv1.AccessGraphNode,
+) [][]string {
+	rows := make([][]string, 0, len(edges))
+
+	for _, e := range edges {
+		peerID := e.Dst
+		if !isCanReach {
+			peerID = e.Src
+		}
+
+		name := peerID
+		if n, ok := nodeMap[peerID]; ok && n.Name != "" {
+			name = n.Name
+		}
+
+		rows = append(rows, []string{
+			peerID,
+			name,
+			formatEdgePortsProtocols(e),
+		})
+	}
+
+	return rows
+}
+
+func formatEdgePortsProtocols(e clientv1.AccessGraphEdge) string {
+	parts := make([]string, 0, len(e.Ports)+len(e.Routes)+len(e.SshUsers)+len(e.Capabilities))
+	parts = append(parts, e.Ports...)
+
+	for _, r := range e.Routes {
+		parts = append(parts, "route:"+r)
+	}
+
+	for _, u := range e.SshUsers {
+		parts = append(parts, "ssh:"+u)
+	}
+
+	for _, c := range e.Capabilities {
+		parts = append(parts, "cap:"+c)
+	}
+
+	if len(parts) == 0 {
+		return "-"
+	}
+
+	return strings.Join(parts, ", ")
 }

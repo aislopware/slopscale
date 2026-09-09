@@ -21,4 +21,5 @@ const (
 	colResult     = "Result"
 	colCreated    = "Created"
 	colExpiration = "Expiration"
+	colEnabled    = "Enabled"
 )

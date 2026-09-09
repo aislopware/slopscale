@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +30,7 @@ func init() {
 	derpCmd.AddCommand(setDERPCmd)
 	derpCmd.AddCommand(resetDERPCmd)
 	derpCmd.AddCommand(refreshDERPCmd)
+	derpCmd.AddCommand(derpLatencyCmd)
 	derpCmd.AddCommand(derpRelayCmd)
 	derpRelayCmd.AddCommand(addDERPRelayCmd)
 	derpRelayCmd.AddCommand(removeDERPRelayCmd)
@@ -541,4 +544,60 @@ func derefInt(i *int64) int64 {
 
 func derefBool(b *bool) bool {
 	return b != nil && *b
+}
+
+var derpLatencyCmd = &cobra.Command{
+	Use:   "latency",
+	Short: "Show relay latency measured by machines",
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			resp, err := client.GetDERPLatencyWithResponse(ctx)
+			if err != nil {
+				return fmt.Errorf("getting DERP latency: %w", err)
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			report := resp.JSON200
+
+			return printListOutput(cmd, report, func() error {
+				return renderTable(
+					[]string{"ID", "Name", "Preferred by", "Reporting", "Median", "p90"},
+					derpLatencyToRows(report.Regions),
+				)
+			})
+		},
+	),
+}
+
+func derpLatencyToRows(regions []clientv1.DERPLatencyRegion) [][]string {
+	rows := make([][]string, 0, len(regions))
+
+	for _, r := range regions {
+		name := r.Name
+		if name == "" {
+			name = r.Code
+		}
+
+		median := "-"
+		p90 := "-"
+
+		if r.Samples > 0 {
+			median = fmt.Sprintf("%.1fms", r.MedianMs)
+			p90 = fmt.Sprintf("%.1fms", r.P90Ms)
+		}
+
+		rows = append(rows, []string{
+			strconv.FormatInt(r.RegionId, util.Base10),
+			name,
+			strconv.FormatInt(r.PreferredBy, util.Base10),
+			strconv.FormatInt(r.Samples, util.Base10),
+			median,
+			p90,
+		})
+	}
+
+	return rows
 }

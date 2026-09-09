@@ -138,7 +138,7 @@ var listAccessRulesCmd = &cobra.Command{
 						"Protocol",
 						"Ports",
 						"Direction",
-						"Enabled",
+						colEnabled,
 						"Expires",
 					},
 					rows,

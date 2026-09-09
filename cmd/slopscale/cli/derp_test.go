@@ -356,6 +356,77 @@ func TestDERPCommands(t *testing.T) {
 			routes:  map[string]apiHandler{"GET /api/v1/derp": getCurrent},
 			wantErr: "no such relay in the region",
 		},
+		{
+			name: "latency report renders table",
+			src:  derpLatencyCmd,
+			routes: map[string]apiHandler{
+				"GET /api/v1/derp/latency": func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+					t.Helper()
+					writeJSON(t, w, clientv1.DERPLatencyReport{
+						Reporting: 5,
+						Silent:    1,
+						HardNat:   0,
+						Regions: []clientv1.DERPLatencyRegion{
+							{
+								RegionId:    1,
+								Code:        "nyc",
+								Name:        "New York City",
+								PreferredBy: 3,
+								Samples:     5,
+								MedianMs:    12.4,
+								P90Ms:       18.2,
+							},
+							{
+								RegionId:    2,
+								Code:        "sfo",
+								Name:        "San Francisco",
+								PreferredBy: 0,
+								Samples:     0,
+								MedianMs:    0,
+								P90Ms:       0,
+							},
+						},
+					})
+				},
+			},
+			wantIn: []string{
+				"1",
+				"New York City",
+				"3",
+				"5",
+				"12.4ms",
+				"18.2ms",
+				"2",
+				"San Francisco",
+				"0",
+				"-",
+			},
+		},
+		{
+			name:  "latency report as json",
+			src:   derpLatencyCmd,
+			flags: map[string]string{"output": "json"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/derp/latency": func(t *testing.T, w http.ResponseWriter, _ *http.Request) {
+					t.Helper()
+					writeJSON(t, w, clientv1.DERPLatencyReport{
+						Reporting: 1,
+						Regions: []clientv1.DERPLatencyRegion{
+							{
+								RegionId:    1,
+								Code:        "nyc",
+								Name:        "New York City",
+								PreferredBy: 1,
+								Samples:     1,
+								MedianMs:    10.0,
+								P90Ms:       10.0,
+							},
+						},
+					})
+				},
+			},
+			wantIn: []string{`"reporting": 1`, `"regionId": 1`, `"name": "New York City"`},
+		},
 	}
 
 	runCommandCases(t, derpFlags, cases)

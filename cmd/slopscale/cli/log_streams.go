@@ -76,7 +76,7 @@ var listLogStreamsCmd = &cobra.Command{
 				}
 
 				return renderTable(
-					[]string{"ID", "Name", "Destination", "URL", "Enabled", "Last delivery", "Delivered", "Dropped"},
+					[]string{"ID", "Name", "Destination", "URL", colEnabled, "Last delivery", "Delivered", "Dropped"},
 					rows,
 				)
 			})

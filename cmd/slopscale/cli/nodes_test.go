@@ -20,6 +20,7 @@ const (
 // nodeFlags mirrors the flags init() registers on the node subcommands.
 func nodeFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint64P("identifier", "i", 0, "")
+	cmd.Flags().Uint64P("node", "n", 0, "")
 	cmd.Flags().StringP("user", "u", "", "")
 	cmd.Flags().StringP("key", "k", "", "")
 	cmd.Flags().StringP("expiry", "e", "", "")
@@ -635,6 +636,102 @@ func TestNodeCommands(t *testing.T) {
 				},
 			},
 			wantErr: "no prefixes configured",
+		},
+		{
+			name:  "access-graph renders Can reach and Reached by tables",
+			src:   accessGraphCmd,
+			flags: map[string]string{"node": "7"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/access-graph": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+					assert.Equal(t, "7", r.URL.Query().Get("node"))
+					writeJSON(t, w, clientv1.AccessGraph{
+						Enforcing: true,
+						Nodes: []clientv1.AccessGraphNode{
+							{
+								Id:     "7",
+								Name:   "laptop",
+								User:   "alice",
+								Online: true,
+								Routes: []string{},
+								Tags:   []string{},
+							},
+							{
+								Id:     "8",
+								Name:   "router",
+								User:   "",
+								Online: true,
+								Routes: []string{"10.0.0.0/8"},
+								Tags:   []string{"tag:router"},
+							},
+							{
+								Id:     "9",
+								Name:   "server",
+								User:   "",
+								Online: true,
+								Routes: []string{},
+								Tags:   []string{"tag:server"},
+							},
+						},
+						Edges: []clientv1.AccessGraphEdge{
+							{
+								Src:          "7",
+								Dst:          "8",
+								Ports:        []string{"*"},
+								Routes:       []string{"10.0.0.0/8"},
+								SshUsers:     []string{},
+								Capabilities: []string{},
+								SshCheck:     false,
+							},
+							{
+								Src:          "9",
+								Dst:          "7",
+								Ports:        []string{"tcp:22"},
+								Routes:       []string{},
+								SshUsers:     []string{"alice"},
+								Capabilities: []string{},
+								SshCheck:     false,
+							},
+						},
+					})
+				},
+			},
+			wantIn: []string{
+				"Can reach:",
+				"8",
+				"router",
+				"*, route:10.0.0.0/8",
+				"Reached by:",
+				"9",
+				"server",
+				"tcp:22, ssh:alice",
+			},
+		},
+		{
+			name:  "access-graph as json",
+			src:   accessGraphCmd,
+			flags: map[string]string{"node": "7", "output": "json"},
+			routes: map[string]apiHandler{
+				"GET /api/v1/access-graph": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+					assert.Equal(t, "7", r.URL.Query().Get("node"))
+					writeJSON(t, w, clientv1.AccessGraph{
+						Enforcing: true,
+						Nodes: []clientv1.AccessGraphNode{
+							{
+								Id:     "7",
+								Name:   "laptop",
+								User:   "alice",
+								Online: true,
+								Routes: []string{},
+								Tags:   []string{},
+							},
+						},
+						Edges: []clientv1.AccessGraphEdge{},
+					})
+				},
+			},
+			wantIn: []string{`"enforcing": true`, `"id": "7"`},
 		},
 	}
 
