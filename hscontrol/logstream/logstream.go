@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/juanfont/headscale/hscontrol/egress"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 )
@@ -63,9 +64,11 @@ func New(store Store, tailnet string) *Streamer {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	return &Streamer{
-		store:     store,
-		tailnet:   tailnet,
-		client:    &http.Client{Timeout: deliveryTimeout, CheckRedirect: noRedirect},
+		store:   store,
+		tailnet: tailnet,
+		// Sink URLs are operator input, so batches dial through the egress
+		// guard; see hscontrol/egress.
+		client:    &http.Client{Timeout: deliveryTimeout, CheckRedirect: noRedirect, Transport: egress.Transport()},
 		backoff:   []time.Duration{2 * time.Second, 10 * time.Second, 30 * time.Second},
 		flush:     defaultFlush,
 		batchSize: defaultBatch,
@@ -192,6 +195,14 @@ func (s *Streamer) Test(ctx context.Context, stream types.LogStream) error {
 	started := time.Now()
 	status, err := s.post(ctx, stream, []Entry{entry})
 	s.record(stream.ID, 1, 0, status, err, 1, time.Since(started))
+
+	if err != nil {
+		// The reported status is coarse, so the cause is logged here.
+		log.Debug().Err(err).
+			Uint64("stream", uint64(stream.ID)).
+			Str("host", stream.Host()).
+			Msg("log stream test delivery failed")
+	}
 
 	return err
 }
@@ -390,6 +401,31 @@ func retryable(status int, err error) bool {
 	return status >= http.StatusInternalServerError || status == http.StatusTooManyRequests
 }
 
+// deliveryStatus is what the operator is told about one batch, stored as the
+// stream's last status. A transport error is collapsed: its text names the
+// address the server resolved and dialed, which is the server's view of its
+// own network, and the whole error goes to the log instead.
+func deliveryStatus(status int, err error) string {
+	switch {
+	case status != 0:
+		return strconv.Itoa(status)
+
+	case err == nil:
+		return "sent"
+
+	case errors.Is(err, egress.ErrBlocked):
+		return "rejected"
+
+	case errors.Is(err, ErrRedirected), errors.Is(err, ErrClosed):
+		// headscale's own words about its own state, with nothing of the
+		// sink's network in them.
+		return err.Error()
+
+	default:
+		return "unreachable"
+	}
+}
+
 // post sends one batch once and returns the HTTP status it got.
 func (s *Streamer) post(ctx context.Context, stream types.LogStream, batch []Entry) (int, error) {
 	payload, err := Encode(stream, batch)
@@ -437,16 +473,11 @@ func (s *Streamer) record(
 		return
 	}
 
-	text := strconv.Itoa(status)
-	if status == 0 && err != nil {
-		text = err.Error()
-	}
-
 	recordErr := s.store.RecordLogStreamDelivery(types.LogStreamDelivery{
 		StreamID: id,
 		Entries:  entries,
 		Dropped:  dropped,
-		Status:   text,
+		Status:   deliveryStatus(status, err),
 		OK:       err == nil,
 		Attempts: attempts,
 		Duration: took,

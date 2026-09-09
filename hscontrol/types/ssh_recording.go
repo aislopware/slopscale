@@ -33,6 +33,25 @@ type SSHRecordingConfig struct {
 	StateDir string
 	// Retention deletes recordings older than this; zero keeps them.
 	Retention time.Duration
+	// MaxSessionBytes bounds one uploaded session; the recording is kept
+	// and marked incomplete when a session runs past it. Zero means
+	// [DefaultMaxSessionBytes], not unlimited: the upload is a stream from
+	// a node and nothing else bounds it.
+	MaxSessionBytes int64
+}
+
+// DefaultMaxSessionBytes is the per-session upload cap when the config
+// names none. An asciinema recording of a long interactive session is a
+// few megabytes, so this is generous.
+const DefaultMaxSessionBytes int64 = 512 << 20
+
+// SessionLimit is the cap in force: the configured one, or the default.
+func (c SSHRecordingConfig) SessionLimit() int64 {
+	if c.MaxSessionBytes <= 0 {
+		return DefaultMaxSessionBytes
+	}
+
+	return c.MaxSessionBytes
 }
 
 // SSHRecordingID identifies a recording in the ssh_recordings table.

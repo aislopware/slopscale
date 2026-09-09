@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/juanfont/headscale/hscontrol/egress"
 )
 
 // WebhookID identifies a webhook endpoint in the webhooks table.
@@ -292,8 +294,8 @@ func validateWebhookURL(w Webhook) error {
 		}
 
 		for _, addr := range splitAddresses(u.Opaque) {
-			_, err := mail.ParseAddress(addr)
-			if err != nil {
+			_, addrErr := mail.ParseAddress(addr)
+			if addrErr != nil {
 				return fmt.Errorf("%w: %q", ErrWebhookMailtoInvalid, addr)
 			}
 		}
@@ -303,6 +305,13 @@ func validateWebhookURL(w Webhook) error {
 
 	if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return fmt.Errorf("%w: %q", ErrWebhookURLInvalid, w.URL)
+	}
+
+	// A receiver on the server's own loopback or on the cloud metadata
+	// service is the control server posting to itself; see hscontrol/egress.
+	err = egress.Default().CheckHost(u.Host)
+	if err != nil {
+		return fmt.Errorf("webhook URL points at a %w", err)
 	}
 
 	if w.ProviderType == WebhookProviderTelegram && u.Query().Get(TelegramChatParam) == "" {

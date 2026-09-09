@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juanfont/headscale/hscontrol/egress"
 	"tailscale.com/tailcfg"
 )
 
@@ -243,6 +244,13 @@ func (s DERPSettings) Validate() error {
 		parsed, err := url.Parse(u)
 		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
 			return fmt.Errorf("%w: %q", ErrDERPURLInvalid, u)
+		}
+
+		// The map is fetched by the server, so the URL must not point at
+		// what only the server can reach; see hscontrol/egress.
+		err = egress.Default().CheckHost(parsed.Host)
+		if err != nil {
+			return fmt.Errorf("DERP map URL points at a %w", err)
 		}
 	}
 

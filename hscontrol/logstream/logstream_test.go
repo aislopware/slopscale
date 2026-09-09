@@ -7,16 +7,26 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/juanfont/headscale/hscontrol/egress"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestMain allows deliveries to loopback: these tests post to httptest
+// receivers on this host, which the egress guard refuses by default.
+func TestMain(m *testing.M) {
+	egress.SetDefault(egress.Policy{AllowLoopback: true})
+
+	os.Exit(m.Run())
+}
 
 type memStore struct {
 	mu      sync.Mutex
@@ -405,6 +415,13 @@ func TestTestRecordsRejection(t *testing.T) {
 	require.ErrorIs(t, err, ErrRejected)
 	assert.Equal(t, "403", store.last(4).Status)
 	assert.False(t, store.last(4).OK)
+
+	// A sink that cannot be reached is recorded coarsely: the dial error
+	// names the address the server resolved, which the status does not
+	// repeat to the operator.
+	dead := types.LogStream{ID: 5, Name: "y", Destination: types.LogStreamSplunk, URL: "http://127.0.0.1:1", Token: "t"}
+	require.Error(t, s.Test(t.Context(), dead))
+	assert.Equal(t, "unreachable", store.last(5).Status)
 
 	s.Close()
 	require.ErrorIs(t, s.Test(t.Context(), stream), ErrClosed)

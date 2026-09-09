@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/juanfont/headscale/hscontrol/egress"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 )
@@ -83,7 +84,9 @@ func New(store Store, tailnet string) *Dispatcher {
 	d := &Dispatcher{
 		store:   store,
 		tailnet: tailnet,
-		client:  &http.Client{Timeout: deliveryTimeout, CheckRedirect: noRedirect},
+		// Receiver URLs are operator input, so deliveries dial through the
+		// egress guard; see hscontrol/egress.
+		client:  &http.Client{Timeout: deliveryTimeout, CheckRedirect: noRedirect, Transport: egress.Transport()},
 		backoff: []time.Duration{2 * time.Second, 10 * time.Second, 30 * time.Second},
 		ctx:     ctx,
 		cancel:  cancel,
@@ -232,6 +235,14 @@ func (d *Dispatcher) Test(ctx context.Context, endpoint types.Webhook) error {
 	status, err := d.deliver(ctx, endpoint, event)
 	d.record(endpoint.ID, event.Type, status, err, 1, time.Since(started))
 
+	if err != nil {
+		// The reported status is coarse, so the cause is logged here.
+		log.Debug().Err(err).
+			Uint64("webhook", uint64(endpoint.ID)).
+			Str("host", endpoint.Host()).
+			Msg("webhook test delivery failed")
+	}
+
 	return err
 }
 
@@ -319,7 +330,8 @@ func (d *Dispatcher) deliverWithRetry(ctx context.Context, endpoint types.Webhoo
 
 	if err != nil {
 		// The URL is a credential for the chat providers, so only its
-		// host is logged.
+		// host is logged. The recorded status is coarse, so the raw error
+		// is only here.
 		log.Warn().Err(err).
 			Uint64("webhook", uint64(endpoint.ID)).
 			Str("host", endpoint.Host()).
@@ -398,20 +410,10 @@ func (d *Dispatcher) record(
 		return
 	}
 
-	text := strconv.Itoa(status)
-
-	switch {
-	case status == 0 && err != nil:
-		text = err.Error()
-	case status == 0:
-		// Mail has no status; the delivery went through.
-		text = "sent"
-	}
-
 	recordErr := d.store.RecordWebhookDelivery(types.WebhookDelivery{
 		WebhookID: id,
 		EventType: eventType,
-		Status:    text,
+		Status:    deliveryStatus(status, err),
 		OK:        err == nil,
 		Attempts:  attempts,
 		Duration:  took,
@@ -419,6 +421,33 @@ func (d *Dispatcher) record(
 	})
 	if recordErr != nil {
 		log.Error().Err(recordErr).Uint64("webhook", uint64(id)).Msg("recording webhook delivery")
+	}
+}
+
+// deliveryStatus is what the operator is told about one delivery, stored as
+// the endpoint's last status. A transport error is collapsed: its text names
+// the address the server resolved and dialed, which is the server's view of
+// its own network, and the whole error goes to the log instead.
+func deliveryStatus(status int, err error) string {
+	switch {
+	case status != 0:
+		return strconv.Itoa(status)
+
+	case err == nil:
+		// Mail has no status; the delivery went through.
+		return "sent"
+
+	case errors.Is(err, egress.ErrBlocked), errors.Is(err, ErrMailRejected):
+		return "rejected"
+
+	case errors.Is(err, ErrRedirected), errors.Is(err, ErrNoMailer),
+		errors.Is(err, ErrQueueFull), errors.Is(err, ErrClosed):
+		// headscale's own words about its own state, with nothing of the
+		// receiver's network in them.
+		return err.Error()
+
+	default:
+		return "unreachable"
 	}
 }
 
@@ -492,7 +521,12 @@ func Payload(endpoint types.Webhook, event types.WebhookEvent) (Request, error) 
 		types.WebhookProviderTeams:
 		body = map[string]string{"text": event.Message}
 	case types.WebhookProviderDiscord:
-		body = map[string]string{"content": event.Message}
+		// An empty parse list stops Discord resolving @everyone or a role
+		// mention out of a name that happens to contain one.
+		body = map[string]any{
+			"content":          event.Message,
+			"allowed_mentions": map[string]any{"parse": []string{}},
+		}
 	case types.WebhookProviderTelegram:
 		// The chat lives in the URL's query, where the operator put it;
 		// the Bot API wants it in the body next to the text.

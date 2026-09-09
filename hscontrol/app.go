@@ -31,6 +31,7 @@ import (
 	derpServer "github.com/juanfont/headscale/hscontrol/derp/server"
 	"github.com/juanfont/headscale/hscontrol/dns"
 	"github.com/juanfont/headscale/hscontrol/dnsprovider"
+	"github.com/juanfont/headscale/hscontrol/egress"
 	"github.com/juanfont/headscale/hscontrol/mapper"
 	"github.com/juanfont/headscale/hscontrol/recorder"
 	"github.com/juanfont/headscale/hscontrol/state"
@@ -106,6 +107,11 @@ func NewHeadscale(cfg *types.Config) (*Headscale, error) {
 	if profilingEnabled {
 		runtime.SetBlockProfileRate(1)
 	}
+
+	// Every outbound client the server builds for an operator-supplied URL
+	// dials through this policy, and the URL validators check it, so it is
+	// installed before anything can be validated or delivered.
+	egress.SetDefault(cfg.Egress.Policy())
 
 	noisePrivateKey, err := readOrCreatePrivateKey(cfg.NoisePrivateKeyPath)
 	if err != nil {

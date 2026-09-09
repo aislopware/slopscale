@@ -1082,6 +1082,90 @@ func TestAuthenticationFlows(t *testing.T) {
 			wantError:  true, // RequestTags rejected for PreAuthKey registrations
 		},
 
+		// TEST: Tagged PreAuthKey accepts RequestTags the key already carries
+		// WHAT: tailscale up --authkey=<tagged key> --advertise-tags=tag:ci
+		// INPUT: Key tagged [tag:ci, tag:prod], client asks for [tag:ci]
+		// EXPECTED: Registration succeeds and the node keeps the key's tags
+		// WHY: Tailscale accepts a request that names tags the key allows
+		{
+			name: "tagged_preauth_key_accepts_subset_request_tags",
+			setupFunc: func(t *testing.T, app *Headscale) (string, error) {
+				t.Helper()
+
+				user := app.state.CreateUserForTest("tagged-pak-subset-user")
+
+				pak, err := app.state.CreatePreAuthKey(
+					user.TypedID(), true, false, nil, []string{"tag:ci", "tag:prod"},
+				)
+				if err != nil {
+					return "", err
+				}
+
+				return pak.Key, nil
+			},
+			request: func(authKey string) tailcfg.RegisterRequest {
+				return tailcfg.RegisterRequest{
+					Auth: &tailcfg.RegisterResponseAuth{
+						AuthKey: authKey,
+					},
+					NodeKey: nodeKey1.Public(),
+					Hostinfo: &tailcfg.Hostinfo{
+						Hostname:    "tagged-pak-subset-node",
+						RequestTags: []string{"tag:ci"},
+					},
+					Expiry: time.Now().Add(24 * time.Hour),
+				}
+			},
+			machineKey: machineKey1.Public,
+			wantAuth:   true,
+			validate: func(t *testing.T, resp *tailcfg.RegisterResponse, app *Headscale) {
+				assert.True(t, resp.MachineAuthorized)
+
+				node, found := app.state.GetNodeByNodeKey(nodeKey1.Public())
+				require.True(t, found)
+				// The key stays authoritative: the node gets every key tag.
+				assert.Equal(t, []string{"tag:ci", "tag:prod"}, node.Tags().AsSlice())
+			},
+		},
+
+		// TEST: Tagged PreAuthKey rejects RequestTags beyond the key's
+		// WHAT: Client asks for a key tag plus one the key does not carry
+		// INPUT: Key tagged [tag:ci], client asks for [tag:ci, tag:extra]
+		// EXPECTED: Registration fails and the message names the key's tags
+		// WHY: The key bounds what a client may advertise
+		{
+			name: "tagged_preauth_key_rejects_superset_request_tags",
+			setupFunc: func(t *testing.T, app *Headscale) (string, error) {
+				t.Helper()
+
+				user := app.state.CreateUserForTest("tagged-pak-superset-user")
+
+				pak, err := app.state.CreatePreAuthKey(
+					user.TypedID(), true, false, nil, []string{"tag:ci"},
+				)
+				if err != nil {
+					return "", err
+				}
+
+				return pak.Key, nil
+			},
+			request: func(authKey string) tailcfg.RegisterRequest {
+				return tailcfg.RegisterRequest{
+					Auth: &tailcfg.RegisterResponseAuth{
+						AuthKey: authKey,
+					},
+					NodeKey: nodeKey1.Public(),
+					Hostinfo: &tailcfg.Hostinfo{
+						Hostname:    "tagged-pak-superset-node",
+						RequestTags: []string{"tag:ci", "tag:extra"},
+					},
+					Expiry: time.Now().Add(24 * time.Hour),
+				}
+			},
+			machineKey: machineKey1.Public,
+			wantError:  true,
+		},
+
 		// === RE-AUTHENTICATION SCENARIOS ===
 		// TEST: Existing node re-authenticates with new pre-auth key
 		// WHAT: Tests that existing node can re-authenticate using new pre-auth key
@@ -3253,6 +3337,10 @@ func createTestApp(t *testing.T) *Headscale {
 		Policy: types.PolicyConfig{
 			Mode: types.PolicyModeDB,
 		},
+		// Receivers in these tests run on loopback, and the API tests reach
+		// the debug endpoint.
+		Egress: types.EgressConfig{AllowLoopbackTargets: true},
+		Debug:  types.DebugConfig{NodeAPIEnabled: true},
 		Tuning: types.Tuning{
 			BatchChangeDelay:      100 * time.Millisecond,
 			BatcherWorkers:        1,

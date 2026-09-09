@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/juanfont/headscale/hscontrol/egress"
 	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog"
@@ -186,6 +187,12 @@ type Config struct {
 
 	// SSHRecording is the embedded session recorder.
 	SSHRecording SSHRecordingConfig
+
+	// Egress bounds where the server's own outbound requests may go.
+	Egress EgressConfig
+
+	// Debug turns on endpoints meant for developing headscale.
+	Debug DebugConfig
 
 	// HTTPSCerts is certificate assistance for machines' MagicDNS names.
 	HTTPSCerts HTTPSCertsConfig
@@ -536,10 +543,51 @@ func httpsCertsConfig() (HTTPSCertsConfig, error) {
 
 func sshRecordingConfig() SSHRecordingConfig {
 	return SSHRecordingConfig{
-		Enabled:   viper.GetBool("ssh_recording.enabled"),
-		Dir:       util.AbsolutePathFromConfigPath(viper.GetString("ssh_recording.dir")),
-		StateDir:  util.AbsolutePathFromConfigPath(viper.GetString("ssh_recording.state_dir")),
-		Retention: viper.GetDuration("ssh_recording.retention"),
+		Enabled:         viper.GetBool("ssh_recording.enabled"),
+		Dir:             util.AbsolutePathFromConfigPath(viper.GetString("ssh_recording.dir")),
+		StateDir:        util.AbsolutePathFromConfigPath(viper.GetString("ssh_recording.state_dir")),
+		Retention:       viper.GetDuration("ssh_recording.retention"),
+		MaxSessionBytes: viper.GetInt64("ssh_recording.max_session_bytes"),
+	}
+}
+
+// EgressConfig bounds the addresses the server's own outbound requests
+// (webhooks, log streams, DERP map URLs) may reach; see
+// [github.com/juanfont/headscale/hscontrol/egress].
+type EgressConfig struct {
+	// DenyPrivateTargets refuses the private ranges as well as the
+	// addresses that are always refused.
+	DenyPrivateTargets bool
+	// AllowLoopbackTargets re-allows loopback, for development.
+	AllowLoopbackTargets bool
+}
+
+// Policy is the guard policy this config asks for.
+func (c EgressConfig) Policy() egress.Policy {
+	return egress.Policy{
+		AllowLoopback: c.AllowLoopbackTargets,
+		DenyPrivate:   c.DenyPrivateTargets,
+	}
+}
+
+func egressConfig() EgressConfig {
+	return EgressConfig{
+		DenyPrivateTargets:   viper.GetBool("egress.deny_private_targets"),
+		AllowLoopbackTargets: viper.GetBool("egress.allow_loopback_targets"),
+	}
+}
+
+// DebugConfig holds the endpoints that exist for developing headscale and
+// are not part of the supported API.
+type DebugConfig struct {
+	// NodeAPIEnabled registers POST /api/v1/debug/node, which mints a node
+	// from key material the caller supplies. Development only.
+	NodeAPIEnabled bool
+}
+
+func debugConfig() DebugConfig {
+	return DebugConfig{
+		NodeAPIEnabled: viper.GetBool("debug.node_api_enabled"),
 	}
 }
 
@@ -689,6 +737,10 @@ func LoadConfig(path string, isFile bool) error {
 	viper.SetDefault("ssh_recording.enabled", false)
 	viper.SetDefault("ssh_recording.dir", "/var/lib/headscale/recordings")
 	viper.SetDefault("ssh_recording.state_dir", "/var/lib/headscale/recorder")
+	viper.SetDefault("ssh_recording.max_session_bytes", 0)
+	viper.SetDefault("egress.deny_private_targets", false)
+	viper.SetDefault("egress.allow_loopback_targets", false)
+	viper.SetDefault("debug.node_api_enabled", false)
 	viper.SetDefault("notifications.smtp.encryption", string(SMTPStartTLS))
 
 	viper.SetDefault("tls_letsencrypt_cache_dir", "/var/www/.cache")
@@ -1656,6 +1708,10 @@ func LoadServerConfig() (*Config, error) {
 		SMTP: smtp,
 
 		SSHRecording: sshRecordingConfig(),
+
+		Egress: egressConfig(),
+
+		Debug: debugConfig(),
 
 		HTTPSCerts: httpsCerts,
 

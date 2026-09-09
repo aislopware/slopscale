@@ -358,6 +358,35 @@ policy:
 #   state_dir: /var/lib/headscale/recorder
 #   # Delete recordings older than this; unset keeps them.
 #   retention: 2160h
+#   # Refuse to store more than this from one session; what arrived is kept
+#   # and marked incomplete. 0 uses the default of 512 MiB, not unlimited.
+#   max_session_bytes: 536870912
+
+## Outbound requests
+#
+# Where headscale's own HTTP clients may go: webhook receivers, log stream
+# sinks and DERP map URLs. Loopback, link-local (169.254.0.0/16, fe80::/10)
+# and unspecified addresses are always refused, so an operator-supplied URL
+# cannot reach the server's own services or a cloud metadata endpoint. Both
+# the URL and the address it resolves to are checked.
+# egress:
+#   # Refuse the private ranges too (10/8, 172.16/12, 192.168/16, fc00::/7
+#   # and the tailnet's 100.64/10). Off by default: receivers on the LAN are
+#   # a normal self-hosted setup.
+#   deny_private_targets: false
+#   # Re-allow loopback, for a development server whose receivers run
+#   # alongside it. Do not set this in production.
+#   allow_loopback_targets: false
+
+## Development endpoints
+#
+# Off by default and not part of the supported API.
+# debug:
+#   # Serve POST /api/v1/debug/node, which mints a node from key material
+#   # the caller supplies (`headscale debug create-node`). Development only:
+#   # while it is off the operation is not registered and is absent from the
+#   # OpenAPI document the server serves.
+#   node_api_enabled: false
 
 ## DNS
 #

@@ -8,16 +8,26 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/mail"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/juanfont/headscale/hscontrol/egress"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestMain allows deliveries to loopback: these tests post to httptest
+// receivers on this host, which the egress guard refuses by default.
+func TestMain(m *testing.M) {
+	egress.SetDefault(egress.Policy{AllowLoopback: true})
+
+	os.Exit(m.Run())
+}
 
 type memStore struct {
 	mu      sync.Mutex
@@ -90,7 +100,9 @@ func TestPayloadPerProvider(t *testing.T) {
 
 	discord, err := Payload(endpoint(types.WebhookProviderDiscord, "https://x/hook"), event)
 	require.NoError(t, err)
-	assert.JSONEq(t, `{"content":"Node laptop joined."}`, string(discord.Body))
+	assert.JSONEq(t,
+		`{"content":"Node laptop joined.","allowed_mentions":{"parse":[]}}`,
+		string(discord.Body))
 
 	telegram, err := Payload(
 		endpoint(types.WebhookProviderTelegram, "https://api.telegram.org/bot123:abc/sendMessage?chat_id=-42"), event,
@@ -156,7 +168,7 @@ func TestEmailEndpointGoesThroughTheMailer(t *testing.T) {
 
 	err := d.Test(t.Context(), endpoint)
 	require.ErrorIs(t, err, ErrNoMailer, "no mail server configured")
-	assert.Equal(t, ErrNoMailer.Error(), store.status(7))
+	assert.Equal(t, ErrNoMailer.Error(), store.status(7), "headscale's own words about its own state")
 
 	mailer := &memMailer{}
 	d.SetMailer(mailer)
@@ -185,7 +197,7 @@ func TestEmailEndpointGoesThroughTheMailer(t *testing.T) {
 		assert.Equal(c, 1, store.record(8).Attempts)
 	}, 5*time.Second, 10*time.Millisecond)
 	assert.False(t, store.record(8).OK)
-	assert.Contains(t, store.status(8), "550 no such user")
+	assert.Equal(t, "rejected", store.status(8), "the mail server's reply stays in the log")
 }
 
 func TestMailMessage(t *testing.T) {
@@ -286,9 +298,12 @@ func TestTestRecordsRejection(t *testing.T) {
 	assert.False(t, store.record(3).OK)
 	assert.Equal(t, 1, store.record(3).Attempts)
 
+	// A receiver that cannot be reached is recorded coarsely: the dial
+	// error names the address the server resolved, which the operator's
+	// status field does not repeat.
 	err = d.Test(t.Context(), types.Webhook{ID: 4, URL: "http://127.0.0.1:1", Secret: "s"})
 	require.Error(t, err)
-	assert.Contains(t, store.status(4), "connect")
+	assert.Equal(t, "unreachable", store.status(4))
 }
 
 // TestDeliveryDoesNotFollowRedirects keeps the signed payload at the

@@ -1,9 +1,14 @@
 package derp
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/juanfont/headscale/hscontrol/egress"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -278,4 +283,90 @@ func TestHasRelay(t *testing.T) {
 	assert.True(t, HasRelay(&tailcfg.DERPMap{Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
 		1: {Nodes: []*tailcfg.DERPNode{{Name: "s", STUNOnly: true}, {Name: "a"}}},
 	}}))
+}
+
+// TestLoadDERPMapFromURL proves the fetch is bounded: a redirect is refused
+// so the map comes from the URL the operator configured, a non-2xx answer is
+// an error naming the status, and a body past the limit is cut off instead of
+// read forever.
+func TestLoadDERPMapFromURL(t *testing.T) {
+	// Not parallel: the egress policy is process-wide and the test servers
+	// are on loopback, which it refuses by default.
+	egress.SetDefault(egress.Policy{AllowLoopback: true})
+	t.Cleanup(func() { egress.SetDefault(egress.Policy{}) })
+
+	t.Run("ok", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"Regions":{"900":{"RegionID":900,"RegionCode":"test"}}}`))
+		}))
+		t.Cleanup(srv.Close)
+
+		derpMap, err := loadDERPMapFromURL(t.Context(), *mustURL(t, srv.URL))
+		require.NoError(t, err)
+		require.NotNil(t, derpMap.Regions[900])
+		assert.Equal(t, "test", derpMap.Regions[900].RegionCode)
+	})
+
+	t.Run("refuses a redirect", func(t *testing.T) {
+		target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"Regions":{}}`))
+		}))
+		t.Cleanup(target.Close)
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, target.URL, http.StatusFound)
+		}))
+		t.Cleanup(srv.Close)
+
+		_, err := loadDERPMapFromURL(t.Context(), *mustURL(t, srv.URL))
+		require.ErrorIs(t, err, ErrRedirected)
+	})
+
+	t.Run("refuses a non-2xx answer", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "nope", http.StatusInternalServerError)
+		}))
+		t.Cleanup(srv.Close)
+
+		_, err := loadDERPMapFromURL(t.Context(), *mustURL(t, srv.URL))
+		require.ErrorIs(t, err, ErrFetchFailed)
+		assert.Contains(t, err.Error(), "500")
+	})
+
+	t.Run("bounds the body", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"Padding":"`))
+
+			chunk := strings.Repeat("a", 1<<20)
+			for range 6 {
+				_, _ = w.Write([]byte(chunk))
+			}
+		}))
+		t.Cleanup(srv.Close)
+
+		_, err := loadDERPMapFromURL(t.Context(), *mustURL(t, srv.URL))
+		require.Error(t, err, "the truncated body is not a map")
+	})
+
+	t.Run("refuses a blocked address", func(t *testing.T) {
+		egress.SetDefault(egress.Policy{})
+		t.Cleanup(func() { egress.SetDefault(egress.Policy{AllowLoopback: true}) })
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"Regions":{}}`))
+		}))
+		t.Cleanup(srv.Close)
+
+		_, err := loadDERPMapFromURL(t.Context(), *mustURL(t, srv.URL))
+		require.ErrorIs(t, err, egress.ErrBlocked)
+	})
+}
+
+func mustURL(t *testing.T, raw string) *url.URL {
+	t.Helper()
+
+	parsed, err := url.Parse(raw)
+	require.NoError(t, err)
+
+	return parsed
 }

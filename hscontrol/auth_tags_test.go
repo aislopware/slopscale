@@ -33,6 +33,9 @@ func createTestAppWithNodeExpiry(t *testing.T, nodeExpiry time.Duration) *Headsc
 			},
 		},
 		OIDC: types.OIDCConfig{},
+		// The egress policy is process-wide, so every test app in this
+		// package installs the same one; receivers here are on loopback.
+		Egress: types.EgressConfig{AllowLoopbackTargets: true},
 		Policy: types.PolicyConfig{
 			Mode: types.PolicyModeDB,
 		},

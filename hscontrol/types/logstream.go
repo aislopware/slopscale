@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/juanfont/headscale/hscontrol/egress"
 )
 
 // LogStreamID identifies a log stream in the log_streams table.
@@ -152,6 +154,13 @@ func ValidateLogStream(l LogStream) error {
 	u, err := url.Parse(l.URL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return fmt.Errorf("%w: %q", ErrLogStreamURLInvalid, l.URL)
+	}
+
+	// A sink on the server's own loopback or on the cloud metadata service
+	// is the control server posting to itself; see hscontrol/egress.
+	err = egress.Default().CheckHost(u.Host)
+	if err != nil {
+		return fmt.Errorf("log stream URL points at a %w", err)
 	}
 
 	if l.Destination.TokenRequired() && l.Token == "" {

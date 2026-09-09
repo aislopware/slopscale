@@ -236,6 +236,12 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 		Policy: types.PolicyConfig{
 			Mode: types.PolicyModeDB,
 		},
+		// Test receivers (webhooks, log sinks, DERP map servers) run on
+		// this host's loopback, which the egress guard refuses by default.
+		Egress: types.EgressConfig{AllowLoopbackTargets: true},
+		// The v1 debug endpoint mints nodes from supplied key material and
+		// is off unless the config asks for it.
+		Debug:    types.DebugConfig{NodeAPIEnabled: true},
 		Taildrop: types.TaildropConfig{Enabled: sc.taildropEnabled},
 		Tuning: types.Tuning{
 			BatchChangeDelay:               sc.batchDelay,

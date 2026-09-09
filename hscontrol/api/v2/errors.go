@@ -1,12 +1,16 @@
 package apiv2
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/db"
+	"github.com/juanfont/headscale/hscontrol/egress"
 	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/rs/zerolog/log"
 )
 
 // apiError is the Tailscale API error body. The official Tailscale Go client
@@ -83,11 +87,33 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrWebhookURLInvalid),
 		errors.Is(err, types.ErrWebhookNoSubscriptions),
 		errors.Is(err, types.ErrWebhookEventUnknown),
+		errors.Is(err, egress.ErrBlocked),
 		errors.Is(err, types.ErrWebhookProviderUnknown),
 		errors.Is(err, types.ErrWebhookDescriptionLong):
 		return huma.Error400BadRequest(msg, err)
 
 	default:
-		return huma.Error500InternalServerError(msg, err)
+		return internalError(msg, err)
 	}
+}
+
+// internalErrorID is a short id shared by the response and the log line, so
+// an operator can find the error the response does not carry.
+func internalErrorID() string {
+	var raw [4]byte
+
+	_, _ = rand.Read(raw[:])
+
+	return hex.EncodeToString(raw[:])
+}
+
+// internalError answers an unmapped error without echoing it: the text can
+// carry a query, a file path or an internal host, none of which the caller
+// asked about. The whole error goes to the log under the id.
+func internalError(msg string, err error) error {
+	id := internalErrorID()
+
+	log.Error().Err(err).Str("errorId", id).Msg(msg)
+
+	return huma.Error500InternalServerError("internal error, see the server log for id " + id)
 }

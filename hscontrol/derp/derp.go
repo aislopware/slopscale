@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/crc64"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/juanfont/headscale/hscontrol/egress"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -25,6 +27,25 @@ import (
 	"tailscale.com/envknob"
 	"tailscale.com/tailcfg"
 )
+
+// maxDERPMapBytes bounds a fetched map: the public one is a few tens of
+// kilobytes, so this leaves room without letting a URL stream forever.
+const maxDERPMapBytes = 4 << 20
+
+var (
+	// ErrFetchFailed is returned when a DERP map URL answers outside 2xx.
+	ErrFetchFailed = errors.New("DERP map URL rejected the request")
+	// ErrRedirected is returned when a DERP map URL redirects; the map is
+	// read from the URL the operator configured only.
+	ErrRedirected = errors.New("DERP map URL redirected")
+)
+
+// noRedirect keeps the fetch at the configured URL instead of following it
+// to wherever it points, which would step past the egress guard's decision
+// about the host the operator named.
+func noRedirect(*http.Request, []*http.Request) error {
+	return ErrRedirected
+}
 
 func loadDERPMapFromPath(path string) (*tailcfg.DERPMap, error) {
 	b, err := os.ReadFile(path)
@@ -51,8 +72,12 @@ func loadDERPMapFromURL(ctx context.Context, addr url.URL) (*tailcfg.DERPMap, er
 		return nil, fmt.Errorf("creating request for DERP map: %w", err)
 	}
 
+	// The URL is operator input: it is dialed through the egress guard, the
+	// answer is taken from where it was asked and its size is bounded.
 	client := http.Client{
-		Timeout: types.HTTPTimeout,
+		Timeout:       types.HTTPTimeout,
+		Transport:     egress.Transport(),
+		CheckRedirect: noRedirect,
 	}
 
 	resp, err := client.Do(req)
@@ -62,7 +87,11 @@ func loadDERPMapFromURL(ctx context.Context, addr url.URL) (*tailcfg.DERPMap, er
 
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, fmt.Errorf("fetching DERP map from %s: %w: %s", addr.Redacted(), ErrFetchFailed, resp.Status)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxDERPMapBytes))
 	if err != nil {
 		return nil, fmt.Errorf("reading DERP map response body: %w", err)
 	}

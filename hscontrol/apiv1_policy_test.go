@@ -188,6 +188,9 @@ func createFilePolicyApp(t *testing.T) *Headscale {
 			},
 		},
 		OIDC: types.OIDCConfig{},
+		// The egress policy is process-wide, so every test app in this
+		// package installs the same one; receivers here are on loopback.
+		Egress: types.EgressConfig{AllowLoopbackTargets: true},
 		Policy: types.PolicyConfig{
 			Mode: types.PolicyModeFile,
 		},
