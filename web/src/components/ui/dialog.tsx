@@ -36,7 +36,7 @@ export const dialogActionsClass = "flex justify-end gap-3 px-6 pt-3 pb-2";
 
 export interface DialogContentProps {
   readonly title: string;
-  readonly description?: string | undefined;
+  readonly description?: ReactNode;
   readonly size?: "sm" | "base" | "lg" | "xl";
   readonly className?: string;
   readonly children: ReactNode;
@@ -108,7 +108,7 @@ function DialogBody({
   description,
   children,
 }: {
-  readonly description: string | undefined;
+  readonly description?: ReactNode;
   readonly children: ReactNode;
 }): ReactElement {
   const { ref, top, bottom } = useScrollEdges();

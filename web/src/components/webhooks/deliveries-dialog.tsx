@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { SkeletonLine } from "@cloudflare/kumo/components/loader";
@@ -19,6 +18,7 @@ import {
   DialogRoot,
 } from "~/components/ui/dialog.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { Status } from "~/components/ui/status.tsx";
 import { formatDuration, urlHost } from "~/components/webhooks/model.ts";
 
 const columnCount = 5;
@@ -39,7 +39,7 @@ export function DeliveriesDialog({
       <DialogContent
         size="lg"
         title="Deliveries"
-        description={`The last deliveries to ${urlHost(webhook.url)}, newest first. The server keeps the last hundred. A failed row shows the final status after every retry.`}
+        description={`The last hundred deliveries to ${urlHost(webhook.url)}, newest first. A failed row shows the status after the final retry.`}
       >
         {open ? <DeliveriesBody webhook={webhook} /> : null}
         <DialogFooter>
@@ -70,7 +70,7 @@ function DeliveriesBody({ webhook }: { readonly webhook: Webhook }): ReactElemen
         className={tableEmptyClass}
         size="sm"
         title="No deliveries yet"
-        description="Nothing has been sent to this endpoint. Send a test event to check it."
+        description="Nothing has been sent to this endpoint yet."
       />
     );
   }
@@ -118,9 +118,7 @@ function DeliveryRow({
         <RelativeTime value={delivery.at} />
       </Table.Cell>
       <Table.Cell>
-        <Badge variant="secondary" className="font-mono text-[0.85em]">
-          {delivery.eventType}
-        </Badge>
+        <span className="font-mono text-[0.85em]">{delivery.eventType}</span>
       </Table.Cell>
       <Table.Cell>
         <ResultCell delivery={delivery} />
@@ -137,7 +135,7 @@ function DeliveryRow({
 function ResultCell({ delivery }: { readonly delivery: WebhookDelivery }): ReactElement {
   return (
     <Tooltip content={delivery.status}>
-      <Badge variant={delivery.ok ? "success" : "error"}>{resultLabel(delivery.status)}</Badge>
+      <Status tone={delivery.ok ? "success" : "danger"}>{resultLabel(delivery.status)}</Status>
     </Tooltip>
   );
 }

@@ -23,9 +23,7 @@ export function MaintenanceSection({ canRun }: { readonly canRun: boolean }): Re
       setConfirming(false);
       setChanges(data.changes);
       toast.success(
-        data.changes.length === 0
-          ? "Nothing to change"
-          : `Backfill made ${changeCount(data.changes)}`,
+        data.changes.length === 0 ? "Nothing to change" : `Backfilled ${changeCount(data.changes)}`,
       );
     },
   });
@@ -57,7 +55,7 @@ export function MaintenanceSection({ canRun }: { readonly canRun: boolean }): Re
         open={confirming}
         onOpenChange={setConfirming}
         title="Backfill IP addresses?"
-        description="Every machine missing an address in a configured family gets one, and addresses in a family that is no longer configured are removed. Each change is listed afterwards."
+        description="Adds and removes addresses so every machine matches the configured families. Each change is listed afterwards."
         confirmLabel="Backfill"
         loading={backfill.isPending}
         error={backfill.isError ? errorMessage(backfill.error) : undefined}
@@ -79,8 +77,8 @@ function BackfillResult({ changes }: { readonly changes: readonly string[] }): R
     <SectionRow className="flex flex-col gap-2">
       <span className="text-kumo-subtle">
         {changes.length === 0
-          ? "Last run: every machine already matched the configured address families."
-          : `Last run: ${changeCount(changes)}.`}
+          ? "The last run changed nothing. Every machine already matched."
+          : `The last run made ${changeCount(changes)}.`}
       </span>
       {changes.length === 0 ? null : (
         <ul className="flex flex-col gap-1 font-mono text-xs text-kumo-default">

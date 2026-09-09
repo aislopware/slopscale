@@ -76,7 +76,7 @@ describe(RouteError, () => {
     await expect.element(screen.getByText("HTTP 403")).toBeVisible();
     await expect.element(screen.getByRole("link", { name: "Back to overview" })).toBeVisible();
 
-    await screen.getByRole("button", { name: "Technical details" }).click();
+    await screen.getByRole("button", { name: "Details" }).click();
     await expect.element(screen.getByText("Request /api/x")).toBeVisible();
   });
 

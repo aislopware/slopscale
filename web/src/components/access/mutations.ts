@@ -39,6 +39,7 @@ export function useAccessMutations(): AccessMutations {
       "/api/v1/access-rule",
       "/api/v1/posture",
       "/api/v1/access-request",
+      "/api/v1/network",
     );
   };
 

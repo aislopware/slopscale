@@ -84,7 +84,7 @@ export function PosturesTab({
                   size="sm"
                   icon={<ShieldCheckIcon size={emptyIconSize} />}
                   title="No postures yet"
-                  description="A posture names conditions a machine must meet, such as a current client, a known serial number or a weekly window. Attach it to a rule to require it of the sources."
+                  description="A posture names conditions a machine must meet. Attach it to a rule to require it of the sources."
                   contents={
                     <Button
                       variant="secondary"
@@ -103,7 +103,6 @@ export function PosturesTab({
                   size="sm"
                   icon={<ShieldCheckIcon size={emptyIconSize} />}
                   title="No postures match"
-                  description="No posture matches this search."
                   contents={
                     <Button
                       variant="secondary"

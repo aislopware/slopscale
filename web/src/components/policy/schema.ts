@@ -17,7 +17,7 @@ export interface KeyInfo {
 
 const srcPosture: KeyInfo = {
   name: "srcPosture",
-  doc: "Postures from the postures section a source must satisfy one of. Absent, defaultSrcPosture applies; an empty list waives it.",
+  doc: "Postures a source must satisfy one of. Without it, defaultSrcPosture applies, and an empty list waives it.",
   shape: "postureRefs",
 };
 
@@ -25,7 +25,7 @@ export const aclKeys: readonly KeyInfo[] = [
   { name: "action", doc: 'Always "accept"; an ACL only ever allows.', shape: "string" },
   {
     name: "proto",
-    doc: "One protocol the rule is limited to, such as tcp or udp, or a number from 0 to 255. Left out, the rule covers them all.",
+    doc: "One protocol the rule is limited to, such as tcp or udp, or a number from 0 to 255. Leave it out to cover every protocol.",
     shape: "string",
   },
   {
@@ -93,7 +93,7 @@ export const sshKeys: readonly KeyInfo[] = [
   },
   {
     name: "checkPeriod",
-    doc: 'With action "check": how long a re-authentication holds, such as "12h", or "always".',
+    doc: 'How long a re-authentication holds with action "check", such as "12h" or "always".',
     shape: "string",
   },
   {
@@ -131,7 +131,7 @@ export const nodeAttrKeys: readonly KeyInfo[] = [
 export const autoApproverKeys: readonly KeyInfo[] = [
   {
     name: "routes",
-    doc: "A range to the users, groups or tags whose advertised routes inside it are approved on their own.",
+    doc: "Each range to the users, groups or tags whose routes inside it are approved automatically.",
     shape: "object",
   },
   {
@@ -171,7 +171,7 @@ export const sshTestKeys: readonly KeyInfo[] = [
 export const sections: readonly KeyInfo[] = [
   {
     name: "groups",
-    doc: 'Named sets of users: "group:eng" to a list of users, each with an @ in it.',
+    doc: 'Named sets of users, such as "group:eng", each member written with an @ in it.',
     shape: "object",
   },
   {
@@ -192,7 +192,7 @@ export const sections: readonly KeyInfo[] = [
   },
   {
     name: "grants",
-    doc: "Rules: who may reach what, on which ports or with which application capabilities.",
+    doc: "Who may reach what, on which ports or with which application capabilities.",
     shape: "array",
     keys: grantKeys,
   },
@@ -228,7 +228,7 @@ export const sections: readonly KeyInfo[] = [
   },
   {
     name: "postures",
-    doc: '"posture:name" to the expressions a machine must all satisfy, such as "node:os == \'macos\'".',
+    doc: 'Each "posture:name" to the expressions a machine must satisfy, such as "node:os == \'macos\'".',
     shape: "object",
   },
   {

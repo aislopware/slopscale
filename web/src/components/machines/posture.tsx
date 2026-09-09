@@ -13,6 +13,7 @@ import type { Me } from "~/auth/me.ts";
 import { AttributeDialog, attributeText } from "~/components/machines/attribute-dialog.tsx";
 import { MatchedPostures } from "~/components/machines/matched-postures.tsx";
 import { Code } from "~/components/ui/code.tsx";
+import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { AttributeText } from "~/components/ui/expression-text.tsx";
@@ -69,7 +70,7 @@ export function PostureSection({
       <DefinitionList items={derived(posture.data)} columns={2} />
       <Identity node={node} posture={posture.data} canEdit={canEdit} />
       <CustomAttributes node={node} posture={posture.data} canEdit={canEdit} />
-      <MatchedPostures node={node} />
+      <MatchedPostures node={node} me={me} />
     </Section>
   );
 }
@@ -140,7 +141,7 @@ function IdentityText({ posture }: { readonly posture: NodePosture }): ReactElem
   if (!posture.identityCollectionOn) {
     return (
       <span className="text-xs text-kumo-subtle">
-        Collection is off. Turn on &quot;Collect device identity&quot; under Settings → Tailnet.
+        Collection is off. Turn on Collect device identity under Settings › Tailnet.
       </span>
     );
   }
@@ -150,7 +151,7 @@ function IdentityText({ posture }: { readonly posture: NodePosture }): ReactElem
   if (identity === undefined) {
     return (
       <span className="text-xs text-kumo-subtle">
-        Not collected yet. The server asks when the machine connects.
+        Not collected. The server asks the next time the machine connects.
       </span>
     );
   }
@@ -158,8 +159,8 @@ function IdentityText({ posture }: { readonly posture: NodePosture }): ReactElem
   if (identity.disabled) {
     return (
       <span className="text-xs text-kumo-subtle">
-        The client has posture checking off (<Code>tailscale set --posture-checking=true</Code>),
-        asked <RelativeTime value={identity.collectedAt} />.
+        Asked <RelativeTime value={identity.collectedAt} />. The client has posture checking off (
+        <Code>tailscale set --posture-checking=true</Code>).
       </span>
     );
   }
@@ -188,10 +189,12 @@ function CustomAttributes({
   readonly canEdit: boolean;
 }): ReactElement {
   const [editing, setEditing] = useState<CustomAttribute | "new" | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const remove = api.useMutation("delete", "/api/v1/node/{nodeId}/attributes/{key}", {
     onSuccess: async () => {
       toast.success("Attribute removed");
+      setRemoving(null);
       await invalidate(queryClient, "/api/v1/node");
     },
     onError: (error) => {
@@ -205,7 +208,7 @@ function CustomAttributes({
         <div className="flex min-w-0 flex-col gap-1">
           <span className="font-medium text-kumo-strong">Custom attributes</span>
           <span className="text-xs text-kumo-subtle">
-            custom:… values the policy can check, optionally until a time you set.
+            Values the policy can check, each with an optional expiry.
           </span>
         </div>
         {canEdit ? (
@@ -255,9 +258,8 @@ function CustomAttributes({
               size="sm"
               aria-label={`Remove ${attribute.key}`}
               icon={<TrashIcon size={iconSize} />}
-              loading={remove.isPending && remove.variables?.params.path.key === attribute.key}
               onClick={() => {
-                remove.mutate({ params: { path: { nodeId: node.id, key: attribute.key } } });
+                setRemoving(attribute.key);
               }}
             />
           ) : null}
@@ -270,6 +272,23 @@ function CustomAttributes({
         onOpenChange={(open) => {
           if (!open) {
             setEditing(null);
+          }
+        }}
+      />
+      <ConfirmDialog
+        open={removing !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRemoving(null);
+          }
+        }}
+        title="Remove attribute?"
+        {...(removing === null ? {} : { description: `${removing} is removed from this machine.` })}
+        confirmLabel="Remove"
+        loading={remove.isPending}
+        onConfirm={() => {
+          if (removing !== null) {
+            remove.mutate({ params: { path: { nodeId: node.id, key: removing } } });
           }
         }}
       />

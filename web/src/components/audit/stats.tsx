@@ -50,7 +50,7 @@ export function AuditStats({ events }: { readonly events: readonly AuditEvent[] 
     <Frame className="grid gap-1 sm:grid-cols-3">
       <Stat label="Events loaded" value={events.length} hint="In the selected range" />
       <Stat label="Distinct actors" value={actors.size} hint="Users, machines, keys and sessions" />
-      <Stat label="Failures" value={failures} hint="Outcome 400 or worse" alert />
+      <Stat label="Failures" value={failures} hint="HTTP status 400 or higher" alert />
     </Frame>
   );
 }

@@ -190,7 +190,7 @@ function AllApproved({ me }: { readonly me: Me }): ReactElement {
           <span className="flex h-lh items-center">
             <CheckCircleIcon weight="fill" className="text-kumo-success" />
           </span>
-          All machines and users are approved.
+          All machines and users are approved
         </span>
         <ApprovalSettingsLink me={me} />
       </FramePanel>
@@ -231,7 +231,7 @@ export function NeedsAttention({ nodes, users, me }: NeedsAttentionProps): React
   return (
     <Section
       title="Needs attention"
-      description="Nothing here can reach the tailnet until it is approved."
+      description="Nothing here can reach the tailnet until it is approved"
       bodyClassName="p-0"
       actions={<ApprovalSettingsLink me={me} />}
     >

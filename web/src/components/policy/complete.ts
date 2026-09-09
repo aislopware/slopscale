@@ -103,7 +103,7 @@ function aliasesFor(side: Side, names: Names, users: readonly string[]): Complet
     ...named([...names.tags], "tag", "tag"),
     ...(machines ? named([...names.hosts], "host", "host") : []),
     ...named(autogroupsFor[side], "autogroup"),
-    ...(machines ? named(["*"], "wildcard", "everyone") : []),
+    ...(machines ? named(["*"], "wildcard", "everything") : []),
   ];
 }
 

@@ -21,7 +21,7 @@ export function RoutesDialog({
       <DialogContent
         size="base"
         title="Approve routes"
-        description="Only approved routes are advertised to the rest of the tailnet."
+        description="Only approved routes reach the rest of the tailnet."
       >
         <RoutesForm node={node} onOpenChange={onOpenChange} mutations={mutations} />
       </DialogContent>
@@ -63,9 +63,8 @@ function RoutesForm({
     <form onSubmit={submit} className="flex flex-col gap-4">
       {available.length === 0 ? (
         <p className="text-kumo-subtle">
-          This machine does not advertise any routes. Run{" "}
-          <Code>tailscale set --advertise-routes</Code> or <Code>--advertise-exit-node</Code> on it
-          first.
+          Nothing advertised. Run <Code>tailscale set --advertise-routes</Code> or{" "}
+          <Code>--advertise-exit-node</Code> on the machine.
         </p>
       ) : null}
       {exit.length > 0 ? (

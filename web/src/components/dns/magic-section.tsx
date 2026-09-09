@@ -1,9 +1,9 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import type { ReactElement } from "react";
 
 import type { Dns } from "~/api/queries.ts";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import { Section } from "~/components/ui/section.tsx";
+import { Status } from "~/components/ui/status.tsx";
 
 export function MagicDnsSection({ dns }: { readonly dns: Dns }): ReactElement {
   return (
@@ -17,9 +17,9 @@ export function MagicDnsSection({ dns }: { readonly dns: Dns }): ReactElement {
           {
             label: "MagicDNS",
             value: (
-              <Badge appearance="dot" variant={dns.magicDns ? "success" : "neutral"}>
+              <Status tone={dns.magicDns ? "success" : "neutral"}>
                 {dns.magicDns ? "On" : "Off"}
-              </Badge>
+              </Status>
             ),
           },
           {

@@ -66,7 +66,7 @@ function describe(problem: Problem | undefined): string | undefined {
     return headline;
   }
 
-  return headline === undefined ? details.join("; ") : `${headline}: ${details.join("; ")}`;
+  return headline === undefined ? details.join(". ") : `${headline}. ${details.join(". ")}`;
 }
 
 /** Turns anything a query or mutation rejected with into a sentence. */
@@ -79,5 +79,5 @@ export function errorMessage(error: unknown): string {
     return error;
   }
 
-  return "Something went wrong.";
+  return "The request failed.";
 }

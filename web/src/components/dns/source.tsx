@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Banner } from "@cloudflare/kumo/components/banner";
 import { ArrowCounterClockwiseIcon, FileTextIcon } from "@phosphor-icons/react";
 import { useState } from "react";
@@ -90,5 +89,10 @@ export function SourceBanner({
 
 /** Marks a value the config file owns. */
 export function FromFileBadge(): ReactElement {
-  return <Badge variant="secondary">Config file</Badge>;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-kumo-subtle">
+      <FileTextIcon size={12} aria-hidden />
+      Config file
+    </span>
+  );
 }

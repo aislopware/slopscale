@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
@@ -40,7 +39,7 @@ export function DnsRulesSection({
   return (
     <Section
       title="Split DNS per group"
-      description="Domains answered by their own resolvers on the machines of some groups only, on top of the split DNS above."
+      description="Split DNS that only the machines in some groups receive, on top of the split DNS above."
       bodyClassName="p-0"
       {...(canEdit
         ? {
@@ -142,7 +141,7 @@ function RuleSummary({
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <span className="flex items-center gap-2">
         <span className="truncate font-medium text-kumo-strong">{rule.name}</span>
-        {rule.enabled ? null : <Badge variant="secondary">Disabled</Badge>}
+        {rule.enabled ? null : <span className="text-xs text-kumo-subtle">Disabled</span>}
       </span>
       <div className="grid min-w-0 gap-x-6 gap-y-0.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
         <span className="min-w-0 font-mono text-sm break-all text-kumo-default">

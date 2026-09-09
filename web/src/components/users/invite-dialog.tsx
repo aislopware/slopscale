@@ -92,7 +92,7 @@ export function InviteDialog({
         {...(result === null
           ? {
               description:
-                "The first sign-in that opens the link, or whose verified email matches the address, creates the account with the role and groups you pick here.",
+                "The account is created on the first sign-in through this link, or by a verified email that matches.",
             }
           : {})}
       >
@@ -142,14 +142,25 @@ function InviteForm({
   readonly onCreated: (result: InviteResult) => void;
 }): ReactElement {
   const [email, setEmail] = useState("");
+  const [touched, setTouched] = useState(false);
   const [role, setRole] = useState<UserRole>("member");
   const [groupIds, setGroupIds] = useState<string[]>([]);
   const [expiry, setExpiry] = useState<InviteExpiry>(defaultInviteExpiry);
   const groups = useQuery({ ...groupsQuery, enabled: can(me, "policy_file:read") });
   const { create } = mutations;
 
+  const emailIssue = looksLikeEmail(email.trim())
+    ? null
+    : "Use an address such as alice@example.com.";
+
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
+    setTouched(true);
+
+    if (emailIssue !== null) {
+      return;
+    }
+
     create.mutate(
       {
         body: {
@@ -164,7 +175,7 @@ function InviteForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
       <Input
         label="Email"
         type="email"
@@ -172,10 +183,14 @@ function InviteForm({
         spellCheck={false}
         autoComplete="off"
         placeholder="alice@example.com"
-        description="Where the invitation goes, and the address the sign-in must prove."
+        description="Where the invitation goes. The sign-in must prove this address."
         onChange={(event) => {
           setEmail(event.target.value);
         }}
+        onBlur={() => {
+          setTouched(true);
+        }}
+        {...(touched && emailIssue !== null ? { error: emailIssue } : {})}
       />
       <Select
         className="w-full"
@@ -200,7 +215,7 @@ function InviteForm({
       {groups.data === undefined ? null : (
         <MultiPicker
           label="Groups"
-          description="The account joins these groups the moment it is created."
+          description="The account joins these groups when it is created."
           placeholder="No groups"
           items={groupItems(groups.data.groups, "membership")}
           value={groupIds}
@@ -225,7 +240,7 @@ function InviteForm({
           loading={create.isPending}
           disabled={email.trim() === ""}
         >
-          Send invite
+          Send invitation
         </Button>
       </DialogFooter>
     </form>
@@ -283,9 +298,17 @@ function MailOutcome({ result }: { readonly result: InviteResult }): ReactNode {
     );
   }
 
+  return <p className="text-kumo-subtle">This server sends no mail. Send the link yourself.</p>;
+}
+
+/** One local part, one at sign, one domain with a dot; the server checks the rest. */
+function looksLikeEmail(value: string): boolean {
+  const at = value.indexOf("@");
+
   return (
-    <p className="text-kumo-subtle">
-      This server sends no mail, so the link has to reach the person another way.
-    </p>
+    at > 0 &&
+    at === value.lastIndexOf("@") &&
+    value.slice(at + 1).includes(".") &&
+    !/\s/u.test(value)
   );
 }

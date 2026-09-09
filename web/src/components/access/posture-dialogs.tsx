@@ -60,7 +60,7 @@ export function PostureDialog(props: PostureDialogProps): ReactElement {
       <DialogContent
         size="lg"
         title={editing ? "Edit posture" : "New posture"}
-        description="Conditions a machine must meet before a rule that names this posture lets its traffic through. Every expression must hold. A schedule limits the posture to a weekly window."
+        description="Conditions a machine must meet for a rule that names this posture. Every expression must hold, and a schedule limits it to a weekly window."
       >
         <PostureForm {...props} />
       </DialogContent>
@@ -212,7 +212,7 @@ function PostureForm({
       />
       <ExpressionEditor
         label="Expressions"
-        description="One per line. Attributes are node:… from what the client reports, custom:… set on the machine, and ip:… from where it connects."
+        description="One per line. Use node:… for what the client reports, custom:… for machine attributes and ip:… for where it connects."
         value={draft.expressions}
         placeholder={"node:tsVersion >= '1.80'\nnode:os IN ['macos', 'windows']"}
         serverErrors={errors}
@@ -242,7 +242,7 @@ function PostureForm({
             <span className="flex flex-col gap-0.5">
               <span className="font-medium text-kumo-default">Only during a weekly window</span>
               <span className="text-xs text-kumo-subtle">
-                Outside the window the posture does not hold, so the rules that name it close.
+                Outside the window the posture fails, so rules that require it deny traffic.
               </span>
             </span>
           }
@@ -268,7 +268,7 @@ function Examples({
 }): ReactElement {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs text-kumo-subtle">Add an example:</span>
+      <span className="text-xs text-kumo-subtle">Examples</span>
       {expressionExamples.map((example) => {
         const needsGeo = example.expression.startsWith("ip:country");
 
@@ -323,7 +323,7 @@ function ScheduleFields({
           />
         ))}
       </div>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid items-start gap-4 sm:grid-cols-2">
         <Input
           label="From"
           value={draft.start}
@@ -336,7 +336,7 @@ function ScheduleFields({
         />
         <Input
           label="To"
-          description="An end before the start wraps past midnight."
+          description="An end before the start runs past midnight."
           value={draft.end}
           placeholder="18:00"
           spellCheck={false}
@@ -345,6 +345,8 @@ function ScheduleFields({
             onChange({ end: event.target.value });
           }}
         />
+      </div>
+      <div className="grid gap-4">
         <Input
           label="Time zone"
           required={false}

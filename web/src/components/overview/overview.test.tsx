@@ -177,7 +177,7 @@ describe(NeedsAttention, () => {
       app(<NeedsAttention nodes={[laptop]} users={[alice]} me={admin} />),
     );
 
-    await expect.element(screen.getByText("All machines and users are approved.")).toBeVisible();
+    await expect.element(screen.getByText("All machines and users are approved")).toBeVisible();
     await expect.element(screen.getByRole("link", { name: "Approval settings" })).toBeVisible();
     await expect.element(screen.getByText("Needs attention")).not.toBeInTheDocument();
     await expect.element(screen.getByRole("button", { name: "Approve" })).not.toBeInTheDocument();
@@ -207,7 +207,7 @@ describe(NeedsAttention, () => {
 
     await expect.element(screen.getByText("Needs attention")).toBeVisible();
     await expect
-      .element(screen.getByText("Nothing here can reach the tailnet until it is approved."))
+      .element(screen.getByText("Nothing here can reach the tailnet until it is approved"))
       .toBeVisible();
   });
 });

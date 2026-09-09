@@ -1,10 +1,10 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import type { ReactElement } from "react";
 
 import { expiresSoon } from "~/components/keys/status.ts";
 import { CopyText } from "~/components/ui/copy-text.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { Status } from "~/components/ui/status.tsx";
 import { formatAbsolute, formatRelative, isPast, parseTime } from "~/lib/time.ts";
 
 /** The identifying head of a key: a click-to-copy monospace run. */
@@ -30,19 +30,13 @@ export function ExpiryCell({ value }: { readonly value: string | null }): ReactE
   }
 
   if (isPast(date)) {
-    return (
-      <Badge variant="error" appearance="dot">
-        Expired
-      </Badge>
-    );
+    return <Status tone="danger">Expired</Status>;
   }
 
   if (expiresSoon(date)) {
     return (
       <Tooltip content={formatAbsolute(date)}>
-        <Badge variant="warning" appearance="dot">
-          {formatRelative(date)}
-        </Badge>
+        <Status tone="warning">{formatRelative(date)}</Status>
       </Tooltip>
     );
   }

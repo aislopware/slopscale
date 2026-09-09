@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Table } from "@cloudflare/kumo/components/table";
 import { SignOutIcon } from "@phosphor-icons/react";
@@ -150,7 +149,7 @@ function SessionRow({
         <RelativeTime value={session.createdAt} />
       </Table.Cell>
       <Table.Cell className="whitespace-nowrap text-kumo-subtle">
-        <RelativeTime value={session.lastSeenAt} never="Not since it opened" />
+        <RelativeTime value={session.lastSeenAt} never="Not since sign-in" />
       </Table.Cell>
       <Table.Cell className="font-mono text-[0.9em] text-kumo-subtle">
         {session.remoteAddr === "" ? "Not recorded" : session.remoteAddr}
@@ -158,7 +157,7 @@ function SessionRow({
       <Table.Cell>
         <span className="flex min-w-0 flex-wrap items-center gap-1.5">
           <span className="truncate text-kumo-default">{describeUserAgent(session.userAgent)}</span>
-          {session.current ? <Badge variant="info">This browser</Badge> : null}
+          {session.current ? <span className="text-xs text-kumo-subtle">This browser</span> : null}
         </span>
       </Table.Cell>
       <Table.Cell sticky="right" className={cellEdge("w-12 text-right", overflowing)}>

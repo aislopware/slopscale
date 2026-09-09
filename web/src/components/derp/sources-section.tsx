@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Select } from "@cloudflare/kumo/components/select";
 import { Switch } from "@cloudflare/kumo/components/switch";
@@ -22,6 +21,7 @@ import type { DerpMutations } from "~/components/derp/mutations.ts";
 import { EntryList } from "~/components/dns/entry-list.tsx";
 import { ValueDialog } from "~/components/dns/value-dialog.tsx";
 import { SettingRow } from "~/components/settings/setting-row.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { UrlText } from "~/components/ui/url-text.tsx";
@@ -43,7 +43,7 @@ export function SourcesSection({
   return (
     <Section
       title="Map sources"
-      description="Maps of relays, fetched and merged in order. A later map's region replaces an earlier one with the same id. Tailscale's public map is the usual first entry."
+      description="Maps of relays, fetched and merged in order. A later map's region replaces an earlier one with the same id."
       bodyClassName="p-0"
       {...(canEdit
         ? {
@@ -83,7 +83,10 @@ export function SourcesSection({
         entries={settings.urls.map((url) => ({
           key: url,
           value: <UrlText url={url} />,
-          aside: url === tailscaleMapUrl ? <Badge variant="secondary">Tailscale</Badge> : undefined,
+          aside:
+            url === tailscaleMapUrl ? (
+              <span className="text-xs text-kumo-subtle">Tailscale</span>
+            ) : undefined,
           removeLabel: `Remove map URL ${url}`,
           onRemove: () => {
             mutations.apply(withoutUrl(settings, url), `Removed ${url}`);
@@ -94,7 +97,7 @@ export function SourcesSection({
         <SectionRow className="flex flex-col gap-1">
           <span className="font-medium text-kumo-strong">Map files</span>
           <p className="max-w-prose text-kumo-subtle">
-            Merged after the URLs, from derp.paths in the config file.
+            Merged after the URLs, from <Code>derp.paths</Code> in the config file.
           </p>
           <ul className="flex flex-col gap-0.5 font-mono text-sm">
             {derp.paths.map((path) => (
@@ -108,7 +111,7 @@ export function SourcesSection({
         open={adding}
         onOpenChange={setAdding}
         title="Add map URL"
-        description="A DERP map in Tailscale's JSON format, such as the one your own control plane or a derper fleet serves."
+        description="A DERP map in Tailscale's JSON format."
         label="Map URL"
         placeholder={tailscaleMapUrl}
         validate={urlError}
@@ -145,8 +148,7 @@ function RefetchRow({
         title="Refetch on a schedule"
         description={
           <>
-            Fetches the map URLs again so new or retired relays reach the machines. When off, the
-            map stays as it is until you refetch it here.
+            Fetches the map URLs again so new or retired relays reach the machines.
             {derp.fetchedAt === "0001-01-01T00:00:00Z" ? null : (
               <>
                 {" "}
@@ -164,7 +166,7 @@ function RefetchRow({
             onCheckedChange={(on) => {
               mutations.apply(
                 withAutoUpdate(settings, on),
-                `Scheduled refetch ${on ? "on" : "off"}`,
+                `Scheduled refetch turned ${on ? "on" : "off"}`,
               );
             }}
           />

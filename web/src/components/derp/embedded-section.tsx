@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
@@ -20,10 +19,12 @@ import type { ServerDraft } from "~/components/derp/model.ts";
 import type { DerpMutations } from "~/components/derp/mutations.ts";
 import { focusFirstInvalid } from "~/components/derp/region-form.tsx";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
+import { Note, Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 function Muted({ children }: { readonly children: string }): ReactElement {
@@ -83,7 +84,7 @@ function regionFact(derp: Derp): Definition {
         <Wrapping>
           <span className="flex flex-wrap items-baseline justify-end gap-x-2">
             <span>{regionLabel(server)}</span>
-            <Muted>published by the map file, not these settings</Muted>
+            <Muted>published by the map file, not by these settings</Muted>
           </span>
         </Wrapping>
       ),
@@ -102,14 +103,14 @@ function facts(derp: Derp): readonly Definition[] {
     {
       label: "Status",
       value: (
-        <span className="flex flex-wrap items-center justify-end gap-2">
-          <Badge appearance="dot" variant={derp.relayRunning ? "success" : "neutral"}>
+        <span className="flex flex-col items-end gap-1">
+          <Status tone={derp.relayRunning ? "success" : "neutral"}>
             {derp.relayRunning ? "Running" : "Off"}
-          </Badge>
+          </Status>
           {insecure ? (
-            <Badge variant="warning" className="max-w-full text-left whitespace-normal">
-              Published as insecure, the server URL is not https
-            </Badge>
+            <Note className="text-left">
+              Published as insecure because the server URL is not HTTPS
+            </Note>
           ) : null}
         </span>
       ),
@@ -118,7 +119,7 @@ function facts(derp: Derp): readonly Definition[] {
     regionFact(derp),
     stunFact(derp),
     {
-      label: "Admits",
+      label: "Clients admitted",
       value:
         server.verifyClients === true ? (
           "Only this tailnet's machines"
@@ -130,7 +131,7 @@ function facts(derp: Derp): readonly Definition[] {
       label: "Published addresses",
       value:
         addresses.length === 0 ? (
-          <Muted>None, machines resolve the host name</Muted>
+          <Muted>None. Machines resolve the host name</Muted>
         ) : (
           addresses.join(", ")
         ),
@@ -157,13 +158,13 @@ export function EmbeddedSection({
   function toggle(on: boolean): void {
     const next = serverFromDraft(serverDraft(server), on);
 
-    mutations.apply(withServer(settings, next), `Embedded relay ${on ? "on" : "off"}`);
+    mutations.apply(withServer(settings, next), `Embedded relay turned ${on ? "on" : "off"}`);
   }
 
   return (
     <Section
       title="Embedded relay"
-      description="The relay this server runs on its own URL, so there is always one next to the control server. Machines pick the closest region by latency."
+      description="The relay this server runs on its own URL, so there is always one next to the control server."
       bodyClassName="p-0"
       {...(canEdit && canRun
         ? {
@@ -185,9 +186,14 @@ export function EmbeddedSection({
         <div className="flex min-w-0 flex-col gap-1">
           <span className="font-medium text-kumo-strong">Run the embedded relay</span>
           <p className="max-w-prose text-kumo-subtle">
-            {canRun
-              ? "Serves DERP on the server URL and STUN on its own UDP port, and publishes the region to every machine. Turning it off drops the machines using it onto the next closest relay."
-              : "The server has no relay key: set derp.server.private_key_path in the config file and restart."}
+            {canRun ? (
+              "Serves DERP on the server URL and STUN on its own UDP port. Turning it off moves the machines using it to the next closest relay."
+            ) : (
+              <>
+                The server has no relay key. Set <Code>derp.server.private_key_path</Code> in the
+                config file and restart.
+              </>
+            )}
           </p>
         </div>
         <span className="flex h-lh shrink-0 items-center">
@@ -205,7 +211,7 @@ export function EmbeddedSection({
         <DialogContent
           size="base"
           title="Embedded relay details"
-          description="How the relay is published to the machines. Changing the STUN address restarts STUN. The relay keeps serving."
+          description="How the relay is published to the machines. Changing the STUN address restarts STUN but not the relay."
         >
           <ServerForm
             derp={derp}
@@ -299,7 +305,7 @@ function ServerForm({
       {field({
         field: "regionName",
         label: "Region name",
-        placeholder: "Headscale Embedded DERP",
+        placeholder: "Headscale embedded relay",
         description: "Leave empty to use the code.",
       })}
       {field({

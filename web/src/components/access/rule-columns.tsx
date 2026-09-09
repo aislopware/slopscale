@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { ArrowRightIcon, ArrowsLeftRightIcon } from "@phosphor-icons/react";
 import { useState } from "react";
@@ -16,6 +15,7 @@ import { RuleMenu } from "~/components/access/rule-menu.tsx";
 import { createAppColumnHelper, useTableContext } from "~/components/table/app-table.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { isPast, parseTime } from "~/lib/time.ts";
 
@@ -85,7 +85,7 @@ export const ruleColumns = helper.columns([
   }),
   helper.accessor((rule) => protocolSummary(rule), {
     id: "protocol",
-    header: "Protocol & ports",
+    header: "Protocol and ports",
     enableSorting: true,
     cell: ({ row }) => <ProtocolCell rule={row.original} />,
     meta: { className: "hidden whitespace-nowrap align-top md:table-cell" },
@@ -128,7 +128,7 @@ function NameCell({ rule }: { readonly rule: AccessRule }): ReactElement {
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="flex min-w-0 items-center gap-2">
         <span className="truncate font-medium text-kumo-default">{rule.name}</span>
-        {isBuiltinRule(rule) ? <Badge variant="outline">Built in</Badge> : null}
+        {isBuiltinRule(rule) ? <span className="text-xs text-kumo-subtle">Built-in</span> : null}
       </span>
       {rule.description === "" ? null : (
         <span className="truncate text-xs text-kumo-subtle">{rule.description}</span>
@@ -165,9 +165,9 @@ function ExpiryLine({ rule }: { readonly rule: AccessRule }): ReactElement | nul
   }
 
   return isPast(expires) ? (
-    <Badge variant="error" className="w-fit">
+    <Status tone="danger" className="w-fit">
       Expired <RelativeTime value={rule.expiresAt} />
-    </Badge>
+    </Status>
   ) : (
     <span className="truncate text-xs text-kumo-subtle">
       Expires <RelativeTime value={rule.expiresAt} />

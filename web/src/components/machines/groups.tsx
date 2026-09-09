@@ -40,7 +40,7 @@ export function GroupsSection({
     <>
       <Section
         title="Groups"
-        description="Rules are written between groups. This machine is in these."
+        description="Rules are written between groups. These are the ones this machine is in."
         actions={
           canEdit ? (
             <Button
@@ -69,7 +69,7 @@ export function GroupsSection({
                   onSuccess: () => {
                     toast.success(
                       ownerName !== undefined && group.userIds.includes(ownerName.id)
-                        ? `Direct membership removed; still in ${group.name} through ${userLabel(ownerName)}`
+                        ? `Removed directly, still in ${group.name} through ${userLabel(ownerName)}`
                         : `Removed from ${group.name}`,
                     );
                   },
@@ -84,7 +84,7 @@ export function GroupsSection({
       </Section>
       <MembershipDialog
         title="Edit groups"
-        description="Groups this machine is added to on its own. Groups it is in through its owner are changed on the user, not here."
+        description="Groups this machine joins directly. Change owner-inherited groups on the user."
         member={{ nodeId: node.id }}
         groups={groups}
         current={direct}

@@ -25,7 +25,7 @@ function TailnetSettingsPage(): ReactElement {
     <>
       <PageHeader
         title="Tailnet"
-        description="Tailnet-wide switches: who may join, what a machine must prove, how long a login lasts and whether SSH sessions are recorded."
+        description="Who may join, what a machine must prove, how long a login lasts and whether SSH sessions are recorded."
       />
       <div className="flex flex-col gap-6">
         <ApprovalSection settings={settings} canEdit={canEdit} />

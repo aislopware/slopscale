@@ -33,7 +33,7 @@ function PreAuthKeysPage(): ReactElement {
     <>
       <PageHeader
         title="Pre-auth keys"
-        description="Register machines without a login. A key says which user or tags a machine joins as, and whether it may be used more than once."
+        description="Register machines without a login. A key sets the user or tags the machine joins as."
       />
       <PreAuthPanel me={me} controls={controls} />
     </>

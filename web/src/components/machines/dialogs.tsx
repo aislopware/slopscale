@@ -17,6 +17,7 @@ import {
   DialogRoot,
 } from "~/components/ui/dialog.tsx";
 import { toast } from "~/components/ui/toast.ts";
+import { dnsLabelIssue } from "~/lib/dns-label.ts";
 import { nodeName } from "~/lib/node.ts";
 
 type Mutations = ReturnType<typeof useNodeMutations>;
@@ -73,10 +74,18 @@ function RenameForm({
   mutations,
 }: Omit<NodeDialogProps, "open">): ReactElement {
   const [name, setName] = useState(nodeName(node));
+  const [touched, setTouched] = useState(false);
   const { rename } = mutations;
+  const issue = dnsLabelIssue(name.trim());
 
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
+    setTouched(true);
+
+    if (issue !== null) {
+      return;
+    }
+
     rename.mutate(
       { params: { path: { nodeId: node.id, newName: name.trim() } } },
       {
@@ -97,6 +106,10 @@ function RenameForm({
         onChange={(event) => {
           setName(event.target.value);
         }}
+        onBlur={() => {
+          setTouched(true);
+        }}
+        {...(touched && issue !== null ? { error: issue } : {})}
       />
       <DialogError message={rename.isError ? errorMessage(rename.error) : undefined} />
       <FormFooter
@@ -219,7 +232,7 @@ export function SuspendDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Suspend machine?"
-      description={`${nodeName(node)} stays registered but loses every peer and cannot reach the tailnet until you lift the suspension. The device does not need to sign in again afterwards.`}
+      description={`${nodeName(node)} keeps its key but loses every peer until you lift the suspension. No sign-in needed afterwards.`}
       confirmLabel="Suspend"
       loading={suspend.isPending}
       error={suspend.isError ? errorMessage(suspend.error) : undefined}

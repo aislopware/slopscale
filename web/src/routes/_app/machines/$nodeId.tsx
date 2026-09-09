@@ -132,13 +132,13 @@ function MachineFacts({ node }: { readonly node: Node }): ReactElement {
       {node.ephemeral ? (
         <>
           <span aria-hidden>·</span>
-          <span>ephemeral, deleted when it logs out or stays offline</span>
+          <span>ephemeral, deleted when it logs out or goes offline</span>
         </>
       ) : null}
       <span aria-hidden>·</span>
       <span>
         {node.online ? (
-          "connected now"
+          "connected"
         ) : (
           <>
             {"last seen "}

@@ -30,8 +30,7 @@ import {
 import type { ProviderChoice } from "~/components/webhooks/model.ts";
 import type { WebhookMutations } from "~/components/webhooks/mutations.ts";
 
-const secretNote =
-  "The secret signs every delivery. It is shown this once. Rotate it later if you lose it.";
+const secretNote = "The secret signs every delivery and is shown only once. Copy it now.";
 
 export interface WebhookDialogProps {
   /** The webhook to edit; absent when creating one. */
@@ -55,7 +54,7 @@ export function WebhookDialog(props: WebhookDialogProps): ReactElement {
         title={secret === null ? title : "Webhook created"}
         description={
           secret === null
-            ? "An endpoint the server posts events to. Generic endpoints get the signed JSON array. Chat, Telegram, ntfy and email endpoints get the message alone."
+            ? "An endpoint the server posts events to. Generic endpoints get the signed JSON array, the rest get the message alone."
             : undefined
         }
       >
@@ -204,7 +203,7 @@ function WebhookForm({
       />
       <MultiPicker
         label="Events"
-        description="Only these are delivered. A test delivery reaches the endpoint whatever it subscribes to."
+        description="Only these are delivered. A test event is sent whatever is picked here."
         placeholder="Events to deliver…"
         items={eventItems(eventTypes)}
         value={draft.subscriptions}
@@ -245,7 +244,7 @@ export function RotateSecretDialog({
         title={secret === null ? "Rotate secret" : "Secret rotated"}
         description={
           secret === null
-            ? "Deliveries are signed with the new secret from now on. The receiver must be updated before it can verify them again."
+            ? "Deliveries are signed with the new secret from now on. Update the receiver or it cannot verify them."
             : undefined
         }
       >

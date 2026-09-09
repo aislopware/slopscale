@@ -26,7 +26,7 @@ function MapPage(): ReactElement {
     <>
       <PageHeader
         title="Map"
-        description="The DERP map every machine receives: the regions and relays that carry traffic between machines that cannot connect directly."
+        description="The regions and relays that carry traffic between machines that cannot connect directly."
       />
       <div className="flex flex-col gap-6">
         <StaleSettingsBanner mutations={mutations} />

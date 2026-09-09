@@ -61,7 +61,7 @@ function RequestForm({
     options.groups.find((group) => group.id === id)?.name ?? "Choose a group";
   const nodeLabel = (id: string): string =>
     id === everyMachine
-      ? "Every machine I own"
+      ? "Every machine you own"
       : (options.nodes.find((node) => node.id === id)?.name ?? id);
 
   function submit(event: SubmitEvent<HTMLFormElement>): void {
@@ -110,14 +110,14 @@ function RequestForm({
       <Select
         className="w-full"
         label="Machine"
-        description="A single machine, or every machine you own now and later."
+        description="One machine, or every machine you own."
         value={nodeId}
         onValueChange={(value) => {
           setNodeId(value ?? everyMachine);
         }}
         renderValue={(value) => nodeLabel(value)}
       >
-        <Select.Option value={everyMachine}>Every machine I own</Select.Option>
+        <Select.Option value={everyMachine}>Every machine you own</Select.Option>
         {options.nodes.map((node) => (
           <Select.Option key={node.id} value={node.id}>
             {node.name}
@@ -132,9 +132,10 @@ function RequestForm({
       />
       <Textarea
         label="Reason"
+        description="The approver sees this."
         required={false}
         value={reason}
-        placeholder="What you need it for. The approver sees this."
+        placeholder="Why you need access"
         minRows={reasonRows}
         onChange={(event) => {
           setReason(event.target.value);

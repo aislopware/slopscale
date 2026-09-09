@@ -70,7 +70,7 @@ export function AttributeDialog({
       <DialogContent
         size="base"
         title={attribute === null ? "Add custom attribute" : `Edit ${attribute.key}`}
-        description="The key starts with custom: and the value is text, a number or true/false. An expiry removes the attribute at that time, which is how a temporary grant such as an on-call marker is made."
+        description="The key starts with custom:. Set an expiry to grant something temporarily, such as an on-call marker."
       >
         <AttributeForm
           key={attribute?.key ?? "new"}
@@ -192,8 +192,8 @@ function AttributeForm({
       />
       <Input
         label="Comment"
+        required={false}
         value={comment}
-        placeholder="Optional"
         onChange={(event) => {
           setComment(event.target.value);
         }}

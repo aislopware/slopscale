@@ -1,10 +1,10 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import type { ReactElement } from "react";
 
 import type { Webhook } from "~/api/queries.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { Status } from "~/components/ui/status.tsx";
 import { UrlText } from "~/components/ui/url-text.tsx";
 import {
   countEvents,
@@ -15,7 +15,6 @@ import {
 import { WebhookMenu } from "~/components/webhooks/webhook-menu.tsx";
 
 const helper = createAppColumnHelper<Webhook>();
-const maxChips = 3;
 
 export const webhookColumns = helper.columns([
   helper.accessor((webhook) => `${webhook.url} ${webhook.description}`, {
@@ -36,7 +35,9 @@ export const webhookColumns = helper.columns([
     id: "subscriptions",
     header: "Events",
     enableSorting: false,
-    cell: ({ row }) => <SubscriptionsCell webhook={row.original} />,
+    cell: ({ row, table }) => (
+      <SubscriptionsCell webhook={row.original} eventTypes={table.options.meta?.eventTypes} />
+    ),
     meta: { className: "hidden min-w-40 md:table-cell" },
   }),
   helper.accessor((webhook) => webhook.lastDeliveryAt ?? "", {
@@ -79,24 +80,24 @@ function EndpointCell({ webhook }: { readonly webhook: Webhook }): ReactElement 
   );
 }
 
-/** The first few event types as chips, the rest folded into a count with the full list on hover. */
-function SubscriptionsCell({ webhook }: { readonly webhook: Webhook }): ReactElement {
-  const shown = webhook.subscriptions.slice(0, maxChips);
-  const rest = webhook.subscriptions.slice(maxChips);
+function SubscriptionsCell({
+  webhook,
+  eventTypes,
+}: {
+  readonly webhook: Webhook;
+  readonly eventTypes?: readonly string[] | undefined;
+}): ReactElement {
+  const isAll =
+    eventTypes !== undefined &&
+    eventTypes.length > 0 &&
+    eventTypes.every((type) => webhook.subscriptions.includes(type));
+
+  const label = isAll ? "All events" : countEvents(webhook.subscriptions.length);
 
   return (
-    <div className="flex flex-wrap gap-1">
-      {shown.map((type) => (
-        <Badge key={type} variant="secondary" className="font-mono text-[0.85em]">
-          {type}
-        </Badge>
-      ))}
-      {rest.length === 0 ? null : (
-        <Tooltip content={rest.join(", ")}>
-          <Badge variant="outline">{`+${rest.length}`}</Badge>
-        </Tooltip>
-      )}
-    </div>
+    <Tooltip content={webhook.subscriptions.join(", ")}>
+      <span>{label}</span>
+    </Tooltip>
   );
 }
 
@@ -110,7 +111,7 @@ function DeliveryCell({ webhook }: { readonly webhook: Webhook }): ReactElement 
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
       <Tooltip content={webhook.lastDeliveryStatus}>
-        <Badge variant={state === "ok" ? "success" : "error"}>{deliveryLabel(webhook)}</Badge>
+        <Status tone={state === "ok" ? "success" : "danger"}>{deliveryLabel(webhook)}</Status>
       </Tooltip>
       <span className="whitespace-nowrap text-kumo-subtle">
         <RelativeTime value={webhook.lastDeliveryAt} />

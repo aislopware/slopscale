@@ -44,7 +44,7 @@ function RequestsPage(): ReactElement {
     <>
       <PageHeader
         title="Requests"
-        description="Asks to join a group for a while. An approver decides here, and the access ends on its own when the time is up."
+        description="Requests to join a group for a set time. An approver decides here, and access ends when the time is up."
         meta={pending === 1 ? "1 waiting for a decision" : `${pending} waiting for a decision`}
       />
       <RequestsTab

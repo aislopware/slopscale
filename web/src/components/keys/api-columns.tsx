@@ -151,14 +151,14 @@ function ApiKeyMenu({ apiKey }: { readonly apiKey: ApiKey }): ReactElement {
       <KeyActions
         label={`Actions for API key ${apiKey.prefix}`}
         rotate={{
-          reason: expired ? "An expired key cannot be rotated; create a new one" : undefined,
+          reason: expired ? "Expired keys cannot be rotated" : undefined,
           onSelect: () => {
             setRotating(true);
           },
         }}
         expire={{
           title: "Expire API key?",
-          description: `Anything still using ${apiKey.prefix} stops being able to call the API.`,
+          description: `Anything using ${apiKey.prefix} can no longer call the v1 API.`,
           pending: expire.isPending,
           error: expire.isError ? errorMessage(expire.error) : undefined,
           run: (done) => {

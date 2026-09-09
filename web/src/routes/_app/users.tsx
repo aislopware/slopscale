@@ -157,7 +157,6 @@ function UsersPage(): ReactElement {
                   className={tableEmptyClass}
                   size="sm"
                   title="No users match"
-                  description="No user matches this search and filter."
                   contents={
                     <Button variant="secondary" onClick={handleClear}>
                       Clear filters

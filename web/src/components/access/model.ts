@@ -140,7 +140,7 @@ export function portsError(ports: string): string | null {
     const [first, last = first] = item.split("-").map(Number);
 
     if (first === undefined || first < 1 || last === undefined || last > maxPort || last < first) {
-      return "Ports go from 1 to 65535 and a range must go up.";
+      return "Use ports from 1 to 65535, with ranges in ascending order.";
     }
   }
 

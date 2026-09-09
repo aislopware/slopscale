@@ -46,16 +46,16 @@ export function KeyExpirySection({
     : [...presets, current].toSorted((left, right) => left - right);
   const fallback =
     settings.defaultKeyExpiryDays > 0
-      ? `Off, the config file gives new logins ${settings.defaultKeyExpiryDays} days unless the client asks for less.`
-      : "Off, a login lasts as long as the client asks for, which is 180 days by default.";
+      ? `Off. The config file gives new logins ${settings.defaultKeyExpiryDays} days unless the client asks for less.`
+      : "Off. A login lasts as long as the client asks for, 180 days by default.";
 
   return (
     <Section title="Key expiry" description="How long a login stays valid." bodyClassName="p-0">
       <SettingRow
-        title="Key expiry"
+        title="Maximum"
         description={
           current > 0
-            ? `A login lasts at most ${optionLabel(current)}; a client that asks for longer is shortened. Applies to the next login of each machine, and never to tagged machines.`
+            ? `A login lasts at most ${optionLabel(current)}, shortened if the client asks for longer. Applies from each machine's next login, never to tagged machines.`
             : fallback
         }
         control={
@@ -72,7 +72,7 @@ export function KeyExpirySection({
                 {
                   onSuccess: () => {
                     toast.success(
-                      days === 0 ? "Key expiry cap off" : `Key expiry set to ${optionLabel(days)}`,
+                      days === 0 ? "Key expiry off" : `Key expiry set to ${optionLabel(days)}`,
                     );
                   },
                 },

@@ -94,7 +94,6 @@ export function GroupsTab({
                 size="sm"
                 icon={<UsersThreeIcon size={emptyIconSize} />}
                 title="No groups match"
-                description="No group matches this search."
                 contents={
                   <Button
                     variant="secondary"
@@ -110,7 +109,7 @@ export function GroupsTab({
             footer={
               <TableFooter>
                 {own === 0
-                  ? "Only the built-in groups so far. Create one to name a set of machines."
+                  ? "Only the built-in groups."
                   : `Showing ${shown} of ${plural(groups.length, "group")}`}
               </TableFooter>
             }

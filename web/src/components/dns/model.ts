@@ -197,7 +197,7 @@ export function recordError(record: DnsRecord): string | null {
 
   switch (record.type) {
     case "": {
-      return isIp(value) ? null : "The value must be an IP address.";
+      return isIp(value) ? null : "Use an IP address.";
     }
     case "A": {
       return isIpv4(value) ? null : "An A record needs an IPv4 address.";

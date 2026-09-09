@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import type { ReactElement } from "react";
 
 import type { Group, Node } from "~/api/queries.ts";
@@ -110,10 +109,10 @@ function NameCell({ group }: { readonly group: Group }): ReactElement {
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="flex min-w-0 items-center gap-2">
         <span className="truncate font-medium text-kumo-default">{group.name}</span>
-        {isBuiltin(group) ? <Badge variant="outline">Built in</Badge> : null}
+        {isBuiltin(group) ? <span className="text-xs text-kumo-subtle">Built-in</span> : null}
         {isSynced(group) ? (
           <span title="Users follow the identity provider's groups claim">
-            <Badge variant="outline">Synced</Badge>
+            <span className="text-xs text-kumo-subtle">Synced</span>
           </span>
         ) : null}
       </span>
@@ -147,7 +146,7 @@ function Count({
 function MachinesCell({ group }: { readonly group: GroupRow }): ReactElement {
   if (group.machines === null) {
     return (
-      <span className="text-kumo-subtle" title="You cannot list machines">
+      <span className="text-kumo-subtle" title="Your credentials may not list machines">
         —
       </span>
     );
@@ -176,7 +175,7 @@ function MachinesCell({ group }: { readonly group: GroupRow }): ReactElement {
 /** What a builtin group stands for, or null for a group the operator described. */
 function builtinDescription(group: Group): string | null {
   if (isSelf(group)) {
-    return "In a rule's destination, the machines owned by the same user as the source. Tailscale's autogroup:self.";
+    return "As a destination, the machines owned by the source's own user.";
   }
 
   return isBuiltin(group) ? "Every machine in the tailnet, kept up to date by the server." : null;

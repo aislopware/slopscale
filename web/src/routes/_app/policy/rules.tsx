@@ -41,7 +41,7 @@ function RulesPage(): ReactElement {
     <>
       <PageHeader
         title="Rules"
-        description="Who may reach what: each rule opens ports from a set of sources to a set of destinations. The policy file covers whatever the rules leave out."
+        description="Each rule opens ports from a set of sources to a set of destinations. The policy file covers whatever the rules leave out."
         meta={enabled === 1 ? "1 rule enabled" : `${enabled} rules enabled`}
       />
       <RulesTab

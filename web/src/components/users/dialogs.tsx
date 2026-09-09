@@ -7,6 +7,8 @@ import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { User } from "~/api/queries.ts";
+import type { Me } from "~/auth/me.ts";
+import { signOut } from "~/auth/session.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import {
@@ -18,7 +20,7 @@ import {
 } from "~/components/ui/dialog.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import type { useUserMutations } from "~/components/users/mutations.ts";
-import { roleOptions, toRole } from "~/components/users/roles.ts";
+import { roleName, roleOptions, toRole } from "~/components/users/roles.ts";
 import type { UserRole } from "~/components/users/roles.ts";
 import { userLabel } from "~/lib/node.ts";
 
@@ -44,7 +46,7 @@ export function CreateUserDialog({
       <DialogContent
         size="base"
         title="Add user"
-        description="A local user that can register machines with a pre-auth key. Users who sign in through an identity provider appear on their own."
+        description="A local user that registers machines with a pre-auth key. Identity provider users appear on their own."
       >
         <CreateUserForm mutations={mutations} onOpenChange={onOpenChange} />
       </DialogContent>
@@ -146,7 +148,7 @@ export function RenameUserDialog({
       <DialogContent
         size="base"
         title="Rename user"
-        description="The username is what the policy and the machine names refer to, so renaming changes both."
+        description="The policy and machine names both use the username, so renaming changes both."
       >
         <RenameUserForm user={user} mutations={mutations} onOpenChange={onOpenChange} />
       </DialogContent>
@@ -213,7 +215,7 @@ export function RoleDialog({ user, open, onOpenChange, mutations }: UserDialogPr
       <DialogContent
         size="base"
         title={`Change role for ${userLabel(user)}`}
-        description="The role decides what this user may do in the console and through the API. There is exactly one owner, so picking owner transfers ownership."
+        description="What this user may do in the console and the API. Picking owner transfers ownership, since there is only one."
       >
         <RoleForm user={user} mutations={mutations} onOpenChange={onOpenChange} />
       </DialogContent>
@@ -252,7 +254,7 @@ function RoleForm({
         className="w-full"
         label="Role"
         value={role}
-        renderValue={(value) => value}
+        renderValue={(value) => roleName(value ?? "")}
         onValueChange={(value: UserRole | null) => {
           if (value !== null) {
             setRole(value);
@@ -329,7 +331,8 @@ export function EndSessionsDialog({
   open,
   onOpenChange,
   mutations,
-}: UserDialogProps): ReactElement {
+  me,
+}: UserDialogProps & { readonly me?: Me }): ReactElement {
   const { endSessions } = mutations;
 
   return (
@@ -346,6 +349,12 @@ export function EndSessionsDialog({
           { params: { path: { id: user.id } } },
           {
             onSuccess: (data) => {
+              if (me?.user !== undefined && me.user.id === user.id) {
+                void signOut();
+
+                return;
+              }
+
               toast.success(`${plural(data.ended, "session")} ended`);
               onOpenChange(false);
             },

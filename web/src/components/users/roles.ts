@@ -1,5 +1,3 @@
-import type { BadgeVariant } from "@cloudflare/kumo/components/badge";
-
 /** The roles the server accepts, most to least privileged. */
 export const userRoles = [
   "owner",
@@ -34,7 +32,7 @@ export const roleOptions: readonly RoleOption[] = [
   {
     value: "it-admin",
     label: "IT admin",
-    description: "Users, devices, keys and settings. Reads policy and routes.",
+    description: "Users, machines, keys and settings. Reads policy and routes.",
   },
   { value: "auditor", label: "Auditor", description: "Reads everything, changes nothing." },
   { value: "member", label: "Member", description: "No admin access." },
@@ -55,13 +53,4 @@ export function roleName(role: string): string {
 
 export function isAdminRole(role: string): boolean {
   return adminRoles.has(toRole(role));
-}
-
-/** Owner is the one seat that outranks everything, so it gets the strongest badge. */
-export function roleVariant(role: string): BadgeVariant {
-  if (role === "owner") {
-    return "primary";
-  }
-
-  return role === "admin" ? "info" : "secondary";
 }

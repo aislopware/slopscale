@@ -14,6 +14,7 @@ import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { InviteResultView } from "~/components/users/invite-dialog.tsx";
 import type { InviteResult } from "~/components/users/invite-dialog.tsx";
+import { cannotChangeUsers } from "~/components/users/menu.tsx";
 import { useInviteMutations } from "~/components/users/mutations.ts";
 
 const actionsIconSize = 18;
@@ -30,7 +31,7 @@ export function InviteMenu({
   const [result, setResult] = useState<InviteResult | null>(null);
   const [confirming, setConfirming] = useState(false);
   const writable = can(me, "users");
-  const reason = writable ? undefined : "Your credentials may not change users";
+  const reason = writable ? undefined : cannotChangeUsers;
 
   function resend(): void {
     mutations.resend.mutate(
@@ -38,7 +39,7 @@ export function InviteMenu({
       {
         onSuccess: setResult,
         onError: (error) => {
-          toast.error("Could not re-send the invite", error);
+          toast.error("Could not resend the invitation", error);
         },
       },
     );
@@ -61,7 +62,7 @@ export function InviteMenu({
         <DropdownMenu.Content align="end">
           <DisabledReason reason={reason}>
             <DropdownMenu.Item icon={PaperPlaneTiltIcon} disabled={!writable} onClick={resend}>
-              Re-send
+              Resend
             </DropdownMenu.Item>
           </DisabledReason>
           <DropdownMenu.Separator />
@@ -90,7 +91,7 @@ export function InviteMenu({
         <DialogContent
           size="base"
           title="New invitation link"
-          description="The link from the earlier message has stopped working."
+          description="The previous link has stopped working."
         >
           {result === null ? null : (
             <InviteResultView
@@ -106,8 +107,8 @@ export function InviteMenu({
         open={confirming}
         onOpenChange={setConfirming}
         title="Revoke this invitation?"
-        description={`The link sent to ${invite.email} stops working. Invite the address again to send a new one.`}
-        confirmLabel="Revoke invite"
+        description={`The link sent to ${invite.email} stops working. Send a new invitation to reissue it.`}
+        confirmLabel="Revoke invitation"
         loading={mutations.revoke.isPending}
         {...(mutations.revoke.isError ? { error: errorMessage(mutations.revoke.error) } : {})}
         onConfirm={() => {

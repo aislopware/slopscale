@@ -16,7 +16,7 @@ export const sourceLabels: Record<RegionSource, string> = {
   tailscale: "Tailscale",
   url: "Map URL",
   file: "Map file",
-  custom: "Your relay",
+  custom: "Added here",
   embedded: "Embedded",
   config: "Config",
 };
@@ -234,7 +234,7 @@ export function frequencyError(value: string): string | null {
     return "Use a duration such as 3h or 30m.";
   }
 
-  return seconds < minute ? "The maps cannot be refetched more often than every minute." : null;
+  return seconds < minute ? "Use a minute or more." : null;
 }
 
 const maxPort = 65_535;
@@ -283,7 +283,9 @@ export function ipv4Error(value: string, allowNone: boolean): string | null {
     return null;
   }
 
-  return allowNone ? "Use an IPv4 address, none, or leave it empty." : "Use an IPv4 address.";
+  return allowNone
+    ? "Use an IPv4 address, the word none, or leave it empty."
+    : "Use an IPv4 address.";
 }
 
 export function ipv6Error(value: string, allowNone: boolean): string | null {
@@ -291,7 +293,9 @@ export function ipv6Error(value: string, allowNone: boolean): string | null {
     return null;
   }
 
-  return allowNone ? "Use an IPv6 address, none, or leave it empty." : "Use an IPv6 address.";
+  return allowNone
+    ? "Use an IPv6 address, the word none, or leave it empty."
+    : "Use an IPv6 address.";
 }
 
 const hostPort = /^(?:\[[^\]]+\]|[^:]*):(?<port>\d{1,5})$/v;
@@ -303,7 +307,7 @@ export function stunAddrError(value: string): string | null {
     return "Use host:port, such as 0.0.0.0:3478.";
   }
 
-  return Number(match.groups?.["port"]) <= maxPort ? null : "The port must be at most 65535.";
+  return Number(match.groups?.["port"]) <= maxPort ? null : "Use a port between 1 and 65535.";
 }
 
 /** The relay as the form edits it: every field a string. */

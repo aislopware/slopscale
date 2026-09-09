@@ -1,5 +1,4 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
-import type { BadgeVariant } from "@cloudflare/kumo/components/badge";
 import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
@@ -15,6 +14,8 @@ import type { KeyStatus } from "~/components/keys/status.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import type { Tone } from "~/components/ui/status.tsx";
+import { Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { userLabel } from "~/lib/node.ts";
 import { parseTime } from "~/lib/time.ts";
@@ -60,7 +61,7 @@ export const preAuthKeyColumns = helper.columns([
   // accessor is what the global filter searches, which keeps "search by tag" working.
   helper.accessor((authKey) => authKey.aclTags.join(" "), {
     id: "type",
-    header: "Type",
+    header: "Options",
     enableSorting: false,
     cell: ({ row, table }) => (
       <TypeCell authKey={row.original} groups={table.options.meta?.groups ?? []} />
@@ -125,22 +126,39 @@ function TypeCell({
   readonly groups: readonly Group[];
 }): ReactElement {
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      <Badge variant="secondary">{authKey.reusable ? "Reusable" : "Single use"}</Badge>
-      {authKey.ephemeral ? <Badge variant="secondary">Ephemeral</Badge> : null}
-      {authKey.preauthorized ? null : <Badge variant="warning">Needs approval</Badge>}
-      {authKey.aclTags.map((tag) => (
-        <Badge key={tag} variant="outline" className="font-mono">
-          {tag}
-        </Badge>
-      ))}
-      {authKey.groupIds.map((id) => (
-        <Badge key={id} variant="outline">
-          {groupName(groups, id)}
-        </Badge>
-      ))}
+    <div className="flex min-w-0 flex-col items-start gap-1">
+      <span className="whitespace-nowrap text-kumo-default">{traits(authKey).join(" · ")}</span>
+      {authKey.aclTags.length === 0 && authKey.groupIds.length === 0 ? null : (
+        <span className="flex flex-wrap gap-1">
+          {authKey.aclTags.map((tag) => (
+            <Badge key={tag} variant="outline" className="font-mono">
+              {tag}
+            </Badge>
+          ))}
+          {authKey.groupIds.map((id) => (
+            <Badge key={id} variant="outline">
+              {groupName(groups, id)}
+            </Badge>
+          ))}
+        </span>
+      )}
     </div>
   );
+}
+
+/** What the key does to a machine that registers with it, as words: "Reusable · Ephemeral". */
+function traits(authKey: PreAuthKey): string[] {
+  const words = [authKey.reusable ? "Reusable" : "Single use"];
+
+  if (authKey.ephemeral) {
+    words.push("Ephemeral");
+  }
+
+  if (!authKey.preauthorized) {
+    words.push("Needs approval");
+  }
+
+  return words;
 }
 
 const statusLabels: Record<KeyStatus, string> = {
@@ -149,18 +167,14 @@ const statusLabels: Record<KeyStatus, string> = {
   expired: "Expired",
 };
 
-const statusVariants: Record<KeyStatus, BadgeVariant> = {
+const statusTones: Record<KeyStatus, Tone> = {
   active: "success",
   used: "neutral",
-  expired: "error",
+  expired: "danger",
 };
 
 function StatusCell({ status }: { readonly status: KeyStatus }): ReactElement {
-  return (
-    <Badge variant={statusVariants[status]} appearance="dot">
-      {statusLabels[status]}
-    </Badge>
-  );
+  return <Status tone={statusTones[status]}>{statusLabels[status]}</Status>;
 }
 
 function PreAuthKeyMenu({
@@ -179,7 +193,7 @@ function PreAuthKeyMenu({
       expire={{
         title: "Expire pre-auth key?",
         description:
-          "Machines already registered with it keep working, but the key cannot register any more.",
+          "Machines already registered keep working, but the key cannot register new ones.",
         pending: expire.isPending,
         error: expire.isError ? errorMessage(expire.error) : undefined,
         run: (done) => {

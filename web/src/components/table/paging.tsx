@@ -54,7 +54,7 @@ export function PagingBand({
           {() => `Showing ${rangeText(page, pageSize, total)} of ${total}`}
         </Pagination.Info>
         <Pagination.PageSize
-          className="ml-auto"
+          className="ml-auto max-sm:hidden"
           label="Rows per page"
           value={pageSize}
           onChange={setPageSize}
@@ -79,7 +79,7 @@ function moreText(fetching: boolean, failed: boolean): string {
     return ", loading more";
   }
 
-  return failed ? ". The next page did not load; try Next again" : "";
+  return failed ? ". The next page did not load" : "";
 }
 
 /**
@@ -119,7 +119,7 @@ export function CursorBand({ paging, noun }: CursorBandProps): ReactElement | nu
       >
         <Pagination.Info>{() => info}</Pagination.Info>
         <Pagination.PageSize
-          className="ml-auto"
+          className="ml-auto max-sm:hidden"
           label="Rows per page"
           value={pageSize}
           onChange={setPageSize}

@@ -75,14 +75,14 @@ function Details({ trouble }: { readonly trouble: Trouble }): ReactElement | nul
           className="transition-transform group-data-[panel-open]/details:rotate-90"
           aria-hidden
         />
-        Technical details
+        Details
       </Collapsible.Trigger>
       <Collapsible.Panel>
         <div className="mt-2 flex flex-col gap-1 rounded-md bg-kumo-tint px-3 py-2 text-sm">
           <CopyText
             value={trouble.message}
             copy={report(trouble)}
-            label="Copy the details"
+            label="Copy details"
             wrap
             display={<span className="whitespace-pre-wrap">{trouble.message}</span>}
           />

@@ -16,6 +16,7 @@ import {
 import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { FromFileBadge } from "~/components/dns/source.tsx";
 import { ValueDialog } from "~/components/dns/value-dialog.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { Section } from "~/components/ui/section.tsx";
 
 export function SearchDomainsSection({
@@ -62,6 +63,7 @@ export function SearchDomainsSection({
                 variant="secondary"
                 icon={PlusIcon}
                 onClick={() => {
+                  mutations.set.reset();
                   setAdding(true);
                 }}
               >
@@ -84,7 +86,12 @@ export function SearchDomainsSection({
         open={adding}
         onOpenChange={setAdding}
         title="Add search domain"
-        description="Machines append it to names without a dot, so `db` also tries `db.corp.example.com`."
+        description={
+          <>
+            Machines append it to names without a dot, so <Code>db</Code> also tries{" "}
+            <Code>db.corp.example.com</Code>.
+          </>
+        }
         label="Domain"
         placeholder="corp.example.com"
         normalize={normalizeDomain}

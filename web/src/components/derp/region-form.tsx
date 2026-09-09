@@ -60,21 +60,18 @@ function regionIssue(
 
   const duplicate = duplicateRelayName(relays);
 
-  return duplicate === null ? null : `Two relays are named ${duplicate}; give one its own name.`;
+  return duplicate === null ? null : `Two relays are named ${duplicate}. Rename one.`;
 }
 
-/** Adds a region of relays, or edits one; the whole configuration is sent back. */
-export function RegionForm({
-  editing,
-  derp,
-  mutations,
-  onDone,
-}: {
+export interface RegionFormProps {
   readonly editing: DerpCustomRegion | null;
   readonly derp: Derp;
   readonly mutations: DerpMutations;
   readonly onDone: () => void;
-}): ReactElement {
+}
+
+/** Adds a region of relays, or edits one; the whole configuration is sent back. */
+export function RegionForm({ editing, derp, mutations, onDone }: RegionFormProps): ReactElement {
   const settings = derp.effective;
   const form = useRef<HTMLFormElement>(null);
   const [id, setId] = useState(editing === null ? "" : String(editing.id));
@@ -187,7 +184,10 @@ export function RegionForm({
       <DialogError
         message={mutations.set.isError ? errorMessage(mutations.set.error) : undefined}
       />
-      <FormFooter label={editing === null ? "Add" : "Save"} pending={mutations.set.isPending} />
+      <FormFooter
+        label={editing === null ? "Add region" : "Save"}
+        pending={mutations.set.isPending}
+      />
     </form>
   );
 }
@@ -335,13 +335,13 @@ function RelayFields({
           key: "ipv4",
           label: "IPv4",
           placeholder: "203.0.113.5",
-          description: "Optional. Used when DNS is down.",
+          description: "Published in the DERP map so machines reach the relay when DNS is down.",
         })}
         {text({
           key: "ipv6",
           label: "IPv6",
           placeholder: "2001:db8::5",
-          description: "Optional. Used when DNS is down.",
+          description: "Published in the DERP map so machines reach the relay when DNS is down.",
         })}
       </div>
       <div className="grid items-start gap-3 sm:grid-cols-3">

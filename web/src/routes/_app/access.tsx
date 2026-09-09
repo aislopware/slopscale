@@ -32,7 +32,7 @@ export const Route = createFileRoute("/_app/access")({
 /** Why asking is not possible, or nothing when it is. */
 function askReason(hasUser: boolean, hasGroups: boolean): string | undefined {
   if (!hasUser) {
-    return "Requests belong to a user, and these credentials are not one";
+    return "These credentials are not a user";
   }
 
   return hasGroups ? undefined : "No group takes requests right now";
@@ -41,14 +41,14 @@ function askReason(hasUser: boolean, hasGroups: boolean): string | undefined {
 /** Why the list is empty, and what would fill it. */
 function emptyText(hasUser: boolean, hasGroups: boolean): string {
   if (!hasUser) {
-    return "Requests belong to a user. Sign in as one to ask for access.";
+    return "Sign in as a user to ask for access.";
   }
 
   if (!hasGroups) {
-    return "No group takes requests right now. An administrator marks a group as requestable under Access controls.";
+    return "No group takes requests. An administrator can mark one requestable under Access controls.";
   }
 
-  return "Ask to join a group for a while. The request shows here with its outcome.";
+  return "Your requests and their outcomes show here.";
 }
 
 /** The signed-in user's own asks for temporary access, and the way to file one. */
@@ -83,7 +83,7 @@ function MyAccessPage(): ReactElement {
     <>
       <PageHeader
         title="My access"
-        description="Ask to join a group for a while. An approver decides, and the access ends on its own when the time is up."
+        description="Ask to join a group for a set time. An approver decides, and access ends when the time is up."
         meta={active === 0 ? undefined : `${active} active ${active === 1 ? "grant" : "grants"}`}
         actions={
           <DisabledReason reason={askReason(me.user !== undefined, options.groups.length > 0)}>
@@ -108,7 +108,7 @@ function MyAccessPage(): ReactElement {
                 className={tableEmptyClass}
                 size="sm"
                 icon={<HandWavingIcon size={emptyIconSize} />}
-                title="No requests yet"
+                title="No requests"
                 description={emptyText(me.user !== undefined, options.groups.length > 0)}
                 contents={
                   canAsk ? (

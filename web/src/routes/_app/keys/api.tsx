@@ -27,7 +27,7 @@ function ApiKeysPage(): ReactElement {
     <>
       <PageHeader
         title="API keys"
-        description="Authenticate this console and automation against the v1 API. A key is shown once; rotating it mints a new secret under the same id and scopes."
+        description="Authenticate this console and automation against the v1 API. Rotating a key gives it a new secret, same id and scopes."
       />
       <ApiPanel me={me} controls={controls} />
     </>

@@ -1,6 +1,6 @@
 import { Input } from "@cloudflare/kumo/components/input";
-import { useState } from "react";
-import type { ReactElement, SubmitEvent } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ReactElement, ReactNode, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
@@ -11,7 +11,7 @@ export interface ValueDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly title: string;
-  readonly description: string;
+  readonly description: ReactNode;
   readonly label: string;
   readonly placeholder: string;
   /** What is wrong with the trimmed value, or null when it can be saved. */
@@ -30,6 +30,7 @@ export interface PendingMutation {
   readonly isPending: boolean;
   readonly isError: boolean;
   readonly error: unknown;
+  readonly reset?: () => void;
 }
 
 const trim = (value: string): string => value.trim();
@@ -39,6 +40,16 @@ const trim = (value: string): string => value.trim();
  * starts empty.
  */
 export function ValueDialog(props: ValueDialogProps): ReactElement {
+  const { reset } = props.mutation;
+  const wasOpen = useRef(false);
+
+  useEffect(() => {
+    if (props.open && !wasOpen.current) {
+      reset?.();
+    }
+    wasOpen.current = props.open;
+  }, [props.open, reset]);
+
   return (
     <DialogRoot open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent size="base" title={props.title} description={props.description}>

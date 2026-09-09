@@ -47,7 +47,7 @@ const emptyDraft: Draft = {
   groupIds: [],
 };
 
-const revealNote = "The full key is shown this once and cannot be read again.";
+const revealNote = "The key is shown only once. Copy it now.";
 const tagRows = 2;
 
 /** Splits the textarea into tags, adding the `tag:` prefix the policy expects. */
@@ -66,14 +66,14 @@ export function parseTags(text: string): string[] {
 export type PreAuthKeyIntent = "key" | "add-machine";
 
 const titles: Record<PreAuthKeyIntent, { readonly form: string; readonly created: string }> = {
-  key: { form: "Create pre-auth key", created: "Key created" },
+  key: { form: "Create pre-auth key", created: "Pre-auth key created" },
   "add-machine": { form: "Add machine", created: "Add machine" },
 };
 
 const descriptions: Record<PreAuthKeyIntent, string> = {
   key: "A machine registers with the key instead of signing in, so it belongs to the user you pick.",
   "add-machine":
-    "A machine joins by registering itself with a pre-auth key, so it belongs to the user you pick.",
+    "A machine registers with the key instead of signing in, so it belongs to the user you pick.",
 };
 
 export function CreatePreAuthKeyDialog({
@@ -170,8 +170,7 @@ function CreatePreAuthKeyForm({
           what the key is for before the operator has to read the button. */}
       {intent === "add-machine" ? (
         <p className="text-kumo-subtle">
-          Creating the key hands you the command to run on the machine. The machine joins the moment
-          it runs.
+          The next step gives you the command to run on the machine.
         </p>
       ) : null}
       <DialogFooter>
@@ -202,7 +201,7 @@ function PreAuthKeyFields({
       {users === undefined ? (
         <Input
           label="User id"
-          description="The numeric id of the user the key belongs to."
+          description="Which user the key belongs to."
           value={draft.userId}
           spellCheck={false}
           onChange={(event) => {
@@ -233,7 +232,7 @@ function PreAuthKeyFields({
         <Switch.Legend>Options</Switch.Legend>
         <OptionSwitch
           label="Reusable"
-          description="Registers more than one machine with the same key."
+          description="Lets more than one machine use the key."
           checked={draft.reusable}
           onChange={(reusable) => {
             onChange({ reusable });
@@ -241,7 +240,7 @@ function PreAuthKeyFields({
         />
         <OptionSwitch
           label="Ephemeral"
-          description="The machine is removed when it goes offline."
+          description="The machine is deleted when it logs out or goes offline."
           checked={draft.ephemeral}
           onChange={(ephemeral) => {
             onChange({ ephemeral });
@@ -249,7 +248,7 @@ function PreAuthKeyFields({
         />
         <OptionSwitch
           label="Pre-authorized"
-          description="The machine skips device approval."
+          description="The machine skips approval."
           checked={draft.preauthorized}
           onChange={(preauthorized) => {
             onChange({ preauthorized });
@@ -288,8 +287,8 @@ function PreAuthKeyFields({
 function TagsHint(): ReactElement {
   return (
     <>
-      Comma separated; <Code>tag:</Code> is added when missing. A tagged machine belongs to its tags
-      instead of the user.
+      Comma separated. <Code>tag:</Code> is added when missing, and a tagged machine belongs to its
+      tags, not the user.
     </>
   );
 }

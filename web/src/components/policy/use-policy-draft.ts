@@ -147,7 +147,13 @@ export function usePolicyDraft({
       setIssue(null);
       setText(saved.policy);
       toast.success("Policy saved");
-      await invalidate(queryClient, "/api/v1/policy");
+      await invalidate(
+        queryClient,
+        "/api/v1/policy",
+        "/api/v1/node",
+        "/api/v1/access-rule",
+        "/api/v1/network",
+      );
     },
     onError: (error) => {
       setIssue({ title: "Could not save the policy", message: errorMessage(error) });

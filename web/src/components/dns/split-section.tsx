@@ -1,7 +1,7 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Input, Textarea } from "@cloudflare/kumo/components/input";
 import { PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
@@ -47,7 +47,7 @@ export function SplitDnsSection({
   return (
     <Section
       title="Split DNS"
-      description="Domains answered by their own resolvers, such as an internal zone behind a subnet router. A domain marked to use with an exit node keeps its resolvers while a machine routes through one."
+      description="Domains answered by their own resolvers, such as an internal zone behind a subnet router."
       bodyClassName="p-0"
       {...(canEdit
         ? {
@@ -86,12 +86,12 @@ export function SplitDnsSection({
                 name={domain}
                 checked={splitKeptWithExitNode(settings, domain)}
                 disabled={!canEdit || pending}
-                reason={canEdit ? undefined : "Your credentials may not change DNS"}
+                reason={canEdit ? undefined : "Your credentials cannot change DNS"}
                 pending={pending}
                 onChange={(on) => {
                   mutations.apply(
                     withSplitUseWithExitNode(settings, domain, on),
-                    `${domain} ${on ? "kept" : "dropped"} with an exit node`,
+                    `${domain} ${on ? "will be used" : "will not be used"} with an exit node`,
                   );
                 }}
               />
@@ -180,6 +180,10 @@ function SplitForm({
   const [domain, setDomain] = useState(editing?.domain ?? "");
   const [servers, setServers] = useState(editing?.servers.join("\n") ?? "");
   const [touched, setTouched] = useState(false);
+
+  useEffect(() => {
+    mutations.set.reset();
+  }, [mutations.set]);
   const cleanDomain = normalizeDomain(domain);
   const list = parseList(servers);
   const issues = splitIssues(settings, editing, { domain: cleanDomain, servers: list });
@@ -228,7 +232,7 @@ function SplitForm({
       />
       <Textarea
         label="Nameservers"
-        description="One per line: an IP, an IP with port, or a known provider's DNS-over-HTTPS URL."
+        description="One per line. An IP, an IP with port, or a DNS-over-HTTPS URL."
         value={servers}
         placeholder={"10.0.0.53\n10.0.0.54"}
         spellCheck={false}

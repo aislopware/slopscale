@@ -32,7 +32,7 @@ export function SharingSection({
     <>
       <Section
         title="Sharing"
-        description="Users whose own devices may reach this machine."
+        description="Users whose own machines may reach this one."
         actions={
           canEdit ? (
             <Button
@@ -51,7 +51,7 @@ export function SharingSection({
           <SectionRow className="text-kumo-subtle">
             {isTagged(node)
               ? "Tagged machines are not shared. The policy grants access to them instead."
-              : "Not shared with anyone yet."}
+              : "Not shared with anyone."}
           </SectionRow>
         ) : (
           node.sharedWith.map((userId) => (

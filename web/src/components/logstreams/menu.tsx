@@ -45,7 +45,7 @@ export function LogStreamMenu({
           if (data.delivered) {
             toast.success(`Test entry delivered (HTTP ${data.status})`);
           } else {
-            toast.error(`Test entry failed: ${data.status}`);
+            toast.error(`Test entry failed (${data.status})`);
           }
         },
         onError: (error) => {

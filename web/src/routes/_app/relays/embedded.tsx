@@ -26,7 +26,7 @@ function EmbeddedPage(): ReactElement {
     <>
       <PageHeader
         title="Embedded relay"
-        description="The relay built into this server: whether it runs, which region it joins and how clients are verified."
+        description="The relay built into this server, the region it joins and how it verifies clients."
       />
       <div className="flex flex-col gap-6">
         <StaleSettingsBanner mutations={mutations} />

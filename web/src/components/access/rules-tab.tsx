@@ -94,7 +94,7 @@ export function RulesTab({
                   description={
                     policyFileEnforces
                       ? "The policy file decides who reaches what. A rule adds to it."
-                      : "Every machine can reach every other machine. The first rule you enable closes everything it does not allow."
+                      : "Every machine can reach every other machine. The first enabled rule blocks everything it does not allow."
                   }
                   contents={
                     <Button
@@ -113,7 +113,6 @@ export function RulesTab({
                   className={tableEmptyClass}
                   size="sm"
                   title="No rules match"
-                  description="No rule matches this search."
                   contents={
                     <Button
                       variant="secondary"
@@ -173,7 +172,7 @@ function StateBanner({
       <Callout
         tone="warning"
         title="The tailnet is open"
-        description="With no enabled rule and no restricting policy file, every machine can reach every other machine."
+        description="No rule is enabled and the policy file restricts nothing, so every machine can reach every other machine."
       />
     );
   }

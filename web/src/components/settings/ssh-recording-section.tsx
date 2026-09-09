@@ -49,7 +49,7 @@ export function SSHRecordingSection({
   };
 
   const embedded = settings.embeddedRecorder ? (
-    "The server runs the embedded recorder, which is always a default. These are added to it."
+    "The server always uses the embedded recorder. These are added to it."
   ) : (
     <>
       The server does not run the embedded recorder (<Code>ssh_recording.enabled</Code> in the
@@ -65,7 +65,9 @@ export function SSHRecordingSection({
     >
       <SettingRow
         title="Default recorders"
-        description={<>Tags or tailnet addresses of recorder nodes, comma separated. {embedded}</>}
+        description={
+          <>Tags or tailnet addresses of the recorder machines, comma separated. {embedded}</>
+        }
         control={
           <form onSubmit={save} className="flex items-center gap-2">
             <Input
@@ -93,7 +95,7 @@ export function SSHRecordingSection({
       />
       <SettingRow
         title="Require recording"
-        description="Reject a session when no default recorder can be reached, and end one whose recording breaks off. When off, the session goes on unrecorded and the failure is logged."
+        description="Refuse a session when no recorder can be reached, and end it if the recording stops. Off, the session continues unrecorded and the failure is logged."
         control={
           <Switch
             aria-label="Require recording"

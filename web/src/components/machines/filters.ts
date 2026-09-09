@@ -15,7 +15,7 @@ export const defaultStatus: StatusFilter = "all";
 export const statusFilterLabels: Record<StatusFilter, string> = {
   all: "All",
   online: "Connected",
-  offline: "Offline",
+  offline: "Disconnected",
   pending: "Needs approval",
 };
 

@@ -18,7 +18,7 @@ import {
 } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 
-const revealNote = "The client secret is shown this once and cannot be read again.";
+const revealNote = "The secret is shown only once. Copy it now.";
 const tagRows = 2;
 
 /** Scopes that mint machine credentials, which the server only allows tagged. */
@@ -49,7 +49,7 @@ export function CreateOAuthClientDialog({
         title={created === null ? "Create OAuth client" : "OAuth client created"}
         description={
           created === null
-            ? "A client mints short-lived tokens for the v2 API with its secret, within the scopes you pick."
+            ? "The client exchanges its secret for short-lived v2 API tokens, limited to the scopes you pick."
             : undefined
         }
       >
@@ -100,7 +100,7 @@ function CreateOAuthClientForm({
       />
       <MultiPicker
         label="Scopes"
-        description="What the client's tokens may do. Pick at least one, and none beyond your own."
+        description="What the client's tokens may do. You can only grant scopes you hold."
         placeholder="Pick scopes"
         items={scopeItems(me)}
         value={scopes}
@@ -112,7 +112,7 @@ function CreateOAuthClientForm({
         required={needsTags(scopes)}
         description={
           needsTags(scopes)
-            ? "Required with machine or pre-auth key scopes: everything the client creates is owned by these tags."
+            ? "Machine and pre-auth key scopes need tags. Everything the client creates is owned by them."
             : "Tags the client may put on the machines and keys it creates."
         }
         value={tags}

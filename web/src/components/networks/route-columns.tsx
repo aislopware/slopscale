@@ -12,6 +12,7 @@ import type { RouteRow, RouteStatus } from "~/components/networks/model.ts";
 import { useNetworkMutations } from "~/components/networks/mutations.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { StatusDot } from "~/components/ui/status-dot.tsx";
+import { Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { nodeName, nodeStatus } from "~/lib/node.ts";
 
@@ -91,7 +92,7 @@ function MachineCell({ row }: { readonly row: RouteRow }): ReactElement {
 
 function NetworksCell({ row }: { readonly row: RouteRow }): ReactElement {
   if (row.networks.length === 0) {
-    return <span className="text-kumo-subtle">Manual</span>;
+    return <span className="text-kumo-subtle">Approved by hand</span>;
   }
 
   return (
@@ -107,17 +108,13 @@ function NetworksCell({ row }: { readonly row: RouteRow }): ReactElement {
 
 function StatusCell({ status }: { readonly status: RouteStatus }): ReactElement {
   if (status === "stale") {
-    return (
-      <Badge appearance="dot" variant="warning">
-        No longer advertised
-      </Badge>
-    );
+    return <Status tone="warning">No longer advertised</Status>;
   }
 
   return (
-    <Badge appearance="dot" variant={status === "approved" ? "success" : "warning"}>
+    <Status tone={status === "approved" ? "success" : "warning"}>
       {status === "approved" ? "Approved" : "Pending"}
-    </Badge>
+    </Status>
   );
 }
 

@@ -54,8 +54,8 @@ export interface GetStartedProps {
 export function GetStarted({ me, onAddMachine }: GetStartedProps): ReactElement {
   return (
     <Section
-      title="Get started"
-      description="No machine has joined yet. These three steps connect the first one."
+      title="Connect your first machine"
+      description="No machine has joined yet."
       bodyClassName="p-0"
     >
       <Step

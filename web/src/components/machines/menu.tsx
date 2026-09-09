@@ -225,7 +225,7 @@ function MachineMenuItems({
             });
           }}
         >
-          {node.globalExitNode ? "Stop being global exit node" : "Use as global exit node"}
+          {node.globalExitNode ? "Clear global exit node" : "Use as global exit node"}
         </DropdownMenu.Item>
       ) : null}
       <DropdownMenu.Item

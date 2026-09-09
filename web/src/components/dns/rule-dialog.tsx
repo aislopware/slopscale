@@ -38,7 +38,7 @@ export function DnsRuleDialog(props: DnsRuleDialogProps): ReactElement {
     <DialogRoot open={props.open} onOpenChange={props.onOpenChange}>
       <DialogContent
         size="base"
-        title={editing ? "Edit DNS rule" : "New DNS rule"}
+        title={editing ? "Edit DNS rule" : "Add DNS rule"}
         description="Queries for the domains go to these nameservers on the machines in the groups, and nowhere else."
       >
         <DnsRuleForm {...props} />
@@ -147,7 +147,7 @@ function DnsRuleForm({
       />
       <Textarea
         label="Domains"
-        description="One per line. Queries for a domain and everything under it go to the nameservers."
+        description="One per line. Queries for a domain and everything under it go to these nameservers."
         value={draft.domains}
         placeholder={"corp.example.com\ninternal.example.com"}
         spellCheck={false}
@@ -164,7 +164,7 @@ function DnsRuleForm({
       />
       <Textarea
         label="Nameservers"
-        description="One per line: an IP, an IP with port, or a known provider's DNS-over-HTTPS URL."
+        description="One per line. An IP, an IP with port, or a DNS-over-HTTPS URL."
         value={draft.nameservers}
         placeholder={"10.0.0.53\n10.0.0.54"}
         spellCheck={false}
@@ -182,7 +182,7 @@ function DnsRuleForm({
       <MultiPicker
         label="Groups"
         description="Only the machines in these groups get the rule."
-        placeholder="Groups that receive the rule…"
+        placeholder="Search groups…"
         items={groupItems(groups)}
         value={draft.groups}
         onValueChange={(chosen) => {
@@ -206,7 +206,7 @@ function DnsRuleForm({
       />
       <DialogError message={mutation.isError ? errorMessage(mutation.error) : undefined} />
       <FormFooter
-        label={rule === undefined ? "Create rule" : "Save"}
+        label={rule === undefined ? "Add rule" : "Save"}
         pending={mutation.isPending}
         disabled={draftIssue(draft) !== null}
       />

@@ -221,11 +221,11 @@ function HeaderContent({
  */
 function SortIcon({ sorted }: { readonly sorted: false | SortDirection }): ReactElement {
   if (sorted === "asc") {
-    return <ArrowUpIcon size={14} aria-label="sorted ascending" />;
+    return <ArrowUpIcon size={14} aria-label="Sorted ascending" />;
   }
 
   if (sorted === "desc") {
-    return <ArrowDownIcon size={14} aria-label="sorted descending" />;
+    return <ArrowDownIcon size={14} aria-label="Sorted descending" />;
   }
 
   return (

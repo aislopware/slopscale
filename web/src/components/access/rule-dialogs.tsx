@@ -43,7 +43,7 @@ export function RuleDialog(props: RuleDialogProps): ReactElement {
         title={editing ? "Edit rule" : "New rule"}
         description={
           props.policyFileEnforces
-            ? "Sources may open connections to destinations. A rule adds to what the policy file allows and cannot take any of it away."
+            ? "Sources may open connections to destinations. A rule only adds to what the policy file allows."
             : "Sources may open connections to destinations. Once a rule is enabled, whatever no rule allows is blocked."
         }
       >
@@ -200,7 +200,7 @@ function RuleFields({
       />
       <MultiPicker
         label="Destinations"
-        placeholder="Groups that accept it…"
+        placeholder="Groups that accept the connection…"
         items={destinationItems}
         value={draft.destinations}
         onValueChange={(destinations) => {
@@ -211,7 +211,7 @@ function RuleFields({
       {postures.length === 0 ? null : (
         <MultiPicker
           label="Required postures"
-          description="A source machine must meet at least one of them. With none, any machine in the groups qualifies."
+          description="A source machine must meet at least one. Leave it empty to accept any machine in the groups."
           placeholder="Postures the source must meet…"
           items={postureItems(postures)}
           value={draft.postures}
@@ -226,7 +226,7 @@ function RuleFields({
         label="Expires"
         required={false}
         emptyLabel="Never"
-        description="The rule stops applying at this time and is kept, marked expired, until it is extended or deleted. With no time it never expires."
+        description="The rule stops applying at this time and stays, marked expired. Leave it empty to never expire."
         value={draft.expires}
         onChange={(expires) => {
           onChange({ expires });
@@ -238,7 +238,7 @@ function RuleFields({
           label="Both directions"
           description={
             toOwnMachines
-              ? "Not with Own machines as a destination: it is defined by the source."
+              ? "Own machines is defined by the source, so this rule cannot go both ways."
               : "Destinations may open connections to sources too."
           }
           checked={draft.bidirectional && !toOwnMachines}

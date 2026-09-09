@@ -17,7 +17,8 @@ export interface DestinationOption {
 const fallbackDestination: DestinationOption = {
   value: "http",
   label: "HTTP (JSON)",
-  description: "A JSON array of entries with a bearer token: Cribl, Panther, Vector, Fluent Bit.",
+  description:
+    "A JSON array of entries with a bearer token, for collectors such as Cribl, Panther, Vector or Fluent Bit.",
   placeholder: "https://collector.example.com/headscale",
   tokenLabel: "Bearer token",
   tokenRequired: false,
@@ -45,7 +46,7 @@ export const destinationOptions: readonly DestinationOption[] = [
   {
     value: "datadog",
     label: "Datadog",
-    description: "The logs intake of your site.",
+    description: "The logs intake endpoint for your Datadog site.",
     placeholder: "https://http-intake.logs.datadoghq.com/api/v2/logs",
     tokenLabel: "API key",
     tokenRequired: true,
@@ -61,7 +62,7 @@ export const destinationOptions: readonly DestinationOption[] = [
   {
     value: "loki",
     label: "Grafana Loki",
-    description: "The push API, with the labels job, type, stream and tailnet.",
+    description: "The push API, labelled job, type, stream and tailnet.",
     placeholder: "https://loki.example.com/loki/api/v1/push",
     tokenLabel: "Bearer token",
     tokenRequired: false,
@@ -111,7 +112,7 @@ export function statusLabel(stream: Pick<LogStream, "lastDeliveryStatus">): stri
   const maxLength = 40;
 
   if (status === "") {
-    return "Never delivered";
+    return "Never";
   }
 
   if (Number.isInteger(Number(status))) {

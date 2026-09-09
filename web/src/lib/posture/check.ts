@@ -75,7 +75,7 @@ function checkAttribute(expression: Expression, into: ExpressionProblem[]): void
       into.push({
         severity: "warning",
         message:
-          "A custom attribute name is custom: and up to 50 letters, digits, underscores or dashes",
+          "A custom attribute name is custom: followed by up to 50 letters, digits, underscores or dashes",
         ...attributeSpan,
       });
     }

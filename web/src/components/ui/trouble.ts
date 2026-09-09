@@ -39,7 +39,7 @@ const unreachable = {
   kind: "unreachable",
   title: "The server did not answer",
   description:
-    "headscale is not responding. It may be restarting, or something between this browser and it is down. Try again in a moment.",
+    "headscale is not responding. It may be restarting, or the network in between is down. Try again.",
 } as const;
 
 const console = {
@@ -47,7 +47,7 @@ const console = {
   eyebrow: "Console error",
   title: "The console hit an error",
   description:
-    "This is a fault in the console, not in your tailnet. Try again, and if it comes back, report it with the details below.",
+    "The console failed, not your tailnet. Try again, or report it with the details below.",
 } as const;
 
 /** The page the address names does not exist; the router says so, not the server. */
@@ -83,7 +83,7 @@ function byStatus(error: ApiError): Omit<Trouble, "message" | "instance"> {
       kind: "session",
       eyebrow,
       title: "Your session has ended",
-      description: "Sign in again to carry on where you were.",
+      description: "Sign in again to continue.",
     };
   }
 
@@ -103,7 +103,7 @@ function byStatus(error: ApiError): Omit<Trouble, "message" | "instance"> {
       kind: "missing",
       eyebrow,
       title: "Not found",
-      description: detail ?? "What this address points at does not exist any more.",
+      description: detail ?? "This address no longer points to anything.",
     };
   }
 
@@ -116,8 +116,7 @@ function byStatus(error: ApiError): Omit<Trouble, "message" | "instance"> {
       kind: "server",
       eyebrow,
       title: "The server hit an error",
-      description:
-        detail ?? "headscale could not finish the request. Try again; the server log has more.",
+      description: detail ?? "headscale could not finish the request. The server log has more.",
     };
   }
 

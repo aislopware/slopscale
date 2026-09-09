@@ -171,7 +171,7 @@ export function ApiPanel({
               size="sm"
               icon={<KeyIcon size={emptyIconSize} />}
               title="No API keys"
-              description="An API key authenticates scripts and other tools against the headscale API."
+              description="An API key authenticates scripts and other tools against the v1 API."
               contents={
                 <Button variant="secondary" onClick={create}>
                   Create API key
@@ -232,7 +232,7 @@ export function OAuthPanel({
               size="sm"
               icon={<PlugsConnectedIcon size={emptyIconSize} />}
               title="No OAuth clients"
-              description="An OAuth client lets automation mint short-lived tokens for the v2 API with a secret instead of an API key."
+              description="An OAuth client lets automation trade a secret for short-lived v2 API tokens."
               contents={
                 <Button variant="secondary" disabled={!canCreate} onClick={create}>
                   Create client
@@ -312,7 +312,6 @@ function PanelTable({
             className={tableEmptyClass}
             size="sm"
             title="No keys match"
-            description="No key matches this search and filter."
             contents={
               <Button variant="secondary" onClick={controls.handleClear}>
                 Clear filters

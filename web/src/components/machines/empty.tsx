@@ -36,7 +36,7 @@ export function MachinesEmpty({
         className={tableEmptyClass}
         icon={<DevicesIcon size={emptyIconSize} />}
         title="No machines yet"
-        description="Register a device with a pre-auth key or by signing in. This list refreshes on its own, so a new machine appears without a reload."
+        description="Register a machine with a pre-auth key or by signing in. New machines appear here on their own."
         contents={
           canCreateKeys ? (
             <Button variant="secondary" icon={PlusIcon} onClick={onAddMachine}>
@@ -54,7 +54,6 @@ export function MachinesEmpty({
         size="sm"
         className={tableEmptyClass}
         title="No machines need approval"
-        description="Every machine on the tailnet has been approved."
         contents={
           <Button variant="secondary" onClick={onClearFilters}>
             View all machines

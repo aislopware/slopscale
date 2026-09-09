@@ -27,7 +27,7 @@ function consoleItems(me: Me): readonly Definition[] {
       value: (
         <span className="flex items-center gap-1.5">
           {displayName(me)}
-          <Badge variant="secondary">{kindLabels[me.kind] ?? me.kind}</Badge>
+          <span className="text-kumo-subtle">{kindLabels[me.kind] ?? me.kind}</span>
         </span>
       ),
     },
@@ -37,7 +37,7 @@ function consoleItems(me: Me): readonly Definition[] {
         role === null ? (
           <span className="text-kumo-subtle">Not bound to a user</span>
         ) : (
-          <Badge variant="info">{role}</Badge>
+          <span>{role}</span>
         ),
     },
     { label: "Scopes", value: <ScopeList me={me} /> },
@@ -48,7 +48,7 @@ export function SessionSection({ me }: { readonly me: Me }): ReactElement {
   return (
     <Section
       title="Current session"
-      description="Who this browser is signed in as. The console holds no privilege of its own."
+      description="Who this browser is signed in as."
       bodyClassName="p-0"
     >
       <DefinitionList items={consoleItems(me)} />
@@ -73,7 +73,7 @@ export function SessionSection({ me }: { readonly me: Me }): ReactElement {
 
 function ScopeList({ me }: { readonly me: Me }): ReactElement {
   if (me.allAccess) {
-    return <Badge variant="success">All access</Badge>;
+    return <span>All access</span>;
   }
 
   if (me.scopes.length === 0) {

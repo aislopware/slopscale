@@ -37,11 +37,13 @@ export function useNodeMutations(): NodeMutations {
         await refresh();
       },
       onError: (error) => {
-        toast.error("Could not approve machine", error);
+        toast.error("Could not approve the machine", error);
       },
     }),
     rename: api.useMutation("post", "/api/v1/node/{nodeId}/rename/{newName}", {
-      onSuccess: refresh,
+      onSuccess: async () => {
+        await invalidate(queryClient, "/api/v1/node", "/api/v1/network");
+      },
     }),
     setTags: api.useMutation("post", "/api/v1/node/{nodeId}/tags", { onSuccess: refresh }),
     setRoutes: api.useMutation("post", "/api/v1/node/{nodeId}/approve_routes", {
@@ -55,7 +57,7 @@ export function useNodeMutations(): NodeMutations {
         await refresh();
       },
       onError: (error) => {
-        toast.error("Could not change global exit node", error);
+        toast.error("Could not change the global exit node", error);
       },
     }),
     expire: api.useMutation("post", "/api/v1/node/{nodeId}/expire", { onSuccess: refresh }),
@@ -63,17 +65,23 @@ export function useNodeMutations(): NodeMutations {
     share: api.useMutation("post", "/api/v1/node/{nodeId}/share", { onSuccess: refresh }),
     unshare: api.useMutation("delete", "/api/v1/node/{nodeId}/share/{userId}", {
       onSuccess: async () => {
-        toast.success("Sharing removed");
+        toast.success("Share removed");
         await refresh();
       },
       onError: (error) => {
-        toast.error("Could not remove sharing", error);
+        toast.error("Could not remove the share", error);
       },
     }),
     remove: api.useMutation("delete", "/api/v1/node/{nodeId}", {
       onSuccess: async () => {
         toast.success("Machine removed");
-        await refresh();
+        await invalidate(
+          queryClient,
+          "/api/v1/node",
+          "/api/v1/group",
+          "/api/v1/access-request",
+          "/api/v1/network",
+        );
         await navigate({ to: "/machines" });
       },
     }),

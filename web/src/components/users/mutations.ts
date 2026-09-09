@@ -54,23 +54,32 @@ export function useUserMutations(): UserMutations {
     approve: api.useMutation("post", "/api/v1/user/{id}/approve", {
       onSuccess: async () => {
         toast.success("User approved");
-        await refresh();
+        await invalidate(queryClient, "/api/v1/user", "/api/v1/node");
       },
       onError: (error) => {
-        toast.error("Could not approve user", error);
+        toast.error("Could not approve the user", error);
       },
     }),
     setRole: api.useMutation("post", "/api/v1/user/{id}/role", { onSuccess: refreshIdentity }),
     remove: api.useMutation("delete", "/api/v1/user/{id}", {
-      // Deleting a user takes their machines with it, so the node list is stale too.
+      // The server refuses to delete a user that still has machines, but it does drop the user's
+      // pre-auth keys and group memberships, so those lists are stale too.
       onSuccess: async () => {
         toast.success("User deleted");
-        await invalidate(queryClient, "/api/v1/user", "/api/v1/node");
+        await invalidate(
+          queryClient,
+          "/api/v1/user",
+          "/api/v1/node",
+          "/api/v1/preauthkey",
+          "/api/v1/group",
+        );
       },
     }),
-    // Nothing the console lists changes, so there is nothing to invalidate; the caller says how
-    // many sessions went.
-    endSessions: api.useMutation("delete", "/api/v1/user/{id}/sessions"),
+    endSessions: api.useMutation("delete", "/api/v1/user/{id}/sessions", {
+      onSuccess: async () => {
+        await invalidate(queryClient, "/api/v1/auth/sessions");
+      },
+    }),
   };
 }
 
@@ -89,11 +98,11 @@ export function useInviteMutations(): InviteMutations {
     resend: api.useMutation("post", "/api/v1/invite/{id}/resend", { onSuccess: refresh }),
     revoke: api.useMutation("delete", "/api/v1/invite/{id}", {
       onSuccess: async () => {
-        toast.success("Invite revoked");
+        toast.success("Invitation revoked");
         await refresh();
       },
       onError: (error) => {
-        toast.error("Could not revoke the invite", error);
+        toast.error("Could not revoke the invitation", error);
       },
     }),
   };

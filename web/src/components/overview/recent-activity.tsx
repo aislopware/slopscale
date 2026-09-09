@@ -62,7 +62,7 @@ export function RecentActivity({ nodes }: RecentActivityProps): ReactElement | n
   return (
     <Section
       title="Recently active"
-      description="The machines that talked to the control server most recently."
+      description="The machines that reached the control server most recently."
       bodyClassName="p-0"
       actions={
         <Link to="/machines" className="text-kumo-link hover:underline">

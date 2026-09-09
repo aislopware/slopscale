@@ -88,8 +88,8 @@ export function NetworksTab({
                   className={tableEmptyClass}
                   size="sm"
                   icon={<PathIcon size={emptyIconSize} />}
-                  title="No networks yet"
-                  description="A network approves a subnet or exit node on its routers and hands the routes only to the groups you pick. Machines outside those groups never see them."
+                  title="No networks"
+                  description="A network approves a subnet or exit node on its routers and hands the routes only to the groups you pick."
                   contents={
                     <Button
                       variant="secondary"
@@ -107,7 +107,6 @@ export function NetworksTab({
                   className={tableEmptyClass}
                   size="sm"
                   title="No networks match"
-                  description="No network matches this search."
                   contents={
                     <Button
                       variant="secondary"

@@ -109,6 +109,7 @@ export function UserMenu({ user, me }: UserMenuProps): ReactElement {
         open={dialog === "sessions"}
         mutations={mutations}
         onOpenChange={close}
+        me={me}
       />
       <DeleteUserDialog
         user={user}
@@ -120,10 +121,12 @@ export function UserMenu({ user, me }: UserMenuProps): ReactElement {
   );
 }
 
+export const cannotChangeUsers = "Your credentials cannot change users";
+
 /** Why an item is off limits, in the order the server refuses it. */
 function itemReason(writable: boolean, own: boolean, ownReason: string): string | undefined {
   if (!writable) {
-    return "Your credentials may not change users";
+    return cannotChangeUsers;
   }
 
   return own ? ownReason : undefined;
@@ -180,7 +183,7 @@ function UserMenuItems({
       >
         Edit profile…
       </DropdownMenu.Item>
-      <DisabledReason reason={itemReason(writable, own, "A role is changed by someone else")}>
+      <DisabledReason reason={itemReason(writable, own, "Only someone else can change your role")}>
         <DropdownMenu.Item
           icon={ShieldCheckIcon}
           disabled={!writable || own}
@@ -214,7 +217,7 @@ function UserMenuItems({
       ) : null}
       <DropdownMenu.Separator />
       {/* Ending your own sessions is allowed: it is how you drop a browser you left signed in. */}
-      <DisabledReason reason={writable ? undefined : "Your credentials may not change users"}>
+      <DisabledReason reason={writable ? undefined : cannotChangeUsers}>
         <DropdownMenu.Item
           icon={SignOutIcon}
           disabled={!writable}

@@ -7,6 +7,7 @@ import { can } from "~/auth/me.ts";
 import { SessionsTable } from "~/components/sessions/table.tsx";
 import { tablePageSize } from "~/components/table/app-table.tsx";
 import { usePageWindow } from "~/components/table/page-window.ts";
+import { Code } from "~/components/ui/code.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
@@ -46,7 +47,12 @@ function SessionsPage(): ReactElement {
     <>
       <PageHeader
         title="SSH sessions"
-        description="Terminal recordings of SSH sessions, one asciinema file each. Play a download with asciinema play."
+        description={
+          <>
+            Terminal recordings of SSH sessions, one asciinema file each. Play a download with{" "}
+            <Code>asciinema play</Code>.
+          </>
+        }
       />
       <Frame>
         <SessionsTable

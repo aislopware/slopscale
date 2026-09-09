@@ -15,7 +15,7 @@ describe(ApiError, () => {
       "422 Unprocessable Entity",
     );
 
-    expect(error.message).toBe("validation failed: expected string");
+    expect(error.message).toBe("validation failed. expected string");
     expect(error.status).toBe(422);
     expect(error.unauthorized).toBe(false);
   });
@@ -32,6 +32,6 @@ describe(errorMessage, () => {
   it("reads any thrown value", () => {
     expect(errorMessage(new Error("boom"))).toBe("boom");
     expect(errorMessage("text")).toBe("text");
-    expect(errorMessage(42)).toBe("Something went wrong.");
+    expect(errorMessage(42)).toBe("The request failed.");
   });
 });

@@ -85,13 +85,13 @@ function ApproveForm({
         choices={choices}
         value={seconds}
         onValueChange={setSeconds}
-        description="The membership ends on its own after this long."
+        description="Membership ends after this long."
       />
       <Textarea
         label="Note"
         required={false}
         value={note}
-        placeholder="Optional, kept on the request"
+        placeholder="Shown to the requester"
         minRows={noteRows}
         onChange={(event) => {
           setNote(event.target.value);

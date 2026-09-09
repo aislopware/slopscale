@@ -1,9 +1,8 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
 import { PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
@@ -77,7 +76,7 @@ export function ExtraRecordsSection({
       {settings.extraRecords.length === 0 ? (
         <SectionEmpty
           title="No extra records"
-          description="Add a record to answer a name from the control server itself."
+          description="The control server answers no names of its own."
         />
       ) : (
         settings.extraRecords.map((record, index) => (
@@ -90,7 +89,9 @@ export function ExtraRecordsSection({
                 {record.name}
               </span>
               <span>
-                <Badge variant="secondary">{record.type === "" ? "Auto" : record.type}</Badge>
+                <span className="font-mono text-xs text-kumo-subtle">
+                  {record.type === "" ? "Auto" : record.type}
+                </span>
               </span>
               <span className="min-w-0 font-mono text-sm break-all text-kumo-subtle">
                 {record.value}
@@ -136,7 +137,7 @@ export function ExtraRecordsSection({
         <DialogContent
           size="base"
           title={dialog === "new" ? "Add record" : "Edit record"}
-          description="Machines resolve the name through MagicDNS. Only A and AAAA records are served."
+          description="Machines resolve the name through MagicDNS. A and AAAA only."
         >
           <RecordForm
             editing={dialog === "new" || dialog === "closed" ? null : dialog}
@@ -164,9 +165,13 @@ function RecordForm({
   readonly onDone: () => void;
 }): ReactElement {
   const [record, setRecord] = useState<DnsRecord>(
-    editing?.record ?? { name: "", type: "", value: "" },
+    editing?.record ?? { name: "", type: "A", value: "" },
   );
   const [touched, setTouched] = useState(false);
+
+  useEffect(() => {
+    mutations.set.reset();
+  }, [mutations.set]);
   const issue = recordError(record);
   const placeholderName =
     dns.baseDomain === "" ? "grafana.example.com" : `grafana.${dns.baseDomain}`;

@@ -84,14 +84,14 @@ describe(CreatedKey, () => {
       .element(screen.getByText(`sudo ${connectCommand("secret")}`, { exact: false }))
       .toBeVisible();
     await expect
-      .element(screen.getByRole("img", { name: "QR code with the Linux join command" }))
-      .toBeVisible();
+      .element(screen.getByRole("img", { name: "QR code with the server address" }))
+      .not.toBeInTheDocument();
 
     await screen.getByRole("tab", { name: "Docker" }).click();
 
     await expect.element(screen.getByText("TS_AUTHKEY=secret", { exact: false })).toBeVisible();
 
-    await screen.getByRole("tab", { name: "iOS & Android" }).click();
+    await screen.getByRole("tab", { name: "iOS and Android" }).click();
 
     await expect
       .element(screen.getByRole("img", { name: "QR code with the server address" }))

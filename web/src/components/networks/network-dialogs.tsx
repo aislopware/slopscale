@@ -44,7 +44,7 @@ export function NetworkDialog(props: NetworkDialogProps): ReactElement {
       <DialogContent
         size="lg"
         title={editing ? "Edit network" : "New network"}
-        description="Prefixes reached through routing machines. The routes are approved on the routers and handed only to the machines in the groups."
+        description="Prefixes reached through routing machines, approved on the routers and handed only to the groups you pick."
       >
         <NetworkForm {...props} />
       </DialogContent>
@@ -95,7 +95,7 @@ function routerItems(nodes: readonly Node[]): PickerItem[] {
       label: nodeName(node),
       hint:
         node.availableRoutes.length === 0
-          ? "Advertises nothing yet"
+          ? "Advertises nothing"
           : node.availableRoutes
               .filter((route) => !isExitRoute(route) || route === "0.0.0.0/0")
               .map((route) => (isExitRoute(route) ? "exit node" : route))
@@ -103,8 +103,7 @@ function routerItems(nodes: readonly Node[]): PickerItem[] {
     }))
     .toSorted((left, right) => {
       const advertising =
-        Number(right.hint !== "Advertises nothing yet") -
-        Number(left.hint !== "Advertises nothing yet");
+        Number(right.hint !== "Advertises nothing") - Number(left.hint !== "Advertises nothing");
 
       return advertising === 0 ? left.label.localeCompare(right.label) : advertising;
     });
@@ -181,7 +180,7 @@ function NetworkForm({
       />
       <Textarea
         label="Prefixes"
-        description="One per line: a CIDR or an address. 0.0.0.0/0 makes the network an exit node offer."
+        description="One per line. A CIDR or an address. Use 0.0.0.0/0 to offer an exit node."
         value={draft.prefixes}
         placeholder={"10.10.0.0/24\n192.168.1.0/24"}
         spellCheck={false}
@@ -201,10 +200,10 @@ function NetworkForm({
         description={
           <>
             Machines that route the prefixes. Each must advertise them with{" "}
-            <Code>tailscale set --advertise-routes</Code>. Two or more make a failover pair.
+            <Code>tailscale set --advertise-routes</Code>. Two or more give failover.
           </>
         }
-        placeholder="Machines that route the prefixes…"
+        placeholder="Search machines…"
         items={routerItems(nodes)}
         value={draft.routers}
         onValueChange={(routers) => {
@@ -213,9 +212,9 @@ function NetworkForm({
         empty="No machine matches."
       />
       <MultiPicker
-        label="Handed to"
-        description="Only the machines in these groups get the routes. Pick the built in All group for everyone."
-        placeholder="Groups that receive the routes…"
+        label="Groups"
+        description="Only the machines in these groups get the routes. Pick the built-in All group for everyone."
+        placeholder="Search groups…"
         items={groupItems(groups)}
         value={draft.groups}
         onValueChange={(chosen) => {
@@ -264,8 +263,8 @@ function NarrowingNotice({
   return (
     <Callout
       tone="warning"
-      title="The narrowing is not in force yet"
-      description="The tailnet is open. There is no enabled access rule and no restricting policy file, so the groups reach every port behind the routers. The protocol and ports take effect once a rule is enabled."
+      title="Protocol and ports are not enforced yet"
+      description="The tailnet is open, so the groups reach every port behind the routers. Enable an access rule to enforce them."
     />
   );
 }

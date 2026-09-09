@@ -64,7 +64,7 @@ export const providerOptions: readonly ProviderOption[] = [
   {
     value: "email",
     label: "Email",
-    description: "mailto: and the recipients. Sent through the server's SMTP settings.",
+    description: "A mailto: address list, sent through the server's SMTP settings.",
   },
 ];
 
@@ -121,14 +121,14 @@ const eventHints: Readonly<Record<string, string>> = {
   nodeKeyExpired: "A machine's key expired",
   nodeSuspended: "A machine was suspended",
   nodeUnsuspended: "A machine's suspension was lifted",
-  nodeDeleted: "A machine was removed",
+  nodeDeleted: "A machine was deleted",
   policyUpdate: "The policy changed",
   userCreated: "A user was created",
   userNeedsApproval: "A user is waiting for approval",
   userApproved: "A user was approved",
   userRoleUpdated: "A user's role changed",
   userDeleted: "A user was deleted",
-  accessRequestCreated: "A member asked for temporary access",
+  accessRequestCreated: "A user asked for temporary access",
   accessRequestApproved: "An access request was approved",
   accessRequestDenied: "An access request was denied",
 };

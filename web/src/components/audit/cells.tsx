@@ -9,6 +9,7 @@ import type { AuditEvent } from "~/api/queries.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
+import { Status } from "~/components/ui/status.tsx";
 import { formatAbsolute, parseTime } from "~/lib/time.ts";
 
 /** How the API names each kind of actor, in the console's words. */
@@ -25,7 +26,7 @@ const actorKinds: Record<string, string> = {
 const targetKinds: Record<string, string> = {
   apikey: "API key",
   key: "Key",
-  node: "Node",
+  node: "Machine",
   oauthclient: "OAuth client",
   policy: "Policy",
   preauthkey: "Pre-auth key",
@@ -135,11 +136,7 @@ export function TargetCell({ event }: { readonly event: AuditEvent }): ReactNode
 export function ResultCell({ event }: { readonly event: AuditEvent }): ReactElement {
   const failed = event.outcome >= clientError;
 
-  return (
-    <Badge appearance="dot" variant={failed ? "error" : "success"}>
-      {failed ? "Failed" : "Success"}
-    </Badge>
-  );
+  return <Status tone={failed ? "danger" : "success"}>{failed ? "Failed" : "Success"}</Status>;
 }
 
 /**

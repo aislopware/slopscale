@@ -10,6 +10,7 @@ import { consoleAuthQuery, meQuery } from "~/auth/me.ts";
 import { consolePath } from "~/auth/session.ts";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
 import { Callout } from "~/components/ui/callout.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { Frame, FramePanel } from "~/components/ui/frame.tsx";
 
 const searchSchema = object({
@@ -31,7 +32,7 @@ const signInProblems: Record<string, string> = {
   invite_used: "That invitation has already been used. Sign in with the account it created.",
 };
 
-const genericProblem = "The sign-in could not be finished. Try again.";
+const genericProblem = "Sign-in did not finish. Try again.";
 
 /**
  * Where to go after signing in. The value comes from the URL, so only a path of the console's own
@@ -62,10 +63,18 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+function signInProblem(error: string | undefined): string | undefined {
+  if (error === undefined) {
+    return undefined;
+  }
+
+  return Object.hasOwn(signInProblems, error) ? signInProblems[error] : genericProblem;
+}
+
 function LoginPage(): ReactElement {
   const { redirect: target, invite, error } = Route.useSearch();
   const { oidc } = Route.useLoaderData();
-  const problem = error === undefined ? undefined : (signInProblems[error] ?? genericProblem);
+  const problem = signInProblem(error);
 
   return (
     <div className="flex min-h-dvh flex-col bg-kumo-canvas">
@@ -85,7 +94,7 @@ function LoginPage(): ReactElement {
                   <p className="text-kumo-subtle">
                     {oidc === undefined
                       ? "This server has no identity provider, so the console cannot sign anyone in."
-                      : "Use the account your administrator gave access to."}
+                      : "Sign in with the account your administrator gave you."}
                   </p>
                 </div>
               </div>
@@ -93,13 +102,18 @@ function LoginPage(): ReactElement {
                 <Banner variant="error" title="Sign-in failed" description={problem} />
               )}
               {invite === undefined || invite === "" ? null : (
-                <Callout title="You were invited. Sign in to accept the invitation." />
+                <Callout title="Sign in to accept your invitation." />
               )}
               {oidc === undefined ? (
                 <Banner
                   variant="alert"
                   title="No identity provider"
-                  description="Set the oidc section of the server configuration and restart it. The CLI and the API keep working with API keys."
+                  description={
+                    <>
+                      Set the <Code>oidc</Code> section of the config file and restart. The CLI and
+                      the API keep working with API keys.
+                    </>
+                  }
                 />
               ) : (
                 <Button
@@ -118,8 +132,8 @@ function LoginPage(): ReactElement {
               )}
               <p className="text-xs text-kumo-subtle">
                 {oidc === undefined
-                  ? "See the OpenID Connect page of the documentation."
-                  : "A sign-in lasts seven days in this browser. Sign out from the account menu to end it sooner."}
+                  ? "See the OpenID Connect documentation."
+                  : "A sign-in lasts seven days in this browser."}
               </p>
             </FramePanel>
           </Frame>

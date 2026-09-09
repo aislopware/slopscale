@@ -1,18 +1,23 @@
-import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement } from "react";
 
+import { Dot } from "~/components/ui/status.tsx";
+import type { Tone } from "~/components/ui/status.tsx";
 import type { NodeStatus } from "~/lib/node.ts";
 
-const styles: Record<NodeStatus, { dot: string; label: string }> = {
-  online: { dot: "bg-kumo-success", label: "Connected" },
-  offline: { dot: "bg-kumo-inactive", label: "Disconnected" },
-  pending: { dot: "bg-kumo-warning", label: "Needs approval" },
-  expired: { dot: "bg-kumo-danger", label: "Key expired" },
-  suspended: { dot: "bg-kumo-danger", label: "Suspended" },
+const styles: Record<NodeStatus, { tone: Tone; label: string }> = {
+  online: { tone: "success", label: "Connected" },
+  offline: { tone: "neutral", label: "Disconnected" },
+  pending: { tone: "warning", label: "Needs approval" },
+  expired: { tone: "danger", label: "Key expired" },
+  suspended: { tone: "danger", label: "Suspended" },
 };
 
 export function statusLabel(status: NodeStatus): string {
   return styles[status].label;
+}
+
+export function statusTone(status: NodeStatus): Tone {
+  return styles[status].tone;
 }
 
 export function StatusDot({
@@ -24,10 +29,7 @@ export function StatusDot({
 }): ReactElement {
   return (
     <span className="inline-flex items-center">
-      <span
-        aria-hidden
-        className={cn("inline-block size-2 shrink-0 rounded-full", styles[status].dot, className)}
-      />
+      <Dot tone={styles[status].tone} {...(className === undefined ? {} : { className })} />
       <span className="sr-only">{styles[status].label}</span>
     </span>
   );

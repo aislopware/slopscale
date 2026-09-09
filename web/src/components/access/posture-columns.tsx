@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import type { ReactElement } from "react";
 
 import type { Posture } from "~/api/queries.ts";
@@ -35,10 +34,12 @@ export const postureColumns = helper.columns([
       return text === "" ? (
         <span className="text-kumo-subtle">Always</span>
       ) : (
-        <span className="whitespace-nowrap">{text}</span>
+        <span className="block max-w-64 truncate" title={text}>
+          {text}
+        </span>
       );
     },
-    meta: { className: "hidden whitespace-nowrap md:table-cell" },
+    meta: { className: "hidden md:table-cell" },
   }),
   helper.accessor((posture) => posture.id, {
     id: "rules",
@@ -105,11 +106,13 @@ function Expressions({ posture }: { readonly posture: Posture }): ReactElement {
   }
 
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-col gap-0.5">
       {posture.expressions.map((expression) => (
-        <Badge key={expression} variant="secondary" className="max-w-72">
-          <ExpressionText text={expression} className="truncate" />
-        </Badge>
+        <ExpressionText
+          key={expression}
+          text={expression}
+          className="block max-w-72 truncate font-mono text-[0.9em]"
+        />
       ))}
     </div>
   );

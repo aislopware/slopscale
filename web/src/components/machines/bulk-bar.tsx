@@ -75,7 +75,7 @@ export function MachineBulkBar({
             setConfirming(true);
           }}
         >
-          Delete…
+          Remove…
         </Button>
         <Button
           variant="ghost"
@@ -91,9 +91,9 @@ export function MachineBulkBar({
       <ConfirmDialog
         open={confirming}
         onOpenChange={setConfirming}
-        title={`Delete ${plural(ids.length, "machine")}?`}
+        title={`Remove ${plural(ids.length, "machine")}?`}
         description="Each machine leaves the tailnet and has to register again to come back. Their routes and shares go with them."
-        confirmLabel="Delete machines"
+        confirmLabel="Remove machines"
         loading={bulk.running === "delete"}
         onConfirm={() => {
           void run("delete");

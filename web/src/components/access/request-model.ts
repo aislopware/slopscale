@@ -102,7 +102,7 @@ export function toRequestRows(
 
 function nodeLabelFor(nodeId: string | undefined, node: { name: string } | undefined): string {
   if (nodeId === undefined) {
-    return "Every machine";
+    return "Every machine you own";
   }
 
   return node === undefined ? `Machine ${nodeId}` : node.name;

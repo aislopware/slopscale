@@ -1,5 +1,4 @@
 import { DeleteResource } from "@cloudflare/kumo";
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { Table } from "@cloudflare/kumo/components/table";
@@ -24,22 +23,22 @@ import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import type { Tone } from "~/components/ui/status.tsx";
+import { Status } from "~/components/ui/status.tsx";
 
-const stateBadges: Record<
-  RecordingState,
-  { variant: "success" | "warning" | "error"; label: string }
-> = {
-  recording: { variant: "warning", label: "Recording" },
-  complete: { variant: "success", label: "Complete" },
-  interrupted: { variant: "error", label: "Interrupted" },
+const stateTones: Record<RecordingState, { tone: Tone; label: string }> = {
+  recording: { tone: "warning", label: "Recording" },
+  complete: { tone: "success", label: "Complete" },
+  interrupted: { tone: "danger", label: "Interrupted" },
 };
 
 function StateBadge({ recording }: { readonly recording: SSHRecording }): ReactElement {
-  const badge = stateBadges[recordingState(recording)];
+  const badge = stateTones[recordingState(recording)];
 
-  return <Badge variant={badge.variant}>{badge.label}</Badge>;
+  return <Status tone={badge.tone}>{badge.label}</Status>;
 }
 
 function RecordingRow({
@@ -149,10 +148,10 @@ export function SessionsTable({
               <Table.Row>
                 <Table.Head>Started</Table.Head>
                 <Table.Head>From</Table.Head>
-                <Table.Head>Session</Table.Head>
+                <Table.Head>To</Table.Head>
                 <Table.Head>Command</Table.Head>
                 <Table.Head>Size</Table.Head>
-                <Table.Head>State</Table.Head>
+                <Table.Head>Status</Table.Head>
                 <Table.Head sticky="right" className={cn("w-24", overflowing && pinnedEdgeClass)}>
                   <span className="sr-only">Actions</span>
                 </Table.Head>
@@ -183,10 +182,17 @@ function EmptySessions({ embeddedRecorder }: { readonly embeddedRecorder: boolea
       size="sm"
       icon={<TerminalWindowIcon size={emptyIconSize} />}
       title="No recorded sessions"
-      description={
-        embeddedRecorder
-          ? "Sessions on machines with an SSH rule land here once the recorder receives them."
-          : "Turn on ssh_recording in the server config, or name a recorder under Settings → Tailnet, and sessions land here."
+      contents={
+        <p className="max-w-140 text-center text-kumo-subtle">
+          {embeddedRecorder ? (
+            "Sessions covered by an SSH rule appear here once the recorder has them."
+          ) : (
+            <>
+              No recorder is set. Turn on <Code>ssh_recording</Code> in the server config, or name a
+              recorder under Settings › Tailnet.
+            </>
+          )}
+        </p>
       }
     />
   );

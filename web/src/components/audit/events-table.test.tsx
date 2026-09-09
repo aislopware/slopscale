@@ -116,7 +116,7 @@ describe(EventsTable, () => {
   it("reads the target kind as a label and keeps the status out of the cell", async () => {
     const screen = await render(app({ ...base, events: [deletion, manyFields] }));
 
-    await expect.element(screen.getByText("Node")).toBeVisible();
+    await expect.element(screen.getByText("Machine")).toBeVisible();
     await expect.element(screen.getByText("Pre-auth key")).toBeVisible();
     await expect.element(screen.getByText("200")).not.toBeInTheDocument();
   });

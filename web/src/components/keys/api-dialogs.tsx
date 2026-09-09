@@ -25,7 +25,7 @@ import {
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { userLabel } from "~/lib/node.ts";
 
-const revealNote = "The full key is shown this once and cannot be read again.";
+const revealNote = "The key is shown only once. Copy it now.";
 
 /** The owner, an admin and the socket may mint a key for someone else. */
 function managesAllKeys(me: Me): boolean {
@@ -53,7 +53,7 @@ export function CreateApiKeyDialog({
         title={created === null ? "Create API key" : "API key created"}
         description={
           created === null
-            ? "The key authenticates calls to the headscale API with the permissions of its owner, or with the scopes you pick."
+            ? "The key authenticates calls to the v1 API with its owner's permissions, or with the scopes you pick."
             : undefined
         }
       >
@@ -136,8 +136,8 @@ function CreateApiKeyForm({
       ) : null}
       <MultiPicker
         label="Scopes"
-        description="Limit the key to these operations. Empty means everything its owner may do. A scope the owner lacks is dropped."
-        placeholder="Everything the owner may do"
+        description="Limit the key to these operations. Empty means everything its owner may do."
+        placeholder="No limit"
         items={scopeItems(me)}
         value={scopes}
         onValueChange={setScopes}
@@ -147,7 +147,7 @@ function CreateApiKeyForm({
       <DialogFooter>
         <DialogClose render={<Button variant="secondary">Cancel</Button>} />
         <Button type="submit" variant="primary" loading={create.isPending}>
-          Create key
+          Create API key
         </Button>
       </DialogFooter>
     </form>
@@ -164,7 +164,7 @@ const rotateExpiryOptions: readonly { value: RotateExpiry; label: string }[] = [
   ...expiryOptions,
 ];
 
-const rotateNote = "The new key is shown this once and cannot be read again.";
+const rotateNote = "The key is shown only once. Copy it now.";
 
 /**
  * Replaces an API key's secret in place. The key keeps its id, owner, scopes and description, so
@@ -192,7 +192,7 @@ export function RotateApiKeyDialog({
         title={rotated === null ? "Rotate API key" : "API key rotated"}
         description={
           rotated === null
-            ? `Anything still using the current secret of ${prefix} stops being able to call the API as soon as you rotate it. The key keeps its id, owner, scopes and description.`
+            ? `Rotating stops the current secret of ${prefix} immediately. The key keeps its id, owner, scopes and description.`
             : undefined
         }
       >
@@ -236,7 +236,7 @@ function RotateApiKeyForm({
       <Select
         className="w-full"
         label="Expiration"
-        description="Rotating can move the expiry out; leave it to keep the one the key already has."
+        description="Leave this to keep the key's current expiry."
         value={expiry}
         items={[...rotateExpiryOptions]}
         onValueChange={(value: RotateExpiry | null) => {

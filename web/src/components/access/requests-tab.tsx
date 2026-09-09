@@ -99,7 +99,7 @@ export function RequestsTab({
                 title={filter === "pending" ? "Nothing to decide" : "No requests"}
                 description={
                   filter === "pending"
-                    ? "No request is waiting. Members ask under My access, for groups marked as requestable."
+                    ? "No request is waiting. Users ask under My access, for groups marked requestable."
                     : "No request matches this search."
                 }
                 contents={

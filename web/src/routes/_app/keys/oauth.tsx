@@ -33,7 +33,7 @@ function OAuthClientsPage(): ReactElement {
     <>
       <PageHeader
         title="OAuth clients"
-        description="Client credentials for the v2 API, each with the scopes and tags it may act with. A client secret is shown once."
+        description="Client credentials for the v2 API, each limited to its own scopes and tags."
       />
       <OAuthPanel me={me} controls={controls} />
     </>

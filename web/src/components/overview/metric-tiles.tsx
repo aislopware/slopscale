@@ -157,7 +157,7 @@ function ExitTile({ nodes }: { readonly nodes: readonly Node[] }): ReactElement 
         icon={<GlobeHemisphereWestIcon weight="duotone" />}
         label="Exit nodes"
         value={count}
-        context={global === undefined ? "No global exit node" : `Global: ${nodeName(global)}`}
+        context={global === undefined ? "No global exit node" : `${nodeName(global)} is global`}
       />
     </Link>
   );

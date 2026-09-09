@@ -36,7 +36,7 @@ export function LogStreamDialog(props: LogStreamDialogProps): ReactElement {
       <DialogContent
         size="lg"
         title={editing ? "Edit log stream" : "New log stream"}
-        description="Every entry of the audit log is posted to the sink in batches, in the shape it expects."
+        description="Every audit log entry is posted to the destination in batches, in the shape it expects."
       >
         <LogStreamForm {...props} />
       </DialogContent>

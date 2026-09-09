@@ -120,7 +120,7 @@ function MembershipForm({
           label="Until"
           required={false}
           emptyLabel="No end"
-          description="The selected groups are removed again at this time. With no time they are kept for good."
+          description="Membership ends at this time. Leave it empty to keep it."
           value={expires}
           onChange={setExpires}
         />

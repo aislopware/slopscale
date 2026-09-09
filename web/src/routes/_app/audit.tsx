@@ -3,6 +3,7 @@ import { Tabs } from "@cloudflare/kumo/components/tabs";
 import type { TabsItem } from "@cloudflare/kumo/components/tabs";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { fallback, object, optional, picklist, pipe, transform, unknown } from "valibot";
 
@@ -19,6 +20,7 @@ import { TableToolbar } from "~/components/table/toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { userLabel } from "~/lib/node.ts";
+import { useDebounced } from "~/lib/use-debounced.ts";
 
 const defaultRange: AuditRange = "7d";
 
@@ -93,6 +95,21 @@ function isFiltered(search: AuditSearch): boolean {
   return search.action !== "" || search.actor !== "" || search.since !== "all";
 }
 
+const actionSettleMs = 300;
+
+/** The search box's own text, reset whenever the address changes it from outside. */
+function useDraft(fromSearch: string): [string, (next: string) => void] {
+  const [draft, setDraft] = useState(fromSearch);
+  const [seen, setSeen] = useState(fromSearch);
+
+  if (seen !== fromSearch) {
+    setSeen(fromSearch);
+    setDraft(fromSearch);
+  }
+
+  return [draft, setDraft];
+}
+
 function userOptions(users: readonly User[]): { value: string; label: string }[] {
   return [
     { value: "", label: "Any user" },
@@ -106,7 +123,20 @@ function AuditPage(): ReactElement {
   const navigate = useNavigate({ from: Route.fullPath });
   const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
   const filters = filtersOf(search);
+  const [actionDraft, setActionDraft] = useDraft(search.action);
+  const settledAction = useDebounced(actionDraft, actionSettleMs);
   const events = useInfiniteQuery(auditQuery(filters));
+
+  // The typed prefix reaches the address, and so the server, once it stops changing. A draft that
+  // is still moving stays local, so clearing the filters elsewhere cannot be undone by a stale one.
+  useEffect(() => {
+    if (settledAction === actionDraft && settledAction !== search.action) {
+      void navigate({
+        search: (previous) => ({ ...previous, action: settledAction }),
+        replace: true,
+      });
+    }
+  }, [settledAction, actionDraft, search.action, navigate]);
   const rows = events.data?.pages.flatMap((page) => page.events) ?? [];
   const window = usePageWindow({
     rows,
@@ -129,14 +159,9 @@ function AuditPage(): ReactElement {
       <AuditStats events={rows} />
       <TableToolbar actions={<ExportMenu filters={filtersOf(search)} />}>
         <SearchInput
-          value={search.action}
-          placeholder="Filter by action"
-          onValueChange={(value) => {
-            void navigate({
-              search: (previous) => ({ ...previous, action: value }),
-              replace: true,
-            });
-          }}
+          value={actionDraft}
+          placeholder="Filter by action prefix"
+          onValueChange={setActionDraft}
         />
         <Tabs
           variant="segmented"

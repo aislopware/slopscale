@@ -31,7 +31,7 @@ export function ShareDialog({
       <DialogContent
         size="base"
         title="Share machine"
-        description="The user's devices can reach this machine as if it were their own. The policy's autogroup:shared decides what they may access."
+        description="The user's machines can reach this one as if they owned it, as far as autogroup:shared allows."
       >
         <ShareForm node={node} users={users} onOpenChange={onOpenChange} mutations={mutations} />
       </DialogContent>
@@ -46,7 +46,7 @@ function ShareForm({
   mutations,
 }: Omit<ShareDialogProps, "open">): ReactElement {
   const candidates = users.filter(
-    (user) => user.id !== ownerId(node) && !node.sharedWith.includes(user.id),
+    (user) => user.approved && user.id !== ownerId(node) && !node.sharedWith.includes(user.id),
   );
   const [userId, setUserId] = useState(candidates[0]?.id ?? "");
   const { share } = mutations;
@@ -67,7 +67,7 @@ function ShareForm({
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
       {candidates.length === 0 ? (
-        <p className="text-kumo-subtle">Every other user already has access.</p>
+        <p className="text-kumo-subtle">Every other user already has a share.</p>
       ) : (
         <Select
           className="w-full"
@@ -79,16 +79,21 @@ function ShareForm({
           placeholder="Choose a user"
           renderValue={(value) => userName(candidates, value)}
         >
-          {candidates.map((user) => (
-            <Select.Option key={user.id} value={user.id}>
-              <span className="flex flex-col gap-0.5">
-                <span>{userLabel(user)}</span>
-                <span className="text-sm text-kumo-subtle">
-                  {user.email === "" ? user.name : user.email}
+          {candidates.map((user) => {
+            const label = userLabel(user);
+            const secondary = user.email === "" ? user.name : user.email;
+
+            return (
+              <Select.Option key={user.id} value={user.id}>
+                <span className="flex flex-col gap-0.5">
+                  <span>{label}</span>
+                  {secondary === label ? null : (
+                    <span className="text-sm text-kumo-subtle">{secondary}</span>
+                  )}
                 </span>
-              </span>
-            </Select.Option>
-          ))}
+              </Select.Option>
+            );
+          })}
         </Select>
       )}
       <DialogError message={share.isError ? errorMessage(share.error) : undefined} />

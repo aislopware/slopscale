@@ -25,7 +25,7 @@ const overrideHelpId = "dns-override-local-help";
 /** Why "Use with exit node" is off limits, or nothing when it is not. */
 function toggleReason(canEdit: boolean, overrideLocalDns: boolean): string | undefined {
   if (!canEdit) {
-    return "Your credentials may not change DNS";
+    return "Your credentials cannot change DNS";
   }
 
   return overrideLocalDns ? undefined : "Turn on Override local DNS to mark a nameserver";
@@ -55,6 +55,7 @@ export function NameserversSection({
                 variant="secondary"
                 icon={PlusIcon}
                 onClick={() => {
+                  mutations.set.reset();
                   setAdding(true);
                 }}
               >
@@ -85,7 +86,7 @@ export function NameserversSection({
               onChange={(on) => {
                 mutations.apply(
                   withUseWithExitNode(settings, ns, on),
-                  `${ns} ${on ? "kept" : "dropped"} with an exit node`,
+                  `${ns} ${on ? "will be used" : "will not be used"} with an exit node`,
                 );
               }}
             />
@@ -100,11 +101,8 @@ export function NameserversSection({
         <div className="flex min-w-0 flex-col gap-1">
           <span className="font-medium text-kumo-strong">Override local DNS</span>
           <p id={overrideHelpId} className="max-w-prose text-kumo-subtle">
-            Machines use the nameservers above for every query instead of only when their own
-            resolvers cannot answer. Needs at least one nameserver. Turn it on to mark nameservers
-            to use with an exit node. A marked one stays in use while a machine routes through an
-            exit node, and the rest of its DNS goes through the exit node then. Turning it off
-            clears the marks.
+            Machines use the nameservers above for every query, not only when their own resolvers
+            cannot answer. Needs at least one nameserver.
           </p>
         </div>
         {/* The spacer stands where a nameserver row's remove button is, so both toggles end together. */}
@@ -121,7 +119,7 @@ export function NameserversSection({
             onCheckedChange={(on) => {
               mutations.apply(
                 withOverrideLocalDns(settings, on),
-                `Override local DNS ${on ? "on" : "off"}`,
+                `Override local DNS turned ${on ? "on" : "off"}`,
               );
             }}
           />
@@ -132,7 +130,7 @@ export function NameserversSection({
         open={adding}
         onOpenChange={setAdding}
         title="Add nameserver"
-        description="An IP address, an IP with port, or the DNS-over-HTTPS URL of a provider Tailscale knows, such as https://dns.nextdns.io/abc123."
+        description="An IP address, an IP with port, or a DNS-over-HTTPS URL such as https://dns.nextdns.io/abc123."
         label="Nameserver"
         placeholder="1.1.1.1"
         validate={nameserverError}

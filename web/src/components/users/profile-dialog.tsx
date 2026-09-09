@@ -31,7 +31,7 @@ export function EditProfileDialog({
       <DialogContent
         size="base"
         title={`Edit profile for ${user.name}`}
-        description="What the clients show for this user. A user who logs in through an identity provider gets these from the provider again at the next login."
+        description="What the clients show for this user. An identity provider overwrites these at the next sign-in."
       >
         <EditProfileForm user={user} mutations={mutations} onOpenChange={onOpenChange} />
       </DialogContent>
@@ -90,7 +90,7 @@ function EditProfileForm({
     <form onSubmit={submit} className="flex flex-col gap-4">
       <Input
         label="Display name"
-        description="Shown instead of the username. Leave empty to show the username."
+        description="Shown instead of the username when set."
         required={false}
         value={displayName}
         autoComplete="off"
@@ -110,7 +110,7 @@ function EditProfileForm({
       />
       <Input
         label="Picture URL"
-        description="An https URL of the picture the clients show."
+        description="An https URL the clients can load."
         required={false}
         type="url"
         value={pictureUrl}
@@ -183,7 +183,7 @@ function PicturePreview({
       {failed === url ? (
         <>
           <Avatar name={name} size="lg" />
-          <span>The picture did not load from here; it may still load from the clients.</span>
+          <span>Did not load from this browser. It may still load from the clients.</span>
         </>
       ) : (
         <>

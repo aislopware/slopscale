@@ -22,7 +22,7 @@ export function MultiPicker({
   value,
   onValueChange,
   disabled = false,
-  empty = "Nothing matches.",
+  empty = "Nothing matches",
 }: {
   readonly label: ReactNode;
   readonly description?: ReactNode;

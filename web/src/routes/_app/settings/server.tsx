@@ -23,7 +23,7 @@ function ServerSettingsPage(): ReactElement {
     <>
       <PageHeader
         title="Server"
-        description="The build, addresses and config file values of the server this console talks to, and its maintenance tasks."
+        description="Build, addresses and config file values of this server, and its maintenance tasks."
       />
       <div className="flex flex-col gap-6">
         <ServerSection info={info} />

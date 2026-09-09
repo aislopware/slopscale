@@ -55,8 +55,8 @@ export function RelaysSection({
 
   return (
     <Section
-      title="Relays you run"
-      description="Regions of your own derper servers, published next to the fetched maps. A region id that a fetched map also uses replaces that region."
+      title="Your relays"
+      description="Regions of relays you run, merged on top of the fetched maps."
       bodyClassName="p-0"
       {...(canEdit
         ? {
@@ -77,7 +77,7 @@ export function RelaysSection({
       {settings.regions.length === 0 ? (
         <SectionEmpty
           title="No relays of your own"
-          description="Run the derper program from Tailscale and add its region here."
+          description="Add a region for a relay you run yourself."
         />
       ) : (
         settings.regions.map((region) => (
@@ -144,7 +144,7 @@ export function RelaysSection({
         <DialogContent
           size="lg"
           title={dialog === "new" ? "Add region" : "Edit region"}
-          description="A region groups relays that are close to each other. A machine picks the region with the lowest latency and any relay in it. Each relay is a derper reachable on its host name."
+          description="A region groups relays that are close to each other. A machine picks the region with the lowest latency."
         >
           <RegionForm
             editing={dialog === "new" || dialog === "closed" ? null : dialog}

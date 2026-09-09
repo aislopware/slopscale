@@ -5,6 +5,7 @@ import type { ReactElement } from "react";
 import { networksQuery, nodesQuery } from "~/api/queries.ts";
 import { RoutesTab } from "~/components/networks/routes-tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
+import { pendingRouteCount } from "~/lib/node.ts";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
 export const Route = createFileRoute("/_app/routes")({
@@ -32,17 +33,13 @@ function RoutesPage(): ReactElement {
     });
   };
 
-  const pending = nodes.reduce(
-    (sum, node) =>
-      sum + node.availableRoutes.filter((route) => !node.approvedRoutes.includes(route)).length,
-    0,
-  );
+  const pending = nodes.reduce((sum, node) => sum + pendingRouteCount(node), 0);
 
   return (
     <>
       <PageHeader
         title="Routes"
-        description="Every route any machine advertises, approved or waiting. A route a network owns is approved by the network; the rest are approved here."
+        description="Every route any machine advertises, approved or waiting. Routes a network owns are approved by that network."
         meta={pending === 1 ? "1 route pending" : `${pending} routes pending`}
       />
       <RoutesTab

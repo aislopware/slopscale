@@ -47,6 +47,15 @@ export function pendingRoutes(node: Node): readonly string[] {
   return node.availableRoutes.filter((route) => !node.approvedRoutes.includes(route));
 }
 
+/** The count of pending routes, with the exit pair (0.0.0.0/0 and ::/0) counted as one. */
+export function pendingRouteCount(node: Node): number {
+  const pending = pendingRoutes(node);
+  const exit = pending.some((route) => isExitRoute(route));
+  const subnets = pending.filter((route) => !isExitRoute(route)).length;
+
+  return subnets + (exit ? 1 : 0);
+}
+
 /** The DNS label operators refer to the node by; hostname when it differs. */
 export function nodeName(node: Node): string {
   return node.givenName === "" ? node.name : node.givenName;

@@ -54,7 +54,7 @@ export function WebhookMenu({
           if (data.delivered) {
             toast.success(`Test event delivered (HTTP ${data.status})`);
           } else {
-            toast.error(`Test event failed: ${data.status}`);
+            toast.error(`Test event failed (${data.status})`);
           }
         },
         onError: (error) => {

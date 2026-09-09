@@ -13,6 +13,7 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
 
 export interface RoutesTabProps {
@@ -66,14 +67,19 @@ export function RoutesTab({
                   size="sm"
                   icon={<SignpostIcon size={emptyIconSize} />}
                   title="Nothing advertised"
-                  description="No machine advertises a subnet or offers itself as an exit node. Run tailscale set --advertise-routes or --advertise-exit-node on one."
+                  contents={
+                    <p className="max-w-140 text-center text-kumo-subtle">
+                      No machine advertises a subnet or offers itself as an exit node. Run{" "}
+                      <Code>tailscale set --advertise-routes</Code> or{" "}
+                      <Code>--advertise-exit-node</Code> on one.
+                    </p>
+                  }
                 />
               ) : (
                 <Empty
                   className={tableEmptyClass}
                   size="sm"
                   title="No routes match"
-                  description="No route matches this search."
                   contents={
                     <Button
                       variant="secondary"

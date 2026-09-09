@@ -14,7 +14,7 @@ const warnings: Record<string, Warning> = {
   "ip-forwarding-off": {
     title: "IP forwarding is off",
     description:
-      "The machine advertises routes but its kernel drops forwarded packets, so nothing behind it is reachable. On Linux, set net.ipv4.ip_forward and net.ipv6.conf.all.forwarding to 1 with sysctl and make it persistent.",
+      "Nothing behind this machine is reachable. On Linux, set net.ipv4.ip_forward and net.ipv6.conf.all.forwarding to 1 in a persistent sysctl file.",
   },
   "router-unhealthy": {
     title: "Route setup is failing",

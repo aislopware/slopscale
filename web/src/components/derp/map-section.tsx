@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Table } from "@cloudflare/kumo/components/table";
 import { useDeferredValue, useMemo, useState } from "react";
@@ -6,20 +5,10 @@ import type { ReactElement } from "react";
 
 import type { Derp } from "~/api/queries.ts";
 import { sourceLabels } from "~/components/derp/model.ts";
-import type { RegionSource } from "~/components/derp/model.ts";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { frameTableClass, frameTableRowClass } from "~/components/ui/frame.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
-
-const sourceVariants: Record<RegionSource, "secondary" | "info" | "success" | "neutral"> = {
-  tailscale: "secondary",
-  url: "secondary",
-  file: "neutral",
-  custom: "success",
-  embedded: "info",
-  config: "neutral",
-};
 
 type Region = Derp["regions"][number];
 
@@ -43,8 +32,8 @@ export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
 
   return (
     <Section
-      title="Map machines receive"
-      description="Every region after merging the sources, the relays you run and the embedded relay. A machine measures its latency to each region and keeps the closest one as home."
+      title="The map machines receive"
+      description="Every region after merging the sources, the relays you run and the embedded relay."
       bodyClassName="p-0"
       panel={regions.length === 0}
       {...(derp.regions.length === 0
@@ -69,7 +58,6 @@ export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
       {derp.regions.length > 0 && regions.length === 0 ? (
         <SectionEmpty
           title="No regions match"
-          description="No region matches this search."
           contents={
             <Button
               variant="secondary"
@@ -88,7 +76,7 @@ export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
             <Table className={frameTableClass}>
               <Table.Header variant="compact">
                 <Table.Row>
-                  <Table.Head className="w-16">Id</Table.Head>
+                  <Table.Head className="w-16">ID</Table.Head>
                   <Table.Head>Code</Table.Head>
                   <Table.Head>Name</Table.Head>
                   <Table.Head className="text-right">Relays</Table.Head>
@@ -103,9 +91,7 @@ export function MapSection({ derp }: { readonly derp: Derp }): ReactElement {
                     <Table.Cell className="text-kumo-subtle">{region.name}</Table.Cell>
                     <Table.Cell className="text-right tabular-nums">{region.nodes}</Table.Cell>
                     <Table.Cell className="text-right">
-                      <Badge variant={sourceVariants[region.source]}>
-                        {sourceLabels[region.source]}
-                      </Badge>
+                      <span className="text-kumo-subtle">{sourceLabels[region.source]}</span>
                     </Table.Cell>
                   </Table.Row>
                 ))}

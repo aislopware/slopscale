@@ -83,7 +83,7 @@ describe(DnsRulesSection, () => {
     const screen = await renderSection([], true);
 
     await screen.getByRole("button", { name: "Add rule" }).click();
-    await expect.element(screen.getByRole("dialog", { name: "New DNS rule" })).toBeVisible();
-    await expect.element(screen.getByRole("button", { name: "Create rule" })).toBeDisabled();
+    await expect.element(screen.getByRole("dialog", { name: "Add DNS rule" })).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Add rule" })).toBeDisabled();
   });
 });

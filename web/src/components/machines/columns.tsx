@@ -19,7 +19,9 @@ import { SelectAllCheckbox, SelectRowCheckbox } from "~/components/machines/sele
 import { StatusBadge } from "~/components/machines/status-badge.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
+import { Code } from "~/components/ui/code.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
+import { Flagged } from "~/components/ui/flagged.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import {
   approvedSubnets,
@@ -141,7 +143,7 @@ function Attributes({ node }: { readonly node: Node }): ReactElement | null {
 
   if (node.globalExitNode) {
     marks.push(
-      <Mark key="global" hint="Global exit node. Every client is told to prefer it.">
+      <Mark key="global" hint="Global exit node, preferred by every client">
         <StarIcon size={markSize} weight="fill" className="text-kumo-warning" />
       </Mark>,
     );
@@ -171,7 +173,7 @@ function Attributes({ node }: { readonly node: Node }): ReactElement | null {
 
   if (node.ephemeral) {
     marks.push(
-      <Mark key="ephemeral" hint="Ephemeral. Deleted when it logs out or stays offline.">
+      <Mark key="ephemeral" hint="Ephemeral, deleted when it logs out or goes offline">
         <HourglassIcon size={markSize} />
       </Mark>,
     );
@@ -185,11 +187,13 @@ function Attributes({ node }: { readonly node: Node }): ReactElement | null {
     <span className="flex items-center gap-1.5">
       {marks}
       {pending.length === 0 ? null : (
-        <Tooltip content={`Waiting for approval: ${pending.join(", ")}`}>
-          <Badge variant="warning" icon={PathIcon}>
-            {pending.length === 1 ? "1 route" : `${pending.length} routes`}
-          </Badge>
-        </Tooltip>
+        <Flagged
+          icon={PathIcon}
+          title="Waiting for approval"
+          detail={<Code className="whitespace-normal">{pending.join(", ")}</Code>}
+        >
+          {pending.length === 1 ? "1 route" : `${pending.length} routes`}
+        </Flagged>
       )}
     </span>
   );
@@ -236,7 +240,8 @@ function OwnerCell({ node }: { readonly node: Node }): ReactElement {
   const label = ownerLabel(node);
 
   return (
-    <span className="flex min-w-0 items-center gap-2">
+    // A table cell grows to its content, so the cap is what lets a long name truncate.
+    <span className="flex max-w-56 min-w-0 items-center gap-2" title={label}>
       <Avatar name={label} size="sm" />
       <span className="truncate">{label}</span>
     </span>

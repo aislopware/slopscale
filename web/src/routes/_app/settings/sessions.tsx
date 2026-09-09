@@ -16,7 +16,7 @@ function SessionsSettingsPage(): ReactElement {
     <>
       <PageHeader
         title="Sessions"
-        description="The credential this browser holds, and every console session signed in as you or anyone else."
+        description="The credential this browser holds, and every console session on the server."
       />
       <div className="flex flex-col gap-6">
         <SessionSection me={me} />

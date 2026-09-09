@@ -73,14 +73,3 @@ export function roleLabel(me: Me): string | null {
 
   return roleName(me.role);
 }
-
-/** The overview greeting: a user's name, or what kind of credential is signed in. */
-export function greeting(me: Me): string {
-  if (me.user !== undefined) {
-    return `Welcome back, ${displayName(me)}`;
-  }
-
-  return me.kind === "local"
-    ? "Signed in over the local socket"
-    : "Signed in with an all-access API key";
-}

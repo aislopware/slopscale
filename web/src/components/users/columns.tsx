@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import type { ReactElement } from "react";
 
 import type { User } from "~/api/queries.ts";
@@ -7,8 +6,9 @@ import { groupsOfUser } from "~/components/access/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { Status } from "~/components/ui/status.tsx";
 import { UserMenu } from "~/components/users/menu.tsx";
-import { roleName, roleVariant } from "~/components/users/roles.ts";
+import { roleName } from "~/components/users/roles.ts";
 import { userLabel } from "~/lib/node.ts";
 
 const helper = createAppColumnHelper<User>();
@@ -43,9 +43,7 @@ export const columns = helper.columns([
     id: "role",
     header: "Role",
     enableSorting: true,
-    cell: ({ row }) => (
-      <Badge variant={roleVariant(row.original.role)}>{roleName(row.original.role)}</Badge>
-    ),
+    cell: ({ row }) => <span>{roleName(row.original.role)}</span>,
     meta: { className: "whitespace-nowrap" },
   }),
   helper.accessor((user) => (user.approved ? 1 : 0), {
@@ -54,9 +52,9 @@ export const columns = helper.columns([
     enableSorting: true,
     enableGlobalFilter: false,
     cell: ({ row }) => (
-      <Badge variant={row.original.approved ? "success" : "warning"} appearance="dot">
+      <Status tone={row.original.approved ? "success" : "warning"}>
         {row.original.approved ? "Approved" : "Needs approval"}
-      </Badge>
+      </Status>
     ),
     meta: { className: "whitespace-nowrap" },
   }),
@@ -104,7 +102,7 @@ function NameCell({ user }: { readonly user: User }): ReactElement {
   const label = userLabel(user);
 
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="flex max-w-72 items-center gap-2.5" title={label}>
       <Avatar name={label} size="lg" />
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate font-medium text-kumo-default">{label}</span>
@@ -124,7 +122,7 @@ function EmailCell({ user }: { readonly user: User }): ReactElement {
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-0.5">
+    <div className="flex max-w-72 min-w-0 flex-col gap-0.5" title={user.email}>
       {user.email === "" ? (
         <span className="text-kumo-subtle">—</span>
       ) : (

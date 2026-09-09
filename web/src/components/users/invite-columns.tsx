@@ -1,15 +1,15 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
-import type { BadgeVariant } from "@cloudflare/kumo/components/badge";
 import type { ReactElement } from "react";
 
 import type { Invite, User } from "~/api/queries.ts";
 import { GroupChips } from "~/components/access/group-chips.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import type { Tone } from "~/components/ui/status.tsx";
+import { Status } from "~/components/ui/status.tsx";
 import { InviteMenu } from "~/components/users/invite-menu.tsx";
 import { inviteState } from "~/components/users/invites.ts";
 import type { InviteState } from "~/components/users/invites.ts";
-import { roleName, roleVariant } from "~/components/users/roles.ts";
+import { roleName } from "~/components/users/roles.ts";
 import { userLabel } from "~/lib/node.ts";
 
 const helper = createAppColumnHelper<Invite>();
@@ -20,7 +20,7 @@ const stateLabels: Record<InviteState, string> = {
   accepted: "Accepted",
 };
 
-const stateVariants: Record<InviteState, BadgeVariant> = {
+const stateTones: Record<InviteState, Tone> = {
   pending: "info",
   expired: "warning",
   accepted: "success",
@@ -51,9 +51,7 @@ export const inviteColumns = helper.columns([
     id: "role",
     header: "Role",
     enableSorting: true,
-    cell: ({ row }) => (
-      <Badge variant={roleVariant(row.original.role)}>{roleName(row.original.role)}</Badge>
-    ),
+    cell: ({ row }) => <span>{roleName(row.original.role)}</span>,
     meta: { className: "whitespace-nowrap" },
   }),
   helper.display({
@@ -96,11 +94,7 @@ export const inviteColumns = helper.columns([
     cell: ({ row }) => {
       const state = inviteState(row.original);
 
-      return (
-        <Badge variant={stateVariants[state]} appearance="dot">
-          {stateLabels[state]}
-        </Badge>
-      );
+      return <Status tone={stateTones[state]}>{stateLabels[state]}</Status>;
     },
     meta: { className: "whitespace-nowrap" },
   }),

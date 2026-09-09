@@ -45,7 +45,7 @@ function LogStreamsPage(): ReactElement {
     <>
       <PageHeader
         title="Log streams"
-        description="Every audit log entry shipped to a SIEM or log store in batches."
+        description="Ships every audit log entry to a SIEM or log store in batches."
         meta={meta}
       />
       <LogStreamsTab me={me} streams={streams} search={search.q ?? ""} onSearchChange={setSearch} />

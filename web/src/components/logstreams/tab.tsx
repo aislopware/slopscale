@@ -95,7 +95,6 @@ export function LogStreamsTab({
                   className={tableEmptyClass}
                   size="sm"
                   title="No log streams match"
-                  description="No log stream matches this search."
                   contents={
                     <Button
                       variant="secondary"

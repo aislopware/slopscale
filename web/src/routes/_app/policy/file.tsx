@@ -50,7 +50,7 @@ function PolicyFilePage(): ReactElement {
     <>
       <PageHeader
         title="Policy file"
-        description="The HuJSON policy for everything the rules do not say. Check validates a draft against the server without saving it."
+        description="The HuJSON policy for everything the rules do not say."
       />
       <PolicyFileTab
         policy={policy}

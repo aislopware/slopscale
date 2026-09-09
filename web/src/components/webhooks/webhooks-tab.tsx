@@ -97,7 +97,6 @@ export function WebhooksTab({
                   className={tableEmptyClass}
                   size="sm"
                   title="No webhooks match"
-                  description="No webhook matches this search."
                   contents={
                     <Button
                       variant="secondary"

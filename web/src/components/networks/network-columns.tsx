@@ -1,7 +1,5 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Switch } from "@cloudflare/kumo/components/switch";
-import { Tooltip } from "@cloudflare/kumo/components/tooltip";
-import { GlobeIcon, PathIcon, WarningIcon } from "@phosphor-icons/react";
+import { GlobeIcon, PathIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
@@ -14,6 +12,8 @@ import { prefixesSummary } from "~/components/networks/model.ts";
 import { useNetworkMutations } from "~/components/networks/mutations.ts";
 import { NetworkMenu } from "~/components/networks/network-menu.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { Code } from "~/components/ui/code.tsx";
+import { Flagged } from "~/components/ui/flagged.tsx";
 import { StatusDot } from "~/components/ui/status-dot.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
@@ -61,7 +61,7 @@ export const networkColumns = helper.columns([
   }),
   helper.accessor((network) => network.groupNames, {
     id: "groups",
-    header: "Handed to",
+    header: "Groups",
     enableSorting: false,
     cell: ({ row, table }) => (
       <GroupChips ids={row.original.groupIds} groups={table.options.meta?.groups ?? []} />
@@ -112,10 +112,10 @@ function NameCell({ network }: { readonly network: NetworkRow }): ReactElement {
       {network.description === "" ? null : (
         <span className="truncate text-xs text-kumo-subtle">{network.description}</span>
       )}
-      {/* The "Handed to" column is hidden on phones; say it here so a reader
+      {/* The "Groups" column is hidden on phones; say it here so a reader
           without edit rights still sees who gets the network. */}
       <span className="truncate text-xs text-kumo-subtle md:hidden">
-        {network.groupNames === "" ? "Handed to no group" : `Handed to ${network.groupNames}`}
+        {network.groupNames === "" ? "No groups" : network.groupNames}
       </span>
     </div>
   );
@@ -140,35 +140,44 @@ function PrefixesCell({
       {narrowed ? (
         <span className="truncate text-xs text-kumo-subtle">
           {protocolSummary(network)}
-          {enforcing ? null : <span className="text-kumo-warning"> · not in force</span>}
+          {enforcing ? null : <span className="text-kumo-warning"> · not enforced</span>}
         </span>
       ) : null}
     </div>
   );
 }
 
-/** Each router with its liveness; one that stopped advertising a prefix gets a warning. */
+/** Each router with its liveness; one that stopped advertising a prefix is flagged by name. */
 function RoutersCell({ network }: { readonly network: Network }): ReactElement {
   if (network.routers.length === 0) {
     return <span className="text-kumo-subtle">No routers</span>;
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      {network.routers.map((router) => (
-        <span key={router.nodeId} className="flex items-center gap-2">
-          <StatusDot status={router.online ? "online" : "offline"} />
-          <span className="truncate">{router.name}</span>
-          {router.missingPrefixes.length === 0 ? null : (
-            <Tooltip content={`Not advertising ${router.missingPrefixes.join(", ")}`}>
-              <Badge variant="warning" className="gap-1">
-                <WarningIcon size={iconSize} />
-                Missing
-              </Badge>
-            </Tooltip>
-          )}
-        </span>
-      ))}
+    <div className="flex flex-col items-start gap-1">
+      {network.routers.map((router) =>
+        router.missingPrefixes.length === 0 ? (
+          <span key={router.nodeId} className="flex max-w-full items-center gap-2">
+            <StatusDot status={router.online ? "online" : "offline"} />
+            <span className="truncate">{router.name}</span>
+          </span>
+        ) : (
+          <Flagged
+            key={router.nodeId}
+            title="Not advertising every prefix"
+            detail={
+              <>
+                <Code className="whitespace-normal">{router.missingPrefixes.join(", ")}</Code> is
+                approved for this network, but the machine stopped advertising it, so nothing
+                reaches it through this router.
+                {router.online ? "" : " The machine is offline."}
+              </>
+            }
+          >
+            {router.name}
+          </Flagged>
+        ),
+      )}
     </div>
   );
 }

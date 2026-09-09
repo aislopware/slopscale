@@ -32,7 +32,7 @@ export interface GroupDialogProps {
   readonly mutations: AccessMutations;
 }
 
-const nameHint = "Letters, digits, spaces, dots, dashes and underscores. It must be unique.";
+const nameHint = "Letters, digits, spaces, dots, dashes and underscores, and unique.";
 
 /** Creates a group or edits one; the form mounts with the dialog so it starts from the record. */
 export function GroupDialog(props: GroupDialogProps): ReactElement {
@@ -43,7 +43,7 @@ export function GroupDialog(props: GroupDialogProps): ReactElement {
       <DialogContent
         size="lg"
         title={editing ? "Edit group" : "New group"}
-        description="A group is a set of machines. Add machines directly, or add users so every machine they own is in it, now and later."
+        description="A group is a set of machines. Add machines directly, or add users to include every machine they own."
       >
         <GroupForm {...props} />
       </DialogContent>
@@ -97,7 +97,7 @@ function GroupForm({
       <Input
         label="Name"
         description={
-          synced ? "Synced from the identity provider: the name is the groups claim's." : nameHint
+          synced ? "The name comes from the identity provider's groups claim." : nameHint
         }
         value={name}
         readOnly={synced}
@@ -121,7 +121,7 @@ function GroupForm({
         label="Users"
         description={
           synced
-            ? "Synced from the identity provider: users follow its groups claim at each sign-in."
+            ? "Users follow the identity provider's groups claim at each sign-in."
             : "Every machine these users own is a member, including ones they register later."
         }
         placeholder={synced ? "Managed by the identity provider" : "Add users…"}
@@ -147,7 +147,7 @@ function GroupForm({
           onCheckedChange={setRequestable}
           label={
             <span className="flex flex-col gap-0.5">
-              <span className="font-medium text-kumo-default">Members may request access</span>
+              <span className="font-medium text-kumo-default">Users may request access</span>
               <span className="text-xs text-kumo-subtle">
                 A signed-in user can ask to join this group for a while. An approver decides under
                 Requests.
@@ -235,7 +235,7 @@ export function DeleteGroupDialog({
         <DialogContent
           size="sm"
           title="Delete synced group"
-          description={`${group.name} is synced from the identity provider. The next sign-in whose groups claim names it creates the group again, empty and without this description and these machines. To keep it gone, remove the claim at the provider or turn group sync off.`}
+          description={`${group.name} is synced from the identity provider. It comes back empty at the next sign-in that names it, unless you remove the claim at the provider or turn group sync off.`}
         >
           <DialogError
             message={deleteGroup.isError ? errorMessage(deleteGroup.error) : undefined}

@@ -19,6 +19,7 @@ import { QuickSearch } from "~/components/layout/quick-search.tsx";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { BreadcrumbProvider, useBreadcrumbLeaf } from "~/lib/breadcrumbs.tsx";
+import { pendingRouteCount } from "~/lib/node.ts";
 
 /**
  * Every page gets the same content width, so navigating never moves the first column sideways.
@@ -227,11 +228,7 @@ function usePendingCounts(me: Me): PendingCounts {
   return {
     pendingNodes: nodeList.filter((node) => !node.approved).length,
     pendingUsers: (users.data?.users ?? []).filter((user) => !user.approved).length,
-    pendingRoutes: nodeList.reduce(
-      (sum, node) =>
-        sum + node.availableRoutes.filter((route) => !node.approvedRoutes.includes(route)).length,
-      0,
-    ),
+    pendingRoutes: nodeList.reduce((sum, node) => sum + pendingRouteCount(node), 0),
     pendingRequests: pendingCount(requests.data?.requests ?? []),
   };
 }
@@ -248,7 +245,7 @@ function PendingBadge({
 
 function CountBadge({ count }: { readonly count: number }): ReactElement | null {
   return count === 0 ? null : (
-    <Sidebar.MenuBadge title={`${count} waiting for approval`}>{count}</Sidebar.MenuBadge>
+    <Sidebar.MenuBadge title={`${count} waiting`}>{count}</Sidebar.MenuBadge>
   );
 }
 
@@ -297,7 +294,7 @@ const kindLabels: Record<string, string> = {
   local: "Local socket",
   api_key: "API key",
   oauth: "OAuth token",
-  session: "Signed in",
+  session: "Browser session",
 };
 
 function AccountMenu({ me }: { readonly me: Me }): ReactElement {

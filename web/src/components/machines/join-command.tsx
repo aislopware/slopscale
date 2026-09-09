@@ -40,19 +40,17 @@ export function JoinCommand({ authKey }: { readonly authKey: string }): ReactEle
           <p className="text-kumo-subtle">{instructions.note}</p>
           {instructions.command === null ? null : (
             <p className="text-kumo-subtle">
-              It appears in the machine list within a few seconds of running.
+              The machine appears in the list a few seconds after this runs.
             </p>
           )}
         </div>
-        <QrCode
-          text={instructions.qr}
-          label={
-            instructions.command === null
-              ? "QR code with the server address"
-              : `QR code with the ${platformLabels[platform]} join command`
-          }
-          className="size-32 shrink-0 justify-self-center rounded-md"
-        />
+        {platform === "mobile" ? (
+          <QrCode
+            text={instructions.qr}
+            label="QR code with the server address"
+            className="size-32 shrink-0 justify-self-center rounded-md"
+          />
+        ) : null}
       </div>
     </div>
   );

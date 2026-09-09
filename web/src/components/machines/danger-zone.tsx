@@ -28,7 +28,7 @@ export function DangerZone({ node }: { readonly node: Node }): ReactElement {
           description={
             node.suspended
               ? "Gives the machine its peers back. Nobody needs to sign in on it."
-              : "Cuts the machine off without touching its key. You can lift it any time."
+              : "Cuts the machine off without touching its key. Reversible at any time."
           }
           action={
             <Button
@@ -72,7 +72,7 @@ export function DangerZone({ node }: { readonly node: Node }): ReactElement {
         />
         <DangerRow
           title="Remove this machine"
-          description="Deletes it with its routes and sharing. The device can register again."
+          description="Removes it with its routes and shares. It can register again."
           action={
             <Button
               variant="destructive"

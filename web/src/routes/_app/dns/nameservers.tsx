@@ -29,7 +29,7 @@ function NameserversPage(): ReactElement {
     <>
       <PageHeader
         title="Nameservers"
-        description="The resolvers every machine uses, MagicDNS, and the search domains that complete short names. Changes reach the machines at once."
+        description="The resolvers every machine uses, MagicDNS, and the search domains that complete short names."
       />
       <div className="flex flex-col gap-6">
         <SourceBanner dns={dns.data} canEdit={canEdit} mutations={mutations} />

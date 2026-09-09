@@ -47,7 +47,7 @@ export function FirstUserEmpty({ me }: { readonly me: Me }): ReactElement {
         size="sm"
         icon={<UsersIcon size={emptyIconSize} />}
         title="No users yet"
-        description="A user appears here after their first sign-in, or you can add one now and hand out a pre-auth key."
+        description="Users appear here after their first sign-in. Add one now to hand out a pre-auth key."
         contents={
           <Button
             variant="secondary"

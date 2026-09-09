@@ -147,7 +147,7 @@ export function EventsTable({
                 <Table.Head className="w-48">Action</Table.Head>
                 <Table.Head className="w-44">Target</Table.Head>
                 <Table.Head className="w-28">Result</Table.Head>
-                <Table.Head className="hidden lg:table-cell">Summary</Table.Head>
+                <Table.Head className="hidden lg:table-cell">Details</Table.Head>
                 <Table.Head sticky="right" className={cn("w-12", overflowing && pinnedEdgeClass)}>
                   <span className="sr-only">Details</span>
                 </Table.Head>
@@ -194,7 +194,7 @@ function EmptyEvents({
         className={tableEmptyClass}
         size="sm"
         title="No events match"
-        description="Nothing was recorded in this range for these filters."
+        description="No events in this range match these filters."
         contents={
           <Button variant="secondary" onClick={onClearFilters}>
             Clear filters

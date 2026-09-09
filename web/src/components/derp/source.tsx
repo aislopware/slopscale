@@ -68,7 +68,7 @@ export function SourceBanner({
         open={confirming}
         onOpenChange={setConfirming}
         title="Reset relay settings?"
-        description="Map URLs, the refetch schedule, the embedded relay and the relays you added go back to the config file's values. The maps are fetched again and every machine gets the new map at once."
+        description="Every relay setting goes back to the config file. The maps are fetched again and every machine gets the new map at once."
         confirmLabel="Reset"
         loading={mutations.reset.isPending}
         error={mutations.reset.isError ? errorMessage(mutations.reset.error) : undefined}
@@ -103,8 +103,8 @@ export function StaleSettingsBanner({
   return (
     <Callout
       tone="warning"
-      title="The relay settings changed since you loaded this page"
-      description="Your change was not applied. Reload the settings, then make it again."
+      title="The relay settings changed since this page loaded"
+      description="Your change was not applied. Reload and try again."
       action={
         <Banner.Action
           variant="ghost"
@@ -131,7 +131,7 @@ export function FetchErrorBanner({ derp }: { readonly derp: Derp }): ReactElemen
       variant="error"
       icon={<WarningIcon />}
       title="The last map fetch failed"
-      description={`Machines keep the last map that was fetched. ${derp.fetchError}`}
+      description={`Machines keep the last map fetched. ${derp.fetchError}`}
     />
   );
 }

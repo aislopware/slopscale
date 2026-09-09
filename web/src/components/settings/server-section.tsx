@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { ArrowRightIcon } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
@@ -10,12 +9,13 @@ import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section } from "~/components/ui/section.tsx";
+import { Status } from "~/components/ui/status.tsx";
 import { UrlText } from "~/components/ui/url-text.tsx";
 
 const tlsLabels: Record<string, string> = {
   letsencrypt: "Let's Encrypt",
   files: "Certificate files",
-  none: "None, a proxy in front terminates it",
+  none: "None. A proxy in front terminates it.",
 };
 
 const databaseLabels: Record<string, string> = { sqlite: "SQLite", postgres: "PostgreSQL" };
@@ -46,9 +46,9 @@ function buildItems(info: ServerInfo, reachable: boolean): readonly Definition[]
       value: (
         <span className="flex items-center gap-2">
           <span>{databaseLabels[info.database] ?? info.database}</span>
-          <Badge appearance="dot" variant={reachable ? "success" : "error"}>
+          <Status tone={reachable ? "success" : "danger"}>
             {reachable ? "Reachable" : "Unreachable"}
-          </Badge>
+          </Status>
         </span>
       ),
     },
@@ -69,9 +69,9 @@ function networkItems(info: ServerInfo): readonly Definition[] {
         ) : (
           <span className="flex items-center gap-2">
             <span className="font-mono text-[0.9em]">{info.baseDomain}</span>
-            <Badge variant={info.magicDns ? "success" : "neutral"}>
+            <Status tone={info.magicDns ? "success" : "neutral"}>
               {info.magicDns ? "On" : "Off"}
-            </Badge>
+            </Status>
           </span>
         ),
     },
@@ -80,7 +80,7 @@ function networkItems(info: ServerInfo): readonly Definition[] {
       label: "Identity provider",
       value:
         info.oidcIssuer === "" ? (
-          <Muted>None, users are created by hand</Muted>
+          <Muted>None. Users are created by hand.</Muted>
         ) : (
           <CopyText
             value={info.oidcIssuer}
@@ -108,9 +108,17 @@ function policyItems(info: ServerInfo): readonly Definition[] {
       ),
     },
     {
-      label: "Default key expiry",
-      value:
-        info.nodeExpiry === "" ? <Muted>Never, unless the client asks</Muted> : info.nodeExpiry,
+      label: "Config file key expiry",
+      value: (
+        <span className="flex items-center gap-2">
+          {info.nodeExpiry === "" ? (
+            <Muted>Never, unless the client asks for an expiry</Muted>
+          ) : (
+            info.nodeExpiry
+          )}
+          <span className="text-kumo-subtle">Overridden by Settings › Tailnet</span>
+        </span>
+      ),
     },
     { label: "Ephemeral timeout", value: info.ephemeralInactivityTimeout },
   ];
@@ -137,9 +145,9 @@ export function ServerSection({ info }: { readonly info: ServerInfo }): ReactEle
               : `${info.derpRegions} ${info.derpRegions === 1 ? "region" : "regions"}`}
             <ArrowRightIcon size={linkIconSize} aria-hidden />
           </Link>
-          <Badge variant={info.derpServer ? "info" : "neutral"}>
+          <Status tone={info.derpServer ? "success" : "neutral"}>
             {info.derpServer ? "Embedded relay running" : "Embedded relay off"}
-          </Badge>
+          </Status>
         </span>
       ),
     },
@@ -148,7 +156,7 @@ export function ServerSection({ info }: { readonly info: ServerInfo }): ReactEle
   return (
     <Section
       title="Server"
-      description="The server this console talks to. These values come from the config file and change only with a restart."
+      description="These values come from the config file and change only with a restart."
       bodyClassName="p-0"
     >
       <DefinitionList items={items} />

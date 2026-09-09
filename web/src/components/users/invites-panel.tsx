@@ -47,7 +47,7 @@ export function PendingInvites({ me }: { readonly me: Me }): ReactElement | null
     <Frame>
       {/* px-5 puts the title where the first column's text starts. */}
       <FrameBand className="px-5 pt-1.5 pb-2">
-        <h2 className="font-semibold text-kumo-strong">Pending invites</h2>
+        <h2 className="font-semibold text-kumo-strong">Pending invitations</h2>
         <p className="text-kumo-subtle">
           An invitation becomes a user the first time its link is opened.
         </p>
@@ -60,7 +60,7 @@ export function PendingInvites({ me }: { readonly me: Me }): ReactElement | null
               size="sm"
               icon={<EnvelopeSimpleIcon size={emptyIconSize} />}
               title="No invitations waiting"
-              description="Invite someone and their link stays here until it is used, revoked or expires."
+              description="An invitation stays here until it is used, revoked or expired."
             />
           }
           footer={

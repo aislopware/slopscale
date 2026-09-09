@@ -106,7 +106,7 @@ describe("a paged table", () => {
 
     await screen.getByRole("button", { name: "Next page" }).click();
 
-    await expect.element(screen.getByLabelText("sorted descending")).toBeVisible();
+    await expect.element(screen.getByLabelText("Sorted descending")).toBeVisible();
     await expect.element(screen.getByText("machine-070")).toBeVisible();
   });
 

@@ -56,14 +56,7 @@ export function ApprovalSection(props: {
   readonly settings: Settings;
   readonly canEdit: boolean;
 }): ReactElement {
-  return (
-    <SwitchSection
-      title="Approval"
-      description="Changes apply immediately."
-      rows={approvals}
-      {...props}
-    />
-  );
+  return <SwitchSection title="Approval" rows={approvals} {...props} />;
 }
 
 export function DeviceTrustSection(props: {
@@ -88,7 +81,7 @@ function SwitchSection({
   canEdit,
 }: {
   readonly title: string;
-  readonly description: string;
+  readonly description?: string;
   readonly rows: readonly ApprovalSwitch[];
   readonly settings: Settings;
   readonly canEdit: boolean;

@@ -62,4 +62,12 @@ describe(NameserversSection, () => {
       .element(screen.getByRole("switch", { name: "Use with exit node for 1.1.1.1" }))
       .toBeDisabled();
   });
+
+  it("opens the add nameserver dialog", async () => {
+    const screen = await renderSection(base);
+
+    await screen.getByRole("button", { name: "Add nameserver" }).click();
+
+    await expect.element(screen.getByRole("heading", { name: "Add nameserver" })).toBeVisible();
+  });
 });

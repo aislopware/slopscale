@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Banner } from "@cloudflare/kumo/components/banner";
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { cn } from "@cloudflare/kumo/utils";
@@ -15,6 +14,7 @@ import type { PolicyEditorHandle } from "~/components/policy/policy-editor.tsx";
 import { usePolicyDraft } from "~/components/policy/use-policy-draft.ts";
 import type { PolicyDraft } from "~/components/policy/use-policy-draft.ts";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { Status } from "~/components/ui/status.tsx";
 import { parseTime } from "~/lib/time.ts";
 
 const referenceUrl = "https://headscale.net/stable/ref/policy/";
@@ -31,25 +31,17 @@ function DraftState({
   readonly updatedAt: string;
 }): ReactElement {
   if (dirty) {
-    return (
-      <Badge appearance="dot" variant="warning">
-        Unsaved changes
-      </Badge>
-    );
+    return <Status tone="warning">Unsaved changes</Status>;
   }
 
   if (parseTime(updatedAt) === null) {
-    return (
-      <Badge appearance="dot" variant="neutral">
-        Never saved
-      </Badge>
-    );
+    return <Status tone="neutral">Never saved</Status>;
   }
 
   return (
-    <Badge appearance="dot" variant="success">
+    <Status tone="success">
       Saved <RelativeTime value={updatedAt} />
-    </Badge>
+    </Status>
   );
 }
 
@@ -143,7 +135,7 @@ export function PolicyFileTab({
           variant="alert"
           icon={<WarningIcon />}
           title={unset ? "No policy is set" : "The policy file restricts nothing"}
-          description="Every machine can reach every other machine until a rule is enabled or the file gets acls or grants."
+          description="Every machine can reach every other machine until a rule is enabled or this file adds acls or grants."
           {...(canEdit && draft.text === ""
             ? {
                 action: (

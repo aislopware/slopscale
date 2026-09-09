@@ -80,7 +80,7 @@ export function BuildingBlocks({
               <span className="text-xs text-kumo-subtle">
                 {blocks.valid
                   ? "Names in the draft"
-                  : "Names picked out of the text, because the draft does not parse"}
+                  : "Read from the text because the draft does not parse"}
               </span>
             ) : null}
           </span>
@@ -93,7 +93,7 @@ export function BuildingBlocks({
         <Collapsible.Panel>
           <FramePanel>
             <BlockRow
-              label="User groups (group:)"
+              label="Groups"
               names={blocks.groups}
               empty="No groups yet"
               onSelect={onSelect}
@@ -102,7 +102,7 @@ export function BuildingBlocks({
             <BlockRow
               label="Autogroups"
               names={blocks.autogroups}
-              empty="None referenced"
+              empty="No autogroups yet"
               onSelect={onSelect}
             />
           </FramePanel>

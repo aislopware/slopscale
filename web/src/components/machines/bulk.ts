@@ -19,7 +19,7 @@ interface ActionWords {
 
 const words: Record<BulkAction, ActionWords> = {
   approve: { verb: "approve", past: "approved" },
-  expire: { verb: "expire the key of", past: "signed out" },
+  expire: { verb: "expire the key of", past: "keys expired" },
   delete: { verb: "delete", past: "deleted" },
 };
 
@@ -67,7 +67,15 @@ export function useMachineBulk(): BulkRunner {
 
       const failures = await runInTurn(action, ids);
 
-      await invalidate(queryClient, "/api/v1/node");
+      await (action === "delete"
+        ? invalidate(
+            queryClient,
+            "/api/v1/node",
+            "/api/v1/group",
+            "/api/v1/access-request",
+            "/api/v1/network",
+          )
+        : invalidate(queryClient, "/api/v1/node"));
       setRunning(null);
       report(action, ids.length - failures.length, failures);
     },

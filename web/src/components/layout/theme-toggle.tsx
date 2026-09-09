@@ -14,9 +14,9 @@ const options: readonly { readonly value: Theme; readonly label: string; readonl
 ];
 
 const labels: Record<Theme, string> = {
-  system: "Theme: system",
-  light: "Theme: light",
-  dark: "Theme: dark",
+  system: "System theme",
+  light: "Light theme",
+  dark: "Dark theme",
 };
 
 const iconSize = 16;
@@ -37,11 +37,12 @@ export function ThemeToggle(): ReactElement {
         render={
           <Button
             variant="outline"
-            className="h-8 gap-1.5 px-2.5 text-sm"
+            className="h-8 gap-1.5 px-2.5 text-sm max-sm:px-2"
             aria-label={labels[current]}
           >
             <Icon size={iconSize} aria-hidden />
-            {active?.label}
+            {/* Small screens keep the icon alone; the aria-label still names the state. */}
+            <span className="max-sm:hidden">{active?.label}</span>
           </Button>
         }
       />

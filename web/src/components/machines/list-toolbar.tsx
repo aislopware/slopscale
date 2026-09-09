@@ -59,7 +59,7 @@ export function MachinesToolbar({
     <TableToolbar actions={<AddMachine me={me} onAdd={onAddMachine} />}>
       {/* Narrower than the console's default search box, so the owner filter stays on this row. */}
       <SearchInput
-        className="max-w-52"
+        className="max-w-44"
         value={query}
         placeholder="Search machines"
         onValueChange={onQueryChange}
@@ -78,7 +78,7 @@ export function MachinesToolbar({
       {users === undefined ? null : (
         <Select
           aria-label="Filter by user"
-          className="w-36"
+          className="w-32"
           value={user}
           items={userOptions(users)}
           onValueChange={(value) => {
@@ -89,7 +89,7 @@ export function MachinesToolbar({
       {tags.length === 0 ? null : (
         <Select
           aria-label="Filter by tag"
-          className="w-36"
+          className="w-32"
           value={tag}
           items={tagFilterOptions(tags)}
           onValueChange={(value) => {
