@@ -72,6 +72,12 @@ func TestAuditEvents(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, byPrefix, 2)
 
+		// The console's action box searches by partial name, so a prefix
+		// without the dot matches too.
+		partial, err := db.ListAuditEvents(types.AuditQuery{Action: "node"})
+		require.NoError(t, err)
+		assert.Len(t, partial, 2)
+
 		exact, err := db.ListAuditEvents(types.AuditQuery{Action: "node.delete"})
 		require.NoError(t, err)
 		require.Len(t, exact, 1)

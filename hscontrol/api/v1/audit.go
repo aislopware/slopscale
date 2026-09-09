@@ -52,13 +52,13 @@ type AuditEvent struct {
 // exported because huma skips unexported embedded fields, which would drop
 // every filter from both operations.
 type AuditFilters struct {
-	ActorUserID string `doc:"Keep events by this user."                query:"actorUserId"`
-	Action      string `doc:"One action, or a prefix ending in a dot." query:"action"`
+	ActorUserID string `doc:"Keep events by this user."                        query:"actorUserId"`
+	Action      string `doc:"An action prefix: node. keeps every node action." query:"action"`
 	TargetKind  string `query:"targetKind"`
 	TargetID    string `query:"targetId"`
-	Since       string `doc:"RFC 3339; events at or after this time."  format:"date-time"  query:"since"`
-	Until       string `doc:"RFC 3339; events before this time."       format:"date-time"  query:"until"`
-	Before      string `doc:"Page: events with an ID below this one."  format:"uint64"     query:"before"`
+	Since       string `doc:"RFC 3339; events at or after this time."          format:"date-time"  query:"since"`
+	Until       string `doc:"RFC 3339; events before this time."               format:"date-time"  query:"until"`
+	Before      string `doc:"Page: events with an ID below this one."          format:"uint64"     query:"before"`
 }
 
 type listAuditInput struct {
@@ -337,7 +337,7 @@ func auditCSVRow(e *types.AuditEvent) ([]string, error) {
 		actorUserID = strconv.FormatUint(uint64(e.ActorUserID), 10)
 	}
 
-	return []string{
+	row := []string{
 		strconv.FormatUint(e.ID, 10),
 		e.CreatedAt.UTC().Format(time.RFC3339),
 		e.Action,
@@ -350,7 +350,31 @@ func auditCSVRow(e *types.AuditEvent) ([]string, error) {
 		strconv.Itoa(e.Outcome),
 		e.RemoteAddr,
 		detail,
-	}, nil
+	}
+
+	for i, cell := range row {
+		row[i] = csvSafe(cell)
+	}
+
+	return row, nil
+}
+
+// csvSafe defuses a cell a spreadsheet would run. Excel, LibreOffice and
+// Sheets evaluate a cell that starts with =, +, -, @, a tab or a carriage
+// return, so a node name or a detail value chosen by whoever provoked the
+// event could execute on the operator's machine when the export is opened
+// (OWASP calls it CSV injection). A leading apostrophe makes it text.
+func csvSafe(cell string) string {
+	if cell == "" {
+		return cell
+	}
+
+	switch cell[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		return "'" + cell
+	}
+
+	return cell
 }
 
 // writeAuditJSON writes the events as one array, in the shape the list

@@ -65,8 +65,8 @@ func (e *AuditEvent) Succeeded() bool {
 type AuditQuery struct {
 	// ActorUserID keeps events by one user.
 	ActorUserID UserID
-	// Action keeps one action, or every action under a prefix when it
-	// ends with a dot ("node." keeps every node action).
+	// Action keeps every action starting with it, so "node." keeps every
+	// node action and "node" also matches a search for a partial name.
 	Action string
 	// TargetKind and TargetID keep events about one object.
 	TargetKind string

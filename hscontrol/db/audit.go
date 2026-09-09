@@ -3,7 +3,6 @@ package db
 import (
 	"encoding/json/v2"
 	"fmt"
-	"strings"
 	"time"
 
 	jet "github.com/go-jet/jet/v2/sqlite"
@@ -249,16 +248,13 @@ func auditWhere(q types.AuditQuery) jet.BoolExpression {
 	}
 
 	if q.Action != "" {
-		if strings.HasSuffix(q.Action, ".") {
-			// A literal prefix match; LIKE would need dialect-specific
-			// escaping of the wildcards.
-			where = where.AND(jet.RawBool(
-				"substr(audit_events.action, 1, #n) = #p",
-				jet.RawArgs{"#n": len(q.Action), "#p": q.Action},
-			))
-		} else {
-			where = where.AND(table.AuditEvents.Action.EQ(jet.String(q.Action)))
-		}
+		// Always a prefix match, so the console's action box finds
+		// node.delete from "node". A literal one: LIKE would need
+		// dialect-specific escaping of the wildcards.
+		where = where.AND(jet.RawBool(
+			"substr(audit_events.action, 1, #n) = #p",
+			jet.RawArgs{"#n": len(q.Action), "#p": q.Action},
+		))
 	}
 
 	if q.TargetKind != "" {
