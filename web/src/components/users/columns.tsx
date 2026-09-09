@@ -33,7 +33,7 @@ export const columns = helper.columns([
       header: "User",
       enableSorting: true,
       cell: ({ row }) => <NameCell user={row.original} />,
-      meta: { className: "w-[32%] min-w-56" },
+      meta: { className: "w-[30%] min-w-56" },
     },
   ),
   helper.accessor((user) => user.role, {
@@ -107,7 +107,7 @@ function NameCell({ user }: { readonly user: User }): ReactElement {
   const title = [label, user.email, provider ?? ""].filter((part) => part !== "").join(", ");
 
   return (
-    <div className="flex max-w-80 items-center gap-2.5" title={title}>
+    <div className="flex max-w-64 items-center gap-2.5" title={title}>
       <Avatar name={label} size="lg" />
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate font-medium text-kumo-default">{label}</span>

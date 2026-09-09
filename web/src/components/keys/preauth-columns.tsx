@@ -81,7 +81,7 @@ export const preAuthKeyColumns = helper.columns([
     header: "Expires",
     enableSorting: true,
     enableGlobalFilter: false,
-    cell: ({ row }) => <ExpiryCell value={row.original.expiration} />,
+    cell: ({ row }) => <ExpiresCell authKey={row.original} />,
     meta: { className: "whitespace-nowrap" },
   }),
   helper.accessor((authKey) => parseTime(authKey.createdAt)?.getTime() ?? 0, {
@@ -143,6 +143,19 @@ function TypeCell({
         </span>
       )}
     </div>
+  );
+}
+
+/** The Status column already says Expired, so this one says when, in muted text. */
+function ExpiresCell({ authKey }: { readonly authKey: PreAuthKey }): ReactElement {
+  if (preAuthKeyStatus(authKey) !== "expired") {
+    return <ExpiryCell value={authKey.expiration} />;
+  }
+
+  return (
+    <span className="text-kumo-subtle">
+      <RelativeTime value={authKey.expiration} />
+    </span>
   );
 }
 
