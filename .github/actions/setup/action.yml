@@ -1,0 +1,67 @@
+name: Set up the devShell and its caches
+description: >-
+  Installs Nix, restores the hestia binary cache for the devShell, and restores
+  the Go build and module caches so a job compiles only what changed since the
+  last run with the same go.sum. Optional caches for golangci-lint, bun and the
+  Playwright browsers.
+
+inputs:
+  go-key:
+    description: >-
+      Distinguishes Go caches that cannot share entries (one per job or
+      target). Empty skips the Go cache for jobs that never run go.
+    default: ""
+  golangci-lint:
+    description: Also restore the golangci-lint analysis cache.
+    default: "false"
+  bun:
+    description: Also restore bun's package cache for the console toolchain.
+    default: "false"
+  playwright:
+    description: Also restore the Playwright browsers.
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: NixOS/nix-installer-action@62c1943b776c509394b550f3f983adc14e9212d6 # v1.0.0
+    - uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
+
+    # Saved once per go.sum and toolchain (flake.lock), so the cache does not
+    # grow by one entry per push; hestia shares the same 10 GB budget. Later
+    # pushes restore the last one and recompile only the packages that changed.
+    - name: Go build and module cache
+      if: inputs.go-key != ''
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: go-${{ inputs.go-key }}-${{ hashFiles('go.sum', 'flake.lock', 'sqlite.cflags') }}
+        restore-keys: |
+          go-${{ inputs.go-key }}-
+
+    - name: golangci-lint cache
+      if: inputs.golangci-lint == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/golangci-lint
+        key: golangci-lint-${{ hashFiles('go.sum', 'flake.lock', '.golangci.yaml') }}
+        restore-keys: |
+          golangci-lint-
+
+    - name: bun cache
+      if: inputs.bun == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ hashFiles('web/bun.lock') }}
+        restore-keys: |
+          bun-
+
+    - name: Playwright browsers
+      if: inputs.playwright == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ hashFiles('web/bun.lock') }}

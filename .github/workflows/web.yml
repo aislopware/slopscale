@@ -4,11 +4,32 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "web/**"
+      - "gen/openapi/**"
+      - "hscontrol/api/**"
+      - "cmd/dev/**"
+      - "*.nix"
+      - "flake.lock"
+      - ".github/workflows/web.yml"
+      - ".github/actions/**"
   pull_request:
+    paths:
+      - "web/**"
+      - "gen/openapi/**"
+      - "hscontrol/api/**"
+      - "cmd/dev/**"
+      - "*.nix"
+      - "flake.lock"
+      - ".github/workflows/web.yml"
+      - ".github/actions/**"
 
 concurrency:
-  group: ${{ github.workflow }}-$${{ github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 defaults:
   run:
@@ -19,51 +40,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
         with:
-          fetch-depth: 2
-      - name: Get changed files
-        id: changed-files
-        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
-        with:
-          filters: |
-            files:
-              - '*.nix'
-              - 'web/**'
-              - 'gen/openapi/**'
-              - 'hscontrol/api/**'
-              - '.github/workflows/web.yml'
-      - uses: NixOS/nix-installer-action@62c1943b776c509394b550f3f983adc14e9212d6 # v1.0.0
-        if: steps.changed-files.outputs.files == 'true'
-      - uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
-        if: steps.changed-files.outputs.files == 'true'
+          go-key: web
+          bun: "true"
+          playwright: "true"
 
       - name: Typecheck, lint and format
-        if: steps.changed-files.outputs.files == 'true'
         run: make lint-web
 
       - name: Check generated API types
-        if: steps.changed-files.outputs.files == 'true'
         run: |
           make web-generate
           if ! git diff --exit-code -- gen/openapi web/src/api web/src/lib/hujson; then
-            echo "❌ Console API types or the HuJSON parser are not up to date; run 'make web-generate' and commit."
+            echo "Console API types or the HuJSON parser are not up to date; run 'make web-generate' and commit."
             exit 1
           fi
 
       - name: Build
-        if: steps.changed-files.outputs.files == 'true'
         run: make web
 
       - name: Browser tests
-        if: steps.changed-files.outputs.files == 'true'
         run: |
           cd web && bunx playwright install --with-deps chromium
           make -C .. test-web
 
       - name: Embedded console tests
-        if: steps.changed-files.outputs.files == 'true'
         run: go test ./web/
 
       - name: End-to-end sign-in
-        if: steps.changed-files.outputs.files == 'true'
         run: make test-e2e

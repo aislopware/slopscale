@@ -1,0 +1,145 @@
+name: Go
+
+# Every Go check that runs in the devShell. The jobs share one composite
+# setup (Nix, hestia, Go caches) and run in parallel; each compiles only what
+# changed since the last push with the same go.sum. The sandboxed flake
+# checks (package build, formatting, NixOS module) live in nix-checks.yml.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "**"
+      - "!docs/**"
+      - "!**/*.md"
+      - "!.claude/**"
+      - "!.github/**"
+      - ".github/workflows/ci.yml"
+      - ".github/actions/**"
+      - "!web/**"
+      - "web/*.go"
+      - "web/unbuilt.html"
+      - "web/dist/**"
+  pull_request:
+    paths:
+      - "**"
+      - "!docs/**"
+      - "!**/*.md"
+      - "!.claude/**"
+      - "!.github/**"
+      - ".github/workflows/ci.yml"
+      - ".github/actions/**"
+      - "!web/**"
+      - "web/*.go"
+      - "web/unbuilt.html"
+      - "web/dist/**"
+
+# A newer push to the same branch supersedes the run in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: nix develop --fallback --command bash -e {0}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          go-key: lint
+          golangci-lint: "true"
+      - name: golangci-lint and go vet
+        run: make lint-go
+      - name: go mod tidy -diff
+        run: make lint-mod
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          go-key: test
+      # ./integration needs Docker (its own workflow) and hscontrol/servertest
+      # is slow and timing-sensitive, so it gets a job of its own.
+      - name: go test
+        run: |
+          go test -race -short -timeout 30m \
+            $(go list ./... | grep -v -e '/integration$' -e '/hscontrol/servertest')
+
+  servertest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          go-key: servertest
+          bun: "true"
+      # The console sign-in cases need the embedded console; without a build
+      # the server answers 503 for /admin/.
+      - name: Build admin console
+        run: make web
+      - name: go test ./hscontrol/servertest
+        run: go test -timeout=20m ./hscontrol/servertest/...
+
+  # cgo cross build: zigcc (Nix devShell) maps GOOS/GOARCH to a zig target and
+  # the binary links statically against musl. Same flags as goreleaser, so a
+  # release cannot fail on a target that main never compiled for.
+  cross:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: linux
+            goarch: arm
+            goarm: "7"
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+      GOARM: ${{ matrix.goarm }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          go-key: cross-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goarm }}
+      - name: go build
+        run: |
+          CC=zigcc go build -trimpath -tags netgo,osusergo \
+            -ldflags '-s -w -linkmode=external -extldflags=-static' \
+            -o slopscale ./cmd/slopscale
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: slopscale-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goarm }}
+          path: slopscale
+
+  # gen/ must match its sources: jet tables from schema.sql, the OpenAPI
+  # document, the console's API types, capver from the Tailscale releases.
+  generated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          go-key: generated
+          bun: "true"
+      - name: make generate
+        run: make generate
+      - name: Check for uncommitted changes
+        run: |
+          if ! git diff --exit-code; then
+            echo "Generated files are not up to date; run 'make generate' and commit the result."
+            exit 1
+          fi

@@ -1,5 +1,7 @@
----
 name: Build (main)
+
+# The development image: every push to main that changes the binary or the
+# console lands on ghcr.io as main-<sha> and development.
 
 on:
   push:
@@ -7,13 +9,20 @@ on:
       - main
     paths:
       - "*.nix"
+      - "flake.lock"
       - "go.*"
       - "**/*.go"
+      - "gen/**"
+      - "web/**"
+      - "hscontrol/assets/**"
+      - "hscontrol/db/*.sql"
+      - "sqlite.cflags"
       - ".github/workflows/container-main.yml"
+      - ".github/actions/**"
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.sha }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 defaults:
@@ -38,8 +47,10 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: NixOS/nix-installer-action@62c1943b776c509394b550f3f983adc14e9212d6 # v1.0.0
-      - uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
+      - uses: ./.github/actions/setup
+        with:
+          go-key: container
+          bun: "true"
 
       - name: Set commit timestamp
         run: echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> $GITHUB_ENV
