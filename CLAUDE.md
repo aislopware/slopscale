@@ -218,6 +218,9 @@ them rather than adding to them.
   it. CI checks that `gen/` matches its sources.
 - User-facing changes get a CHANGELOG.md entry under the unreleased version,
   written for operators and linked to the PR.
+- A release is cut by the Release workflow, run by hand with the version. It
+  takes the version's CHANGELOG section as the release notes and refuses to
+  run without one, so the `## X.Y.Z (202x-xx-xx)` heading must exist first.
 - zerolog: with four or more fields, or conditional ones, build incrementally
   and reassign, `e = e.Str(k, v)`. Forgetting the reassignment silently drops
   the field.
