@@ -1,5 +1,4 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { cn } from "@cloudflare/kumo/utils";
 import { CheckCircleIcon, DevicesIcon, UserIcon } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -13,7 +12,7 @@ import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { allUsers } from "~/components/overview/links.ts";
 import { plural } from "~/components/overview/plural.ts";
-import { framePanelClass } from "~/components/ui/frame.tsx";
+import { Frame, FramePanel } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
@@ -179,26 +178,23 @@ function ApprovalSettingsLink({ me }: { readonly me: Me }): ReactElement | null 
 }
 
 /**
- * Nothing is waiting: one quiet row on its own panel, no heading. It keeps the shape of the other
- * panels on the page, so it reads as a state of the same list rather than a loose line between two
- * cards.
+ * Nothing is waiting: one quiet row in a frame of its own, no heading. It keeps the shape of the
+ * other frames on the page, band and panel, so it reads as a state of the same list rather than a
+ * loose line between two cards.
  */
 function AllApproved({ me }: { readonly me: Me }): ReactElement {
   return (
-    <div
-      className={cn(
-        framePanelClass,
-        "flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-3 text-kumo-subtle",
-      )}
-    >
-      <span className="flex items-start gap-2">
-        <span className="flex h-lh items-center">
-          <CheckCircleIcon weight="fill" className="text-kumo-success" />
+    <Frame>
+      <FramePanel className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-3 text-kumo-subtle">
+        <span className="flex items-start gap-2">
+          <span className="flex h-lh items-center">
+            <CheckCircleIcon weight="fill" className="text-kumo-success" />
+          </span>
+          All machines and users are approved.
         </span>
-        All machines and users are approved.
-      </span>
-      <ApprovalSettingsLink me={me} />
-    </div>
+        <ApprovalSettingsLink me={me} />
+      </FramePanel>
+    </Frame>
   );
 }
 
