@@ -40,7 +40,9 @@ export function FormFooter({
   readonly disabled?: boolean;
 }): ReactElement {
   return (
-    <DialogFooter>
+    // Enter in a text input presses the hidden submitter, so it holds what the visible button does:
+    // a form nobody can submit by button is not one Enter can submit either.
+    <DialogFooter submitDisabled={disabled || pending}>
       <DialogClose render={<Button variant="secondary">Cancel</Button>} />
       <Button type="submit" variant="primary" loading={pending} disabled={disabled}>
         {label}

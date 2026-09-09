@@ -3,9 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import { api } from "~/api/client.ts";
-import { groupsQuery, servicesQuery, usersQuery } from "~/api/queries.ts";
+import { appsQuery, groupsQuery, servicesQuery, usersQuery } from "~/api/queries.ts";
 import type { User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
+import { AppConnectorSection } from "~/components/apps/app-connector-section.tsx";
+import { ConnectivitySection } from "~/components/machines/connectivity.tsx";
 import { DangerZone } from "~/components/machines/danger-zone.tsx";
 import { GroupsSection } from "~/components/machines/groups.tsx";
 import { MachineHeader } from "~/components/machines/header.tsx";
@@ -33,6 +35,9 @@ export const Route = createFileRoute("/_app/machines/$nodeId")({
       can(context.me, "policy_file:read")
         ? context.queryClient.query(groupsQuery)
         : Promise.resolve(),
+      can(context.me, "policy_file:read")
+        ? context.queryClient.query(appsQuery)
+        : Promise.resolve(),
       can(context.me, "services:read")
         ? context.queryClient.query(servicesQuery)
         : Promise.resolve(),
@@ -50,6 +55,7 @@ function MachinePage(): ReactElement {
   });
   const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
   const groups = useQuery({ ...groupsQuery, enabled: can(me, "policy_file:read") });
+  const apps = useQuery({ ...appsQuery, enabled: can(me, "policy_file:read") });
   const services = useQuery({ ...servicesQuery, enabled: can(me, "services:read") });
   const { node } = detail.data;
   const userList = users.data?.users ?? emptyUsers;
@@ -65,6 +71,9 @@ function MachinePage(): ReactElement {
         <div className="flex flex-col gap-6">
           <OverviewSection node={node} />
           <RoutesSection node={node} canEdit={routes} />
+          {node.appConnector && apps.data !== undefined ? (
+            <AppConnectorSection node={node} apps={apps.data.apps} />
+          ) : null}
           {services.data === undefined ? null : (
             <ServicesSection
               node={node}
@@ -80,6 +89,7 @@ function MachinePage(): ReactElement {
         </div>
         <div className="flex flex-col gap-6">
           <AddressesSection node={node} />
+          <ConnectivitySection node={node} />
           <GlobalExitSection node={node} canEdit={routes} />
           {can(me, "devices:core") ? <DangerZone node={node} /> : null}
         </div>

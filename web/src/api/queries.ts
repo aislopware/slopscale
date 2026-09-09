@@ -45,6 +45,9 @@ export type Webhook = MethodResponse<typeof api, "get", "/api/v1/webhook">["webh
 export type Service = MethodResponse<typeof api, "get", "/api/v1/services">["services"][number];
 /** One machine's standing towards a service: what it announces and whether it may host it. */
 export type ServiceHost = Service["hosts"][number];
+export type App = MethodResponse<typeof api, "get", "/api/v1/apps">["apps"][number];
+/** A connector node of an app: what it advertises and whether it runs the connector. */
+export type AppNode = App["nodes"][number];
 
 /**
  * How long the collections every page reads stay fresh. The sidebar badges and the command palette
@@ -81,10 +84,29 @@ export type AccessRequestOptions = MethodResponse<
   "get",
   "/api/v1/access-request/options"
 >;
+
+/** The whole graph, which is also the shape of one machine's: the machines never narrow. */
+const wholeAccessGraphQuery = api.queryOptions("get", "/api/v1/access-graph", {
+  params: { query: {} },
+});
+
+export type AccessGraphQuery = typeof wholeAccessGraphQuery;
+
+/**
+ * Who reaches what, read off the rules the server hands each machine. With a machine id the server
+ * keeps only the edges that machine is an end of; the machines it lists stay the whole tailnet, so
+ * the picker works either way.
+ */
+export function accessGraphQuery(node: string): AccessGraphQuery {
+  return api.queryOptions("get", "/api/v1/access-graph", {
+    params: { query: node === "" ? {} : { node } },
+  });
+}
 export const dnsQuery = api.queryOptions("get", "/api/v1/dns");
 export const dnsRulesQuery = api.queryOptions("get", "/api/v1/dns/rule");
 export const networksQuery = api.queryOptions("get", "/api/v1/network");
 export const servicesQuery = api.queryOptions("get", "/api/v1/services");
+export const appsQuery = api.queryOptions("get", "/api/v1/apps");
 export const webhooksQuery = api.queryOptions("get", "/api/v1/webhook");
 
 export type LogStream = MethodResponse<
@@ -95,6 +117,24 @@ export type LogStream = MethodResponse<
 
 export const logStreamsQuery = api.queryOptions("get", "/api/v1/log-stream");
 export const webhookEventTypesQuery = api.queryOptions("get", "/api/v1/webhook/event-types");
+
+export type PostureIntegration = MethodResponse<
+  typeof api,
+  "get",
+  "/api/v1/posture-integrations"
+>["integrations"][number];
+
+export type PostureProvider = MethodResponse<
+  typeof api,
+  "get",
+  "/api/v1/posture-integrations/providers"
+>["providers"][number];
+
+export const postureIntegrationsQuery = api.queryOptions("get", "/api/v1/posture-integrations");
+export const postureProvidersQuery = api.queryOptions(
+  "get",
+  "/api/v1/posture-integrations/providers",
+);
 
 export type WebhookDelivery = MethodResponse<
   typeof api,
@@ -146,6 +186,18 @@ export const derpQuery = queryOptions({
 
     return { derp: data, etag: response.headers.get("ETag") ?? "" };
   },
+});
+
+/**
+ * How often the relay latency page asks again. Clients send a network report as they move between
+ * networks, so the page is live; only while the tab is in front, like the machine list.
+ */
+export const derpLatencyPollMs = 60_000;
+
+/** What every machine last measured to each relay region, worst machines first. */
+export const derpLatencyQuery = api.queryOptions("get", "/api/v1/derp/latency", undefined, {
+  refetchInterval: derpLatencyPollMs,
+  refetchIntervalInBackground: false,
 });
 
 /** The time ranges the audit page offers; the preset, not an instant, keys the query. */
@@ -265,14 +317,18 @@ type Collection =
   | "/api/v1/access-rule"
   | "/api/v1/posture"
   | "/api/v1/access-request"
+  | "/api/v1/access-graph"
   | "/api/v1/dns"
   | "/api/v1/dns/rule"
   | "/api/v1/derp"
   | "/api/v1/server"
   | "/api/v1/network"
   | "/api/v1/services"
+  | "/api/v1/apps"
   | "/api/v1/webhook"
   | "/api/v1/log-stream"
+  | "/api/v1/posture-integration"
+  | "/api/v1/posture-integrations"
   | "/api/v1/ssh-recording"
   | "/api/v1/auth/sessions"
   | "/api/v1/invite";

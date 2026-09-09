@@ -26,6 +26,8 @@ const owner = {
 
 function node(id: string, available: string[], approved: string[]): Node {
   return {
+    appConnector: false,
+    sshServer: false,
     approved: true,
     approvedAt: stamp,
     announcedServices: [],

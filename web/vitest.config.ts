@@ -9,6 +9,8 @@ export default mergeConfig(viteConfig, {
   test: {
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["./src/test-setup.ts"],
+    // The suite uses no setup hooks, so vitest puts stubbed globals back itself.
+    unstubGlobals: true,
     browser: {
       enabled: true,
       headless: true,

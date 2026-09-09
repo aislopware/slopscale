@@ -71,6 +71,7 @@ export function PostureSection({
     >
       <DefinitionList items={derived(posture.data)} columns={2} />
       <Identity node={node} posture={posture.data} canEdit={canEdit} />
+      <IntegrationAttributes posture={posture.data} />
       <CustomAttributes node={node} posture={posture.data} canEdit={canEdit} />
       <MatchedPostures node={node} me={me} />
     </Section>
@@ -178,6 +179,60 @@ function IdentityText({ posture }: { readonly posture: NodePosture }): ReactElem
         collected <RelativeTime value={identity.collectedAt} />
       </span>
     </span>
+  );
+}
+
+function IntegrationAttributes({
+  posture,
+}: {
+  readonly posture: NodePosture;
+}): ReactElement | null {
+  const attributes = posture.integration ?? [];
+
+  if (attributes.length === 0) {
+    return null;
+  }
+
+  return (
+    <>
+      <SectionRow className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <span className="font-medium text-kumo-strong">From integrations</span>
+          <span className="text-xs text-kumo-subtle">
+            Attributes synced from endpoint security and device management services.
+          </span>
+        </div>
+      </SectionRow>
+      {attributes.map((attribute) => (
+        <IntegrationAttributeRow key={attribute.key} attribute={attribute} />
+      ))}
+    </>
+  );
+}
+
+function IntegrationAttributeRow({
+  attribute,
+}: {
+  readonly attribute: CustomAttribute;
+}): ReactElement {
+  return (
+    <SectionRow className="flex flex-wrap items-center justify-between gap-3 py-3">
+      <div className="flex min-w-0 flex-col gap-0.5 text-left">
+        <AttributeText name={attribute.key} value={attribute.value} />
+        <span className="text-xs text-kumo-subtle">
+          {attribute.expiresAt === undefined ? (
+            "Does not expire"
+          ) : (
+            <>
+              Expires <RelativeTime value={attribute.expiresAt} />
+            </>
+          )}
+          {attribute.comment === undefined || attribute.comment === ""
+            ? null
+            : ` · ${attribute.comment}`}
+        </span>
+      </div>
+    </SectionRow>
   );
 }
 

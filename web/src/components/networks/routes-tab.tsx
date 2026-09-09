@@ -1,13 +1,22 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { SignpostIcon } from "@phosphor-icons/react";
-import { useDeferredValue, useMemo } from "react";
+import type { ExpandedState } from "@tanstack/react-table";
+import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
 import type { Network, Node } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
-import { toRouteRows } from "~/components/networks/model.ts";
 import { routeColumns } from "~/components/networks/route-columns.tsx";
+import { RouteFilterChips } from "~/components/networks/route-filters.tsx";
+import {
+  filterGroups,
+  groupRoutes,
+  isRouteGroup,
+  noRouteFilters,
+  routeFilterCounts,
+} from "~/components/networks/routes-model.ts";
+import type { RouteFilterState, RoutesRow } from "~/components/networks/routes-model.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
@@ -21,32 +30,48 @@ export interface RoutesTabProps {
   readonly nodes: readonly Node[];
   readonly networks: readonly Network[];
   readonly search: string;
+  readonly filters: RouteFilterState;
   readonly onSearchChange: (value: string) => void;
+  readonly onFiltersChange: (value: RouteFilterState) => void;
 }
 
-/** Every route any machine advertises, with what approved it and a button for the rest. */
+/**
+ * Every advertised route across the tailnet, one row per prefix. A prefix several machines
+ * advertise unfolds into a row each, so a pair of subnet routers reads as one route with a standby
+ * rather than as two rows that happen to share a number.
+ */
 export function RoutesTab({
   me,
   nodes,
   networks,
   search,
+  filters,
   onSearchChange,
+  onFiltersChange,
 }: RoutesTabProps): ReactElement {
   const query = useDeferredValue(search);
-  const rows = useMemo(() => toRouteRows(nodes, networks), [nodes, networks]);
+  const groups = useMemo(() => groupRoutes(nodes, networks), [nodes, networks]);
+  const counts = useMemo(() => routeFilterCounts(groups), [groups]);
+  const rows: RoutesRow[] = useMemo(() => filterGroups(groups, filters), [groups, filters]);
+  const [expanded, setExpanded] = useState<ExpandedState>({});
 
   const table = useAppTable({
     data: rows,
     columns: routeColumns,
     getRowId: (row) => row.id,
-    state: { globalFilter: query },
+    // A prefix only one machine advertises stays a flat row; the rest carry their advertisers.
+    getSubRows: (row) =>
+      isRouteGroup(row) && row.advertisers.length > 1 ? row.advertisers : undefined,
+    state: { globalFilter: query, expanded },
+    onExpandedChange: setExpanded,
     initialState: { sorting: [{ id: "status", desc: false }] },
     meta: { me, networks },
   });
 
-  const total = rows.length;
-  const shown = table.getRowModel().rows.length;
-  const pending = rows.filter((row) => row.status === "pending").length;
+  const total = groups.length;
+  const shown = table.getRowModel().rows.filter((row) => row.depth === 0).length;
+  const pending = groups.reduce((sum, group) => sum + group.pending, 0);
+  const narrowed = search !== "" || routeFilterCount(filters) > 0;
 
   return (
     <>
@@ -55,6 +80,13 @@ export function RoutesTab({
           value={search}
           placeholder="Search by route, machine or network"
           onValueChange={onSearchChange}
+        />
+        <RouteFilterChips
+          state={filters}
+          counts={counts}
+          onToggle={(filter) => {
+            onFiltersChange({ ...filters, [filter]: !filters[filter] });
+          }}
         />
       </TableToolbar>
       <Frame>
@@ -81,14 +113,17 @@ export function RoutesTab({
                   size="sm"
                   title="No routes match"
                   contents={
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        onSearchChange("");
-                      }}
-                    >
-                      Clear search
-                    </Button>
+                    narrowed ? (
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          onSearchChange("");
+                          onFiltersChange(noRouteFilters);
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    ) : undefined
                   }
                 />
               )
@@ -107,4 +142,8 @@ export function RoutesTab({
 
 function countRoutes(total: number): string {
   return total === 1 ? "1 route" : `${total} routes`;
+}
+
+function routeFilterCount(filters: RouteFilterState): number {
+  return Object.values(filters).filter(Boolean).length;
 }

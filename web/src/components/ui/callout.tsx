@@ -1,18 +1,19 @@
 import { Banner } from "@cloudflare/kumo/components/banner";
 import { cn } from "@cloudflare/kumo/utils";
 import type { Icon } from "@phosphor-icons/react";
-import { InfoIcon, WarningIcon } from "@phosphor-icons/react";
+import { InfoIcon, WarningCircleIcon, WarningIcon } from "@phosphor-icons/react";
 import type { ReactElement, ReactNode } from "react";
 
 /**
  * What the callout is telling the operator: a fact about the tailnet, or something to watch out
  * for.
  */
-export type CalloutTone = "info" | "warning";
+export type CalloutTone = "info" | "warning" | "error";
 
 const tones = {
   info: { variant: "default", icon: InfoIcon, color: "text-kumo-info" },
   warning: { variant: "alert", icon: WarningIcon, color: "text-kumo-warning" },
+  error: { variant: "error", icon: WarningCircleIcon, color: "text-kumo-danger" },
 } as const;
 
 /**

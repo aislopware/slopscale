@@ -34,8 +34,11 @@ export function useNetworkMutations(): NetworkMutations {
         await refresh();
       },
     }),
+    // A connector's routes are what an app learns, so approving them moves the app's counts too.
     setRoutes: api.useMutation("post", "/api/v1/node/{nodeId}/approve_routes", {
-      onSuccess: refresh,
+      onSuccess: async () => {
+        await invalidate(queryClient, "/api/v1/network", "/api/v1/node", "/api/v1/apps");
+      },
     }),
   };
 }

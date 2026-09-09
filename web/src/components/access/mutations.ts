@@ -40,6 +40,8 @@ export function useAccessMutations(): AccessMutations {
       "/api/v1/posture",
       "/api/v1/access-request",
       "/api/v1/network",
+      // Rules, groups and postures are what the graph is derived from.
+      "/api/v1/access-graph",
     );
   };
 

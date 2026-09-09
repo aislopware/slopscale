@@ -237,6 +237,15 @@ function useFormOwner(
   }, [actions, anchor, fallbackId]);
 }
 
+export interface DialogFooterProps extends ComponentProps<"div"> {
+  /**
+   * Whether the footer's submit button is disabled, so the hidden submitter is too: a disabled
+   * default button stops implicit submission, and one that is not would let Enter in a text input
+   * submit a form the visible button refuses.
+   */
+  readonly submitDisabled?: boolean;
+}
+
 /**
  * The actions of a dialog. It is written inside the body, at the end of the form when there is one,
  * and shows on the band under the panel. A hidden submit button stays where it was written: as the
@@ -246,8 +255,9 @@ function useFormOwner(
 export function DialogFooter({
   className,
   children,
+  submitDisabled = false,
   ...props
-}: ComponentProps<"div">): ReactElement {
+}: DialogFooterProps): ReactElement {
   const slot = use(FooterSlotContext);
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
   const [actions, setActions] = useState<HTMLDivElement | null>(null);
@@ -257,7 +267,14 @@ export function DialogFooter({
 
   return (
     <>
-      <button ref={setAnchor} type="submit" hidden tabIndex={-1} aria-hidden />
+      <button
+        ref={setAnchor}
+        type="submit"
+        hidden
+        tabIndex={-1}
+        aria-hidden
+        disabled={submitDisabled}
+      />
       {slot === null
         ? null
         : createPortal(

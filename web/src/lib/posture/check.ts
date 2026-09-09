@@ -1,4 +1,4 @@
-import { attributeInfo, osValues } from "~/lib/posture/attributes.ts";
+import { attributeInfo, isBooleanType, osValues } from "~/lib/posture/attributes.ts";
 import type { AttributeInfo } from "~/lib/posture/attributes.ts";
 import { parseExpression } from "~/lib/posture/expression.ts";
 import type { Expression, Value } from "~/lib/posture/expression.ts";
@@ -41,17 +41,26 @@ function checkKnownValues(info: AttributeInfo, value: Value, into: ExpressionPro
 
 function checkValueType(info: AttributeInfo, value: Value, into: ExpressionProblem[]): void {
   for (const item of scalars(value)) {
-    if (info.type === "bool" && item.kind !== "bool") {
+    if (isBooleanType(info.type) && item.kind !== "bool") {
       into.push({
         severity: "warning",
         message: `${info.name} is true or false, not a string or number`,
         from: item.from,
         to: item.to,
       });
-    } else if (info.type !== "bool" && item.kind === "bool") {
+    } else if (!isBooleanType(info.type) && item.kind === "bool") {
       into.push({
         severity: "warning",
         message: `${info.name} is not true or false`,
+        from: item.from,
+        to: item.to,
+      });
+    } else if (info.type === "number" && item.kind === "string") {
+      // The server compares a number attribute numerically, and a quoted value is never a number
+      // to it, so the comparison is false whatever the device reports.
+      into.push({
+        severity: "warning",
+        message: `${info.name} is a number, so a quoted value never matches`,
         from: item.from,
         to: item.to,
       });
@@ -97,7 +106,12 @@ function checkAttribute(expression: Expression, into: ExpressionProblem[]): void
     return;
   }
 
-  if (orderedOperators.has(operator) && info.type !== "version" && info.type !== "string") {
+  if (
+    orderedOperators.has(operator) &&
+    info.type !== "version" &&
+    info.type !== "string" &&
+    info.type !== "number"
+  ) {
     into.push({
       severity: "warning",
       message: `${attribute} is not a version or a number, so ${operator} never matches`,

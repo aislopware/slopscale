@@ -1,5 +1,6 @@
 import {
   columnFilteringFeature,
+  createExpandedRowModel,
   createFilteredRowModel,
   createPaginatedRowModel,
   createSortedRowModel,
@@ -8,6 +9,7 @@ import {
   filterFn_equalsString,
   filterFn_includesString,
   globalFilteringFeature,
+  rowExpandingFeature,
   rowPaginationFeature,
   rowSortingFeature,
   sortFn_alphanumeric,
@@ -24,7 +26,15 @@ import type {
   TableState,
 } from "@tanstack/react-table";
 
-import type { AccessRule, Group, Network, Node, Posture, User } from "~/api/queries.ts";
+import type {
+  AccessRule,
+  Group,
+  Network,
+  Node,
+  Posture,
+  PostureProvider,
+  User,
+} from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 
 /**
@@ -48,6 +58,10 @@ export const appTableFeatures = tableFeatures({
     equalsString: filterFn_equalsString,
     arrIncludesSome: filterFn_arrIncludesSome,
   },
+  // A table whose rows nest, such as the prefixes on the routes page with the machines advertising
+  // them under them, hands the hook `getSubRows`; a flat table has no sub-rows and never expands.
+  rowExpandingFeature,
+  expandedRowModel: createExpandedRowModel(),
   rowPaginationFeature,
   paginatedRowModel: createPaginatedRowModel(),
 });
@@ -111,6 +125,7 @@ declare module "@tanstack/react-table" {
     postures?: readonly Posture[];
     networks?: readonly Network[];
     eventTypes?: readonly string[];
+    postureProviders?: readonly PostureProvider[];
     /** Whether the policy file restricts traffic on its own; false means the rules are all there is. */
     policyFileEnforces?: boolean;
     /** Whether the tailnet has a packet filter at all, so a network's protocol and ports apply. */

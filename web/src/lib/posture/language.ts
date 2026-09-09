@@ -7,7 +7,7 @@ import type { Extension, Line } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 
 import { lintDelay } from "~/lib/editor/problems.ts";
-import { knownAttributes } from "~/lib/posture/attributes.ts";
+import { isBooleanType, knownAttributes } from "~/lib/posture/attributes.ts";
 import type { AttributeInfo } from "~/lib/posture/attributes.ts";
 import { checkExpression } from "~/lib/posture/check.ts";
 import { tokenize } from "~/lib/posture/tokens.ts";
@@ -110,8 +110,12 @@ const boolCompletions: readonly Completion[] = [
   { label: "false", type: "constant" },
 ];
 
+/**
+ * What an attribute takes as a value: true and false for a boolean, its known values otherwise, and
+ * nothing for one that takes anything. `bool` is the one spelling, so every boolean completes.
+ */
 function valueOptions(known: AttributeInfo | undefined): readonly Completion[] {
-  if (known?.type === "bool") {
+  if (known !== undefined && isBooleanType(known.type)) {
     return boolCompletions;
   }
 

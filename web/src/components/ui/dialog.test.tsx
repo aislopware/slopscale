@@ -28,9 +28,11 @@ function TallDialog(): React.ReactElement {
 
 function FormDialog({
   onSubmit,
+  disabled = false,
 }: {
   /** Called with the text of the button that submitted, or "" for an implicit submission. */
   readonly onSubmit: (submitter: string) => void;
+  readonly disabled?: boolean;
 }): React.ReactElement {
   return (
     <DialogRoot open onOpenChange={vi.fn<(open: boolean) => void>()}>
@@ -42,9 +44,9 @@ function FormDialog({
           }}
         >
           <Input label="Name" defaultValue="laptop" />
-          <DialogFooter>
+          <DialogFooter submitDisabled={disabled}>
             <Button variant="secondary">Cancel</Button>
-            <Button type="submit" variant="primary">
+            <Button type="submit" variant="primary" disabled={disabled}>
               Save
             </Button>
           </DialogFooter>
@@ -87,5 +89,17 @@ describe(DialogContent, () => {
     await screen.getByRole("textbox", { name: "Name" }).fill("desk");
     await userEvent.keyboard("{Enter}");
     expect(onSubmit).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not submit by Enter while the button is disabled", async () => {
+    const onSubmit = vi.fn<(submitter: string) => void>();
+    const screen = await render(<FormDialog disabled onSubmit={onSubmit} />);
+
+    await expect.element(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+    await screen.getByRole("textbox", { name: "Name" }).fill("desk");
+    await userEvent.keyboard("{Enter}");
+
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

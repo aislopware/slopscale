@@ -1,5 +1,6 @@
 import type { Icon } from "@phosphor-icons/react";
 import {
+  AppWindowIcon,
   ClockCounterClockwiseIcon,
   DesktopIcon,
   GearSixIcon,
@@ -31,6 +32,7 @@ export type NavPath =
   | "/access"
   | "/policy"
   | "/policy/rules"
+  | "/policy/graph"
   | "/policy/groups"
   | "/policy/postures"
   | "/policy/requests"
@@ -41,15 +43,18 @@ export type NavPath =
   | "/dns/records"
   | "/relays"
   | "/relays/map"
+  | "/relays/latency"
   | "/relays/sources"
   | "/relays/own"
   | "/relays/embedded"
   | "/networks"
   | "/routes"
   | "/services"
+  | "/apps"
   | "/integrations"
   | "/integrations/webhooks"
   | "/integrations/log-streams"
+  | "/integrations/posture"
   | "/settings"
   | "/settings/tailnet"
   | "/settings/sessions"
@@ -122,6 +127,7 @@ export const navGroups: readonly NavGroup[] = [
         scope: "policy_file:read",
         children: [
           { to: "/policy/rules", label: "Rules" },
+          { to: "/policy/graph", label: "Graph" },
           { to: "/policy/groups", label: "Groups" },
           { to: "/policy/postures", label: "Postures" },
           { to: "/policy/requests", label: "Requests", badge: "pendingRequests" },
@@ -143,6 +149,7 @@ export const navGroups: readonly NavGroup[] = [
         badge: "pendingRoutes",
       },
       { to: "/services", label: "Services", icon: HardDrivesIcon, scope: "services:read" },
+      { to: "/apps", label: "Apps", icon: AppWindowIcon, scope: "policy_file:read" },
       {
         to: "/dns",
         label: "DNS",
@@ -161,6 +168,7 @@ export const navGroups: readonly NavGroup[] = [
         scope: "feature_settings:read",
         children: [
           { to: "/relays/map", label: "Map" },
+          { to: "/relays/latency", label: "Latency" },
           { to: "/relays/sources", label: "Sources" },
           { to: "/relays/own", label: "Your relays" },
           { to: "/relays/embedded", label: "Embedded relay" },
@@ -219,6 +227,11 @@ export const navGroups: readonly NavGroup[] = [
             to: "/integrations/log-streams",
             label: "Log streams",
             scope: "logs:configuration:read",
+          },
+          {
+            to: "/integrations/posture",
+            label: "Device posture",
+            scope: "devices:posture_attributes:read",
           },
         ],
       },

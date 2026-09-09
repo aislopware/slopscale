@@ -35,6 +35,8 @@ function node(
 ): Node {
   return {
     announcedServices: [...announced],
+    appConnector: false,
+    sshServer: false,
     approved: true,
     approvedAt: stamp,
     approvedRoutes: [],

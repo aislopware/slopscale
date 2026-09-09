@@ -47,8 +47,11 @@ export function useNodeMutations(): NodeMutations {
       },
     }),
     setTags: api.useMutation("post", "/api/v1/node/{nodeId}/tags", { onSuccess: refresh }),
+    // A connector's routes are what an app learns, so approving them moves the app's counts too.
     setRoutes: api.useMutation("post", "/api/v1/node/{nodeId}/approve_routes", {
-      onSuccess: refresh,
+      onSuccess: async () => {
+        await invalidate(queryClient, "/api/v1/node", "/api/v1/apps");
+      },
     }),
     // An approval is stored on the node and read back on the service, so both lists go stale.
     setServices: api.useMutation("post", "/api/v1/node/{nodeId}/approve_services", {

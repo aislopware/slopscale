@@ -29,6 +29,8 @@ const ada: User = {
 
 function node(id: string, overrides: Partial<Node> = {}): Node {
   return {
+    appConnector: false,
+    sshServer: false,
     approved: true,
     approvedAt: stamp,
     announcedServices: [],

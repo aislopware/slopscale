@@ -7,7 +7,7 @@ export interface AttributeInfo {
   readonly name: string;
   readonly doc: string;
   /** What the attribute holds, which decides what a comparison against it can mean. */
-  readonly type: "string" | "version" | "bool" | "list" | "address" | "country";
+  readonly type: "string" | "version" | "bool" | "list" | "address" | "country" | "number";
   /** The values the attribute is known to take, when there is a fixed set. */
   readonly values?: readonly string[];
 }
@@ -73,8 +73,128 @@ export const ipAttributes: readonly AttributeInfo[] = [
   },
 ];
 
-export const knownAttributes: readonly AttributeInfo[] = [...nodeAttributes, ...ipAttributes];
+export const providerAttributes: readonly AttributeInfo[] = [
+  {
+    name: "falcon:ztaScore",
+    doc: "The Zero Trust Assessment score, 0 to 100.",
+    type: "number",
+  },
+  {
+    name: "sentinelOne:operationalState",
+    doc: "The agent's operational state.",
+    type: "string",
+  },
+  {
+    name: "sentinelOne:activeThreats",
+    doc: "Unresolved threats on the device.",
+    type: "number",
+  },
+  {
+    name: "sentinelOne:agentVersion",
+    doc: "The installed agent version.",
+    type: "string",
+  },
+  {
+    name: "sentinelOne:encryptedApplications",
+    doc: "Whether disk encryption is on.",
+    type: "bool",
+  },
+  {
+    name: "sentinelOne:firewallEnabled",
+    doc: "Whether the firewall is on.",
+    type: "bool",
+  },
+  {
+    name: "sentinelOne:infected",
+    doc: "Whether the agent reports an infection.",
+    type: "bool",
+  },
+  {
+    name: "intune:complianceState",
+    doc: "compliant, noncompliant, inGracePeriod, unknown.",
+    type: "string",
+  },
+  {
+    name: "intune:azureADRegistered",
+    doc: "Whether the device is registered in Entra.",
+    type: "bool",
+  },
+  {
+    name: "intune:deviceRegistrationState",
+    doc: "registered, notRegistered, revoked.",
+    type: "string",
+  },
+  {
+    name: "intune:isSupervised",
+    doc: "Whether the device is supervised.",
+    type: "bool",
+  },
+  {
+    name: "intune:isEncrypted",
+    doc: "Whether the disk is encrypted.",
+    type: "bool",
+  },
+  {
+    name: "intune:managedDeviceOwnerType",
+    doc: "company, personal or unknown.",
+    type: "string",
+  },
+  {
+    name: "jamfPro:remoteManaged",
+    doc: "Whether MDM manages the computer.",
+    type: "bool",
+  },
+  {
+    name: "jamfPro:supervised",
+    doc: "Whether the computer is supervised.",
+    type: "bool",
+  },
+  {
+    name: "jamfPro:firewallEnabled",
+    doc: "Whether the firewall is on.",
+    type: "bool",
+  },
+  {
+    name: "jamfPro:fileVaultStatus",
+    doc: "ALL_ENCRYPTED, SOME_ENCRYPTED, NOT_ENCRYPTED.",
+    type: "string",
+  },
+  {
+    name: "jamfPro:SIPEnabled",
+    doc: "ENABLED or DISABLED.",
+    type: "string",
+  },
+  {
+    name: "kandji:mdmEnabled",
+    doc: "Whether MDM is enabled on the device.",
+    type: "bool",
+  },
+  {
+    name: "kandji:agentInstalled",
+    doc: "Whether the Kandji agent is installed.",
+    type: "bool",
+  },
+  {
+    name: "kolide:authState",
+    doc: "Good, Notified, Will Block or Blocked.",
+    type: "string",
+  },
+];
+
+export const knownAttributes: readonly AttributeInfo[] = [
+  ...nodeAttributes,
+  ...ipAttributes,
+  ...providerAttributes,
+];
 
 export function attributeInfo(name: string): AttributeInfo | undefined {
   return knownAttributes.find((attribute) => attribute.name === name);
+}
+
+/**
+ * Whether the attribute holds true or false. One spelling, shared by the diagnostics and the
+ * completions, so an attribute that takes a boolean is offered true and false and warns alike.
+ */
+export function isBooleanType(type: AttributeInfo["type"]): boolean {
+  return type === "bool";
 }

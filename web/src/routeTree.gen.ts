@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppSplatRouteImport } from './routes/_app/$'
 import { Route as AppAccessRouteImport } from './routes/_app/access'
+import { Route as AppAppsRouteImport } from './routes/_app/apps'
 import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppNetworksRouteImport } from './routes/_app/networks'
 import { Route as AppRoutesRouteImport } from './routes/_app/routes'
@@ -25,6 +26,7 @@ import { Route as AppDnsRecordsRouteImport } from './routes/_app/dns/records'
 import { Route as AppDnsSplitRouteImport } from './routes/_app/dns/split'
 import { Route as AppIntegrationsIndexRouteImport } from './routes/_app/integrations/index'
 import { Route as AppIntegrationsLogStreamsRouteImport } from './routes/_app/integrations/log-streams'
+import { Route as AppIntegrationsPostureRouteImport } from './routes/_app/integrations/posture'
 import { Route as AppIntegrationsWebhooksRouteImport } from './routes/_app/integrations/webhooks'
 import { Route as AppKeysIndexRouteImport } from './routes/_app/keys/index'
 import { Route as AppKeysApiRouteImport } from './routes/_app/keys/api'
@@ -34,12 +36,14 @@ import { Route as AppMachinesIndexRouteImport } from './routes/_app/machines/ind
 import { Route as AppMachinesNodeIdRouteImport } from './routes/_app/machines/$nodeId'
 import { Route as AppPolicyIndexRouteImport } from './routes/_app/policy/index'
 import { Route as AppPolicyFileRouteImport } from './routes/_app/policy/file'
+import { Route as AppPolicyGraphRouteImport } from './routes/_app/policy/graph'
 import { Route as AppPolicyGroupsRouteImport } from './routes/_app/policy/groups'
 import { Route as AppPolicyPosturesRouteImport } from './routes/_app/policy/postures'
 import { Route as AppPolicyRequestsRouteImport } from './routes/_app/policy/requests'
 import { Route as AppPolicyRulesRouteImport } from './routes/_app/policy/rules'
 import { Route as AppRelaysIndexRouteImport } from './routes/_app/relays/index'
 import { Route as AppRelaysEmbeddedRouteImport } from './routes/_app/relays/embedded'
+import { Route as AppRelaysLatencyRouteImport } from './routes/_app/relays/latency'
 import { Route as AppRelaysMapRouteImport } from './routes/_app/relays/map'
 import { Route as AppRelaysOwnRouteImport } from './routes/_app/relays/own'
 import { Route as AppRelaysSourcesRouteImport } from './routes/_app/relays/sources'
@@ -49,6 +53,7 @@ import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/ind
 import { Route as AppSettingsServerRouteImport } from './routes/_app/settings/server'
 import { Route as AppSettingsSessionsRouteImport } from './routes/_app/settings/sessions'
 import { Route as AppSettingsTailnetRouteImport } from './routes/_app/settings/tailnet'
+import { Route as AppMachinesNodeIdSshRouteImport } from './routes/_app/machines/$nodeId_.ssh'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -72,6 +77,11 @@ const AppSplatRoute = AppSplatRouteImport.update({
 const AppAccessRoute = AppAccessRouteImport.update({
   id: '/access',
   path: '/access',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAppsRoute = AppAppsRouteImport.update({
+  id: '/apps',
+  path: '/apps',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAuditRoute = AppAuditRouteImport.update({
@@ -130,6 +140,11 @@ const AppIntegrationsLogStreamsRoute =
     path: '/integrations/log-streams',
     getParentRoute: () => AppRoute,
   } as any)
+const AppIntegrationsPostureRoute = AppIntegrationsPostureRouteImport.update({
+  id: '/integrations/posture',
+  path: '/integrations/posture',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppIntegrationsWebhooksRoute = AppIntegrationsWebhooksRouteImport.update({
   id: '/integrations/webhooks',
   path: '/integrations/webhooks',
@@ -175,6 +190,11 @@ const AppPolicyFileRoute = AppPolicyFileRouteImport.update({
   path: '/policy/file',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPolicyGraphRoute = AppPolicyGraphRouteImport.update({
+  id: '/policy/graph',
+  path: '/policy/graph',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPolicyGroupsRoute = AppPolicyGroupsRouteImport.update({
   id: '/policy/groups',
   path: '/policy/groups',
@@ -203,6 +223,11 @@ const AppRelaysIndexRoute = AppRelaysIndexRouteImport.update({
 const AppRelaysEmbeddedRoute = AppRelaysEmbeddedRouteImport.update({
   id: '/relays/embedded',
   path: '/relays/embedded',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRelaysLatencyRoute = AppRelaysLatencyRouteImport.update({
+  id: '/relays/latency',
+  path: '/relays/latency',
   getParentRoute: () => AppRoute,
 } as any)
 const AppRelaysMapRoute = AppRelaysMapRouteImport.update({
@@ -250,12 +275,18 @@ const AppSettingsTailnetRoute = AppSettingsTailnetRouteImport.update({
   path: '/settings/tailnet',
   getParentRoute: () => AppRoute,
 } as any)
+const AppMachinesNodeIdSshRoute = AppMachinesNodeIdSshRouteImport.update({
+  id: '/machines/$nodeId_/ssh',
+  path: '/machines/$nodeId/ssh',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
   '/$': typeof AppSplatRoute
   '/access': typeof AppAccessRoute
+  '/apps': typeof AppAppsRoute
   '/audit': typeof AppAuditRoute
   '/networks': typeof AppNetworksRoute
   '/routes': typeof AppRoutesRoute
@@ -265,17 +296,20 @@ export interface FileRoutesByFullPath {
   '/dns/records': typeof AppDnsRecordsRoute
   '/dns/split': typeof AppDnsSplitRoute
   '/integrations/log-streams': typeof AppIntegrationsLogStreamsRoute
+  '/integrations/posture': typeof AppIntegrationsPostureRoute
   '/integrations/webhooks': typeof AppIntegrationsWebhooksRoute
   '/keys/api': typeof AppKeysApiRoute
   '/keys/oauth': typeof AppKeysOauthRoute
   '/keys/pre-auth': typeof AppKeysPreAuthRoute
   '/machines/$nodeId': typeof AppMachinesNodeIdRoute
   '/policy/file': typeof AppPolicyFileRoute
+  '/policy/graph': typeof AppPolicyGraphRoute
   '/policy/groups': typeof AppPolicyGroupsRoute
   '/policy/postures': typeof AppPolicyPosturesRoute
   '/policy/requests': typeof AppPolicyRequestsRoute
   '/policy/rules': typeof AppPolicyRulesRoute
   '/relays/embedded': typeof AppRelaysEmbeddedRoute
+  '/relays/latency': typeof AppRelaysLatencyRoute
   '/relays/map': typeof AppRelaysMapRoute
   '/relays/own': typeof AppRelaysOwnRoute
   '/relays/sources': typeof AppRelaysSourcesRoute
@@ -291,11 +325,13 @@ export interface FileRoutesByFullPath {
   '/relays/': typeof AppRelaysIndexRoute
   '/services/': typeof AppServicesIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
+  '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/$': typeof AppSplatRoute
   '/access': typeof AppAccessRoute
+  '/apps': typeof AppAppsRoute
   '/audit': typeof AppAuditRoute
   '/networks': typeof AppNetworksRoute
   '/routes': typeof AppRoutesRoute
@@ -306,17 +342,20 @@ export interface FileRoutesByTo {
   '/dns/records': typeof AppDnsRecordsRoute
   '/dns/split': typeof AppDnsSplitRoute
   '/integrations/log-streams': typeof AppIntegrationsLogStreamsRoute
+  '/integrations/posture': typeof AppIntegrationsPostureRoute
   '/integrations/webhooks': typeof AppIntegrationsWebhooksRoute
   '/keys/api': typeof AppKeysApiRoute
   '/keys/oauth': typeof AppKeysOauthRoute
   '/keys/pre-auth': typeof AppKeysPreAuthRoute
   '/machines/$nodeId': typeof AppMachinesNodeIdRoute
   '/policy/file': typeof AppPolicyFileRoute
+  '/policy/graph': typeof AppPolicyGraphRoute
   '/policy/groups': typeof AppPolicyGroupsRoute
   '/policy/postures': typeof AppPolicyPosturesRoute
   '/policy/requests': typeof AppPolicyRequestsRoute
   '/policy/rules': typeof AppPolicyRulesRoute
   '/relays/embedded': typeof AppRelaysEmbeddedRoute
+  '/relays/latency': typeof AppRelaysLatencyRoute
   '/relays/map': typeof AppRelaysMapRoute
   '/relays/own': typeof AppRelaysOwnRoute
   '/relays/sources': typeof AppRelaysSourcesRoute
@@ -332,6 +371,7 @@ export interface FileRoutesByTo {
   '/relays': typeof AppRelaysIndexRoute
   '/services': typeof AppServicesIndexRoute
   '/settings': typeof AppSettingsIndexRoute
+  '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -339,6 +379,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_app/$': typeof AppSplatRoute
   '/_app/access': typeof AppAccessRoute
+  '/_app/apps': typeof AppAppsRoute
   '/_app/audit': typeof AppAuditRoute
   '/_app/networks': typeof AppNetworksRoute
   '/_app/routes': typeof AppRoutesRoute
@@ -349,17 +390,20 @@ export interface FileRoutesById {
   '/_app/dns/records': typeof AppDnsRecordsRoute
   '/_app/dns/split': typeof AppDnsSplitRoute
   '/_app/integrations/log-streams': typeof AppIntegrationsLogStreamsRoute
+  '/_app/integrations/posture': typeof AppIntegrationsPostureRoute
   '/_app/integrations/webhooks': typeof AppIntegrationsWebhooksRoute
   '/_app/keys/api': typeof AppKeysApiRoute
   '/_app/keys/oauth': typeof AppKeysOauthRoute
   '/_app/keys/pre-auth': typeof AppKeysPreAuthRoute
   '/_app/machines/$nodeId': typeof AppMachinesNodeIdRoute
   '/_app/policy/file': typeof AppPolicyFileRoute
+  '/_app/policy/graph': typeof AppPolicyGraphRoute
   '/_app/policy/groups': typeof AppPolicyGroupsRoute
   '/_app/policy/postures': typeof AppPolicyPosturesRoute
   '/_app/policy/requests': typeof AppPolicyRequestsRoute
   '/_app/policy/rules': typeof AppPolicyRulesRoute
   '/_app/relays/embedded': typeof AppRelaysEmbeddedRoute
+  '/_app/relays/latency': typeof AppRelaysLatencyRoute
   '/_app/relays/map': typeof AppRelaysMapRoute
   '/_app/relays/own': typeof AppRelaysOwnRoute
   '/_app/relays/sources': typeof AppRelaysSourcesRoute
@@ -375,6 +419,7 @@ export interface FileRoutesById {
   '/_app/relays/': typeof AppRelaysIndexRoute
   '/_app/services/': typeof AppServicesIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
+  '/_app/machines/$nodeId_/ssh': typeof AppMachinesNodeIdSshRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -383,6 +428,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/$'
     | '/access'
+    | '/apps'
     | '/audit'
     | '/networks'
     | '/routes'
@@ -392,17 +438,20 @@ export interface FileRouteTypes {
     | '/dns/records'
     | '/dns/split'
     | '/integrations/log-streams'
+    | '/integrations/posture'
     | '/integrations/webhooks'
     | '/keys/api'
     | '/keys/oauth'
     | '/keys/pre-auth'
     | '/machines/$nodeId'
     | '/policy/file'
+    | '/policy/graph'
     | '/policy/groups'
     | '/policy/postures'
     | '/policy/requests'
     | '/policy/rules'
     | '/relays/embedded'
+    | '/relays/latency'
     | '/relays/map'
     | '/relays/own'
     | '/relays/sources'
@@ -418,11 +467,13 @@ export interface FileRouteTypes {
     | '/relays/'
     | '/services/'
     | '/settings/'
+    | '/machines/$nodeId/ssh'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
     | '/$'
     | '/access'
+    | '/apps'
     | '/audit'
     | '/networks'
     | '/routes'
@@ -433,17 +484,20 @@ export interface FileRouteTypes {
     | '/dns/records'
     | '/dns/split'
     | '/integrations/log-streams'
+    | '/integrations/posture'
     | '/integrations/webhooks'
     | '/keys/api'
     | '/keys/oauth'
     | '/keys/pre-auth'
     | '/machines/$nodeId'
     | '/policy/file'
+    | '/policy/graph'
     | '/policy/groups'
     | '/policy/postures'
     | '/policy/requests'
     | '/policy/rules'
     | '/relays/embedded'
+    | '/relays/latency'
     | '/relays/map'
     | '/relays/own'
     | '/relays/sources'
@@ -459,12 +513,14 @@ export interface FileRouteTypes {
     | '/relays'
     | '/services'
     | '/settings'
+    | '/machines/$nodeId/ssh'
   id:
     | '__root__'
     | '/_app'
     | '/login'
     | '/_app/$'
     | '/_app/access'
+    | '/_app/apps'
     | '/_app/audit'
     | '/_app/networks'
     | '/_app/routes'
@@ -475,17 +531,20 @@ export interface FileRouteTypes {
     | '/_app/dns/records'
     | '/_app/dns/split'
     | '/_app/integrations/log-streams'
+    | '/_app/integrations/posture'
     | '/_app/integrations/webhooks'
     | '/_app/keys/api'
     | '/_app/keys/oauth'
     | '/_app/keys/pre-auth'
     | '/_app/machines/$nodeId'
     | '/_app/policy/file'
+    | '/_app/policy/graph'
     | '/_app/policy/groups'
     | '/_app/policy/postures'
     | '/_app/policy/requests'
     | '/_app/policy/rules'
     | '/_app/relays/embedded'
+    | '/_app/relays/latency'
     | '/_app/relays/map'
     | '/_app/relays/own'
     | '/_app/relays/sources'
@@ -501,6 +560,7 @@ export interface FileRouteTypes {
     | '/_app/relays/'
     | '/_app/services/'
     | '/_app/settings/'
+    | '/_app/machines/$nodeId_/ssh'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -543,6 +603,13 @@ declare module '@tanstack/react-router' {
       path: '/access'
       fullPath: '/access'
       preLoaderRoute: typeof AppAccessRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/apps': {
+      id: '/_app/apps'
+      path: '/apps'
+      fullPath: '/apps'
+      preLoaderRoute: typeof AppAppsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/audit': {
@@ -622,6 +689,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIntegrationsLogStreamsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/integrations/posture': {
+      id: '/_app/integrations/posture'
+      path: '/integrations/posture'
+      fullPath: '/integrations/posture'
+      preLoaderRoute: typeof AppIntegrationsPostureRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/integrations/webhooks': {
       id: '/_app/integrations/webhooks'
       path: '/integrations/webhooks'
@@ -685,6 +759,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPolicyFileRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/policy/graph': {
+      id: '/_app/policy/graph'
+      path: '/policy/graph'
+      fullPath: '/policy/graph'
+      preLoaderRoute: typeof AppPolicyGraphRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/policy/groups': {
       id: '/_app/policy/groups'
       path: '/policy/groups'
@@ -725,6 +806,13 @@ declare module '@tanstack/react-router' {
       path: '/relays/embedded'
       fullPath: '/relays/embedded'
       preLoaderRoute: typeof AppRelaysEmbeddedRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/relays/latency': {
+      id: '/_app/relays/latency'
+      path: '/relays/latency'
+      fullPath: '/relays/latency'
+      preLoaderRoute: typeof AppRelaysLatencyRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/relays/map': {
@@ -790,12 +878,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsTailnetRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/machines/$nodeId_/ssh': {
+      id: '/_app/machines/$nodeId_/ssh'
+      path: '/machines/$nodeId/ssh'
+      fullPath: '/machines/$nodeId/ssh'
+      preLoaderRoute: typeof AppMachinesNodeIdSshRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
   AppSplatRoute: typeof AppSplatRoute
   AppAccessRoute: typeof AppAccessRoute
+  AppAppsRoute: typeof AppAppsRoute
   AppAuditRoute: typeof AppAuditRoute
   AppNetworksRoute: typeof AppNetworksRoute
   AppRoutesRoute: typeof AppRoutesRoute
@@ -806,17 +902,20 @@ interface AppRouteChildren {
   AppDnsRecordsRoute: typeof AppDnsRecordsRoute
   AppDnsSplitRoute: typeof AppDnsSplitRoute
   AppIntegrationsLogStreamsRoute: typeof AppIntegrationsLogStreamsRoute
+  AppIntegrationsPostureRoute: typeof AppIntegrationsPostureRoute
   AppIntegrationsWebhooksRoute: typeof AppIntegrationsWebhooksRoute
   AppKeysApiRoute: typeof AppKeysApiRoute
   AppKeysOauthRoute: typeof AppKeysOauthRoute
   AppKeysPreAuthRoute: typeof AppKeysPreAuthRoute
   AppMachinesNodeIdRoute: typeof AppMachinesNodeIdRoute
   AppPolicyFileRoute: typeof AppPolicyFileRoute
+  AppPolicyGraphRoute: typeof AppPolicyGraphRoute
   AppPolicyGroupsRoute: typeof AppPolicyGroupsRoute
   AppPolicyPosturesRoute: typeof AppPolicyPosturesRoute
   AppPolicyRequestsRoute: typeof AppPolicyRequestsRoute
   AppPolicyRulesRoute: typeof AppPolicyRulesRoute
   AppRelaysEmbeddedRoute: typeof AppRelaysEmbeddedRoute
+  AppRelaysLatencyRoute: typeof AppRelaysLatencyRoute
   AppRelaysMapRoute: typeof AppRelaysMapRoute
   AppRelaysOwnRoute: typeof AppRelaysOwnRoute
   AppRelaysSourcesRoute: typeof AppRelaysSourcesRoute
@@ -832,11 +931,13 @@ interface AppRouteChildren {
   AppRelaysIndexRoute: typeof AppRelaysIndexRoute
   AppServicesIndexRoute: typeof AppServicesIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+  AppMachinesNodeIdSshRoute: typeof AppMachinesNodeIdSshRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppSplatRoute: AppSplatRoute,
   AppAccessRoute: AppAccessRoute,
+  AppAppsRoute: AppAppsRoute,
   AppAuditRoute: AppAuditRoute,
   AppNetworksRoute: AppNetworksRoute,
   AppRoutesRoute: AppRoutesRoute,
@@ -847,17 +948,20 @@ const AppRouteChildren: AppRouteChildren = {
   AppDnsRecordsRoute: AppDnsRecordsRoute,
   AppDnsSplitRoute: AppDnsSplitRoute,
   AppIntegrationsLogStreamsRoute: AppIntegrationsLogStreamsRoute,
+  AppIntegrationsPostureRoute: AppIntegrationsPostureRoute,
   AppIntegrationsWebhooksRoute: AppIntegrationsWebhooksRoute,
   AppKeysApiRoute: AppKeysApiRoute,
   AppKeysOauthRoute: AppKeysOauthRoute,
   AppKeysPreAuthRoute: AppKeysPreAuthRoute,
   AppMachinesNodeIdRoute: AppMachinesNodeIdRoute,
   AppPolicyFileRoute: AppPolicyFileRoute,
+  AppPolicyGraphRoute: AppPolicyGraphRoute,
   AppPolicyGroupsRoute: AppPolicyGroupsRoute,
   AppPolicyPosturesRoute: AppPolicyPosturesRoute,
   AppPolicyRequestsRoute: AppPolicyRequestsRoute,
   AppPolicyRulesRoute: AppPolicyRulesRoute,
   AppRelaysEmbeddedRoute: AppRelaysEmbeddedRoute,
+  AppRelaysLatencyRoute: AppRelaysLatencyRoute,
   AppRelaysMapRoute: AppRelaysMapRoute,
   AppRelaysOwnRoute: AppRelaysOwnRoute,
   AppRelaysSourcesRoute: AppRelaysSourcesRoute,
@@ -873,6 +977,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppRelaysIndexRoute: AppRelaysIndexRoute,
   AppServicesIndexRoute: AppServicesIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
+  AppMachinesNodeIdSshRoute: AppMachinesNodeIdSshRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

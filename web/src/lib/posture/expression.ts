@@ -10,7 +10,17 @@ import { parseGoFloat } from "~/lib/posture/number.ts";
 import { hasOperator, isAttributeChar, isSpace, operators } from "~/lib/posture/tokens.ts";
 import type { Operator } from "~/lib/posture/tokens.ts";
 
-export const prefixes = ["node", "custom", "ip"] as const;
+export const prefixes = [
+  "node",
+  "custom",
+  "ip",
+  "falcon",
+  "sentinelOne",
+  "intune",
+  "jamfPro",
+  "kandji",
+  "kolide",
+] as const;
 
 export const errors = {
   empty: "posture expression is empty",
@@ -22,7 +32,8 @@ export const errors = {
   scalar: "this operator takes a single value, not a list",
   ordered: "<, <=, > and >= compare numbers or version strings",
   unterminated: "unterminated string in posture expression",
-  prefix: "attribute prefix must be one of node, custom or ip",
+  prefix:
+    "attribute prefix must be one of node, custom, ip or an integration's: falcon, sentinelOne, intune, jamfPro, kandji, kolide",
 } as const;
 
 export interface ExpressionError {

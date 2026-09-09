@@ -153,6 +153,8 @@ export function usePolicyDraft({
         "/api/v1/node",
         "/api/v1/access-rule",
         "/api/v1/network",
+        // The graph is read off the rules the policy compiles to.
+        "/api/v1/access-graph",
       );
     },
     onError: (error) => {
