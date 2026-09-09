@@ -21,3 +21,18 @@ export function useSettingsMutation(): Mutation<"post", "/api/v1/settings"> {
     },
   });
 }
+
+/** Switches tailnet lock off. Dropping lock state invalidates the tailnet lock and node queries. */
+export function useDisableTailnetLockMutation(): Mutation<"post", "/api/v1/tailnet-lock/disable"> {
+  const queryClient = useQueryClient();
+
+  return api.useMutation("post", "/api/v1/tailnet-lock/disable", {
+    onSuccess: async () => {
+      await invalidate(queryClient, "/api/v1/tailnet-lock", "/api/v1/node");
+      toast.success("Tailnet lock switched off");
+    },
+    onError: (error) => {
+      toast.error("Could not switch off tailnet lock", error);
+    },
+  });
+}

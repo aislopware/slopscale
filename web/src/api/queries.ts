@@ -24,6 +24,7 @@ export type OAuthClient = MethodResponse<
   "/api/v1/oauth-client"
 >["oauthClients"][number];
 export type Settings = MethodResponse<typeof api, "get", "/api/v1/settings">;
+export type TailnetLock = MethodResponse<typeof api, "get", "/api/v1/tailnet-lock">;
 export type ServerInfo = MethodResponse<typeof api, "get", "/api/v1/server">;
 export type Policy = MethodResponse<typeof api, "get", "/api/v1/policy">;
 export type AuditPage = MethodResponse<typeof api, "get", "/api/v1/audit">;
@@ -63,6 +64,7 @@ export const preAuthKeysQuery = api.queryOptions("get", "/api/v1/preauthkey");
 export const apiKeysQuery = api.queryOptions("get", "/api/v1/apikey");
 export const oauthClientsQuery = api.queryOptions("get", "/api/v1/oauth-client");
 export const settingsQuery = api.queryOptions("get", "/api/v1/settings");
+export const tailnetLockQuery = api.queryOptions("get", "/api/v1/tailnet-lock");
 export const serverInfoQuery = api.queryOptions("get", "/api/v1/server");
 export const groupsQuery = api.queryOptions("get", "/api/v1/group", undefined, {
   staleTime: sharedStaleTime,
@@ -257,6 +259,7 @@ type Collection =
   | "/api/v1/apikey"
   | "/api/v1/oauth-client"
   | "/api/v1/settings"
+  | "/api/v1/tailnet-lock"
   | "/api/v1/policy"
   | "/api/v1/group"
   | "/api/v1/access-rule"
