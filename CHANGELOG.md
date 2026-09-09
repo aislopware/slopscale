@@ -339,7 +339,9 @@ Windows, Docker, the phone apps) with a QR code carrying the same line, so a
 machine without a shared clipboard can scan it. Panels, tables and dialogs
 are framed: a tinted band carries the title, the column headers or the row
 count, and the content sits on an inset panel with concentric corners; a
-table's search, filters and primary action sit on the page above its frame. A
+table's search, filters and primary action sit on the page above its frame; a
+dialog's buttons sit on the band under its panel, in reach however long the
+form is, since the panel is what scrolls. A
 page with several parts, such as the access controls, DNS, relays, settings,
 the keys or the integrations, is a branch of the sidebar with a page and an
 address per part rather than a row of tabs. The policy file editor
