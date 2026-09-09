@@ -3,7 +3,7 @@ package types
 import (
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog"
 )
 
@@ -11,7 +11,7 @@ import (
 const NewAPIKeyPrefixLength = 12
 
 // APIKey describes the datamodel for API keys used to remotely authenticate with
-// headscale.
+// slopscale.
 type APIKey struct {
 	ID     uint64
 	Prefix string

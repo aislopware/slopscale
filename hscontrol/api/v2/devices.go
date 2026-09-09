@@ -7,13 +7,13 @@ import (
 	"slices"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/api/principal"
+	"github.com/aislopware/slopscale/hscontrol/api/tagguard"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/api/principal"
-	"github.com/juanfont/headscale/hscontrol/api/tagguard"
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
 	"tailscale.com/net/tsaddr"
 )
 
@@ -21,8 +21,8 @@ func init() {
 	registrations = append(registrations, registerDevices)
 }
 
-// Device is the Tailscale device response. Headscale nodes map onto it; fields
-// Headscale does not track are emitted as their zero value. The route slices
+// Device is the Tailscale device response. Slopscale nodes map onto it; fields
+// Slopscale does not track are emitted as their zero value. The route slices
 // are only populated for the fields=all variant, matching Tailscale.
 type Device struct {
 	Addresses         []string   `json:"addresses"          nullable:"false"`
@@ -66,7 +66,7 @@ type (
 	}
 	// setTagsRequest.Tags is intentionally not nullable:"false": the SDK sends
 	// "tags":null for "make untagged", which the handler accepts as a no-op
-	// rather than failing to decode (Headscale cannot untag a node).
+	// rather than failing to decode (Slopscale cannot untag a node).
 	setTagsRequest struct {
 		Tags []string `json:"tags"`
 	}
@@ -294,7 +294,7 @@ func handleDeleteDevice(ctx context.Context, b Backend, in *deviceByIDInput) (*e
 	return &emptyOutput{}, nil
 }
 
-// handleAuthorizeDevice accepts authorized=true as a no-op: Headscale nodes
+// handleAuthorizeDevice accepts authorized=true as a no-op: Slopscale nodes
 // are authorized the moment they register, so there is no de-authorize state.
 // authorized=false is rejected so callers are not misled into thinking the
 // device is fenced off.
@@ -341,7 +341,7 @@ func handleSetDeviceName(ctx context.Context, b Backend, in *setNameInput) (*emp
 }
 
 // handleSetDeviceTags accepts an empty/null tag set as a no-op rather than
-// rejecting it: Headscale cannot make a node untagged (tags-as-identity is
+// rejecting it: Slopscale cannot make a node untagged (tags-as-identity is
 // one-way), and the SDK sends "tags":null for "make untagged", so treating it
 // as a no-op keeps tooling lifecycles such as Terraform destroy working.
 func handleSetDeviceTags(ctx context.Context, b Backend, in *setTagsInput) (*emptyOutput, error) {
@@ -380,7 +380,7 @@ func handleSetDeviceTags(ctx context.Context, b Backend, in *setTagsInput) (*emp
 
 // handleSetDeviceKey only handles disabling expiry (expiry=nil never
 // expires). Re-enabling has no target expiry in the Tailscale request and
-// Headscale stores no original, so it is accepted as a no-op (keeps Terraform
+// Slopscale stores no original, so it is accepted as a no-op (keeps Terraform
 // destroy working) rather than guessing a lifetime.
 func handleSetDeviceKey(ctx context.Context, b Backend, in *setKeyInput) (*emptyOutput, error) {
 	node, err := lookupNode(b, in.DeviceID)
@@ -478,7 +478,7 @@ func parseRoutes(routes []string) ([]netip.Prefix, error) {
 	return slices.Compact(approved), nil
 }
 
-// deviceFromView maps a Headscale node onto the Tailscale Device, reading
+// deviceFromView maps a Slopscale node onto the Tailscale Device, reading
 // through the [types.NodeView] accessors. allFields gates the route slices,
 // which Tailscale only returns for fields=all.
 func deviceFromView(view types.NodeView, allFields bool) Device {

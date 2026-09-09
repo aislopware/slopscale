@@ -1,6 +1,6 @@
 # DNS
 
-Headscale supports [most DNS features](../about/features.md) from Tailscale. DNS related settings can be configured
+Slopscale supports [most DNS features](../about/features.md) from Tailscale. DNS related settings can be configured
 within the `dns` section of the [configuration file](configuration.md), and most of them can be changed while the
 server runs, from the admin console, the API or the CLI.
 
@@ -24,15 +24,15 @@ Tailscale Terraform provider and other tooling written against them work unchang
 (`dns:read` to look); a network admin holds it, an IT admin can only read. The CLI mirrors the API:
 
 ```console
-$ headscale dns show
-$ headscale dns set --nameserver 1.1.1.1 --nameserver 1.0.0.1 --override-local-dns \
+$ slopscale dns show
+$ slopscale dns set --nameserver 1.1.1.1 --nameserver 1.0.0.1 --override-local-dns \
     --split corp.example=10.0.0.53 --search-domain corp.example \
     --record grafana.myvpn.example.com=100.64.0.3
-$ headscale dns reset
+$ slopscale dns reset
 ```
 
 Settings set this way are stored in the database and survive restarts. While they are in force the configuration
-file's `dns` section is ignored, except for `magic_dns`, `base_domain` and `extra_records_path`; `headscale dns show`
+file's `dns` section is ignored, except for `magic_dns`, `base_domain` and `extra_records_path`; `slopscale dns show`
 and `GET /api/v1/dns` report both what clients receive and what the file says, and a reset goes back to the file. Every
 change is pushed to the clients at once and logged in the [audit log](audit.md) as `dns.set` or `dns.reset`.
 
@@ -49,12 +49,12 @@ client serves nothing else.
 
 A machine that routes through an exit node sends its DNS through the exit node as well, and drops the tailnet's
 nameservers. Tailscale's admin console has a per-nameserver "Use with exit node" setting that keeps a nameserver in
-use during that time; headscale has the same, since clients from Tailscale 1.88.1 honour it:
+use during that time; slopscale has the same, since clients from Tailscale 1.88.1 honour it:
 
 - in the configuration file, `dns.nameservers.use_with_exit_node.global` lists the global nameservers to keep and
   `dns.nameservers.use_with_exit_node.split` the split DNS nameservers per domain,
 - on the console's _DNS_ page, the switch next to each nameserver and each split DNS domain,
-- `headscale dns set --use-with-exit-node 1.1.1.1 --split-use-with-exit-node corp.example=10.0.0.53`, and
+- `slopscale dns set --use-with-exit-node 1.1.1.1 --split-use-with-exit-node corp.example=10.0.0.53`, and
 - `useWithExitNode` and `splitUseWithExitNode` in `PUT /api/v1/dns`.
 
 Two client rules shape what is accepted. The client honours the flag only on the resolvers it uses for every query,
@@ -73,26 +73,26 @@ keeps the global resolvers first and adds the rule's after them. The nameservers
 else, and a group a rule names cannot be deleted until the rule drops it. The zones MagicDNS answers on the client,
 the base domain and the reverse zones of the tailnet's prefixes, cannot be routed by a rule.
 
-Rules live on the console's _DNS_ page under _Split DNS per group_, in `headscale dns rules` (`list`, `create`,
+Rules live on the console's _DNS_ page under _Split DNS per group_, in `slopscale dns rules` (`list`, `create`,
 `update`, `delete`) and at `/api/v1/dns/rule` (`GET`, `POST`, `PUT /{id}`, `DELETE /{id}`), gated by the `dns` and
 `dns:read` scopes and logged as `dns.rule.create`, `dns.rule.update` and `dns.rule.delete`:
 
 ```console
-$ headscale dns rules create --name "Corp DNS" --domain corp.example.com --nameserver 10.0.0.53 --group 2
+$ slopscale dns rules create --name "Corp DNS" --domain corp.example.com --nameserver 10.0.0.53 --group 2
 ```
 
 ## Setting extra DNS records
 
-Headscale allows to set extra DNS records which are made available via
+Slopscale allows to set extra DNS records which are made available via
 [MagicDNS](https://tailscale.com/docs/features/magicdns). Extra DNS records can be configured either via static entries
-in the [configuration file](configuration.md) or from a JSON file that Headscale continuously watches for changes:
+in the [configuration file](configuration.md) or from a JSON file that Slopscale continuously watches for changes:
 
 - Use the `dns.extra_records` option in the [configuration file](configuration.md) for entries that are static and
-  don't change while Headscale is running. Those entries are processed when Headscale is starting up and changes to the
-  configuration require a restart of Headscale.
-- For dynamic DNS records that may be added, updated or removed while Headscale is running or DNS records that are
+  don't change while Slopscale is running. Those entries are processed when Slopscale is starting up and changes to the
+  configuration require a restart of Slopscale.
+- For dynamic DNS records that may be added, updated or removed while Slopscale is running or DNS records that are
   generated by scripts the option `dns.extra_records_path` in the [configuration file](configuration.md) is useful.
-  Set it to the absolute path of the JSON file containing DNS records and Headscale processes this file as it detects
+  Set it to the absolute path of the JSON file containing DNS records and Slopscale processes this file as it detects
   changes.
 
 An example use case is to serve multiple apps on the same host via a reverse proxy like NGINX, in this case a Prometheus
@@ -121,7 +121,7 @@ hostname and port combination "http://hostname-in-magic-dns.myvpn.example.com:30
           ...
         ```
 
-        Restart your headscale instance.
+        Restart your slopscale instance.
 
     === "Dynamic entries, via `dns.extra_records_path`"
 
@@ -140,15 +140,15 @@ hostname and port combination "http://hostname-in-magic-dns.myvpn.example.com:30
         ]
         ```
 
-        Headscale picks up changes to the above JSON file automatically.
+        Slopscale picks up changes to the above JSON file automatically.
 
         !!! tip "Good to know"
 
             - The `dns.extra_records_path` option in the [configuration file](configuration.md) needs to reference the
               JSON file containing extra DNS records.
             - Be sure to "sort keys" and produce a stable output in case you generate the JSON file with a script.
-              Headscale uses a checksum to detect changes to the file and a stable output avoids unnecessary processing.
-            - Headscale reads the file once it has been left alone for a moment, so a script may write it in several
+              Slopscale uses a checksum to detect changes to the file and a stable output avoids unnecessary processing.
+            - Slopscale reads the file once it has been left alone for a moment, so a script may write it in several
               steps. Record names are lowercased on the way in, as a client only matches lowercase names.
 
 1. Verify that DNS records are properly set using the DNS querying tool of your choice:

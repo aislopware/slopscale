@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// The e2e suite runs the real server: cmd/dev builds headscale with the
+// The e2e suite runs the real server: cmd/dev builds slopscale with the
 // console embedded, starts it with an in-process mock identity provider,
 // and the browser signs in through that provider like it would through
 // Google. Build the console first (bun run build) so the binary embeds it;

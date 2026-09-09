@@ -46,8 +46,8 @@ The owner of a node, or anyone holding the `devices` scope, shares it with a
 user by id:
 
 ```console
-$ headscale nodes share --identifier 7 --user 3
-$ headscale nodes unshare --identifier 7 --user 3
+$ slopscale nodes share --identifier 7 --user 3
+$ slopscale nodes unshare --identifier 7 --user 3
 ```
 
 The same operations are `POST /api/v1/node/{id}/share` with `{"userId": "3"}`

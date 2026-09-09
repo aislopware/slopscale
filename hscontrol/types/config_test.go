@@ -49,7 +49,7 @@ func TestReadConfig(t *testing.T) {
 						"https://dns.nextdns.io/abc123",
 					},
 					Split: map[string][]string{
-						"darp.headscale.net": {"1.1.1.1", "8.8.8.8"},
+						"darp.slopscale.net": {"1.1.1.1", "8.8.8.8"},
 						"foo.bar.com":        {"1.1.1.1"},
 					},
 				},
@@ -82,7 +82,7 @@ func TestReadConfig(t *testing.T) {
 					{Addr: "https://dns.nextdns.io/abc123"},
 				},
 				Routes: map[string][]*dnstype.Resolver{
-					"darp.headscale.net": {{Addr: "1.1.1.1"}, {Addr: "8.8.8.8"}},
+					"darp.slopscale.net": {{Addr: "1.1.1.1"}, {Addr: "8.8.8.8"}},
 					"foo.bar.com":        {{Addr: "1.1.1.1"}},
 				},
 				ExtraRecords: []tailcfg.DNSRecord{
@@ -115,7 +115,7 @@ func TestReadConfig(t *testing.T) {
 						"https://dns.nextdns.io/abc123",
 					},
 					Split: map[string][]string{
-						"darp.headscale.net": {"1.1.1.1", "8.8.8.8"},
+						"darp.slopscale.net": {"1.1.1.1", "8.8.8.8"},
 						"foo.bar.com":        {"1.1.1.1"},
 					},
 				},
@@ -148,7 +148,7 @@ func TestReadConfig(t *testing.T) {
 					{Addr: "https://dns.nextdns.io/abc123"},
 				},
 				Routes: map[string][]*dnstype.Resolver{
-					"darp.headscale.net": {{Addr: "1.1.1.1"}, {Addr: "8.8.8.8"}},
+					"darp.slopscale.net": {{Addr: "1.1.1.1"}, {Addr: "8.8.8.8"}},
 					"foo.bar.com":        {{Addr: "1.1.1.1"}},
 				},
 				ExtraRecords: []tailcfg.DNSRecord{
@@ -315,9 +315,9 @@ func TestReadConfigFromEnv(t *testing.T) {
 		{
 			name: "test-random-base-settings-with-env",
 			configEnv: map[string]string{
-				"HEADSCALE_LOG_LEVEL":                       "trace",
-				"HEADSCALE_DATABASE_SQLITE_WRITE_AHEAD_LOG": "false",
-				"HEADSCALE_PREFIXES_V4":                     "100.64.0.0/10",
+				"SLOPSCALE_LOG_LEVEL":                       "trace",
+				"SLOPSCALE_DATABASE_SQLITE_WRITE_AHEAD_LOG": "false",
+				"SLOPSCALE_PREFIXES_V4":                     "100.64.0.0/10",
 			},
 			setup: func(t *testing.T) (any, error) {
 				t.Logf("all settings: %#v", viper.AllSettings())
@@ -333,15 +333,15 @@ func TestReadConfigFromEnv(t *testing.T) {
 		{
 			name: "unmarshal-dns-full-config",
 			configEnv: map[string]string{
-				"HEADSCALE_DNS_MAGIC_DNS":          "true",
-				"HEADSCALE_DNS_BASE_DOMAIN":        "example.com",
-				"HEADSCALE_DNS_OVERRIDE_LOCAL_DNS": "false",
-				"HEADSCALE_DNS_NAMESERVERS_GLOBAL": `1.1.1.1 8.8.8.8`,
-				"HEADSCALE_DNS_SEARCH_DOMAINS":     "test.com bar.com",
+				"SLOPSCALE_DNS_MAGIC_DNS":          "true",
+				"SLOPSCALE_DNS_BASE_DOMAIN":        "example.com",
+				"SLOPSCALE_DNS_OVERRIDE_LOCAL_DNS": "false",
+				"SLOPSCALE_DNS_NAMESERVERS_GLOBAL": `1.1.1.1 8.8.8.8`,
+				"SLOPSCALE_DNS_SEARCH_DOMAINS":     "test.com bar.com",
 
 				// TODO(kradalby): Figure out how to pass these as env vars
-				// "HEADSCALE_DNS_NAMESERVERS_SPLIT":  `{foo.bar.com: ["1.1.1.1"]}`,
-				// "HEADSCALE_DNS_EXTRA_RECORDS":
+				// "SLOPSCALE_DNS_NAMESERVERS_SPLIT":  `{foo.bar.com: ["1.1.1.1"]}`,
+				// "SLOPSCALE_DNS_EXTRA_RECORDS":
 				//   `[{ name: "prometheus.myvpn.example.com", type: "A", value: "100.64.0.4" }]`,
 			},
 			setup: func(t *testing.T) (any, error) {
@@ -467,7 +467,7 @@ dns:
   override_local_dns: false
 oidc:
   issuer: https://idp.example.com
-  client_id: headscale
+  client_id: slopscale
   pkce:
     enabled: true
     method: S256-typo
@@ -497,7 +497,7 @@ func TestOIDCConfigValidation(t *testing.T) {
 			name: "non-http issuer",
 			oidcBlock: `
   issuer: ftp://idp.example.com
-  client_id: headscale
+  client_id: slopscale
   client_secret: sekret`,
 			wantErr: "valid http(s) URL",
 		},
@@ -512,14 +512,14 @@ func TestOIDCConfigValidation(t *testing.T) {
 			name: "missing client_secret",
 			oidcBlock: `
   issuer: https://idp.example.com
-  client_id: headscale`,
+  client_id: slopscale`,
 			wantErr: "client_secret",
 		},
 		{
 			name: "valid",
 			oidcBlock: `
   issuer: https://idp.example.com
-  client_id: headscale
+  client_id: slopscale
   client_secret: sekret`,
 			wantErr: "",
 		},
@@ -553,11 +553,11 @@ oidc:` + tt.oidcBlock + "\n")
 }
 
 // OK
-// server_url: headscale.com, base: clients.headscale.com
-// server_url: headscale.com, base: headscale.net
+// server_url: slopscale.com, base: clients.slopscale.com
+// server_url: slopscale.com, base: slopscale.net
 //
 // NOT OK
-// server_url: server.headscale.com, base: headscale.com.
+// server_url: server.slopscale.com, base: slopscale.com.
 func TestSafeServerURL(t *testing.T) {
 	tests := []struct {
 		serverURL, baseDomain,
@@ -568,30 +568,30 @@ func TestSafeServerURL(t *testing.T) {
 			baseDomain: "example.org",
 		},
 		{
-			serverURL:  "https://headscale.com",
-			baseDomain: "headscale.com",
+			serverURL:  "https://slopscale.com",
+			baseDomain: "slopscale.com",
 			wantErr:    errServerURLSame.Error(),
 		},
 		{
-			serverURL:  "https://headscale.com",
-			baseDomain: "clients.headscale.com",
+			serverURL:  "https://slopscale.com",
+			baseDomain: "clients.slopscale.com",
 		},
 		{
-			serverURL:  "https://headscale.com",
-			baseDomain: "clients.subdomain.headscale.com",
+			serverURL:  "https://slopscale.com",
+			baseDomain: "clients.subdomain.slopscale.com",
 		},
 		{
-			serverURL:  "https://headscale.kristoffer.com",
+			serverURL:  "https://slopscale.kristoffer.com",
 			baseDomain: "mybase",
 		},
 		{
-			serverURL:  "https://server.headscale.com",
-			baseDomain: "headscale.com",
+			serverURL:  "https://server.slopscale.com",
+			baseDomain: "slopscale.com",
 			wantErr:    errServerURLSuffix.Error(),
 		},
 		{
-			serverURL:  "https://server.subdomain.headscale.com",
-			baseDomain: "headscale.com",
+			serverURL:  "https://server.subdomain.slopscale.com",
+			baseDomain: "slopscale.com",
 			wantErr:    errServerURLSuffix.Error(),
 		},
 		{
@@ -622,18 +622,18 @@ func TestSafeServerURLWithPort(t *testing.T) {
 		wantErr string
 	}{
 		{
-			serverURL:  "https://server.headscale.com:443",
-			baseDomain: "headscale.com",
+			serverURL:  "https://server.slopscale.com:443",
+			baseDomain: "slopscale.com",
 			wantErr:    errServerURLSuffix.Error(),
 		},
 		{
-			serverURL:  "https://server.subdomain.headscale.com:8080",
-			baseDomain: "headscale.com",
+			serverURL:  "https://server.subdomain.slopscale.com:8080",
+			baseDomain: "slopscale.com",
 			wantErr:    errServerURLSuffix.Error(),
 		},
 		{
-			serverURL:  "https://headscale.com:443",
-			baseDomain: "headscale.com",
+			serverURL:  "https://slopscale.com:443",
+			baseDomain: "slopscale.com",
 			wantErr:    errServerURLSame.Error(),
 		},
 		{
@@ -659,7 +659,7 @@ func TestSafeServerURLWithPort(t *testing.T) {
 
 // TestConfigJSONOmitsSecrets verifies that marshalling a [Config] to JSON
 // (as /debug/config does via [state.State.DebugConfig]) does not leak the
-// Postgres password, the OIDC client secret, or the headscale admin
+// Postgres password, the OIDC client secret, or the slopscale admin
 // API key. Operators who widen metrics_listen_addr to 0.0.0.0 should
 // not be able to read these back via debug endpoints reachable over
 // CGNAT/loopback.
@@ -667,7 +667,7 @@ func TestConfigJSONOmitsSecrets(t *testing.T) {
 	const (
 		secretPostgresPass = "p0stgres-secret-marker"
 		secretClientSecret = "oidc-client-secret-marker"
-		secretAPIKey       = "headscale-cli-api-key-marker"
+		secretAPIKey       = "slopscale-cli-api-key-marker"
 	)
 
 	cfg := &Config{

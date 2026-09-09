@@ -19,8 +19,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/egress"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 	"go.yaml.in/yaml/v3"
@@ -261,7 +261,7 @@ func HasRelay(dm *tailcfg.DERPMap) bool {
 
 // debugUseDERPIP makes the embedded relay's region carry the server's IP
 // instead of its host name, for integration tests whose DNS is unreliable.
-var debugUseDERPIP = envknob.Bool("HEADSCALE_DEBUG_DERP_USE_IP")
+var debugUseDERPIP = envknob.Bool("SLOPSCALE_DEBUG_DERP_USE_IP")
 
 // EmbeddedRegion is the region the embedded relay is published as: one
 // relay at the server URL's host and port, STUN on the settings' port.
@@ -295,7 +295,7 @@ func EmbeddedRegion(ctx context.Context, serverURL string, s types.DERPServerSet
 			log.Error().Caller().Err(resolveErr).Msgf("failed to resolve DERP hostname %s to IP, using hostname", host)
 		} else if len(ips) > 0 {
 			ip := ips[0].IP.String()
-			log.Info().Caller().Msgf("HEADSCALE_DEBUG_DERP_USE_IP: resolved %s to %s", host, ip)
+			log.Info().Caller().Msgf("SLOPSCALE_DEBUG_DERP_USE_IP: resolved %s to %s", host, ip)
 			host = ip
 		}
 	}

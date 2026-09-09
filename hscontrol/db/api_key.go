@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aislopware/slopscale/gen/jet/table"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	jet "github.com/go-jet/jet/v2/sqlite"
-	"github.com/juanfont/headscale/gen/jet/table"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"golang.org/x/crypto/bcrypt"
 	"tailscale.com/util/rands"
 )
@@ -269,7 +269,7 @@ func (hsdb *HSDatabase) AuthenticateAPIKey(keyStr string) (*types.APIKey, error)
 }
 
 // SetAPIKeyUser sets the owning user of an API key. Used when an admin mints a
-// key on behalf of a user (headscale apikeys create --user).
+// key on behalf of a user (slopscale apikeys create --user).
 func (hsdb *HSDatabase) SetAPIKeyUser(keyID uint64, userID types.UserID) error {
 	_, err := hsdb.ex.exec(
 		table.APIKeys.UPDATE(table.APIKeys.UserID).SET(uint(userID)).WHERE(table.APIKeys.ID.EQ(jet.Uint64(keyID))),

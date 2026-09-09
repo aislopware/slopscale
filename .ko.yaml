@@ -3,8 +3,8 @@
 # .goreleaser.yml: the SQLite driver is C compiled by cgo, zigcc picks the
 # zig target from GOOS/GOARCH and the result links statically against musl.
 builds:
-  - id: headscale
-    main: ./cmd/headscale
+  - id: slopscale
+    main: ./cmd/slopscale
     env:
       - CGO_ENABLED=1
       - CC=zigcc

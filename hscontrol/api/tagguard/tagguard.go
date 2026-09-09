@@ -12,8 +12,8 @@ package tagguard
 import (
 	"context"
 
+	"github.com/aislopware/slopscale/hscontrol/api/principal"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/api/principal"
 )
 
 // Policy is the tag ownership the guard reads; *state.State satisfies it.

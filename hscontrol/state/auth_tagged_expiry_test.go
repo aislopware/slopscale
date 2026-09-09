@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
@@ -22,10 +22,10 @@ import (
 func TestTaggedReauthKeepsNilExpiry(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	user := database.CreateUserForTest("reauth-user")
@@ -111,7 +111,7 @@ func TestTaggedReauthKeepsNilExpiry(t *testing.T) {
 func TestTaggedReauthWithReusedUserPAK(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)
@@ -124,7 +124,7 @@ func TestTaggedReauthWithReusedUserPAK(t *testing.T) {
 	_, err = s.SetPolicy([]byte(policy))
 	require.NoError(t, err)
 
-	// One-shot, user-owned PAK: `headscale preauthkeys create -u 1`.
+	// One-shot, user-owned PAK: `slopscale preauthkeys create -u 1`.
 	pak, err := s.CreatePreAuthKey(user.TypedID(), false, false, nil, nil)
 	require.NoError(t, err)
 
@@ -144,7 +144,7 @@ func TestTaggedReauthWithReusedUserPAK(t *testing.T) {
 	require.True(t, first.Valid())
 	nodeID := first.ID()
 
-	// `headscale nodes tag -t tag:foo`: convert to a tagged node. This clears
+	// `slopscale nodes tag -t tag:foo`: convert to a tagged node. This clears
 	// both UserID and User (state.SetNodeTags), diverging the node's ownership
 	// from the still-user-owned PAK.
 	tagged, _, err := s.SetNodeTags(nodeID, []string{"tag:foo"})
@@ -174,7 +174,7 @@ func TestTaggedReauthWithReusedUserPAK(t *testing.T) {
 func reregisterExpiredUserNodeWithSpentKey(t *testing.T, sameNodeKey bool) (types.NodeView, error) {
 	t.Helper()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)
@@ -248,7 +248,7 @@ func TestExpiredUserNodeReusedOneShotKey_SameNodeKey(t *testing.T) {
 func TestReusableUserPAKReauthOnTaggedNodeNoDuplicate(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)
@@ -291,7 +291,7 @@ func TestReusableUserPAKReauthOnTaggedNodeNoDuplicate(t *testing.T) {
 func TestTaggedPAKReauthConvertsUserOwnedNode(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)
@@ -337,7 +337,7 @@ func TestTaggedPAKReauthConvertsUserOwnedNode(t *testing.T) {
 func registerTwoUsersOnOneMachine(t *testing.T) (*State, key.MachinePublic, types.NodeID) {
 	t.Helper()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)
@@ -448,10 +448,10 @@ type seededTaggedNode struct {
 func seedTagOwnedNode(t *testing.T, tags []string, createdByName string) seededTaggedNode {
 	t.Helper()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	seedUser := database.CreateUserForTest("seed")
@@ -559,7 +559,7 @@ func (n seededTaggedNode) get(t *testing.T) types.NodeView {
 // TestTaggedReauthAddTagAsOwner reproduces issue #3374 with the issue's own
 // scenario: a tag-owned node holding tag:tag1 re-authenticates with
 // --advertise-tags=tag:tag1,tag:tag2, and the authenticating user (ci-admin,
-// via group:ci) owns BOTH tags. Today headscale rejects the whole set as
+// via group:ci) owns BOTH tags. Today slopscale rejects the whole set as
 // "invalid or not permitted", leaving the re-keyed node logged out.
 //
 // This is stronger than re-advertising the already-held set: it exercises BOTH
@@ -906,10 +906,10 @@ func TestTaggedReauthPreservesOnlineAndLastSeen(t *testing.T) {
 func TestIssue3371_TaggedNodeInteractiveReloginAfterLogout(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	user := database.CreateUserForTest("interactive-user")
@@ -975,14 +975,14 @@ func TestIssue3371_TaggedNodeInteractiveReloginAfterLogout(t *testing.T) {
 }
 
 // TestIssue3371_TaggedNodePastExpirySelfHealsOnReregister covers the 0.29.x
-// upgrade path: a tagged node broken by an OLDER headscale carries a past
+// upgrade path: a tagged node broken by an OLDER slopscale carries a past
 // expiry persisted in its DB row. After a restart (State reloads the row) it
 // comes back expired, and its next auth-key re-registration must self-heal it
 // by clearing the stale past expiry. This is the "part b" defensive clear.
 func TestIssue3371_TaggedNodePastExpirySelfHealsOnReregister(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)
@@ -1107,7 +1107,7 @@ func TestIssue3371_ExpiredTaggedNodeSameSpentKeyNotRevalidated(t *testing.T) {
 func TestTaggedPAKReauthRetagsExistingTaggedNode(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)
@@ -1183,7 +1183,7 @@ func TestTaggedPAKReauthRetagsExistingTaggedNode(t *testing.T) {
 // TestTaggedPAKReauthSameKeyPreservesTags is the counterpart constraint to
 // #3370: re-authenticating with the *same* tagged key must NOT clobber the
 // node's current tags, even after an admin retagged it via
-// `headscale nodes tag`. This is the unit-level guard for the integration
+// `slopscale nodes tag`. This is the unit-level guard for the integration
 // test TestTagsAuthKeyWithTagAdminOverrideReauthPreserves (admin decisions are
 // authoritative), and it is why the retag discriminator must key on the
 // pre-auth key's *identity* (a different key) rather than on "validation ran"
@@ -1192,7 +1192,7 @@ func TestTaggedPAKReauthRetagsExistingTaggedNode(t *testing.T) {
 func TestTaggedPAKReauthSameKeyPreservesTags(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)
@@ -1400,7 +1400,7 @@ func TestTaggedPAKReauthSameSingleUseKeySameNodeKeyPreservesTags(t *testing.T) {
 }
 
 // TestTaggedPAKReauthUserScopedKeyRetags: a user-scoped tagged key
-// (User != nil, the `headscale preauthkeys create -u <user> --tags` shape)
+// (User != nil, the `slopscale preauthkeys create -u <user> --tags` shape)
 // exercises the pak.User != nil branch of findExistingNodeForPAK, a different
 // lookup path from tags-only keys. It must still retag.
 func TestTaggedPAKReauthUserScopedKeyRetags(t *testing.T) {
@@ -1474,7 +1474,7 @@ func TestExpiredTaggedNodeReauthRetags(t *testing.T) {
 
 // TestTaggedPAKReauthRetagPreservesFutureAdminExpiry pins the composition
 // decision between #3370 (retag) and #3371 (never wrongly expire a tagged
-// node): a deliberate FUTURE expiry set by an admin via `headscale nodes expire`
+// node): a deliberate FUTURE expiry set by an admin via `slopscale nodes expire`
 // is a node property, not tied to the auth key, so re-keying an already-tagged
 // node with a different key must retag it WITHOUT wiping that future expiry.
 // Only a stale PAST expiry is cleared (see TestExpiredTaggedNodeReauthRetags).
@@ -1497,7 +1497,7 @@ func TestTaggedPAKReauthRetagPreservesFutureAdminExpiry(t *testing.T) {
 	require.NoError(t, err)
 
 	// Admin sets a deliberate future expiry on the tagged node
-	// (`headscale nodes expire`), which SetNodeExpiry permits.
+	// (`slopscale nodes expire`), which SetNodeExpiry permits.
 	future := time.Now().Add(30 * 24 * time.Hour)
 	_, _, err = s.SetNodeExpiry(first.ID(), &future)
 	require.NoError(t, err)
@@ -1524,7 +1524,7 @@ func TestTaggedPAKReauthRetagPreservesFutureAdminExpiry(t *testing.T) {
 func newRetagTestState(t *testing.T) *State {
 	t.Helper()
 
-	cfg := persistTestConfig(t.TempDir() + "/headscale.db")
+	cfg := persistTestConfig(t.TempDir() + "/slopscale.db")
 	s, err := NewState(cfg)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = s.Close() })
@@ -1549,7 +1549,7 @@ func newRetagTestState(t *testing.T) *State {
 func TestPreAuthKeyReauthPersistsAuthKeyID(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)
@@ -1617,11 +1617,11 @@ func TestPreAuthKeyReauthPersistsAuthKeyID(t *testing.T) {
 
 // TestTaggedNodeCanHaveKeyExpiry matches Tailscale: a tagged node has key
 // expiry disabled by default, but it can still be set explicitly (e.g. via
-// `headscale nodes expire`).
+// `slopscale nodes expire`).
 func TestTaggedNodeCanHaveKeyExpiry(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)
@@ -1657,7 +1657,7 @@ func TestTaggedNodeCanHaveKeyExpiry(t *testing.T) {
 func TestTaggingPreservesNodeExpiry(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)

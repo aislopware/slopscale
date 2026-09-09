@@ -9,7 +9,7 @@ import (
 
 // EnvTestLogLevel overrides the default test log level. Accepts any zerolog
 // level string: trace, debug, info, warn, error, fatal, panic, disabled.
-const EnvTestLogLevel = "HEADSCALE_TEST_LOG_LEVEL"
+const EnvTestLogLevel = "SLOPSCALE_TEST_LOG_LEVEL"
 
 // init quiets zerolog when this package is loaded inside a test binary.
 //
@@ -18,7 +18,7 @@ const EnvTestLogLevel = "HEADSCALE_TEST_LOG_LEVEL"
 // the only place that needs to know about test logging configuration.
 //
 // Default: [zerolog.ErrorLevel] (silent in green-path runs, real errors still surface).
-// Override: HEADSCALE_TEST_LOG_LEVEL=debug (or trace, info, warn, disabled).
+// Override: SLOPSCALE_TEST_LOG_LEVEL=debug (or trace, info, warn, disabled).
 //
 // Production binaries are unaffected because [testing.Testing] returns false
 // outside of test execution. The same [testing.Testing] pattern is already

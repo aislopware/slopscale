@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 
 export type Theme = "light" | "dark" | "system";
 
-const storageKey = "headscale-admin.theme";
+const storageKey = "slopscale-admin.theme";
 const themes: readonly Theme[] = ["light", "dark", "system"];
 const listeners = new Set<() => void>();
 const media = globalThis.matchMedia("(prefers-color-scheme: dark)");

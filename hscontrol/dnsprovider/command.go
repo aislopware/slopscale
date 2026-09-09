@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 )
 
 // commandTimeout bounds one run of the program.

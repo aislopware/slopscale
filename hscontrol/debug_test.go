@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -24,10 +24,10 @@ const (
 	debugAllowAllACL  = `{"acls":[{"action":"accept","src":["*"],"dst":["*:*"]}]}`
 )
 
-// debugTestEnv is a Headscale with one user and one registered node in the
+// debugTestEnv is a Slopscale with one user and one registered node in the
 // NodeStore, plus the debug mux as served by debugHTTPServer.
 type debugTestEnv struct {
-	app     *Headscale
+	app     *Slopscale
 	handler http.Handler
 	node    types.NodeView
 }
@@ -199,7 +199,7 @@ func TestDebugOverview(t *testing.T) {
 	env := newDebugTestEnv(t)
 
 	body := env.text(t, "/debug/overview").Body.String()
-	assert.Contains(t, body, "=== Headscale State Overview ===")
+	assert.Contains(t, body, "=== Slopscale State Overview ===")
 	assert.Contains(t, body, "Nodes: 1 total")
 	assert.Contains(t, body, "Users: 1 total")
 	assert.Contains(t, body, "  - "+debugUserName+": 1 nodes")
@@ -316,7 +316,7 @@ func TestDebugDERP(t *testing.T) {
 				RegionID:   900,
 				RegionName: "Debug Region",
 				Nodes: []*tailcfg.DERPNode{
-					{Name: "900a", RegionID: 900, HostName: "derp.headscale.test", DERPPort: 443, STUNPort: 3478},
+					{Name: "900a", RegionID: 900, HostName: "derp.slopscale.test", DERPPort: 443, STUNPort: 3478},
 				},
 			},
 		},
@@ -326,7 +326,7 @@ func TestDebugDERP(t *testing.T) {
 	assert.Contains(t, body, "=== DERP Map Configuration ===")
 	assert.Contains(t, body, "Total Regions: 1")
 	assert.Contains(t, body, "Region 900: Debug Region")
-	assert.Contains(t, body, "    - 900a (derp.headscale.test:443)")
+	assert.Contains(t, body, "    - 900a (derp.slopscale.test:443)")
 	assert.Contains(t, body, "      STUN: 3478")
 
 	info = state.DebugDERPInfo{}
@@ -336,7 +336,7 @@ func TestDebugDERP(t *testing.T) {
 	assert.Equal(t, 1, info.TotalRegions)
 	require.Contains(t, info.Regions, tailcfg.DERPRegionID(900))
 	require.Len(t, info.Regions[900].Nodes, 1)
-	assert.Equal(t, "derp.headscale.test", info.Regions[900].Nodes[0].HostName)
+	assert.Equal(t, "derp.slopscale.test", info.Regions[900].Nodes[0].HostName)
 	assert.Equal(t, 3478, info.Regions[900].Nodes[0].STUNPort)
 }
 
@@ -431,7 +431,7 @@ func TestDebugMapResponsesWithoutDumpPath(t *testing.T) {
 
 	rec := env.debugRequest(t, "/debug/mapresponses", "")
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "HEADSCALE_DEBUG_DUMP_MAPRESPONSE_PATH not set", rec.Body.String())
+	assert.Equal(t, "SLOPSCALE_DEBUG_DUMP_MAPRESPONSE_PATH not set", rec.Body.String())
 }
 
 func TestDebugBatcher(t *testing.T) {

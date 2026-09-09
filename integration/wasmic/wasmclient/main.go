@@ -7,7 +7,7 @@
 // WebSocket GET — the exact transport a Tailscale JS/WASM client uses.
 //
 // It is the container-side half of the integration test guarding issue #3357:
-// headscale must register /ts2021 for GET, not POST only, or the WebSocket
+// slopscale must register /ts2021 for GET, not POST only, or the WebSocket
 // upgrade is rejected with 405 before the Noise handshake can start.
 //
 // It is intentionally not the full tsconnect IPN — the regression is entirely

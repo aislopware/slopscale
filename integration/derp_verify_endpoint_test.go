@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/juanfont/headscale/integration/dsic"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
+	"github.com/aislopware/slopscale/integration/dsic"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/integrationutil"
+	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/derp"
 	"tailscale.com/derp/derphttp"
@@ -22,16 +22,16 @@ import (
 func TestDERPVerifyEndpoint(t *testing.T) {
 	IntegrationSkip(t)
 
-	// Generate random hostname for the headscale instance
+	// Generate random hostname for the slopscale instance
 	hash := rands.HexString(6)
 
 	testName := "derpverify"
 	hostname := fmt.Sprintf("hs-%s-%s", testName, hash)
 
-	headscalePort := 8080
+	slopscalePort := 8080
 
-	// Create cert for headscale
-	certsHeadscale, err := integrationutil.CreateCertificate(hostname)
+	// Create cert for slopscale
+	certsSlopscale, err := integrationutil.CreateCertificate(hostname)
 	require.NoError(t, err)
 
 	spec := ScenarioSpec{
@@ -46,9 +46,9 @@ func TestDERPVerifyEndpoint(t *testing.T) {
 
 	derper, err := scenario.CreateDERPServer(
 		"head",
-		dsic.WithCACert(certsHeadscale.CACertPEM),
+		dsic.WithCACert(certsSlopscale.CACertPEM),
 		dsic.WithVerifyClientURL(
-			fmt.Sprintf("https://%s/verify", net.JoinHostPort(hostname, strconv.Itoa(headscalePort))),
+			fmt.Sprintf("https://%s/verify", net.JoinHostPort(hostname, strconv.Itoa(slopscalePort))),
 		),
 	)
 	require.NoError(t, err)
@@ -80,14 +80,14 @@ func TestDERPVerifyEndpoint(t *testing.T) {
 	//
 	// [tsic.WithCACert] passes the external DERP server's certificate so
 	// tailscale clients trust it. [hsic.WithCustomTLS] and [hsic.WithDERPConfig]
-	// configure headscale to use the external DERP server created
+	// configure slopscale to use the external DERP server created
 	// above instead of the default embedded one.
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{tsic.WithCACert(derper.GetCert())},
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{tsic.WithCACert(derper.GetCert())},
 		hsic.WithHostname(hostname),
-		hsic.WithPort(headscalePort),
-		hsic.WithCustomTLS(certsHeadscale.CACertPEM, certsHeadscale.CertPEM, certsHeadscale.KeyPEM),
+		hsic.WithPort(slopscalePort),
+		hsic.WithCustomTLS(certsSlopscale.CACertPEM, certsSlopscale.CertPEM, certsSlopscale.KeyPEM),
 		hsic.WithDERPConfig(derpMap))
-	requireNoErrHeadscaleEnv(t, err)
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 )
 
 // TestHarness orchestrates a [TestServer] with multiple [TestClient] instances,

@@ -1,4 +1,4 @@
-// cmd/dev starts a local headscale development server with a pre-created
+// cmd/dev starts a local slopscale development server with a pre-created
 // user and pre-auth key, ready for connecting tailscale nodes via mts.
 package main
 
@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	// defaultPort is the headscale listen port when --port is not given.
+	// defaultPort is the slopscale listen port when --port is not given.
 	defaultPort = 8080
 	// metricsPortOffset is added to --port to derive the metrics listen
 	// port, so the default lands on 9090.
@@ -40,7 +40,7 @@ const (
 )
 
 var (
-	port      = flag.Int("port", defaultPort, "headscale listen port")
+	port      = flag.Int("port", defaultPort, "slopscale listen port")
 	keep      = flag.Bool("keep", false, "keep state directory on exit")
 	serverURL = flag.String("server-url", "",
 		"public URL of the server (default http://127.0.0.1:<port>); "+
@@ -84,14 +84,14 @@ derp:
 
 dns:
   magic_dns: true
-  base_domain: headscale.dev
+  base_domain: slopscale.dev
   override_local_dns: false
   nameservers:
     global:
       - 1.1.1.1
       - 1.0.0.1
   search_domains:
-    - corp.headscale.dev
+    - corp.slopscale.dev
 
 log:
   level: debug
@@ -108,7 +108,7 @@ egress:
 debug:
   node_api_enabled: true
 
-unix_socket: %s/headscale.sock
+unix_socket: %s/slopscale.sock
 unix_socket_permission: "0770"
 
 # Recordings land under the state directory so the console can serve them.
@@ -155,7 +155,7 @@ func run() error {
 		publicURL = fmt.Sprintf("http://127.0.0.1:%d", *port)
 	}
 
-	tmpDir, err := os.MkdirTemp("", "headscale-dev-")
+	tmpDir, err := os.MkdirTemp("", "slopscale-dev-")
 	if err != nil {
 		return fmt.Errorf("creating temp dir: %w", err)
 	}
@@ -189,22 +189,22 @@ func run() error {
 		return fmt.Errorf("writing config: %w", err)
 	}
 
-	// Build headscale.
-	fmt.Println("Building headscale...")
+	// Build slopscale.
+	fmt.Println("Building slopscale...")
 
-	hsBin := filepath.Join(tmpDir, "headscale")
+	hsBin := filepath.Join(tmpDir, "slopscale")
 
-	build := exec.CommandContext(ctx, "go", "build", "-o", hsBin, "./cmd/headscale")
+	build := exec.CommandContext(ctx, "go", "build", "-o", hsBin, "./cmd/slopscale")
 	build.Stdout = os.Stdout
 	build.Stderr = os.Stderr
 
 	err = build.Run()
 	if err != nil {
-		return fmt.Errorf("building headscale: %w", err)
+		return fmt.Errorf("building slopscale: %w", err)
 	}
 
-	// Start headscale serve.
-	fmt.Println("Starting headscale server...")
+	// Start slopscale serve.
+	fmt.Println("Starting slopscale server...")
 
 	serve := exec.CommandContext(ctx, hsBin, "serve", "-c", configPath)
 	serve.Stdout = os.Stdout
@@ -212,7 +212,7 @@ func run() error {
 
 	err = serve.Start()
 	if err != nil {
-		return fmt.Errorf("starting headscale: %w", err)
+		return fmt.Errorf("starting slopscale: %w", err)
 	}
 
 	// Wait for server to be ready.
@@ -220,7 +220,7 @@ func run() error {
 
 	err = waitForHealth(ctx, healthURL, healthTimeout)
 	if err != nil {
-		return fmt.Errorf("waiting for headscale: %w", err)
+		return fmt.Errorf("waiting for slopscale: %w", err)
 	}
 
 	// Create user.
@@ -257,7 +257,7 @@ func run() error {
 	// Print banner.
 	fmt.Printf(
 		`
-=== Headscale Dev Environment ===
+=== Slopscale Dev Environment ===
   Server:  http://127.0.0.1:%d
   Console: %s/admin/  (sign in through the mock provider as %s, an admin)
   OIDC:    %s
@@ -274,7 +274,7 @@ Connect nodes with mts:
   go tool mts node1 up --login-server=http://127.0.0.1:%d --authkey=%s
   go tool mts node1 status                # check connection
 
-Manage headscale:
+Manage slopscale:
   %s -c %s nodes list
   %s -c %s users list
 
@@ -288,7 +288,7 @@ Press Ctrl+C to stop.
 		hsBin, configPath,
 	)
 
-	// Wait for headscale to exit.
+	// Wait for slopscale to exit.
 	err = serve.Wait()
 	if err != nil {
 		// Context cancellation is expected on Ctrl+C.
@@ -298,7 +298,7 @@ Press Ctrl+C to stop.
 			return nil
 		}
 
-		return fmt.Errorf("headscale exited: %w", err)
+		return fmt.Errorf("slopscale exited: %w", err)
 	}
 
 	return nil
@@ -336,7 +336,7 @@ func waitForHealth(ctx context.Context, url string, timeout time.Duration) error
 	return errHealthTimeout
 }
 
-// runHS executes a headscale CLI command and returns its stdout.
+// runHS executes a slopscale CLI command and returns its stdout.
 func runHS(ctx context.Context, bin, config string, args ...string) ([]byte, error) {
 	fullArgs := append([]string{"-c", config}, args...)
 	cmd := exec.CommandContext(ctx, bin, fullArgs...)
@@ -344,7 +344,7 @@ func runHS(ctx context.Context, bin, config string, args ...string) ([]byte, err
 
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("running headscale CLI %s: %w", bin, err)
+		return nil, fmt.Errorf("running slopscale CLI %s: %w", bin, err)
 	}
 
 	return out, nil

@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/assets"
-	"github.com/juanfont/headscale/hscontrol/templates"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/wire"
+	"github.com/aislopware/slopscale/hscontrol/assets"
+	"github.com/aislopware/slopscale/hscontrol/templates"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/wire"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 )
@@ -58,7 +58,7 @@ func httpUserError(w http.ResponseWriter, err error) {
 	w.WriteHeader(code)
 
 	page := templates.AuthError(templates.AuthErrorResult{
-		Title:   "Headscale - Error",
+		Title:   "Slopscale - Error",
 		Heading: http.StatusText(code),
 		Message: userMsg,
 	})
@@ -128,7 +128,7 @@ func parseCapabilityVersion(req *http.Request) (tailcfg.CapabilityVersion, error
 // OOMing the public router with arbitrarily large POSTs.
 const verifyBodyLimit int64 = 4 * 1024
 
-func (h *Headscale) handleVerifyRequest(
+func (h *Slopscale) handleVerifyRequest(
 	req *http.Request,
 	writer io.Writer,
 ) error {
@@ -172,7 +172,7 @@ func (h *Headscale) handleVerifyRequest(
 // client is allowed to connect. See:
 //
 // https://github.com/tailscale/tailscale/blob/964282d34f06ecc06ce644769c66b0b31d118340/derp/derp_server.go#L1159
-func (h *Headscale) VerifyHandler(
+func (h *Slopscale) VerifyHandler(
 	writer http.ResponseWriter,
 	req *http.Request,
 ) {
@@ -197,9 +197,9 @@ func (h *Headscale) VerifyHandler(
 	}
 }
 
-// KeyHandler provides the Headscale pub key
+// KeyHandler provides the Slopscale pub key
 // Listens in /key.
-func (h *Headscale) KeyHandler(
+func (h *Slopscale) KeyHandler(
 	writer http.ResponseWriter,
 	req *http.Request,
 ) {
@@ -238,7 +238,7 @@ func (h *Headscale) KeyHandler(
 	}
 }
 
-func (h *Headscale) HealthHandler(
+func (h *Slopscale) HealthHandler(
 	writer http.ResponseWriter,
 	req *http.Request,
 ) {
@@ -273,7 +273,7 @@ func (h *Headscale) HealthHandler(
 	respond(nil)
 }
 
-func (h *Headscale) RobotsHandler(
+func (h *Slopscale) RobotsHandler(
 	writer http.ResponseWriter,
 	_ *http.Request,
 ) {
@@ -289,9 +289,9 @@ func (h *Headscale) RobotsHandler(
 	}
 }
 
-// VersionHandler returns version information about the Headscale server
+// VersionHandler returns version information about the Slopscale server
 // Listens in /version.
-func (h *Headscale) VersionHandler(
+func (h *Slopscale) VersionHandler(
 	writer http.ResponseWriter,
 	_ *http.Request,
 ) {
@@ -353,8 +353,8 @@ func (a *AuthProviderWeb) AuthHandler(
 
 	_, err = writer.Write([]byte(templates.AuthWeb(
 		"Authentication check",
-		"Run the command below in the headscale server to approve this authentication request:",
-		"headscale auth approve --auth-id "+authID.String(),
+		"Run the command below in the slopscale server to approve this authentication request:",
+		"slopscale auth approve --auth-id "+authID.String(),
 	).Render()))
 	if err != nil {
 		log.Error().Err(err).Msg("failed to write auth response")
@@ -406,8 +406,8 @@ func (a *AuthProviderWeb) RegisterHandler(
 
 	_, err = writer.Write([]byte(templates.AuthWeb(
 		"Node registration",
-		"Run the command below in the headscale server to add this node to your network:",
-		fmt.Sprintf("headscale auth register --auth-id %s --user USERNAME", authID.String()),
+		"Run the command below in the slopscale server to add this node to your network:",
+		fmt.Sprintf("slopscale auth register --auth-id %s --user USERNAME", authID.String()),
 	).Render()))
 	if err != nil {
 		log.Error().Err(err).Msg("failed to write register response")

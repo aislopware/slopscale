@@ -1,4 +1,4 @@
-// Package assets provides embedded static assets for Headscale.
+// Package assets provides embedded static assets for Slopscale.
 // All static files (favicon, CSS, SVG) are embedded here for
 // centralized asset management.
 package assets
@@ -18,7 +18,7 @@ var Favicon []byte
 //go:embed style.css
 var CSS string
 
-// SVG is the embedded headscale.svg logo used in HTML templates.
+// SVG is the embedded slopscale.svg logo used in HTML templates.
 //
-//go:embed headscale.svg
+//go:embed slopscale.svg
 var SVG string

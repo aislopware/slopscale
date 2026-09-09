@@ -1,7 +1,7 @@
 // This file implements a data-driven test runner for grant compatibility
 // tests. It loads HuJSON golden files from testdata/grant_results/grant-*.hujson
 // and via-grant-*.hujson, captured from a Tailscale-hosted control plane, and compares
-// headscale's grants engine output against the captured packet filter rules.
+// slopscale's grants engine output against the captured packet filter rules.
 //
 // Each file is a testcapture.Capture containing:
 //   - A full policy with grants (and optionally ACLs)
@@ -9,11 +9,11 @@
 //   - Or an error response for invalid policies
 //
 // Tests known to fail due to unimplemented features or known differences are
-// skipped with a TODO comment explaining the root cause. As headscale's grants
+// skipped with a TODO comment explaining the root cause. As slopscale's grants
 // implementation improves, tests should be removed from the skip list.
 //
 // Test data source: testdata/grant_results/{grant,via-grant}-*.hujson
-// Source format:    github.com/juanfont/headscale/hscontrol/types/testcapture
+// Source format:    github.com/aislopware/slopscale/hscontrol/types/testcapture
 
 package v2
 
@@ -23,11 +23,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/policy/policyutil"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/testcapture"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juanfont/headscale/hscontrol/policy/policyutil"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 )
@@ -148,14 +148,14 @@ var grantSkipReasons = map[string]string{
 	// USER_PASSKEY_WILDCARD (2 tests)
 	//
 	// Tailscale SaaS policies can use user:*@passkey as a wildcard matching
-	// all passkey-authenticated users. headscale does not support passkey
+	// all passkey-authenticated users. slopscale does not support passkey
 	// authentication and has no equivalent for this wildcard pattern.
-	"grant-k20": "USER_PASSKEY_WILDCARD: src=user:*@passkey not supported in headscale",
-	"grant-k21": "USER_PASSKEY_WILDCARD: dst=user:*@passkey not supported in headscale",
+	"grant-k20": "USER_PASSKEY_WILDCARD: src=user:*@passkey not supported in slopscale",
+	"grant-k21": "USER_PASSKEY_WILDCARD: dst=user:*@passkey not supported in slopscale",
 }
 
 // TestGrantsCompat is a data-driven test that loads all GRANT-*.json
-// test files captured from Tailscale SaaS and compares headscale's grants
+// test files captured from Tailscale SaaS and compares slopscale's grants
 // engine output against the real Tailscale behavior.
 //
 // Each JSON file contains:
@@ -163,11 +163,11 @@ var grantSkipReasons = map[string]string{
 //   - For success cases: expected packet_filter_rules per node
 //   - For error cases: expected error message
 //
-// The test converts Tailscale user email formats to headscale format
+// The test converts Tailscale user email formats to slopscale format
 // (@example.com, @example.org) and runs the policy through unmarshalPolicy,
 // validate, compileFilterRulesForNode, and ReduceFilterRules.
 //
-// 2 tests are skipped for user:*@passkey wildcard (not supported in headscale).
+// 2 tests are skipped for user:*@passkey wildcard (not supported in slopscale).
 func TestGrantsCompat(t *testing.T) {
 	t.Parallel()
 
@@ -246,7 +246,7 @@ func testGrantError(t *testing.T, policyJSON []byte, tf *testcapture.Capture) {
 	)
 }
 
-// assertGrantErrorContains requires that headscale's error contains
+// assertGrantErrorContains requires that slopscale's error contains
 // the Tailscale SaaS error message exactly. Divergence means an
 // emitter needs to be aligned, not papered over with a translation
 // table.
@@ -258,7 +258,7 @@ func assertGrantErrorContains(t *testing.T, err error, wantMsg, testID string) {
 		return
 	}
 
-	t.Errorf("%s: error message mismatch\n  tailscale wants: %q\n  headscale got:   %q",
+	t.Errorf("%s: error message mismatch\n  tailscale wants: %q\n  slopscale got:   %q",
 		testID, wantMsg, errStr)
 }
 
@@ -285,7 +285,7 @@ func testGrantSuccess(
 			require.NotNilf(t, node,
 				"golden node %s not found in test setup", nodeName)
 
-			// Compile headscale filter rules for this node
+			// Compile slopscale filter rules for this node
 			gotRules := pol.compileFilterRulesForNode(
 				users,
 				node.View(),
@@ -296,15 +296,15 @@ func testGrantSuccess(
 
 			wantRules := capture.PacketFilterRules
 
-			// Compare headscale output against Tailscale expected output.
-			// The diff labels show (-tailscale +headscale) to make clear
+			// Compare slopscale output against Tailscale expected output.
+			// The diff labels show (-tailscale +slopscale) to make clear
 			// which side produced which output.
 			// EquateEmpty treats nil and empty slices as equal since
-			// Tailscale's JSON null -> nil, headscale may return empty slice.
+			// Tailscale's JSON null -> nil, slopscale may return empty slice.
 			opts := append(cmpOptions(), cmpopts.EquateEmpty())
 			if diff := cmp.Diff(wantRules, gotRules, opts...); diff != "" {
 				t.Errorf(
-					"%s/%s: filter rules mismatch (-tailscale +headscale):\n%s",
+					"%s/%s: filter rules mismatch (-tailscale +slopscale):\n%s",
 					tf.TestID,
 					nodeName,
 					diff,

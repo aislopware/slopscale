@@ -6,8 +6,8 @@ import (
 	"net/netip"
 	"slices"
 
-	"github.com/juanfont/headscale/hscontrol/policy"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/policy"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 )
 
@@ -420,7 +420,7 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 		{
 			// Users gain an administrative role (see types.Role). Every
 			// existing user is a member; the operator promotes the first
-			// owner with `headscale users set-role`, and a database that
+			// owner with `slopscale users set-role`, and a database that
 			// has no users yet makes the first user created its owner.
 			id: "202609062100-user-role",
 			run: func(tx *Tx) error {

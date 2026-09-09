@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/netmap"

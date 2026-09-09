@@ -1506,7 +1506,7 @@ type ListAuditEventsParams struct {
 	// ActorUserId Keep events by this user.
 	ActorUserId *string `form:"actorUserId,omitempty" json:"actorUserId,omitempty"`
 
-	// Action One action, or a prefix ending in a dot.
+	// Action An action prefix: node. keeps every node action.
 	Action     *string `form:"action,omitempty" json:"action,omitempty"`
 	TargetKind *string `form:"targetKind,omitempty" json:"targetKind,omitempty"`
 	TargetId   *string `form:"targetId,omitempty" json:"targetId,omitempty"`
@@ -1529,7 +1529,7 @@ type ExportAuditEventsParams struct {
 	// ActorUserId Keep events by this user.
 	ActorUserId *string `form:"actorUserId,omitempty" json:"actorUserId,omitempty"`
 
-	// Action One action, or a prefix ending in a dot.
+	// Action An action prefix: node. keeps every node action.
 	Action     *string `form:"action,omitempty" json:"action,omitempty"`
 	TargetKind *string `form:"targetKind,omitempty" json:"targetKind,omitempty"`
 	TargetId   *string `form:"targetId,omitempty" json:"targetId,omitempty"`

@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
-	"github.com/juanfont/headscale/integration/dockertestutil"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
+	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
+	"github.com/aislopware/slopscale/integration/dockertestutil"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/integrationutil"
+	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/oauth2-proxy/mockoidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,7 +38,7 @@ func sshScenario(t *testing.T, policy *policyv2.Policy, testName string, clients
 	scenario, err := NewScenario(spec)
 	require.NoError(t, err)
 
-	err = scenario.CreateHeadscaleEnv(
+	err = scenario.CreateSlopscaleEnv(
 		[]tsic.Option{
 			tsic.WithSSH(),
 
@@ -688,16 +688,16 @@ func doSSHCheckWithTimeout(
 	return ch
 }
 
-// findSSHCheckAuthID polls headscale container logs for the SSH action auth-id.
+// findSSHCheckAuthID polls slopscale container logs for the SSH action auth-id.
 // The SSH action handler logs "SSH action follow-up" with the auth_id on the
 // follow-up request (where auth_id is non-empty).
-func findSSHCheckAuthID(t *testing.T, headscale ControlServer) string {
+func findSSHCheckAuthID(t *testing.T, slopscale ControlServer) string {
 	t.Helper()
 
 	var authID string
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		_, stderr, err := headscale.ReadLog()
+		_, stderr, err := slopscale.ReadLog()
 		assert.NoError(c, err)
 
 		for line := range strings.SplitSeq(stderr, "\n") {
@@ -717,9 +717,9 @@ func findSSHCheckAuthID(t *testing.T, headscale ControlServer) string {
 			}
 		}
 
-		assert.NotEmpty(c, authID, "auth-id not found in headscale logs")
+		assert.NotEmpty(c, authID, "auth-id not found in slopscale logs")
 	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.SlowPoll,
-		"waiting for SSH check auth-id in headscale logs")
+		"waiting for SSH check auth-id in slopscale logs")
 
 	return authID
 }
@@ -791,12 +791,12 @@ func sshCheckPolicyWithPeriod(period time.Duration) *policyv2.Policy {
 	}
 }
 
-// findNewSSHCheckAuthID polls headscale logs for an SSH check auth-id
+// findNewSSHCheckAuthID polls slopscale logs for an SSH check auth-id
 // that differs from excludeID. Used to verify re-authentication after
 // session expiry.
 func findNewSSHCheckAuthID(
 	t *testing.T,
-	headscale ControlServer,
+	slopscale ControlServer,
 	excludeID string,
 ) string {
 	t.Helper()
@@ -804,7 +804,7 @@ func findNewSSHCheckAuthID(
 	var authID string
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		_, stderr, err := headscale.ReadLog()
+		_, stderr, err := slopscale.ReadLog()
 		assert.NoError(c, err)
 
 		for line := range strings.SplitSeq(stderr, "\n") {
@@ -827,7 +827,7 @@ func findNewSSHCheckAuthID(
 			}
 		}
 
-		assert.NotEmpty(c, authID, "new auth-id not found in headscale logs")
+		assert.NotEmpty(c, authID, "new auth-id not found in slopscale logs")
 	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.SlowPoll, "waiting for new SSH check auth-id")
 
 	return authID
@@ -847,7 +847,7 @@ func TestSSHOneUserToOneCheckModeCLI(t *testing.T) {
 	user2Clients, err := scenario.ListTailscaleClients("user2")
 	requireNoErrListClients(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	err = scenario.WaitForTailscaleSync()
@@ -866,13 +866,13 @@ func TestSSHOneUserToOneCheckModeCLI(t *testing.T) {
 			// Start SSH — will block waiting for check auth
 			sshResult := doSSHCheck(t, client, peer)
 
-			// Find the auth-id from headscale logs
-			authID := findSSHCheckAuthID(t, headscale)
+			// Find the auth-id from slopscale logs
+			authID := findSSHCheckAuthID(t, slopscale)
 
 			// Approve via CLI
-			_, err := headscale.Execute(
+			_, err := slopscale.Execute(
 				[]string{
-					"headscale", "auth", "approve",
+					"slopscale", "auth", "approve",
 					"--auth-id", authID,
 				},
 			)
@@ -926,13 +926,13 @@ func TestSSHOneUserToOneCheckModeOIDC(t *testing.T) {
 	require.NoError(t, err)
 
 	oidcMap := map[string]string{
-		"HEADSCALE_OIDC_ISSUER":             scenario.mockOIDC.Issuer(),
-		"HEADSCALE_OIDC_CLIENT_ID":          scenario.mockOIDC.ClientID(),
+		"SLOPSCALE_OIDC_ISSUER":             scenario.mockOIDC.Issuer(),
+		"SLOPSCALE_OIDC_CLIENT_ID":          scenario.mockOIDC.ClientID(),
 		"CREDENTIALS_DIRECTORY_TEST":        "/tmp",
-		"HEADSCALE_OIDC_CLIENT_SECRET_PATH": "${CREDENTIALS_DIRECTORY_TEST}/hs_client_oidc_secret",
+		"SLOPSCALE_OIDC_CLIENT_SECRET_PATH": "${CREDENTIALS_DIRECTORY_TEST}/hs_client_oidc_secret",
 	}
 
-	err = scenario.CreateHeadscaleEnvWithLoginURL(
+	err = scenario.CreateSlopscaleEnvWithLoginURL(
 		[]tsic.Option{
 			tsic.WithSSH(),
 			tsic.WithNetfilter("off"),
@@ -959,7 +959,7 @@ func TestSSHOneUserToOneCheckModeOIDC(t *testing.T) {
 	user2Clients, err := scenario.ListTailscaleClients("user2")
 	requireNoErrListClients(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	err = scenario.WaitForTailscaleSync()
@@ -978,12 +978,12 @@ func TestSSHOneUserToOneCheckModeOIDC(t *testing.T) {
 			// Start SSH — will block waiting for check auth
 			sshResult := doSSHCheck(t, client, peer)
 
-			// Find the auth-id from headscale logs
-			authID := findSSHCheckAuthID(t, headscale)
+			// Find the auth-id from slopscale logs
+			authID := findSSHCheckAuthID(t, slopscale)
 
 			// Build auth URL and visit it to trigger OIDC flow.
 			// The mock OIDC server auto-authenticates from the user queue.
-			authURL := headscale.GetEndpoint() + "/auth/" + authID
+			authURL := slopscale.GetEndpoint() + "/auth/" + authID
 			parsedURL, err := url.Parse(authURL)
 			require.NoError(t, err)
 
@@ -1032,7 +1032,7 @@ func TestSSHCheckModeUnapprovedTimeout(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv(
+	err = scenario.CreateSlopscaleEnv(
 		[]tsic.Option{
 			tsic.WithSSH(),
 			tsic.WithNetfilter("off"),
@@ -1043,8 +1043,8 @@ func TestSSHCheckModeUnapprovedTimeout(t *testing.T) {
 		hsic.WithACLPolicy(sshCheckPolicy()),
 		hsic.WithTestName("sshchecktimeout"),
 		hsic.WithConfigEnv(map[string]string{
-			"HEADSCALE_TUNING_REGISTER_CACHE_EXPIRATION": "15s",
-			"HEADSCALE_TUNING_REGISTER_CACHE_CLEANUP":    "5s",
+			"SLOPSCALE_TUNING_REGISTER_CACHE_EXPIRATION": "15s",
+			"SLOPSCALE_TUNING_REGISTER_CACHE_CLEANUP":    "5s",
 		}),
 	)
 	require.NoError(t, err)
@@ -1058,7 +1058,7 @@ func TestSSHCheckModeUnapprovedTimeout(t *testing.T) {
 	user2Clients, err := scenario.ListTailscaleClients("user2")
 	requireNoErrListClients(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	err = scenario.WaitForTailscaleSync()
@@ -1077,7 +1077,7 @@ func TestSSHCheckModeUnapprovedTimeout(t *testing.T) {
 			sshResult := doSSHCheck(t, client, peer)
 
 			// Confirm the check flow was entered
-			_ = findSSHCheckAuthID(t, headscale)
+			_ = findSSHCheckAuthID(t, slopscale)
 
 			// Do NOT approve — wait for cache expiry and SSH rejection
 			select {
@@ -1118,7 +1118,7 @@ func TestSSHCheckModeCheckPeriodCLI(t *testing.T) {
 	user1Clients, err := scenario.ListTailscaleClients("user1")
 	requireNoErrListClients(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	err = scenario.WaitForTailscaleSync()
@@ -1135,11 +1135,11 @@ func TestSSHCheckModeCheckPeriodCLI(t *testing.T) {
 			}
 
 			sshResult := doSSHCheck(t, client, peer)
-			firstAuthID := findSSHCheckAuthID(t, headscale)
+			firstAuthID := findSSHCheckAuthID(t, slopscale)
 
-			_, err := headscale.Execute(
+			_, err := slopscale.Execute(
 				[]string{
-					"headscale", "auth", "approve",
+					"slopscale", "auth", "approve",
 					"--auth-id", firstAuthID,
 				},
 			)
@@ -1166,7 +1166,7 @@ func TestSSHCheckModeCheckPeriodCLI(t *testing.T) {
 
 			// === Phase 3: Second SSH — must re-authenticate ===
 			sshResult2 := doSSHCheck(t, client, peer)
-			secondAuthID := findNewSSHCheckAuthID(t, headscale, firstAuthID)
+			secondAuthID := findNewSSHCheckAuthID(t, slopscale, firstAuthID)
 
 			require.NotEqual(
 				t,
@@ -1175,9 +1175,9 @@ func TestSSHCheckModeCheckPeriodCLI(t *testing.T) {
 				"second SSH should trigger a new auth flow after checkPeriod expiry",
 			)
 
-			_, err = headscale.Execute(
+			_, err = slopscale.Execute(
 				[]string{
-					"headscale", "auth", "approve",
+					"slopscale", "auth", "approve",
 					"--auth-id", secondAuthID,
 				},
 			)
@@ -1213,7 +1213,7 @@ func TestSSHCheckModeAutoApprove(t *testing.T) {
 	user1Clients, err := scenario.ListTailscaleClients("user1")
 	requireNoErrListClients(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	err = scenario.WaitForTailscaleSync()
@@ -1230,11 +1230,11 @@ func TestSSHCheckModeAutoApprove(t *testing.T) {
 			}
 
 			sshResult := doSSHCheck(t, client, peer)
-			firstAuthID := findSSHCheckAuthID(t, headscale)
+			firstAuthID := findSSHCheckAuthID(t, slopscale)
 
-			_, err := headscale.Execute(
+			_, err := slopscale.Execute(
 				[]string{
-					"headscale", "auth", "approve",
+					"slopscale", "auth", "approve",
 					"--auth-id", firstAuthID,
 				},
 			)
@@ -1283,7 +1283,7 @@ func TestSSHCheckModeSessionLossReDelegates(t *testing.T) {
 	user1Clients, err := scenario.ListTailscaleClients("user1")
 	requireNoErrListClients(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	err = scenario.WaitForTailscaleSync()
@@ -1303,13 +1303,13 @@ func TestSSHCheckModeSessionLossReDelegates(t *testing.T) {
 			// generous window: the flow spans a full control-plane restart.
 			sshResult := doSSHCheckWithTimeout(t, client, peer, 120*time.Second)
 
-			firstAuthID := findSSHCheckAuthID(t, headscale)
+			firstAuthID := findSSHCheckAuthID(t, slopscale)
 
 			// Restart the control plane: the in-memory auth cache is dropped
 			// (the on-disk database and keys persist), so the auth_id the
 			// client is still polling for no longer exists.
-			err := headscale.Restart()
-			require.NoError(t, err, "restarting headscale should succeed")
+			err := slopscale.Restart()
+			require.NoError(t, err, "restarting slopscale should succeed")
 
 			err = scenario.WaitForTailscaleSync()
 			requireNoErrSync(t, err)
@@ -1318,15 +1318,15 @@ func TestSSHCheckModeSessionLossReDelegates(t *testing.T) {
 			// server re-delegates a fresh session instead of returning an error
 			// the client cannot recover from. A new auth_id only appears if the
 			// re-delegation happened.
-			secondAuthID := findNewSSHCheckAuthID(t, headscale, firstAuthID)
+			secondAuthID := findNewSSHCheckAuthID(t, slopscale, firstAuthID)
 			require.NotEqual(t, firstAuthID, secondAuthID,
 				"a lost session under an active check must re-delegate with a new auth_id")
 
 			// Approve the re-delegated session; the SSH connection must now
 			// complete instead of hanging until it times out.
-			_, err = headscale.Execute(
+			_, err = slopscale.Execute(
 				[]string{
-					"headscale", "auth", "approve",
+					"slopscale", "auth", "approve",
 					"--auth-id", secondAuthID,
 				},
 			)
@@ -1348,7 +1348,7 @@ func TestSSHCheckModeSessionLossReDelegates(t *testing.T) {
 	}
 }
 
-// TestSSHCheckModeNegativeCLI verifies that `headscale auth reject`
+// TestSSHCheckModeNegativeCLI verifies that `slopscale auth reject`
 // properly denies an SSH check.
 func TestSSHCheckModeNegativeCLI(t *testing.T) {
 	IntegrationSkip(t)
@@ -1362,7 +1362,7 @@ func TestSSHCheckModeNegativeCLI(t *testing.T) {
 	user1Clients, err := scenario.ListTailscaleClients("user1")
 	requireNoErrListClients(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	err = scenario.WaitForTailscaleSync()
@@ -1378,12 +1378,12 @@ func TestSSHCheckModeNegativeCLI(t *testing.T) {
 			}
 
 			sshResult := doSSHCheck(t, client, peer)
-			authID := findSSHCheckAuthID(t, headscale)
+			authID := findSSHCheckAuthID(t, slopscale)
 
 			// Reject via CLI
-			_, err := headscale.Execute(
+			_, err := slopscale.Execute(
 				[]string{
-					"headscale", "auth", "reject",
+					"slopscale", "auth", "reject",
 					"--auth-id", authID,
 				},
 			)
@@ -1402,7 +1402,7 @@ func TestSSHCheckModeNegativeCLI(t *testing.T) {
 
 // TestSSHLocalpart tests that SSH with localpart:*@<domain> works correctly.
 // localpart maps the local-part of each user's OIDC email to an OS user,
-// so user1@headscale.net can SSH as local user "user1".
+// so user1@slopscale.net can SSH as local user "user1".
 // This requires OIDC login so that users have real email addresses.
 func TestSSHLocalpart(t *testing.T) {
 	IntegrationSkip(t)
@@ -1435,7 +1435,7 @@ func TestSSHLocalpart(t *testing.T) {
 							new(policyv2.AutoGroupMember),
 							new(policyv2.AutoGroupTagged),
 						},
-						Users: []policyv2.SSHUser{"localpart:*@headscale.net"},
+						Users: []policyv2.SSHUser{"localpart:*@slopscale.net"},
 					},
 				},
 			},
@@ -1448,14 +1448,14 @@ func TestSSHLocalpart(t *testing.T) {
 				user2Clients, err := scenario.ListTailscaleClients("user2")
 				requireNoErrListClients(t, err)
 
-				// user1 can SSH to user2's nodes as "user1" (localpart of user1@headscale.net)
+				// user1 can SSH to user2's nodes as "user1" (localpart of user1@slopscale.net)
 				for _, client := range user1Clients {
 					for _, peer := range user2Clients {
 						assertSSHHostnameAsUser(t, client, peer, "user1")
 					}
 				}
 
-				// user2 can SSH to user1's nodes as "user2" (localpart of user2@headscale.net)
+				// user2 can SSH to user1's nodes as "user2" (localpart of user2@slopscale.net)
 				for _, client := range user2Clients {
 					for _, peer := range user1Clients {
 						assertSSHHostnameAsUser(t, client, peer, "user2")
@@ -1486,7 +1486,7 @@ func TestSSHLocalpart(t *testing.T) {
 						Action:       "accept",
 						Sources:      policyv2.SSHSrcAliases{new(policyv2.AutoGroupMember)},
 						Destinations: policyv2.SSHDstAliases{new(policyv2.AutoGroupSelf)},
-						Users:        []policyv2.SSHUser{"localpart:*@headscale.net"},
+						Users:        []policyv2.SSHUser{"localpart:*@slopscale.net"},
 					},
 				},
 			},
@@ -1535,7 +1535,7 @@ func TestSSHLocalpart(t *testing.T) {
 							new(policyv2.AutoGroupTagged),
 						},
 						Users: []policyv2.SSHUser{
-							"localpart:*@headscale.net",
+							"localpart:*@slopscale.net",
 							"root",
 						},
 					},
@@ -1598,13 +1598,13 @@ func TestSSHLocalpart(t *testing.T) {
 			defer scenario.ShutdownAssertNoPanics(t)
 
 			oidcMap := map[string]string{
-				"HEADSCALE_OIDC_ISSUER":             scenario.mockOIDC.Issuer(),
-				"HEADSCALE_OIDC_CLIENT_ID":          scenario.mockOIDC.ClientID(),
+				"SLOPSCALE_OIDC_ISSUER":             scenario.mockOIDC.Issuer(),
+				"SLOPSCALE_OIDC_CLIENT_ID":          scenario.mockOIDC.ClientID(),
 				"CREDENTIALS_DIRECTORY_TEST":        "/tmp",
-				"HEADSCALE_OIDC_CLIENT_SECRET_PATH": "${CREDENTIALS_DIRECTORY_TEST}/hs_client_oidc_secret",
+				"SLOPSCALE_OIDC_CLIENT_SECRET_PATH": "${CREDENTIALS_DIRECTORY_TEST}/hs_client_oidc_secret",
 			}
 
-			err = scenario.CreateHeadscaleEnvWithLoginURL(
+			err = scenario.CreateSlopscaleEnvWithLoginURL(
 				[]tsic.Option{
 					tsic.WithSSH(),
 					tsic.WithNetfilter("off"),
@@ -1617,7 +1617,7 @@ func TestSSHLocalpart(t *testing.T) {
 				hsic.WithConfigEnv(oidcMap),
 				hsic.WithFileInContainer("/tmp/hs_client_oidc_secret", []byte(scenario.mockOIDC.ClientSecret())),
 			)
-			requireNoErrHeadscaleEnv(t, err)
+			requireNoErrSlopscaleEnv(t, err)
 
 			err = scenario.WaitForTailscaleSync()
 			requireNoErrSync(t, err)

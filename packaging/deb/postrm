@@ -1,5 +1,5 @@
 #!/bin/sh
-# postrm script for headscale.
+# postrm script for slopscale.
 
 set -e
 
@@ -25,10 +25,10 @@ case "$1" in
     ;;
 
     purge)
-      userdel headscale
-      rm -rf /var/lib/headscale
+      userdel slopscale
+      rm -rf /var/lib/slopscale
       if [ -x "/usr/bin/deb-systemd-helper" ]; then
-        deb-systemd-helper purge headscale.service >/dev/null || true
+        deb-systemd-helper purge slopscale.service >/dev/null || true
       fi
     ;;
 

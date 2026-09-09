@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"tailscale.com/control/controlclient"
 	_ "tailscale.com/feature/c2n" // answers c2n pings
 	"tailscale.com/health"

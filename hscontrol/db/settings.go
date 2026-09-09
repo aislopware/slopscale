@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/aislopware/slopscale/gen/jet/table"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	jet "github.com/go-jet/jet/v2/sqlite"
-	"github.com/juanfont/headscale/gen/jet/table"
-	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 // settingRow is a settings table row: one tailnet-wide switch.

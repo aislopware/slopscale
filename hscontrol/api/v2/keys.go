@@ -6,12 +6,12 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/api/tagguard"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/api/tagguard"
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
 )
 
 func init() {
@@ -23,14 +23,14 @@ func init() {
 const defaultExpiry = 90 * 24 * time.Hour
 
 const (
-	// keyTypeAuth is a machine auth key (Headscale pre-auth key); the default.
+	// keyTypeAuth is a machine auth key (Slopscale pre-auth key); the default.
 	keyTypeAuth = "auth"
 	// keyTypeClient is an OAuth client (client-credentials). Multiplexed onto the
 	// keys resource exactly as Tailscale does.
 	keyTypeClient = "client"
 )
 
-// KeyCapabilities maps a resource to the actions a key permits. Headscale
+// KeyCapabilities maps a resource to the actions a key permits. Slopscale
 // populates only devices.create (auth keys); the named types (vs Tailscale's
 // anonymous nesting) give Huma stable schema names.
 type KeyCapabilities struct {
@@ -90,13 +90,13 @@ type Key struct {
 
 type (
 	createKeyInput struct {
-		Tailnet string `doc:"Tailnet; must be \"-\" (the single Headscale tailnet)." path:"tailnet"`
+		Tailnet string `doc:"Tailnet; must be \"-\" (the single Slopscale tailnet)." path:"tailnet"`
 		Body    CreateKeyRequest
 	}
 
 	listKeysInput struct {
 		Tailnet string `path:"tailnet"`
-		All     bool   `doc:"Accepted for compatibility; Headscale returns all keys." query:"all"`
+		All     bool   `doc:"Accepted for compatibility; Slopscale returns all keys." query:"all"`
 	}
 
 	keyByIDInput struct {

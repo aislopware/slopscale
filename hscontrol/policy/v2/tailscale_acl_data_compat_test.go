@@ -1,6 +1,6 @@
 // This file implements a data-driven test runner for ACL compatibility tests.
 // It loads HuJSON golden files from testdata/acl_results/acl-*.hujson and
-// compares headscale's ACL engine output against the expected packet filter
+// compares slopscale's ACL engine output against the expected packet filter
 // rules captured from a Tailscale-hosted control plane by an external capture tool.
 //
 // Each file is a testcapture.Capture containing:
@@ -10,7 +10,7 @@
 //     scenarios that the SaaS rejected)
 //
 // Test data source: testdata/acl_results/acl-*.hujson
-// Source format:    github.com/juanfont/headscale/hscontrol/types/testcapture
+// Source format:    github.com/aislopware/slopscale/hscontrol/types/testcapture
 
 package v2
 
@@ -23,11 +23,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/policy/policyutil"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/testcapture"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juanfont/headscale/hscontrol/policy/policyutil"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 )
@@ -203,7 +203,7 @@ func loadACLTestFile(t *testing.T, path string) *testcapture.Capture {
 }
 
 // TestACLCompat is a data-driven test that loads all ACL-*.json test files
-// and compares headscale's ACL engine output against the expected behavior.
+// and compares slopscale's ACL engine output against the expected behavior.
 //
 // Each JSON file contains:
 //   - A full policy with groups, tagOwners, hosts, and acls
@@ -289,7 +289,7 @@ func testACLError(t *testing.T, tf *testcapture.Capture) {
 	)
 }
 
-// assertACLErrorContains requires that headscale's error contains the
+// assertACLErrorContains requires that slopscale's error contains the
 // Tailscale SaaS error message exactly. Divergence means an emitter
 // needs to be aligned, not papered over with a translation table.
 func assertACLErrorContains(
@@ -308,7 +308,7 @@ func assertACLErrorContains(
 	t.Errorf(
 		"%s: error message mismatch\n"+
 			"  want (tailscale): %q\n"+
-			"  got  (headscale): %q",
+			"  got  (slopscale): %q",
 		testID,
 		wantMsg,
 		errStr,
@@ -325,7 +325,7 @@ func testACLSuccess(
 ) {
 	t.Helper()
 
-	// Convert Tailscale SaaS user emails to headscale @example.com format.
+	// Convert Tailscale SaaS user emails to slopscale @example.com format.
 	policyJSON := convertPolicyUserEmails(tf.Input.FullPolicy)
 
 	pol, err := unmarshalPolicy(policyJSON)
@@ -356,7 +356,7 @@ func testACLSuccess(
 				return
 			}
 
-			// Compile headscale filter rules for this node
+			// Compile slopscale filter rules for this node
 			compiledRules := pol.compileFilterRulesForNode(
 				users,
 				node.View(),

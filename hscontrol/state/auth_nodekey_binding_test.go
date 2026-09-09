@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 )
@@ -19,10 +19,10 @@ import (
 func TestPreAuthKeyReauthRejectsVictimNodeKey(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	// Attacker owns N_a under U_a with machine key M_a.

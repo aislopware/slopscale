@@ -1,4 +1,4 @@
-# hi — Headscale Integration test runner
+# hi — Slopscale Integration test runner
 
 `hi` wraps Docker container orchestration around the tests in
 [`../../integration`](../../integration) and extracts debugging artefacts
@@ -62,7 +62,7 @@ changing.
 | `--logs-dir`        | `control_logs` | Where to save run artefacts                                                 |
 | `--verbose`         | `false`        | Verbose output                                                              |
 | `--stats`           | `false`        | Collect container resource-usage stats                                      |
-| `--hs-memory-limit` | `0`            | Fail if any headscale container exceeds N MB (0 = disabled)                 |
+| `--hs-memory-limit` | `0`            | Fail if any slopscale container exceeds N MB (0 = disabled)                 |
 | `--ts-memory-limit` | `0`            | Fail if any tailscale container exceeds N MB                                |
 
 ### Timeout guidance
@@ -130,8 +130,8 @@ Every run saves debugging artefacts under `control_logs/{runID}/`:
 
 ```
 control_logs/20260409-104215-mdjtzx/
-├── hs-<test>-<hash>.stderr.log        # headscale server errors
-├── hs-<test>-<hash>.stdout.log        # headscale server output
+├── hs-<test>-<hash>.stderr.log        # slopscale server errors
+├── hs-<test>-<hash>.stdout.log        # slopscale server output
 ├── hs-<test>-<hash>.db                # database snapshot (SQLite)
 ├── hs-<test>-<hash>_metrics.txt       # Prometheus metrics dump
 ├── hs-<test>-<hash>-mapresponses/     # MapResponse protocol captures
@@ -147,7 +147,7 @@ unwanted directories to reclaim disk.
 
 When a test fails, read the artefacts **in this order**:
 
-1. **`hs-*.stderr.log`** — headscale server errors, panics, policy
+1. **`hs-*.stderr.log`** — slopscale server errors, panics, policy
    evaluation failures. Most issues originate server-side.
 
    ```bash

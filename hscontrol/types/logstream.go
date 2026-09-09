@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/egress"
 )
 
 // LogStreamID identifies a log stream in the log_streams table.

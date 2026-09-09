@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tailcfg/nodecap"

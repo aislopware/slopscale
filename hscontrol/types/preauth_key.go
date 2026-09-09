@@ -4,8 +4,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/aislopware/slopscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )

@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/wire"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/wire"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tailcfg/nodecap"
@@ -42,7 +42,7 @@ const funnelUnavailable = "Funnel is not available on this server: it needs Tail
 // sessionNode returns the node a machine request speaks for, refusing a
 // node key that is unknown or not bound to the session's machine key.
 func (ns *noiseServer) sessionNode(nodeKey key.NodePublic) (types.NodeView, error) {
-	node, ok := ns.headscale.state.GetNodeByNodeKey(nodeKey)
+	node, ok := ns.slopscale.state.GetNodeByNodeKey(nodeKey)
 	if !ok || node.MachineKey() != ns.machineKey {
 		return types.NodeView{}, NewHTTPError(http.StatusUnauthorized, "node key does not match the session",
 			fmt.Errorf("%w: %s", ErrMachineKeyMismatch, nodeKey.ShortString()))
@@ -96,7 +96,7 @@ func (ns *noiseServer) AuditLogHandler(writer http.ResponseWriter, req *http.Req
 		event.ActorUserID = types.UserID(uid)
 	}
 
-	audit.Record(ns.headscale.state, event)
+	audit.Record(ns.slopscale.state, event)
 
 	writer.WriteHeader(http.StatusOK)
 }
@@ -160,7 +160,7 @@ func (ns *noiseServer) featureQueryResponse(node types.NodeView, feature string)
 		return tailcfg.QueryFeatureResponse{Text: fmt.Sprintf("%q is not a feature this server knows.", feature)}
 	}
 
-	capMap := ns.headscale.state.NodeCapMap(node.ID())
+	capMap := ns.slopscale.state.NodeCapMap(node.ID())
 
 	var missing []string
 
@@ -183,7 +183,7 @@ func (ns *noiseServer) featureQueryResponse(node types.NodeView, feature string)
 				"to the machine in the policy file, under Access controls. This command waits for that.",
 			featureTitle(feature), strings.Join(missing, " and "),
 		),
-		URL:        ns.headscale.cfg.ServerURL + "/admin/policy",
+		URL:        ns.slopscale.cfg.ServerURL + "/admin/policy",
 		ShouldWait: true,
 	}
 }

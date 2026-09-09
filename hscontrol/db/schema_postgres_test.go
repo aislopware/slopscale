@@ -17,7 +17,7 @@ import (
 // added since. schema_postgres.sql must produce exactly the same columns,
 // indexes and constraints so databases created before and after the move
 // are interchangeable. After adding a table to both schema files, run the
-// test with HEADSCALE_UPDATE_GOLDEN=1 to rewrite the file, then check the
+// test with SLOPSCALE_UPDATE_GOLDEN=1 to rewrite the file, then check the
 // diff by eye.
 const postgresGoldenPath = "testdata/postgres/gorm_schema_golden.txt"
 
@@ -29,7 +29,7 @@ func TestPostgresSchemaMatchesGolden(t *testing.T) {
 	got, err := dumpPostgresSchema(t.Context(), db.DB)
 	require.NoError(t, err)
 
-	if os.Getenv("HEADSCALE_UPDATE_GOLDEN") != "" {
+	if os.Getenv("SLOPSCALE_UPDATE_GOLDEN") != "" {
 		require.NoError(t, os.WriteFile(postgresGoldenPath, []byte(got), 0o600))
 	}
 

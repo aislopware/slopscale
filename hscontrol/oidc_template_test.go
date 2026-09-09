@@ -3,7 +3,7 @@ package hscontrol
 import (
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/templates"
+	"github.com/aislopware/slopscale/hscontrol/templates"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +17,7 @@ func TestAuthErrorTemplate(t *testing.T) {
 		{
 			name: "bad_request",
 			result: templates.AuthErrorResult{
-				Title:   "Headscale - Error",
+				Title:   "Slopscale - Error",
 				Heading: "Bad Request",
 				Message: "The request could not be processed. Please try again.",
 			},
@@ -25,7 +25,7 @@ func TestAuthErrorTemplate(t *testing.T) {
 		{
 			name: "forbidden",
 			result: templates.AuthErrorResult{
-				Title:   "Headscale - Error",
+				Title:   "Slopscale - Error",
 				Heading: "Forbidden",
 				Message: "You are not authorized. Please contact your administrator.",
 			},
@@ -33,7 +33,7 @@ func TestAuthErrorTemplate(t *testing.T) {
 		{
 			name: "gone_expired",
 			result: templates.AuthErrorResult{
-				Title:   "Headscale - Error",
+				Title:   "Slopscale - Error",
 				Heading: "Gone",
 				Message: "Your session has expired. Please try again.",
 			},
@@ -41,7 +41,7 @@ func TestAuthErrorTemplate(t *testing.T) {
 		{
 			name: "internal_server_error",
 			result: templates.AuthErrorResult{
-				Title:   "Headscale - Error",
+				Title:   "Slopscale - Error",
 				Heading: "Internal Server Error",
 				Message: "Something went wrong. Please try again later.",
 			},
@@ -67,7 +67,7 @@ func TestAuthErrorTemplate(t *testing.T) {
 
 			// Verify SVG elements are present
 			assert.Contains(t, html, "<svg")
-			assert.Contains(t, html, "class=\"headscale-logo\"")
+			assert.Contains(t, html, "class=\"slopscale-logo\"")
 			assert.Contains(t, html, "id=\"error-icon\"")
 
 			// Verify no success checkbox icon
@@ -86,7 +86,7 @@ func TestAuthSuccessTemplate(t *testing.T) {
 		{
 			name: "node_registered",
 			result: templates.AuthSuccessResult{
-				Title:   "Headscale - Node Registered",
+				Title:   "Slopscale - Node Registered",
 				Heading: "Node registered",
 				Verb:    "Registered",
 				User:    "newuser@example.com",
@@ -96,7 +96,7 @@ func TestAuthSuccessTemplate(t *testing.T) {
 		{
 			name: "node_reauthenticated",
 			result: templates.AuthSuccessResult{
-				Title:   "Headscale - Node Reauthenticated",
+				Title:   "Slopscale - Node Reauthenticated",
 				Heading: "Node reauthenticated",
 				Verb:    "Reauthenticated",
 				User:    "test@example.com",
@@ -106,7 +106,7 @@ func TestAuthSuccessTemplate(t *testing.T) {
 		{
 			name: "ssh_session_authorized",
 			result: templates.AuthSuccessResult{
-				Title:   "Headscale - SSH Session Authorized",
+				Title:   "Slopscale - SSH Session Authorized",
 				Heading: "SSH session authorized",
 				Verb:    "Authorized",
 				User:    "test@example.com",
@@ -136,7 +136,7 @@ func TestAuthSuccessTemplate(t *testing.T) {
 
 			// Verify SVG elements are present
 			assert.Contains(t, html, "<svg")
-			assert.Contains(t, html, "class=\"headscale-logo\"")
+			assert.Contains(t, html, "class=\"slopscale-logo\"")
 			assert.Contains(t, html, "id=\"checkbox\"")
 		})
 	}

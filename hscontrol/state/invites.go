@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	hsdb "github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
-	"github.com/juanfont/headscale/hscontrol/webhook"
+	hsdb "github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
+	"github.com/aislopware/slopscale/hscontrol/webhook"
 	"github.com/rs/zerolog/log"
 )
 
@@ -328,7 +328,7 @@ func (s *State) SendInviteMail(ctx context.Context, invite types.UserInvite, lin
 
 	subject := "You have been invited to " + tailnet
 	if tailnet == "" {
-		subject = "You have been invited to a Headscale tailnet"
+		subject = "You have been invited to a Slopscale tailnet"
 	}
 
 	var body strings.Builder

@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/rs/zerolog/log"
 )
 

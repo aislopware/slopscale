@@ -1,5 +1,5 @@
 {
-  "name": "headscale-admin-codegen",
+  "name": "slopscale-admin-codegen",
   "private": true,
   "description": "Generates the API types from the server's OpenAPI document. Lives in its own workspace because openapi-typescript drives the TypeScript 5 compiler API, which the Go-based TypeScript 7 the app uses does not expose.",
   "type": "module",

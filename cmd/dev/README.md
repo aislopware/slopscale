@@ -1,12 +1,12 @@
 # cmd/dev -- Local Development Environment
 
-Starts a headscale server on localhost with a pre-created user and
+Starts a slopscale server on localhost with a pre-created user and
 pre-auth key. Pair with `mts` to add real tailscale nodes.
 
 ## Quick start
 
 ```bash
-# Terminal 1: start headscale
+# Terminal 1: start slopscale
 go run ./cmd/dev
 
 # Terminal 2: start mts server
@@ -27,7 +27,7 @@ done
 go tool mts server stop node1 && go tool mts server start node1
 go tool mts server stop node2 && go tool mts server start node2
 
-# Connect to headscale (use the auth key printed by cmd/dev)
+# Connect to slopscale (use the auth key printed by cmd/dev)
 go tool mts node1 up --login-server=http://127.0.0.1:8080 --authkey=<KEY> --reset
 go tool mts node2 up --login-server=http://127.0.0.1:8080 --authkey=<KEY> --reset
 
@@ -39,21 +39,21 @@ go tool mts node1 status
 
 | Flag     | Default | Description                  |
 | -------- | ------- | ---------------------------- |
-| `--port` | 8080    | Headscale listen port        |
+| `--port` | 8080    | Slopscale listen port        |
 | `--keep` | false   | Keep state directory on exit |
 
 The metrics/debug port is `port + 1010` (default 9090).
 
 ## What it does
 
-1. Builds the headscale binary into a temp directory
+1. Builds the slopscale binary into a temp directory
 2. Writes a minimal dev config (SQLite, public DERP, debug logging)
-3. Starts `headscale serve` as a subprocess
+3. Starts `slopscale serve` as a subprocess
 4. Creates a "dev" user and a reusable 24h pre-auth key via the CLI
 5. Prints a banner with server URL, auth key, and usage instructions
-6. Blocks until Ctrl+C, then kills headscale
+6. Blocks until Ctrl+C, then kills slopscale
 
-State lives in `/tmp/headscale-dev-*/`. Pass `--keep` to preserve it
+State lives in `/tmp/slopscale-dev-*/`. Pass `--keep` to preserve it
 across restarts (useful for inspecting the database or reusing keys).
 
 ## Useful endpoints
@@ -63,14 +63,14 @@ across restarts (useful for inspecting the database or reusing keys).
 - `http://127.0.0.1:9090/debug/ping?node=1` -- quick-ping a node
 - `POST http://127.0.0.1:9090/debug/ping` with `node=<id>` -- trigger ping
 
-## Managing headscale
+## Managing slopscale
 
 The banner prints the full path to the built binary and config. Use it
-for any headscale CLI command:
+for any slopscale CLI command:
 
 ```bash
-/tmp/headscale-dev-*/headscale -c /tmp/headscale-dev-*/config.yaml nodes list
-/tmp/headscale-dev-*/headscale -c /tmp/headscale-dev-*/config.yaml users list
+/tmp/slopscale-dev-*/slopscale -c /tmp/slopscale-dev-*/config.yaml nodes list
+/tmp/slopscale-dev-*/slopscale -c /tmp/slopscale-dev-*/config.yaml users list
 ```
 
 ## Known issues

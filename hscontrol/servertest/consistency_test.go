@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
 	"github.com/stretchr/testify/assert"
 	"tailscale.com/types/netmap"
 )

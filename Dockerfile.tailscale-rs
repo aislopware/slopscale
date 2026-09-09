@@ -7,7 +7,7 @@ WORKDIR /app
 RUN git clone --depth 1 --branch "$TAILSCALE_RS_REF" "$TAILSCALE_RS_REPO" .
 
 # Re-export ts_control's insecure-keyfetch feature through the tailscale
-# crate so the axum example can fetch the headscale control key over
+# crate so the axum example can fetch the slopscale control key over
 # plain HTTP. The integration harness serves the control plane without
 # TLS, and upstream only allows plain-HTTP key fetches when this Cargo
 # feature is compiled in.

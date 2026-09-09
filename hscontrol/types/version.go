@@ -30,7 +30,7 @@ func (v *VersionInfo) String() string {
 		version += "-dirty"
 	}
 
-	fmt.Fprintf(&sb, "headscale version %s\n", version)
+	fmt.Fprintf(&sb, "slopscale version %s\n", version)
 	fmt.Fprintf(&sb, "commit: %s\n", v.Commit)
 	fmt.Fprintf(&sb, "build time: %s\n", v.BuildTime)
 	fmt.Fprintf(&sb, "built with: %s %s/%s\n", v.Go.Version, v.Go.OS, v.Go.Arch)

@@ -6,7 +6,7 @@
 //
 // For field name constants, use the zf subpackage:
 //
-//	import "github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+//	import "github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
 //
 // # Usage Pattern: Sub-Loggers
 //

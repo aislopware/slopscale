@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 	"tailscale.com/tailcfg"
@@ -345,7 +345,7 @@ func snapshotPrimaries(
 	return readPrimaries(rt, srv, clients)
 }
 
-// TestHAProberProperty drives a real Headscale TestServer with a small
+// TestHAProberProperty drives a real Slopscale TestServer with a small
 // fleet of HA-route-advertising clients through a randomised sequence
 // of connect / disconnect / reconnect / prober-tick operations and
 // asserts that the live PrimaryRoutes() snapshot honours every HA

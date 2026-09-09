@@ -18,11 +18,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
+	"github.com/aislopware/slopscale/integration/dockertestutil"
+	"github.com/aislopware/slopscale/integration/integrationutil"
 	"github.com/cenkalti/backoff/v5"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/integration/dockertestutil"
-	"github.com/juanfont/headscale/integration/integrationutil"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"tailscale.com/ipn"
@@ -65,10 +65,10 @@ var (
 	errTailscaleCannotUpWithoutAuthkey = errors.New("cannot up without authkey")
 	errInvalidClientConfig             = errors.New("verifiably invalid client config requested")
 	errInvalidTailscaleImageFormat     = errors.New(
-		"invalid HEADSCALE_INTEGRATION_TAILSCALE_IMAGE format, expected repository:tag",
+		"invalid SLOPSCALE_INTEGRATION_TAILSCALE_IMAGE format, expected repository:tag",
 	)
 	errTailscaleImageRequiredInCI = errors.New(
-		"HEADSCALE_INTEGRATION_TAILSCALE_IMAGE must be set in CI for HEAD version",
+		"SLOPSCALE_INTEGRATION_TAILSCALE_IMAGE must be set in CI for HEAD version",
 	)
 	errContainerNotInitialized = errors.New("container not initialized")
 	errFQDNNotYetAvailable     = errors.New("FQDN not yet available")
@@ -99,7 +99,7 @@ type TailscaleInContainer struct {
 
 	// optional config
 	caCerts           [][]byte
-	headscaleHostname string
+	slopscaleHostname string
 	withWebsocketDERP bool
 	withDERPOverHTTP  bool
 	withSSH           bool
@@ -141,11 +141,11 @@ func WithNetwork(network *dockertest.Network) Option {
 	}
 }
 
-// WithHeadscaleName set the name of the headscale instance,
+// WithSlopscaleName set the name of the slopscale instance,
 // mostly useful in combination with TLS and WithCACert.
-func WithHeadscaleName(hsName string) Option {
+func WithSlopscaleName(hsName string) Option {
 	return func(tsic *TailscaleInContainer) {
-		tsic.headscaleHostname = hsName
+		tsic.slopscaleHostname = hsName
 	}
 }
 
@@ -166,7 +166,7 @@ func WithWebsocketDERP(enabled bool) Option {
 
 // WithDERPOverHTTP makes the client reach the DERP server over plain-HTTP
 // websockets (TS_DEBUG_DERP_WS_CLIENT + TS_DEBUG_USE_DERP_HTTP). It is the
-// counterpart to [hsic.WithoutTLS]: a Headscale serving its embedded DERP without
+// counterpart to [hsic.WithoutTLS]: a Slopscale serving its embedded DERP without
 // TLS is otherwise unreachable, because the client defaults to dialing DERP over
 // HTTPS.
 func WithDERPOverHTTP() Option {
@@ -381,7 +381,7 @@ func New(
 	switch version {
 	case VersionHead:
 		// Check if a pre-built image is available via environment variable
-		prebuiltImage := os.Getenv("HEADSCALE_INTEGRATION_TAILSCALE_IMAGE")
+		prebuiltImage := os.Getenv("SLOPSCALE_INTEGRATION_TAILSCALE_IMAGE")
 
 		// If custom build tags are required (e.g., for websocket DERP), we cannot use
 		// the pre-built image as it won't have the necessary code compiled in.

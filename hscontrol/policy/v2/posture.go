@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/posture"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/posture"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"go4.org/netipx"
 	"tailscale.com/types/views"
 )

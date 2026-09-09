@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/policy/matcher"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	"github.com/juanfont/headscale/hscontrol/util"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
 )

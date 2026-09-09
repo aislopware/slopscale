@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
+	"github.com/aislopware/slopscale/hscontrol/types/testcapture"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/netmap"
 )

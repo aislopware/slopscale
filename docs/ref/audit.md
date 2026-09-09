@@ -1,6 +1,6 @@
 # Audit log
 
-Headscale records who changed what. Every writing request to the API, from
+Slopscale records who changed what. Every writing request to the API, from
 the CLI, the [admin console](console.md) or any other client, becomes one
 audit event once it has run, and so do the sign-in events the server
 performs itself. The log is append-only; nothing in the API edits or deletes
@@ -27,10 +27,10 @@ Actions are listed in the OpenAPI document: each writing operation carries
 From the CLI:
 
 ```console
-$ headscale audit list
-$ headscale audit list --action node. --limit 20
-$ headscale audit list --user 3 --since 2026-09-01T00:00:00Z
-$ headscale audit list --since 24h --target-kind node
+$ slopscale audit list
+$ slopscale audit list --action node. --limit 20
+$ slopscale audit list --user 3 --since 2026-09-01T00:00:00Z
+$ slopscale audit list --since 24h --target-kind node
 ```
 
 `--since` takes an RFC 3339 time or a duration back from now. The next page
@@ -40,7 +40,7 @@ Or from the API, newest first:
 
 ```console
 $ curl -H "Authorization: Bearer $KEY" \
-    "https://headscale.example.com/api/v1/audit?action=user.role.set&limit=50"
+    "https://slopscale.example.com/api/v1/audit?action=user.role.set&limit=50"
 ```
 
 `action` keeps one action, or every action under a prefix when it ends with a
@@ -65,18 +65,18 @@ an _Export_ button for the window and filters on screen, and the CLI writes the
 same file:
 
 ```console
-headscale audit export --since 2026-09-01T00:00:00Z --until 2026-10-01T00:00:00Z -o audit-september.csv
+slopscale audit export --since 2026-09-01T00:00:00Z --until 2026-10-01T00:00:00Z -o audit-september.csv
 ```
 
-The CLI takes the same filters as `headscale audit list`, `--user`, `--action`,
+The CLI takes the same filters as `slopscale audit list`, `--user`, `--action`,
 `--target-kind`, `--target-id`, `--since` and `--before`, and adds `--until` and
 `--format`. `--since` and `--until` accept an RFC 3339 time or a duration back
 from now, such as `24h`. Without `--output` the file is written to stdout, so it
 can be piped.
 
 ```console
-curl -H "Authorization: Bearer $HEADSCALE_API_KEY" \
-  "https://headscale.example.com/api/v1/audit/export?since=2026-09-01T00:00:00Z&until=2026-10-01T00:00:00Z" \
+curl -H "Authorization: Bearer $SLOPSCALE_API_KEY" \
+  "https://slopscale.example.com/api/v1/audit/export?since=2026-09-01T00:00:00Z&until=2026-10-01T00:00:00Z" \
   -o audit-september.csv
 ```
 

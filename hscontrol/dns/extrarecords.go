@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/cenkalti/backoff/v5"
 	"github.com/fsnotify/fsnotify"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 	"tailscale.com/util/set"
@@ -26,7 +26,7 @@ var ErrPathIsDirectory = errors.New("path is a directory, only file is supported
 // is read again. An editor or a script writes the file in several steps
 // (truncate, write, rename, chmod), each an event of its own, and reading
 // after the first one sees a partial file that fails to parse
-// (juanfont/headscale#2753).
+// (aislopware/slopscale#2753).
 const extraRecordsSettle = 100 * time.Millisecond
 
 type ExtraRecordsMan struct {

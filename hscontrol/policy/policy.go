@@ -4,9 +4,9 @@ import (
 	"net/netip"
 	"slices"
 
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/policy/matcher"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/types/views"
 )

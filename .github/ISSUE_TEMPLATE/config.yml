@@ -3,9 +3,9 @@ blank_issues_enabled: false
 
 # Contact links
 contact_links:
-  - name: "headscale Discord community"
-    url: "https://discord.gg/c84AZQhmpx"
-    about: "Please ask and answer questions about usage of headscale here."
-  - name: "headscale usage documentation"
-    url: "https://headscale.net/"
-    about: "Find documentation about how to configure and run headscale."
+  - name: "slopscale discussions"
+    url: "https://github.com/aislopware/slopscale/discussions"
+    about: "Please ask and answer questions about usage of slopscale here."
+  - name: "slopscale usage documentation"
+    url: "https://aislopware.github.io/slopscale/"
+    about: "Find documentation about how to configure and run slopscale."

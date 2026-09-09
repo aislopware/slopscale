@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -36,7 +36,7 @@ func TestDNSConfigMapResponse(t *testing.T) {
 			want: &tailcfg.DNSConfig{
 				Routes: map[string][]*dnstype.Resolver{},
 				Domains: []string{
-					"foobar.headscale.net",
+					"foobar.slopscale.net",
 				},
 				Proxied: true,
 			},
@@ -44,7 +44,7 @@ func TestDNSConfigMapResponse(t *testing.T) {
 		{
 			magicDNS: false,
 			want: &tailcfg.DNSConfig{
-				Domains: []string{"foobar.headscale.net"},
+				Domains: []string{"foobar.slopscale.net"},
 				Proxied: false,
 			},
 		},
@@ -64,7 +64,7 @@ func TestDNSConfigMapResponse(t *testing.T) {
 				}
 			}
 
-			baseDomain := "foobar.headscale.net"
+			baseDomain := "foobar.slopscale.net"
 
 			dnsConfigOrig := tailcfg.DNSConfig{
 				Routes:  make(map[string][]*dnstype.Resolver),
@@ -231,7 +231,7 @@ func TestBuildFromChangeFiltersPeerPatchesByVisibility(t *testing.T) {
 		PrefixV4:     &p4,
 		PrefixV6:     &p6,
 		IPAllocation: types.IPAllocationStrategySequential,
-		BaseDomain:   "headscale.test",
+		BaseDomain:   "slopscale.test",
 		Policy:       types.PolicyConfig{Mode: types.PolicyModeDB},
 		DERP: types.DERPConfig{
 			DERPMap: &tailcfg.DERPMap{
@@ -244,7 +244,7 @@ func TestBuildFromChangeFiltersPeerPatchesByVisibility(t *testing.T) {
 		},
 	}
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	user1 := database.CreateUserForTest("u1")
@@ -319,7 +319,7 @@ func TestBuildFromChangeFiltersUserProfilesByVisibility(t *testing.T) {
 		PrefixV4:     &p4,
 		PrefixV6:     &p6,
 		IPAllocation: types.IPAllocationStrategySequential,
-		BaseDomain:   "headscale.test",
+		BaseDomain:   "slopscale.test",
 		Policy:       types.PolicyConfig{Mode: types.PolicyModeDB},
 		DERP: types.DERPConfig{
 			DERPMap: &tailcfg.DERPMap{
@@ -332,7 +332,7 @@ func TestBuildFromChangeFiltersUserProfilesByVisibility(t *testing.T) {
 		},
 	}
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	user1 := database.CreateUserForTest("u1")
@@ -395,7 +395,7 @@ func TestBuildFromChangeVisibilityMatchesFullMap(t *testing.T) {
 		PrefixV4:     &p4,
 		PrefixV6:     &p6,
 		IPAllocation: types.IPAllocationStrategySequential,
-		BaseDomain:   "headscale.test",
+		BaseDomain:   "slopscale.test",
 		Policy:       types.PolicyConfig{Mode: types.PolicyModeDB},
 		DERP: types.DERPConfig{
 			DERPMap: &tailcfg.DERPMap{
@@ -408,7 +408,7 @@ func TestBuildFromChangeVisibilityMatchesFullMap(t *testing.T) {
 		},
 	}
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	user1 := database.CreateUserForTest("u1")
@@ -599,7 +599,7 @@ func TestFullMapResponseSurvivesPeerWithInvalidName(t *testing.T) {
 				PrefixV4:     &p4,
 				PrefixV6:     &p6,
 				IPAllocation: types.IPAllocationStrategySequential,
-				BaseDomain:   "headscale.test",
+				BaseDomain:   "slopscale.test",
 				Policy:       types.PolicyConfig{Mode: types.PolicyModeDB},
 				DERP: types.DERPConfig{
 					DERPMap: &tailcfg.DERPMap{
@@ -612,7 +612,7 @@ func TestFullMapResponseSurvivesPeerWithInvalidName(t *testing.T) {
 				},
 			}
 
-			database, err := db.NewHeadscaleDatabase(cfg)
+			database, err := db.NewSlopscaleDatabase(cfg)
 			require.NoError(t, err)
 
 			user := database.CreateUserForTest("u1")

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/types/netmap"
@@ -100,7 +100,7 @@ func TestConnectionLifecycle(t *testing.T) {
 		h := servertest.NewHarness(t, 2)
 
 		// Reconnect without explicitly waiting for the old session to
-		// fully drain. This tests that Headscale correctly replaces
+		// fully drain. This tests that Slopscale correctly replaces
 		// the old map session for the same node.
 		h.Client(0).Reconnect(t)
 		h.WaitForMeshComplete(t, 15*time.Second)

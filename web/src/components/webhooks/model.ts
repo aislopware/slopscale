@@ -77,7 +77,7 @@ export interface UrlField {
 
 const defaultUrlField: UrlField = {
   label: "URL",
-  placeholder: "https://ops.example.com/headscale",
+  placeholder: "https://ops.example.com/slopscale",
   hint: "",
 };
 
@@ -92,7 +92,7 @@ const urlFields: Partial<Record<ProviderChoice, UrlField>> = {
     placeholder: "mailto:ops@example.com, security@example.com",
     hint: "mailto: followed by one or more addresses. The server needs notifications.smtp configured.",
   },
-  ntfy: { label: "Topic URL", placeholder: "https://ntfy.sh/headscale-ops", hint: "" },
+  ntfy: { label: "Topic URL", placeholder: "https://ntfy.sh/slopscale-ops", hint: "" },
 };
 
 export function urlField(choice: ProviderChoice): UrlField {

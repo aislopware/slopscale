@@ -19,8 +19,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/egress"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 )
 
@@ -417,7 +417,7 @@ func deliveryStatus(status int, err error) string {
 		return "rejected"
 
 	case errors.Is(err, ErrRedirected), errors.Is(err, ErrClosed):
-		// headscale's own words about its own state, with nothing of the
+		// slopscale's own words about its own state, with nothing of the
 		// sink's network in them.
 		return err.Error()
 
@@ -439,7 +439,7 @@ func (s *Streamer) post(ctx context.Context, stream types.LogStream, batch []Ent
 	}
 
 	req.Header.Set("Content-Type", payload.ContentType)
-	req.Header.Set("User-Agent", "headscale-logstream/1")
+	req.Header.Set("User-Agent", "slopscale-logstream/1")
 
 	if payload.AuthHeader != "" {
 		req.Header.Set(payload.AuthHeader, payload.AuthValue)

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/egress"
 	"tailscale.com/tailcfg"
 )
 
@@ -42,7 +42,7 @@ type DERPSettings struct {
 	// AutoUpdate refetches URLs every UpdateFrequency.
 	AutoUpdate      bool          `json:"autoUpdate"`
 	UpdateFrequency time.Duration `json:"updateFrequency"`
-	// Server is the relay headscale runs itself.
+	// Server is the relay slopscale runs itself.
 	Server DERPServerSettings `json:"server"`
 }
 

@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"testing"
 
+	apiv2 "github.com/aislopware/slopscale/hscontrol/api/v2"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/google/go-cmp/cmp"
-	apiv2 "github.com/juanfont/headscale/hscontrol/api/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

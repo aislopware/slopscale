@@ -36,7 +36,7 @@ const base: DerpSettings = {
   server: {
     enabled: true,
     regionId: 999,
-    regionCode: "headscale",
+    regionCode: "slopscale",
     regionName: "",
     verifyClients: true,
     stunAddr: "0.0.0.0:3478",

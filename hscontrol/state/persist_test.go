@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -26,10 +26,10 @@ import (
 func persistTestSetup(t *testing.T) (string, *State, types.NodeID) {
 	t.Helper()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	user := database.CreateUserForTest("persist-user")
@@ -71,7 +71,7 @@ func persistTestConfig(dbPath string) *types.Config {
 		PrefixV4:     &prefixV4,
 		PrefixV6:     &prefixV6,
 		IPAllocation: types.IPAllocationStrategySequential,
-		BaseDomain:   "headscale.test",
+		BaseDomain:   "slopscale.test",
 		Policy: types.PolicyConfig{
 			Mode: types.PolicyModeDB,
 		},
@@ -236,10 +236,10 @@ func TestPersistEmptyEndpoints(t *testing.T) {
 func TestRegistrationRejectsNodeKeyClaimedByAnotherMachine(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	user := database.CreateUserForTest("nk-user")
@@ -283,10 +283,10 @@ func TestRegistrationRejectsNodeKeyClaimedByAnotherMachine(t *testing.T) {
 func TestReauthRejectsNodeKeyClaimedByAnotherMachine(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	attacker := database.CreateUserForTest("attacker")
@@ -349,10 +349,10 @@ func TestReauthRejectsNodeKeyClaimedByAnotherMachine(t *testing.T) {
 func TestReauthPreservesEndpointsWhenClientOmitsThem(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	user := database.CreateUserForTest("user")
@@ -442,7 +442,7 @@ func TestReauthChange(t *testing.T) {
 func TestPreAuthKeyReauthRejectsNodeKeyClaimedByAnotherMachine(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)
@@ -501,7 +501,7 @@ var errInjectedNodeUpdate = errors.New("injected node update failure")
 func TestPreAuthKeyReauthRevertsNodeStoreOnDBFailure(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)
@@ -555,7 +555,7 @@ func TestPreAuthKeyReauthRevertsNodeStoreOnDBFailure(t *testing.T) {
 func TestConcurrentPreAuthKeyRegistrationSameMachineKey(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
 	s, err := NewState(cfg)

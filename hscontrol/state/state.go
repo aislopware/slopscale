@@ -1,4 +1,4 @@
-// Package state provides core state management for Headscale,
+// Package state provides core state management for Slopscale,
 // coordinating between subsystems like database, IP allocation,
 // policy management, and DERP routing.
 //
@@ -22,17 +22,17 @@ import (
 	"sync/atomic"
 	"time"
 
+	hsdb "github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/logstream"
+	"github.com/aislopware/slopscale/hscontrol/policy"
+	"github.com/aislopware/slopscale/hscontrol/policy/matcher"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/util/zlog"
+	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
+	"github.com/aislopware/slopscale/hscontrol/webhook"
 	"github.com/hashicorp/golang-lru/v2/expirable"
-	hsdb "github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/logstream"
-	"github.com/juanfont/headscale/hscontrol/policy"
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/hscontrol/util/zlog"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
-	"github.com/juanfont/headscale/hscontrol/webhook"
 	"github.com/oschwald/maxminddb-golang/v2"
 	"github.com/puzpuzpuz/xsync/v4"
 	"github.com/rs/zerolog"
@@ -100,13 +100,13 @@ type sshCheckPair struct {
 	Dst types.NodeID
 }
 
-// State manages Headscale's core state, coordinating between database, policy management,
+// State manages Slopscale's core state, coordinating between database, policy management,
 // IP allocation, and DERP routing. All methods are thread-safe.
 //
 // See [policy.PolicyManager] for policy evaluation and [NodeStore] for the
 // in-memory node cache.
 type State struct {
-	// cfg holds the current Headscale configuration
+	// cfg holds the current Slopscale configuration
 	cfg *types.Config
 
 	// nodeStore provides an in-memory cache for nodes.
@@ -226,7 +226,7 @@ func NewState(cfg *types.Config) (*State, error) {
 		cacheExpiration,
 	)
 
-	db, err := hsdb.NewHeadscaleDatabase(cfg)
+	db, err := hsdb.NewSlopscaleDatabase(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("initializing database: %w", err)
 	}
@@ -1742,7 +1742,7 @@ func (s *State) TagExists(tag string) bool {
 }
 
 // HasTagOwners reports whether the policy defines any tag at all. Without
-// one no tag can be validated, so callers keep headscale's historical
+// one no tag can be validated, so callers keep slopscale's historical
 // behaviour of taking any well-formed tag.
 func (s *State) HasTagOwners() bool {
 	return s.polMan.HasTagOwners()
@@ -2095,7 +2095,7 @@ func (s *State) HandleNodeFromPreAuthKey(
 	//
 	// Tagged nodes are excluded: they never expire (KB 1068), so an
 	// IsExpired() tagged node only reflects a stale logout stamp left by an
-	// older headscale (#3371). Forcing it down the re-validation path burns its
+	// older slopscale (#3371). Forcing it down the re-validation path burns its
 	// fresh key and blocks re-auth forever; treat it as a plain re-registration
 	// and clear the stale expiry in the update below.
 	isExpired := existsSameUser && existingNodeSameUser.Valid() &&
@@ -2235,7 +2235,7 @@ func (s *State) HandleNodeFromPreAuthKey(
 				// Converting a user-owned node to tagged drops the user's key
 				// expiry (tagged nodes never expire). But retagging an
 				// already-tagged node must preserve a deliberate FUTURE expiry
-				// set via `headscale nodes expire` - that is a node property, not
+				// set via `slopscale nodes expire` - that is a node property, not
 				// tied to the auth key - and only clear a stale PAST expiry. This
 				// keeps the retag path symmetric with the same-key relogin path
 				// (#3371) rather than silently overriding an admin decision.
@@ -2267,9 +2267,9 @@ func (s *State) HandleNodeFromPreAuthKey(
 				s.applyDefaultNodeExpiry(node)
 			} else if node.IsExpired() {
 				// #3371: a tagged node must never carry key expiry. Clear a
-				// stale PAST expiry left by a logout (older headscale) so
+				// stale PAST expiry left by a logout (older slopscale) so
 				// re-auth is not permanently blocked. A deliberate future
-				// expiry (headscale nodes expire) has IsExpired() == false and
+				// expiry (slopscale nodes expire) has IsExpired() == false and
 				// is left untouched.
 				node.Expiry = nil
 			}
@@ -2782,7 +2782,7 @@ func clientWarnings(flags []string) []string {
 // and rides along the next substantive change or full MapResponse, so no
 // reachable path is permanently hidden from peers.
 //
-// Limitation: headscale stores bare []netip.AddrPort with no per-endpoint
+// Limitation: slopscale stores bare []netip.AddrPort with no per-endpoint
 // type, so we can only classify the *new* request's endpoints (via the
 // parallel newTypes slice). We therefore gate on whether any newly-added
 // endpoint (present in new, absent from stored) is useful (non-STUN). When
@@ -2831,7 +2831,7 @@ func isUsefulEndpointType(t tailcfg.EndpointType) bool {
 // Hostinfo changes require a full update, while endpoint/DERP changes can use lightweight patches. A request
 // that moved nothing worth telling peers about (a periodic re-send, a reconnect with matching state, or
 // STUN-only endpoint churn) yields an empty change, which the batcher drops; it used to count as "node
-// added" and fan a peer change out to every connected node (juanfont/headscale#3417).
+// added" and fan a peer change out to every connected node (aislopware/slopscale#3417).
 func buildMapRequestChangeResponse(
 	id types.NodeID,
 	node types.NodeView,
@@ -3419,7 +3419,7 @@ func (s *State) applyReauthExpiry(
 		setReauthExpiry(node, params, regData)
 	case isTagged && node.IsExpired():
 		// Tagged → Tagged, but carrying a stale PAST expiry from an older
-		// headscale's logout stamp (#3371). Tagged nodes never expire, so
+		// slopscale's logout stamp (#3371). Tagged nodes never expire, so
 		// clear it; a deliberate future expiry has IsExpired() == false and
 		// falls through to the no-op below.
 		node.Expiry = nil

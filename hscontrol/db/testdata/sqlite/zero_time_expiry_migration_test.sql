@@ -1,7 +1,7 @@
 -- Test SQL dump for zero-time node expiry migration
 -- (202605221435-clear-zero-time-node-expiry)
 --
--- Pre-0.28 versions of Headscale persisted a zero time.Time as the string
+-- Pre-0.28 versions of Slopscale persisted a zero time.Time as the string
 -- '0001-01-01 00:00:00+00:00' in nodes.expiry instead of NULL. Upgrading
 -- to 0.29 surfaces those rows as "expired" because they look like a
 -- timestamp at year 1. This dump exercises the data fix.

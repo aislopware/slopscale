@@ -14,9 +14,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/integration/dockertestutil"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
+	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"tailscale.com/tailcfg"
@@ -149,7 +149,7 @@ func CreateCertificate(hostname string) (CertificateBundle, error) {
 	ca := &x509.Certificate{
 		SerialNumber: big.NewInt(2019),
 		Subject: pkix.Name{
-			Organization: []string{"Headscale testing INC"},
+			Organization: []string{"Slopscale testing INC"},
 			Country:      []string{"NL"},
 			Locality:     []string{"Leiden"},
 		},
@@ -194,7 +194,7 @@ func CreateCertificate(hostname string) (CertificateBundle, error) {
 		SerialNumber: big.NewInt(1658),
 		Subject: pkix.Name{
 			CommonName:   hostname,
-			Organization: []string{"Headscale testing INC"},
+			Organization: []string{"Slopscale testing INC"},
 			Country:      []string{"NL"},
 			Locality:     []string{"Leiden"},
 		},

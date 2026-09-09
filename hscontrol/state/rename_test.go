@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,12 +17,12 @@ import (
 func TestRenameNodeRejectsNameExceedingFQDNLimit(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 	// A long base domain so a 63-char label overflows the 255-char FQDN bound.
 	cfg.BaseDomain = strings.Repeat("b", 200) + ".example.com"
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	user := database.CreateUserForTest("rename-user")

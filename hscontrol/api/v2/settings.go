@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/api/principal"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/api/principal"
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 func init() {
@@ -21,7 +21,7 @@ func init() {
 // devicesKeyDurationDays.
 const hoursPerDay = 24
 
-// TailnetSettings is the Tailscale tailnet-settings response. Headscale's config
+// TailnetSettings is the Tailscale tailnet-settings response. Slopscale's config
 // is file-based and mostly not runtime-mutable, so only a few fields carry a
 // real value; the rest report the default "off".
 type TailnetSettings struct {
@@ -108,7 +108,7 @@ func registerSettings(api huma.API, b Backend) {
 		Path:        "/api/v2/tailnet/{tailnet}/settings",
 		Summary:     "Update tailnet settings",
 		Description: "Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the " +
-			"other settings are file-based in Headscale and cannot be changed here.",
+			"other settings are file-based in Slopscale and cannot be changed here.",
 		Tags:     settingsTags,
 		Security: security,
 		Errors:   []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	apiv2 "github.com/juanfont/headscale/hscontrol/api/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
+	apiv2 "github.com/aislopware/slopscale/hscontrol/api/v2"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +20,7 @@ import (
 // OAuth token endpoint, which the humatest harness in apiv2_keys_test.go does
 // not mount) over a real httptest server, returning the app, its base URL, and
 // an all-access admin API key.
-func newOAuthTestServer(t *testing.T) (*Headscale, string, string) {
+func newOAuthTestServer(t *testing.T) (*Slopscale, string, string) {
 	t.Helper()
 
 	app := createTestApp(t)

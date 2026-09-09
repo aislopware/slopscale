@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/audit"
-	hsdb "github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/templates"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/web"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	hsdb "github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/templates"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/web"
 	"github.com/rs/zerolog/log"
 )
 
@@ -169,7 +169,7 @@ func renderConsoleRefused(writer http.ResponseWriter, code int, heading, message
 	writer.WriteHeader(code)
 
 	page := templates.AuthError(templates.AuthErrorResult{
-		Title:   "Headscale - " + heading,
+		Title:   "Slopscale - " + heading,
 		Heading: heading,
 		Message: message,
 	})
@@ -233,7 +233,7 @@ func (a *AuthProviderOIDC) isConfiguredAdmin(claims *types.OIDCClaims) bool {
 	return false
 }
 
-// syncConfiguredGroups mirrors the login's groups claim into headscale
+// syncConfiguredGroups mirrors the login's groups claim into slopscale
 // groups when oidc.groups.sync is on. It runs on every login, so a person
 // added to or removed from a group at the identity provider gets or loses
 // the group's access the next time they sign in.

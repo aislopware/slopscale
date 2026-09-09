@@ -35,7 +35,7 @@ its operations, so a credential means the same thing on both APIs. Run
 The tailnet has exactly one owner.
 
 - The first user created on a fresh server becomes the owner, whether it is
-  created with `headscale users create` or by the first OpenID Connect login.
+  created with `slopscale users create` or by the first OpenID Connect login.
 - The owner's role changes only by transferring ownership: assigning `owner`
   to another user makes that user the owner and turns the previous owner into
   an admin.
@@ -47,7 +47,7 @@ user is a `member`. Pick one with the CLI, which is bound only by the rules
 above:
 
 ```console
-headscale users set-role --name alice --role owner
+slopscale users set-role --name alice --role owner
 ```
 
 ## Assigning roles
@@ -55,12 +55,12 @@ headscale users set-role --name alice --role owner
 Only the owner or an admin may assign roles, and nobody may change their own.
 
 ```console
-headscale users set-role --name bob --role network-admin
-headscale users list
+slopscale users set-role --name bob --role network-admin
+slopscale users list
 ```
 
 Through the API, `POST /api/v1/user/{id}/role` with `{"role": "auditor"}`.
-Roles show in `headscale users list`, in the v1 user object and in the v2
+Roles show in `slopscale users list`, in the v1 user object and in the v2
 user object's `role` field, which `GET /api/v2/tailnet/-/users?role=admin`
 filters on.
 
@@ -70,7 +70,7 @@ An API key may belong to a user, in which case the key is bounded by that
 user's current role: demoting the user demotes every key the user holds.
 
 ```console
-headscale apikeys create --user 3
+slopscale apikeys create --user 3
 ```
 
 - Any authenticated caller may mint a key for itself.

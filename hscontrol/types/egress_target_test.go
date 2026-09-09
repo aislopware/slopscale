@@ -3,7 +3,7 @@ package types
 import (
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/egress"
 	"github.com/stretchr/testify/require"
 )
 

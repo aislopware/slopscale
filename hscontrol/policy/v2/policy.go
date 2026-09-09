@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	"github.com/juanfont/headscale/hscontrol/policy/policyutil"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/policy/matcher"
+	"github.com/aislopware/slopscale/hscontrol/policy/policyutil"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/puzpuzpuz/xsync/v4"
 	"github.com/rs/zerolog/log"
 	"go4.org/netipx"
@@ -1053,7 +1053,7 @@ func (pm *PolicyManager) TagOwnedByTags(tag string, ownerTags []string) bool {
 }
 
 // HasTagOwners reports whether the policy defines any tag at all.
-// Without one no tag can be validated, so callers keep headscale's
+// Without one no tag can be validated, so callers keep slopscale's
 // historical behaviour of taking any well-formed tag.
 func (pm *PolicyManager) HasTagOwners() bool {
 	if pm == nil {

@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/egress"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,13 +19,13 @@ import (
 func TestMapErrorHidesUnmappedErrors(t *testing.T) {
 	t.Parallel()
 
-	err := mapError("getting node", errors.New("sqlite: no such table: nodes at /var/lib/headscale/db.sqlite"))
+	err := mapError("getting node", errors.New("sqlite: no such table: nodes at /var/lib/slopscale/db.sqlite"))
 
 	statusErr, ok := err.(huma.StatusError) //nolint:errorlint // huma returns the interface, not a wrapped error
 	require.True(t, ok)
 	assert.Equal(t, http.StatusInternalServerError, statusErr.GetStatus())
 	assert.NotContains(t, err.Error(), "sqlite")
-	assert.NotContains(t, err.Error(), "/var/lib/headscale")
+	assert.NotContains(t, err.Error(), "/var/lib/slopscale")
 	assert.Regexp(t, `^internal error, see the server log for id [0-9a-f]{8}$`, err.Error())
 
 	// Two errors get two ids, so a log line matches one response.

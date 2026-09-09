@@ -1,7 +1,7 @@
 # DERP
 
 A [DERP (Designated Encrypted Relay for Packets) server](https://tailscale.com/docs/reference/derp-servers) is mainly
-used to relay traffic between two nodes in case a direct connection can't be established. Headscale can run an embedded
+used to relay traffic between two nodes in case a direct connection can't be established. Slopscale can run an embedded
 DERP server (`derp.server.enabled`) so that two nodes that cannot reach each other directly still have a relay to meet at.
 
 ## Configuration
@@ -12,10 +12,10 @@ check the [example configuration](configuration.md) for all available configurat
 
 ### Embedded DERP
 
-Headscale ships with an embedded DERP server, on by default, so every tailnet has a relay next to its control
+Slopscale ships with an embedded DERP server, on by default, so every tailnet has a relay next to its control
 server. It is published to the machines as region 999 together with Tailscale's public relays, and each machine
 picks the closest region by measured latency. For improved connection stability configure the public IPv4 and
-public IPv6 address of your Headscale server; the machines then reach the relay while their DNS is down:
+public IPv6 address of your Slopscale server; the machines then reach the relay while their DNS is down:
 
 ```yaml title="config.yaml" hl_lines="3-5"
 derp:
@@ -41,22 +41,22 @@ MagicDNS. The answer is the addresses of every DERP node and of this server, res
 ### Change relays at runtime
 
 The map URLs, the refetch schedule, the embedded relay and relays you run yourself can be changed without a restart
-from the admin console's _Relays_ page, with `headscale derp`, or through `PUT /api/v1/derp`. Settings set this way are
-stored in the database and replace the file's `derp` section until `headscale derp reset` returns to it. A change
+from the admin console's _Relays_ page, with `slopscale derp`, or through `PUT /api/v1/derp`. Settings set this way are
+stored in the database and replace the file's `derp` section until `slopscale derp reset` returns to it. A change
 fetches the maps, starts or stops the embedded relay and pushes the new map to every machine at once; a map that
 cannot be fetched is refused and nothing changes.
 
 ```console
-$ headscale derp show
-$ headscale derp set --ipv4 198.51.100.1 --ipv6 2001:db8::1
-$ headscale derp set --url ""            # only your own relays
-$ headscale derp relay add --region 900 --code custom-east --host derp900a.example.com --ipv4 198.51.100.1
-$ headscale derp relay remove --region 900
-$ headscale derp refresh                 # refetch the maps now
-$ headscale derp reset
+$ slopscale derp show
+$ slopscale derp set --ipv4 198.51.100.1 --ipv6 2001:db8::1
+$ slopscale derp set --url ""            # only your own relays
+$ slopscale derp relay add --region 900 --code custom-east --host derp900a.example.com --ipv4 198.51.100.1
+$ slopscale derp relay remove --region 900
+$ slopscale derp refresh                 # refetch the maps now
+$ slopscale derp reset
 ```
 
-`headscale derp set` starts from the settings in force and replaces only the fields whose flags were given. What the
+`slopscale derp set` starts from the settings in force and replaces only the fields whose flags were given. What the
 file alone can express stays in the file: the map files in `derp.paths`, the relay's key and
 `automatically_add_embedded_derp_region`.
 
@@ -72,14 +72,14 @@ A few things to know when changing the relays while machines use them:
   since you read them; read again, reapply your change and retry with the new `ETag`. `If-Match: *` always matches,
   and a request without the header writes whatever it finds. The `PUT` and `DELETE` responses carry the new `ETag`.
 - With the schedule off the map is not fetched again until you refetch it, in the console or with
-  `headscale derp refresh`.
+  `slopscale derp refresh`.
 - The embedded relay is published on the STUN port it is bound to, so a `stun_listen_addr` with port 0 works.
 - The audit log records the map URLs without user info or query strings.
 
 ### Remove Tailscale's DERP servers
 
-Headscale's embedded DERP is added to the list of free-to-use [DERP
-servers](https://tailscale.com/docs/reference/derp-servers) offered by Tailscale Inc. To only use Headscale's embedded
+Slopscale's embedded DERP is added to the list of free-to-use [DERP
+servers](https://tailscale.com/docs/reference/derp-servers) offered by Tailscale Inc. To only use Slopscale's embedded
 DERP server, disable the loading of the default DERP map (or clear the map URLs on the console's _Relays_ page):
 
 ```yaml title="config.yaml" hl_lines="6"
@@ -102,7 +102,7 @@ derp:
 ### Customize DERP map
 
 The DERP map offered to clients can be customized with a [dedicated YAML-configuration
-file](https://github.com/juanfont/headscale/blob/main/derp-example.yaml). This allows to modify previously loaded DERP
+file](https://github.com/aislopware/slopscale/blob/main/derp-example.yaml). This allows to modify previously loaded DERP
 maps fetched via URL or to offer your own, custom DERP servers to nodes.
 
 === "Remove specific DERP regions"
@@ -125,7 +125,7 @@ maps fetched via URL or to offer your own, custom DERP servers to nodes.
       urls:
         - https://controlplane.tailscale.com/derpmap/default
       paths:
-        - /etc/headscale/derp.yaml
+        - /etc/slopscale/derp.yaml
     ```
 
 === "Provide custom DERP servers"
@@ -171,7 +171,7 @@ maps fetched via URL or to offer your own, custom DERP servers to nodes.
         enabled: false
       urls: []
       paths:
-        - /etc/headscale/derp.yaml
+        - /etc/slopscale/derp.yaml
     ```
 
 === "Prefer or avoid a region"
@@ -214,18 +214,18 @@ clients.
     Tailscale's `derper` provides two parameters to configure client verification:
 
     - Use the `-verify-client-url` parameter of the `derper` and point it towards the `/verify` endpoint of your
-      Headscale server (e.g `https://headscale.example.com/verify`). The DERP server will query your Headscale instance
+      Slopscale server (e.g `https://slopscale.example.com/verify`). The DERP server will query your Slopscale instance
       as soon as a client connects with it to ask whether access should be allowed or denied. Access is allowed if
-      Headscale knows about the connecting client and denied otherwise.
+      Slopscale knows about the connecting client and denied otherwise.
     - The parameter `-verify-client-url-fail-open` controls what should happen when the DERP server can't reach the
-      Headscale instance. By default, it will allow access if Headscale is unreachable.
+      Slopscale instance. By default, it will allow access if Slopscale is unreachable.
 
 ## Check DERP server connectivity
 
 Any Tailscale client may be used to introspect the DERP map and to check for connectivity issues with DERP servers.
 
 - Display DERP map: `tailscale debug derp-map`
-- Check connectivity with the embedded DERP[^1]:`tailscale debug derp headscale`
+- Check connectivity with the embedded DERP[^1]:`tailscale debug derp slopscale`
 
 Additional DERP related metrics and information is available via the [metrics and debug
 endpoint](debug.md#metrics-and-debug-endpoint).

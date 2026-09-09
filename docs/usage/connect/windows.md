@@ -1,8 +1,8 @@
 # Connecting a Windows client
 
-This documentation has the goal of showing how a user can use the official Windows [Tailscale](https://tailscale.com) client with headscale.
+This documentation has the goal of showing how a user can use the official Windows [Tailscale](https://tailscale.com) client with slopscale.
 
-!!! info "Instructions on your headscale instance"
+!!! info "Instructions on your slopscale instance"
 
     An endpoint with information on how to connect your Windows device
     is also available at `/windows` on your running instance.
@@ -11,13 +11,13 @@ This documentation has the goal of showing how a user can use the official Windo
 
 Download the [Official Windows Client](https://tailscale.com/download/windows) and install it.
 
-## Configuring the headscale URL
+## Configuring the slopscale URL
 
-Open a Command Prompt or Powershell and use Tailscale's login command to connect with your headscale instance (e.g
-`https://headscale.example.com`):
+Open a Command Prompt or Powershell and use Tailscale's login command to connect with your slopscale instance (e.g
+`https://slopscale.example.com`):
 
 ```
-tailscale login --login-server <YOUR_HEADSCALE_URL>
+tailscale login --login-server <YOUR_SLOPSCALE_URL>
 ```
 
 Follow the instructions in the opened browser window to finish the configuration.
@@ -44,7 +44,7 @@ If you are seeing repeated messages like:
 [GIN] 2022/02/10 - 16:39:34 | 200 |    1.105306ms |       127.0.0.1 | POST     "/machine/redacted"
 ```
 
-in your headscale output, turn on `DEBUG` logging and look for:
+in your slopscale output, turn on `DEBUG` logging and look for:
 
 ```
 2022-02-11T00:59:29Z DBG Machine registration has expired. Sending a authurl to register machine=redacted
@@ -56,5 +56,5 @@ To reset and try again, it is important to do the following:
 
 1. Shut down the Tailscale service (or the client running in the tray)
 1. Delete Tailscale Application data folder, located at `C:\Users\<USERNAME>\AppData\Local\Tailscale` and try to connect again.
-1. Ensure the Windows node is deleted from headscale (to ensure fresh setup)
+1. Ensure the Windows node is deleted from slopscale (to ensure fresh setup)
 1. Start Tailscale on the Windows machine and retry the login.

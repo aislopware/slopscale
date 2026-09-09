@@ -6,9 +6,9 @@ import (
 	"slices"
 	"time"
 
-	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"tailscale.com/tailcfg"
 )
 

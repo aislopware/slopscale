@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -761,7 +761,7 @@ func TestGrantViaSubnetFilterRules(t *testing.T) {
 // TestGrantViaSubnetBroaderDstFilterRules verifies that a via grant
 // whose destination is broader than the router's advertised subnet
 // still produces a filter rule on the router and surfaces the route in
-// the client's AllowedIPs. Reproduces juanfont/headscale#3267 at the
+// the client's AllowedIPs. Reproduces aislopware/slopscale#3267 at the
 // server level. Pre-fix the policy compiler required exact prefix
 // equality, so the router's PacketFilter had no rule for the steered
 // destination and traffic was silently dropped.

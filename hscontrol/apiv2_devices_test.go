@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	apiv2 "github.com/aislopware/slopscale/hscontrol/api/v2"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/danielgtaylor/huma/v2/humatest"
-	apiv2 "github.com/juanfont/headscale/hscontrol/api/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +19,7 @@ import (
 // app's state, with no auth middleware (the contract tests exercise wire shapes;
 // auth is covered by TestAPIv2). The full Backend (Change + Cfg) is wired so the
 // device/acl write handlers work.
-func registerAPIV2(t *testing.T, app *Headscale) humatest.TestAPI {
+func registerAPIV2(t *testing.T, app *Slopscale) humatest.TestAPI {
 	t.Helper()
 
 	_, api := humatest.New(t, apiv2.Config())
@@ -30,7 +30,7 @@ func registerAPIV2(t *testing.T, app *Headscale) humatest.TestAPI {
 
 // deviceTestEnv is one seeded, registered, user-owned node plus the v2 API.
 type deviceTestEnv struct {
-	app      *Headscale
+	app      *Slopscale
 	api      humatest.TestAPI
 	user     *types.User
 	nodeID   types.NodeID

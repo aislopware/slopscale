@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 	"tailscale.com/util/rands"
@@ -158,7 +158,7 @@ func (s *State) c2nRoundTrip(
 func c2nResponseURL(serverURL, id string) string {
 	u, err := url.Parse(serverURL)
 	if err != nil || u.Host == "" {
-		return "https://headscale/machine/c2n-response?id=" + id
+		return "https://slopscale/machine/c2n-response?id=" + id
 	}
 
 	return "https://" + u.Host + "/machine/c2n-response?id=" + id

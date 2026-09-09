@@ -13,7 +13,7 @@ run_tests() {
 
 	for ((i = 1; i <= num_tests; i++)); do
 		docker network prune -f >/dev/null 2>&1
-		docker rm headscale-test-suite >/dev/null 2>&1 || true
+		docker rm slopscale-test-suite >/dev/null 2>&1 || true
 		docker kill "$(docker ps -q)" >/dev/null 2>&1 || true
 
 		echo "Run $i"
@@ -22,11 +22,11 @@ run_tests() {
 		docker run \
 			--tty --rm \
 			--volume ~/.cache/hs-integration-go:/go \
-			--name headscale-test-suite \
+			--name slopscale-test-suite \
 			--volume "$PWD:$PWD" -w "$PWD"/integration \
 			--volume /var/run/docker.sock:/var/run/docker.sock \
 			--volume "$PWD"/control_logs:/tmp/control \
-			-e "HEADSCALE_INTEGRATION_POSTGRES" \
+			-e "SLOPSCALE_INTEGRATION_POSTGRES" \
 			golang:1 \
 			go test ./... \
 			-failfast \

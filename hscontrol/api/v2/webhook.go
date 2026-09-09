@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/api/principal"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/api/principal"
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 func init() {
@@ -29,7 +29,7 @@ type WebhookEndpoint struct {
 	Subscriptions    []string   `json:"subscriptions"            nullable:"false"`
 	Secret           string     `json:"secret,omitempty"`
 	LastDeliveryAt   *time.Time `json:"lastDeliveryAt,omitempty"`
-	// LastDeliveryStatus is a Headscale addition: the HTTP status of the
+	// LastDeliveryStatus is a Slopscale addition: the HTTP status of the
 	// newest delivery, or the error when none came back.
 	LastDeliveryStatus string `json:"lastDeliveryStatus,omitempty"`
 }
@@ -294,7 +294,7 @@ func registerWebhookActions(api huma.API, b Backend) {
 		Method:      http.MethodPost,
 		Path:        "/api/v2/webhooks/{endpointId}/test",
 		Summary:     "Test webhook",
-		Description: "Posts a test event now. Tailscale queues it; Headscale delivers it before " +
+		Description: "Posts a test event now. Tailscale queues it; Slopscale delivers it before " +
 			"answering, so a failing receiver shows as a 502.",
 		Tags:     webhookTags,
 		Security: security,

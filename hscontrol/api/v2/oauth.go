@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/go-chi/chi/v5"
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 // grantAuditAction is the audit action of a client-credentials exchange.

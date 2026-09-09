@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/views"
 )
@@ -17,8 +17,8 @@ import (
 // Tailscale's policy file `tests` block validates a policy against operator
 // assertions: from a given src, named dst:port pairs must be accepted, and
 // (optionally) other dst:port pairs must be denied. They run at user-write
-// boundaries — `headscale policy set`, file-mode reload after a change,
-// `headscale policy check` — and reject the write if any assertion fails.
+// boundaries — `slopscale policy set`, file-mode reload after a change,
+// `slopscale policy check` — and reject the write if any assertion fails.
 // Boot-time reload of an already-stored policy does not run them, so a
 // stale referenced entity (e.g. a deleted user) cannot lock the server out.
 //

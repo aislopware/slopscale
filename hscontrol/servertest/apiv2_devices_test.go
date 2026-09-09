@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	tsclient "tailscale.com/client/tailscale/v2"
@@ -461,7 +461,7 @@ func apiv2DevicesACLTerraform(
 	tf.assertNoDrift()
 
 	// destroy resets the policy; the node is a data source, so it persists.
-	// Tags/expiry teardown are no-ops on Headscale, so they are not reverted.
+	// Tags/expiry teardown are no-ops on Slopscale, so they are not reverted.
 	tf.run("destroy", "-auto-approve", "-no-color", "-input=false", "-parallelism=1")
 
 	_, ok := srv.State().GetNodeByID(id)

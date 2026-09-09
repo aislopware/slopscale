@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/logstream"
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/logstream"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -486,7 +486,7 @@ func TestNotificationProviders(t *testing.T) {
 		require.NoError(t, err)
 
 		srv := servertest.NewServer(t, servertest.WithSMTP(types.SMTPConfig{
-			Host: host, Port: portNum, From: "Headscale <hs@example.com>", Encryption: types.SMTPNoEncryption,
+			Host: host, Port: portNum, From: "Slopscale <hs@example.com>", Encryption: types.SMTPNoEncryption,
 		}))
 		client := srv.HTTPClient(t)
 		v1 := srv.URL + "/api/v1"
@@ -522,6 +522,6 @@ func TestNotificationProviders(t *testing.T) {
 		assert.Equal(t, "hs@example.com", mail.messages[0].from)
 		assert.Equal(t, []string{"ops@example.com", "sec@example.com"}, mail.messages[0].to)
 		assert.Contains(t, mail.messages[0].data, "Subject: ")
-		assert.Contains(t, mail.messages[0].data, "This is a test event from headscale.")
+		assert.Contains(t, mail.messages[0].data, "This is a test event from slopscale.")
 	})
 }

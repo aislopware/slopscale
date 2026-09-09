@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"pgregory.net/rapid"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"

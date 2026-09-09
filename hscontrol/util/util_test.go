@@ -114,10 +114,10 @@ func TestParseLoginURLFromCLILogin(t *testing.T) {
 			output: `
 To authenticate, visit:
 
-        https://headscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi
+        https://slopscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi
 
 Success.`,
-			wantURL: "https://headscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi",
+			wantURL: "https://slopscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi",
 			wantErr: "",
 		},
 		{
@@ -125,10 +125,10 @@ Success.`,
 			output: `
 To authenticate, visit:
 
-        http://headscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi
+        http://slopscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi
 
 Success.`,
-			wantURL: "http://headscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi",
+			wantURL: "http://slopscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi",
 			wantErr: "",
 		},
 		{
@@ -145,16 +145,16 @@ Success.`,
 			output: `
 To authenticate, visit:
 
-        https://headscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi
+        https://slopscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi
 
 To authenticate, visit:
 
-        http://headscale.example.com/register/dv1l2k5FackOYl-7-V3mSd_E
+        http://slopscale.example.com/register/dv1l2k5FackOYl-7-V3mSd_E
 
 Success.`,
 			wantURL: "",
-			wantErr: "multiple URLs found: https://headscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi" +
-				" and http://headscale.example.com/register/dv1l2k5FackOYl-7-V3mSd_E",
+			wantErr: "multiple URLs found: https://slopscale.example.com/register/3oYCOZYA2zZmGB4PQ7aHBaMi" +
+				" and http://slopscale.example.com/register/dv1l2k5FackOYl-7-V3mSd_E",
 		},
 		{
 			name: "invalid URL",
@@ -220,7 +220,7 @@ func TestParseTraceroute(t *testing.T) {
 		{
 			name: "simple successful traceroute",
 			input: `traceroute to 172.24.0.3 (172.24.0.3), 30 hops max, 46 byte packets
- 1  ts-head-hk0urr.headscale.net (100.64.0.1)  1.135 ms  0.922 ms  0.619 ms
+ 1  ts-head-hk0urr.slopscale.net (100.64.0.1)  1.135 ms  0.922 ms  0.619 ms
  2  172.24.0.3 (172.24.0.3)  0.593 ms  0.549 ms  0.522 ms`,
 			want: Traceroute{
 				Hostname: "172.24.0.3",
@@ -228,7 +228,7 @@ func TestParseTraceroute(t *testing.T) {
 				Route: []TraceroutePath{
 					{
 						Hop:      1,
-						Hostname: "ts-head-hk0urr.headscale.net",
+						Hostname: "ts-head-hk0urr.slopscale.net",
 						IP:       netip.MustParseAddr("100.64.0.1"),
 						Latencies: []time.Duration{
 							1135 * time.Microsecond,
@@ -430,7 +430,7 @@ over a maximum of 30 hops:
 		{
 			name: "backward compatibility - original format with 3 latencies",
 			input: `traceroute to 172.24.0.3 (172.24.0.3), 30 hops max, 46 byte packets
- 1  ts-head-hk0urr.headscale.net (100.64.0.1)  1.135 ms  0.922 ms  0.619 ms
+ 1  ts-head-hk0urr.slopscale.net (100.64.0.1)  1.135 ms  0.922 ms  0.619 ms
  2  172.24.0.3 (172.24.0.3)  0.593 ms  0.549 ms  0.522 ms`,
 			want: Traceroute{
 				Hostname: "172.24.0.3",
@@ -438,7 +438,7 @@ over a maximum of 30 hops:
 				Route: []TraceroutePath{
 					{
 						Hop:      1,
-						Hostname: "ts-head-hk0urr.headscale.net",
+						Hostname: "ts-head-hk0urr.slopscale.net",
 						IP:       netip.MustParseAddr("100.64.0.1"),
 						Latencies: []time.Duration{
 							1135 * time.Microsecond,

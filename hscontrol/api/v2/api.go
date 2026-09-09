@@ -1,12 +1,12 @@
-// Package apiv2 is Headscale's v2 HTTP API, served at /api/v2.
+// Package apiv2 is Slopscale's v2 HTTP API, served at /api/v2.
 //
-// Where the v1 API (hscontrol/api/v1) is the headscale-native admin surface, v2
+// Where the v1 API (hscontrol/api/v1) is the slopscale-native admin surface, v2
 // additionally ports selected endpoints from Tailscale's API, reusing
 // Tailscale's wire shapes (paths, request/response JSON, error body), so the
 // existing Tailscale ecosystem (the Terraform/OpenTofu provider, tscli, and
-// tailscale.com/client/tailscale/v2) can drive Headscale unchanged. Ported
-// operations carry the "Tailscale compat" tag; a headscale-native v2 operation
-// may use headscale's own conventions instead. See README.md for the porting
+// tailscale.com/client/tailscale/v2) can drive Slopscale unchanged. Ported
+// operations carry the "Tailscale compat" tag; a slopscale-native v2 operation
+// may use slopscale's own conventions instead. See README.md for the porting
 // guide.
 //
 // It depends only on the domain layer (hscontrol/state, hscontrol/types, and
@@ -20,15 +20,15 @@ import (
 	"maps"
 	"net/http"
 
+	"github.com/aislopware/slopscale/hscontrol/api/principal"
+	"github.com/aislopware/slopscale/hscontrol/api/tagguard"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
-	"github.com/juanfont/headscale/hscontrol/api/principal"
-	"github.com/juanfont/headscale/hscontrol/api/tagguard"
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
 )
 
 // Backend is the dependency surface the v2 API needs from the control plane:
@@ -63,8 +63,8 @@ func Register(api huma.API, b Backend) {
 // Tailscale error transform. Suppressing SchemasPath/CreateHooks keeps "$schema"
 // out of the emitted bodies, matching the Tailscale wire contract.
 func Config() huma.Config {
-	config := huma.DefaultConfig("Headscale API", "v2")
-	config.Info.Description = "Headscale v2 API. Some endpoints are ported from / compatible with " +
+	config := huma.DefaultConfig("Slopscale API", "v2")
+	config.Info.Description = "Slopscale v2 API. Some endpoints are ported from / compatible with " +
 		"the Tailscale API (tagged \"Tailscale compat\")."
 
 	config.OpenAPIPath = "/api/v2/openapi"
@@ -186,7 +186,7 @@ func principalTags(ctx context.Context) ([]string, bool) {
 	return tagguard.PrincipalTags(ctx)
 }
 
-// requireDefaultTailnet rejects any tailnet other than "-". Headscale is
+// requireDefaultTailnet rejects any tailnet other than "-". Slopscale is
 // single-tailnet; the Tailscale SDK sends "-" (its default tailnet). A non-"-"
 // value is "no such tailnet", a 404, which lets the SDK's IsNotFound behave.
 func requireDefaultTailnet(tailnet string) error {

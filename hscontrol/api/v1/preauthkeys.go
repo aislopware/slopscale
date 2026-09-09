@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/api/tagguard"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/api/tagguard"
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 func init() {
@@ -433,7 +433,7 @@ func authorizeKeyOwnership(ctx context.Context, b Backend, tags []string, user t
 // validateKeyTags checks a pre-auth key's tags: the syntax, and that the
 // policy defines each one, as [state.State.SetNodeTags] does. A key
 // carrying an unknown tag mints a node no rule can name. A tailnet with
-// no tagOwners at all keeps headscale's historical behaviour and takes
+// no tagOwners at all keeps slopscale's historical behaviour and takes
 // any well-formed tag.
 func validateKeyTags(b Backend, tags []string) error {
 	err := validateTags(tags)

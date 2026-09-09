@@ -12,7 +12,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
@@ -26,8 +26,8 @@ func TestIssue3233ViaInternetExitVisibility(t *testing.T) {
 	t.Parallel()
 
 	users := types.Users{
-		{ID: 1, Name: "alice", Email: "alice@headscale.net"},
-		{ID: 2, Name: "bob", Email: "bob@headscale.net"},
+		{ID: 1, Name: "alice", Email: "alice@slopscale.net"},
+		{ID: 2, Name: "bob", Email: "bob@slopscale.net"},
 	}
 
 	exitRoutes := []netip.Prefix{tsaddr.AllIPv4(), tsaddr.AllIPv6()}
@@ -51,12 +51,12 @@ func TestIssue3233ViaInternetExitVisibility(t *testing.T) {
 
 	policy := `{
 		"tagOwners": {
-			"tag:exit1": ["alice@headscale.net"],
-			"tag:exit2": ["bob@headscale.net"]
+			"tag:exit1": ["alice@slopscale.net"],
+			"tag:exit2": ["bob@slopscale.net"]
 		},
 		"grants": [
 			{
-				"src": ["alice@headscale.net"],
+				"src": ["alice@slopscale.net"],
 				"dst": ["autogroup:internet"],
 				"via": ["tag:exit1"],
 				"ip": ["*"]

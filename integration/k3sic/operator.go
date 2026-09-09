@@ -32,8 +32,8 @@ func (k *K3sInContainer) ApplyManifest(name, manifest string) error {
 // InstallOperator installs the Tailscale Kubernetes operator via Helm into the
 // tailscale namespace, pointed at loginServer with the given OAuth client
 // credentials. loginServer is used by the operator for both the control plane
-// and the management API; for an in-test Headscale pass its HTTP endpoint by IP
-// (hsic.HeadscaleInContainer.GetIPEndpoint) so the pods need no DNS or CA. The
+// and the management API; for an in-test Slopscale pass its HTTP endpoint by IP
+// (hsic.SlopscaleInContainer.GetIPEndpoint) so the pods need no DNS or CA. The
 // operator and proxy images come from ghcr at the capver-derived tag. Blocks
 // (helm --wait) until the operator deployment is available.
 func (k *K3sInContainer) InstallOperator(loginServer, clientID, clientSecret string) error {
@@ -102,7 +102,7 @@ func (k *K3sInContainer) InstallOperator(loginServer, clientID, clientSecret str
 // operator proxies reach the embedded (non-TLS) DERP over websocket. Proxy
 // resources reference it via spec.proxyClass / the tailscale.com/proxy-class
 // annotation.
-const DERPWebsocketProxyClass = "headscale-derp-ws"
+const DERPWebsocketProxyClass = "slopscale-derp-ws"
 
 func (k *K3sInContainer) applyDERPWebsocketProxyClass() error {
 	manifest := fmt.Sprintf(`apiVersion: tailscale.com/v1alpha1
@@ -125,7 +125,7 @@ spec:
 
 // DeployConnector applies a Connector CR advertising an egress subnet router for
 // advertiseRoutes, tagged with tags. The operator provisions a proxy and
-// registers it as a node in Headscale.
+// registers it as a node in Slopscale.
 func (k *K3sInContainer) DeployConnector(name string, tags, advertiseRoutes []string) error {
 	manifest := fmt.Sprintf(`apiVersion: tailscale.com/v1alpha1
 kind: Connector

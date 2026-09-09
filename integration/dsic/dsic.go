@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/integration/dockertestutil"
-	"github.com/juanfont/headscale/integration/integrationutil"
+	"github.com/aislopware/slopscale/integration/dockertestutil"
+	"github.com/aislopware/slopscale/integration/integrationutil"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"tailscale.com/util/rands"
@@ -148,7 +148,7 @@ func New(
 	}
 
 	// Install the CA cert so the DERP server trusts its own certificate
-	// and any headscale CA certs passed via [WithCACert].
+	// and any slopscale CA certs passed via [WithCACert].
 	dsic.caCerts = append(dsic.caCerts, certs.CACertPEM)
 
 	for _, opt := range opts {

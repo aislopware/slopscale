@@ -32,14 +32,14 @@ const statusServerError = 500;
 const statusBadGateway = 502;
 const statusServiceUnavailable = 503;
 const statusGatewayTimeout = 504;
-/** The proxy in front of headscale answered for it: the server itself was not reached. */
+/** The proxy in front of slopscale answered for it: the server itself was not reached. */
 const gatewayStatuses = new Set([statusBadGateway, statusServiceUnavailable, statusGatewayTimeout]);
 
 const unreachable = {
   kind: "unreachable",
   title: "The server did not answer",
   description:
-    "headscale is not responding. It may be restarting, or the network in between is down. Try again.",
+    "slopscale is not responding. It may be restarting, or the network in between is down. Try again.",
 } as const;
 
 const console = {
@@ -116,7 +116,7 @@ function byStatus(error: ApiError): Omit<Trouble, "message" | "instance"> {
       kind: "server",
       eyebrow,
       title: "The server hit an error",
-      description: detail ?? "headscale could not finish the request. The server log has more.",
+      description: detail ?? "slopscale could not finish the request. The server log has more.",
     };
   }
 

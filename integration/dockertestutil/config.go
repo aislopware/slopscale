@@ -19,7 +19,7 @@ const (
 // GetIntegrationRunID returns the run ID for the current integration test session.
 // This is set by the hi tool and passed through environment variables.
 func GetIntegrationRunID() string {
-	return os.Getenv("HEADSCALE_INTEGRATION_RUN_ID")
+	return os.Getenv("SLOPSCALE_INTEGRATION_RUN_ID")
 }
 
 // DockerAddIntegrationLabels adds integration test labels to Docker [dockertest.RunOptions].
@@ -28,7 +28,7 @@ func GetIntegrationRunID() string {
 func DockerAddIntegrationLabels(opts *dockertest.RunOptions, testType string) {
 	runID := GetIntegrationRunID()
 	if runID == "" {
-		panic("HEADSCALE_INTEGRATION_RUN_ID environment variable is required")
+		panic("SLOPSCALE_INTEGRATION_RUN_ID environment variable is required")
 	}
 
 	if opts.Labels == nil {

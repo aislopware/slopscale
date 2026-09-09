@@ -74,7 +74,7 @@ linters:
             - pkg: gopkg.in/yaml.v3
               desc: archived upstream; use go.yaml.in/yaml/v3
             - pkg: github.com/tcnksm/go-latest
-              desc: unmaintained since 2017; the release check is a plain GitHub API call in cmd/headscale/cli/root.go
+              desc: unmaintained since 2017; the release check is a plain GitHub API call in cmd/slopscale/cli/root.go
             - pkg: github.com/sasha-s/go-deadlock
               desc: was configured but never used by any mutex; use sync
             - pkg: math/rand$
@@ -93,7 +93,7 @@ linters:
           list-mode: lax
           files:
             - "**/hscontrol/**"
-            - "**/cmd/headscale/**"
+            - "**/cmd/slopscale/**"
           deny:
             - pkg: log$
               desc: use zerolog (github.com/rs/zerolog/log)
@@ -173,7 +173,7 @@ linters:
         - hscontrol/policy\.PolicyManager
         - hscontrol\.AuthProvider
         - hscontrol/policy/v2\.(Alias|Owner|AutoApprover|ResolvedAddresses)
-        - headscale/integration\.(TailscaleClient|ControlServer)
+        - slopscale/integration\.(TailscaleClient|ControlServer)
     lll:
       line-length: 120
       tab-width: 4
@@ -215,7 +215,7 @@ linters:
       # Errors from third-party packages must carry context before they
       # cross a function boundary; errors from this module already do.
       ignore-package-globs:
-        - github.com/juanfont/headscale/*
+        - github.com/aislopware/slopscale/*
       ignore-sigs:
         - .Errorf(
         - errors.New(
@@ -257,7 +257,7 @@ linters:
         - pattern: '\.(Str|Int|Int8|Int16|Int32|Int64|Uint|Uint8|Uint16|Uint32|Uint64|Float32|Float64|Bool|Dur|Time|TimeDiff|Strs|Ints|Uints|Floats|Bools|Any|Interface)\("[^"]+"'
           msg: >-
             Use zf.* constants for zerolog field names instead of string literals.
-            Import "github.com/juanfont/headscale/hscontrol/util/zlog/zf" and use
+            Import "github.com/aislopware/slopscale/hscontrol/util/zlog/zf" and use
             constants like zf.NodeID, zf.UserName, etc. Add new constants to
             hscontrol/util/zlog/zf/fields.go if needed.
         # Forbid ptr.To - use Go 1.26 new(expr) instead
@@ -307,7 +307,7 @@ linters:
           - wrapcheck
       # cobra subcommands and huma operations register themselves from
       # init(); that is the framework convention.
-      - path: "^cmd/headscale/cli/|^hscontrol/api/"
+      - path: "^cmd/slopscale/cli/|^hscontrol/api/"
         linters:
           - gochecknoinits
 

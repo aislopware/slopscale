@@ -10,7 +10,7 @@ import (
 // communicate what just happened.
 type AuthSuccessResult struct {
 	// Title is the browser tab / page title,
-	// e.g. "Headscale - Node Registered".
+	// e.g. "Slopscale - Node Registered".
 	Title string
 
 	// Heading is the bold green text inside the success box,
@@ -45,11 +45,11 @@ func AuthSuccess(result AuthSuccessResult) *elem.Element {
 		result.Title,
 		box,
 		H2(elem.Text("Getting started")),
-		P(elem.Text("Check out the documentation to learn more about headscale and Tailscale:")),
+		P(elem.Text("Check out the documentation to learn more about slopscale and Tailscale:")),
 		Ul(
 			elem.Li(
 				nil,
-				externalLink("https://headscale.net/stable/", "Headscale documentation"),
+				externalLink("https://aislopware.github.io/slopscale/stable/", "Slopscale documentation"),
 			),
 			elem.Li(
 				nil,

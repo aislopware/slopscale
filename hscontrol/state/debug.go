@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	hsdb "github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
+	hsdb "github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"tailscale.com/tailcfg"
 )
 
@@ -66,7 +66,7 @@ func (s *State) DebugOverview() string {
 
 	var sb strings.Builder
 
-	sb.WriteString("=== Headscale State Overview ===\n\n")
+	sb.WriteString("=== Slopscale State Overview ===\n\n")
 
 	// Node statistics
 	fmt.Fprintf(&sb, "Nodes: %d total\n", info.Nodes.Total)

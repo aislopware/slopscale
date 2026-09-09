@@ -3,7 +3,7 @@ package types
 import "time"
 
 // SessionCookieName is the cookie that carries a console session token.
-const SessionCookieName = "headscale_session"
+const SessionCookieName = "slopscale_session"
 
 // SessionLifetime is how long a console sign-in lasts. The cookie and the
 // row expire together; there is no sliding renewal, so a stolen cookie is

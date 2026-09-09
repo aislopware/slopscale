@@ -11,7 +11,7 @@ import (
 	"tailscale.com/tailcfg"
 )
 
-// TestExtraRecordsFileIsReadOnceItSettles covers juanfont/headscale#2753
+// TestExtraRecordsFileIsReadOnceItSettles covers aislopware/slopscale#2753
 // and #2782: a file written in several steps is read once, after the
 // writer has gone quiet, so no partial write is parsed, and the names it
 // carries are lowercased like those from the API.

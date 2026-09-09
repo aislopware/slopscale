@@ -20,10 +20,10 @@
 			"dns":      {"magic_dns": false, "nameservers": [], "search_paths": [], "split_dns": {}},
 			"settings": {}
 		},
-		"scenario_hujson": "                             \n{\n    \"category\": \"nodeattrs\",\n    \"description\": \"operator-supplied unknown attr -- pass-through\",\n    \"id\": \"nodeattrs-attr-c11-unknown\",\n    \"options\": {},\n    \"policy\": {\n        \"nodeAttrs\": [\n            {\n                \"attr\": [\n                    \"custom:headscale-test\"\n                ],\n                \"target\": [\n                    \"tag:server\"\n                ]\n            }\n        ],\n        \"tagOwners\": {\n            \"tag:client\": [\n                \"odin@example.com\"\n            ],\n            \"tag:exit\": [\n                \"odin@example.com\"\n            ],\n            \"tag:prod\": [\n                \"odin@example.com\"\n            ],\n            \"tag:router\": [\n                \"odin@example.com\"\n            ],\n            \"tag:server\": [\n                \"odin@example.com\"\n            ]\n        }\n    },\n    \"tailnet\": {\n        \"dns\": {\n            \"magic_dns\": false,\n            \"nameservers\": [],\n            \"search_paths\": [],\n            \"split_dns\": {}\n        },\n        \"settings\": {}\n    },\n    \"topology\": \"../_topologies/nodeattrs.hujson\"\n}\n",
+		"scenario_hujson": "                             \n{\n    \"category\": \"nodeattrs\",\n    \"description\": \"operator-supplied unknown attr -- pass-through\",\n    \"id\": \"nodeattrs-attr-c11-unknown\",\n    \"options\": {},\n    \"policy\": {\n        \"nodeAttrs\": [\n            {\n                \"attr\": [\n                    \"custom:slopscale-test\"\n                ],\n                \"target\": [\n                    \"tag:server\"\n                ]\n            }\n        ],\n        \"tagOwners\": {\n            \"tag:client\": [\n                \"odin@example.com\"\n            ],\n            \"tag:exit\": [\n                \"odin@example.com\"\n            ],\n            \"tag:prod\": [\n                \"odin@example.com\"\n            ],\n            \"tag:router\": [\n                \"odin@example.com\"\n            ],\n            \"tag:server\": [\n                \"odin@example.com\"\n            ]\n        }\n    },\n    \"tailnet\": {\n        \"dns\": {\n            \"magic_dns\": false,\n            \"nameservers\": [],\n            \"search_paths\": [],\n            \"split_dns\": {}\n        },\n        \"settings\": {}\n    },\n    \"topology\": \"../_topologies/nodeattrs.hujson\"\n}\n",
 		"scenario_path":   "scenarios/nodeattrs/nodeattrs-attr-c11-unknown.hujson",
 		"full_policy": {
-			"nodeAttrs": [{"attr": ["custom:headscale-test"], "target": ["tag:server"]}],
+			"nodeAttrs": [{"attr": ["custom:slopscale-test"], "target": ["tag:server"]}],
 			"tagOwners": {
 				"tag:client": ["odin@example.com"],
 				"tag:exit":   ["odin@example.com"],
@@ -5599,7 +5599,7 @@
 				"Tags":              ["tag:server"],
 				"MachineAuthorized": true,
 				"CapMap": {
-					"custom:headscale-test":                  null,
+					"custom:slopscale-test":                  null,
 					"default-auto-update":                    [false],
 					"https://tailscale.com/cap/file-sharing": null,
 					"https://tailscale.com/cap/is-owner":     null,
@@ -5615,7 +5615,7 @@
 				"ComputedNameWithHost": "server"
 			},
 			"AllCaps": [
-				"custom:headscale-test",
+				"custom:slopscale-test",
 				"default-auto-update",
 				"https://tailscale.com/cap/file-sharing",
 				"https://tailscale.com/cap/is-owner",

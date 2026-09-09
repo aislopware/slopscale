@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,8 +13,8 @@ import (
 // keep each table row focussed on the policy + tests under exercise.
 func policyTestUsers() types.Users {
 	return types.Users{
-		{ID: 1, Name: "alice", Email: "alice@headscale.net"},
-		{ID: 2, Name: "bob", Email: "bob@headscale.net"},
+		{ID: 1, Name: "alice", Email: "alice@slopscale.net"},
+		{ID: 2, Name: "bob", Email: "bob@slopscale.net"},
 	}
 }
 
@@ -73,14 +73,14 @@ func TestRunTests(t *testing.T) {
 		{
 			name: "all-pass-user-to-tag",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"acls": [{
 					"action": "accept",
-					"src": ["alice@headscale.net"],
+					"src": ["alice@slopscale.net"],
 					"dst": ["tag:server:22"]
 				}],
 				"tests": [{
-					"src": "alice@headscale.net",
+					"src": "alice@slopscale.net",
 					"accept": ["tag:server:22"]
 				}]
 			}`,
@@ -89,37 +89,37 @@ func TestRunTests(t *testing.T) {
 		{
 			name: "accept-fail-blocked-by-policy",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"acls": [{
 					"action": "accept",
-					"src": ["alice@headscale.net"],
+					"src": ["alice@slopscale.net"],
 					"dst": ["tag:server:22"]
 				}],
 				"tests": [{
-					"src": "bob@headscale.net",
+					"src": "bob@slopscale.net",
 					"accept": ["tag:server:22"]
 				}]
 			}`,
 			wantPass:    false,
-			wantErrSub:  []string{"bob@headscale.net", "tag:server:22", "expected ALLOWED"},
+			wantErrSub:  []string{"bob@slopscale.net", "tag:server:22", "expected ALLOWED"},
 			wantNoErrIs: errPolicyTestsFailed,
 		},
 		{
 			name: "deny-fail-policy-allows-traffic",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"acls": [{
 					"action": "accept",
-					"src": ["alice@headscale.net"],
+					"src": ["alice@slopscale.net"],
 					"dst": ["tag:server:22"]
 				}],
 				"tests": [{
-					"src": "alice@headscale.net",
+					"src": "alice@slopscale.net",
 					"deny": ["tag:server:22"]
 				}]
 			}`,
 			wantPass:    false,
-			wantErrSub:  []string{"alice@headscale.net", "tag:server:22", "expected DENIED"},
+			wantErrSub:  []string{"alice@slopscale.net", "tag:server:22", "expected DENIED"},
 			wantNoErrIs: errPolicyTestsFailed,
 		},
 		{
@@ -131,12 +131,12 @@ func TestRunTests(t *testing.T) {
 					"dst": ["*:*"]
 				}],
 				"tests": [{
-					"src": "ghost@headscale.net",
+					"src": "ghost@slopscale.net",
 					"accept": ["alice-laptop:22"]
 				}]
 			}`,
 			wantPass:    false,
-			wantErrSub:  []string{"ghost@headscale.net", "failed to resolve source"},
+			wantErrSub:  []string{"ghost@slopscale.net", "failed to resolve source"},
 			wantNoErrIs: errPolicyTestsFailed,
 		},
 		// "malformed-dst-missing-port" used to live here; structural
@@ -146,14 +146,14 @@ func TestRunTests(t *testing.T) {
 		{
 			name: "wildcard-src-passes",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"acls": [{
 					"action": "accept",
 					"src": ["*"],
 					"dst": ["tag:server:80"]
 				}],
 				"tests": [{
-					"src": "alice@headscale.net",
+					"src": "alice@slopscale.net",
 					"accept": ["tag:server:80"]
 				}]
 			}`,
@@ -162,21 +162,21 @@ func TestRunTests(t *testing.T) {
 		{
 			name: "proto-restrict-tcp-only",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"acls": [{
 					"action": "accept",
 					"proto": "tcp",
-					"src": ["alice@headscale.net"],
+					"src": ["alice@slopscale.net"],
 					"dst": ["tag:server:22"]
 				}],
 				"tests": [
 					{
-						"src": "alice@headscale.net",
+						"src": "alice@slopscale.net",
 						"proto": "tcp",
 						"accept": ["tag:server:22"]
 					},
 					{
-						"src": "alice@headscale.net",
+						"src": "alice@slopscale.net",
 						"proto": "udp",
 						"deny": ["tag:server:22"]
 					}
@@ -187,14 +187,14 @@ func TestRunTests(t *testing.T) {
 		{
 			name: "grants-only-policy-evaluated",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"grants": [{
-					"src": ["alice@headscale.net"],
+					"src": ["alice@slopscale.net"],
 					"dst": ["tag:server"],
 					"ip":  ["22"]
 				}],
 				"tests": [{
-					"src": "alice@headscale.net",
+					"src": "alice@slopscale.net",
 					"accept": ["tag:server:22"]
 				}]
 			}`,
@@ -203,25 +203,25 @@ func TestRunTests(t *testing.T) {
 		{
 			name: "mixed-pass-and-fail-reports-failure",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"acls": [{
 					"action": "accept",
-					"src": ["alice@headscale.net"],
+					"src": ["alice@slopscale.net"],
 					"dst": ["tag:server:22"]
 				}],
 				"tests": [
 					{
-						"src": "alice@headscale.net",
+						"src": "alice@slopscale.net",
 						"accept": ["tag:server:22"]
 					},
 					{
-						"src": "bob@headscale.net",
+						"src": "bob@slopscale.net",
 						"accept": ["tag:server:22"]
 					}
 				]
 			}`,
 			wantPass:    false,
-			wantErrSub:  []string{"bob@headscale.net", "expected ALLOWED"},
+			wantErrSub:  []string{"bob@slopscale.net", "expected ALLOWED"},
 			wantNoErrIs: errPolicyTestsFailed,
 		},
 		{
@@ -271,27 +271,27 @@ func TestSetPolicyRejectsFailingTests(t *testing.T) {
 	nodes := policyTestNodes(users)
 
 	good := `{
-		"tagOwners": { "tag:server": ["alice@headscale.net"] },
+		"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 		"acls": [{
 			"action": "accept",
-			"src": ["alice@headscale.net"],
+			"src": ["alice@slopscale.net"],
 			"dst": ["tag:server:22"]
 		}],
 		"tests": [{
-			"src": "alice@headscale.net",
+			"src": "alice@slopscale.net",
 			"accept": ["tag:server:22"]
 		}]
 	}`
 
 	bad := `{
-		"tagOwners": { "tag:server": ["alice@headscale.net"] },
+		"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 		"acls": [{
 			"action": "accept",
-			"src": ["alice@headscale.net"],
+			"src": ["alice@slopscale.net"],
 			"dst": ["tag:server:22"]
 		}],
 		"tests": [{
-			"src": "bob@headscale.net",
+			"src": "bob@slopscale.net",
 			"accept": ["tag:server:22"]
 		}]
 	}`
@@ -320,7 +320,7 @@ func TestNewPolicyManagerSkipsTests(t *testing.T) {
 	users := policyTestUsers()
 	nodes := policyTestNodes(users)
 
-	// Tests reference "ghost@headscale.net" which doesn't exist. Boot
+	// Tests reference "ghost@slopscale.net" which doesn't exist. Boot
 	// must not error.
 	stale := `{
 		"acls": [{
@@ -329,7 +329,7 @@ func TestNewPolicyManagerSkipsTests(t *testing.T) {
 			"dst": ["*:*"]
 		}],
 		"tests": [{
-			"src": "ghost@headscale.net",
+			"src": "ghost@slopscale.net",
 			"accept": ["alice-laptop:22"]
 		}]
 	}`
@@ -411,11 +411,11 @@ func TestPolicyTestResultsErrorsRendering(t *testing.T) {
 		AllPassed: false,
 		Results: []PolicyTestResult{
 			{
-				Src:        "alice@headscale.net",
+				Src:        "alice@slopscale.net",
 				AcceptFail: []string{"tag:server:22"},
 			},
 			{
-				Src:      "bob@headscale.net",
+				Src:      "bob@slopscale.net",
 				Proto:    "tcp",
 				DenyFail: []string{"tag:server:443"},
 			},
@@ -424,8 +424,8 @@ func TestPolicyTestResultsErrorsRendering(t *testing.T) {
 
 	rendered := results.Errors()
 	for _, sub := range []string{
-		"alice@headscale.net -> tag:server:22: expected ALLOWED, got DENIED",
-		"bob@headscale.net -> tag:server:443 (tcp): expected DENIED, got ALLOWED",
+		"alice@slopscale.net -> tag:server:22: expected ALLOWED, got DENIED",
+		"bob@slopscale.net -> tag:server:443 (tcp): expected DENIED, got ALLOWED",
 	} {
 		assert.Contains(t, rendered, sub)
 	}

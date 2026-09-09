@@ -8,7 +8,7 @@ import (
 // to complete an authentication or registration flow.
 func AuthWeb(title, description, command string) *elem.Element {
 	return page(
-		title+" - Headscale",
+		title+" - Slopscale",
 		H1(elem.Text(title)),
 		P(elem.Text(description)),
 		codeBlockText(command),

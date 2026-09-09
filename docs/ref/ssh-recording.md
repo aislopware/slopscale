@@ -5,7 +5,7 @@ SSH admits, the way Tailscale's [session
 recording](https://tailscale.com/docs/features/tailscale-ssh-session-recording)
 does. The client on the machine being logged into streams the session to
 a recorder node as it happens, and the recorder writes it to an
-[asciinema](https://asciinema.org) file. Headscale can run the recorder
+[asciinema](https://asciinema.org) file. Slopscale can run the recorder
 inside the server, or the policy can name any other recorder, such as
 Tailscale's `tsrecorder`.
 
@@ -16,13 +16,13 @@ Turn it on in the config file:
 ```yaml
 ssh_recording:
   enabled: true
-  dir: /var/lib/headscale/recordings
-  state_dir: /var/lib/headscale/recorder
+  dir: /var/lib/slopscale/recordings
+  state_dir: /var/lib/slopscale/recorder
   retention: 2160h
 ```
 
-The server then joins its own tailnet as a node named `headscale-recorder`
-with the tag `tag:headscale-recorder`, approved and reachable on port 80
+The server then joins its own tailnet as a node named `slopscale-recorder`
+with the tag `tag:slopscale-recorder`, approved and reachable on port 80
 from every machine, and stores each session under `dir` as one `.cast`
 file. `state_dir` holds the node's keys, so it keeps its identity across
 restarts; on the first start the server mints a short-lived pre-auth key
@@ -35,7 +35,7 @@ adds a grant that lets every machine reach every recorder on its port.
 
 ## Other recorders
 
-The tailnet default is a setting: `headscale settings set --ssh-recorders tag:recorder`, `POST /api/v1/settings` with `sshRecorders`, or the _SSH
+The tailnet default is a setting: `slopscale settings set --ssh-recorders tag:recorder`, `POST /api/v1/settings` with `sshRecorders`, or the _SSH
 session recording_ section of the console's _Settings_ page. A recorder is
 a tag, a host from the policy's `hosts` section, or a tailnet address. The
 default applies to every SSH rule that names no recorder of its own.
@@ -65,7 +65,7 @@ A `check` rule records like an `accept` rule once the check passes.
 Without enforcement, a session whose recorder cannot be reached goes on
 unrecorded, and the client reports the failure to the server. With it, the
 client rejects the session when no recorder answers, and ends a session
-whose recording breaks off. The tailnet-wide switch is `headscale settings set --ssh-recording-enforce`, `sshRecordingEnforce` in the API, or _Require
+whose recording breaks off. The tailnet-wide switch is `slopscale settings set --ssh-recording-enforce`, `sshRecordingEnforce` in the API, or _Require
 recording_ in the console; it covers the default recorders. A rule's
 `enforceRecorder` covers the rule's own recorders, or the default ones when
 the rule names none.
@@ -79,15 +79,15 @@ connecting machine, the SSH user and the recorders tried, and fires the
 ## Recordings
 
 Recordings from the embedded recorder are listed newest first on the
-console's _SSH sessions_ page, by `headscale ssh-recordings list`, or
+console's _SSH sessions_ page, by `slopscale ssh-recordings list`, or
 through `/api/v1/ssh-recording`. Each carries who connected from where,
 the SSH user and local account, the command when one ran instead of a
 shell, the file's size and whether the upload ended cleanly. A recording
 still being uploaded is listed as such.
 
 ```console
-$ headscale ssh-recordings list
-$ headscale ssh-recordings download -i 12
+$ slopscale ssh-recordings list
+$ slopscale ssh-recordings download -i 12
 $ asciinema play ssh-recording-12.cast
 ```
 
@@ -97,7 +97,7 @@ need the `logs:configuration:read` scope, which every admin role and the
 auditor hold; deleting needs `logs:configuration`.
 
 Recordings sent to another recorder live wherever that recorder keeps
-them; Headscale only knows about its own.
+them; Slopscale only knows about its own.
 
 ## How it works
 

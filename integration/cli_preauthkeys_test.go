@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/integrationutil"
+	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,10 +27,10 @@ func TestPreAuthKeyCommand(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("clipak"))
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("clipak"))
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	keys := make([]*clientv1.PreAuthKey, count)
@@ -42,9 +42,9 @@ func TestPreAuthKeyCommand(t *testing.T) {
 
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
 			executeAndUnmarshalErr := executeAndUnmarshal(
-				headscale,
+				slopscale,
 				[]string{
-					"headscale",
+					"slopscale",
 					"preauthkeys",
 					"--user",
 					"1",
@@ -71,9 +71,9 @@ func TestPreAuthKeyCommand(t *testing.T) {
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		err = executeAndUnmarshal(
-			headscale,
+			slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"preauthkeys",
 				"list",
 				"--output",
@@ -84,7 +84,7 @@ func TestPreAuthKeyCommand(t *testing.T) {
 		assert.NoError(c, err)
 	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for preauth keys list")
 
-	// There is one key created by [Scenario.CreateHeadscaleEnv]
+	// There is one key created by [Scenario.CreateSlopscaleEnv]
 	assert.Len(t, listedPreAuthKeys, 4)
 
 	assert.Equal(
@@ -132,9 +132,9 @@ func TestPreAuthKeyCommand(t *testing.T) {
 	}
 
 	// Test key expiry
-	_, err = headscale.Execute(
+	_, err = slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"preauthkeys",
 			"expire",
 			"--id",
@@ -147,9 +147,9 @@ func TestPreAuthKeyCommand(t *testing.T) {
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		err = executeAndUnmarshal(
-			headscale,
+			slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"preauthkeys",
 				"list",
 				"--output",
@@ -182,19 +182,19 @@ func TestPreAuthKeyCommandWithoutExpiry(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("clipaknaexp"))
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("clipaknaexp"))
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	var preAuthKey clientv1.PreAuthKey
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		err = executeAndUnmarshal(
-			headscale,
+			slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"preauthkeys",
 				"--user",
 				"1",
@@ -216,9 +216,9 @@ func TestPreAuthKeyCommandWithoutExpiry(t *testing.T) {
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		err = executeAndUnmarshal(
-			headscale,
+			slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"preauthkeys",
 				"list",
 				"--output",
@@ -229,7 +229,7 @@ func TestPreAuthKeyCommandWithoutExpiry(t *testing.T) {
 		assert.NoError(c, err)
 	}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for preauth keys list")
 
-	// There is one key created by [Scenario.CreateHeadscaleEnv]
+	// There is one key created by [Scenario.CreateSlopscaleEnv]
 	assert.Len(t, listedPreAuthKeys, 2)
 
 	assert.True(t, listedPreAuthKeys[1].Expiration.After(time.Now()))
@@ -252,19 +252,19 @@ func TestPreAuthKeyCommandReusableEphemeral(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("clipakresueeph"))
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("clipakresueeph"))
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	var preAuthReusableKey clientv1.PreAuthKey
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		err = executeAndUnmarshal(
-			headscale,
+			slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"preauthkeys",
 				"--user",
 				"1",
@@ -286,9 +286,9 @@ func TestPreAuthKeyCommandReusableEphemeral(t *testing.T) {
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		err = executeAndUnmarshal(
-			headscale,
+			slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"preauthkeys",
 				"--user",
 				"1",
@@ -313,9 +313,9 @@ func TestPreAuthKeyCommandReusableEphemeral(t *testing.T) {
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		err = executeAndUnmarshal(
-			headscale,
+			slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"preauthkeys",
 				"list",
 				"--output",
@@ -330,7 +330,7 @@ func TestPreAuthKeyCommandReusableEphemeral(t *testing.T) {
 		"Waiting for preauth keys list after reusable/ephemeral creation",
 	)
 
-	// There is one key created by [Scenario.CreateHeadscaleEnv]
+	// There is one key created by [Scenario.CreateSlopscaleEnv]
 	assert.Len(t, listedPreAuthKeys, 3)
 }
 
@@ -340,12 +340,12 @@ func TestPreAuthKeyCommandReusableEphemeral(t *testing.T) {
 func TestPreAuthKeyDeleteCommand(t *testing.T) {
 	IntegrationSkip(t)
 
-	scenario, headscale := setupCLIScenario(t, "cli-pakdelete", []string{"user1"}, 0)
+	scenario, slopscale := setupCLIScenario(t, "cli-pakdelete", []string{"user1"}, 0)
 	defer scenario.ShutdownAssertNoPanics(t)
 
 	// Create a key to delete.
-	created := assertJSONRoundtrip[*clientv1.PreAuthKey](t, headscale, []string{
-		"headscale",
+	created := assertJSONRoundtrip[*clientv1.PreAuthKey](t, slopscale, []string{
+		"slopscale",
 		"preauthkeys",
 		"--user", "1",
 		"create",
@@ -355,12 +355,12 @@ func TestPreAuthKeyDeleteCommand(t *testing.T) {
 	require.NotEmpty(t, created.Id)
 
 	// delete with no --id must be rejected.
-	_, err := headscale.Execute([]string{"headscale", "preauthkeys", "delete"})
+	_, err := slopscale.Execute([]string{"slopscale", "preauthkeys", "delete"})
 	require.ErrorContains(t, err, "missing --id parameter")
 
 	// delete the created key by id.
-	_, err = headscale.Execute([]string{
-		"headscale", "preauthkeys", "delete",
+	_, err = slopscale.Execute([]string{
+		"slopscale", "preauthkeys", "delete",
 		"--id", created.Id,
 	})
 	require.NoError(t, err)
@@ -369,8 +369,8 @@ func TestPreAuthKeyDeleteCommand(t *testing.T) {
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		var listed []clientv1.PreAuthKey
 
-		err := executeAndUnmarshal(headscale,
-			[]string{"headscale", "preauthkeys", "list", "--output", "json"},
+		err := executeAndUnmarshal(slopscale,
+			[]string{"slopscale", "preauthkeys", "list", "--output", "json"},
 			&listed,
 		)
 		assert.NoError(c, err)
@@ -391,7 +391,7 @@ func TestPreAuthKeyDeleteCommand(t *testing.T) {
 func TestPreAuthKeyCommandValidation(t *testing.T) {
 	IntegrationSkip(t)
 
-	scenario, headscale := setupCLIScenario(t, "cli-pakval", []string{"user1"}, 0)
+	scenario, slopscale := setupCLIScenario(t, "cli-pakval", []string{"user1"}, 0)
 	defer scenario.ShutdownAssertNoPanics(t)
 
 	tests := []struct {
@@ -413,7 +413,7 @@ func TestPreAuthKeyCommandValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := headscale.Execute(append([]string{"headscale"}, tt.args...))
+			_, err := slopscale.Execute(append([]string{"slopscale"}, tt.args...))
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
 

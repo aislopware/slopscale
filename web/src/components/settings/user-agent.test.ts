@@ -45,7 +45,7 @@ describe(describeUserAgent, () => {
   });
 
   it("hands back a header it does not recognise, and says so when there is none", () => {
-    expect(describeUserAgent("headscale-cli/0.28")).toBe("headscale-cli/0.28");
+    expect(describeUserAgent("slopscale-cli/0.28")).toBe("slopscale-cli/0.28");
     expect(describeUserAgent("")).toBe("Unknown");
     expect(describeUserAgent("   ")).toBe("Unknown");
   });

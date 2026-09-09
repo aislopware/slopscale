@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/derp"
@@ -189,7 +189,7 @@ func TestDERPSettingsEndToEnd(t *testing.T) {
 			"server": map[string]any{
 				"enabled":       true,
 				"regionId":      999,
-				"regionCode":    "headscale",
+				"regionCode":    "slopscale",
 				"verifyClients": true,
 				"stunAddr":      "127.0.0.1:0",
 			},
@@ -251,7 +251,7 @@ func TestDERPSettingsEndToEnd(t *testing.T) {
 				"nodes": []map[string]any{{"hostName": "sgp.derp.example", "ipv4": "203.0.113.5"}},
 			}},
 			"server": map[string]any{
-				"enabled": true, "regionId": 999, "regionCode": "headscale",
+				"enabled": true, "regionId": 999, "regionCode": "slopscale",
 				"verifyClients": false, "stunAddr": "127.0.0.1:0",
 			},
 		}
@@ -269,7 +269,7 @@ func TestDERPSettingsEndToEnd(t *testing.T) {
 				"nodes": []map[string]any{{"hostName": "sgp.derp.example", "ipv4": "203.0.113.5"}},
 			}},
 			"server": map[string]any{
-				"enabled": true, "regionId": 999, "regionCode": "headscale", "stunAddr": "127.0.0.1:0",
+				"enabled": true, "regionId": 999, "regionCode": "slopscale", "stunAddr": "127.0.0.1:0",
 			},
 		}
 		status, body = apiCall(t, client, ownerKey, http.MethodPut, v1, verified)

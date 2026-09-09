@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"tailscale.com/net/tsaddr"
@@ -43,7 +43,7 @@ const (
 	updateMulti     = 6
 )
 
-const prometheusNamespace = "headscale"
+const prometheusNamespace = "slopscale"
 
 var (
 	nodeStoreOperations = promauto.NewCounterVec(prometheus.CounterOpts{

@@ -1,27 +1,27 @@
-# Example NixOS configuration using the headscale module
+# Example NixOS configuration using the slopscale module
 #
-# This file demonstrates how to use the headscale NixOS module from this flake.
+# This file demonstrates how to use the slopscale NixOS module from this flake.
 # To use in your own configuration, add this to your flake.nix inputs:
 #
-#   inputs.headscale.url = "github:juanfont/headscale";
+#   inputs.slopscale.url = "github:aislopware/slopscale";
 #
 # Then import the module:
 #
-#   imports = [ inputs.headscale.nixosModules.default ];
+#   imports = [ inputs.slopscale.nixosModules.default ];
 #
 
 { config, pkgs, ... }:
 
 {
-  # Import the headscale module
+  # Import the slopscale module
   # In a real configuration, this would come from the flake input
-  # imports = [ inputs.headscale.nixosModules.default ];
+  # imports = [ inputs.slopscale.nixosModules.default ];
 
-  services.headscale = {
+  services.slopscale = {
     enable = true;
 
-    # Optional: Use a specific package (defaults to pkgs.headscale)
-    # package = pkgs.headscale;
+    # Optional: Use a specific package (defaults to pkgs.slopscale)
+    # package = pkgs.slopscale;
 
     # Listen on all interfaces (default is 127.0.0.1)
     address = "0.0.0.0";
@@ -29,10 +29,10 @@
 
     settings = {
       # The URL clients will connect to
-      server_url = "https://headscale.example.com";
+      server_url = "https://slopscale.example.com";
 
       # IP prefixes for the tailnet
-      # These use the freeform settings - you can set any headscale config option
+      # These use the freeform settings - you can set any slopscale config option
       prefixes = {
         v4 = "100.64.0.0/10";
         v6 = "fd7a:115c:a1e0::/48";
@@ -72,7 +72,7 @@
       database = {
         type = "sqlite";
         sqlite = {
-          path = "/var/lib/headscale/db.sqlite";
+          path = "/var/lib/slopscale/db.sqlite";
           write_ahead_log = true;
         };
 
@@ -81,9 +81,9 @@
         # postgres = {
         #   host = "localhost";
         #   port = 5432;
-        #   name = "headscale";
-        #   user = "headscale";
-        #   password_file = "/run/secrets/headscale-db-password";
+        #   name = "slopscale";
+        #   user = "slopscale";
+        #   password_file = "/run/secrets/slopscale-db-password";
         # };
       };
 
@@ -103,7 +103,7 @@
       # };
 
       # Optional: Let's Encrypt TLS certificates
-      # tls_letsencrypt_hostname = "headscale.example.com";
+      # tls_letsencrypt_hostname = "slopscale.example.com";
       # tls_letsencrypt_challenge_type = "HTTP-01";
 
       # Optional: Provide your own TLS certificates
@@ -113,10 +113,10 @@
       # ACL policy configuration
       policy = {
         mode = "file";
-        path = "/var/lib/headscale/policy.hujson";
+        path = "/var/lib/slopscale/policy.hujson";
       };
 
-      # You can add ANY headscale configuration option here thanks to freeform settings
+      # You can add ANY slopscale configuration option here thanks to freeform settings
       # For example, experimental features or settings not explicitly defined above:
       # experimental_feature = true;
       # custom_setting = "value";
@@ -133,7 +133,7 @@
   # Optional: Use with nginx reverse proxy for TLS termination
   # services.nginx = {
   #   enable = true;
-  #   virtualHosts."headscale.example.com" = {
+  #   virtualHosts."slopscale.example.com" = {
   #     enableACME = true;
   #     forceSSL = true;
   #     locations."/" = {

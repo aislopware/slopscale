@@ -1,7 +1,8 @@
 # CLAUDE.md
 
-Headscale is an open-source Tailscale control server in Go. This file holds
-what the code cannot tell you. Procedures live next to the code:
+Slopscale is a fork of headscale, the open-source Tailscale control server in
+Go, that adds an admin console, features and fixes on top of it. This file
+holds what the code cannot tell you. Procedures live next to the code:
 `cmd/hi/README.md` for running integration tests, `integration/README.md` for
 writing them, `hscontrol/api/v2/README.md` for the v2 API.
 
@@ -182,7 +183,7 @@ which source each region came from. The embedded relay is one
 `derpServer.DERPServer` created whenever a key path exists (a missing key
 only fails startup when the file enables the relay) and driven by
 `Apply(DERPServerSettings)`; its handler answers 404 while off, client
-verification goes through the process-global `headscale-derp-verify://`
+verification goes through the process-global `slopscale-derp-verify://`
 transport, and turning it off or verification on replaces the Tailscale
 server inside so connected clients are dropped. The app's scheduler re-arms
 its DERP timer from `derpRefreshInterval()`, wakes on `State.DERPChanged()`

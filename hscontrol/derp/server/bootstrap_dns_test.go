@@ -40,7 +40,7 @@ func bootstrapDERPMap() tailcfg.DERPMapView {
 		Regions: map[tailcfg.DERPRegionID]*tailcfg.DERPRegion{
 			1: {RegionID: 1, Nodes: []*tailcfg.DERPNode{
 				{Name: "1a", RegionID: 1, HostName: "derp.example.com"},
-				{Name: "1b", RegionID: 1, HostName: "derp.headscale.invalid"},
+				{Name: "1b", RegionID: 1, HostName: "derp.slopscale.invalid"},
 			}},
 		},
 	}).View()

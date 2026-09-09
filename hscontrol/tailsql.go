@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/tailscale/tailsql/server/tailsql"
 	"tailscale.com/tsnet"
 	"tailscale.com/tsweb"
@@ -32,12 +32,12 @@ func newTailSQLHTTPServer(handler http.Handler) *http.Server {
 
 func runTailSQLService(ctx context.Context, logf logger.Logf, stateDir, dbPath string) error {
 	opts := tailsql.Options{
-		Hostname: "tailsql-headscale",
+		Hostname: "tailsql-slopscale",
 		StateDir: stateDir,
 		Sources: []tailsql.DBSpec{
 			{
-				Source: "headscale",
-				Label:  "headscale - sqlite",
+				Source: "slopscale",
+				Label:  "slopscale - sqlite",
 				Driver: "sqlite",
 				URL:    fmt.Sprintf("file:%s?mode=ro", dbPath),
 				Named: map[string]string{

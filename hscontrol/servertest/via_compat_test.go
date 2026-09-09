@@ -4,7 +4,7 @@
 // connectivity and cross-subnet forwarding.
 //
 // Test data source: ../policy/v2/testdata/grant_results/via-grant-v{29,30,31,33,35,36}.hujson
-// Source format:    github.com/juanfont/headscale/hscontrol/types/testcapture
+// Source format:    github.com/aislopware/slopscale/hscontrol/types/testcapture
 package servertest_test
 
 import (
@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -38,11 +38,11 @@ var viaCompatTests = []struct {
 }
 
 // TestViaGrantMapCompat loads golden captures from Tailscale SaaS and
-// compares headscale's [tailcfg.MapResponse] structure against the captured [netmap.NetworkMap].
+// compares slopscale's [tailcfg.MapResponse] structure against the captured [netmap.NetworkMap].
 //
 // The comparison is IP-independent: it validates peer visibility, route
 // prefixes in AllowedIPs, and PrimaryRoutes — not literal Tailscale IP
-// addresses which differ between Tailscale SaaS and headscale allocation.
+// addresses which differ between Tailscale SaaS and slopscale allocation.
 //
 // CROSS-DEPENDENCY WARNING:
 // This test reads golden files from ../policy/v2/testdata/grant_results/
@@ -101,7 +101,7 @@ func runViaMapCompat(t *testing.T, c *testcapture.Capture) {
 	}
 
 	// Create tagged clients matching the golden topology.
-	// Nodes are created in SaaS registration order so headscale assigns
+	// Nodes are created in SaaS registration order so slopscale assigns
 	// sequential DB IDs in the same relative order. This matters for
 	// PrimaryRoutes election which uses lowest-node-ID-wins — the
 	// tiebreaker must pick the same node as SaaS.
@@ -231,7 +231,7 @@ func runViaMapCompat(t *testing.T, c *testcapture.Capture) {
 	}
 }
 
-// compareNetmap compares the headscale [tailcfg.MapResponse] against the
+// compareNetmap compares the slopscale [tailcfg.MapResponse] against the
 // captured [netmap.NetworkMap] data in an IP-independent way. It validates:
 //   - Peer visibility (which peers are present, by hostname)
 //   - Route prefixes in AllowedIPs (non-Tailscale-IP entries like 10.44.0.0/16)
@@ -256,7 +256,7 @@ func compareNetmap(
 		}
 	}
 
-	// Build headscale peer map.
+	// Build slopscale peer map.
 	gotPeers := map[string]peerSummary{}
 
 	for _, peer := range got.Peers {
@@ -316,7 +316,7 @@ func compareNetmap(
 		gotPeer, visible := gotPeers[name]
 		if !visible {
 			wantRoutes := extractRoutePrefixesView(wantPeer.AllowedIPs())
-			t.Errorf("peer %s: visible in Tailscale SaaS (routes=%v), missing in headscale",
+			t.Errorf("peer %s: visible in Tailscale SaaS (routes=%v), missing in slopscale",
 				name, wantRoutes)
 
 			continue
@@ -365,10 +365,10 @@ func compareNetmap(
 			"peer %s: PrimaryRoutes mismatch", name)
 	}
 
-	// Check for extra peers headscale shows that Tailscale SaaS doesn't.
+	// Check for extra peers slopscale shows that Tailscale SaaS doesn't.
 	for name := range gotPeers {
 		if _, expected := wantPeers[name]; !expected {
-			t.Errorf("peer %s: visible in headscale but NOT in Tailscale SaaS", name)
+			t.Errorf("peer %s: visible in slopscale but NOT in Tailscale SaaS", name)
 		}
 	}
 
@@ -388,7 +388,7 @@ func compareNetmap(
 	hsAddrs := hsAddrsByPeer(clients)
 
 	// Compare destination prefixes per rule — subnet CIDRs like
-	// 10.44.0.0/16 are stable between Tailscale SaaS and headscale.
+	// 10.44.0.0/16 are stable between Tailscale SaaS and slopscale.
 	// Source IPs are re-keyed per peer identity before comparison.
 	for i := range wantFilterRules {
 		wantRule := wantFilterRules[i]
@@ -401,7 +401,7 @@ func compareNetmap(
 			"PacketFilter[%d]: source peer identities mismatch", i)
 
 		// Destination prefixes: extract non-Tailscale-IP CIDRs
-		// from both golden and headscale rules and compare.
+		// from both golden and slopscale rules and compare.
 		var wantDstPrefixes []string
 
 		for _, dp := range wantRule.DstPorts {
@@ -477,7 +477,7 @@ func saasAddrsByPeer(
 	return out
 }
 
-// hsAddrsByPeer builds a map from headscale Tailscale address to peer
+// hsAddrsByPeer builds a map from slopscale Tailscale address to peer
 // hostname by walking each live client's self addresses.
 func hsAddrsByPeer(clients map[string]*servertest.TestClient) map[netip.Addr]string {
 	out := map[netip.Addr]string{}
@@ -532,7 +532,7 @@ func canonicaliseSrcStrings(
 	return sortedKeys(seen)
 }
 
-// canonicaliseSrcPrefixes is the headscale-side counterpart of
+// canonicaliseSrcPrefixes is the slopscale-side counterpart of
 // [canonicaliseSrcStrings], reading already-parsed [netip.Prefix] values
 // from [tailcfg.Match.Srcs].
 func canonicaliseSrcPrefixes(

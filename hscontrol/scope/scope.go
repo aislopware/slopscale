@@ -1,9 +1,9 @@
-// Package scope models the OAuth capability scopes the Headscale v2 API enforces
+// Package scope models the OAuth capability scopes the Slopscale v2 API enforces
 // and the rule for whether a granted set of scopes satisfies a required one.
 //
 // The vocabulary is taken from Tailscale's OpenAPI spec (the same scope names
 // the Terraform provider and Kubernetes operator request), so a client written
-// against Tailscale's scopes works unchanged against Headscale. The grant
+// against Tailscale's scopes works unchanged against Slopscale. The grant
 // predicate is kept here, separate from the HTTP/huma layer in
 // hscontrol/api/v2, so it can be tested exhaustively on its own.
 package scope
@@ -11,7 +11,7 @@ package scope
 import (
 	"strings"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 )
 
 // Scope is an OAuth capability an operation requires and a token grants. The names

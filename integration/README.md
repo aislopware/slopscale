@@ -1,6 +1,6 @@
 # Integration testing
 
-Headscale's integration tests start a real Headscale server and run
+Slopscale's integration tests start a real Slopscale server and run
 scenarios against real Tailscale clients across supported versions, all
 inside Docker. They are the safety net that keeps us honest about
 Tailscale protocol compatibility.
@@ -37,16 +37,16 @@ and commit the generated workflow file.
 The integration framework has four layers:
 
 - **`scenario.go`** — `Scenario` orchestrates a test environment: a
-  Headscale server, one or more users, and a collection of Tailscale
+  Slopscale server, one or more users, and a collection of Tailscale
   clients. `NewScenario(spec)` returns a ready-to-use environment.
-- **`hsic/`** — "Headscale Integration Container": wraps a Headscale
+- **`hsic/`** — "Slopscale Integration Container": wraps a Slopscale
   server in Docker. Options for config, DB backend, DERP, OIDC, etc.
 - **`tsic/`** — "Tailscale Integration Container": wraps a single
   Tailscale client. Options for version, hostname, auth method, etc.
 - **`dockertestutil/`** — low-level Docker helpers (networks, container
   lifecycle, `IsRunningInContainer()` detection).
 
-Tests compose these pieces via `ScenarioSpec` and `CreateHeadscaleEnv`
+Tests compose these pieces via `ScenarioSpec` and `CreateSlopscaleEnv`
 rather than calling Docker directly.
 
 ## Required scaffolding
@@ -72,7 +72,7 @@ func TestMyScenario(t *testing.T) {
 
 ### Scenario setup
 
-The canonical setup creates users, clients, and the Headscale server in
+The canonical setup creates users, clients, and the Slopscale server in
 one shot:
 
 ```go
@@ -88,7 +88,7 @@ func TestMyScenario(t *testing.T) {
     require.NoError(t, err)
     defer scenario.ShutdownAssertNoPanics(t)
 
-    err = scenario.CreateHeadscaleEnv(
+    err = scenario.CreateSlopscaleEnv(
         []tsic.Option{tsic.WithSSH()},
         hsic.WithTestName("myscenario"),
     )
@@ -97,7 +97,7 @@ func TestMyScenario(t *testing.T) {
     allClients, err := scenario.ListTailscaleClients()
     require.NoError(t, err)
 
-    headscale, err := scenario.Headscale()
+    slopscale, err := scenario.Slopscale()
     require.NoError(t, err)
 
     // ... assertions
@@ -131,7 +131,7 @@ assert.EventuallyWithT(t, func(c *assert.CollectT) {
 These read distributed state and may reflect stale data until
 propagation completes:
 
-- `headscale.ListNodes()`
+- `slopscale.ListNodes()`
 - `client.Status()`
 - `client.Curl()`
 - `client.Traceroute()`
@@ -192,7 +192,7 @@ creates a shadow invisible to the outer scope:
 var nodes []*v1.Node
 var err error
 assert.EventuallyWithT(t, func(c *assert.CollectT) {
-    nodes, err = headscale.ListNodes()   // = not :=
+    nodes, err = slopscale.ListNodes()   // = not :=
     assert.NoError(c, err)
     assert.Len(c, nodes, 2)
     requireNodeRouteCountWithCollect(c, nodes[0], 2, 2, 2)
@@ -219,7 +219,7 @@ must accept `*assert.CollectT` as its first parameter, not `*testing.T`.
 
 ## Identifying nodes by property, not position
 
-The order of `headscale.ListNodes()` is not stable. Tests that index
+The order of `slopscale.ListNodes()` is not stable. Tests that index
 `nodes[0]` will break when node ordering changes. Look nodes up by ID,
 hostname, or tag:
 
@@ -252,13 +252,13 @@ func TestRouteAdvertisementBasic(t *testing.T) {
     require.NoError(t, err)
     defer scenario.ShutdownAssertNoPanics(t)
 
-    err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("route"))
+    err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("route"))
     require.NoError(t, err)
 
     allClients, err := scenario.ListTailscaleClients()
     require.NoError(t, err)
 
-    headscale, err := scenario.Headscale()
+    slopscale, err := scenario.Slopscale()
     require.NoError(t, err)
 
     // --- Blocking: advertise the route on one client ---
@@ -269,10 +269,10 @@ func TestRouteAdvertisementBasic(t *testing.T) {
     })
     require.NoErrorf(t, err, "advertising route: %s", err)
 
-    // --- Eventually: headscale should see the announced route ---
+    // --- Eventually: slopscale should see the announced route ---
     var nodes []*v1.Node
     assert.EventuallyWithT(t, func(c *assert.CollectT) {
-        nodes, err = headscale.ListNodes()
+        nodes, err = slopscale.ListNodes()
         assert.NoError(c, err)
         assert.Len(c, nodes, 2)
 
@@ -283,7 +283,7 @@ func TestRouteAdvertisementBasic(t *testing.T) {
         }
     }, 10*time.Second, 500*time.Millisecond, "route should be announced")
 
-    // --- Blocking: approve the route via headscale CLI ---
+    // --- Blocking: approve the route via slopscale CLI ---
     var routerNode *v1.Node
     for _, node := range nodes {
         if node.GetName() == router.Hostname() {
@@ -293,7 +293,7 @@ func TestRouteAdvertisementBasic(t *testing.T) {
     }
     require.NotNil(t, routerNode)
 
-    _, err = headscale.ApproveRoutes(routerNode.GetId(), []string{"10.33.0.0/16"})
+    _, err = slopscale.ApproveRoutes(routerNode.GetId(), []string{"10.33.0.0/16"})
     require.NoError(t, err)
 
     // --- Eventually: a peer should see the approved route ---

@@ -3,8 +3,8 @@ package state
 import (
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,10 +29,10 @@ func TestGivenNameMapsToValidFQDNCheck(t *testing.T) {
 func TestScanNodeHealthReportsInvalidNameWithoutMutating(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	user := database.CreateUserForTest("scan-user")

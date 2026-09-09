@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/db/sqliteconfig"
+	"github.com/aislopware/slopscale/hscontrol/db/sqliteconfig"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

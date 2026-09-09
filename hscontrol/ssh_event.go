@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 )
@@ -32,7 +32,7 @@ func (ns *noiseServer) SSHEventHandler(writer http.ResponseWriter, req *http.Req
 		return
 	}
 
-	node, ok := ns.headscale.state.GetNodeByNodeKey(event.NodeKey)
+	node, ok := ns.slopscale.state.GetNodeByNodeKey(event.NodeKey)
 	if !ok || node.MachineKey() != ns.machineKey {
 		httpError(writer, NewHTTPError(http.StatusUnauthorized, "node key does not match the session",
 			fmt.Errorf("%w: %s", ErrSSHEventNodeMismatch, event.NodeKey.ShortString())))
@@ -40,14 +40,14 @@ func (ns *noiseServer) SSHEventHandler(writer http.ResponseWriter, req *http.Req
 		return
 	}
 
-	ns.headscale.recordSSHEvent(node, event)
+	ns.slopscale.recordSSHEvent(node, event)
 
 	writer.WriteHeader(http.StatusNoContent)
 }
 
 // recordSSHEvent writes the event to the audit log and hands it to the
 // webhooks.
-func (h *Headscale) recordSSHEvent(node types.NodeView, event tailcfg.SSHEventNotifyRequest) {
+func (h *Slopscale) recordSSHEvent(node types.NodeView, event tailcfg.SSHEventNotifyRequest) {
 	attempts := make([]map[string]string, 0, len(event.RecordingAttempts))
 	for _, attempt := range event.RecordingAttempts {
 		if attempt == nil {

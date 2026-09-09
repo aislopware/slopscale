@@ -13,7 +13,7 @@ defaults:
 
 jobs:
   goreleaser:
-    if: github.repository == 'juanfont/headscale'
+    if: github.repository == 'aislopware/slopscale'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

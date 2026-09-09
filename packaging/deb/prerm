@@ -1,5 +1,5 @@
 #!/bin/sh
-# prerm script for headscale.
+# prerm script for slopscale.
 
 set -e
 
@@ -18,7 +18,7 @@ set -e
 case "$1" in
     remove)
       if [ -d /run/systemd/system ]; then
-          deb-systemd-invoke stop headscale.service >/dev/null || true
+          deb-systemd-invoke stop slopscale.service >/dev/null || true
       fi
     ;;
     upgrade|deconfigure)

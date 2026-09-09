@@ -1,6 +1,6 @@
 # Admin console
 
-The headscale admin console: a client-rendered React application served by the
+The slopscale admin console: a client-rendered React application served by the
 server at `/admin/` (see `embed.go`, which embeds `dist/` into the binary).
 
 ## Stack
@@ -45,7 +45,7 @@ server at `/admin/` (see `embed.go`, which embeds `dist/` into the binary).
 
 ```console
 $ bun install            # once; the lockfile pins everything
-$ bun run dev            # http://localhost:5173/admin/, proxies /api and /oidc to $HEADSCALE_URL or 127.0.0.1:8080
+$ bun run dev            # http://localhost:5173/admin/, proxies /api and /oidc to $SLOPSCALE_URL or 127.0.0.1:8080
 $ bun run check          # typecheck + lint + format check + tests
 $ bun run build          # writes dist/, which the Go build embeds
 $ bun run e2e            # builds, starts a real server (cmd/dev) and signs in through a browser
@@ -55,7 +55,7 @@ $ bun run e2e            # builds, starts a real server (cmd/dev) and signs in t
 
 The console signs in only through an identity provider. For local work,
 `go run ./cmd/dev -server-url http://localhost:5173` (from the repository
-root) starts a headscale with a mock provider whose only user is an admin;
+root) starts a slopscale with a mock provider whose only user is an admin;
 `-server-url` makes the provider send the browser back to Vite. The e2e
 suite in `e2e/` uses the same `cmd/dev` on its own port, against the built
 console embedded in the binary, so it needs no running server.

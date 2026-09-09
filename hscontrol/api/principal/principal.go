@@ -17,9 +17,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 // Kind is how a principal authenticated.
@@ -320,7 +320,7 @@ func LocalTrustMiddleware(ctx huma.Context, next func(huma.Context)) {
 }
 
 // scopeMetaKey keys the per-operation required scope in huma.Operation.Metadata.
-const scopeMetaKey = "headscale.scope"
+const scopeMetaKey = "slopscale.scope"
 
 // RequireScope records op's required scope, both in its Metadata (where the
 // middleware reads it back) and in the generated OpenAPI document: an

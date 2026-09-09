@@ -1,4 +1,4 @@
-# Minimal CI image - expects pre-built headscale binary in build context
+# Minimal CI image - expects pre-built slopscale binary in build context
 # For local development with delve debugging, use Dockerfile.integration instead
 
 FROM debian:trixie-slim
@@ -7,11 +7,11 @@ RUN apt-get --update install --no-install-recommends --yes \
     bash ca-certificates curl dnsutils findutils iproute2 jq less procps python3 sqlite3 \
   && apt-get dist-clean
 
-RUN mkdir -p /var/run/headscale
+RUN mkdir -p /var/run/slopscale
 
-# Copy pre-built headscale binary from build context
-COPY headscale /usr/local/bin/headscale
+# Copy pre-built slopscale binary from build context
+COPY slopscale /usr/local/bin/slopscale
 
 ENTRYPOINT []
 EXPOSE 8080/tcp
-CMD ["/usr/local/bin/headscale"]
+CMD ["/usr/local/bin/slopscale"]

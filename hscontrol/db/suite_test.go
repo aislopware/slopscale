@@ -7,25 +7,25 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"zombiezen.com/go/postgrestest"
 )
 
 func newSQLiteTestDB() (*HSDatabase, error) {
-	tmpDir, err := os.MkdirTemp("", "headscale-db-test-*")
+	tmpDir, err := os.MkdirTemp("", "slopscale-db-test-*")
 	if err != nil {
 		return nil, err
 	}
 
-	log.Info().Str("path", tmpDir+"/headscale_test.db").Msg("database path")
+	log.Info().Str("path", tmpDir+"/slopscale_test.db").Msg("database path")
 
-	db, err := NewHeadscaleDatabase(
+	db, err := NewSlopscaleDatabase(
 		&types.Config{
 			Database: types.DatabaseConfig{
 				Type: types.DatabaseSqlite,
 				Sqlite: types.SqliteConfig{
-					Path: tmpDir + "/headscale_test.db",
+					Path: tmpDir + "/slopscale_test.db",
 				},
 			},
 			Policy: types.PolicyConfig{
@@ -43,7 +43,7 @@ func newSQLiteTestDB() (*HSDatabase, error) {
 func newPostgresTestDB(t *testing.T) *HSDatabase {
 	t.Helper()
 
-	return newHeadscaleDBFromPostgresURL(t, newPostgresDBForTest(t))
+	return newSlopscaleDBFromPostgresURL(t, newPostgresDBForTest(t))
 }
 
 func newPostgresDBForTest(t *testing.T) *url.URL {
@@ -69,13 +69,13 @@ func newPostgresDBForTest(t *testing.T) *url.URL {
 	return pu
 }
 
-func newHeadscaleDBFromPostgresURL(t *testing.T, pu *url.URL) *HSDatabase {
+func newSlopscaleDBFromPostgresURL(t *testing.T, pu *url.URL) *HSDatabase {
 	t.Helper()
 
 	pass, _ := pu.User.Password()
 	port, _ := strconv.Atoi(pu.Port())
 
-	db, err := NewHeadscaleDatabase(
+	db, err := NewSlopscaleDatabase(
 		&types.Config{
 			Database: types.DatabaseConfig{
 				Type: types.DatabasePostgres,

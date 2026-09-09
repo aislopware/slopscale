@@ -237,7 +237,7 @@ func (v NodeView) Hostname() string { return v.ж.Hostname }
 // a valid name set by the [User]
 //
 // GivenName is the name used in all DNS related
-// parts of headscale.
+// parts of slopscale.
 func (v NodeView) GivenName() string { return v.ж.GivenName }
 
 // UserID identifies the owning user for user-owned nodes.
@@ -263,7 +263,7 @@ func (v NodeView) AuthKey() PreAuthKeyView               { return v.ж.AuthKey.V
 func (v NodeView) Expiry() views.ValuePointer[time.Time] { return views.ValuePointerOf(v.ж.Expiry) }
 
 // LastSeen is when the node was last in contact with
-// headscale. It is best effort and not persisted.
+// slopscale. It is best effort and not persisted.
 func (v NodeView) LastSeen() views.ValuePointer[time.Time] {
 	return views.ValuePointerOf(v.ж.LastSeen)
 }

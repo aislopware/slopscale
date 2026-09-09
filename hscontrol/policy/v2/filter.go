@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/rs/zerolog/log"
 	"go4.org/netipx"
 	"tailscale.com/tailcfg"

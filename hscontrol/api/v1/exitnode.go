@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/aislopware/slopscale/hscontrol/scope"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/scope"
 )
 
 func init() {

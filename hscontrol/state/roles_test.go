@@ -3,8 +3,8 @@ package state
 import (
 	"testing"
 
-	hsdb "github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
+	hsdb "github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,7 +12,7 @@ import (
 func newRoleTestState(t *testing.T) *State {
 	t.Helper()
 
-	s, err := NewState(persistTestConfig(t.TempDir() + "/headscale.db"))
+	s, err := NewState(persistTestConfig(t.TempDir() + "/slopscale.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = s.Close() })
 

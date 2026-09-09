@@ -449,7 +449,7 @@ const defaultRegionId = 999;
 export function serverDraft(server: DerpServerSettings): ServerDraft {
   return {
     regionId: String(server.regionId ?? defaultRegionId),
-    regionCode: server.regionCode ?? "headscale",
+    regionCode: server.regionCode ?? "slopscale",
     regionName: server.regionName ?? "",
     verifyClients: server.verifyClients ?? true,
     stunAddr: server.stunAddr ?? "0.0.0.0:3478",

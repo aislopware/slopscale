@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/integrationutil"
+	"github.com/aislopware/slopscale/integration/tsic"
 	tcmp "github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,10 +28,10 @@ func TestUserCommand(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("cli-user"))
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("cli-user"))
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	var (
@@ -40,9 +40,9 @@ func TestUserCommand(t *testing.T) {
 	)
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		executeAndUnmarshalErr := executeAndUnmarshal(headscale,
+		executeAndUnmarshalErr := executeAndUnmarshal(slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"users",
 				"list",
 				"--output",
@@ -63,9 +63,9 @@ func TestUserCommand(t *testing.T) {
 		)
 	}, integrationutil.ScaledTimeout(20*time.Second), 1*time.Second)
 
-	_, err = headscale.Execute(
+	_, err = slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"users",
 			"rename",
 			"--output=json",
@@ -78,9 +78,9 @@ func TestUserCommand(t *testing.T) {
 	var listAfterRenameUsers []*clientv1.User
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		executeAndUnmarshalErr := executeAndUnmarshal(headscale,
+		executeAndUnmarshalErr := executeAndUnmarshal(slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"users",
 				"list",
 				"--output",
@@ -104,9 +104,9 @@ func TestUserCommand(t *testing.T) {
 	var listByUsername []*clientv1.User
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		err = executeAndUnmarshal(headscale,
+		err = executeAndUnmarshal(slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"users",
 				"list",
 				"--output",
@@ -140,9 +140,9 @@ func TestUserCommand(t *testing.T) {
 	var listByID []*clientv1.User
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		err = executeAndUnmarshal(headscale,
+		err = executeAndUnmarshal(slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"users",
 				"list",
 				"--output",
@@ -173,9 +173,9 @@ func TestUserCommand(t *testing.T) {
 		t.Errorf("unexpected users (-want +got):\n%s", diff)
 	}
 
-	deleteResult, err := headscale.Execute(
+	deleteResult, err := slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"users",
 			"destroy",
 			"--force",
@@ -189,9 +189,9 @@ func TestUserCommand(t *testing.T) {
 	var listAfterIDDelete []*clientv1.User
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		executeAndUnmarshalErr := executeAndUnmarshal(headscale,
+		executeAndUnmarshalErr := executeAndUnmarshal(slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"users",
 				"list",
 				"--output",
@@ -221,9 +221,9 @@ func TestUserCommand(t *testing.T) {
 		}
 	}, integrationutil.ScaledTimeout(20*time.Second), 1*time.Second)
 
-	deleteResult, err = headscale.Execute(
+	deleteResult, err = slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"users",
 			"destroy",
 			"--force",
@@ -236,9 +236,9 @@ func TestUserCommand(t *testing.T) {
 	var listAfterNameDelete []clientv1.User
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		err = executeAndUnmarshal(headscale,
+		err = executeAndUnmarshal(slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"users",
 				"list",
 				"--output",
@@ -255,7 +255,7 @@ func TestUserCommand(t *testing.T) {
 	)
 }
 
-// TestUserCreateCommand exercises `headscale users create` with all of its
+// TestUserCreateCommand exercises `slopscale users create` with all of its
 // optional flags (--display-name, --email, --picture-url), the --email list
 // filter, and the validation error paths (duplicate name, missing flags).
 func TestUserCreateCommand(t *testing.T) {
@@ -263,13 +263,13 @@ func TestUserCreateCommand(t *testing.T) {
 
 	// One pre-existing user with a node so the server holds real data while we
 	// create and inspect additional users via the CLI.
-	scenario, headscale := setupCLIScenario(t, "cli-usercreate", []string{"existing"}, 1)
+	scenario, slopscale := setupCLIScenario(t, "cli-usercreate", []string{"existing"}, 1)
 	defer scenario.ShutdownAssertNoPanics(t)
 
 	// Create a user populated with every optional field. The created user is
 	// returned on stdout and round-tripped through the User type.
-	created := assertJSONRoundtrip[*clientv1.User](t, headscale, []string{
-		"headscale",
+	created := assertJSONRoundtrip[*clientv1.User](t, slopscale, []string{
+		"slopscale",
 		"users",
 		"create",
 		"cli-created",
@@ -289,9 +289,9 @@ func TestUserCreateCommand(t *testing.T) {
 	var byEmail []*clientv1.User
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		err := executeAndUnmarshal(headscale,
+		err := executeAndUnmarshal(slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"users",
 				"list",
 				"--email", "cli-created@example.com",
@@ -315,7 +315,7 @@ func TestUserCreateCommand(t *testing.T) {
 func TestUserCommandValidation(t *testing.T) {
 	IntegrationSkip(t)
 
-	scenario, headscale := setupCLIScenario(t, "cli-userval", []string{"user1"}, 0)
+	scenario, slopscale := setupCLIScenario(t, "cli-userval", []string{"user1"}, 0)
 	defer scenario.ShutdownAssertNoPanics(t)
 
 	// wantEmptyList means the command must succeed and return no users;
@@ -349,7 +349,7 @@ func TestUserCommandValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			out, err := headscale.Execute(append([]string{"headscale"}, tt.args...))
+			out, err := slopscale.Execute(append([]string{"slopscale"}, tt.args...))
 
 			switch {
 			case tt.wantEmptyList:

@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/integrationutil"
+	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -28,8 +28,8 @@ func TestResolveMagicDNS(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("magicdns"))
-	requireNoErrHeadscaleEnv(t, err)
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("magicdns"))
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -49,7 +49,7 @@ func TestResolveMagicDNS(t *testing.T) {
 			// It is safe to ignore this error as we handled it when caching it
 			peerFQDN, _ := peer.FQDN()
 
-			assert.Equal(t, peer.Hostname()+".headscale.net.", peerFQDN)
+			assert.Equal(t, peer.Hostname()+".slopscale.net.", peerFQDN)
 
 			assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 				command := []string{
@@ -101,18 +101,18 @@ func TestResolveMagicDNSExtraRecordsPath(t *testing.T) {
 	})
 	b, _ := json.Marshal(extraRecords)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{
 		tsic.WithPackages("python3", "curl", "bind-tools"),
 	},
 		hsic.WithTestName("extrarecords"),
 		hsic.WithConfigEnv(map[string]string{
 			// Disable global nameservers to make the test run offline.
-			"HEADSCALE_DNS_NAMESERVERS_GLOBAL": "",
-			"HEADSCALE_DNS_EXTRA_RECORDS_PATH": erPath,
+			"SLOPSCALE_DNS_NAMESERVERS_GLOBAL": "",
+			"SLOPSCALE_DNS_EXTRA_RECORDS_PATH": erPath,
 		}),
 		hsic.WithFileInContainer(erPath, b),
 	)
-	requireNoErrHeadscaleEnv(t, err)
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -131,7 +131,7 @@ func TestResolveMagicDNSExtraRecordsPath(t *testing.T) {
 		assertCommandOutputContains(t, client, []string{"dig", "test.myvpn.example.com"}, "6.6.6.6")
 	}
 
-	hs, err := scenario.Headscale()
+	hs, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	// Write the file directly into place from the docker API.

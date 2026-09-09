@@ -78,7 +78,7 @@ func RegisterConfirm(info RegisterConfirmInfo) *elem.Element {
 	)
 
 	return page(
-		"Headscale - Confirm node registration",
+		"Slopscale - Confirm node registration",
 		H2(elem.Text("Confirm node registration")),
 		P(elem.Text(
 			"A device is asking to be added to your tailnet. "+

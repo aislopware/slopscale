@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +20,7 @@ func TestAPIV1SocketClient(t *testing.T) {
 
 	app := createTestApp(t)
 
-	socketPath := filepath.Join(t.TempDir(), "headscale.sock")
+	socketPath := filepath.Join(t.TempDir(), "slopscale.sock")
 
 	lis, err := new(net.ListenConfig).Listen(t.Context(), "unix", socketPath)
 	require.NoError(t, err)

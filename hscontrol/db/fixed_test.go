@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/gen/jet/table"
 	jet "github.com/go-jet/jet/v2/sqlite"
-	"github.com/juanfont/headscale/gen/jet/table"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

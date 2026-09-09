@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/templates"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/arl/statsviz"
-	"github.com/juanfont/headscale/hscontrol/templates"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"tailscale.com/tailcfg"
@@ -80,7 +80,7 @@ func writeDebug(w http.ResponseWriter, r *http.Request, jsonVal func() any, text
 	_, _ = w.Write([]byte(textVal()))
 }
 
-func (h *Headscale) debugHTTPServer() *http.Server {
+func (h *Slopscale) debugHTTPServer() *http.Server {
 	debugMux := http.NewServeMux()
 	debug := tsweb.Debugger(debugMux)
 
@@ -242,7 +242,7 @@ func (h *Headscale) debugHTTPServer() *http.Server {
 	return debugHTTPServer
 }
 
-func (h *Headscale) debugMapResponses(w http.ResponseWriter, _ *http.Request) {
+func (h *Slopscale) debugMapResponses(w http.ResponseWriter, _ *http.Request) {
 	res, err := h.mapBatcher.DebugMapResponses()
 	if err != nil {
 		httpError(w, err)
@@ -251,7 +251,7 @@ func (h *Headscale) debugMapResponses(w http.ResponseWriter, _ *http.Request) {
 
 	if res == nil {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("HEADSCALE_DEBUG_DUMP_MAPRESPONSE_PATH not set"))
+		_, _ = w.Write([]byte("SLOPSCALE_DEBUG_DUMP_MAPRESPONSE_PATH not set"))
 
 		return
 	}
@@ -260,7 +260,7 @@ func (h *Headscale) debugMapResponses(w http.ResponseWriter, _ *http.Request) {
 }
 
 // debugBatcher returns debug information about the batcher's connected nodes.
-func (h *Headscale) debugBatcher() string {
+func (h *Slopscale) debugBatcher() string {
 	var sb strings.Builder
 	sb.WriteString("=== Batcher Connected Nodes ===\n\n")
 
@@ -327,7 +327,7 @@ type DebugBatcherNodeInfo struct {
 }
 
 // debugBatcherJSON returns structured debug information about the batcher's connected nodes.
-func (h *Headscale) debugBatcherJSON() DebugBatcherInfo {
+func (h *Slopscale) debugBatcherJSON() DebugBatcherInfo {
 	info := DebugBatcherInfo{
 		ConnectedNodes: make(map[string]DebugBatcherNodeInfo),
 		TotalNodes:     0,
@@ -346,7 +346,7 @@ func (h *Headscale) debugBatcherJSON() DebugBatcherInfo {
 }
 
 // connectedNodesList returns a list of connected nodes for the ping page.
-func (h *Headscale) connectedNodesList() []templates.ConnectedNode {
+func (h *Slopscale) connectedNodesList() []templates.ConnectedNode {
 	debugInfo := h.mapBatcher.Debug()
 
 	var nodes []templates.ConnectedNode
@@ -379,7 +379,7 @@ func (h *Headscale) connectedNodesList() []templates.ConnectedNode {
 const pingTimeout = 30 * time.Second
 
 // doPing sends a [tailcfg.PingRequest] to the node identified by query and waits for a response.
-func (h *Headscale) doPing(ctx context.Context, query string) *templates.PingResult {
+func (h *Slopscale) doPing(ctx context.Context, query string) *templates.PingResult {
 	if query == "" {
 		return &templates.PingResult{
 			Status:  "error",

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -14,15 +14,15 @@ import (
 // each row focussed on the policy under exercise. Three users, six
 // nodes:
 //
-//   - alice (id 1) at headscale.net owns alice-laptop and alice-tablet
-//   - bob   (id 2) at headscale.net owns bob-laptop
+//   - alice (id 1) at slopscale.net owns alice-laptop and alice-tablet
+//   - bob   (id 2) at slopscale.net owns bob-laptop
 //   - thor  (id 3) at example.org   owns thor-laptop
 //   - server (alice-created tagged node) → tag:server
 //   - prod   (alice-created tagged node) → tag:prod
 func sshTestUsers() types.Users {
 	return types.Users{
-		{ID: 1, Name: "alice", Email: "alice@headscale.net"},
-		{ID: 2, Name: "bob", Email: "bob@headscale.net"},
+		{ID: 1, Name: "alice", Email: "alice@slopscale.net"},
+		{ID: 2, Name: "bob", Email: "bob@slopscale.net"},
 		{ID: 3, Name: "thor", Email: "thor@example.org"},
 	}
 }
@@ -102,15 +102,15 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "accept-pass-basic",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["root"]
 				}],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["root"]
 				}]
@@ -120,15 +120,15 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "accept-pass-multi-user-in-rule",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["root", "ubuntu"]
 				}],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["root", "ubuntu"]
 				}]
@@ -138,60 +138,60 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "accept-fail-no-rule",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["root"]
 				}]
 			}`,
 			wantPass:   false,
-			wantErrSub: []string{"alice@headscale.net", "root", "expected ALLOWED"},
+			wantErrSub: []string{"alice@slopscale.net", "root", "expected ALLOWED"},
 		},
 		{
 			name: "accept-fail-user-not-allowed-by-rule",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["root"]
 				}],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["mallory"]
 				}]
 			}`,
 			wantPass:   false,
-			wantErrSub: []string{"alice@headscale.net", "mallory", "expected ALLOWED"},
+			wantErrSub: []string{"alice@slopscale.net", "mallory", "expected ALLOWED"},
 		},
 		{
 			name: "accept-fail-different-src",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["root"]
 				}],
 				"sshTests": [{
-					"src":    "bob@headscale.net",
+					"src":    "bob@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["root"]
 				}]
 			}`,
 			wantPass:   false,
-			wantErrSub: []string{"bob@headscale.net", "root", "expected ALLOWED"},
+			wantErrSub: []string{"bob@slopscale.net", "root", "expected ALLOWED"},
 		},
 		{
 			name: "deny-pass-no-rule",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"sshTests": [{
-					"src":  "alice@headscale.net",
+					"src":  "alice@slopscale.net",
 					"dst":  ["tag:server"],
 					"deny": ["root"]
 				}]
@@ -201,15 +201,15 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "deny-pass-rule-blocks-user",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["autogroup:nonroot"]
 				}],
 				"sshTests": [{
-					"src":  "alice@headscale.net",
+					"src":  "alice@slopscale.net",
 					"dst":  ["tag:server"],
 					"deny": ["root"]
 				}]
@@ -219,34 +219,34 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "deny-fail-rule-allows",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["root"]
 				}],
 				"sshTests": [{
-					"src":  "alice@headscale.net",
+					"src":  "alice@slopscale.net",
 					"dst":  ["tag:server"],
 					"deny": ["root"]
 				}]
 			}`,
 			wantPass:   false,
-			wantErrSub: []string{"alice@headscale.net", "root", "expected DENIED"},
+			wantErrSub: []string{"alice@slopscale.net", "root", "expected DENIED"},
 		},
 		{
 			name: "check-pass-rule-is-check",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "check",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["root"]
 				}],
 				"sshTests": [{
-					"src":   "alice@headscale.net",
+					"src":   "alice@slopscale.net",
 					"dst":   ["tag:server"],
 					"check": ["root"]
 				}]
@@ -256,22 +256,22 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "check-fail-rule-is-accept",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["root"]
 				}],
 				"sshTests": [{
-					"src":   "alice@headscale.net",
+					"src":   "alice@slopscale.net",
 					"dst":   ["tag:server"],
 					"check": ["root"]
 				}]
 			}`,
 			wantPass: false,
 			wantErrSub: []string{
-				"alice@headscale.net",
+				"alice@slopscale.net",
 				"root",
 				"via check",
 				"via accept",
@@ -280,23 +280,23 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "check-pass-and-accept-pass-coexist",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [
 					{
 						"action": "accept",
-						"src":    ["alice@headscale.net"],
+						"src":    ["alice@slopscale.net"],
 						"dst":    ["tag:server"],
 						"users":  ["root"]
 					},
 					{
 						"action": "check",
-						"src":    ["alice@headscale.net"],
+						"src":    ["alice@slopscale.net"],
 						"dst":    ["tag:server"],
 						"users":  ["ubuntu"]
 					}
 				],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["root"],
 					"check":  ["ubuntu"]
@@ -307,15 +307,15 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "accept-passes-on-check-rule",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "check",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["root"]
 				}],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["root"]
 				}]
@@ -326,24 +326,24 @@ func TestRunSSHTests(t *testing.T) {
 			name: "multi-dst-all-must-reach",
 			policy: `{
 				"tagOwners": {
-					"tag:server": ["alice@headscale.net"],
-					"tag:prod":   ["alice@headscale.net"]
+					"tag:server": ["alice@slopscale.net"],
+					"tag:prod":   ["alice@slopscale.net"]
 				},
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["root"]
 				}],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server", "tag:prod"],
 					"accept": ["root"]
 				}]
 			}`,
 			wantPass: false,
 			wantErrSub: []string{
-				"alice@headscale.net",
+				"alice@slopscale.net",
 				"root",
 				"prod",
 				"expected ALLOWED",
@@ -352,23 +352,23 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "multi-user-mixed-accept-deny-check-in-one-entry",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [
 					{
 						"action": "accept",
-						"src":    ["alice@headscale.net"],
+						"src":    ["alice@slopscale.net"],
 						"dst":    ["tag:server"],
 						"users":  ["root"]
 					},
 					{
 						"action": "check",
-						"src":    ["alice@headscale.net"],
+						"src":    ["alice@slopscale.net"],
 						"dst":    ["tag:server"],
 						"users":  ["ubuntu"]
 					}
 				],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["root"],
 					"deny":   ["mallory"],
@@ -380,15 +380,15 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "nonroot-allows-alice",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["autogroup:nonroot"]
 				}],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["alice"]
 				}]
@@ -398,41 +398,41 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "nonroot-denies-root",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["autogroup:nonroot"]
 				}],
 				"sshTests": [
 					{
-						"src":    "alice@headscale.net",
+						"src":    "alice@slopscale.net",
 						"dst":    ["tag:server"],
 						"accept": ["root"]
 					},
 					{
-						"src":  "alice@headscale.net",
+						"src":  "alice@slopscale.net",
 						"dst":  ["tag:server"],
 						"deny": ["root"]
 					}
 				]
 			}`,
 			wantPass:   false,
-			wantErrSub: []string{"alice@headscale.net", "root", "expected ALLOWED"},
+			wantErrSub: []string{"alice@slopscale.net", "root", "expected ALLOWED"},
 		},
 		{
 			name: "wildcard-user-allows-mallory",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["autogroup:nonroot"]
 				}],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["mallory"]
 				}]
@@ -442,28 +442,28 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "root-only-rule",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["root"]
 				}],
 				"sshTests": [
 					{
-						"src":    "alice@headscale.net",
+						"src":    "alice@slopscale.net",
 						"dst":    ["tag:server"],
 						"accept": ["root"]
 					},
 					{
-						"src":    "alice@headscale.net",
+						"src":    "alice@slopscale.net",
 						"dst":    ["tag:server"],
 						"accept": ["alice"]
 					}
 				]
 			}`,
 			wantPass:   false,
-			wantErrSub: []string{"alice@headscale.net", "alice", "expected ALLOWED"},
+			wantErrSub: []string{"alice@slopscale.net", "alice", "expected ALLOWED"},
 		},
 		{
 			name: "autogroup-self-same-user",
@@ -475,7 +475,7 @@ func TestRunSSHTests(t *testing.T) {
 					"users":  ["root"]
 				}],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["autogroup:self"],
 					"accept": ["root"]
 				}]
@@ -487,12 +487,12 @@ func TestRunSSHTests(t *testing.T) {
 			policy: `{
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["autogroup:self"],
 					"users":  ["root"]
 				}],
 				"sshTests": [{
-					"src":    "bob@headscale.net",
+					"src":    "bob@slopscale.net",
 					"dst":    ["autogroup:self"],
 					"accept": ["root"]
 				}]
@@ -500,20 +500,20 @@ func TestRunSSHTests(t *testing.T) {
 			wantPass: false,
 			// autogroup:self for bob resolves to bob-laptop; the only
 			// rule allows alice as src, so reachability fails.
-			wantErrSub: []string{"bob@headscale.net", "root"},
+			wantErrSub: []string{"bob@slopscale.net", "root"},
 		},
 		{
 			name: "localpart-domain-match",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
-					"users":  ["localpart:*@headscale.net"]
+					"users":  ["localpart:*@slopscale.net"]
 				}],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["alice"]
 				}]
@@ -523,12 +523,12 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "localpart-domain-mismatch",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
 					"src":    ["thor@example.org"],
 					"dst":    ["tag:server"],
-					"users":  ["localpart:*@headscale.net"]
+					"users":  ["localpart:*@slopscale.net"]
 				}],
 				"sshTests": [{
 					"src":    "thor@example.org",
@@ -543,8 +543,8 @@ func TestRunSSHTests(t *testing.T) {
 			name: "tag-as-src",
 			policy: `{
 				"tagOwners": {
-					"tag:server": ["alice@headscale.net"],
-					"tag:prod":   ["alice@headscale.net"]
+					"tag:server": ["alice@slopscale.net"],
+					"tag:prod":   ["alice@slopscale.net"]
 				},
 				"ssh": [{
 					"action": "accept",
@@ -563,20 +563,20 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "acl-allows-tcp22-no-ssh-rule",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"acls": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server:22"]
 				}],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["root"]
 				}]
 			}`,
 			wantPass:   false,
-			wantErrSub: []string{"alice@headscale.net", "root", "expected ALLOWED"},
+			wantErrSub: []string{"alice@slopscale.net", "root", "expected ALLOWED"},
 		},
 		{
 			// ACL grants only TCP:80 to alice; no rule grants TCP:22.
@@ -586,20 +586,20 @@ func TestRunSSHTests(t *testing.T) {
 			// filter rule for the SSH port.
 			name: "acl-denies-tcp22-ssh-rule-allows",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"acls": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server:80"]
 				}],
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["root"]
 				}],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["root"]
 				}]
@@ -620,24 +620,24 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "both-tests-and-sshTests-both-pass",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"acls": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server:22"]
 				}],
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["root"]
 				}],
 				"tests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"accept": ["tag:server:22"]
 				}],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": ["root"]
 				}]
@@ -647,33 +647,33 @@ func TestRunSSHTests(t *testing.T) {
 		{
 			name: "empty-accept-deny-check-in-entry",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"sshTests": [{
-					"src": "alice@headscale.net",
+					"src": "alice@slopscale.net",
 					"dst": ["tag:server"]
 				}]
 			}`,
 			wantPass:   false,
-			wantErrSub: []string{"alice@headscale.net", "no accept, deny, or check"},
+			wantErrSub: []string{"alice@slopscale.net", "no accept, deny, or check"},
 		},
 		{
 			name: "empty-user-in-accept",
 			policy: `{
-				"tagOwners": { "tag:server": ["alice@headscale.net"] },
+				"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 				"ssh": [{
 					"action": "accept",
-					"src":    ["alice@headscale.net"],
+					"src":    ["alice@slopscale.net"],
 					"dst":    ["tag:server"],
 					"users":  ["root"]
 				}],
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:server"],
 					"accept": [""]
 				}]
 			}`,
 			wantPass:   false,
-			wantErrSub: []string{"alice@headscale.net", "expected ALLOWED"},
+			wantErrSub: []string{"alice@slopscale.net", "expected ALLOWED"},
 		},
 		{
 			// tag:empty has an owner but no tagged nodes, so the dst
@@ -683,9 +683,9 @@ func TestRunSSHTests(t *testing.T) {
 			// guard exists to catch.
 			name: "dst-tag-with-no-tagged-nodes-fails",
 			policy: `{
-				"tagOwners": { "tag:empty": ["alice@headscale.net"] },
+				"tagOwners": { "tag:empty": ["alice@slopscale.net"] },
 				"sshTests": [{
-					"src":    "alice@headscale.net",
+					"src":    "alice@slopscale.net",
 					"dst":    ["tag:empty"],
 					"accept": ["root"]
 				}]
@@ -699,7 +699,7 @@ func TestRunSSHTests(t *testing.T) {
 			// empty-dst guard, distinct trigger path.
 			name: "dst-autogroup-self-from-tag-src-fails",
 			policy: `{
-				"tagOwners": { "tag:prod": ["alice@headscale.net"] },
+				"tagOwners": { "tag:prod": ["alice@slopscale.net"] },
 				"sshTests": [{
 					"src":    "tag:prod",
 					"dst":    ["autogroup:self"],
@@ -748,18 +748,18 @@ func TestRunSSHTestsBothTestsPassSSHTestsFail(t *testing.T) {
 	nodes := sshTestNodes(users)
 
 	policy := `{
-		"tagOwners": { "tag:server": ["alice@headscale.net"] },
+		"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 		"acls": [{
 			"action": "accept",
-			"src":    ["alice@headscale.net"],
+			"src":    ["alice@slopscale.net"],
 			"dst":    ["tag:server:22"]
 		}],
 		"tests": [{
-			"src":    "alice@headscale.net",
+			"src":    "alice@slopscale.net",
 			"accept": ["tag:server:22"]
 		}],
 		"sshTests": [{
-			"src":    "alice@headscale.net",
+			"src":    "alice@slopscale.net",
 			"dst":    ["tag:server"],
 			"accept": ["root"]
 		}]
@@ -790,30 +790,30 @@ func TestSetPolicyRejectsFailingSSHTests(t *testing.T) {
 	nodes := sshTestNodes(users)
 
 	good := `{
-		"tagOwners": { "tag:server": ["alice@headscale.net"] },
+		"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 		"ssh": [{
 			"action": "accept",
-			"src":    ["alice@headscale.net"],
+			"src":    ["alice@slopscale.net"],
 			"dst":    ["tag:server"],
 			"users":  ["root"]
 		}],
 		"sshTests": [{
-			"src":    "alice@headscale.net",
+			"src":    "alice@slopscale.net",
 			"dst":    ["tag:server"],
 			"accept": ["root"]
 		}]
 	}`
 
 	bad := `{
-		"tagOwners": { "tag:server": ["alice@headscale.net"] },
+		"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 		"ssh": [{
 			"action": "accept",
-			"src":    ["alice@headscale.net"],
+			"src":    ["alice@slopscale.net"],
 			"dst":    ["tag:server"],
 			"users":  ["root"]
 		}],
 		"sshTests": [{
-			"src":    "bob@headscale.net",
+			"src":    "bob@slopscale.net",
 			"dst":    ["tag:server"],
 			"accept": ["root"]
 		}]
@@ -863,24 +863,24 @@ func TestSetPolicyAggregatesACLAndSSHTestFailures(t *testing.T) {
 	nodes := sshTestNodes(users)
 
 	good := `{
-		"tagOwners": { "tag:server": ["alice@headscale.net"] },
+		"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 		"acls": [{
 			"action": "accept",
-			"src":    ["alice@headscale.net"],
+			"src":    ["alice@slopscale.net"],
 			"dst":    ["tag:server:22"]
 		}],
 		"ssh": [{
 			"action": "accept",
-			"src":    ["alice@headscale.net"],
+			"src":    ["alice@slopscale.net"],
 			"dst":    ["tag:server"],
 			"users":  ["root"]
 		}],
 		"tests": [{
-			"src":    "alice@headscale.net",
+			"src":    "alice@slopscale.net",
 			"accept": ["tag:server:22"]
 		}],
 		"sshTests": [{
-			"src":    "alice@headscale.net",
+			"src":    "alice@slopscale.net",
 			"dst":    ["tag:server"],
 			"accept": ["root"]
 		}]
@@ -889,24 +889,24 @@ func TestSetPolicyAggregatesACLAndSSHTestFailures(t *testing.T) {
 	// Both blocks fail: acls only allow alice but tests assert bob;
 	// ssh only allows alice but sshTests assert bob.
 	bad := `{
-		"tagOwners": { "tag:server": ["alice@headscale.net"] },
+		"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 		"acls": [{
 			"action": "accept",
-			"src":    ["alice@headscale.net"],
+			"src":    ["alice@slopscale.net"],
 			"dst":    ["tag:server:22"]
 		}],
 		"ssh": [{
 			"action": "accept",
-			"src":    ["alice@headscale.net"],
+			"src":    ["alice@slopscale.net"],
 			"dst":    ["tag:server"],
 			"users":  ["root"]
 		}],
 		"tests": [{
-			"src":    "bob@headscale.net",
+			"src":    "bob@slopscale.net",
 			"accept": ["tag:server:22"]
 		}],
 		"sshTests": [{
-			"src":    "bob@headscale.net",
+			"src":    "bob@slopscale.net",
 			"dst":    ["tag:server"],
 			"accept": ["root"]
 		}]
@@ -925,7 +925,7 @@ func TestSetPolicyAggregatesACLAndSSHTestFailures(t *testing.T) {
 	body := err.Error()
 	assert.Contains(t, body, "tag:server:22",
 		"aggregated error must include the ACL failure message")
-	assert.Contains(t, body, "bob@headscale.net",
+	assert.Contains(t, body, "bob@slopscale.net",
 		"aggregated error must include the bob src")
 	// The SSH renderer emits "src/user -> dst" form; the ACL renderer
 	// emits "src -> dst". Substring "/root -> " is unique to the SSH
@@ -947,9 +947,9 @@ func TestNewPolicyManagerWarnsOnSSHTestsFailure(t *testing.T) {
 	// sshTests reference a user that does exist but no rule allows
 	// them — the test should fail at user-write but not at boot.
 	stale := `{
-		"tagOwners": { "tag:server": ["alice@headscale.net"] },
+		"tagOwners": { "tag:server": ["alice@slopscale.net"] },
 		"sshTests": [{
-			"src":    "alice@headscale.net",
+			"src":    "alice@slopscale.net",
 			"dst":    ["tag:server"],
 			"accept": ["root"]
 		}]
@@ -976,19 +976,19 @@ func TestSSHPolicyTestResultsErrorsRendering(t *testing.T) {
 		AllPassed: false,
 		Results: []SSHPolicyTestResult{
 			{
-				Src: "alice@headscale.net",
+				Src: "alice@slopscale.net",
 				AcceptFail: map[string][]string{
 					"root": {"server"},
 				},
 			},
 			{
-				Src: "bob@headscale.net",
+				Src: "bob@slopscale.net",
 				DenyFail: map[string][]string{
 					"root": {"alice-laptop"},
 				},
 			},
 			{
-				Src: "alice@headscale.net",
+				Src: "alice@slopscale.net",
 				CheckFail: map[string][]string{
 					"ubuntu": {"server"},
 				},
@@ -1001,9 +1001,9 @@ func TestSSHPolicyTestResultsErrorsRendering(t *testing.T) {
 
 	rendered := results.Errors()
 	for _, sub := range []string{
-		"alice@headscale.net/root -> server: expected ALLOWED, got DENIED",
-		"bob@headscale.net/root -> alice-laptop: expected DENIED, got ALLOWED",
-		"alice@headscale.net/ubuntu -> server: expected ALLOWED via check, got ALLOWED via accept",
+		"alice@slopscale.net/root -> server: expected ALLOWED, got DENIED",
+		"bob@slopscale.net/root -> alice-laptop: expected DENIED, got ALLOWED",
+		"alice@slopscale.net/ubuntu -> server: expected ALLOWED via check, got ALLOWED via accept",
 	} {
 		assert.Contains(t, rendered, sub)
 	}

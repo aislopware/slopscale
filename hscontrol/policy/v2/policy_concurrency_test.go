@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,9 +23,9 @@ func TestPolicyManagerConcurrentReads(t *testing.T) {
 	t.Parallel()
 
 	users := types.Users{
-		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
-		{ID: 2, Name: "user2", Email: "user2@headscale.net"},
-		{ID: 3, Name: "user3", Email: "user3@headscale.net"},
+		{ID: 1, Name: "user1", Email: "user1@slopscale.net"},
+		{ID: 2, Name: "user2", Email: "user2@slopscale.net"},
+		{ID: 3, Name: "user3", Email: "user3@slopscale.net"},
 	}
 
 	policy := `{

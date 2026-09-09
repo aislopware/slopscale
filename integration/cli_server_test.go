@@ -3,8 +3,8 @@ package integration
 import (
 	"testing"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/hscontrol/types"
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,27 +16,27 @@ import (
 func TestServerInfoCommands(t *testing.T) {
 	IntegrationSkip(t)
 
-	scenario, headscale := setupCLIScenario(t, "cli-serverinfo", []string{"user1"}, 1)
+	scenario, slopscale := setupCLIScenario(t, "cli-serverinfo", []string{"user1"}, 1)
 	defer scenario.ShutdownAssertNoPanics(t)
 
 	t.Run("health", func(t *testing.T) {
-		health := assertJSONRoundtrip[*clientv1.HealthResponseBody](t, headscale, []string{
-			"headscale", "health", "--output", "json",
+		health := assertJSONRoundtrip[*clientv1.HealthResponseBody](t, slopscale, []string{
+			"slopscale", "health", "--output", "json",
 		})
 		assert.True(t, health.DatabaseConnectivity, "database should be reachable")
 	})
 
 	t.Run("version", func(t *testing.T) {
-		info := assertJSONRoundtrip[types.VersionInfo](t, headscale, []string{
-			"headscale", "version", "--output", "json",
+		info := assertJSONRoundtrip[types.VersionInfo](t, slopscale, []string{
+			"slopscale", "version", "--output", "json",
 		})
 		assert.NotEmpty(t, info.Version, "version string should be populated")
 		assert.NotEmpty(t, info.Go.Version, "go version should be populated")
 	})
 
 	t.Run("generate-private-key", func(t *testing.T) {
-		key := assertJSONRoundtrip[map[string]string](t, headscale, []string{
-			"headscale", "generate", "private-key", "--output", "json",
+		key := assertJSONRoundtrip[map[string]string](t, slopscale, []string{
+			"slopscale", "generate", "private-key", "--output", "json",
 		})
 
 		priv, ok := key["private_key"]

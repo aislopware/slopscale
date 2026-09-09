@@ -1,0 +1,270 @@
+package cli
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/policy"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/spf13/cobra"
+	"tailscale.com/types/views"
+)
+
+const (
+	bypassFlag = "bypass-server-and-access-database-directly"
+
+	bypassFlagHelp = "Uses the slopscale config to directly access the database, " +
+		"bypassing the API and does not require the server to be running"
+	bypassFlagHelpCheck = "Open the database directly (no running server required) to resolve user " +
+		"references and to evaluate the policy's tests and sshTests blocks. " +
+		"Required when those checks are needed."
+)
+
+var errAborted = errors.New("command aborted by user")
+
+// bypassDatabase opens the database directly, bypassing the running server.
+// The caller must close the returned handle.
+func bypassDatabase() (*db.HSDatabase, error) {
+	cfg, err := types.LoadServerConfig()
+	if err != nil {
+		return nil, fmt.Errorf("loading config: %w", err)
+	}
+
+	d, err := db.NewSlopscaleDatabase(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("opening database: %w", err)
+	}
+
+	return d, nil
+}
+
+// openBypassDB confirms the destructive bypass action and opens the database
+// directly. The caller is responsible for closing the returned handle.
+func openBypassDB(cmd *cobra.Command) (*db.HSDatabase, error) {
+	if !confirmAction(
+		cmd,
+		"DO NOT run this command if an instance of slopscale is running, are you sure slopscale is not running?",
+	) {
+		return nil, errAborted
+	}
+
+	return bypassDatabase()
+}
+
+func init() {
+	rootCmd.AddCommand(policyCmd)
+
+	getPolicy.Flags().
+		BoolP(bypassFlag, "", false, bypassFlagHelp)
+	policyCmd.AddCommand(getPolicy)
+
+	setPolicy.Flags().StringP("file", "f", "", "Path to a policy file in HuJSON format")
+	setPolicy.Flags().
+		BoolP(bypassFlag, "", false, bypassFlagHelp)
+	mustMarkRequired(setPolicy, "file")
+	policyCmd.AddCommand(setPolicy)
+
+	checkPolicy.Flags().StringP("file", "f", "", "Path to a policy file in HuJSON format")
+	checkPolicy.Flags().
+		BoolP(bypassFlag, "", false, bypassFlagHelpCheck)
+	mustMarkRequired(checkPolicy, "file")
+	policyCmd.AddCommand(checkPolicy)
+}
+
+var policyCmd = &cobra.Command{
+	Use:   "policy",
+	Short: "Manage the policy",
+}
+
+var getPolicy = &cobra.Command{
+	Use:     "get",
+	Short:   "Print the current policy",
+	Aliases: []string{cmdShow, "view", "fetch"},
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		var policyData string
+
+		if bypass, _ := cmd.Flags().GetBool(bypassFlag); bypass {
+			d, err := openBypassDB(cmd)
+			if err != nil {
+				return err
+			}
+			defer d.Close()
+
+			pol, err := d.GetPolicy()
+			if err != nil {
+				return fmt.Errorf("loading policy from database: %w", err)
+			}
+
+			policyData = pol.Data
+		} else {
+			err := withClient(func(ctx context.Context, client *clientv1.ClientWithResponses) error {
+				resp, err := client.GetPolicyWithResponse(ctx)
+				if err != nil {
+					return fmt.Errorf("loading ACL policy: %w", err)
+				}
+
+				if resp.StatusCode() != http.StatusOK {
+					return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+				}
+
+				policyData = resp.JSON200.Policy
+
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		// This does not pass output format as we don't support yaml, json or
+		// json-line output for this command. It is HuJSON already.
+		fmt.Println(policyData)
+
+		return nil
+	},
+}
+
+var setPolicy = &cobra.Command{
+	Use:   "set",
+	Short: "Replace the policy",
+	Long: `Replaces the stored policy with the given HuJSON file. Works only when
+policy.mode is "database", where the policy lives in the database.`,
+	Aliases: []string{"put", cmdUpdate},
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		policyPath, _ := cmd.Flags().GetString("file")
+
+		policyBytes, err := os.ReadFile(policyPath)
+		if err != nil {
+			return fmt.Errorf("reading policy file: %w", err)
+		}
+
+		if bypass, _ := cmd.Flags().GetBool(bypassFlag); bypass {
+			d, err := openBypassDB(cmd)
+			if err != nil {
+				return err
+			}
+			defer d.Close()
+
+			users, err := d.ListUsers(nil)
+			if err != nil {
+				return fmt.Errorf("loading users for policy validation: %w", err)
+			}
+
+			_, err = policy.NewPolicyManager(policyBytes, users, views.Slice[types.NodeView]{})
+			if err != nil {
+				return fmt.Errorf("parsing policy file: %w", err)
+			}
+
+			_, err = d.SetPolicy(string(policyBytes))
+			if err != nil {
+				return fmt.Errorf("setting ACL policy: %w", err)
+			}
+		} else {
+			policyStr := string(policyBytes)
+
+			err := withClient(func(ctx context.Context, client *clientv1.ClientWithResponses) error {
+				resp, err := client.SetPolicyWithResponse(ctx, clientv1.SetPolicyJSONRequestBody{
+					Policy: &policyStr,
+				})
+				if err != nil {
+					return fmt.Errorf("setting ACL policy: %w", err)
+				}
+
+				if resp.StatusCode() != http.StatusOK {
+					return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+				}
+
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		fmt.Println("Policy updated.")
+
+		return nil
+	},
+}
+
+var checkPolicy = &cobra.Command{
+	Use:   "check",
+	Short: "Check the Policy file for errors",
+	Long: `Validates the policy against the server's live users and nodes and runs its
+"tests" and "sshTests" blocks. By default the command calls a running slopscale
+over its API. Pass --` + bypassFlag + ` to open the database directly when
+slopscale is not running.`,
+	RunE: func(cmd *cobra.Command, _ []string) error {
+		policyPath, _ := cmd.Flags().GetString("file")
+
+		policyBytes, err := os.ReadFile(policyPath)
+		if err != nil {
+			return fmt.Errorf("reading policy file: %w", err)
+		}
+
+		if bypass, _ := cmd.Flags().GetBool(bypassFlag); bypass {
+			d, dbErr := openBypassDB(cmd)
+			if dbErr != nil {
+				return dbErr
+			}
+			defer d.Close()
+
+			users, dbErr := d.ListUsers(nil)
+			if dbErr != nil {
+				return fmt.Errorf("loading users: %w", dbErr)
+			}
+
+			nodes, dbErr := d.ListNodes()
+			if dbErr != nil {
+				return fmt.Errorf("loading nodes: %w", dbErr)
+			}
+
+			// [policy.NewPolicyManager] validates structure and user references
+			// but intentionally skips test evaluation (boot path).
+			// [policy.PolicyManager.SetPolicy] is the user-write boundary and is what runs the
+			// tests and sshTests blocks.
+			pm, dbErr := policy.NewPolicyManager(policyBytes, users, nodes.ViewSlice())
+			if dbErr != nil {
+				return fmt.Errorf("parsing policy file: %w", dbErr)
+			}
+
+			_, dbErr = pm.SetPolicy(policyBytes)
+			if dbErr != nil {
+				return dbErr
+			}
+
+			fmt.Println("Policy is valid")
+
+			return nil
+		}
+
+		policyStr := string(policyBytes)
+
+		err = withClient(func(ctx context.Context, client *clientv1.ClientWithResponses) error {
+			resp, reqErr := client.CheckPolicyWithResponse(ctx, clientv1.CheckPolicyJSONRequestBody{
+				Policy: &policyStr,
+			})
+			if reqErr != nil {
+				return reqErr
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("Policy is valid")
+
+		return nil
+	},
+}

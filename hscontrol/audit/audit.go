@@ -11,9 +11,9 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/aislopware/slopscale/hscontrol/api/principal"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/api/principal"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 )
 
@@ -25,8 +25,8 @@ type Sink interface {
 }
 
 const (
-	actionMetaKey = "headscale.audit.action"
-	targetMetaKey = "headscale.audit.target"
+	actionMetaKey = "slopscale.audit.action"
+	targetMetaKey = "slopscale.audit.target"
 )
 
 // target is how an operation names its object: the kind, and the path

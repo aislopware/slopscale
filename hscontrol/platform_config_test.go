@@ -6,14 +6,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/go-chi/chi/v5"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestApplePlatformConfig_ServesProfilesViaChiRouter is the regression
-// guard for issue juanfont/headscale#3296.
+// guard for issue aislopware/slopscale#3296.
 //
 // The Apple profile download endpoints (`/apple/macos-app-store`,
 // `/apple/macos-standalone`, `/apple/ios`) are registered on the chi
@@ -31,9 +31,9 @@ import (
 func TestApplePlatformConfig_ServesProfilesViaChiRouter(t *testing.T) {
 	t.Parallel()
 
-	h := &Headscale{
+	h := &Slopscale{
 		cfg: &types.Config{
-			ServerURL: "https://headscale.example.com",
+			ServerURL: "https://slopscale.example.com",
 		},
 	}
 
@@ -69,7 +69,7 @@ func TestApplePlatformConfig_ServesProfilesViaChiRouter(t *testing.T) {
 				resp.Header.Get("Content-Type"),
 				"profile must be served as an Apple aspen config")
 			assert.Contains(t, body,
-				"https://headscale.example.com",
+				"https://slopscale.example.com",
 				"rendered profile must embed the configured ServerURL")
 		})
 	}
@@ -84,9 +84,9 @@ func TestApplePlatformConfig_ServesProfilesViaChiRouter(t *testing.T) {
 func TestApplePlatformConfig_RejectsUnknownPlatform(t *testing.T) {
 	t.Parallel()
 
-	h := &Headscale{
+	h := &Slopscale{
 		cfg: &types.Config{
-			ServerURL: "https://headscale.example.com",
+			ServerURL: "https://slopscale.example.com",
 		},
 	}
 

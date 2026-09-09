@@ -4,12 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/types/netmap"
 )
 
-// TestDeletedNodeIsToldToLogInAgain covers juanfont/headscale#3410: a
+// TestDeletedNodeIsToldToLogInAgain covers aislopware/slopscale#3410: a
 // deleted node's long poll used to run on with keep-alives, and once it
 // broke the client re-polled its old key into a 404 for good. Now the
 // stream ends with the node's own entry expired, which tailscaled reads as

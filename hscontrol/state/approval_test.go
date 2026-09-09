@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -172,7 +172,7 @@ func TestUsersApproval(t *testing.T) {
 func TestSettingsPersist(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 
 	s, err := NewState(persistTestConfig(dbPath))
 	require.NoError(t, err)

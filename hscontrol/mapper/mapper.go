@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/envknob"
 	"tailscale.com/tailcfg"
@@ -30,7 +30,7 @@ const (
 	debugMapResponsePerm = 0o755
 )
 
-var debugDumpMapResponsePath = envknob.String("HEADSCALE_DEBUG_DUMP_MAPRESPONSE_PATH")
+var debugDumpMapResponsePath = envknob.String("SLOPSCALE_DEBUG_DUMP_MAPRESPONSE_PATH")
 
 // TODO: Optimise
 // As this work continues, the idea is that there will be one Mapper instance

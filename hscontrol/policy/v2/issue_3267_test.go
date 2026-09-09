@@ -5,12 +5,12 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 )
 
-const issue3267AliceEmail = "alice@headscale.net"
+const issue3267AliceEmail = "alice@slopscale.net"
 
 // TestIssue3267ViaGrantBroaderDestination locks the SaaS contract for
 // a via grant whose destination is a host alias broader than (or

@@ -13,11 +13,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
-	"github.com/juanfont/headscale/hscontrol/wire"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
+	"github.com/aislopware/slopscale/hscontrol/wire"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
@@ -37,7 +37,7 @@ type contextKey string
 const nodeNameContextKey = contextKey("nodeName")
 
 type mapSession struct {
-	h      *Headscale
+	h      *Slopscale
 	req    tailcfg.MapRequest
 	ctx    context.Context //nolint:containedctx // mapSession is a per-stream session struct whose lifetime matches ctx
 	capVer tailcfg.CapabilityVersion
@@ -55,7 +55,7 @@ type mapSession struct {
 	log zerolog.Logger
 }
 
-func (h *Headscale) newMapSession(
+func (h *Slopscale) newMapSession(
 	ctx context.Context,
 	req tailcfg.MapRequest,
 	w http.ResponseWriter,
@@ -125,7 +125,7 @@ var nodeGoneExpiry = time.Unix(0, 0).UTC()
 // nodeGoneResponse is the map response for a node the server no longer
 // knows: its own entry with the key expired. tailscaled reads an expired
 // self key as NeedsLogin and stops polling, where a bare HTTP error is a
-// temporary failure it retries forever (juanfont/headscale#3410). The
+// temporary failure it retries forever (aislopware/slopscale#3410). The
 // hosted control plane answers a deleted device the same way. Only the
 // fields the client needs to recognise itself are filled in; node may be
 // a bare key when the server never knew it.

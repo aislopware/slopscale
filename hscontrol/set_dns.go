@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/dnsprovider"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/dnsprovider"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 )
@@ -51,7 +51,7 @@ func newDNSProvider(cfg *types.Config) (dnsprovider.Provider, error) {
 // publishes the record. A node may only write the challenge record of
 // its own MagicDNS name, over its own Noise session.
 func (ns *noiseServer) SetDNSHandler(writer http.ResponseWriter, req *http.Request) {
-	if ns.headscale.dnsProvider == nil {
+	if ns.slopscale.dnsProvider == nil {
 		httpError(writer, NewHTTPError(http.StatusNotImplemented, "certificate assistance is not enabled",
 			ErrSetDNSDisabled))
 
@@ -67,7 +67,7 @@ func (ns *noiseServer) SetDNSHandler(writer http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	node, ok := ns.headscale.state.GetNodeByNodeKey(request.NodeKey)
+	node, ok := ns.slopscale.state.GetNodeByNodeKey(request.NodeKey)
 	if !ok || node.MachineKey() != ns.machineKey {
 		httpError(writer, NewHTTPError(http.StatusUnauthorized, "node key does not match the session",
 			fmt.Errorf("%w: %s", ErrSetDNSNodeMismatch, request.NodeKey.ShortString())))
@@ -84,14 +84,14 @@ func (ns *noiseServer) SetDNSHandler(writer http.ResponseWriter, req *http.Reque
 
 	name := strings.ToLower(strings.TrimSuffix(request.Name, "."))
 
-	if !node.ACMEChallengeAllowed(ns.headscale.cfg, name) {
+	if !node.ACMEChallengeAllowed(ns.slopscale.cfg, name) {
 		httpError(writer, NewHTTPError(http.StatusForbidden, "not this node's challenge record",
 			fmt.Errorf("%w: %q", ErrSetDNSNameNotAllowed, request.Name)))
 
 		return
 	}
 
-	err = ns.headscale.dnsProvider.SetTXT(req.Context(), name, request.Value)
+	err = ns.slopscale.dnsProvider.SetTXT(req.Context(), name, request.Value)
 	if err != nil {
 		log.Error().Err(err).Str("name", name).Uint64("node.id", uint64(node.ID())).
 			Msg("publishing ACME challenge record")
@@ -100,7 +100,7 @@ func (ns *noiseServer) SetDNSHandler(writer http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	audit.Record(ns.headscale.state, &types.AuditEvent{
+	audit.Record(ns.slopscale.state, &types.AuditEvent{
 		Action:     "node.cert_challenge",
 		TargetKind: "node",
 		TargetID:   node.ID().String(),

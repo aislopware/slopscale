@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/mapper"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/mapper"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -159,7 +159,7 @@ func TestServeLongPollWritesErrorWhenInitialMapFails(t *testing.T) {
 	app.mapBatcher.Close()
 	require.NoError(t, app.state.Close())
 
-	database, err := db.NewHeadscaleDatabase(app.cfg)
+	database, err := db.NewSlopscaleDatabase(app.cfg)
 	require.NoError(t, err)
 	_, err = database.DB.ExecContext(t.Context(),
 		"UPDATE nodes SET given_name = $1 WHERE id = $2", "", createdNode.ID)

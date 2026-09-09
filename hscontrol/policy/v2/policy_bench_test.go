@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/types/views"
 )
@@ -14,7 +14,7 @@ import (
 // pair of addresses so the pair scan in BuildPeerMap does real work.
 func benchPeerMapNodes(count int) (types.Users, views.Slice[types.NodeView]) {
 	users := types.Users{
-		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
+		{ID: 1, Name: "user1", Email: "user1@slopscale.net"},
 	}
 
 	nodes := make(types.Nodes, 0, count)

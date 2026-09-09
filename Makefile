@@ -1,4 +1,4 @@
-# Headscale Makefile
+# Slopscale Makefile
 # Modern Makefile following best practices
 
 # Version calculation
@@ -50,8 +50,8 @@ check-web-deps:
 # Build targets
 .PHONY: build
 build: check-deps $(GO_SOURCES) go.mod go.sum
-	@echo "Building headscale..."
-	go build $(PIE_FLAGS) -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o headscale ./cmd/headscale
+	@echo "Building slopscale..."
+	go build $(PIE_FLAGS) -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o slopscale ./cmd/slopscale
 
 # Admin console. The React app in web/ is built by bun and embedded into
 # the binary by web/embed.go, so `make web` must run before `make build`
@@ -175,7 +175,7 @@ openapi:
 .PHONY: client
 client:
 	@echo "Generating API clients..."
-	@tmp=$$(mktemp -t headscale-openapi-3.1.XXXXXX.yaml); \
+	@tmp=$$(mktemp -t slopscale-openapi-3.1.XXXXXX.yaml); \
 	go run ./cmd/gen-openapi -out "$$tmp" && \
 	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0 \
 		-generate types,client -package clientv1 -o gen/client/v1/client.gen.go "$$tmp" && \
@@ -187,13 +187,13 @@ client:
 # Clean targets
 .PHONY: clean
 clean:
-	rm -rf headscale gen/client web/dist/assets web/dist/index.html
+	rm -rf slopscale gen/client web/dist/assets web/dist/index.html
 
 # Development workflow
 .PHONY: dev
 dev: fmt lint test build
 
-# Start a local headscale dev server (use mts to add nodes)
+# Start a local slopscale dev server (use mts to add nodes)
 .PHONY: dev-server
 dev-server:
 	go run ./cmd/dev
@@ -201,11 +201,11 @@ dev-server:
 # Help target
 .PHONY: help
 help:
-	@echo "Headscale Development Makefile"
+	@echo "Slopscale Development Makefile"
 	@echo ""
 	@echo "Main targets:"
 	@echo "  all          - Run lint, test, and build (default)"
-	@echo "  build        - Build headscale binary"
+	@echo "  build        - Build slopscale binary"
 	@echo "  test         - Run Go tests"
 	@echo "  fmt          - Format all code (Go, docs, markup)"
 	@echo "  lint         - Lint all code (golangci-lint, vet, mod tidy, govulncheck)"

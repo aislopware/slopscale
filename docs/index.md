@@ -4,34 +4,23 @@ hide:
   - toc
 ---
 
-# Welcome to headscale
+# Welcome to slopscale
 
-Headscale is an open source, self-hosted implementation of the Tailscale control server.
+Slopscale is a fork of [headscale](https://github.com/juanfont/headscale), the open source, self-hosted
+implementation of the Tailscale control server. It keeps headscale's core and adds an admin console, features, speed
+and fixes.
 
-This page contains the documentation for the latest version of headscale. Please also check our [FAQ](about/faq.md).
-
-Join our [Discord server](https://discord.gg/c84AZQhmpx) for a chat and community support.
+This page contains the documentation for the latest version of slopscale. Please also check our [FAQ](about/faq.md).
 
 ## Design goal
 
-Headscale aims to implement a self-hosted, open source alternative to the
-[Tailscale](https://tailscale.com/) control server. Headscale's goal is to
-provide self-hosters and hobbyists with an open-source server they can use for
-their projects and labs. It implements a narrow scope, a _single_ Tailscale
-network (tailnet), suitable for a personal use, or a small open-source
-organisation.
-
-## Supporting headscale
-
-Please see [Sponsor](about/sponsor.md) for more information.
+Slopscale runs a _single_ Tailscale network (tailnet) for a person, a lab or a small organisation, with everything an
+operator needs in one binary: the control server, the CLI and the [admin console](ref/console.md).
 
 ## Contributing
-
-Headscale is "Open Source, acknowledged contribution", this means that any
-contribution will have to be discussed with the Maintainers before being submitted.
 
 Please see [Contributing](about/contributing.md) for more information.
 
 ## About
 
-Headscale is maintained by [Kristoffer Dalby](https://kradalby.no/) and [Juan Font](https://font.eu).
+Slopscale is not associated with Tailscale Inc. or the headscale project.

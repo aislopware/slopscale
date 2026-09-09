@@ -27,7 +27,7 @@ clients advertise them as a pair.
    that get the routes. From the console's _Networks_ page, or:
 
     ```console
-    $ headscale networks create --name "Office LAN" --prefix 10.10.0.0/24 --router 7 --group 2
+    $ slopscale networks create --name "Office LAN" --prefix 10.10.0.0/24 --router 7 --group 2
     ```
 
     The routes are approved on the router at once, no separate approval step.
@@ -41,7 +41,7 @@ clients advertise them as a pair.
     ```
 
 Two or more routers make a failover pair: every one advertises the same
-prefixes and Headscale elects a primary, as for any
+prefixes and Slopscale elects a primary, as for any
 [high availability](routes.md#high-availability) router. The console marks a
 router that stops advertising one of the network's prefixes; the network
 still hands out whatever the other routers serve.
@@ -102,6 +102,6 @@ reach behind the routers.
 carries a `routers` list with each router's liveness, the prefixes it serves
 and the ones it does not advertise.
 
-`headscale networks` has `list`, `show`, `create`, `update` (which fetches the
+`slopscale networks` has `list`, `show`, `create`, `update` (which fetches the
 network and replaces only the flags given), `enable`, `disable` and `delete`.
 `create` and `update` take `--protocol` and `--ports`.

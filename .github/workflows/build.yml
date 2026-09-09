@@ -68,8 +68,8 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: steps.changed-files.outputs.files == 'true'
         with:
-          name: headscale-linux
-          path: result/bin/headscale
+          name: slopscale-linux
+          path: result/bin/slopscale
   build-cross:
     runs-on: ubuntu-latest
     strategy:
@@ -88,9 +88,9 @@ jobs:
       - name: Run go cross compile
         run:
           env ${{ matrix.env }} CC=zigcc go build -trimpath -tags netgo,osusergo
-          -ldflags '-s -w -linkmode=external -extldflags=-static' -o "headscale"
-          ./cmd/headscale
+          -ldflags '-s -w -linkmode=external -extldflags=-static' -o "slopscale"
+          ./cmd/slopscale
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: "headscale-${{ matrix.env }}"
-          path: "headscale"
+          name: "slopscale-${{ matrix.env }}"
+          path: "slopscale"

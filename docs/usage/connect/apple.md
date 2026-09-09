@@ -1,8 +1,8 @@
 # Connecting an Apple client
 
-This documentation has the goal of showing how a user can use the official iOS and macOS [Tailscale](https://tailscale.com) clients with headscale.
+This documentation has the goal of showing how a user can use the official iOS and macOS [Tailscale](https://tailscale.com) clients with slopscale.
 
-!!! info "Instructions on your headscale instance"
+!!! info "Instructions on your slopscale instance"
 
     An endpoint with information on how to connect your Apple device
     is also available at `/apple` on your running instance.
@@ -13,13 +13,13 @@ This documentation has the goal of showing how a user can use the official iOS a
 
 Install the official Tailscale iOS client from the [App Store](https://apps.apple.com/app/tailscale/id1470499037).
 
-### Configuring the headscale URL
+### Configuring the slopscale URL
 
 - Open the Tailscale app
 - Click the account icon in the top-right corner and select `Log in…`.
 - Tap the top-right options menu button and select `Use custom coordination server`.
-- Enter your instance url (e.g `https://headscale.example.com`)
-- Enter your credentials and log in. Headscale should now be working on your iOS device.
+- Enter your instance url (e.g `https://slopscale.example.com`)
+- Enter your credentials and log in. Slopscale should now be working on your iOS device.
 
 ## macOS
 
@@ -28,21 +28,21 @@ Install the official Tailscale iOS client from the [App Store](https://apps.appl
 Choose one of the available [Tailscale clients for macOS](https://tailscale.com/docs/concepts/macos-variants) and
 install it.
 
-### Configuring the headscale URL
+### Configuring the slopscale URL
 
 #### Command line
 
-Use Tailscale's login command to connect with your headscale instance (e.g `https://headscale.example.com`):
+Use Tailscale's login command to connect with your slopscale instance (e.g `https://slopscale.example.com`):
 
 ```
-tailscale login --login-server <YOUR_HEADSCALE_URL>
+tailscale login --login-server <YOUR_SLOPSCALE_URL>
 ```
 
 #### GUI
 
 - Option + Click the Tailscale icon in the menu and hover over the Debug menu
 - Under `Custom Login Server`, select `Add Account...`
-- Enter the URL of your headscale instance (e.g `https://headscale.example.com`) and press `Add Account`
+- Enter the URL of your slopscale instance (e.g `https://slopscale.example.com`) and press `Add Account`
 - Follow the login procedure in the browser
 
 ## tvOS
@@ -53,14 +53,14 @@ Install the official Tailscale tvOS client from the [App Store](https://apps.app
 
 !!! danger
 
-    **Don't** sign in to the Tailscale App before the headscale URL is configured!
+    **Don't** sign in to the Tailscale App before the slopscale URL is configured!
 
-### Configuring the headscale URL
+### Configuring the slopscale URL
 
 - Open Tailscale
 - Click the button `Install VPN configuration` and confirm the appearing popup by clicking the `Allow` button, but don't sign in yet
 - Open Settings (the Apple tvOS settings) > Apps > Tailscale
 - Under `ALTERNATE COORDINATION SERVER URL`, select `URL`
-- Enter the URL of your headscale instance (e.g `https://headscale.example.com`) and press `OK`
+- Enter the URL of your slopscale instance (e.g `https://slopscale.example.com`) and press `OK`
 - Return to the tvOS Home screen and open Tailscale
 - Scan the QR code and follow the login procedure

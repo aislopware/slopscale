@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
 	"tailscale.com/tailcfg"
 )
 
@@ -56,7 +56,7 @@ type DERPCustomRegion struct {
 	Nodes []DERPRelay `json:"nodes,omitempty" nullable:"false" required:"false"`
 }
 
-// DERPServerSettings configures the relay headscale runs itself. Only
+// DERPServerSettings configures the relay slopscale runs itself. Only
 // enabled is needed; the other fields matter while it is on.
 type DERPServerSettings struct {
 	Enabled bool `json:"enabled"`

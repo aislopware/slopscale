@@ -29,7 +29,7 @@ dist/
 !/web/dist/
 /web/dist/*
 !/web/dist/.gitkeep
-/headscale
+/slopscale
 config.yaml
 config*.yaml
 !config-example.yaml
@@ -53,7 +53,7 @@ result
 integration_test/etc/config.dump.yaml
 
 # OpenAPI spec is served live from the code and emitted on demand, not committed
-/openapi/v1/headscale.yaml
+/openapi/v1/slopscale.yaml
 
 # MkDocs
 .cache

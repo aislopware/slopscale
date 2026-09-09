@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	tsclient "tailscale.com/client/tailscale/v2"
@@ -19,7 +19,7 @@ import (
 
 // TestAPIv2 proves the v2 API's Tailscale-compatible (ported) endpoints against the three real
 // clients it exists to support: the official Go SDK, tscli, and the Tailscale
-// Terraform provider (via OpenTofu). All three run against one Headscale bound
+// Terraform provider (via OpenTofu). All three run against one Slopscale bound
 // to a real loopback port, authenticating with a user-owned API key.
 //
 // Every mutation is validated three ways — the tool's own get-after-set, the
@@ -198,18 +198,18 @@ func apiv2UsersGoClient(t *testing.T, srv *servertest.TestServer, baseURL, apiKe
 	assert.True(t, containsUserID(all, ownerID), "owner present in user list")
 	assert.Len(t, all, srvUserCount(t, srv))
 
-	// member matches every Headscale user; shared/admin match nothing.
+	// member matches every Slopscale user; shared/admin match nothing.
 	members, err := ur.List(ctx, new(tsclient.UserTypeMember), nil)
 	require.NoError(t, err)
 	assert.Len(t, members, len(all))
 
 	shared, err := ur.List(ctx, new(tsclient.UserTypeShared), nil)
 	require.NoError(t, err)
-	assert.Empty(t, shared, "Headscale has no shared users")
+	assert.Empty(t, shared, "Slopscale has no shared users")
 
 	admins, err := ur.List(ctx, nil, new(tsclient.UserRoleAdmin))
 	require.NoError(t, err)
-	assert.Empty(t, admins, "Headscale has no admin-role users")
+	assert.Empty(t, admins, "Slopscale has no admin-role users")
 
 	_, err = ur.Get(ctx, "999999")
 	require.Error(t, err)
@@ -382,7 +382,7 @@ func apiv2Terraform(t *testing.T, srv *servertest.TestServer, baseURL, apiKey st
 
 // usersTFConfig drives the tailscale_user (by login name) and tailscale_users
 // data sources, plus tailscale_4via6 (provider-local compute, no server call) to
-// prove that data source resolves against Headscale unchanged. %s is the owner's
+// prove that data source resolves against Slopscale unchanged. %s is the owner's
 // login name. Data sources create nothing, so the assertions are value
 // correctness plus no drift on re-read.
 const usersTFConfig = `

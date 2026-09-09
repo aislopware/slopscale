@@ -1,6 +1,6 @@
 package state
 
-import "github.com/juanfont/headscale/hscontrol/types"
+import "github.com/aislopware/slopscale/hscontrol/types"
 
 // ExportAuditEvents hands every audit entry matching q to fn, oldest
 // first, read in batches so a large export stays out of memory. The store

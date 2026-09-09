@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/types/netmap"
 )
 
-// TestUserProfileUpdateReachesClients covers juanfont/headscale#2166: an
+// TestUserProfileUpdateReachesClients covers aislopware/slopscale#2166: an
 // operator sets a user's display name and picture after creation, and the
 // user's own machine and its peers show the new profile. A field left out
 // of the request keeps its value.

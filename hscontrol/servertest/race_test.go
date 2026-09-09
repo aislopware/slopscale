@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -413,7 +413,7 @@ func TestRaceBatcherContention(t *testing.T) {
 	t.Parallel()
 
 	// Many nodes connecting at the same time generates many
-	// concurrent [hscontrol.Headscale.Change] calls. The [mapper.Batcher] must handle this
+	// concurrent [hscontrol.Slopscale.Change] calls. The [mapper.Batcher] must handle this
 	// without dropping updates or panicking.
 	t.Run("many_simultaneous_connects", func(t *testing.T) {
 		t.Parallel()

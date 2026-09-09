@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/dnsprovider"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/dnsprovider"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -266,10 +266,10 @@ func TestRFC2136(t *testing.T) {
 	t.Run("signed", func(t *testing.T) {
 		t.Parallel()
 
-		server := newUpdateServer(t, "ts.example.com", "headscale", secret)
+		server := newUpdateServer(t, "ts.example.com", "slopscale", secret)
 
 		provider, err := dnsprovider.NewRFC2136(types.RFC2136Config{
-			Server: server.address, TSIGKeyName: "headscale", TSIGSecret: secret, TSIGAlgorithm: "hmac-sha256",
+			Server: server.address, TSIGKeyName: "slopscale", TSIGSecret: secret, TSIGAlgorithm: "hmac-sha256",
 		}, "ts.example.com", time.Minute)
 		require.NoError(t, err)
 
@@ -300,10 +300,10 @@ func TestRFC2136(t *testing.T) {
 	t.Run("wrong key is refused by the server", func(t *testing.T) {
 		t.Parallel()
 
-		server := newUpdateServer(t, "ts.example.com", "headscale", secret)
+		server := newUpdateServer(t, "ts.example.com", "slopscale", secret)
 
 		provider, err := dnsprovider.NewRFC2136(types.RFC2136Config{
-			Server: server.address, TSIGKeyName: "headscale",
+			Server: server.address, TSIGKeyName: "slopscale",
 			TSIGSecret: "d3JvbmdzZWNyZXR3cm9uZ3NlY3JldHdyb25nc2VjcmV0", TSIGAlgorithm: "hmac-sha256",
 		}, "ts.example.com", time.Minute)
 		require.NoError(t, err)

@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/integrationutil"
+	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,18 +26,18 @@ func TestApiKeyCommand(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("cli-apikey"))
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("cli-apikey"))
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	keys := make([]string, count)
 
 	for idx := range count {
-		apiResult, executeErr := headscale.Execute(
+		apiResult, executeErr := slopscale.Execute(
 			[]string{
-				"headscale",
+				"slopscale",
 				"apikeys",
 				"create",
 				"--expiration",
@@ -57,9 +57,9 @@ func TestApiKeyCommand(t *testing.T) {
 	var listedAPIKeys []clientv1.ApiKey
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		err = executeAndUnmarshal(headscale,
+		err = executeAndUnmarshal(slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"apikeys",
 				"list",
 				"--output",
@@ -115,9 +115,9 @@ func TestApiKeyCommand(t *testing.T) {
 
 	// Expire three keys
 	for idx := range 3 {
-		_, executeErr := headscale.Execute(
+		_, executeErr := slopscale.Execute(
 			[]string{
-				"headscale",
+				"slopscale",
 				"apikeys",
 				"expire",
 				"--prefix",
@@ -132,9 +132,9 @@ func TestApiKeyCommand(t *testing.T) {
 	var listedAfterExpireAPIKeys []clientv1.ApiKey
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		err = executeAndUnmarshal(headscale,
+		err = executeAndUnmarshal(slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"apikeys",
 				"list",
 				"--output",
@@ -165,9 +165,9 @@ func TestApiKeyCommand(t *testing.T) {
 		}
 	}
 
-	_, err = headscale.Execute(
+	_, err = slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"apikeys",
 			"delete",
 			"--prefix",
@@ -178,9 +178,9 @@ func TestApiKeyCommand(t *testing.T) {
 	var listedAPIKeysAfterDelete []clientv1.ApiKey
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		err = executeAndUnmarshal(headscale,
+		err = executeAndUnmarshal(slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"apikeys",
 				"list",
 				"--output",
@@ -198,9 +198,9 @@ func TestApiKeyCommand(t *testing.T) {
 	assert.Len(t, listedAPIKeysAfterDelete, 4)
 
 	// Test expire by ID (using key at index 0)
-	_, err = headscale.Execute(
+	_, err = slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"apikeys",
 			"expire",
 			"--id",
@@ -211,9 +211,9 @@ func TestApiKeyCommand(t *testing.T) {
 	var listedAPIKeysAfterExpireByID []clientv1.ApiKey
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		err = executeAndUnmarshal(headscale,
+		err = executeAndUnmarshal(slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"apikeys",
 				"list",
 				"--output",
@@ -238,9 +238,9 @@ func TestApiKeyCommand(t *testing.T) {
 
 	// Test delete by ID (using key at index 1)
 	deletedKeyID := listedAPIKeysAfterExpireByID[1].Id
-	_, err = headscale.Execute(
+	_, err = slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"apikeys",
 			"delete",
 			"--id",
@@ -251,9 +251,9 @@ func TestApiKeyCommand(t *testing.T) {
 	var listedAPIKeysAfterDeleteByID []clientv1.ApiKey
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		err = executeAndUnmarshal(headscale,
+		err = executeAndUnmarshal(slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"apikeys",
 				"list",
 				"--output",
@@ -284,19 +284,19 @@ func TestApiKeyCommand(t *testing.T) {
 func TestApiKeyCommandValidation(t *testing.T) {
 	IntegrationSkip(t)
 
-	scenario, headscale := setupCLIScenario(t, "cli-apikeyval", []string{"user1"}, 0)
+	scenario, slopscale := setupCLIScenario(t, "cli-apikeyval", []string{"user1"}, 0)
 	defer scenario.ShutdownAssertNoPanics(t)
 
 	// Create a real key so a valid prefix exists. `apikeys create` prints the
 	// raw secret, not JSON of the key, so list to discover the prefix.
-	_, err := headscale.Execute([]string{"headscale", "apikeys", "create", "--output", "json"})
+	_, err := slopscale.Execute([]string{"slopscale", "apikeys", "create", "--output", "json"})
 	require.NoError(t, err)
 
 	var listed []clientv1.ApiKey
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		err := executeAndUnmarshal(headscale,
-			[]string{"headscale", "apikeys", "list", "--output", "json"},
+		err := executeAndUnmarshal(slopscale,
+			[]string{"slopscale", "apikeys", "list", "--output", "json"},
 			&listed,
 		)
 		assert.NoError(c, err)
@@ -338,7 +338,7 @@ func TestApiKeyCommandValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := headscale.Execute(append([]string{"headscale"}, tt.args...))
+			_, err := slopscale.Execute(append([]string{"slopscale"}, tt.args...))
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
 

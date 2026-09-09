@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"tailscale.com/tailcfg"
 )
 

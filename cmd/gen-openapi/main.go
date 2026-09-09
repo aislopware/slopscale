@@ -1,4 +1,4 @@
-// Command gen-openapi emits a Headscale OpenAPI document from the authoritative
+// Command gen-openapi emits a Slopscale OpenAPI document from the authoritative
 // Huma definitions in hscontrol/api/v1 and hscontrol/api/v2. The server also
 // serves each spec live (at /openapi.yaml and /api/v2/openapi); this tool emits
 // them on demand, and with -downgrade the 3.0.3 form used to generate the typed
@@ -20,8 +20,8 @@ import (
 	"os"
 	"path/filepath"
 
-	apiv1 "github.com/juanfont/headscale/hscontrol/api/v1"
-	apiv2 "github.com/juanfont/headscale/hscontrol/api/v2"
+	apiv1 "github.com/aislopware/slopscale/hscontrol/api/v1"
+	apiv2 "github.com/aislopware/slopscale/hscontrol/api/v2"
 )
 
 // spec bundles a version's full (3.1) and downgraded (3.0.3) generators with the
@@ -34,8 +34,8 @@ type spec struct {
 
 // specs maps the -api value to its generators.
 var specs = map[string]spec{
-	"v1": {apiv1.Spec, apiv1.Spec30, "openapi/v1/headscale.yaml"},
-	"v2": {apiv2.Spec, apiv2.Spec30, "openapi/v2/headscale.yaml"},
+	"v1": {apiv1.Spec, apiv1.Spec30, "openapi/v1/slopscale.yaml"},
+	"v2": {apiv2.Spec, apiv2.Spec30, "openapi/v2/slopscale.yaml"},
 }
 
 func main() {

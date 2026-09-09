@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +24,7 @@ func TestSQLiteMigrationAndDataValidation(t *testing.T) {
 		dbPath   string
 		wantFunc func(*testing.T, *HSDatabase)
 	}{
-		// at 14:15:06 ❯ go run ./cmd/headscale preauthkeys list
+		// at 14:15:06 ❯ go run ./cmd/slopscale preauthkeys list
 		// ID | Key      | Reusable | Ephemeral | Used  | Expiration | Created    | Tags
 		// 1  | 09b28f.. | false    | false     | false | 2024-09-27 | 2024-09-27 | tag:derp
 		// 2  | 3112b9.. | false    | false     | false | 2024-09-27 | 2024-09-27 | tag:derp
@@ -567,7 +567,7 @@ func TestPostgresMigrationAndDataValidation(t *testing.T) {
 				t.Fatalf("failed to restore postgres database: %s", err)
 			}
 
-			db := newHeadscaleDBFromPostgresURL(t, u)
+			db := newSlopscaleDBFromPostgresURL(t, u)
 
 			if tt.wantFunc != nil {
 				tt.wantFunc(t, db)
@@ -584,7 +584,7 @@ func dbForTest(t *testing.T) *HSDatabase {
 func dbForTestWithPath(t *testing.T, sqlFilePath string) *HSDatabase {
 	t.Helper()
 
-	dbPath := t.TempDir() + "/headscale_test.db"
+	dbPath := t.TempDir() + "/slopscale_test.db"
 
 	// If SQL file path provided, validate and create database from it
 	if sqlFilePath != "" {
@@ -599,7 +599,7 @@ func dbForTestWithPath(t *testing.T, sqlFilePath string) *HSDatabase {
 		}
 	}
 
-	db, err := NewHeadscaleDatabase(
+	db, err := NewSlopscaleDatabase(
 		&types.Config{
 			Database: types.DatabaseConfig{
 				Type: "sqlite3",
@@ -629,8 +629,8 @@ func dbForTestWithPath(t *testing.T, sqlFilePath string) *HSDatabase {
 // in the testdata directory. It verifies they can be successfully migrated to the current
 // schema version. This test only validates migration success, not data integrity.
 //
-// All test database files are SQL dumps (created with `sqlite3 headscale.db .dump`) generated
-// with old Headscale binaries on empty databases (no user/node data). These dumps include the
+// All test database files are SQL dumps (created with `sqlite3 slopscale.db .dump`) generated
+// with old Slopscale binaries on empty databases (no user/node data). These dumps include the
 // migration history in the `migrations` table, which allows the migration system to correctly
 // skip already-applied migrations and only run new ones.
 func TestSQLiteAllTestdataMigrations(t *testing.T) {
@@ -651,14 +651,14 @@ func TestSQLiteAllTestdataMigrations(t *testing.T) {
 		t.Run(schema.Name(), func(t *testing.T) {
 			t.Parallel()
 
-			dbPath := t.TempDir() + "/headscale_test.db"
+			dbPath := t.TempDir() + "/slopscale_test.db"
 
 			// Setup a database with the old schema
 			schemaPath := filepath.Join("testdata", "sqlite", schema.Name())
 			err := createSQLiteFromSQLFile(schemaPath, dbPath)
 			require.NoError(t, err)
 
-			_, err = NewHeadscaleDatabase(
+			_, err = NewSlopscaleDatabase(
 				&types.Config{
 					Database: types.DatabaseConfig{
 						Type: "sqlite3",

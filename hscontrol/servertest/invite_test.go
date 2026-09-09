@@ -7,16 +7,16 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/juanfont/headscale/hscontrol"
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/oauth2-proxy/mockoidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// newInviteServer starts a Headscale server that signs users in through a
+// newInviteServer starts a Slopscale server that signs users in through a
 // mock identity provider and, when mail is asked for, delivers through an
 // in-process SMTP server.
 func newInviteServer(t *testing.T, withMail bool, users ...mockoidc.MockUser) (*servertest.TestServer, *smtpServer) {
@@ -43,7 +43,7 @@ func newInviteServer(t *testing.T, withMail bool, users ...mockoidc.MockUser) (*
 		require.NoError(t, err)
 
 		opts = append(opts, servertest.WithSMTP(types.SMTPConfig{
-			Host: host, Port: portNum, From: "Headscale <hs@example.com>", Encryption: types.SMTPNoEncryption,
+			Host: host, Port: portNum, From: "Slopscale <hs@example.com>", Encryption: types.SMTPNoEncryption,
 		}))
 	}
 

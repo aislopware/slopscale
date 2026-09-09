@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -53,7 +53,7 @@ func TestIssuesMapContent(t *testing.T) {
 	// An online peer carries LastSeen too. Tailscale's control plane
 	// sets it whenever the node has ever been seen, and a client on the
 	// peer-delta path treats a peer without it as never seen
-	// (juanfont/headscale#3420), so the online patch and the full map both
+	// (aislopware/slopscale#3420), so the online patch and the full map both
 	// stamp it.
 	t.Run("online_peers_carry_last_seen", func(t *testing.T) {
 		t.Parallel()

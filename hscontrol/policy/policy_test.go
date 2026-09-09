@@ -5,10 +5,10 @@ import (
 	"net/netip"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/policy/matcher"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/google/go-cmp/cmp"
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -959,7 +959,7 @@ func TestReduceNodesFromPolicy(t *testing.T) {
 			// autogroup:internet emits no client packet filter, but it
 			// must still produce a matcher: Node.CanAccess uses
 			// matcher.DestsIsTheInternet() + IsExitNode() to surface
-			// exit-node peers (juanfont/headscale#3212).
+			// exit-node peers (aislopware/slopscale#3212).
 			want: types.Nodes{
 				n(2, "100.64.0.2", "server", "server"),
 				n(3, "100.64.0.3", "exit", "server", "0.0.0.0/0", "::/0"),

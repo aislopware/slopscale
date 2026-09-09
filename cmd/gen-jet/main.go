@@ -21,7 +21,7 @@ import (
 	sqlitegen "github.com/go-jet/jet/v2/generator/sqlite"
 	"github.com/go-jet/jet/v2/generator/template"
 	"github.com/go-jet/jet/v2/sqlite"
-	"github.com/juanfont/headscale/hscontrol/db/sqliteconfig"
+	"github.com/aislopware/slopscale/hscontrol/db/sqliteconfig"
 )
 
 var errEmptySchema = errors.New("schema file is empty")

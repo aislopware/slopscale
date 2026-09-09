@@ -5,17 +5,17 @@ import (
 	"testing"
 	"time"
 
-	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
+	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/integrationutil"
+	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 )
 
-// TestPolicyCheckCommand exercises `headscale policy check` across the
+// TestPolicyCheckCommand exercises `slopscale policy check` across the
 // matrix that nblock asked about on PR #3229:
 //
 //   - policyMode: server runs with policy_mode=file vs policy_mode=database.
@@ -26,7 +26,7 @@ import (
 //     database directly.
 //
 // Each row spins up its own scenario because policy_mode is fixed at boot
-// via `HEADSCALE_POLICY_MODE`. The two users + two nodes give the tests
+// via `SLOPSCALE_POLICY_MODE`. The two users + two nodes give the tests
 // block real `user@` aliases to resolve against.
 func TestPolicyCheckCommand(t *testing.T) {
 	IntegrationSkip(t)
@@ -131,26 +131,26 @@ func TestPolicyCheckCommand(t *testing.T) {
 
 			defer scenario.ShutdownAssertNoPanics(t)
 
-			err = scenario.CreateHeadscaleEnv(
+			err = scenario.CreateSlopscaleEnv(
 				[]tsic.Option{},
 				hsic.WithTestName("cli-policycheck"),
 				hsic.WithConfigEnv(map[string]string{
-					"HEADSCALE_POLICY_MODE": tt.policyMode,
+					"SLOPSCALE_POLICY_MODE": tt.policyMode,
 				}),
 			)
 			require.NoError(t, err)
 
-			headscale, err := scenario.Headscale()
+			slopscale, err := scenario.Slopscale()
 			require.NoError(t, err)
 
 			pBytes, err := json.Marshal(tt.fixture.policy)
 			require.NoError(t, err)
 
-			policyFilePath := "/etc/headscale/policy.json"
-			err = headscale.WriteFile(policyFilePath, pBytes)
+			policyFilePath := "/etc/slopscale/policy.json"
+			err = slopscale.WriteFile(policyFilePath, pBytes)
 			require.NoError(t, err)
 
-			cmd := []string{"headscale", "policy", "check", "-f", policyFilePath}
+			cmd := []string{"slopscale", "policy", "check", "-f", policyFilePath}
 			if tt.bypass {
 				// --force suppresses the "is the server running?"
 				// confirmation prompt so the command can run
@@ -158,7 +158,7 @@ func TestPolicyCheckCommand(t *testing.T) {
 				cmd = append(cmd, "--bypass-server-and-access-database-directly", "--force")
 			}
 
-			stdout, err := headscale.Execute(cmd)
+			stdout, err := slopscale.Execute(cmd)
 
 			if tt.wantErr != "" {
 				require.ErrorContains(t, err, tt.wantErr)
@@ -172,7 +172,7 @@ func TestPolicyCheckCommand(t *testing.T) {
 	}
 }
 
-// TestSSHTestsRejectFailingPolicy asserts `headscale policy set` rejects
+// TestSSHTestsRejectFailingPolicy asserts `slopscale policy set` rejects
 // a policy whose sshTests fail, surfaces the engine's "test(s) failed"
 // sentinel, and leaves the stored policy unchanged. autogroup:member as
 // dst lets every scenario node count, so no tagged node is needed.
@@ -226,16 +226,16 @@ func TestSSHTestsRejectFailingPolicy(t *testing.T) {
 
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv(
+	err = scenario.CreateSlopscaleEnv(
 		[]tsic.Option{},
 		hsic.WithTestName("cli-policyset-sshtests"),
 		hsic.WithConfigEnv(map[string]string{
-			"HEADSCALE_POLICY_MODE": types.PolicyModeDB,
+			"SLOPSCALE_POLICY_MODE": types.PolicyModeDB,
 		}),
 	)
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	goodBytes, err := json.Marshal(goodPolicy)
@@ -245,22 +245,22 @@ func TestSSHTestsRejectFailingPolicy(t *testing.T) {
 	require.NoError(t, err)
 
 	const (
-		goodPath = "/etc/headscale/policy-good.json"
-		badPath  = "/etc/headscale/policy-bad.json"
+		goodPath = "/etc/slopscale/policy-good.json"
+		badPath  = "/etc/slopscale/policy-bad.json"
 	)
 
-	require.NoError(t, headscale.WriteFile(goodPath, goodBytes))
-	require.NoError(t, headscale.WriteFile(badPath, badBytes))
+	require.NoError(t, slopscale.WriteFile(goodPath, goodBytes))
+	require.NoError(t, slopscale.WriteFile(badPath, badBytes))
 
 	// Establish the good policy as the live policy.
-	_, err = headscale.Execute([]string{
-		"headscale", "policy", "set", "-f", goodPath,
+	_, err = slopscale.Execute([]string{
+		"slopscale", "policy", "set", "-f", goodPath,
 	})
 	require.NoError(t, err, "setting the good policy must succeed")
 
 	// Confirm the server returns the good policy.
-	stdoutBefore, err := headscale.Execute([]string{
-		"headscale", "policy", "get",
+	stdoutBefore, err := slopscale.Execute([]string{
+		"slopscale", "policy", "get",
 	})
 	require.NoError(t, err)
 	require.JSONEq(t, string(goodBytes), stdoutBefore,
@@ -269,16 +269,16 @@ func TestSSHTestsRejectFailingPolicy(t *testing.T) {
 	// Attempt to overwrite with a policy whose sshTests fail. The CLI
 	// must surface the engine's "test(s) failed" sentinel and exit
 	// non-zero.
-	_, err = headscale.Execute([]string{
-		"headscale", "policy", "set", "-f", badPath,
+	_, err = slopscale.Execute([]string{
+		"slopscale", "policy", "set", "-f", badPath,
 	})
 	require.Error(t, err, "setting a policy with failing sshTests must fail")
 	require.ErrorContains(t, err, "test(s) failed",
 		"CLI error must surface the engine's test failure sentinel")
 
 	// The rejected write must not have mutated the stored policy.
-	stdoutAfter, err := headscale.Execute([]string{
-		"headscale", "policy", "get",
+	stdoutAfter, err := slopscale.Execute([]string{
+		"slopscale", "policy", "get",
 	})
 	require.NoError(t, err)
 	require.JSONEq(t, string(goodBytes), stdoutAfter,
@@ -297,16 +297,16 @@ func TestPolicyCommand(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv(
+	err = scenario.CreateSlopscaleEnv(
 		[]tsic.Option{},
 		hsic.WithTestName("cli-policy"),
 		hsic.WithConfigEnv(map[string]string{
-			"HEADSCALE_POLICY_MODE": "database", // test sets/gets policy via CLI
+			"SLOPSCALE_POLICY_MODE": "database", // test sets/gets policy via CLI
 		}),
 	)
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	p := policyv2.Policy{
@@ -327,16 +327,16 @@ func TestPolicyCommand(t *testing.T) {
 
 	pBytes, _ := json.Marshal(p)
 
-	policyFilePath := "/etc/headscale/policy.json"
+	policyFilePath := "/etc/slopscale/policy.json"
 
-	err = headscale.WriteFile(policyFilePath, pBytes)
+	err = slopscale.WriteFile(policyFilePath, pBytes)
 	require.NoError(t, err)
 
 	// No policy is present at this time.
 	// Add a new policy from a file.
-	_, err = headscale.Execute(
+	_, err = slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"policy",
 			"set",
 			"-f",
@@ -352,9 +352,9 @@ func TestPolicyCommand(t *testing.T) {
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		err = executeAndUnmarshal(
-			headscale,
+			slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"policy",
 				"get",
 				"--output",
@@ -382,16 +382,16 @@ func TestPolicyBrokenConfigCommand(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv(
+	err = scenario.CreateSlopscaleEnv(
 		[]tsic.Option{},
 		hsic.WithTestName("cli-policybad"),
 		hsic.WithConfigEnv(map[string]string{
-			"HEADSCALE_POLICY_MODE": "database", // test sets invalid policy via CLI
+			"SLOPSCALE_POLICY_MODE": "database", // test sets invalid policy via CLI
 		}),
 	)
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	p := policyv2.Policy{
@@ -414,16 +414,16 @@ func TestPolicyBrokenConfigCommand(t *testing.T) {
 
 	pBytes, _ := json.Marshal(p)
 
-	policyFilePath := "/etc/headscale/policy.json"
+	policyFilePath := "/etc/slopscale/policy.json"
 
-	err = headscale.WriteFile(policyFilePath, pBytes)
+	err = slopscale.WriteFile(policyFilePath, pBytes)
 	require.NoError(t, err)
 
 	// No policy is present at this time.
 	// Add a new policy from a file.
-	_, err = headscale.Execute(
+	_, err = slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"policy",
 			"set",
 			"-f",
@@ -434,9 +434,9 @@ func TestPolicyBrokenConfigCommand(t *testing.T) {
 
 	// The new policy was invalid, the old one should still be in place, which
 	// is none.
-	_, err = headscale.Execute(
+	_, err = slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"policy",
 			"get",
 			"--output",

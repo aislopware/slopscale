@@ -2,14 +2,14 @@
 
 !!! warning "Community documentation"
 
-    This page is not actively maintained by the headscale authors and is
-    written by community members. It is _not_ verified by headscale developers.
+    This page is not actively maintained by the slopscale authors and is
+    written by community members. It is _not_ verified by slopscale developers.
 
     **It might be outdated and it might miss necessary steps**.
 
-Headscale can be built from source using the latest version of [Go](https://golang.org) and [Buf](https://buf.build)
+Slopscale can be built from source using the latest version of [Go](https://golang.org) and [Buf](https://buf.build)
 (Protobuf generator). See the [Contributing section in the GitHub
-README](https://github.com/juanfont/headscale#contributing) for more information.
+README](https://github.com/aislopware/slopscale#contributing) for more information.
 
 ## OpenBSD
 
@@ -20,12 +20,12 @@ README](https://github.com/juanfont/headscale#contributing) for more information
 # with the base system; the SQLite driver is C compiled through cgo)
 pkg_add go git gmake
 
-git clone https://github.com/juanfont/headscale.git
+git clone https://github.com/aislopware/slopscale.git
 
-cd headscale
+cd slopscale
 
 # optionally checkout a release
-# option a. you can find official release at https://github.com/juanfont/headscale/releases/latest
+# option a. you can find official release at https://github.com/aislopware/slopscale/releases/latest
 # option b. get latest tag, this may be a beta release
 latestTag=$(git describe --tags `git rev-list --tags --max-count=1`)
 
@@ -35,8 +35,8 @@ git checkout $latestTag
 gmake build
 
 # make it executable
-chmod a+x headscale
+chmod a+x slopscale
 
 # copy it to /usr/local/sbin
-cp headscale /usr/local/sbin
+cp slopscale /usr/local/sbin
 ```

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/miekg/dns"
 )
 

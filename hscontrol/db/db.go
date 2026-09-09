@@ -10,11 +10,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/db/sqliteconfig"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
-	"github.com/juanfont/headscale/hscontrol/db/sqliteconfig"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/rs/zerolog/log"
 	"github.com/tailscale/squibble"
 )
@@ -43,10 +43,10 @@ type HSDatabase struct {
 	cfg *types.Config
 }
 
-// NewHeadscaleDatabase opens the configured database, creates the schema on
+// NewSlopscaleDatabase opens the configured database, creates the schema on
 // a new database or applies the pending migrations on an existing one, and
 // validates the result against schema.sql on SQLite.
-func NewHeadscaleDatabase(cfg *types.Config) (*HSDatabase, error) {
+func NewSlopscaleDatabase(cfg *types.Config) (*HSDatabase, error) {
 	hsdb, err := openDB(cfg)
 	if err != nil {
 		return nil, err

@@ -9,8 +9,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/juanfont/headscale/integration/dockertestutil"
-	"github.com/juanfont/headscale/integration/k3sic"
+	"github.com/aislopware/slopscale/integration/dockertestutil"
+	"github.com/aislopware/slopscale/integration/k3sic"
 	"github.com/moby/moby/client"
 )
 
@@ -319,8 +319,8 @@ func checkGitRepository(ctx context.Context) DoctorResult {
 		return fail(
 			"Git Repository",
 			"Not in a Git repository",
-			"Run from within the headscale git repository",
-			"Clone the repository: git clone https://github.com/juanfont/headscale.git",
+			"Run from within the slopscale git repository",
+			"Clone the repository: git clone https://github.com/aislopware/slopscale.git",
 		)
 	}
 
@@ -348,9 +348,9 @@ func checkRequiredFiles(_ context.Context) DoctorResult {
 		return fail(
 			"Required Files",
 			"Missing required files: "+strings.Join(missingFiles, ", "),
-			"Ensure you're in the headscale project root directory",
+			"Ensure you're in the slopscale project root directory",
 			"Check that integration/ directory exists",
-			"Verify this is a complete headscale repository",
+			"Verify this is a complete slopscale repository",
 		)
 	}
 

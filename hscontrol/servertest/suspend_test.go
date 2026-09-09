@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/types/netmap"
@@ -41,7 +41,7 @@ func TestSuspendNode(t *testing.T) {
 	bob.WaitForPeerCount(t, 1, approvalWait)
 
 	suspended := func(nm *netmap.NetworkMap) bool {
-		_, told := nm.DisplayMessages["headscale-suspended"]
+		_, told := nm.DisplayMessages["slopscale-suspended"]
 
 		return !authorized(nm) && len(nm.Peers) == 0 && told
 	}
@@ -91,7 +91,7 @@ func TestSuspendNode(t *testing.T) {
 			"authorized with a peer and no message",
 			approvalWait,
 			func(nm *netmap.NetworkMap) bool {
-				_, told := nm.DisplayMessages["headscale-suspended"]
+				_, told := nm.DisplayMessages["slopscale-suspended"]
 
 				return authorized(nm) && len(nm.Peers) == 1 && !told
 			},

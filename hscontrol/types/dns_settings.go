@@ -177,7 +177,7 @@ func (s DNSSettings) Normalize() DNSSettings {
 // and trailing dots dropped, types uppercased, and whitespace trimmed.
 // The client's resolver matches a query against the record name after
 // lowercasing the query, so a name written as "Printer.fritz.box" never
-// resolves (juanfont/headscale#2782); every path that takes records in,
+// resolves (aislopware/slopscale#2782); every path that takes records in,
 // the config file, the watched file and the API, goes through here.
 func NormalizeExtraRecords(records []tailcfg.DNSRecord) []tailcfg.DNSRecord {
 	out := make([]tailcfg.DNSRecord, 0, len(records))

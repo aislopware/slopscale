@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -16,14 +16,14 @@ import (
 // re-registers under a new hostname is reachable under it: the GivenName
 // follows the hostname on the re-registration path the way it does on the
 // map request path, so a re-imaged fleet does not keep stale MagicDNS names
-// (juanfont/headscale#3432). A name an administrator chose is kept.
+// (aislopware/slopscale#3432). A name an administrator chose is kept.
 func TestReauthWithNewHostnameRenamesMagicDNS(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	user := database.CreateUserForTest("reimage")

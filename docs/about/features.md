@@ -1,8 +1,8 @@
 # Features
 
-Headscale aims to implement a self-hosted, open source alternative to the Tailscale control server. Headscale's goal is
+Slopscale aims to implement a self-hosted, open source alternative to the Tailscale control server. Slopscale's goal is
 to provide self-hosters and hobbyists with an open-source server they can use for their projects and labs. This page
-provides on overview of Headscale's feature and compatibility with the Tailscale control server:
+provides on overview of Slopscale's feature and compatibility with the Tailscale control server:
 
 - [x] Full "base" support of Tailscale's features
 - [x] [Node registration](../ref/registration.md)
@@ -12,7 +12,7 @@ provides on overview of Headscale's feature and compatibility with the Tailscale
     - [x] [MagicDNS](https://tailscale.com/docs/features/magicdns)
     - [x] [Global and restricted nameservers (split DNS)](https://tailscale.com/docs/reference/dns-in-tailscale#nameservers)
     - [x] [search domains](https://tailscale.com/docs/reference/dns-in-tailscale#search-domains)
-    - [x] [Extra DNS records (Headscale only)](../ref/dns.md#setting-extra-dns-records)
+    - [x] [Extra DNS records (Slopscale only)](../ref/dns.md#setting-extra-dns-records)
 - [x] File sharing
     - [x] [Taildrive](https://tailscale.com/docs/features/taildrive)
     - [x] [Taildrop](https://tailscale.com/docs/features/taildrop)
@@ -25,7 +25,7 @@ provides on overview of Headscale's feature and compatibility with the Tailscale
 - [x] Ephemeral nodes
 - [x] Embedded [DERP server](../ref/derp.md)
 - [x] [Peer relays](https://tailscale.com/docs/features/peer-relay)
-- [x] [Policy](../ref/policy.md) ([GitHub label "policy"](https://github.com/juanfont/headscale/labels/policy%20%F0%9F%93%9D))
+- [x] [Policy](../ref/policy.md) ([GitHub label "policy"](https://github.com/aislopware/slopscale/labels/policy%20%F0%9F%93%9D))
     - [x] ACLs
     - [x] Grants
     - [x] Some [Autogroups](../ref/policy.md#autogroups)
@@ -36,7 +36,7 @@ provides on overview of Headscale's feature and compatibility with the Tailscale
     - [x] [Node attributes](../ref/policy.md#node-attributes)
     - [x] [Tests](https://tailscale.com/docs/reference/syntax/policy-file#tests) and
       [sshTests](https://tailscale.com/docs/reference/syntax/policy-file#ssh-tests)
-- [x] [Node registration using Single-Sign-On (OpenID Connect)](../ref/oidc.md) ([GitHub label "OIDC"](https://github.com/juanfont/headscale/labels/OIDC))
+- [x] [Node registration using Single-Sign-On (OpenID Connect)](../ref/oidc.md) ([GitHub label "OIDC"](https://github.com/aislopware/slopscale/labels/OIDC))
     - [x] Basic registration
     - [x] Update user profile from identity provider
     - [ ] OIDC groups cannot be used in ACLs

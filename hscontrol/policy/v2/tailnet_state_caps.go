@@ -1,7 +1,7 @@
 package v2
 
 // This file enumerates [tailcfg.NodeCapability] values that the
-// Tailscale-hosted control plane emits where headscale has no
+// Tailscale-hosted control plane emits where slopscale has no
 // equivalent concept yet. The compat test in
 // tailscale_nodeattrs_compat_test.go builds the self-view CapMap via
 // [types.Node.TailNode] -- the same call the mapper makes -- and
@@ -9,7 +9,7 @@ package v2
 // compared in full as it lands on the wire.
 //
 // Each entry documents its purpose (cross-referenced to Tailscale
-// source), why headscale does not emit it, and a tracking issue where
+// source), why slopscale does not emit it, and a tracking issue where
 // one exists.
 
 import (
@@ -17,7 +17,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tailcfg/nodecap"
 )
@@ -36,7 +36,7 @@ import (
 // is what the hosted control plane does with no nodeAttrs at all (the
 // issue_3212 captures with an exit auto-approver): a client without a
 // suggested peer shows no exit nodes on Apple platforms since Tailscale
-// 1.102 (juanfont/headscale#3415). A global exit node narrows the set:
+// 1.102 (aislopware/slopscale#3415). A global exit node narrows the set:
 // while one is marked, globalExitNodes is true and only peers whose own
 // caps carry suggest-exit-node (the marked ones, and any a nodeAttrs
 // grant names) are suggested. Approval gates the cap in both cases so a
@@ -55,7 +55,7 @@ func PeerCapMap(peer types.NodeView, peerSelfCaps tailcfg.NodeCapMap, globalExit
 	// peer's addresses when the peer carries the cap on its peer view;
 	// the self view only covers the node's own name. Nothing gates it,
 	// so it is copied whenever the policy stamps it on the peer.
-	// See juanfont/headscale#3322.
+	// See aislopware/slopscale#3322.
 	if v, ok := peerSelfCaps[nodecap.DNSSubdomainResolve]; ok {
 		if out == nil {
 			out = tailcfg.NodeCapMap{}
@@ -70,20 +70,20 @@ func PeerCapMap(peer types.NodeView, peerSelfCaps tailcfg.NodeCapMap, globalExit
 // unmodelledTailnetStateCaps lists [tailcfg.NodeCapability] values
 // stripped on both sides of the compat diff. Order:
 //
-//  1. Caps gated on a user-role concept headscale does not model.
-//  2. Caps gated on a tailnet feature headscale does not implement.
+//  1. Caps gated on a user-role concept slopscale does not model.
+//  2. Caps gated on a tailnet feature slopscale does not implement.
 //  3. Caps that are tailnet-state metadata (display name, key
 //     duration, etc.) where the values are not derivable from
-//     headscale config in a way that round-trips through the
+//     slopscale config in a way that round-trips through the
 //     anonymized capture.
 //  4. Caps that are internal magicsock or embedded-SSH tuning with no
-//     headscale-side equivalent.
+//     slopscale-side equivalent.
 var unmodelledTailnetStateCaps = []nodecap.Cap{
 	// --- 1. User-role gated ---
 
 	// [tailcfg.CapabilityAdmin]: the hosted control plane stamps this
 	// on nodes whose owning user has the admin role; tagged nodes
-	// inherit from a tagOwner with the role. Headscale stamps it from
+	// inherit from a tagOwner with the role. Slopscale stamps it from
 	// the user's role too (see stampRoleCaps), but the anonymised
 	// captures carry no roles, so the replayed tailnet cannot
 	// reproduce which users held one. Stripping on both sides keeps
@@ -100,19 +100,19 @@ var unmodelledTailnetStateCaps = []nodecap.Cap{
 	// [tailcfg.CapabilityTailnetLock]: tailnet-lock signs node keys
 	// with a tailnet-wide signing key so peers can detect silent
 	// re-keying by the control plane. Client reads at
-	// ipn/ipnlocal/local.go:1752 (b.capTailnetLock). Headscale has no
+	// ipn/ipnlocal/local.go:1752 (b.capTailnetLock). Slopscale has no
 	// tailnet-lock implementation.
 	nodecap.TailnetLock,
 
 	// [tailcfg.NodeAttrServiceHost]: marks a node as approved to host
 	// VIP services (Tailscale Services). Client reads via
 	// UnmarshalNodeCapViewJSON at ipn/ipnlocal/local.go:2704.
-	// Headscale does not implement Tailscale Services.
+	// Slopscale does not implement Tailscale Services.
 	nodecap.ServiceHost,
 
 	// [tailcfg.NodeAttrStoreAppCRoutes]: tells an app-connector node
 	// to persist learned routes across restarts. Client reads via
-	// controlknobs:148. Headscale does not implement app connectors.
+	// controlknobs:148. Slopscale does not implement app connectors.
 	nodecap.StoreAppCRoutes,
 
 	// [tailcfg.CapabilityWarnFunnelNoHTTPS]: deprecated in Tailscale
@@ -120,11 +120,11 @@ var unmodelledTailnetStateCaps = []nodecap.Cap{
 	// defensively in case a stale tailnet still emits it.
 	nodecap.WarnFunnelNoHTTPS,
 
-	// --- 3. Tailnet-state metadata not derivable from headscale config ---
+	// --- 3. Tailnet-state metadata not derivable from slopscale config ---
 
 	// [tailcfg.NodeAttrTailnetDisplayName]: tailnet display name
 	// surfaced in the client UI. The hosted control plane emits the
-	// tailnet admin's email; headscale would have to invent a value
+	// tailnet admin's email; slopscale would have to invent a value
 	// from cfg.Domain() that does not round-trip through the
 	// anonymized capture string. Skip rather than diverge on a value
 	// with no real-world equivalent.
@@ -136,7 +136,7 @@ var unmodelledTailnetStateCaps = []nodecap.Cap{
 	// PR).
 	nodecap.NativeIPV4,
 
-	// --- 4. Internal tuning, no headscale equivalent ---
+	// --- 4. Internal tuning, no slopscale equivalent ---
 
 	// [tailcfg.NodeAttrProbeUDPLifetime]: tunes magicsock's UDP
 	// path-lifetime probe behavior. Internal performance knob; not

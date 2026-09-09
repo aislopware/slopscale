@@ -1,10 +1,10 @@
 // Package tsric provides a TailscaleRustInContainer (tsric) implementation
 // that runs the tailscale-rs axum example inside a Docker container for
-// integration testing with headscale.
+// integration testing with slopscale.
 //
 // Unlike tsic (which runs the official Tailscale client), tsric runs a Rust
 // implementation of a Tailscale node. It does not have the `tailscale` CLI,
-// so verification is done externally via headscale API and peer connectivity.
+// so verification is done externally via slopscale API and peer connectivity.
 package tsric
 
 import (
@@ -15,8 +15,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/juanfont/headscale/integration/dockertestutil"
-	"github.com/juanfont/headscale/integration/integrationutil"
+	"github.com/aislopware/slopscale/integration/dockertestutil"
+	"github.com/aislopware/slopscale/integration/integrationutil"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"tailscale.com/util/rands"
@@ -37,7 +37,7 @@ var errInvalidImageFormat = errors.New("tsric: invalid image format, expected re
 
 // getPrebuiltImage returns the pre-built tailscale-rs Docker image name if set.
 func getPrebuiltImage() string {
-	return os.Getenv("HEADSCALE_INTEGRATION_TAILSCALE_RS_IMAGE")
+	return os.Getenv("SLOPSCALE_INTEGRATION_TAILSCALE_RS_IMAGE")
 }
 
 // TailscaleRustInContainer runs the tailscale-rs axum example as an
@@ -50,7 +50,7 @@ type TailscaleRustInContainer struct {
 	network   *dockertest.Network
 
 	caCerts      [][]byte
-	headscaleURL string
+	slopscaleURL string
 	authKey      string
 	extraHosts   []string
 	repo         string
@@ -74,10 +74,10 @@ func WithNetwork(network *dockertest.Network) Option {
 	}
 }
 
-// WithHeadscaleURL sets the headscale control server URL.
-func WithHeadscaleURL(url string) Option {
+// WithSlopscaleURL sets the slopscale control server URL.
+func WithSlopscaleURL(url string) Option {
 	return func(t *TailscaleRustInContainer) {
-		t.headscaleURL = url
+		t.slopscaleURL = url
 	}
 }
 
@@ -144,8 +144,8 @@ func New(
 		return nil, errors.New("tsric: no network set")
 	}
 
-	if t.headscaleURL == "" {
-		return nil, errors.New("tsric: no headscale URL set")
+	if t.slopscaleURL == "" {
+		return nil, errors.New("tsric: no slopscale URL set")
 	}
 
 	if t.authKey == "" {
@@ -321,7 +321,7 @@ func (t *TailscaleRustInContainer) buildEntrypoint() []string {
 	commands = append(
 		commands,
 		"update-ca-certificates 2>/dev/null || true",
-		fmt.Sprintf(`export TS_CONTROL_URL=%q`, t.headscaleURL),
+		fmt.Sprintf(`export TS_CONTROL_URL=%q`, t.slopscaleURL),
 		// The tailscale crate refuses to run without this env gate;
 		// see lib.rs in tailscale-rs.
 		"export TS_RS_EXPERIMENT=this_is_unstable_software",

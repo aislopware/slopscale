@@ -1,6 +1,6 @@
 // Replay golden HuJSON captures under testdata/ssh_results/ssh-*.hujson:
-// the 200 path compares headscale's compileSSHPolicy output node-by-node
-// against the captured SSHRules; the non-200 path requires headscale to
+// the 200 path compares slopscale's compileSSHPolicy output node-by-node
+// against the captured SSHRules; the non-200 path requires slopscale to
 // reject the same input with the captured error body as a substring.
 // Divergences are listed in sshSkipReasons (200) and sshRejectSkipReasons
 // (non-200) with the engine gap each represents.
@@ -12,10 +12,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/testcapture"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -56,14 +56,14 @@ func loadSSHTestFile(t *testing.T, path string) *testcapture.Capture {
 }
 
 // sshSkipReasons documents captures the upstream control plane accepts
-// but headscale cannot yet represent. Each entry names the feature gap.
+// but slopscale cannot yet represent. Each entry names the feature gap.
 var sshSkipReasons = map[string]string{
-	"ssh-b5":  "headscale has no passkey authentication; user:*@passkey wildcard unsupported",
-	"ssh-d10": "headscale has no passkey authentication; user:*@passkey wildcard unsupported",
+	"ssh-b5":  "slopscale has no passkey authentication; user:*@passkey wildcard unsupported",
+	"ssh-d10": "slopscale has no passkey authentication; user:*@passkey wildcard unsupported",
 }
 
 // sshRejectSkipReasons documents captures the upstream control plane
-// rejects for reasons headscale cannot apply. Each entry names the
+// rejects for reasons slopscale cannot apply. Each entry names the
 // feature gap.
 var sshRejectSkipReasons = map[string]string{
 	"ssh-b4": sshNoTailnetDomainsReason,
@@ -73,13 +73,13 @@ var sshRejectSkipReasons = map[string]string{
 	"ssh-malformed-user-localpart-multi-glob": sshNoTailnetDomainsReason,
 }
 
-const sshNoTailnetDomainsReason = "headscale has no associated-tailnet-domains config;" +
+const sshNoTailnetDomainsReason = "slopscale has no associated-tailnet-domains config;" +
 	" user:*@domain / localpart:*@domain are not domain-validated"
 
 // TestSSHDataCompat loads every ssh-*.hujson capture, parses the policy
 // it pinned, and compiles the same per-node SSH rules to compare against
 // the captured shape. Non-200 captures replay the rejection path: the
-// recorded error body must appear as a substring of headscale's
+// recorded error body must appear as a substring of slopscale's
 // rejection.
 func TestSSHDataCompat(t *testing.T) {
 	t.Parallel()
@@ -138,7 +138,7 @@ func TestSSHDataCompat(t *testing.T) {
 					got = setErr
 				}
 
-				require.Error(t, got, "tailscale rejected; headscale must reject too")
+				require.Error(t, got, "tailscale rejected; slopscale must reject too")
 
 				if tf.Input.APIResponseBody == nil ||
 					tf.Input.APIResponseBody.Message == "" {
@@ -148,7 +148,7 @@ func TestSSHDataCompat(t *testing.T) {
 				want := tf.Input.APIResponseBody.Message
 				if !strings.Contains(got.Error(), want) {
 					t.Errorf(
-						"error body mismatch\n  tailscale wants: %q\n  headscale got:   %q",
+						"error body mismatch\n  tailscale wants: %q\n  slopscale got:   %q",
 						want,
 						got.Error(),
 					)
@@ -177,7 +177,7 @@ func TestSSHDataCompat(t *testing.T) {
 					require.NotNilf(t, node,
 						"golden node %s not found in test setup", nodeName)
 
-					// Compile headscale SSH policy for this node
+					// Compile slopscale SSH policy for this node
 					gotSSH, err := pol.compileSSHPolicy(
 						"https://unused",
 						users,
@@ -204,7 +204,7 @@ func TestSSHDataCompat(t *testing.T) {
 						gotSSH = nil
 					}
 
-					// Compare headscale output against Tailscale expected.
+					// Compare slopscale output against Tailscale expected.
 					// EquateEmpty treats nil and empty slices as equal.
 					// Sort principals within rules (order doesn't matter).
 					// Do NOT sort rules — order matters (first-match-wins).
@@ -217,7 +217,7 @@ func TestSSHDataCompat(t *testing.T) {
 					}
 					if diff := cmp.Diff(wantSSH, gotSSH, opts...); diff != "" {
 						t.Errorf(
-							"%s/%s: SSH policy mismatch (-tailscale +headscale):\n%s",
+							"%s/%s: SSH policy mismatch (-tailscale +slopscale):\n%s",
 							tf.TestID,
 							nodeName,
 							diff,
@@ -226,7 +226,7 @@ func TestSSHDataCompat(t *testing.T) {
 
 					// Separate presence check: the fields ignored by
 					// the diff above must still be populated on matching
-					// rules. This catches regressions where headscale
+					// rules. This catches regressions where slopscale
 					// would silently drop the HoldAndDelegate URL or
 					// flip Accept to false while we are not looking.
 					if wantSSH != nil && gotSSH != nil {

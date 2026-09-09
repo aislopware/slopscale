@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go4.org/netipx"
@@ -121,14 +121,14 @@ func TestUnmarshalPolicy(t *testing.T) {
 {
 	"groups": {
 		"group:example": [
-			"derp@headscale.net",
+			"derp@slopscale.net",
 		],
 	},
 }
 `,
 			want: &Policy{
 				Groups: Groups{
-					Group("group:example"): []Username{Username("derp@headscale.net")},
+					Group("group:example"): []Username{Username("derp@slopscale.net")},
 				},
 			},
 		},
@@ -138,10 +138,10 @@ func TestUnmarshalPolicy(t *testing.T) {
 {
 	"groups": {
 		"group:example": [
-			"testuser@headscale.net",
+			"testuser@slopscale.net",
 		],
 		"group:other": [
-			"otheruser@headscale.net",
+			"otheruser@slopscale.net",
 		],
 		"group:noat": [
 			"noat@",
@@ -149,9 +149,9 @@ func TestUnmarshalPolicy(t *testing.T) {
 	},
 
 	"tagOwners": {
-		"tag:user": ["testuser@headscale.net"],
+		"tag:user": ["testuser@slopscale.net"],
 		"tag:group": ["group:other"],
-		"tag:userandgroup": ["testuser@headscale.net", "group:other"],
+		"tag:userandgroup": ["testuser@slopscale.net", "group:other"],
 	},
 
 	"hosts": {
@@ -172,8 +172,8 @@ func TestUnmarshalPolicy(t *testing.T) {
 		{
 			"action": "accept",
 			"proto": "tcp",
-			"src": ["testuser@headscale.net"],
-			"dst": ["otheruser@headscale.net:80"],
+			"src": ["testuser@slopscale.net"],
+			"dst": ["otheruser@slopscale.net:80"],
 		},
 		// Groups
 		{
@@ -222,14 +222,14 @@ func TestUnmarshalPolicy(t *testing.T) {
 `,
 			want: &Policy{
 				Groups: Groups{
-					Group("group:example"): []Username{Username("testuser@headscale.net")},
-					Group("group:other"):   []Username{Username("otheruser@headscale.net")},
+					Group("group:example"): []Username{Username("testuser@slopscale.net")},
+					Group("group:other"):   []Username{Username("otheruser@slopscale.net")},
 					Group("group:noat"):    []Username{Username("noat@")},
 				},
 				TagOwners: TagOwners{
-					Tag("tag:user"):         Owners{up("testuser@headscale.net")},
+					Tag("tag:user"):         Owners{up("testuser@slopscale.net")},
 					Tag("tag:group"):        Owners{gp("group:other")},
-					Tag("tag:userandgroup"): Owners{up("testuser@headscale.net"), gp("group:other")},
+					Tag("tag:userandgroup"): Owners{up("testuser@slopscale.net"), gp("group:other")},
 				},
 				Hosts: Hosts{
 					"host-1":   Prefix(mp("100.100.100.100/32")),
@@ -257,11 +257,11 @@ func TestUnmarshalPolicy(t *testing.T) {
 						Action:   "accept",
 						Protocol: "tcp",
 						Sources: Aliases{
-							new(Username("testuser@headscale.net")),
+							new(Username("testuser@slopscale.net")),
 						},
 						Destinations: []AliasWithPorts{
 							{
-								Alias: new(Username("otheruser@headscale.net")),
+								Alias: new(Username("otheruser@slopscale.net")),
 								Ports: []tailcfg.PortRange{{First: 80, Last: 80}},
 							},
 						},
@@ -1157,10 +1157,10 @@ func TestUnmarshalPolicy(t *testing.T) {
 `,
 			wantErr: `unknown field: "INVALID_AUTO_APPROVER_FIELD"`,
 		},
-		// headscale-admin uses # in some field names to add metadata, so we will ignore
+		// slopscale-admin uses # in some field names to add metadata, so we will ignore
 		// those to ensure it doesnt break.
 		//nolint:lll // URL
-		// https://github.com/GoodiesHQ/headscale-admin/blob/214a44a9c15c92d2b42383f131b51df10c84017c/src/lib/common/acl.svelte.ts#L38
+		// https://github.com/GoodiesHQ/slopscale-admin/blob/214a44a9c15c92d2b42383f131b51df10c84017c/src/lib/common/acl.svelte.ts#L38
 		{
 			name: "hash-fields-are-allowed-but-ignored",
 			input: `
@@ -4797,7 +4797,7 @@ func TestSSHRuleSaaSValidation(t *testing.T) {
 		},
 		{
 			// SaaS rejects hosts-table aliases on SSH dst with
-			// `invalid dst "srv"`. headscale validates the same
+			// `invalid dst "srv"`. slopscale validates the same
 			// regardless of whether the alias resolves to a
 			// single IP or a CIDR.
 			name: "host alias as SSH dst rejected",

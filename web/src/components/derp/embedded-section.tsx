@@ -139,7 +139,7 @@ function facts(derp: Derp): readonly Definition[] {
   ];
 }
 
-/** The relay headscale runs itself: a switch, its facts and a form for the details. */
+/** The relay slopscale runs itself: a switch, its facts and a form for the details. */
 export function EmbeddedSection({
   derp,
   canEdit,
@@ -298,14 +298,14 @@ function ServerForm({
         {field({
           field: "regionCode",
           label: "Region code",
-          placeholder: "headscale",
+          placeholder: "slopscale",
           description: "The short code clients show.",
         })}
       </div>
       {field({
         field: "regionName",
         label: "Region name",
-        placeholder: "Headscale embedded relay",
+        placeholder: "Slopscale embedded relay",
         description: "Leave empty to use the code.",
       })}
       {field({

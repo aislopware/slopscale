@@ -17,9 +17,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/coder/websocket"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/derp"
 	"tailscale.com/derp/derpserver"
@@ -35,7 +35,7 @@ import (
 // following its HTTP request.
 const (
 	fastStartHeader  = "Derp-Fast-Start"
-	DerpVerifyScheme = "headscale-derp-verify"
+	DerpVerifyScheme = "slopscale-derp-verify"
 )
 
 // VerifyFunc answers the relay's admission check for one client: it reads
@@ -207,7 +207,7 @@ func (d *DERPServer) DERPHandler(
 		if upgrade != "" {
 			log.Warn().
 				Caller().
-				Msg("No Upgrade header in DERP server request. If headscale is behind a reverse proxy, " +
+				Msg("No Upgrade header in DERP server request. If slopscale is behind a reverse proxy, " +
 					"make sure it is configured to pass WebSockets through.")
 		}
 

@@ -5,11 +5,11 @@ A machine can get a TLS certificate for its MagicDNS name with
 client asks Let's Encrypt for the certificate and proves it holds the name
 with a DNS-01 challenge: a TXT record under `_acme-challenge.<name>`. It
 cannot publish that record itself, so it sends it to the control server
-over `/machine/set-dns`, and Headscale publishes it in the zone that holds
+over `/machine/set-dns`, and Slopscale publishes it in the zone that holds
 the tailnet's names.
 
 This needs a base domain that is a real zone on the public internet, and
-a way for Headscale to write to it.
+a way for Slopscale to write to it.
 
 ## Setting it up
 
@@ -53,7 +53,7 @@ its own Noise session. Anything else is refused. Every record published
 lands in the [audit log](audit.md) as `node.cert_challenge` on the
 machine.
 
-Headscale does not delete challenge records afterwards; they are
+Slopscale does not delete challenge records afterwards; they are
 harmless, and Let's Encrypt asks for a fresh value each time. The
 `cloudflare` provider skips a record whose value is already there, and
 each provider keeps the other values at the name, because a certificate

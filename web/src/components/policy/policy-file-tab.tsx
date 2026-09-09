@@ -17,7 +17,7 @@ import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { parseTime } from "~/lib/time.ts";
 
-const referenceUrl = "https://headscale.net/stable/ref/policy/";
+const referenceUrl = "https://aislopware.github.io/slopscale/stable/ref/policy/";
 
 /** The external-link glyph sits after the label, where a link leaving the console shows it. */
 const externalIconSize = 14;

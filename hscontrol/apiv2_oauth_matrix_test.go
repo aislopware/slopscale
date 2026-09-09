@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	apiv2 "github.com/juanfont/headscale/hscontrol/api/v2"
-	"github.com/juanfont/headscale/hscontrol/scope"
+	apiv2 "github.com/aislopware/slopscale/hscontrol/api/v2"
+	"github.com/aislopware/slopscale/hscontrol/scope"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

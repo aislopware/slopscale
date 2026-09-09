@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 )
 
@@ -152,7 +152,7 @@ func isDev(version string) bool {
 	return ok
 }
 
-// checkVersionUpgradePath verifies that the running headscale version
+// checkVersionUpgradePath verifies that the running slopscale version
 // is compatible with the version that last used this database.
 //
 // Rules:
@@ -180,7 +180,7 @@ func checkVersionUpgradePathFromVersions(e *executor, currentVersion string) err
 		if storedVersion != "" && !isDev(storedVersion) {
 			log.Warn().
 				Str("database_version", storedVersion).
-				Msg("running a development build of headscale without a version number, " +
+				Msg("running a development build of slopscale without a version number, " +
 					"database version check is skipped, the stored database version is preserved")
 		}
 
@@ -210,7 +210,7 @@ func checkVersionUpgradePathFromVersions(e *executor, currentVersion string) err
 
 	if current.Major != stored.Major {
 		return fmt.Errorf(
-			"headscale version %s cannot be used with a database last used by %s: %w",
+			"slopscale version %s cannot be used with a database last used by %s: %w",
 			currentVersion, storedVersion, errVersionMajorChange,
 		)
 	}
@@ -229,10 +229,10 @@ func checkVersionUpgradePathFromVersions(e *executor, currentVersion string) err
 	case minorDiff > 1:
 		// Multi-minor upgrade: blocked.
 		return fmt.Errorf(
-			"headscale version %s cannot be used with a database last used by %s, "+
+			"slopscale version %s cannot be used with a database last used by %s, "+
 				"upgrading more than one minor version at a time is not supported, "+
 				"please upgrade to the latest v%d.%d.x release first, then to %s, "+
-				"release page: https://github.com/juanfont/headscale/releases: %w",
+				"release page: https://github.com/aislopware/slopscale/releases: %w",
 			currentVersion, storedVersion,
 			stored.Major, stored.Minor+1,
 			current.String(),
@@ -242,9 +242,9 @@ func checkVersionUpgradePathFromVersions(e *executor, currentVersion string) err
 	default:
 		// minorDiff < 0: any minor downgrade is blocked.
 		return fmt.Errorf(
-			"headscale version %s cannot be used with a database last used by %s, "+
+			"slopscale version %s cannot be used with a database last used by %s, "+
 				"downgrading to a previous minor version is not supported, "+
-				"release page: https://github.com/juanfont/headscale/releases: %w",
+				"release page: https://github.com/aislopware/slopscale/releases: %w",
 			currentVersion, storedVersion,
 			errVersionDowngrade,
 		)

@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/api/principal"
+	apiv2 "github.com/aislopware/slopscale/hscontrol/api/v2"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juanfont/headscale/hscontrol/api/principal"
-	apiv2 "github.com/juanfont/headscale/hscontrol/api/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +31,7 @@ func taggedCaps(tags ...string) *apiv2.KeyCapabilities {
 // newKeyTestAPI builds an app + v2 API with NO owner user in context. Without the
 // auth middleware ownerUser(ctx) is empty, so only the tagged-key path creates;
 // the user-owned path (which needs an owning API key) is covered by TestAPIv2.
-func newKeyTestAPI(t *testing.T) (*Headscale, humatest.TestAPI) {
+func newKeyTestAPI(t *testing.T) (*Slopscale, humatest.TestAPI) {
 	t.Helper()
 
 	app := createTestApp(t)
@@ -99,7 +99,7 @@ func containsKeyID(keys []apiv2.Key, id string) bool {
 
 // srvKey is the server-side ground truth: the stored PreAuthKey, found by its
 // stringified id through ListPreAuthKeys (User is preloaded).
-func srvKey(t *testing.T, app *Headscale, id string) types.PreAuthKey {
+func srvKey(t *testing.T, app *Slopscale, id string) types.PreAuthKey {
 	t.Helper()
 
 	want, err := strconv.ParseUint(id, 10, 64)
@@ -119,7 +119,7 @@ func srvKey(t *testing.T, app *Headscale, id string) types.PreAuthKey {
 	return types.PreAuthKey{}
 }
 
-func keyCount(t *testing.T, app *Headscale) int {
+func keyCount(t *testing.T, app *Slopscale) int {
 	t.Helper()
 
 	keys, err := app.state.ListPreAuthKeys()

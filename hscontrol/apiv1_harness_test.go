@@ -14,18 +14,18 @@ import (
 	"testing"
 	"time"
 
-	apiv1 "github.com/juanfont/headscale/hscontrol/api/v1"
+	apiv1 "github.com/aislopware/slopscale/hscontrol/api/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // apiV1Harness drives a request through the Huma service and compares the result
 // against a golden keyed by the test name. Goldens neutralise timestamps so they
-// stay stable across runs; refresh with HEADSCALE_UPDATE_GOLDEN=1 after an
+// stay stable across runs; refresh with SLOPSCALE_UPDATE_GOLDEN=1 after an
 // intentional contract change. assertParity suits reads/errors; mutations use
 // assertParityIsolated against a freshly-seeded app.
 type apiV1Harness struct {
-	app  *Headscale
+	app  *Slopscale
 	huma http.Handler
 }
 
@@ -44,7 +44,7 @@ func newAPIV1Harness(t *testing.T) *apiV1Harness {
 // bearer-key middleware — the same local-trust the unix socket gets — so these
 // tests can exercise response shapes. Auth itself is covered against the full
 // router in TestAPIV1AuthMiddleware.
-func newHumaTestHandler(app *Headscale) http.Handler {
+func newHumaTestHandler(app *Slopscale) http.Handler {
 	mux, _ := apiv1.Handler(apiv1.Backend{
 		State:  app.state,
 		Change: app.Change,
@@ -99,7 +99,7 @@ func (h *apiV1Harness) assertParity(t *testing.T, method, path string, body []by
 // be nil) and compares to the golden. Use for mutations.
 func assertParityIsolated(
 	t *testing.T,
-	seed func(t *testing.T, app *Headscale),
+	seed func(t *testing.T, app *Slopscale),
 	method, path string,
 	body []byte,
 ) httpResult {
@@ -154,7 +154,7 @@ func assertAgainstGolden(t *testing.T, method, path string, hum httpResult) {
 
 	gpath := goldenPath(t)
 
-	if os.Getenv("HEADSCALE_UPDATE_GOLDEN") != "" {
+	if os.Getenv("SLOPSCALE_UPDATE_GOLDEN") != "" {
 		writeGolden(t, gpath, hum)
 
 		return
@@ -162,7 +162,7 @@ func assertAgainstGolden(t *testing.T, method, path string, hum httpResult) {
 
 	raw, err := os.ReadFile(gpath)
 	require.NoErrorf(t, err,
-		"missing golden %s for %s %s — run with HEADSCALE_UPDATE_GOLDEN=1 to generate",
+		"missing golden %s for %s %s — run with SLOPSCALE_UPDATE_GOLDEN=1 to generate",
 		gpath, method, path)
 
 	var golden goldenRecord
@@ -182,7 +182,7 @@ func assertAgainstGolden(t *testing.T, method, path string, hum httpResult) {
 	}
 }
 
-// writeGolden persists the response under HEADSCALE_UPDATE_GOLDEN. Success
+// writeGolden persists the response under SLOPSCALE_UPDATE_GOLDEN. Success
 // bodies are normalised the same way the comparison path does, so the file stays
 // stable across runs. Error responses are stored status-only, since the reader
 // never compares error bodies.

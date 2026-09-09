@@ -8,10 +8,10 @@ import (
 
 // SSHRecorderTag is the tag the embedded session recorder registers
 // with, so policy aliases and the tailnet default can name it.
-const SSHRecorderTag = "tag:headscale-recorder"
+const SSHRecorderTag = "tag:slopscale-recorder"
 
 // SSHRecorderHostname is the embedded recorder's node name.
-const SSHRecorderHostname = "headscale-recorder"
+const SSHRecorderHostname = "slopscale-recorder"
 
 // SSHRecorderPort is the port a session recorder listens on; the client
 // speaks plain HTTP to it over the tailnet.

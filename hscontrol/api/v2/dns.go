@@ -5,12 +5,12 @@ import (
 	"maps"
 	"net/http"
 
+	"github.com/aislopware/slopscale/hscontrol/api/principal"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/api/principal"
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
 )
 
 func init() {
@@ -18,7 +18,7 @@ func init() {
 }
 
 // DNSNameservers is the Tailscale nameservers body. overrideLocalDns is a
-// Headscale addition: Tailscale keeps it in its console only.
+// Slopscale addition: Tailscale keeps it in its console only.
 type DNSNameservers struct {
 	DNS              []string `json:"dns"                        nullable:"false"`
 	MagicDNS         bool     `json:"magicDNS,omitempty"`

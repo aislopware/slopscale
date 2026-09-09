@@ -3,7 +3,7 @@ package v2
 import (
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -100,7 +100,7 @@ func TestRoleAutogroupsInGrants(t *testing.T) {
 	require.Len(t, rules, 1)
 	assert.Equal(t, []string{"100.64.0.2"}, rules[0].SrcIPs, "only the admin reaches the server")
 
-	sshPol, err := pm.SSHPolicy("https://headscale.test", nodes[2].View())
+	sshPol, err := pm.SSHPolicy("https://slopscale.test", nodes[2].View())
 	require.NoError(t, err)
 	require.Len(t, sshPol.Rules, 1)
 	require.Len(t, sshPol.Rules[0].Principals, 1)

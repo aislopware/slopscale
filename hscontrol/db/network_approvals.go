@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/netip"
 
+	"github.com/aislopware/slopscale/gen/jet/table"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	jet "github.com/go-jet/jet/v2/sqlite"
-	"github.com/juanfont/headscale/gen/jet/table"
-	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 // networkRouteApprovalRow is a row of network_route_approvals: one route

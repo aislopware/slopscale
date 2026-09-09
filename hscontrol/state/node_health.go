@@ -3,8 +3,8 @@ package state
 import (
 	"fmt"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog/log"
 )
 
@@ -32,7 +32,7 @@ var givenNameMapsToValidFQDN = nodeHealthCheck{
 	check: func(nv types.NodeView, cfg *types.Config) (string, string, bool) {
 		err := types.ValidateGivenName(nv.GivenName(), cfg.BaseDomain)
 		if err != nil {
-			return err.Error(), fmt.Sprintf("headscale nodes rename %d <name>", nv.ID()), false
+			return err.Error(), fmt.Sprintf("slopscale nodes rename %d <name>", nv.ID()), false
 		}
 
 		return "", "", true

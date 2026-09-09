@@ -4,9 +4,9 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/policy/matcher"
+	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/views"
 )

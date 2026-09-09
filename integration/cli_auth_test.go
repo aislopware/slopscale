@@ -3,7 +3,7 @@ package integration
 import (
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +20,7 @@ import (
 func TestAuthCommandValidation(t *testing.T) {
 	IntegrationSkip(t)
 
-	scenario, headscale := setupCLIScenario(t, "cli-authval", []string{"user1"}, 0)
+	scenario, slopscale := setupCLIScenario(t, "cli-authval", []string{"user1"}, 0)
 	defer scenario.ShutdownAssertNoPanics(t)
 
 	// Well-formed (correct prefix/length) but unknown auth-id: the handler
@@ -66,7 +66,7 @@ func TestAuthCommandValidation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := headscale.Execute(append([]string{"headscale"}, tt.args...))
+			_, err := slopscale.Execute(append([]string{"slopscale"}, tt.args...))
 			require.ErrorContains(t, err, tt.wantErr)
 		})
 	}

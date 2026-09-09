@@ -4,7 +4,7 @@ import type { AuditExportFormat, AuditFilters } from "~/api/queries.ts";
 /** How long the blob URL outlives the click that started the download. */
 const revokeDelayMs = 1000;
 
-/** `headscale-audit-2026-09-08.csv`: the day the export was taken, so downloads sort by date. */
+/** `slopscale-audit-2026-09-08.csv`: the day the export was taken, so downloads sort by date. */
 export function auditExportFileName(format: AuditExportFormat, now: Date = new Date()): string {
   const day = [
     String(now.getFullYear()),
@@ -12,7 +12,7 @@ export function auditExportFileName(format: AuditExportFormat, now: Date = new D
     String(now.getDate()).padStart(2, "0"),
   ].join("-");
 
-  return `headscale-audit-${day}.${format}`;
+  return `slopscale-audit-${day}.${format}`;
 }
 
 /**

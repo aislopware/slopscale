@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/go-jet/jet/v2/qrm"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )

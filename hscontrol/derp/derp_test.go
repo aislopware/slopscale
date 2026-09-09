@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/egress"
 	"github.com/google/go-cmp/cmp"
-	"github.com/juanfont/headscale/hscontrol/egress"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

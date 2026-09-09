@@ -1,4 +1,4 @@
-# If you plan to somehow use headscale, please deploy your own DERP infra.
+# If you plan to somehow use slopscale, please deploy your own DERP infra.
 # See: https://tailscale.com/docs/reference/derp-servers/custom-derp-servers
 regions:
   1: null # Disable DERP region with ID 1

@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/egress"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -168,7 +168,7 @@ func TestEmailEndpointGoesThroughTheMailer(t *testing.T) {
 
 	err := d.Test(t.Context(), endpoint)
 	require.ErrorIs(t, err, ErrNoMailer, "no mail server configured")
-	assert.Equal(t, ErrNoMailer.Error(), store.status(7), "headscale's own words about its own state")
+	assert.Equal(t, ErrNoMailer.Error(), store.status(7), "slopscale's own words about its own state")
 
 	mailer := &memMailer{}
 	d.SetMailer(mailer)
@@ -179,7 +179,7 @@ func TestEmailEndpointGoesThroughTheMailer(t *testing.T) {
 
 	require.Equal(t, 1, mailer.count())
 	assert.Equal(t, []string{"ops@example.com", "sec@example.com"}, mailer.sent[0].to)
-	assert.Equal(t, "[example.ts.net] This is a test event from headscale.", mailer.sent[0].subject)
+	assert.Equal(t, "[example.ts.net] This is a test event from slopscale.", mailer.sent[0].subject)
 	assert.Contains(t, mailer.sent[0].body, "Event: test")
 
 	// A permanent rejection is not retried.
@@ -203,10 +203,10 @@ func TestEmailEndpointGoesThroughTheMailer(t *testing.T) {
 func TestMailMessage(t *testing.T) {
 	t.Parallel()
 
-	from := &mail.Address{Name: "Headscale", Address: "hs@example.com"}
+	from := &mail.Address{Name: "Slopscale", Address: "hs@example.com"}
 	msg := message(from, []string{"a@example.com"}, "Đăng nhập", "body")
 
-	assert.Contains(t, msg, "From: \"Headscale\" <hs@example.com>\r\n")
+	assert.Contains(t, msg, "From: \"Slopscale\" <hs@example.com>\r\n")
 	assert.Contains(t, msg, "To: a@example.com\r\n")
 	assert.Contains(t, msg, "Subject: =?utf-8?q?")
 	assert.True(t, strings.HasSuffix(msg, "\r\n\r\nbody"))

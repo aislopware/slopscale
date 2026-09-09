@@ -3,7 +3,7 @@ package v2
 import (
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -116,7 +116,7 @@ func TestAutogroupSharedSSH(t *testing.T) {
 	require.NoError(t, pol.validate())
 
 	sshPol, err := pol.compileSSHPolicy(
-		"https://headscale.test",
+		"https://slopscale.test",
 		users,
 		nodes[0].View(),
 		nodes.ViewSlice(),
@@ -129,7 +129,7 @@ func TestAutogroupSharedSSH(t *testing.T) {
 	assert.Equal(t, "100.64.0.2", sshPol.Rules[0].Principals[0].NodeIP)
 
 	sshPol, err = pol.compileSSHPolicy(
-		"https://headscale.test",
+		"https://slopscale.test",
 		users,
 		nodes[1].View(),
 		nodes.ViewSlice(),

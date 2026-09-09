@@ -6,7 +6,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

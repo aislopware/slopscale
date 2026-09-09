@@ -1,5 +1,5 @@
 {
-  description = "headscale - Open Source Tailscale Control server";
+  description = "slopscale - Open Source Tailscale Control server";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -18,7 +18,7 @@
     , ...
     }:
     let
-      headscaleVersion = self.shortRev or self.dirtyShortRev;
+      slopscaleVersion = self.shortRev or self.dirtyShortRev;
       commitHash = self.rev or self.dirtyRev;
       # C flags for the SQLite bundled in mattn/go-sqlite3 (see
       # sqlite.cflags); exported as CGO_CFLAGS wherever Go compiles it.
@@ -29,8 +29,8 @@
     {
       # NixOS module
       nixosModules = rec {
-        headscale = import ./nix/module.nix;
-        default = headscale;
+        slopscale = import ./nix/module.nix;
+        default = slopscale;
       };
 
       overlays.default = _: prev:
@@ -42,9 +42,9 @@
           vendorHash = (builtins.fromJSON (builtins.readFile ./flakehashes.json)).vendor.sri;
         in
         {
-          headscale = buildGo {
-            pname = "headscale";
-            version = headscaleVersion;
+          slopscale = buildGo {
+            pname = "slopscale";
+            version = slopscaleVersion;
             src = pkgs.lib.cleanSource self;
 
             # Only run unit tests when testing a build
@@ -58,16 +58,16 @@
             # cgo whenever a C compiler is present).
             env.CGO_CFLAGS = sqliteCFlags;
 
-            subPackages = [ "cmd/headscale" ];
+            subPackages = [ "cmd/slopscale" ];
 
             meta = {
-              mainProgram = "headscale";
+              mainProgram = "slopscale";
             };
           };
 
           hi = buildGo {
             pname = "hi";
-            version = headscaleVersion;
+            version = slopscaleVersion;
             src = pkgs.lib.cleanSource self;
 
             checkFlags = [ "-short" ];
@@ -182,17 +182,17 @@
           ]
           ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [ traceroute ];
 
-        # Add entry to build a docker image with headscale
+        # Add entry to build a docker image with slopscale
         # caveat: only works on Linux
         #
         # Usage:
-        # nix build .#headscale-docker
+        # nix build .#slopscale-docker
         # docker load < result
-        headscale-docker = pkgs.dockerTools.buildLayeredImage {
-          name = "headscale";
-          tag = headscaleVersion;
-          contents = [ pkgs.headscale ];
-          config.Entrypoint = [ (pkgs.headscale + "/bin/headscale") ];
+        slopscale-docker = pkgs.dockerTools.buildLayeredImage {
+          name = "slopscale";
+          tag = slopscaleVersion;
+          contents = [ pkgs.slopscale ];
+          config.Entrypoint = [ (pkgs.slopscale + "/bin/slopscale") ];
         };
 
         # Go flake checks from the flake-checks library. CI gates on
@@ -203,8 +203,8 @@
         common = {
           inherit pkgs;
           root = ./.;
-          pname = "headscale";
-          version = headscaleVersion;
+          pname = "slopscale";
+          version = slopscaleVersion;
           vendorHash = (builtins.fromJSON (builtins.readFile ./flakehashes.json)).vendor.sri;
           goPkg = pkgs.go_latest;
           # //go:embed targets and test-read files outside the default whitelist.
@@ -218,7 +218,7 @@
         };
         goChecks = {
           build = fc.goBuild (common // {
-            subPackages = [ "cmd/headscale" ];
+            subPackages = [ "cmd/slopscale" ];
             env = { CGO_CFLAGS = sqliteCFlags; };
           });
 
@@ -302,21 +302,21 @@
 
         # `nix build`
         packages = with pkgs; {
-          inherit headscale;
-          inherit headscale-docker;
-          default = headscale;
+          inherit slopscale;
+          inherit slopscale-docker;
+          default = slopscale;
         };
 
         # `nix run`
-        apps.headscale = flake-utils.lib.mkApp {
-          drv = pkgs.headscale;
+        apps.slopscale = flake-utils.lib.mkApp {
+          drv = pkgs.slopscale;
         };
         apps.default = flake-utils.lib.mkApp {
-          drv = pkgs.headscale;
+          drv = pkgs.slopscale;
         };
 
         checks = {
-          headscale = pkgs.testers.nixosTest (import ./nix/tests/headscale.nix);
+          slopscale = pkgs.testers.nixosTest (import ./nix/tests/slopscale.nix);
         }
         # The Go build/test checks are gated to Linux: parts of the tree are
         # Linux-specific and the pure unit subset is validated by CI.

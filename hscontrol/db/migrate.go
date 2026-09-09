@@ -30,7 +30,7 @@ const lastMigrationRequiringFKDisabled = "202501311657"
 var (
 	errMigrationHistoryMissing = errors.New(
 		"database has tables but no migration history; " +
-			"it was not created by headscale 0.25 or later",
+			"it was not created by slopscale 0.25 or later",
 	)
 	errForeignKeyConstraintsViolated = errors.New("foreign key constraints violated")
 )

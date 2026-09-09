@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/templates"
+	"github.com/aislopware/slopscale/hscontrol/templates"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,7 +19,7 @@ func TestTemplateHTMLConsistency(t *testing.T) {
 		{
 			name: "Auth Success",
 			html: templates.AuthSuccess(templates.AuthSuccessResult{
-				Title:   "Headscale - Node Registered",
+				Title:   "Slopscale - Node Registered",
 				Heading: "Node registered",
 				Verb:    "Registered",
 				User:    "test@example.com",
@@ -29,7 +29,7 @@ func TestTemplateHTMLConsistency(t *testing.T) {
 		{
 			name: "Auth Error",
 			html: templates.AuthError(templates.AuthErrorResult{
-				Title:   "Headscale - Error",
+				Title:   "Slopscale - Error",
 				Heading: "Forbidden",
 				Message: "You are not authorized. Please contact your administrator.",
 			}).Render(),
@@ -38,16 +38,16 @@ func TestTemplateHTMLConsistency(t *testing.T) {
 			name: "Auth Web Register",
 			html: templates.AuthWeb(
 				"Machine registration",
-				"Run the command below in the headscale server to add this machine to your network:",
-				"headscale auth register --auth-id test-key-123 --user USERNAME",
+				"Run the command below in the slopscale server to add this machine to your network:",
+				"slopscale auth register --auth-id test-key-123 --user USERNAME",
 			).Render(),
 		},
 		{
 			name: "Auth Web Approve",
 			html: templates.AuthWeb(
 				"Authentication check",
-				"Run the command below in the headscale server to approve this authentication request:",
-				"headscale auth approve --auth-id test-key-123",
+				"Run the command below in the slopscale server to approve this authentication request:",
+				"slopscale auth approve --auth-id test-key-123",
 			).Render(),
 		},
 		{
@@ -105,7 +105,7 @@ func TestTemplateModernHTMLFeatures(t *testing.T) {
 		{
 			name: "Auth Success",
 			html: templates.AuthSuccess(templates.AuthSuccessResult{
-				Title:   "Headscale - Node Registered",
+				Title:   "Slopscale - Node Registered",
 				Heading: "Node registered",
 				Verb:    "Registered",
 				User:    "test@example.com",
@@ -115,7 +115,7 @@ func TestTemplateModernHTMLFeatures(t *testing.T) {
 		{
 			name: "Auth Error",
 			html: templates.AuthError(templates.AuthErrorResult{
-				Title:   "Headscale - Error",
+				Title:   "Slopscale - Error",
 				Heading: "Forbidden",
 				Message: "You are not authorized. Please contact your administrator.",
 			}).Render(),
@@ -124,16 +124,16 @@ func TestTemplateModernHTMLFeatures(t *testing.T) {
 			name: "Auth Web Register",
 			html: templates.AuthWeb(
 				"Machine registration",
-				"Run the command below in the headscale server to add this machine to your network:",
-				"headscale auth register --auth-id test-key-123 --user USERNAME",
+				"Run the command below in the slopscale server to add this machine to your network:",
+				"slopscale auth register --auth-id test-key-123 --user USERNAME",
 			).Render(),
 		},
 		{
 			name: "Auth Web Approve",
 			html: templates.AuthWeb(
 				"Authentication check",
-				"Run the command below in the headscale server to approve this authentication request:",
-				"headscale auth approve --auth-id test-key-123",
+				"Run the command below in the slopscale server to approve this authentication request:",
+				"slopscale auth approve --auth-id test-key-123",
 			).Render(),
 		},
 		{
@@ -179,21 +179,21 @@ func TestTemplateExternalLinkSecurity(t *testing.T) {
 		{
 			name: "Auth Success",
 			html: templates.AuthSuccess(templates.AuthSuccessResult{
-				Title:   "Headscale - Node Registered",
+				Title:   "Slopscale - Node Registered",
 				Heading: "Node registered",
 				Verb:    "Registered",
 				User:    "test@example.com",
 				Message: "You can now close this window.",
 			}).Render(),
 			externalURLs: []string{
-				"https://headscale.net/stable/",
+				"https://aislopware.github.io/slopscale/stable/",
 				"https://tailscale.com/docs",
 			},
 		},
 		{
 			name: "Auth Error",
 			html: templates.AuthError(templates.AuthErrorResult{
-				Title:   "Headscale - Error",
+				Title:   "Slopscale - Error",
 				Heading: "Forbidden",
 				Message: "You are not authorized. Please contact your administrator.",
 			}).Render(),
@@ -203,8 +203,8 @@ func TestTemplateExternalLinkSecurity(t *testing.T) {
 			name: "Auth Web Register",
 			html: templates.AuthWeb(
 				"Machine registration",
-				"Run the command below in the headscale server to add this machine to your network:",
-				"headscale auth register --auth-id test-key-123 --user USERNAME",
+				"Run the command below in the slopscale server to add this machine to your network:",
+				"slopscale auth register --auth-id test-key-123 --user USERNAME",
 			).Render(),
 			externalURLs: []string{}, // No external links
 		},
@@ -212,8 +212,8 @@ func TestTemplateExternalLinkSecurity(t *testing.T) {
 			name: "Auth Web Approve",
 			html: templates.AuthWeb(
 				"Authentication check",
-				"Run the command below in the headscale server to approve this authentication request:",
-				"headscale auth approve --auth-id test-key-123",
+				"Run the command below in the slopscale server to approve this authentication request:",
+				"slopscale auth approve --auth-id test-key-123",
 			).Render(),
 			externalURLs: []string{}, // No external links
 		},
@@ -280,7 +280,7 @@ func TestTemplateAccessibilityAttributes(t *testing.T) {
 		{
 			name: "Auth Success",
 			html: templates.AuthSuccess(templates.AuthSuccessResult{
-				Title:   "Headscale - Node Registered",
+				Title:   "Slopscale - Node Registered",
 				Heading: "Node registered",
 				Verb:    "Registered",
 				User:    "test@example.com",
@@ -290,7 +290,7 @@ func TestTemplateAccessibilityAttributes(t *testing.T) {
 		{
 			name: "Auth Error",
 			html: templates.AuthError(templates.AuthErrorResult{
-				Title:   "Headscale - Error",
+				Title:   "Slopscale - Error",
 				Heading: "Forbidden",
 				Message: "You are not authorized. Please contact your administrator.",
 			}).Render(),
@@ -299,16 +299,16 @@ func TestTemplateAccessibilityAttributes(t *testing.T) {
 			name: "Auth Web Register",
 			html: templates.AuthWeb(
 				"Machine registration",
-				"Run the command below in the headscale server to add this machine to your network:",
-				"headscale auth register --auth-id test-key-123 --user USERNAME",
+				"Run the command below in the slopscale server to add this machine to your network:",
+				"slopscale auth register --auth-id test-key-123 --user USERNAME",
 			).Render(),
 		},
 		{
 			name: "Auth Web Approve",
 			html: templates.AuthWeb(
 				"Authentication check",
-				"Run the command below in the headscale server to approve this authentication request:",
-				"headscale auth approve --auth-id test-key-123",
+				"Run the command below in the slopscale server to approve this authentication request:",
+				"slopscale auth approve --auth-id test-key-123",
 			).Render(),
 		},
 		{

@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/derp"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/derp"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -171,7 +171,7 @@ func setupBatcherWithTestData(
 
 	// Create database and populate with test data first
 	tmpDir := tb.TempDir()
-	dbPath := tmpDir + "/headscale_test.db"
+	dbPath := tmpDir + "/slopscale_test.db"
 
 	prefixV4 := netip.MustParsePrefix("100.64.0.0/10")
 	prefixV6 := netip.MustParsePrefix("fd7a:115c:a1e0::/48")
@@ -186,7 +186,7 @@ func setupBatcherWithTestData(
 		PrefixV4:     &prefixV4,
 		PrefixV6:     &prefixV6,
 		IPAllocation: types.IPAllocationStrategySequential,
-		BaseDomain:   "headscale.test",
+		BaseDomain:   "slopscale.test",
 		Policy: types.PolicyConfig{
 			Mode: types.PolicyModeDB,
 		},
@@ -209,7 +209,7 @@ func setupBatcherWithTestData(
 	}
 
 	// Create database and populate it with test data
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	if err != nil {
 		tb.Fatalf("setting up database: %s", err)
 	}

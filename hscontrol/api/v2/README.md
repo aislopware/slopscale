@@ -1,14 +1,14 @@
-# API v2: Headscale's v2 API
+# API v2: Slopscale's v2 API
 
-This is Headscale's v2 HTTP API, served at `/api/v2`. Some of its endpoints are
+This is Slopscale's v2 HTTP API, served at `/api/v2`. Some of its endpoints are
 **ported from Tailscale's API**, reusing Tailscale's wire shapes, so the
-Tailscale ecosystem that cannot talk to Headscale today works: the
+Tailscale ecosystem that cannot talk to Slopscale today works: the
 [Terraform/OpenTofu provider], [tscli], and the official [Go client]
 (`tailscale.com/client/tailscale/v2`).
 
 It is **not** a port of the whole Tailscale API. Ported endpoints are added one
-at a time, only as we need them; a headscale-native v2 endpoint may use
-headscale's own conventions. The headscale-native admin API stays at `/api/v1`
+at a time, only as we need them; a slopscale-native v2 endpoint may use
+slopscale's own conventions. The slopscale-native admin API stays at `/api/v1`
 (`hscontrol/api/v1`). This guide is for the endpoints **ported from Tailscale**.
 
 [Terraform/OpenTofu provider]: https://registry.terraform.io/providers/tailscale/tailscale/latest
@@ -18,11 +18,11 @@ headscale's own conventions. The headscale-native admin API stays at `/api/v1`
 ## Conventions
 
 - Operations derived from Tailscale carry the `Tailscale compat` tag.
-- The `{tailnet}` path segment must be `-` (the single Headscale tailnet);
+- The `{tailnet}` path segment must be `-` (the single Slopscale tailnet);
   anything else is `404`. See `requireDefaultTailnet`.
 - Errors use **Tailscale's** body (`{"message","data","status"}`), installed as
   a per-API transform (`tailscaleErrorTransformer` in `errors.go`). A future
-  headscale-native v2 operation would keep Huma's RFC 9457 problem+json.
+  slopscale-native v2 operation would keep Huma's RFC 9457 problem+json.
 - Auth accepts a credential as **HTTP Basic** (key as username, what the SDK
   sends) or **Bearer**: an admin API key (`hskey-api-…`), or an OAuth access
   token (`hskey-oauthtok-…`). See `authMiddleware`.
@@ -57,7 +57,7 @@ headscale's own conventions. The headscale-native admin API stays at `/api/v1`
 
 Most of the Tailscale ecosystem (the Terraform provider, `tscli`, the Go client)
 accepts **either** an API key **or OAuth 2.0 client-credentials**; the Kubernetes
-operator is OAuth-only. Supporting OAuth lets all of them drive Headscale.
+operator is OAuth-only. Supporting OAuth lets all of them drive Slopscale.
 
 - **OAuth clients** are not a separate resource; they are `keyType:"client"` on
   the keys endpoint, exactly as Tailscale does it. Create
@@ -84,12 +84,12 @@ operator is OAuth-only. Supporting OAuth lets all of them drive Headscale.
 
 ## Adding an endpoint
 
-Worked example: the keys resource (`keys.go`) = Tailscale auth keys = Headscale
+Worked example: the keys resource (`keys.go`) = Tailscale auth keys = Slopscale
 pre-auth keys.
 
 1. **Read the Tailscale spec.** Find the operation in the [Tailscale API
    reference](https://tailscale.com/api) (OpenAPI 3.1). Note method, path,
-   request/response schema, and which variant(s) Headscale supports (auth keys
+   request/response schema, and which variant(s) Slopscale supports (auth keys
    only, for keys).
 
 2. **Capture golden samples.** Pull the request + response JSON examples from the
@@ -97,9 +97,9 @@ pre-auth keys.
    test. _Acceptance: the captured request and response are recorded in the
    test._
 
-3. **Map to Headscale.** Write the field ↔ field ↔ `state` call mapping. Record
+3. **Map to Slopscale.** Write the field ↔ field ↔ `state` call mapping. Record
    gaps and the decision for each (e.g. Tailscale `preauthorized` has no
-   Headscale equivalent: accepted, ignored, echoed back). _Acceptance: every
+   Slopscale equivalent: accepted, ignored, echoed back). _Acceptance: every
    request field is consumed or deliberately ignored; every response field has a
    source._
 
@@ -126,6 +126,6 @@ go test ./hscontrol/servertest/ -run TestAPIv2` is green._
    has no separate key-expire verb (its `DELETE` _is_ the revoke), so v2 maps
    `DELETE` to a soft revoke: the key stays retrievable with `invalid: true`
    until the collector reaps it (`preauth_keys.revoked_retention`), the
-   equivalent of v1 `preauthkeys expire`. `headscale preauthkeys` still stays on
+   equivalent of v1 `preauthkeys expire`. `slopscale preauthkeys` still stays on
    v1 for now (it is the cross-user admin surface), but the verb gap that
    previously blocked migration is closed.

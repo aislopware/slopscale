@@ -3,7 +3,7 @@ package state
 import (
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 )
 
 // RotateAPIKey mints a new secret for an existing API key and returns the new

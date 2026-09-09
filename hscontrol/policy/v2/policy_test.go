@@ -5,9 +5,9 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/policy/matcher"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/google/go-cmp/cmp"
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/puzpuzpuz/xsync/v4"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/net/tsaddr"
@@ -29,8 +29,8 @@ func TestPolicyManager(t *testing.T) {
 	t.Parallel()
 
 	users := types.Users{
-		{ID: 1, Name: "testuser", Email: "testuser@headscale.net"},
-		{ID: 2, Name: "otheruser", Email: "otheruser@headscale.net"},
+		{ID: 1, Name: "testuser", Email: "testuser@slopscale.net"},
+		{ID: 2, Name: "otheruser", Email: "otheruser@slopscale.net"},
 	}
 
 	tests := []struct {
@@ -92,9 +92,9 @@ func TestInvalidateAutogroupSelfCache(t *testing.T) {
 	t.Parallel()
 
 	users := types.Users{
-		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
-		{ID: 2, Name: "user2", Email: "user2@headscale.net"},
-		{ID: 3, Name: "user3", Email: "user3@headscale.net"},
+		{ID: 1, Name: "user1", Email: "user1@slopscale.net"},
+		{ID: 2, Name: "user2", Email: "user2@slopscale.net"},
+		{ID: 3, Name: "user3", Email: "user3@slopscale.net"},
 	}
 
 	policy := `{
@@ -237,8 +237,8 @@ func TestSetNodesAutogroupSelfUnhydratedUser(t *testing.T) {
 	t.Parallel()
 
 	users := types.Users{
-		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
-		{ID: 2, Name: "user2", Email: "user2@headscale.net"},
+		{ID: 1, Name: "user1", Email: "user1@slopscale.net"},
+		{ID: 2, Name: "user2", Email: "user2@slopscale.net"},
 	}
 
 	policy := `{
@@ -307,14 +307,14 @@ func TestSSHCheckParamsUnhydratedUserNoPanic(t *testing.T) {
 	t.Parallel()
 
 	users := types.Users{
-		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
+		{ID: 1, Name: "user1", Email: "user1@slopscale.net"},
 	}
 
 	policy := `{
 		"ssh": [
 			{
 				"action": "check",
-				"src":    ["user1@headscale.net"],
+				"src":    ["user1@slopscale.net"],
 				"dst":    ["autogroup:self"],
 				"users":  ["root"]
 			}
@@ -541,8 +541,8 @@ func TestInvalidateGlobalPolicyCache(t *testing.T) {
 func TestAutogroupSelfReducedVsUnreducedRules(t *testing.T) {
 	t.Parallel()
 
-	user1 := types.User{ID: 1, Name: "user1", Email: "user1@headscale.net"}
-	user2 := types.User{ID: 2, Name: "user2", Email: "user2@headscale.net"}
+	user1 := types.User{ID: 1, Name: "user1", Email: "user1@slopscale.net"}
+	user2 := types.User{ID: 2, Name: "user2", Email: "user2@slopscale.net"}
 	users := types.Users{user1, user2}
 
 	// Create two nodes
@@ -795,31 +795,31 @@ func TestTagPropagationToPeerMap(t *testing.T) {
 	t.Parallel()
 
 	users := types.Users{
-		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
-		{ID: 2, Name: "user2", Email: "user2@headscale.net"},
+		{ID: 1, Name: "user1", Email: "user1@slopscale.net"},
+		{ID: 2, Name: "user2", Email: "user2@slopscale.net"},
 	}
 
 	// Policy: user2 can access tag:web nodes
 	policy := `{
 		"tagOwners": {
-			"tag:web": ["user1@headscale.net"],
-			"tag:internal": ["user1@headscale.net"]
+			"tag:web": ["user1@slopscale.net"],
+			"tag:internal": ["user1@slopscale.net"]
 		},
 		"acls": [
 			{
 				"action": "accept",
-				"src": ["user2@headscale.net"],
-				"dst": ["user2@headscale.net:*"]
+				"src": ["user2@slopscale.net"],
+				"dst": ["user2@slopscale.net:*"]
 			},
 			{
 				"action": "accept",
-				"src": ["user2@headscale.net"],
+				"src": ["user2@slopscale.net"],
 				"dst": ["tag:web:*"]
 			},
 			{
 				"action": "accept",
 				"src": ["tag:web"],
-				"dst": ["user2@headscale.net:*"]
+				"dst": ["user2@slopscale.net:*"]
 			}
 		]
 	}`
@@ -2140,7 +2140,7 @@ func TestViaRoutesForPeer(t *testing.T) {
 }
 
 // TestBuildPeerMap_AutogroupInternetMakesExitNodeVisible reproduces
-// juanfont/headscale#3212. An ACL that grants access only via
+// aislopware/slopscale#3212. An ACL that grants access only via
 // `autogroup:internet` must keep the exit node visible to the source
 // in BuildPeerMap so the Tailscale client surfaces it in
 // `tailscale exit-node list`. Authoritative SaaS captures
@@ -2150,7 +2150,7 @@ func TestBuildPeerMap_AutogroupInternetMakesExitNodeVisible(t *testing.T) {
 	t.Parallel()
 
 	users := types.Users{
-		{ID: 1, Name: "alice", Email: "alice@headscale.net"},
+		{ID: 1, Name: "alice", Email: "alice@slopscale.net"},
 	}
 
 	aliceNode := node("alice-laptop", "100.64.0.10", "fd7a:115c:a1e0::a", users[0])
@@ -2166,7 +2166,7 @@ func TestBuildPeerMap_AutogroupInternetMakesExitNodeVisible(t *testing.T) {
 
 	policy := `{
 		"acls": [
-			{"action": "accept", "src": ["alice@headscale.net"], "dst": ["autogroup:internet:*"]}
+			{"action": "accept", "src": ["alice@slopscale.net"], "dst": ["autogroup:internet:*"]}
 		]
 	}`
 
@@ -2256,7 +2256,7 @@ func TestSetPolicy_DuplicateUsername(t *testing.T) {
 	require.NotNil(t, filter, "filter must remain populated after rejected SetPolicy")
 }
 
-// Empty users → syntax-only check, used by `headscale policy check`.
+// Empty users → syntax-only check, used by `slopscale policy check`.
 func TestValidateUserReferences_EmptyUsersTolerant(t *testing.T) {
 	t.Parallel()
 
@@ -2379,8 +2379,8 @@ func TestPeerRelayGrantMakesRelayVisible(t *testing.T) {
 	t.Parallel()
 
 	users := types.Users{
-		{ID: 1, Name: "alice", Email: "alice@headscale.net"},
-		{ID: 2, Name: "tagowner", Email: "tagowner@headscale.net"},
+		{ID: 1, Name: "alice", Email: "alice@slopscale.net"},
+		{ID: 2, Name: "tagowner", Email: "tagowner@slopscale.net"},
 	}
 
 	// Helper for tagged nodes belonging to the tag-owner user.
@@ -2451,8 +2451,8 @@ func TestPeerRelayGrantMakesRelayVisible(t *testing.T) {
 			},
 			policy: `{
 				"tagOwners": {
-					"tag:us-east-vpc":    ["tagowner@headscale.net"],
-					"tag:us-east-relays": ["tagowner@headscale.net"]
+					"tag:us-east-vpc":    ["tagowner@slopscale.net"],
+					"tag:us-east-relays": ["tagowner@slopscale.net"]
 				},
 				"grants": [
 					{
@@ -2475,7 +2475,7 @@ func TestPeerRelayGrantMakesRelayVisible(t *testing.T) {
 			},
 			policy: `{
 				"tagOwners": {
-					"tag:client": ["tagowner@headscale.net"]
+					"tag:client": ["tagowner@slopscale.net"]
 				},
 				"grants": [
 					{
@@ -2501,7 +2501,7 @@ func TestPeerRelayGrantMakesRelayVisible(t *testing.T) {
 				},
 				"grants": [
 					{
-						"src": ["alice@headscale.net"],
+						"src": ["alice@slopscale.net"],
 						"dst": ["peer-relay"],
 						"app": {"tailscale.com/cap/relay": []}
 					}

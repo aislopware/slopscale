@@ -26,7 +26,7 @@ func validDERPSettings() DERPSettings {
 		Server: DERPServerSettings{
 			Enabled:    true,
 			RegionID:   999,
-			RegionCode: "headscale",
+			RegionCode: "slopscale",
 			STUNAddr:   "0.0.0.0:3478",
 		},
 	}

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aislopware/slopscale/gen/jet/table"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	jet "github.com/go-jet/jet/v2/sqlite"
-	"github.com/juanfont/headscale/gen/jet/table"
-	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 // sshRecordingRow is a row of the ssh_recordings table; see schema.sql.

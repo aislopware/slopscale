@@ -3,7 +3,7 @@
 // Using constants ensures typos are caught at compile time and enables
 // easy refactoring. Import as:
 //
-//	import "github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+//	import "github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
 //
 // Usage:
 //
@@ -203,9 +203,9 @@ const (
 
 // Debug environment variable fields.
 const (
-	DebugDERPUseIP             = "HEADSCALE_DEBUG_DERP_USE_IP"
-	DebugDumpConfig            = "HEADSCALE_DEBUG_DUMP_CONFIG"
-	DebugHighCardinalityMetric = "HEADSCALE_DEBUG_HIGH_CARDINALITY_METRICS"
-	DebugProfilingEnabled      = "HEADSCALE_DEBUG_PROFILING_ENABLED"
-	DebugTailSQLEnabled        = "HEADSCALE_DEBUG_TAILSQL_ENABLED"
+	DebugDERPUseIP             = "SLOPSCALE_DEBUG_DERP_USE_IP"
+	DebugDumpConfig            = "SLOPSCALE_DEBUG_DUMP_CONFIG"
+	DebugHighCardinalityMetric = "SLOPSCALE_DEBUG_HIGH_CARDINALITY_METRICS"
+	DebugProfilingEnabled      = "SLOPSCALE_DEBUG_PROFILING_ENABLED"
+	DebugTailSQLEnabled        = "SLOPSCALE_DEBUG_TAILSQL_ENABLED"
 )

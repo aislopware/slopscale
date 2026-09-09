@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/integrationutil"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,11 +29,11 @@ func TestAuthWebFlowAuthenticationPingAll(t *testing.T) {
 	}
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnvWithLoginURL(
+	err = scenario.CreateSlopscaleEnvWithLoginURL(
 		nil,
 		hsic.WithTestName("webauthping"),
 	)
-	requireNoErrHeadscaleEnv(t, err)
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -64,11 +64,11 @@ func TestAuthWebFlowLogoutAndReloginSameUser(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnvWithLoginURL(
+	err = scenario.CreateSlopscaleEnvWithLoginURL(
 		nil,
 		hsic.WithTestName("weblogout"),
 	)
-	requireNoErrHeadscaleEnv(t, err)
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -85,14 +85,14 @@ func TestAuthWebFlowLogoutAndReloginSameUser(t *testing.T) {
 
 	assertPingAll(t, allClients, allAddrs)
 
-	headscale, err := scenario.Headscale()
-	requireNoErrGetHeadscale(t, err)
+	slopscale, err := scenario.Slopscale()
+	requireNoErrGetSlopscale(t, err)
 
 	// Collect expected node IDs for validation
 	expectedNodes := collectExpectedNodeIDs(t, allClients)
 
 	// Validate initial connection state
-	validateInitialConnection(t, headscale, expectedNodes)
+	validateInitialConnection(t, slopscale, expectedNodes)
 
 	var listNodes []*clientv1.Node
 
@@ -100,7 +100,7 @@ func TestAuthWebFlowLogoutAndReloginSameUser(t *testing.T) {
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		var listNodesErr error
 
-		listNodes, listNodesErr = headscale.ListNodes()
+		listNodes, listNodesErr = slopscale.ListNodes()
 		assert.NoError(ct, listNodesErr, "Failed to list nodes after web authentication")
 		assert.Len(
 			ct,
@@ -141,14 +141,14 @@ func TestAuthWebFlowLogoutAndReloginSameUser(t *testing.T) {
 	requireNoErrLogout(t, err)
 
 	// Validate that all nodes are offline after logout
-	validateLogoutComplete(t, headscale, expectedNodes)
+	validateLogoutComplete(t, slopscale, expectedNodes)
 
 	t.Logf("all clients logged out")
 
 	for _, userName := range spec.Users {
-		err = scenario.RunTailscaleUpWithURL(userName, headscale.GetEndpoint())
+		err = scenario.RunTailscaleUpWithURL(userName, slopscale.GetEndpoint())
 		if err != nil {
-			t.Fatalf("failed to run tailscale up (%q): %s", headscale.GetEndpoint(), err)
+			t.Fatalf("failed to run tailscale up (%q): %s", slopscale.GetEndpoint(), err)
 		}
 	}
 
@@ -158,7 +158,7 @@ func TestAuthWebFlowLogoutAndReloginSameUser(t *testing.T) {
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		var listNodesErr error
 
-		listNodes, listNodesErr = headscale.ListNodes()
+		listNodes, listNodesErr = slopscale.ListNodes()
 		assert.NoError(ct, listNodesErr, "Failed to list nodes after web flow logout")
 		assert.Len(
 			ct,
@@ -176,7 +176,7 @@ func TestAuthWebFlowLogoutAndReloginSameUser(t *testing.T) {
 	t.Logf("node count first login: %d, after relogin: %d", nodeCountBeforeLogout, len(listNodes))
 
 	// Validate connection state after relogin
-	validateReloginComplete(t, headscale, expectedNodes)
+	validateReloginComplete(t, slopscale, expectedNodes)
 
 	allIps, err = scenario.ListTailscaleClientsIPs()
 	requireNoErrListClientIPs(t, err)
@@ -219,7 +219,7 @@ func TestAuthWebFlowLogoutAndReloginSameUser(t *testing.T) {
 // initially authenticate using the web-based authentication flow (where users visit a URL
 // in their browser to authenticate), then all clients log out and log back in as a different user.
 //
-// This test validates the "user switching" behavior in headscale's web authentication flow:
+// This test validates the "user switching" behavior in slopscale's web authentication flow:
 // - Multiple clients authenticate via web flow, each to their respective users (user1, user2)
 // - All clients log out simultaneously
 // - All clients log back in via web flow, but this time they all authenticate as user1
@@ -228,10 +228,10 @@ func TestAuthWebFlowLogoutAndReloginSameUser(t *testing.T) {
 // - The test verifies network connectivity works after the user switch
 //
 // This scenario is important for organizations that need to reassign devices between users
-// or when consolidating multiple user accounts. It ensures that headscale properly handles
+// or when consolidating multiple user accounts. It ensures that slopscale properly handles
 // the security implications of user switching while maintaining node persistence in the database.
 //
-// The test uses headscale's web authentication flow, which is the most user-friendly method
+// The test uses slopscale's web authentication flow, which is the most user-friendly method
 // where authentication happens through a web browser rather than pre-shared keys or OIDC.
 func TestAuthWebFlowLogoutAndReloginNewUser(t *testing.T) {
 	IntegrationSkip(t)
@@ -246,11 +246,11 @@ func TestAuthWebFlowLogoutAndReloginNewUser(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnvWithLoginURL(
+	err = scenario.CreateSlopscaleEnvWithLoginURL(
 		nil,
 		hsic.WithTestName("webflowrelnewuser"),
 	)
-	requireNoErrHeadscaleEnv(t, err)
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -265,14 +265,14 @@ func TestAuthWebFlowLogoutAndReloginNewUser(t *testing.T) {
 	err = scenario.WaitForTailscaleSync()
 	requireNoErrSync(t, err)
 
-	headscale, err := scenario.Headscale()
-	requireNoErrGetHeadscale(t, err)
+	slopscale, err := scenario.Slopscale()
+	requireNoErrGetSlopscale(t, err)
 
 	// Collect expected node IDs for validation
 	expectedNodes := collectExpectedNodeIDs(t, allClients)
 
 	// Validate initial connection state
-	validateInitialConnection(t, headscale, expectedNodes)
+	validateInitialConnection(t, slopscale, expectedNodes)
 
 	var listNodes []*clientv1.Node
 
@@ -280,7 +280,7 @@ func TestAuthWebFlowLogoutAndReloginNewUser(t *testing.T) {
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		var listNodesErr error
 
-		listNodes, listNodesErr = headscale.ListNodes()
+		listNodes, listNodesErr = slopscale.ListNodes()
 		assert.NoError(ct, listNodesErr, "Failed to list nodes after initial web authentication")
 		assert.Len(
 			ct,
@@ -311,7 +311,7 @@ func TestAuthWebFlowLogoutAndReloginNewUser(t *testing.T) {
 	requireNoErrLogout(t, err)
 
 	// Validate that all nodes are offline after logout
-	validateLogoutComplete(t, headscale, expectedNodes)
+	validateLogoutComplete(t, slopscale, expectedNodes)
 
 	t.Logf("all clients logged out")
 
@@ -320,7 +320,7 @@ func TestAuthWebFlowLogoutAndReloginNewUser(t *testing.T) {
 	// This tests the cross-user re-authentication behavior where ALL clients
 	// (including those originally from user2) are registered to user1
 	for _, client := range allClients {
-		loginURL, getEndpointErr := client.LoginWithURL(headscale.GetEndpoint())
+		loginURL, getEndpointErr := client.LoginWithURL(slopscale.GetEndpoint())
 		if getEndpointErr != nil {
 			t.Fatalf("failed to get login URL for client %s: %s", client.Hostname(), getEndpointErr)
 		}
@@ -331,8 +331,8 @@ func TestAuthWebFlowLogoutAndReloginNewUser(t *testing.T) {
 		}
 
 		// Register all clients as user1 (this is where cross-user registration happens)
-		// This simulates: headscale auth register --auth-id <id> --user user1
-		_ = scenario.runHeadscaleRegister("user1", body)
+		// This simulates: slopscale auth register --auth-id <id> --user user1
+		_ = scenario.runSlopscaleRegister("user1", body)
 	}
 
 	// Wait for all clients to reach running state
@@ -351,7 +351,7 @@ func TestAuthWebFlowLogoutAndReloginNewUser(t *testing.T) {
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		var listNodesErr error
 
-		user1Nodes, listNodesErr = headscale.ListNodes("user1")
+		user1Nodes, listNodesErr = slopscale.ListNodes("user1")
 		assert.NoError(ct, listNodesErr, "Failed to list nodes for user1 after web flow relogin")
 		assert.Len(
 			ct,
@@ -374,7 +374,7 @@ func TestAuthWebFlowLogoutAndReloginNewUser(t *testing.T) {
 	}
 
 	// Validate connection state after relogin as user1
-	validateReloginComplete(t, headscale, expectedUser1Nodes)
+	validateReloginComplete(t, slopscale, expectedUser1Nodes)
 
 	// Validate that user2's old nodes still exist in database (but are expired/offline)
 	// When CLI registration creates new nodes for user1, user2's old nodes remain
@@ -387,7 +387,7 @@ func TestAuthWebFlowLogoutAndReloginNewUser(t *testing.T) {
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		var listNodesErr error
 
-		user2Nodes, listNodesErr = headscale.ListNodes("user2")
+		user2Nodes, listNodesErr = slopscale.ListNodes("user2")
 		assert.NoError(ct, listNodesErr, "Failed to list nodes for user2 after CLI registration to user1")
 		assert.Len(
 			ct,

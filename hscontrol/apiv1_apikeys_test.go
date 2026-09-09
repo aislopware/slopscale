@@ -13,7 +13,7 @@ import (
 
 // seedAPIKey creates a single API key and returns its database ID and the
 // masked display prefix the API exposes, so tests can address it by either.
-func seedAPIKey(t *testing.T, app *Headscale) (uint64, string) {
+func seedAPIKey(t *testing.T, app *Slopscale) (uint64, string) {
 	t.Helper()
 
 	_, key, err := app.state.CreateAPIKey(nil)

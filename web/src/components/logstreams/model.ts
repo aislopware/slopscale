@@ -19,7 +19,7 @@ const fallbackDestination: DestinationOption = {
   label: "HTTP (JSON)",
   description:
     "A JSON array of entries with a bearer token, for collectors such as Cribl, Panther, Vector or Fluent Bit.",
-  placeholder: "https://collector.example.com/headscale",
+  placeholder: "https://collector.example.com/slopscale",
   tokenLabel: "Bearer token",
   tokenRequired: false,
 };
@@ -39,7 +39,7 @@ export const destinationOptions: readonly DestinationOption[] = [
     value: "elastic",
     label: "Elasticsearch",
     description: "A bulk request to the index named in the URL.",
-    placeholder: "https://es.example.com:9200/headscale-audit/_bulk",
+    placeholder: "https://es.example.com:9200/slopscale-audit/_bulk",
     tokenLabel: "API key",
     tokenRequired: false,
   },
@@ -55,7 +55,7 @@ export const destinationOptions: readonly DestinationOption[] = [
     value: "axiom",
     label: "Axiom",
     description: "A dataset's ingest endpoint.",
-    placeholder: "https://api.axiom.co/v1/datasets/headscale/ingest",
+    placeholder: "https://api.axiom.co/v1/datasets/slopscale/ingest",
     tokenLabel: "API token",
     tokenRequired: true,
   },

@@ -1,17 +1,17 @@
 ---
-site_name: Headscale
-site_url: https://juanfont.github.io/headscale/
+site_name: Slopscale
+site_url: https://aislopware.github.io/slopscale/
 edit_uri: blob/main/docs/
-site_author: Headscale authors
+site_author: Slopscale authors
 site_description: >-
-  An open source, self-hosted implementation of the Tailscale control server.
+  A fork of headscale, the open source Tailscale control server, with a built-in admin console.
 
 # Repository
-repo_name: juanfont/headscale
-repo_url: https://github.com/juanfont/headscale
+repo_name: aislopware/slopscale
+repo_url: https://github.com/aislopware/slopscale
 
 # Copyright
-copyright: Copyright &copy; 2026 Headscale authors
+copyright: Copyright &copy; 2026 Slopscale authors
 
 # Configuration
 theme:
@@ -59,7 +59,7 @@ theme:
     text: Roboto
     code: Roboto Mono
   favicon: assets/favicon.png
-  logo: assets/logo/headscale3-dots.svg
+  logo: assets/logo/slopscale-mark.svg
 
 # Excludes
 exclude_docs: |
@@ -93,7 +93,6 @@ plugins:
         remote-cli.md: ref/api.md#remote-control
         reverse-proxy.md: ref/integration/reverse-proxy.md
         tls.md: ref/tls.md
-        web-ui.md: ref/integration/web-ui.md
         windows-client.md: usage/connect/windows.md
 
 # Customization
@@ -105,14 +104,10 @@ extra:
     json: [.s2]
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/juanfont/headscale
-    - icon: material/coffee
-      link: https://ko-fi.com/headscale
+      link: https://github.com/aislopware/slopscale
     - icon: fontawesome/brands/docker
-      link: https://github.com/juanfont/headscale/pkgs/container/headscale
-    - icon: fontawesome/brands/discord
-      link: https://discord.gg/c84AZQhmpx
-  headscale:
+      link: https://github.com/aislopware/slopscale/pkgs/container/slopscale
+  slopscale:
     version: 0.29.3
 
 # Extensions
@@ -164,13 +159,11 @@ nav:
       - Getting help: about/help.md
       - Releases: about/releases.md
       - Contributing: about/contributing.md
-      - Sponsor: about/sponsor.md
 
   - Setup:
       - Requirements and Assumptions: setup/requirements.md
       - Installation:
           - Official releases: setup/install/official.md
-          - Community packages: setup/install/community.md
           - Container: setup/install/container.md
           - Build from source: setup/install/source.md
           - Development builds: setup/install/main.md
@@ -208,5 +201,3 @@ nav:
       - Debug: ref/debug.md
       - Integration:
           - Reverse proxy: ref/integration/reverse-proxy.md
-          - Web UI: ref/integration/web-ui.md
-          - Tools: ref/integration/tools.md

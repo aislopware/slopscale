@@ -4,8 +4,8 @@ import (
 	"net/netip"
 	"slices"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"tailscale.com/tailcfg"
 )
 

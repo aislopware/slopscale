@@ -1,5 +1,5 @@
 #!/bin/sh
-# postinst script for headscale.
+# postinst script for slopscale.
 
 set -e
 
@@ -15,35 +15,35 @@ set -e
 # for details, see https://www.debian.org/doc/debian-policy/ or
 # the debian-policy package.
 
-HEADSCALE_USER="headscale"
-HEADSCALE_GROUP="headscale"
-HEADSCALE_HOME_DIR="/var/lib/headscale"
-HEADSCALE_SHELL="/usr/sbin/nologin"
-HEADSCALE_SERVICE="headscale.service"
+SLOPSCALE_USER="slopscale"
+SLOPSCALE_GROUP="slopscale"
+SLOPSCALE_HOME_DIR="/var/lib/slopscale"
+SLOPSCALE_SHELL="/usr/sbin/nologin"
+SLOPSCALE_SERVICE="slopscale.service"
 
 case "$1" in
     configure)
-      groupadd --force --system "$HEADSCALE_GROUP"
-      if ! id -u "$HEADSCALE_USER" >/dev/null 2>&1; then
-        useradd --system --shell "$HEADSCALE_SHELL" \
-          --gid "$HEADSCALE_GROUP" --home-dir "$HEADSCALE_HOME_DIR" \
-          --comment "headscale default user" "$HEADSCALE_USER"
+      groupadd --force --system "$SLOPSCALE_GROUP"
+      if ! id -u "$SLOPSCALE_USER" >/dev/null 2>&1; then
+        useradd --system --shell "$SLOPSCALE_SHELL" \
+          --gid "$SLOPSCALE_GROUP" --home-dir "$SLOPSCALE_HOME_DIR" \
+          --comment "slopscale default user" "$SLOPSCALE_USER"
       fi
 
       # Enable service and keep track of its state
-      if deb-systemd-helper --quiet was-enabled "$HEADSCALE_SERVICE"; then
-        deb-systemd-helper enable "$HEADSCALE_SERVICE" >/dev/null || true
+      if deb-systemd-helper --quiet was-enabled "$SLOPSCALE_SERVICE"; then
+        deb-systemd-helper enable "$SLOPSCALE_SERVICE" >/dev/null || true
       else
-        deb-systemd-helper update-state "$HEADSCALE_SERVICE" >/dev/null || true
+        deb-systemd-helper update-state "$SLOPSCALE_SERVICE" >/dev/null || true
       fi
 
       # Bounce service
       if [ -d /run/systemd/system ]; then
         systemctl --system daemon-reload >/dev/null || true
         if [ -n "$2" ]; then
-          deb-systemd-invoke restart "$HEADSCALE_SERVICE" >/dev/null || true
+          deb-systemd-invoke restart "$SLOPSCALE_SERVICE" >/dev/null || true
         else
-          deb-systemd-invoke start "$HEADSCALE_SERVICE" >/dev/null || true
+          deb-systemd-invoke start "$SLOPSCALE_SERVICE" >/dev/null || true
         fi
       fi
     ;;

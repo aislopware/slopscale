@@ -14,15 +14,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/db"
+	hsstate "github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/templates"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/hashicorp/golang-lru/v2/expirable"
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/db"
-	hsstate "github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/templates"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
-	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/oauth2"
 	"tailscale.com/util/rands"
@@ -97,7 +97,7 @@ type AuthInfo struct {
 }
 
 type AuthProviderOIDC struct {
-	h         *Headscale
+	h         *Slopscale
 	serverURL string
 	cfg       *types.OIDCConfig
 
@@ -112,7 +112,7 @@ type AuthProviderOIDC struct {
 
 func NewAuthProviderOIDC(
 	ctx context.Context,
-	h *Headscale,
+	h *Slopscale,
 	serverURL string,
 	cfg *types.OIDCConfig,
 ) (*AuthProviderOIDC, error) {
@@ -440,7 +440,7 @@ func doOIDCAuthorization(
 // rendered the interstitial. It includes a per-session prefix derived
 // from the auth ID so cookies for unrelated registrations on the same
 // browser do not collide.
-const registerConfirmCSRFCookie = "headscale_register_confirm"
+const registerConfirmCSRFCookie = "slopscale_register_confirm"
 
 // setRegisterConfirmCookie writes the per-session register-confirm CSRF
 // cookie. Pass the CSRF token and authCacheExpiration seconds to set it;
@@ -589,7 +589,7 @@ func (a *AuthProviderOIDC) RegisterConfirmHandler(
 
 // cookiesSecure reports whether the OIDC cookies should carry the Secure flag.
 // It keys off the configured server_url scheme, not req.TLS, so cookies stay
-// Secure behind a TLS-terminating reverse proxy (where the proxy→Headscale hop
+// Secure behind a TLS-terminating reverse proxy (where the proxy→Slopscale hop
 // is plain HTTP and req.TLS is nil). Deriving it from config avoids trusting a
 // spoofable X-Forwarded-Proto header.
 func (a *AuthProviderOIDC) cookiesSecure() bool {
@@ -1181,14 +1181,14 @@ func renderRegistrationSuccessTemplate(
 	newNode bool,
 ) *bytes.Buffer {
 	result := templates.AuthSuccessResult{
-		Title:   "Headscale - Node Reauthenticated",
+		Title:   "Slopscale - Node Reauthenticated",
 		Heading: "Node reauthenticated",
 		Verb:    "Reauthenticated",
 		User:    user.Display(),
 		Message: "You can now close this window.",
 	}
 	if newNode {
-		result.Title = "Headscale - Node Registered"
+		result.Title = "Slopscale - Node Registered"
 		result.Heading = "Node registered"
 		result.Verb = "Registered"
 	}
@@ -1200,7 +1200,7 @@ func renderAuthSuccessTemplate(
 	user *types.User,
 ) *bytes.Buffer {
 	result := templates.AuthSuccessResult{
-		Title:   "Headscale - SSH Session Authorized",
+		Title:   "Slopscale - SSH Session Authorized",
 		Heading: "SSH session authorized",
 		Verb:    "Authorized",
 		User:    user.Display(),

@@ -4,14 +4,14 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestOIDCGroupSync mirrors the identity provider's groups claim into
-// headscale groups: the first login creates the claimed groups with the
+// slopscale groups: the first login creates the claimed groups with the
 // user in them, a later login with a different claim moves the user, and
 // the console cannot edit the users of a synced group.
 func TestOIDCGroupSync(t *testing.T) {

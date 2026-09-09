@@ -4,12 +4,30 @@
 
 **Minimum supported Tailscale client version: v1.82.0**
 
+### Renamed to slopscale
+
+This fork of headscale is now called slopscale, and every name follows. The
+binary and the CLI are `slopscale`, the config directory is `/etc/slopscale`,
+the data directory is `/var/lib/slopscale`, the socket is
+`/var/run/slopscale/slopscale.sock`, the environment prefix is `SLOPSCALE_`,
+the Debian package, its system user and the systemd unit are `slopscale`, the
+container image is `ghcr.io/aislopware/slopscale`, the NixOS module is
+`services.slopscale` and the Go module is `github.com/aislopware/slopscale`.
+The SSH recorder joins the tailnet as `slopscale-recorder` with the tag
+`tag:slopscale-recorder`. Nothing changes inside the database.
+
+An operator upgrading in place moves `/etc/headscale` and `/var/lib/headscale`
+to the new directories, or points `database.sqlite.path` and the recording
+directories at the old ones, renames `HEADSCALE_*` variables and replaces
+`tag:headscale-recorder` in the policy. The console forgets the chosen theme
+once, because its storage key moved.
+
 ### v1 REST API replaced; gRPC and Protobuf removed
 
 The v1 REST API now provides an OpenAPI 3.1 specification at
 `/api/v1/openapi.yaml`, with interactive documentation at `/api/v1/docs`. This
 replaces the Swagger 2.0 document and the `/swagger` UI. The Protobuf, gRPC and
-grpc-gateway stack behind it is gone, and the `headscale` CLI now talks to the
+grpc-gateway stack behind it is gone, and the `slopscale` CLI now talks to the
 HTTP API directly.
 
 [#3324](https://github.com/juanfont/headscale/pull/3324)
@@ -20,10 +38,10 @@ The v2 API now authenticates with OAuth 2.0 client-credentials, the way the
 Tailscale ecosystem does. An OAuth client mints short-lived access tokens whose
 scopes limit which operations they may perform and whose tags limit the devices
 they may create, so a credential can be issued with only the access it needs.
-The `headscale oauth-clients` command and the console's _Keys_ page manage
+The `slopscale oauth-clients` command and the console's _Keys_ page manage
 them, and the v1 API lists, creates and revokes them at `/api/v1/oauth-client`.
 This lets the Tailscale Terraform provider and Kubernetes operator drive
-Headscale unchanged; admin API keys remain all-access.
+Slopscale unchanged; admin API keys remain all-access.
 
 [#3334](https://github.com/juanfont/headscale/pull/3334)
 
@@ -32,9 +50,9 @@ Headscale unchanged; admin API keys remain all-access.
 Every user now has a role, one of `owner`, `admin`, `network-admin`, `it-admin`,
 `auditor` and `member`, that bounds what the user may do through the admin API,
 following Tailscale's user roles. The first user of a fresh server becomes the
-owner; existing users start as members, and `headscale users set-role` picks an
+owner; existing users start as members, and `slopscale users set-role` picks an
 owner and assigns the rest. An API key created for a user
-(`headscale apikeys create --user`) is bounded by that user's role, on the v1 and
+(`slopscale apikeys create --user`) is bounded by that user's role, on the v1 and
 v2 APIs alike; keys without a user keep their all-access meaning. A key can
 further be limited to some operations with `--scope` (or the scope picker on
 the console's _Keys_ page) and carry a `--description`; scopes never reach past
@@ -43,30 +61,30 @@ passes its own on, and an OAuth token cannot mint API keys. The policy
 gains `autogroup:owner`, `autogroup:admin`, `autogroup:network-admin`,
 `autogroup:it-admin` and `autogroup:auditor`, and the devices of the owner and
 admins carry Tailscale's `is-admin` capability. See
-[User roles](https://headscale.net/development/ref/roles/).
+[User roles](https://aislopware.github.io/slopscale/development/ref/roles/).
 
 ### Device and user approval
 
 Two tailnet-wide settings put an administrator between a node or user and the
 tailnet, following Tailscale's device approval and user approval. With
 `devicesApprovalOn`, a newly registered node waits until
-`headscale nodes approve` admits it. It has no peers, no peer sees it and the
+`slopscale nodes approve` admits it. It has no peers, no peer sees it and the
 client shows it as needing machine authorization. The wait is skipped when it
 registered with a preauthorized pre-auth key (the default for keys,
 `--preauthorized=false` opts out). With
 `usersApprovalOn`, a user created by an OpenID Connect login cannot register
-nodes until `headscale users approve` admits them. Both switches are off after
+nodes until `slopscale users approve` admits them. Both switches are off after
 an upgrade and everything that exists counts as approved; switching one off
-approves everything that was waiting. `headscale settings` manages the
+approves everything that was waiting. `slopscale settings` manages the
 switches, and the v2 API's `authorized` device flag, `needs-approval` user
 status, `preauthorized` key capability and tailnet settings `PATCH` now carry
 real meaning, so Tailscale tooling can drive approval. See
-[Device and user approval](https://headscale.net/development/ref/approval/).
+[Device and user approval](https://aislopware.github.io/slopscale/development/ref/approval/).
 
 ### Node sharing
 
 A user can share one of their nodes with another user, following Tailscale's
-node sharing: `headscale nodes share --identifier <node> --user <user id>` (or
+node sharing: `slopscale nodes share --identifier <node> --user <user id>` (or
 `POST /api/v1/node/{id}/share`), which a member may do for the nodes they own.
 The policy decides what a share allows through the new `autogroup:shared`
 source, which stands, per destination node, for the personal devices of the
@@ -74,17 +92,17 @@ users that node is shared with; the destination is always narrowed to the
 shared node, so a share never opens anything else. The sharee's devices see the
 node as a peer marked with the owner as sharer, the shared node gets no access
 back, and a policy that never names `autogroup:shared` ignores shares. See
-[Node sharing](https://headscale.net/development/ref/sharing/).
+[Node sharing](https://aislopware.github.io/slopscale/development/ref/sharing/).
 
 ### DNS settings at runtime
 
 The DNS configuration no longer needs a restart. Global nameservers, override
 local DNS, split DNS, search domains and extra records can be changed from the
-admin console's _DNS_ page, `headscale dns set`, `PUT /api/v1/dns` or
+admin console's _DNS_ page, `slopscale dns set`, `PUT /api/v1/dns` or
 Tailscale's `/api/v2/tailnet/-/dns/*` endpoints, and reach every client at
 once; MagicDNS and the base domain stay in the configuration file. Settings set
 this way are stored in the database, replace the file's `dns` section until
-`headscale dns reset` (or `DELETE /api/v1/dns`) returns to it, and are logged as
+`slopscale dns reset` (or `DELETE /api/v1/dns`) returns to it, and are logged as
 `dns.set` and `dns.reset`. The new `dns` and `dns:read` scopes gate them; a
 network admin may write, an IT admin may read. Only what the Tailscale
 client can use is accepted: a nameserver is an IP, an IP with port, or the
@@ -93,8 +111,8 @@ NextDNS and the like), and extra records are A or AAAA. An extra-records file
 (`dns.extra_records_path`) keeps owning the records while the rest is edited.
 Split DNS can also be handed to some groups only: a group DNS rule names
 domains, nameservers and the groups whose machines receive them, from the
-console's _DNS_ page, `headscale dns rules` or `/api/v1/dns/rule`. See
-[DNS](https://headscale.net/development/ref/dns/).
+console's _DNS_ page, `slopscale dns rules` or `/api/v1/dns/rule`. See
+[DNS](https://aislopware.github.io/slopscale/development/ref/dns/).
 
 ### DERP relays at runtime, embedded relay on by default
 
@@ -108,9 +126,9 @@ old behaviour. The relay settings no longer need a restart either: the map
 URLs, the refetch schedule, the embedded relay (on, off, region, STUN
 address, published addresses, client verification) and relays you run
 yourself can be changed from the admin console's _Relays_ page,
-`headscale derp set`, `headscale derp relay add`, or `PUT /api/v1/derp`,
+`slopscale derp set`, `slopscale derp relay add`, or `PUT /api/v1/derp`,
 and reach every machine at once. Settings set this way are stored in the
-database, replace the file's `derp` section until `headscale derp reset`
+database, replace the file's `derp` section until `slopscale derp reset`
 (or `DELETE /api/v1/derp`) returns to it, and are logged as `derp.set`,
 `derp.refresh` and `derp.reset`. The `feature_settings` and
 `feature_settings:read` scopes gate them. A change fetches the maps first
@@ -125,7 +143,7 @@ verification on drops the machines connected to it, so they reconnect
 under the new rule; a request that leaves `verifyClients` out gets
 verification on; and a fetched map with a broken relay entry is served
 without it rather than failing the refresh. See
-[DERP](https://headscale.net/development/ref/derp/).
+[DERP](https://aislopware.github.io/slopscale/development/ref/derp/).
 
 - `GET /api/v1/derp` returns an `ETag` for the settings in force and
   `PUT /api/v1/derp` accepts it back as `If-Match`: when someone else changed
@@ -145,9 +163,9 @@ ports, one way or both ways. Rules only allow; the first enabled rule makes
 everything else unreachable, and rules combine with the policy file when
 there is one. Pre-auth keys can carry groups so the machines they register
 join them. Manage it all from the console's _Access controls_ page, with
-`headscale groups` and `headscale access-rules`, or through `/api/v1/group`
+`slopscale groups` and `slopscale access-rules`, or through `/api/v1/group`
 and `/api/v1/access-rule`. See
-[Groups and access rules](https://headscale.net/development/ref/access-control/).
+[Groups and access rules](https://aislopware.github.io/slopscale/development/ref/access-control/).
 
 A new server no longer starts open. The builtin group _Own machines_ is
 Tailscale's `autogroup:self`, a rule destination meaning the machines owned
@@ -161,17 +179,17 @@ cut anything off.
 
 ### Key expiry setting and server info
 
-`headscale settings set --key-expiry-days` (or `keyExpiryDays` on
+`slopscale settings set --key-expiry-days` (or `keyExpiryDays` on
 `/api/v1/settings`, `devicesKeyDurationDays` on the v2 tailnet settings)
 caps how long a login stays valid, the way Tailscale's key expiry setting
 does, without a config change or restart. `GET /api/v1/server` reports the
 build, addresses, DERP regions and config file values of the running server,
 and the console's _Settings_ page shows both. See
-[Device and user approval](https://headscale.net/development/ref/approval/#key-expiry).
+[Device and user approval](https://aislopware.github.io/slopscale/development/ref/approval/#key-expiry).
 
 ### Webhooks
 
-Headscale can now post events to your own endpoints or to a Slack,
+Slopscale can now post events to your own endpoints or to a Slack,
 Mattermost, Google Chat or Discord incoming webhook: a machine joining,
 needing approval, being approved, expiring or being removed, a user being
 created, approved, changing role or being deleted, and policy changes
@@ -185,9 +203,9 @@ hundred deliveries with status, attempts and timing. Deliveries are posted to
 the configured URL only (no redirects), at most sixteen at a time from a
 bounded queue, and logs and audit entries carry the endpoint's host rather
 than the URL, which for chat providers is a credential. Manage them from the
-console's _Webhooks_ page, with `headscale webhooks`, or through
+console's _Webhooks_ page, with `slopscale webhooks`, or through
 `/api/v1/webhook`. See
-[Webhooks](https://headscale.net/development/ref/webhooks/).
+[Webhooks](https://aislopware.github.io/slopscale/development/ref/webhooks/).
 
 ### Device trust
 
@@ -195,7 +213,7 @@ A machine can be suspended: it stays registered with its key and addresses
 but loses every peer and cannot reach the tailnet, and its client shows a
 health message saying so, until an administrator lifts the suspension.
 Nobody has to sign in on the device afterwards, which makes it the
-reversible alternative to expiring the key. `headscale nodes suspend`,
+reversible alternative to expiring the key. `slopscale nodes suspend`,
 `POST /api/v1/node/{id}/suspend`, the machine's menu and danger zone in the
 console, the `node.suspension.set` audit action and the `nodeSuspended` and
 `nodeUnsuspended` webhook events cover it.
@@ -207,7 +225,7 @@ new `postureIdentityOn` setting lets the server ask clients for their
 identity, and `custom:...` attributes an operator sets with an optional
 expiry, so a temporary marker such as an on-call rotation removes itself.
 `GET /api/v1/node/{id}/posture`, `PUT` and `DELETE /api/v1/node/{id}/attributes/{key}`, Tailscale's
-`/api/v2/device/{id}/attributes`, `headscale nodes posture` and a _Device
+`/api/v2/device/{id}/attributes`, `slopscale nodes posture` and a _Device
 posture_ section on the machine's page in the console cover it, under the
 new `devices:posture_attributes` scope.
 
@@ -222,10 +240,10 @@ satisfy it, and the policy recomputes itself when an attribute, the source
 address or a schedule boundary changes. The policy file takes Tailscale's
 `postures`, `srcPosture` and `defaultSrcPosture` as well. `/api/v1/posture`,
 `POST /api/v1/posture/check`, `GET /api/v1/node/{id}/postures`,
-`headscale postures`, the `--posture` flag of `headscale access-rules`, a
+`slopscale postures`, the `--posture` flag of `slopscale access-rules`, a
 _Postures_ page and a _Required postures_ picker in the console's access
 controls cover it. See
-[Device trust](https://headscale.net/development/ref/device-trust/).
+[Device trust](https://aislopware.github.io/slopscale/development/ref/device-trust/).
 
 ### Temporary access
 
@@ -238,14 +256,14 @@ thirty days, for one machine or all of theirs, with a reason; anyone with
 the `policy_file` scope approves for the duration asked or another one,
 or denies with a note, and the membership is added with its expiry at
 once. The server sweeps expired rules and memberships every minute and
-rebuilds the policy. `--expires` on `headscale access-rules` and
-`headscale groups add-node|add-user`, `--requestable` on
-`headscale groups`, `headscale access-requests`,
+rebuilds the policy. `--expires` on `slopscale access-rules` and
+`slopscale groups add-node|add-user`, `--requestable` on
+`slopscale groups`, `slopscale access-requests`,
 `/api/v1/access-request`, the `accessRequestCreated`,
 `accessRequestApproved` and `accessRequestDenied` webhook events, the
 `access_request.*` audit actions, a _My access_ page for every signed-in
 user and a _Requests_ page under the console's access controls cover it.
-See [Temporary access](https://headscale.net/development/ref/temporary-access/).
+See [Temporary access](https://aislopware.github.io/slopscale/development/ref/temporary-access/).
 
 ### Notifications and log streaming
 
@@ -262,20 +280,20 @@ URL and a credential, and every audit event is batched and posted in the
 shape that sink expects, with retries, counters of delivered and dropped
 entries and a test entry on demand. The `logs:configuration` scope, held by
 every admin role, manages streams; `logs:configuration:read` lists them
-without their tokens. `headscale log-streams`, `/api/v1/log-stream` and a
+without their tokens. `slopscale log-streams`, `/api/v1/log-stream` and a
 _Log streams_ tab on the console's _Integrations_ page (formerly _Webhooks_)
-cover it. See [Log streaming](https://headscale.net/development/ref/log-streaming/)
-and [Webhooks](https://headscale.net/development/ref/webhooks/#notifications).
+cover it. See [Log streaming](https://aislopware.github.io/slopscale/development/ref/log-streaming/)
+and [Webhooks](https://aislopware.github.io/slopscale/development/ref/webhooks/#notifications).
 
 ### SSH session recording
 
 Tailscale SSH sessions can be recorded, the way Tailscale's session
 recording works. `ssh_recording.enabled` in the config file runs a recorder
-inside the server: it joins the tailnet as `headscale-recorder`
-(`tag:headscale-recorder`), takes the upload every machine's client sends
+inside the server: it joins the tailnet as `slopscale-recorder`
+(`tag:slopscale-recorder`), takes the upload every machine's client sends
 when a session starts, stores one asciinema file per session under
 `ssh_recording.dir`, and deletes them after `ssh_recording.retention`. The
-tailnet default recorders are a setting (`headscale settings set --ssh-recorders tag:recorder`, `sshRecorders` in `/api/v1/settings`, the
+tailnet default recorders are a setting (`slopscale settings set --ssh-recorders tag:recorder`, `sshRecorders` in `/api/v1/settings`, the
 _SSH session recording_ section of the console's _Settings_ page), an SSH
 rule may name its own with `recorder` and require it with
 `enforceRecorder`, and the tailnet-wide `sshRecordingEnforce` switch
@@ -284,9 +302,9 @@ recorder: the server adds a grant to every recorder's port. A client
 reports a failed recording to `/machine/ssh/event`, which lands in the
 audit log as `ssh.recording.*` and fires the `sshRecordingFailed` webhook
 event. Recordings are listed, downloaded and deleted from the console's _SSH
-sessions_ page, `headscale ssh-recordings` and `/api/v1/ssh-recording`
+sessions_ page, `slopscale ssh-recordings` and `/api/v1/ssh-recording`
 under the `logs:configuration` scopes. See [SSH session
-recording](https://headscale.net/development/ref/ssh-recording/).
+recording](https://aislopware.github.io/slopscale/development/ref/ssh-recording/).
 
 ### HTTPS certificates
 
@@ -299,7 +317,7 @@ token), `rfc2136` (dynamic update, TSIG-signed) or `command` (a program
 given the record name and value). A machine may publish only its own
 name's challenge record, and each one lands in the audit log as
 `node.cert_challenge`. The base domain must be a public zone. See [HTTPS
-certificates](https://headscale.net/development/ref/https-certificates/).
+certificates](https://aislopware.github.io/slopscale/development/ref/https-certificates/).
 
 ### Networks
 
@@ -313,18 +331,18 @@ without a policy file. Two routers make a failover pair. A network can narrow
 what its groups reach behind the routers to a protocol and ports, the way an
 access rule does, so a printer subnet can be handed out on TCP 631 alone.
 Manage networks from the console's _Networks_ page, with every route any
-machine advertises on the _Routes_ page next to it, with `headscale networks`, or through
-`/api/v1/network`. See [Networks](https://headscale.net/development/ref/networks/).
+machine advertises on the _Routes_ page next to it, with `slopscale networks`, or through
+`/api/v1/network`. See [Networks](https://aislopware.github.io/slopscale/development/ref/networks/).
 
 ### Global exit node
 
-`headscale nodes global-exit-node --identifier <node>` (or
+`slopscale nodes global-exit-node --identifier <node>` (or
 `POST /api/v1/node/{id}/global-exit-node`) marks an exit node every client is
 told to prefer, with no policy involved: its exit routes are approved, the
 marked nodes alone carry `suggest-exit-node` on every other client's view of
 them and every node carries `auto-exit-node`, so `tailscale exit-node suggest`
 names one and clients set to `--exit-node=auto:any` pick it. See
-[Global exit node](https://headscale.net/development/ref/routes/#global-exit-node).
+[Global exit node](https://aislopware.github.io/slopscale/development/ref/routes/#global-exit-node).
 
 ### Admin console
 
@@ -352,7 +370,7 @@ colours and checks expressions the same way. URLs show their host in the
 foreground. Copyable values keep their copy icon in view. There is a dark mode. It signs
 in only through the configured identity
 provider (Google, or any OIDC issuer) and shows what that user's role allows.
-_Settings_ carries the IP backfill (`headscale nodes backfillips`).
+_Settings_ carries the IP backfill (`slopscale nodes backfillips`).
 Long tables page at fifty rows, with the page size and the page controls
 on the band under the rows, scroll sideways on a phone with the row menu
 kept in reach, and figures line up on the right; the page is the only thing
@@ -373,15 +391,15 @@ says why on hover, the theme is a Light, Dark, System menu, and dates are
 picked with a calendar rather than the browser's own field.
 Release binaries and container images include it. When building from source,
 run `make web` before `make build`.
-See [Admin console](https://headscale.net/development/ref/console/).
+See [Admin console](https://aislopware.github.io/slopscale/development/ref/console/).
 
 ### Audit log
 
 Every writing API request, whether from the CLI, the console or a script, is
 recorded with who made it, what it touched and how it ended, alongside console
-sign-ins. Read it with `headscale audit list`, `GET /api/v1/audit` or the
+sign-ins. Read it with `slopscale audit list`, `GET /api/v1/audit` or the
 console's _Audit log_ page; bound it with `audit.retention`. See
-[Audit log](https://headscale.net/development/ref/audit/).
+[Audit log](https://aislopware.github.io/slopscale/development/ref/audit/).
 
 The log can be downloaded as a file: `GET /api/v1/audit/export` takes the same
 filters as the list plus `format=csv|json` and streams every matching event,
@@ -390,7 +408,7 @@ reads the log in pages while it writes, so a long export does not build up in
 memory; one export carries at most 100000 events, so narrow `since` and
 `until` to walk a longer log. It needs the same `logs:configuration:read`
 scope as reading the list. The console's _Audit log_ page has an _Export_
-button and `headscale audit export` writes the file from the CLI.
+button and `slopscale audit export` writes the file from the CLI.
 
 ### Console sessions and user invites
 
@@ -401,11 +419,11 @@ request. An administrator can end any session with
 `DELETE /api/v1/auth/sessions/{id}` or sign a user out of every browser with
 `DELETE /api/v1/user/{id}/sessions` (_Sign out everywhere_ on the console's
 user page); a member sees and ends only their own. From the CLI these are
-`headscale sessions list`, `headscale sessions end` and
-`headscale users sign-out`. Both are recorded in the audit log as
+`slopscale sessions list`, `slopscale sessions end` and
+`slopscale users sign-out`. Both are recorded in the audit log as
 `session.end` and `user.sessions.end`.
 
-Users can be invited by email. `POST /api/v1/invite`, `headscale invites
+Users can be invited by email. `POST /api/v1/invite`, `slopscale invites
 create` or _Invite_ on the console's _Users_ page returns a one-time link and
 mails it to the address when `notifications.smtp` is configured. The first
 login that opens the link, or whose verified email matches the invitation,
@@ -414,12 +432,12 @@ role and groups. Invitations expire (seven days by default, thirty at most),
 can be revoked with `DELETE /api/v1/invite/{id}` and re-sent with a fresh link
 with `POST /api/v1/invite/{id}/resend`. An invitation cannot hand out
 ownership; transfer it instead. See
-[Console](https://headscale.net/development/ref/console/).
+[Console](https://aislopware.github.io/slopscale/development/ref/console/).
 
 ### API key rotation
 
 An API key can be rotated: `POST /api/v1/apikey/{prefix}/rotate`,
-`headscale apikeys rotate` or the _Rotate_ action on the console's _Keys_ page
+`slopscale apikeys rotate` or the _Rotate_ action on the console's _Keys_ page
 mints a new secret for an existing key and returns it once, while the key keeps
 its id, owner, scopes, description and expiry, so nothing that refers to the
 key has to be re-created. The old secret is refused from the moment the call
@@ -443,7 +461,7 @@ rotations are recorded in the audit log as `apikey.rotate`.
 #### CLI
 
 - `--output json` / `--output yaml` now emit the API's shape (camelCase fields, string-encoded IDs, RFC3339 timestamps) instead of the old Protobuf encoding [#3324](https://github.com/juanfont/headscale/pull/3324)
-- `headscale policy` renames the database-bypass flag from `--bypass-grpc-and-access-database-directly` to `--bypass-server-and-access-database-directly` [#3324](https://github.com/juanfont/headscale/pull/3324)
+- `slopscale policy` renames the database-bypass flag from `--bypass-grpc-and-access-database-directly` to `--bypass-server-and-access-database-directly` [#3324](https://github.com/juanfont/headscale/pull/3324)
 
 ### Changes
 
@@ -453,15 +471,15 @@ rotations are recorded in the audit log as `apikey.rotate`.
 - SQLite runs with a 64 MiB page cache per connection instead of SQLite's 2 MiB default
 - SQLite maps up to 256 MiB of the database file into memory (`mmap_size`) and keeps temporary tables in memory instead of on disk, so reads on a machine with spare RAM skip the page cache copy and sorts do not touch the disk. The lookups on the map request and registration paths (`nodes.node_key`, `nodes.machine_key`, `nodes.user_id`, `pre_auth_keys.key`) are indexed by a migration, which a large database on PostgreSQL will notice on every registration. The hot paths do less work per request: a node is read from the in-memory store without a copy, an unchanged Hostinfo is recognised without cloning it four times, the peer list is filtered through the policy once per map response instead of twice, the DERP map is shared instead of cloned into every full map, and a node's posture inputs are compared in place on every store write. `make build` now strips the binary like the release builds do
 - The in-memory node store no longer recomputes who may see whom on every write. A write that changes none of the inputs of that computation, which is every endpoint, DERP region or last-seen update, carries the previous peer map forward; only a new or deleted node, a change of tags, user, addresses, routes, shares, posture or approval, or a policy reload recomputes it. On a 1000-node tailnet that turns a 30 ms, 23 MiB rebuild per write into 1.6 ms and 1.5 MiB. The recompute itself is faster too: pairs are indexed by position instead of by map key (46% less time for 1000 nodes), the snapshot rebuild allocates a third of what it did, a map request from an unchanged address no longer queues a store write, a broadcast change is no longer copied once per connected node, and the poll session keeps a view of the node instead of cloning it. A server start runs the SQLite foreign key check only after a migration actually ran.
-- A DERP map source that cannot be reached no longer keeps the server from starting: the map is built from the local regions, the failure shows on the Relays page and in `headscale derp`, and the server retries every five minutes until a fetch succeeds. The retry runs off the scheduler, so an unreachable source no longer stalls key expiry and health checks for the length of its back-off.
+- A DERP map source that cannot be reached no longer keeps the server from starting: the map is built from the local regions, the failure shows on the Relays page and in `slopscale derp`, and the server retries every five minutes until a fetch succeeds. The retry runs off the scheduler, so an unreachable source no longer stalls key expiry and health checks for the length of its back-off.
 - Map responses cost less CPU and memory to build and send: the control protocol is encoded with Go's `encoding/json/v2` into pooled buffers, via grants are resolved once per policy change instead of once per viewer-peer pair, and the hot database statements are rendered once and only bound per call. A full map for a 100-node tailnet takes about 40% less CPU and 60% fewer allocations than before
-- `HEADSCALE_DEBUG_DEADLOCK` and `HEADSCALE_DEBUG_DEADLOCK_TIMEOUT` are removed; they configured a lock detector no lock used
+- `SLOPSCALE_DEBUG_DEADLOCK` and `SLOPSCALE_DEBUG_DEADLOCK_TIMEOUT` are removed; they configured a lock detector no lock used
 - SQLite is compiled in defensive mode with double-quoted string literals disabled (the flags in `sqlite.cflags`), so SQL that could corrupt the database file is refused and a mistyped `"identifier"` is an error rather than a silent string; a binary built without those flags still runs but logs a warning at startup
 - Expiring or deleting a non-existent pre-auth key now returns an error instead of silently succeeding [#3324](https://github.com/juanfont/headscale/pull/3324)
 - A machine that re-registers under a new hostname (`tailscale up --force-reauth` after a re-image) gets its MagicDNS name from the new hostname, as it does when the hostname changes on a running machine; a name an administrator chose is kept [#3432](https://github.com/juanfont/headscale/issues/3432)
 - The embedded DERP server's `/bootstrap-dns` now answers the `q` parameter a client sends when its own DNS is broken, and includes the control server's own address next to the DERP nodes, resolved every ten minutes instead of on every request. A client can therefore find the server through the DERP it still reaches by IP, which is what `tailscale switch` between two servers needs [#2757](https://github.com/juanfont/headscale/issues/2757)
 - Online peers now carry `LastSeen` in the map response and in the online and offline patches, as Tailscale's control plane sends it. The Apple clients on 1.102 read a peer without it as never seen and showed it offline in the peer list, and the `tailscale status` last-seen column was empty for online machines [#3415](https://github.com/juanfont/headscale/issues/3415), [#3420](https://github.com/juanfont/headscale/issues/3420)
-- The `dns-subdomain-resolve` node attribute now reaches peers: a client answers `*.<machine>` with that machine's addresses only when the attribute is on its peer entry, and headscale set it on the machine's own entry alone [#3322](https://github.com/juanfont/headscale/issues/3322)
+- The `dns-subdomain-resolve` node attribute now reaches peers: a client answers `*.<machine>` with that machine's addresses only when the attribute is on its peer entry, and slopscale set it on the machine's own entry alone [#3322](https://github.com/juanfont/headscale/issues/3322)
 - Deleting a machine, by hand or by ephemeral clean-up, now ends its map stream with its own key expired, and a machine that polls with a key the server no longer knows gets the same answer instead of a 404. The client goes to "needs login" at once, where before it kept receiving keep-alives, then retried the 404 until someone ran `tailscale up --force-reauth`, and its stale stream held up a graceful shutdown [#3410](https://github.com/juanfont/headscale/issues/3410)
 - Every approved exit node is now suggested to the other machines (`suggest-exit-node` on their view of it), as Tailscale's control plane does with no policy at all. The macOS and iOS apps since Tailscale 1.102 build their exit node list from the suggestion and showed "No exit nodes available" without one. Marking a global exit node narrows the suggestion to the marked machines, as before [#3415](https://github.com/juanfont/headscale/issues/3415)
 - Extra DNS records from `dns.extra_records` and `dns.extra_records_path` are lowercased like those set through the API, so `Printer.fritz.box` resolves [#2782](https://github.com/juanfont/headscale/issues/2782). The watched file is read once it has been quiet for a moment rather than on the first of a write's several events, which parsed half a file [#2753](https://github.com/juanfont/headscale/issues/2753), and an event carrying several operations at once (a truncating rewrite on macOS reports write and chmod together) is no longer dropped
@@ -472,32 +490,32 @@ rotations are recorded in the audit log as `apikey.rotate`.
 - The tailnet's key expiry, when set, is published as the `tailnet.maxKeyDuration` node capability in seconds, the shape the hosted control plane uses, for clients that read it
 - `/machine/audit-log`, which a client under an always-on device policy posts when its user disconnects with a reason, is recorded in the audit log as action `node.client.disconnect` with actor kind `node`; the server answered 501 before and the client gave up on the entry. `/machine/feature/query`, behind `tailscale serve --https` on a machine without the capability, now names the node attribute to grant, links to the policy page and keeps the command waiting until the policy grants it; `tailscale funnel` gets an error, as before, because Funnel needs Tailscale's public ingress
 - Warnings a client reports in its map requests (`warn-ip-forwarding-off` on a subnet router whose kernel drops forwarded packets, `warn-router-unhealthy`, `warn-etc-apt-source-disabled`) are kept on the node as `clientWarnings` in `GET /api/v1/node` and shown on the console's machine page, where before they were dropped
-- A nameserver can be kept in use while a machine routes through an exit node, like Tailscale's per-nameserver "Use with exit node" setting: `dns.nameservers.use_with_exit_node` in the configuration file, the switch next to each nameserver and split DNS domain on the console's _DNS_ page, `headscale dns set --use-with-exit-node` and `--split-use-with-exit-node`, and `useWithExitNode`/`splitUseWithExitNode` in `PUT /api/v1/dns`. The rest of the machine's DNS goes through the exit node then, as before. Global nameservers need override local DNS, as the client only honours the flag on the resolvers it uses for every query, and a split DNS domain survives only when every one of its nameservers is kept; the API enforces the first and the console marks the whole domain. Needs Tailscale 1.88.1 or later on the client [#2816](https://github.com/juanfont/headscale/issues/2816), [#3376](https://github.com/juanfont/headscale/issues/3376), [#2234](https://github.com/juanfont/headscale/issues/2234)
-- A client that asks to be ephemeral in its register request is now ephemeral: a `tailscaled` with `--state=mem:`, a `tsnet` program with `Ephemeral` set or the browser client is deleted on logout and after the ephemeral inactivity timeout offline, with a regular pre-auth key or an interactive login alike, where before only an ephemeral pre-auth key counted and such nodes piled up. `headscale nodes list`, the console and the `ephemeral` field of the v1 node report either kind
-- A DERP map file can carry `homeparams.regionscore` to prefer or avoid regions when a client picks its home DERP, as the hosted control plane's map does. The scores are merged across the loaded maps, later files winning, where before they were dropped in the merge. See [DERP](https://headscale.net/development/ref/derp/#customize-derp-map)
-- Groups can be synced from the identity provider: with `oidc.groups.sync` on, a user's `groups` claim is mirrored into headscale groups of the same name at every sign-in (optionally only the claims with `oidc.groups.prefix`, stripped), and the user leaves the synced groups the claim drops, like Tailscale's user and group provisioning. Synced groups show as such in the console and the API (`source: oidc`); their users and name cannot be edited by hand, machines and description can, and an operator-made group is never taken over by name. Each sync that moved a membership is logged as `group.sync`
+- A nameserver can be kept in use while a machine routes through an exit node, like Tailscale's per-nameserver "Use with exit node" setting: `dns.nameservers.use_with_exit_node` in the configuration file, the switch next to each nameserver and split DNS domain on the console's _DNS_ page, `slopscale dns set --use-with-exit-node` and `--split-use-with-exit-node`, and `useWithExitNode`/`splitUseWithExitNode` in `PUT /api/v1/dns`. The rest of the machine's DNS goes through the exit node then, as before. Global nameservers need override local DNS, as the client only honours the flag on the resolvers it uses for every query, and a split DNS domain survives only when every one of its nameservers is kept; the API enforces the first and the console marks the whole domain. Needs Tailscale 1.88.1 or later on the client [#2816](https://github.com/juanfont/headscale/issues/2816), [#3376](https://github.com/juanfont/headscale/issues/3376), [#2234](https://github.com/juanfont/headscale/issues/2234)
+- A client that asks to be ephemeral in its register request is now ephemeral: a `tailscaled` with `--state=mem:`, a `tsnet` program with `Ephemeral` set or the browser client is deleted on logout and after the ephemeral inactivity timeout offline, with a regular pre-auth key or an interactive login alike, where before only an ephemeral pre-auth key counted and such nodes piled up. `slopscale nodes list`, the console and the `ephemeral` field of the v1 node report either kind
+- A DERP map file can carry `homeparams.regionscore` to prefer or avoid regions when a client picks its home DERP, as the hosted control plane's map does. The scores are merged across the loaded maps, later files winning, where before they were dropped in the merge. See [DERP](https://aislopware.github.io/slopscale/development/ref/derp/#customize-derp-map)
+- Groups can be synced from the identity provider: with `oidc.groups.sync` on, a user's `groups` claim is mirrored into slopscale groups of the same name at every sign-in (optionally only the claims with `oidc.groups.prefix`, stripped), and the user leaves the synced groups the claim drops, like Tailscale's user and group provisioning. Synced groups show as such in the console and the API (`source: oidc`); their users and name cannot be edited by hand, machines and description can, and an operator-made group is never taken over by name. Each sync that moved a membership is logged as `group.sync`
 - `oidc.match_by_email`: a login whose provider identifier is unknown is matched to the existing OIDC user with the same verified email, the user moves to the new identifier and keeps its machines, so an identity provider can be switched without editing the database. The switch is logged as `user.provider.switch`; a login is refused when several users share the email [#2438](https://github.com/juanfont/headscale/issues/2438)
 - `nodeAttrs` accepts the `app` field, application capabilities with data such as Tailscale's app connector definitions (`tailscale.com/app-connectors`): the values reach the targets' node capability map verbatim, values from several entries for the same capability add up, and the policy is refused when a capability is not domain-qualified or a value is not a JSON object. A policy with `app` was rejected as unknown before [#3021](https://github.com/juanfont/headscale/issues/3021)
 - `nodeAttrs` accepts `ipPool`, Tailscale's IP pools: a new node whose user, group, tag or autogroup a grant names is numbered from the grant's IPv4 ranges, the first pool with room first; existing nodes keep their address, a full set of pools refuses the registration, and pools must lie within `prefixes.v4` [#2912](https://github.com/juanfont/headscale/issues/2912)
 - Regional routing for high availability subnet routers: when the routers for a prefix report different DERP home regions, each client is steered to the router in its own region and falls back to the tailnet-wide primary when its region has no healthy router; a client that changes region is steered again. The `/debug/routes` endpoint lists the per-region primaries [#3237](https://github.com/juanfont/headscale/issues/3237)
-- A user's display name, email and profile picture can be changed after creation with `headscale users set` or `PATCH /api/v1/user/{id}`, and the clients show the new profile on their next map update; the picture must be an https URL. Renaming a user reaches the clients the same way, where before the map response kept the old profile until a restart [#2166](https://github.com/juanfont/headscale/issues/2166)
+- A user's display name, email and profile picture can be changed after creation with `slopscale users set` or `PATCH /api/v1/user/{id}`, and the clients show the new profile on their next map update; the picture must be an https URL. Renaming a user reaches the clients the same way, where before the map response kept the old profile until a restart [#2166](https://github.com/juanfont/headscale/issues/2166)
 - Improve systemd service file hardening [#3341](https://github.com/juanfont/headscale/pull/3341)
-- Headscale now requires Go 1.27 to build
-- Fix `headscale policy set --bypass-server-and-access-database-directly` storing the policy with its comments blanked out; the file is now saved as written
+- Slopscale now requires Go 1.27 to build
+- Fix `slopscale policy set --bypass-server-and-access-database-directly` storing the policy with its comments blanked out; the file is now saved as written
 - Fix the OIDC success page always saying "Node registered"; a node logging in again now sees "Node reauthenticated"
 - Fix a registration followup that arrives after the login completed being refused with "extending key is not allowed"; the client now gets its registered node
 - Fix a node that registers or changes under a policy which hides it (one whose own filter is empty, such as `autogroup:shared` before anything is shared, or `autogroup:self`) still reaching the netmaps of nodes that could not access it: the incremental map update skipped the policy whenever the recipient's own filter was empty, and now applies the same pairwise rule as the full map
-- User roles: `headscale users set-role`, a `Role` column in `headscale users list`, `POST /api/v1/user/{id}/role`, `GET /api/v1/whoami`, a `userId` on API keys and `headscale apikeys create --user`; the v2 user object's `role` field and `?role=` filter now reflect the real role
+- User roles: `slopscale users set-role`, a `Role` column in `slopscale users list`, `POST /api/v1/user/{id}/role`, `GET /api/v1/whoami`, a `userId` on API keys and `slopscale apikeys create --user`; the v2 user object's `role` field and `?role=` filter now reflect the real role
 - The `is-admin` node capability, previously stamped on every node, is now stamped only on devices of the owner and admins; `is-owner` on the owner's. Clients use these for admin-console affordances in their UI only
 - `POST /api/v1/apikey` without an `expiration` now mints a key that never expires instead of one that was already expired
 - Admin console at `/admin/`, embedded in the binary; `make web` builds it from `web/`
-- Console sign-in through the identity provider only: `/oidc/login` opens a seven-day session cookie for the OIDC user, `GET /api/v1/auth/console` names the provider, `DELETE /api/v1/auth/session` signs out; `GET /api/v1/whoami` reports `kind: session`. The client ID and secret may be set as `HEADSCALE_OIDC_CLIENT_ID` and `HEADSCALE_OIDC_CLIENT_SECRET`
-- `oidc.admin_users` (`HEADSCALE_OIDC_ADMIN_USERS`): email addresses that become admins the moment they sign in, so a fresh server can be administered from the console without CLI role grants; the promotion is recorded in the audit log
+- Console sign-in through the identity provider only: `/oidc/login` opens a seven-day session cookie for the OIDC user, `GET /api/v1/auth/console` names the provider, `DELETE /api/v1/auth/session` signs out; `GET /api/v1/whoami` reports `kind: session`. The client ID and secret may be set as `SLOPSCALE_OIDC_CLIENT_ID` and `SLOPSCALE_OIDC_CLIENT_SECRET`
+- `oidc.admin_users` (`SLOPSCALE_OIDC_ADMIN_USERS`): email addresses that become admins the moment they sign in, so a fresh server can be administered from the console without CLI role grants; the promotion is recorded in the audit log
 - `go run ./cmd/dev` starts a mock identity provider next to the development server and `make test-e2e` signs in through it from a browser, so the console's sign-in can be exercised without Google
-- Audit log: `audit_events` table, `GET /api/v1/audit` with `actorUserId`, `action`, `targetKind`, `targetId`, `since`, `until`, `before` and `limit`, `headscale audit list`, the `logs:configuration:read` scope (held by every role but member) and `audit.retention` in the configuration
-- Global exit node: `headscale nodes global-exit-node`, `POST /api/v1/node/{id}/global-exit-node` and `globalExitNode` on nodes
-- Node sharing: `headscale nodes share|unshare`, `POST /api/v1/node/{id}/share`, `DELETE /api/v1/node/{id}/share/{userId}`, `sharedWith` on nodes and the `autogroup:shared` policy source
-- Device and user approval: `headscale settings get|set`, `headscale nodes approve`, `headscale users approve`, `headscale preauthkeys create --preauthorized`, an `Approved` column in `headscale nodes list` and `headscale users list`, `GET|POST /api/v1/settings`, `POST /api/v1/node/{id}/approve`, `POST /api/v1/user/{id}/approve`, `approved`/`approvedAt` on nodes and users and `preauthorized` on pre-auth keys; the v2 API's `PATCH /api/v2/tailnet/{tailnet}/settings` now updates `devicesApprovalOn` and `usersApprovalOn` instead of returning 501, `POST /api/v2/device/{id}/authorized` accepts `false`, and `POST /api/v2/users/{id}/approve|suspend|restore` exist
+- Audit log: `audit_events` table, `GET /api/v1/audit` with `actorUserId`, `action`, `targetKind`, `targetId`, `since`, `until`, `before` and `limit`, `slopscale audit list`, the `logs:configuration:read` scope (held by every role but member) and `audit.retention` in the configuration
+- Global exit node: `slopscale nodes global-exit-node`, `POST /api/v1/node/{id}/global-exit-node` and `globalExitNode` on nodes
+- Node sharing: `slopscale nodes share|unshare`, `POST /api/v1/node/{id}/share`, `DELETE /api/v1/node/{id}/share/{userId}`, `sharedWith` on nodes and the `autogroup:shared` policy source
+- Device and user approval: `slopscale settings get|set`, `slopscale nodes approve`, `slopscale users approve`, `slopscale preauthkeys create --preauthorized`, an `Approved` column in `slopscale nodes list` and `slopscale users list`, `GET|POST /api/v1/settings`, `POST /api/v1/node/{id}/approve`, `POST /api/v1/user/{id}/approve`, `approved`/`approvedAt` on nodes and users and `preauthorized` on pre-auth keys; the v2 API's `PATCH /api/v2/tailnet/{tailnet}/settings` now updates `devicesApprovalOn` and `usersApprovalOn` instead of returning 501, `POST /api/v2/device/{id}/authorized` accepts `false`, and `POST /api/v2/users/{id}/approve|suspend|restore` exist
 - Security: the v1 API now applies the same tag boundary to OAuth tokens as the v2 API when it creates pre-auth keys, sets a node's tags or registers a node; an invite may only carry a role its creator could assign directly, so an IT admin cannot mint an admin through an invitation; an OAuth client's tokens are bounded by its creator's current role and die with the creator's account; `oidc.admin_users` no longer promotes a login whose email the provider has not verified when `email_verified_required` is on; `match_by_email` no longer lets a second identity at the same provider take over an existing account, and a user's email may not be changed to one another user holds; the OAuth token endpoint is audited; unauthenticated requests are bounded to nothing instead of local trust; the register-confirm CSRF token is compared in constant time; the Discord webhook payload disables mentions
 - Security: webhooks, log streams and DERP map URLs may no longer point at loopback or link-local addresses, checked again at dial time so DNS rebinding cannot get past it (`egress.allow_loopback_targets` re-allows loopback for development, `egress.deny_private_targets` blocks RFC1918 ranges too); the DERP fetch refuses redirects, caps the body and checks the status; delivery status and test results report `HTTP <code>`, `unreachable` or `rejected` instead of the raw transport error; unmapped internal errors return a reference id instead of the error text; the audit CSV export neutralises spreadsheet formulas; invite addresses must parse as email; SSH recording uploads are capped by `ssh_recording.max_session_bytes` and refused from unknown nodes; `POST /api/v1/debug/node` is only registered with `debug.node_api_enabled`
 - Fix a posture such as `node:os NOT IN ['ios','android']` matching a machine that reported nothing: a missing attribute now fails every check except `NOT SET`, as Tailscale documents
@@ -508,14 +526,14 @@ rotations are recorded in the audit log as `apikey.rotate`.
 - Console: approving or deleting a user, saving the policy, deleting or renaming a machine and ending a user's sessions refresh every list they change; "sign out everywhere" on your own user signs the console out; exit routes on the machine page are one row, so rejecting one half of the pair works; the pending route count agrees between the sidebar, the Routes header and its table; the role picker shows role names; the machine page tells you when postures could not be loaded; DNS dialogs no longer open with the previous dialog's error; a new extra record defaults to type A; removing a custom attribute asks first; the QR code is only shown for phones; the global exit node switch is disabled until the machine advertises an exit route; the share picker hides users waiting for approval; rename and invite forms say what is wrong before the server does; long names truncate instead of widening tables; the posture schedule fields and the custom attribute value no longer overflow their dialog; the theme button is icon only on small screens; the Server page names its key expiry row as the config file's value; the audit action filter waits for typing to pause
 - Console: states such as Connected, Pending or Failed are a coloured dot and plain text instead of a pill, roles and qualifiers are plain text, and a pill is kept for tags, scopes and other identifiers; a router that stopped advertising a prefix or a route the machine no longer offers is flagged by name, with the reason shown on hover or tap; the pre-auth key list says "Reusable · Ephemeral" in words; the webhook list counts events instead of listing them; the theme button is icon only on small screens; the paging band fits a phone
 - Console: every row's actions sit behind one … menu, on SSH recordings, console sessions, nameservers, search domains, relay regions and map URLs, split DNS, DNS rules, extra records and a machine's groups, shares and custom attributes, the way the tables already did; the Disconnected and Used dots are painted again; a table that scrolls sideways can be moved from the keyboard; the pre-auth key list folds the user and options under the key on a phone
-- Outbound requests headscale makes to operator-supplied URLs (webhook receivers, log stream sinks, DERP map URLs) can no longer reach the server's own loopback services, a link-local cloud metadata endpoint or an unspecified address: the URL is checked when it is stored and again against the address it resolves to when it is dialed, so a name that points at a blocked address is refused at connect time. Private ranges stay reachable, because a receiver on the LAN is a normal self-hosted setup; `egress.deny_private_targets` refuses them too and `egress.allow_loopback_targets` re-allows loopback for development
+- Outbound requests slopscale makes to operator-supplied URLs (webhook receivers, log stream sinks, DERP map URLs) can no longer reach the server's own loopback services, a link-local cloud metadata endpoint or an unspecified address: the URL is checked when it is stored and again against the address it resolves to when it is dialed, so a name that points at a blocked address is refused at connect time. Private ranges stay reachable, because a receiver on the LAN is a normal self-hosted setup; `egress.deny_private_targets` refuses them too and `egress.allow_loopback_targets` re-allows loopback for development
 - A DERP map fetched from a URL no longer follows redirects, is read to at most 4 MiB and must answer 2xx, so a source that redirects or answers with an error page leaves the previous map in place
 - A webhook or log stream delivery is now reported as `unreachable`, `rejected` or its HTTP status instead of the raw transport error, which named the address the server resolved and dialed; the whole error is in the server log
 - The audit log's CSV export prefixes any cell starting with `=`, `+`, `-`, `@`, a tab or a carriage return with an apostrophe, so a node or user name cannot become a formula when the export is opened in a spreadsheet
 - An unexpected server error now answers with an id (`internal error, see the server log for id <8 hex chars>`) and logs the error under that id, instead of returning the internal error text; errors the API maps deliberately are unchanged
 - An SSH session upload is bounded by `ssh_recording.max_session_bytes` (512 MiB by default); a session that runs past it is kept, marked incomplete, and the upload is refused. An upload from an address that is not a node is refused with 403
 - An invite address must be one plain mailbox: a display name, a list or an embedded header is refused
-- `POST /api/v1/debug/node` (`headscale debug create-node`) is off unless `debug.node_api_enabled` is set, and while it is off the operation is not registered and is absent from the OpenAPI document the server serves
+- `POST /api/v1/debug/node` (`slopscale debug create-node`) is off unless `debug.node_api_enabled` is set, and while it is off the operation is not registered and is absent from the OpenAPI document the server serves
 - On the v1 API an OAuth access token is now bounded by its tags the way it already was on v2: it may create a pre-auth key or tag a node only with tags it holds or that those tags own, it cannot create an untagged (user-owned) key, and it cannot create a key for a user or register a node into a user's account. Admin API keys are unaffected
 - A registration id is recorded in the audit log by its first eight characters only, because the whole id is the secret a node registers with
 
@@ -527,8 +545,8 @@ rotations are recorded in the audit log as `apikey.rotate`.
 
 - Fix HTTP metrics only counting `OPTIONS` requests, so `http_requests_total` and `http_request_duration_seconds` now cover regular traffic [#3414](https://github.com/juanfont/headscale/pull/3414)
 - Fix extra-records filewatcher hanging on shutdown after the watched file is deleted, and leaking the watcher when setup fails [#3437](https://github.com/juanfont/headscale/pull/3437)
-- Fix `headscale users rename` sending the raw `--identifier` flag value instead of the matched user's identifier, so renaming by name works again [#3442](https://github.com/juanfont/headscale/pull/3442)
-- Fix tailsql not shutting down with headscale, leaving the process hanging on graceful shutdown [#3400](https://github.com/juanfont/headscale/pull/3400)
+- Fix `slopscale users rename` sending the raw `--identifier` flag value instead of the matched user's identifier, so renaming by name works again [#3442](https://github.com/juanfont/headscale/pull/3442)
+- Fix tailsql not shutting down with slopscale, leaving the process hanging on graceful shutdown [#3400](https://github.com/juanfont/headscale/pull/3400)
 - Fix tvOS setup instructions: install the VPN configuration before setting the coordination server URL [#3431](https://github.com/juanfont/headscale/pull/3431)
 
 ## 0.29.3 (2026-07-29)
@@ -582,21 +600,21 @@ with a `check` action policy, the user is prompted to authenticate via OIDC or C
 is granted. OIDC approval requires the authenticated user to own the source node; tagged source nodes
 cannot use SSH check-mode.
 
-A new `headscale auth` CLI command group supports the approval flow:
+A new `slopscale auth` CLI command group supports the approval flow:
 
-- `headscale auth approve --auth-id <id>` approves a pending authentication request (SSH check or web auth)
-- `headscale auth reject --auth-id <id>` rejects a pending authentication request
-- `headscale auth register --auth-id <id> --user <user>` registers a node (replaces deprecated `headscale nodes register`)
+- `slopscale auth approve --auth-id <id>` approves a pending authentication request (SSH check or web auth)
+- `slopscale auth reject --auth-id <id>` rejects a pending authentication request
+- `slopscale auth register --auth-id <id> --user <user>` registers a node (replaces deprecated `slopscale nodes register`)
 
 [#1850](https://github.com/juanfont/headscale/pull/1850)
 [#3180](https://github.com/juanfont/headscale/pull/3180)
 
 ### Policy tests (beta)
 
-Headscale now evaluates the `tests` block in a policy file. Tests assert reachability between
+Slopscale now evaluates the `tests` block in a policy file. Tests assert reachability between
 named sources and destinations and cover the whole policy — both `acls` and `grants` rules
-contribute. They run on user-initiated writes via `headscale policy set`, on SIGHUP reload
-(`systemctl reload headscale` / `kill -HUP $(pidof headscale)`), and on `headscale policy check`.
+contribute. They run on user-initiated writes via `slopscale policy set`, on SIGHUP reload
+(`systemctl reload slopscale` / `kill -HUP $(pidof slopscale)`), and on `slopscale policy check`.
 A failing test rejects the write before it is applied, with the same error message Tailscale SaaS
 would return for the same policy.
 
@@ -610,12 +628,12 @@ This feature is **beta** while behavioural coverage against Tailscale SaaS broad
 
 ### SSH policy tests (beta)
 
-Headscale now evaluates the `sshTests` block in a policy file. Each entry names a source, one or
+Slopscale now evaluates the `sshTests` block in a policy file. Each entry names a source, one or
 more destination hosts, and three optional user lists: `accept` asserts the listed login users
 reach every destination via an accept- or check-action SSH rule, `deny` asserts none of them
 reach any destination, and `check` requires reachability specifically through a check-action
-rule. Tests run on `headscale policy set`, on SIGHUP reload (`systemctl reload headscale` /
-`kill -HUP $(pidof headscale)`), and on `headscale policy check`. A failing test rejects the
+rule. Tests run on `slopscale policy set`, on SIGHUP reload (`systemctl reload slopscale` /
+`kill -HUP $(pidof slopscale)`), and on `slopscale policy check`. A failing test rejects the
 write before it is applied, with the same error message Tailscale SaaS would return for the same
 policy.
 
@@ -686,7 +704,7 @@ unless they make a local opt-in / opt-out choice.
 
 Policies that use the `funnel` cap, `ipPool` blocks, or
 `autogroup:admin` / `autogroup:owner` targets are rejected at load —
-those features depend on machinery headscale does not yet ship.
+those features depend on machinery slopscale does not yet ship.
 
 [#3251](https://github.com/juanfont/headscale/pull/3251)
 
@@ -739,7 +757,7 @@ Examples that previously regressed and now work:
 
 ### HA subnet router health probing
 
-Headscale now actively probes HA subnet routers to detect nodes that are connected but not
+Slopscale now actively probes HA subnet routers to detect nodes that are connected but not
 forwarding traffic. The control plane periodically pings HA subnet routers via the Noise
 control channel and fails over to a healthy standby if the primary stops responding. This is
 enabled by default (`node.routes.ha.probe_interval: 10s`, `probe_timeout: 5s`) and only
@@ -769,7 +787,7 @@ connected" routers that maintain their control session but cannot route packets.
 
 #### Upgrade Path
 
-- Headscale now enforces a strict version upgrade path [#3083](https://github.com/juanfont/headscale/pull/3083)
+- Slopscale now enforces a strict version upgrade path [#3083](https://github.com/juanfont/headscale/pull/3083)
   - Skipping minor versions (e.g. 0.27 → 0.29) is blocked; upgrade one minor version at a time
   - Downgrading to a previous minor version is blocked
   - Patch version changes within the same minor are always allowed
@@ -779,7 +797,7 @@ connected" routers that maintain their control session but cannot route packets.
 - The `randomize_client_port` server-config key was removed; the
   toggle now lives in the policy file as a top-level
   `randomizeClientPort` field, matching the Tailscale-hosted schema. [#3251](https://github.com/juanfont/headscale/pull/3251)
-  Headscale refuses to start when the old key is set. Move it to the
+  Slopscale refuses to start when the old key is set. Move it to the
   policy file referenced by `policy.path`:
 
   ```jsonc
@@ -797,7 +815,7 @@ connected" routers that maintain their control session but cannot route packets.
 
 #### CLI
 
-- `headscale nodes register` is deprecated in favour of `headscale auth register --auth-id <id> --user <user>` [#1850](https://github.com/juanfont/headscale/pull/1850)
+- `slopscale nodes register` is deprecated in favour of `slopscale auth register --auth-id <id> --user <user>` [#1850](https://github.com/juanfont/headscale/pull/1850)
   - The old command continues to work but will be removed in a future release
 
 ### Changes
@@ -817,7 +835,7 @@ connected" routers that maintain their control session but cannot route packets.
 - Fix non-wildcard source IPs being dropped when combined with wildcard `*` in the same ACL rule [#2180](https://github.com/juanfont/headscale/pull/2180)
 - Fix exit node approval not triggering filter rule recalculation for peers [#2180](https://github.com/juanfont/headscale/pull/2180)
 - Policy validation error messages now include field context (e.g., `src=`, `dst=`) and are more descriptive [#2180](https://github.com/juanfont/headscale/pull/2180)
-- Reject policies whose `user@` tokens match multiple DB users; rename the duplicate via `headscale users rename` to load [#3160](https://github.com/juanfont/headscale/issues/3160)
+- Reject policies whose `user@` tokens match multiple DB users; rename the duplicate via `slopscale users rename` to load [#3160](https://github.com/juanfont/headscale/issues/3160)
 - Evaluate the policy `tests` block on user-initiated writes across both `acls` and `grants`; reject policies whose tests fail (beta) [#1803](https://github.com/juanfont/headscale/issues/1803)
 
 #### Grants
@@ -835,13 +853,13 @@ connected" routers that maintain their control session but cannot route packets.
 
 #### CLI
 
-- Add `headscale auth register`, `headscale auth approve`, and `headscale auth reject` CLI commands [#1850](https://github.com/juanfont/headscale/pull/1850)
-- Deprecate `headscale nodes register --key` in favour of `headscale auth register --auth-id` [#1850](https://github.com/juanfont/headscale/pull/1850)
-- `headscale policy check --bypass-grpc-and-access-database-directly` validates `user@` tokens against the live user database [#3160](https://github.com/juanfont/headscale/issues/3160)
+- Add `slopscale auth register`, `slopscale auth approve`, and `slopscale auth reject` CLI commands [#1850](https://github.com/juanfont/headscale/pull/1850)
+- Deprecate `slopscale nodes register --key` in favour of `slopscale auth register --auth-id` [#1850](https://github.com/juanfont/headscale/pull/1850)
+- `slopscale policy check --bypass-grpc-and-access-database-directly` validates `user@` tokens against the live user database [#3160](https://github.com/juanfont/headscale/issues/3160)
 - Remove deprecated `--namespace` flag from `nodes list`, `nodes register`, and `debug create-node` commands (use `--user` instead) [#3093](https://github.com/juanfont/headscale/pull/3093)
 - Remove deprecated `namespace`/`ns` command aliases for `users` and `machine`/`machines` aliases for `nodes` [#3093](https://github.com/juanfont/headscale/pull/3093)
 - Fix `DestroyUser` deleting all pre-auth keys in the database instead of only the target user's keys [#3155](https://github.com/juanfont/headscale/pull/3155)
-- `headscale policy check` evaluates the `tests` block when invoked with `--bypass-grpc-and-access-database-directly`; without the flag it warns instead of running the tests against empty data [#1803](https://github.com/juanfont/headscale/issues/1803)
+- `slopscale policy check` evaluates the `tests` block when invoked with `--bypass-grpc-and-access-database-directly`; without the flag it warns instead of running the tests against empty data [#1803](https://github.com/juanfont/headscale/issues/1803)
 
 #### API
 
@@ -914,7 +932,7 @@ documentation. The templates now use consistent typography, spacing, and colours
 
 ### Database migration support removed for pre-0.25.0 databases
 
-Headscale no longer supports direct upgrades from databases created before version 0.25.0. Users on older versions must upgrade
+Slopscale no longer supports direct upgrades from databases created before version 0.25.0. Users on older versions must upgrade
 sequentially through each stable release, selecting the latest patch version available for each minor release.
 
 ### BREAKING
@@ -922,31 +940,31 @@ sequentially through each stable release, selecting the latest patch version ava
 - **API**: The Node message in the gRPC/REST API has been simplified - the `ForcedTags`, `InvalidTags`, and `ValidTags` fields have been removed and replaced with a single `Tags` field that contains the node's applied tags [#2993](https://github.com/juanfont/headscale/pull/2993)
 
   - API clients should use the `Tags` field instead of `ValidTags`
-  - The `headscale nodes list` CLI command now always shows a Tags column and the `--tags` flag has been removed
+  - The `slopscale nodes list` CLI command now always shows a Tags column and the `--tags` flag has been removed
 
 - **PreAuthKey CLI**: Commands now use ID-based operations instead of user+key combinations [#2992](https://github.com/juanfont/headscale/pull/2992)
 
-  - `headscale preauthkeys create` no longer requires `--user` flag (optional for tracking creation)
-  - `headscale preauthkeys list` lists all keys (no longer filtered by user)
-  - `headscale preauthkeys expire --id <ID>` replaces `--user <USER> <KEY>`
-  - `headscale preauthkeys delete --id <ID>` replaces `--user <USER> <KEY>`
+  - `slopscale preauthkeys create` no longer requires `--user` flag (optional for tracking creation)
+  - `slopscale preauthkeys list` lists all keys (no longer filtered by user)
+  - `slopscale preauthkeys expire --id <ID>` replaces `--user <USER> <KEY>`
+  - `slopscale preauthkeys delete --id <ID>` replaces `--user <USER> <KEY>`
 
   **Before:**
 
   ```bash
-  headscale preauthkeys create --user 1 --reusable --tags tag:server
-  headscale preauthkeys list --user 1
-  headscale preauthkeys expire --user 1 <KEY>
-  headscale preauthkeys delete --user 1 <KEY>
+  slopscale preauthkeys create --user 1 --reusable --tags tag:server
+  slopscale preauthkeys list --user 1
+  slopscale preauthkeys expire --user 1 <KEY>
+  slopscale preauthkeys delete --user 1 <KEY>
   ```
 
   **After:**
 
   ```bash
-  headscale preauthkeys create --reusable --tags tag:server
-  headscale preauthkeys list
-  headscale preauthkeys expire --id 123
-  headscale preauthkeys delete --id 123
+  slopscale preauthkeys create --reusable --tags tag:server
+  slopscale preauthkeys list
+  slopscale preauthkeys expire --id 123
+  slopscale preauthkeys delete --id 123
   ```
 
 - **Tags**: The gRPC `SetTags` endpoint now allows converting user-owned nodes to tagged nodes by setting tags. [#2885](https://github.com/juanfont/headscale/pull/2885)
@@ -956,17 +974,17 @@ sequentially through each stable release, selecting the latest patch version ava
   - `--advertise-tags` is processed during registration, not on every policy evaluation
   - PreAuthKey tagged devices ignore `--advertise-tags` from clients
   - User-owned nodes can use `--advertise-tags` if authorized by `tagOwners` policy
-  - Tags can be managed via CLI (`headscale nodes tag`) or the SetTags API after registration
+  - Tags can be managed via CLI (`slopscale nodes tag`) or the SetTags API after registration
 
 - Database migration support removed for pre-0.25.0 databases [#2883](https://github.com/juanfont/headscale/pull/2883)
 
   - If you are running a version older than 0.25.0, you must upgrade to 0.25.1 first, then upgrade to this release
-  - See the [upgrade path documentation](https://headscale.net/stable/about/faq/#what-is-the-recommended-update-path-can-i-skip-multiple-versions-while-updating) for detailed guidance
+  - See the [upgrade path documentation](https://aislopware.github.io/slopscale/stable/about/faq/#what-is-the-recommended-update-path-can-i-skip-multiple-versions-while-updating) for detailed guidance
   - In version 0.29, all migrations before 0.28.0 will also be removed
 
 - Remove ability to move nodes between users [#2922](https://github.com/juanfont/headscale/pull/2922)
 
-  - The `headscale nodes move` CLI command has been removed
+  - The `slopscale nodes move` CLI command has been removed
   - The `MoveNode` API endpoint has been removed
   - Nodes are permanently associated with their user or tag at registration time
 
@@ -1113,25 +1131,25 @@ technical details about the issues and solutions.
 **SQLite Database Backup Example:**
 
 ```bash
-# Stop headscale
-systemctl stop headscale
+# Stop slopscale
+systemctl stop slopscale
 
 # Backup sqlite database
-cp /var/lib/headscale/db.sqlite /var/lib/headscale/db.sqlite.backup
+cp /var/lib/slopscale/db.sqlite /var/lib/slopscale/db.sqlite.backup
 
 # Backup sqlite WAL/SHM files (if they exist)
-cp /var/lib/headscale/db.sqlite-wal /var/lib/headscale/db.sqlite-wal.backup
-cp /var/lib/headscale/db.sqlite-shm /var/lib/headscale/db.sqlite-shm.backup
+cp /var/lib/slopscale/db.sqlite-wal /var/lib/slopscale/db.sqlite-wal.backup
+cp /var/lib/slopscale/db.sqlite-shm /var/lib/slopscale/db.sqlite-shm.backup
 
-# Start headscale (migration will run automatically)
-systemctl start headscale
+# Start slopscale (migration will run automatically)
+systemctl start slopscale
 ```
 
 ### DERPMap update frequency
 
 The default DERPMap update frequency has been changed from 24 hours to 3 hours.
 If you set the `derp.update_frequency` configuration option, it is recommended
-to change it to `3h` to ensure that the headscale instance gets the latest
+to change it to `3h` to ensure that the slopscale instance gets the latest
 DERPMap updates when upstream is changed.
 
 ### Autogroups
@@ -1144,7 +1162,7 @@ for a detailed explanation.
 `autogroup:self` is marked as experimental and should be used with caution, but
 we need help testing it. Experimental here means two things; first, generating
 the packet filter from policies that use `autogroup:self` is very expensive, and
-it might perform, or straight up not work on Headscale installations with a
+it might perform, or straight up not work on Slopscale installations with a
 large number of nodes. Second, the implementation might have bugs or edge cases
 we are not aware of, meaning that nodes or users might gain _more_ access than
 expected. Please report bugs.
@@ -1225,19 +1243,19 @@ database. This was done to simplify the codebase, which had grown unnecessarily
 complex after the routes were split into separate tables. The overhead of having
 to go via the database and keeping the state in sync made the code very hard to
 reason about and prone to errors. The majority of the route state is only
-relevant when headscale is running, and is now only kept in memory. As part of
+relevant when slopscale is running, and is now only kept in memory. As part of
 this, the CLI and API has been simplified to reflect the changes;
 
 ```console
-$ headscale nodes list-routes
+$ slopscale nodes list-routes
 ID | Hostname           | Approved | Available       | Serving (Primary)
 1  | ts-head-ruqsg8     |          | 0.0.0.0/0, ::/0 |
 2  | ts-unstable-fq7ob4 |          | 0.0.0.0/0, ::/0 |
 
-$ headscale nodes approve-routes --identifier 1 --routes 0.0.0.0/0,::/0
+$ slopscale nodes approve-routes --identifier 1 --routes 0.0.0.0/0,::/0
 Node updated
 
-$ headscale nodes list-routes
+$ slopscale nodes list-routes
 ID | Hostname           | Approved        | Available       | Serving (Primary)
 1  | ts-head-ruqsg8     | 0.0.0.0/0, ::/0 | 0.0.0.0/0, ::/0 | 0.0.0.0/0, ::/0
 2  | ts-unstable-fq7ob4 |                 | 0.0.0.0/0, ::/0 |
@@ -1280,18 +1298,18 @@ new policy code passes all of our tests.
 <summary>Migration notes when the policy is stored in the database.</summary>
 
 This section **only** applies if the policy is stored in the database and
-Headscale 0.26 doesn't start due to a policy error
+Slopscale 0.26 doesn't start due to a policy error
 (`failed to load ACL policy`).
 
-- Start Headscale 0.26 with the environment variable `HEADSCALE_POLICY_V1=1`
-  set. You can check that Headscale picked up the environment variable by
+- Start Slopscale 0.26 with the environment variable `SLOPSCALE_POLICY_V1=1`
+  set. You can check that Slopscale picked up the environment variable by
   observing this message during startup: `Using policy manager version: 1`
-- Dump the policy to a file: `headscale policy get > policy.json`
+- Dump the policy to a file: `slopscale policy get > policy.json`
 - Edit `policy.json` and migrate to policy V2. Use the command
-  `headscale policy check --file policy.json` to check for policy errors.
-- Load the modified policy: `headscale policy set --file policy.json`
-- Restart Headscale **without** the environment variable `HEADSCALE_POLICY_V1`.
-  Headscale should now print the message `Using policy manager version: 2` and
+  `slopscale policy check --file policy.json` to check for policy errors.
+- Load the modified policy: `slopscale policy set --file policy.json`
+- Restart Slopscale **without** the environment variable `SLOPSCALE_POLICY_V1`.
+  Slopscale should now print the message `Using policy manager version: 2` and
   startup successfully.
 
 </details>
@@ -1332,7 +1350,7 @@ working in v1 and not tested might be broken in v2 (and vice versa).
 ### Changes
 
 - Use Go 1.24 [#2427](https://github.com/juanfont/headscale/pull/2427)
-- Add `headscale policy check` command to check policy [#2553](https://github.com/juanfont/headscale/pull/2553)
+- Add `slopscale policy check` command to check policy [#2553](https://github.com/juanfont/headscale/pull/2553)
 - `oidc.map_legacy_users` and `oidc.strip_email_domain` has been removed [#2411](https://github.com/juanfont/headscale/pull/2411)
 - Add more information to `/debug` endpoint [#2420](https://github.com/juanfont/headscale/pull/2420)
   - It is now possible to inspect running goroutines and take profiles
@@ -1340,7 +1358,7 @@ working in v1 and not tested might be broken in v2 (and vice versa).
     DERPmap
 - OIDC: Fetch UserInfo to get EmailVerified if necessary [#2493](https://github.com/juanfont/headscale/pull/2493)
   - If a OIDC provider doesn't include the `email_verified` claim in its ID
-    tokens, Headscale will attempt to get it from the UserInfo endpoint.
+    tokens, Slopscale will attempt to get it from the UserInfo endpoint.
 - OIDC: Try to populate name, email and username from UserInfo [#2545](https://github.com/juanfont/headscale/pull/2545)
 - Improve performance by only querying relevant nodes from the database for node
   updates [#2509](https://github.com/juanfont/headscale/pull/2509)
@@ -1382,7 +1400,7 @@ working in v1 and not tested might be broken in v2 (and vice versa).
 - Pre auth keys belonging to a user are no longer deleted with the user [#2396](https://github.com/juanfont/headscale/pull/2396)
 - Pre auth keys that are used by a node can no longer be deleted [#2396](https://github.com/juanfont/headscale/pull/2396)
 - Rehaul HTTP errors, return better status code and errors to users [#2398](https://github.com/juanfont/headscale/pull/2398)
-- Print headscale version and commit on server startup [#2415](https://github.com/juanfont/headscale/pull/2415)
+- Print slopscale version and commit on server startup [#2415](https://github.com/juanfont/headscale/pull/2415)
 
 ## 0.24.3 (2025-02-07)
 
@@ -1411,52 +1429,52 @@ working in v1 and not tested might be broken in v2 (and vice versa).
 
 ## 0.24.0 (2025-01-17)
 
-### Security fix: OIDC changes in Headscale 0.24.0
+### Security fix: OIDC changes in Slopscale 0.24.0
 
-The following issue _only_ affects Headscale installations which authenticate
+The following issue _only_ affects Slopscale installations which authenticate
 with OIDC.
 
-_Headscale v0.23.0 and earlier_ identified OIDC users by the "username" part of
+_Slopscale v0.23.0 and earlier_ identified OIDC users by the "username" part of
 their email address (when `strip_email_domain: true`, the default) or whole
 email address (when `strip_email_domain: false`).
 
-Depending on how Headscale and your Identity Provider (IdP) were configured,
+Depending on how Slopscale and your Identity Provider (IdP) were configured,
 only using the `email` claim could allow a malicious user with an IdP account to
-take over another Headscale user's account, even when
+take over another Slopscale user's account, even when
 `strip_email_domain: false`.
 
-This would also cause a user to lose access to their Headscale account if they
+This would also cause a user to lose access to their Slopscale account if they
 changed their email address.
 
-_Headscale v0.24.0_ now identifies OIDC users by the `iss` and `sub` claims.
+_Slopscale v0.24.0_ now identifies OIDC users by the `iss` and `sub` claims.
 [These are guaranteed by the OIDC specification to be stable and unique](https://openid.net/specs/openid-connect-core-1_0.html#ClaimStability),
 even if a user changes email address. A well-designed IdP will typically set
 `sub` to an opaque identifier like a UUID or numeric ID, which has no relation
 to the user's name or email address.
 
-Headscale v0.24.0 and later will also automatically update profile fields with
+Slopscale v0.24.0 and later will also automatically update profile fields with
 OIDC data on login. This means that users can change those details in your IdP,
-and have it populate to Headscale automatically the next time they log in.
+and have it populate to Slopscale automatically the next time they log in.
 However, this may affect the way you reference users in policies.
 
-Headscale v0.23.0 and earlier never recorded the `iss` and `sub` fields, so all
+Slopscale v0.23.0 and earlier never recorded the `iss` and `sub` fields, so all
 legacy (existing) OIDC accounts _need to be migrated_ to be properly secured.
 
 #### What do I need to do to migrate?
 
-Headscale v0.24.0 has an automatic migration feature, which is enabled by
+Slopscale v0.24.0 has an automatic migration feature, which is enabled by
 default (`map_legacy_users: true`). **This will be disabled by default in a
-future version of Headscale – any unmigrated users will get new accounts.**
+future version of Slopscale – any unmigrated users will get new accounts.**
 
 The migration will mostly be done automatically, with one exception. If your
-OIDC does not provide an `email_verified` claim, Headscale will ignore the
+OIDC does not provide an `email_verified` claim, Slopscale will ignore the
 `email`. This means that either the administrator will have to mark the user
 emails as verified, or ensure the users verify their emails. Any unverified
 emails will be ignored, meaning that the users will get new accounts instead of
 being migrated.
 
-After this exception is ensured, make all users log into Headscale with their
-account, and Headscale will automatically update the account record. This will
+After this exception is ensured, make all users log into Slopscale with their
+account, and Slopscale will automatically update the account record. This will
 be transparent to the users.
 
 When all users have logged in, you can disable the automatic migration by
@@ -1471,29 +1489,29 @@ and the migration mechanism will be removed in v0.26.0.
 
 ##### What does automatic migration do?
 
-When automatic migration is enabled (`map_legacy_users: true`), Headscale will
-first match an OIDC account to a Headscale account by `iss` and `sub`, and then
-fall back to matching OIDC users similarly to how Headscale v0.23.0 did:
+When automatic migration is enabled (`map_legacy_users: true`), Slopscale will
+first match an OIDC account to a Slopscale account by `iss` and `sub`, and then
+fall back to matching OIDC users similarly to how Slopscale v0.23.0 did:
 
-- If `strip_email_domain: true` (the default): the Headscale username matches
+- If `strip_email_domain: true` (the default): the Slopscale username matches
   the "username" part of their email address.
-- If `strip_email_domain: false`: the Headscale username matches the _whole_
+- If `strip_email_domain: false`: the Slopscale username matches the _whole_
   email address.
 
-On migration, Headscale will change the account's username to their
+On migration, Slopscale will change the account's username to their
 `preferred_username`. **This could break any ACLs or policies which are
 configured to match by username.**
 
-Like with Headscale v0.23.0 and earlier, this migration only works for users who
-haven't changed their email address since their last Headscale login.
+Like with Slopscale v0.23.0 and earlier, this migration only works for users who
+haven't changed their email address since their last Slopscale login.
 
 A _successful_ automated migration should otherwise be transparent to users.
 
-Once a Headscale account has been migrated, it will be _unavailable_ to be
+Once a Slopscale account has been migrated, it will be _unavailable_ to be
 matched by the legacy process. An OIDC login with a matching username, but
-_non-matching_ `iss` and `sub` will instead get a _new_ Headscale account.
+_non-matching_ `iss` and `sub` will instead get a _new_ Slopscale account.
 
-Because of the way OIDC works, Headscale's automated migration process can
+Because of the way OIDC works, Slopscale's automated migration process can
 _only_ work when a user tries to log in after the update.
 
 Legacy account migration should have no effect on new installations where all
@@ -1507,13 +1525,13 @@ users have a recorded `sub` and `iss`.
 
 ##### What happens when automatic migration is disabled?
 
-When automatic migration is disabled (`map_legacy_users: false`), Headscale will
-only try to match an OIDC account to a Headscale account by `iss` and `sub`.
+When automatic migration is disabled (`map_legacy_users: false`), Slopscale will
+only try to match an OIDC account to a Slopscale account by `iss` and `sub`.
 
-If there is no match, it will get a _new_ Headscale account – even if there was
+If there is no match, it will get a _new_ Slopscale account – even if there was
 a legacy account which _could_ have matched and migrated.
 
-We recommend new Headscale users explicitly disable automatic migration – but it
+We recommend new Slopscale users explicitly disable automatic migration – but it
 should otherwise have no effect if every account has a recorded `iss` and `sub`.
 
 When automatic migration is disabled, the `strip_email_domain` setting will have
@@ -1526,11 +1544,11 @@ these changes.
 
 #### Other OIDC changes
 
-Headscale now uses
+Slopscale now uses
 [the standard OIDC claims](https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims)
 to populate and update user information every time they log in:
 
-| Headscale profile field | OIDC claim           | Notes / examples                                                                                          |
+| Slopscale profile field | OIDC claim           | Notes / examples                                                                                          |
 | ----------------------- | -------------------- | --------------------------------------------------------------------------------------------------------- |
 | email address           | `email`              | Only used when `"email_verified": true`                                                                   |
 | display name            | `name`               | eg: `Sam Smith`                                                                                           |
@@ -1550,7 +1568,7 @@ This will also affect the way you
 - Remove versions older than 1.56 [#2149](https://github.com/juanfont/headscale/pull/2149)
   - Clean up old code required by old versions
 - User gRPC/API [#2261](https://github.com/juanfont/headscale/pull/2261):
-  - If you depend on a Headscale Web UI, you should wait with this update until
+  - If you depend on a Slopscale Web UI, you should wait with this update until
     the UI have been updated to match the new API.
   - `GET /api/v1/user/{name}` and `GetUser` have been removed in favour of
     `ListUsers` with an ID parameter
@@ -1583,7 +1601,7 @@ us to improve further and make it easier for the maintainers to keep on top of
 the project. However, as you all have noticed, it turned out to become a much
 larger, much longer release cycle than anticipated. It has ended up to be a
 release with a lot of rewrites and changes to the code base and functionality of
-Headscale, cleaning up a lot of technical debt and introducing a lot of
+Slopscale, cleaning up a lot of technical debt and introducing a lot of
 improvements. This does come with some breaking changes,
 
 **Please remember to always back up your database between versions**
@@ -1594,31 +1612,31 @@ Code has been organised into modules, reducing use of global variables/objects,
 isolating concerns and “putting the right things in the logical place”.
 
 The new
-[policy](https://github.com/juanfont/headscale/tree/main/hscontrol/policy) and
-[mapper](https://github.com/juanfont/headscale/tree/main/hscontrol/mapper)
+[policy](https://github.com/aislopware/slopscale/tree/main/hscontrol/policy) and
+[mapper](https://github.com/aislopware/slopscale/tree/main/hscontrol/mapper)
 package, containing the ACL/Policy logic and the logic for creating the data
 served to clients (the network “map”) has been rewritten and improved. This
 change has allowed us to finish SSH support and add additional tests throughout
 the code to ensure correctness.
 
 The
-[“poller”, or streaming logic](https://github.com/juanfont/headscale/blob/main/hscontrol/poll.go)
+[“poller”, or streaming logic](https://github.com/aislopware/slopscale/blob/main/hscontrol/poll.go)
 has been rewritten and instead of keeping track of the latest updates, checking
 at a fixed interval, it now uses go channels, implemented in our new
-[notifier](https://github.com/juanfont/headscale/tree/main/hscontrol/notifier)
+[notifier](https://github.com/aislopware/slopscale/tree/main/hscontrol/notifier)
 package and it allows us to send updates to connected clients immediately. This
 should both improve performance and potential latency before a client picks up
 an update.
 
-Headscale now supports sending “delta” updates, thanks to the new mapper and
+Slopscale now supports sending “delta” updates, thanks to the new mapper and
 poller logic, allowing us to only inform nodes about new nodes, changed nodes
 and removed nodes. Previously we sent the entire state of the network every time
 an update was due.
 
 While we have a pretty good
-[test harness](https://github.com/search?q=repo%3Ajuanfont%2Fheadscale+path%3A_test.go&type=code)
+[test harness](https://github.com/search?q=repo%3Ajuanfont%2Fslopscale+path%3A_test.go&type=code)
 for validating our changes, the changes came down to
-[284 changed files with 32,316 additions and 24,245 deletions](https://github.com/juanfont/headscale/compare/b01f1f1867136d9b2d7b1392776eb363b482c525...ed78ecd)
+[284 changed files with 32,316 additions and 24,245 deletions](https://github.com/aislopware/slopscale/compare/b01f1f1867136d9b2d7b1392776eb363b482c525...ed78ecd)
 and bugs are expected. We need help testing this release. In addition, while we
 think the performance should in general be better, there might be regressions in
 parts of the platform, particularly where we prioritised correctness over speed.
@@ -1640,24 +1658,24 @@ part of adopting [#1460](https://github.com/juanfont/headscale/pull/1460).
 - API: Machine is now Node [#1553](https://github.com/juanfont/headscale/pull/1553)
 - Remove support for older Tailscale clients [#1611](https://github.com/juanfont/headscale/pull/1611)
   - The oldest supported client is 1.42
-- Headscale checks that _at least_ one DERP is defined at start [#1564](https://github.com/juanfont/headscale/pull/1564)
+- Slopscale checks that _at least_ one DERP is defined at start [#1564](https://github.com/juanfont/headscale/pull/1564)
   - If no DERP is configured, the server will fail to start, this can be because
     it cannot load the DERPMap from file or url.
 - Embedded DERP server requires a private key [#1611](https://github.com/juanfont/headscale/pull/1611)
   - Add a filepath entry to
-    [`derp.server.private_key_path`](https://github.com/juanfont/headscale/blob/b35993981297e18393706b2c963d6db882bba6aa/config-example.yaml#L95)
+    [`derp.server.private_key_path`](https://github.com/aislopware/slopscale/blob/b35993981297e18393706b2c963d6db882bba6aa/config-example.yaml#L95)
 - Docker images are now built with goreleaser (ko) [#1716](https://github.com/juanfont/headscale/pull/1716)
   [#1763](https://github.com/juanfont/headscale/pull/1763)
-  - Entrypoint of container image has changed from shell to headscale, require
-    change from `headscale serve` to `serve`
-  - `/var/lib/headscale` and `/var/run/headscale` is no longer created
+  - Entrypoint of container image has changed from shell to slopscale, require
+    change from `slopscale serve` to `serve`
+  - `/var/lib/slopscale` and `/var/run/slopscale` is no longer created
     automatically, see [container docs](./docs/setup/install/container.md)
 - Prefixes are now defined per v4 and v6 range. [#1756](https://github.com/juanfont/headscale/pull/1756)
   - `ip_prefixes` option is now `prefixes.v4` and `prefixes.v6`
   - `prefixes.allocation` can be set to assign IPs at `sequential` or `random`.
     [#1869](https://github.com/juanfont/headscale/pull/1869)
 - MagicDNS domains no longer contain usernames
-  - This is in preparation to fix Headscales implementation of tags which
+  - This is in preparation to fix Slopscales implementation of tags which
     currently does not correctly remove the link between a tagged device and a
     user. As tagged devices will not have a user, this will require a change to
     the DNS generation, removing the username, see
@@ -1666,8 +1684,8 @@ part of adopting [#1460](https://github.com/juanfont/headscale/pull/1460).
   - `use_username_in_magic_dns` can be used to turn this behaviour on again, but
     note that this option _will be removed_ when tags are fixed.
     - dns.base_domain can no longer be the same as (or part of) server_url.
-    - This option brings Headscales behaviour in line with Tailscale.
-- YAML files are no longer supported for headscale policy. [#1792](https://github.com/juanfont/headscale/pull/1792)
+    - This option brings Slopscales behaviour in line with Tailscale.
+- YAML files are no longer supported for slopscale policy. [#1792](https://github.com/juanfont/headscale/pull/1792)
   - HuJSON is now the only supported format for policy.
 - DNS configuration has been restructured [#2034](https://github.com/juanfont/headscale/pull/2034)
   - Please review the new [config-example.yaml](./config-example.yaml) for the
@@ -1699,7 +1717,7 @@ part of adopting [#1460](https://github.com/juanfont/headscale/pull/1460).
 - Restore foreign keys and add constraints [#1562](https://github.com/juanfont/headscale/pull/1562)
 - Make registration page easier to use on mobile devices
 - Make write-ahead-log default on and configurable for SQLite [#1985](https://github.com/juanfont/headscale/pull/1985)
-- Add APIs for managing headscale policy. [#1792](https://github.com/juanfont/headscale/pull/1792)
+- Add APIs for managing slopscale policy. [#1792](https://github.com/juanfont/headscale/pull/1792)
 - Fix for registering nodes using preauthkeys when running on a postgres
   database in a non-UTC timezone.
   [#764](https://github.com/juanfont/headscale/issues/764)
@@ -1708,7 +1726,7 @@ part of adopting [#1460](https://github.com/juanfont/headscale/pull/1460).
   errors or warnings from unset settings
   [#2109](https://github.com/juanfont/headscale/pull/2109)
 - CLI results are now concistently sent to stdout and errors to stderr [#2109](https://github.com/juanfont/headscale/pull/2109)
-- Fix issue where shutting down headscale would hang [#2113](https://github.com/juanfont/headscale/pull/2113)
+- Fix issue where shutting down slopscale would hang [#2113](https://github.com/juanfont/headscale/pull/2113)
 
 ## 0.22.3 (2023-05-12)
 
@@ -1727,7 +1745,7 @@ part of adopting [#1460](https://github.com/juanfont/headscale/pull/1460).
 - Replace node filter logic, ensuring nodes with access can see each other [#1381](https://github.com/juanfont/headscale/pull/1381)
 - Disable (or delete) both exit routes at the same time [#1428](https://github.com/juanfont/headscale/pull/1428)
 - Ditch distroless for Docker image, create default socket dir in
-  `/var/run/headscale` [#1450](https://github.com/juanfont/headscale/pull/1450)
+  `/var/run/slopscale` [#1450](https://github.com/juanfont/headscale/pull/1450)
 
 ## 0.22.1 (2023-04-20)
 
@@ -1747,7 +1765,7 @@ part of adopting [#1460](https://github.com/juanfont/headscale/pull/1460).
   [#1279](https://github.com/juanfont/headscale/pull/1279)
 - Fix issue where IPv6 could not be used in, or while using ACLs (part of [#809](https://github.com/juanfont/headscale/issues/809))
   [#1339](https://github.com/juanfont/headscale/pull/1339)
-- Target Go 1.20 and Tailscale 1.38 for Headscale [#1323](https://github.com/juanfont/headscale/pull/1323)
+- Target Go 1.20 and Tailscale 1.38 for Slopscale [#1323](https://github.com/juanfont/headscale/pull/1323)
 
 ## 0.21.0 (2023-03-20)
 
@@ -1830,14 +1848,14 @@ part of adopting [#1460](https://github.com/juanfont/headscale/pull/1460).
     - We are currently improving our testing of the SSH ACLs, help us get an
       overview by testing and giving feedback.
   - This feature should be considered dangerous and it is disabled by default.
-    Enable by setting `HEADSCALE_EXPERIMENTAL_FEATURE_SSH=1`.
+    Enable by setting `SLOPSCALE_EXPERIMENTAL_FEATURE_SSH=1`.
 
 ### Changes
 
-- Add ability to specify config location via env var `HEADSCALE_CONFIG` [#674](https://github.com/juanfont/headscale/issues/674)
-- Target Go 1.19 for Headscale [#778](https://github.com/juanfont/headscale/pull/778)
-- Target Tailscale v1.30.0 to build Headscale [#780](https://github.com/juanfont/headscale/pull/780)
-- Give a warning when running Headscale with reverse proxy improperly configured
+- Add ability to specify config location via env var `SLOPSCALE_CONFIG` [#674](https://github.com/juanfont/headscale/issues/674)
+- Target Go 1.19 for Slopscale [#778](https://github.com/juanfont/headscale/pull/778)
+- Target Tailscale v1.30.0 to build Slopscale [#780](https://github.com/juanfont/headscale/pull/780)
+- Give a warning when running Slopscale with reverse proxy improperly configured
   for WebSockets [#788](https://github.com/juanfont/headscale/pull/788)
 - Fix subnet routers with Primary Routes [#811](https://github.com/juanfont/headscale/pull/811)
 - Added support for JSON logs [#653](https://github.com/juanfont/headscale/issues/653)
@@ -1845,7 +1863,7 @@ part of adopting [#1460](https://github.com/juanfont/headscale/pull/1460).
 - Add support for generating pre-auth keys with tags [#767](https://github.com/juanfont/headscale/pull/767)
 - Add support for evaluating `autoApprovers` ACL entries when a machine is
   registered [#763](https://github.com/juanfont/headscale/pull/763)
-- Add config flag to allow Headscale to start if OIDC provider is down [#829](https://github.com/juanfont/headscale/pull/829)
+- Add config flag to allow Slopscale to start if OIDC provider is down [#829](https://github.com/juanfont/headscale/pull/829)
 - Fix prefix length comparison bug in AutoApprovers route evaluation [#862](https://github.com/juanfont/headscale/pull/862)
 - Random node DNS suffix only applied if names collide in namespace. [#766](https://github.com/juanfont/headscale/issues/766)
 - Remove `ip_prefix` configuration option and warning [#899](https://github.com/juanfont/headscale/pull/899)
@@ -1898,7 +1916,7 @@ part of adopting [#1460](https://github.com/juanfont/headscale/pull/1460).
 ### Changes
 
 - **Drop** armhf (32-bit ARM) support. [#609](https://github.com/juanfont/headscale/pull/609)
-- Headscale fails to serve if the ACL policy file cannot be parsed [#537](https://github.com/juanfont/headscale/pull/537)
+- Slopscale fails to serve if the ACL policy file cannot be parsed [#537](https://github.com/juanfont/headscale/pull/537)
 - Fix labels cardinality error when registering unknown pre-auth key [#519](https://github.com/juanfont/headscale/pull/519)
 - Fix send on closed channel crash in polling [#542](https://github.com/juanfont/headscale/pull/542)
 - Fixed spurious calls to setLastStateChangeToNow from ephemeral nodes [#566](https://github.com/juanfont/headscale/pull/566)
@@ -1930,7 +1948,7 @@ part of adopting [#1460](https://github.com/juanfont/headscale/pull/1460).
   [#639](https://github.com/juanfont/headscale/pull/639)
 - Fix nodes being shown as 'offline' in `tailscale status` [#648](https://github.com/juanfont/headscale/pull/648)
 - Improve shutdown behaviour [#651](https://github.com/juanfont/headscale/pull/651)
-- Drop Gin as web framework in Headscale
+- Drop Gin as web framework in Slopscale
   [648](https://github.com/juanfont/headscale/pull/648)
   [677](https://github.com/juanfont/headscale/pull/677)
 - Make tailnet node updates check interval configurable [#675](https://github.com/juanfont/headscale/pull/675)
@@ -1960,7 +1978,7 @@ part of adopting [#1460](https://github.com/juanfont/headscale/pull/1460).
 - Add shorthand aliases for commands and subcommands [#376](https://github.com/juanfont/headscale/pull/376)
 - Add `/windows` endpoint for Windows configuration instructions + registry file
   download [#392](https://github.com/juanfont/headscale/pull/392)
-- Added embedded DERP (and STUN) server into Headscale [#388](https://github.com/juanfont/headscale/pull/388)
+- Added embedded DERP (and STUN) server into Slopscale [#388](https://github.com/juanfont/headscale/pull/388)
 
 ### Changes
 
@@ -1986,7 +2004,7 @@ will be able to communicate regardless of if they are in the same namespace.
 This means that the behaviour currently limited to ACLs will become default.
 From version `0.15.0`, all limitation of communications must be done with ACLs.
 
-This is a part of aligning `headscale`'s behaviour with Tailscale's upstream
+This is a part of aligning `slopscale`'s behaviour with Tailscale's upstream
 behaviour.
 
 ### BREAKING
@@ -1995,7 +2013,7 @@ behaviour.
   provides. **NOTE:** This is only active if you use ACLs
   - Namespaces are now treated as Users
   - All machines can communicate with all machines by default
-  - Tags should now work correctly and adding a host to Headscale should now
+  - Tags should now work correctly and adding a host to Slopscale should now
     reload the rules.
   - The documentation have a [fictional example](./docs/ref/acls.md) that should
     cover some use cases of the ACLs features
@@ -2014,7 +2032,7 @@ behaviour.
 
 - Add IPv6 support to the prefix assigned to namespaces
 - Add API Key support
-  - Enable remote control of `headscale` via CLI
+  - Enable remote control of `slopscale` via CLI
     [docs](./docs/ref/api.md#grpc)
   - Enable HTTP API (beta, subject to change)
 - OpenID Connect users will be mapped per namespaces
@@ -2036,7 +2054,7 @@ behaviour.
 
 - Make gRPC Unix Socket permissions configurable [#292](https://github.com/juanfont/headscale/pull/292)
 - Trim whitespace before reading Private Key from file [#289](https://github.com/juanfont/headscale/pull/289)
-- Add new command to generate a private key for `headscale` [#290](https://github.com/juanfont/headscale/pull/290)
+- Add new command to generate a private key for `slopscale` [#290](https://github.com/juanfont/headscale/pull/290)
 - Fixed issue where hosts deleted from control server may be written back to the
   database, as long as they are connected to the control server
   [#278](https://github.com/juanfont/headscale/pull/278)
@@ -2069,7 +2087,7 @@ tagging)
   - This change requires a new format for private key, private keys are now
     generated automatically:
     1. Delete your current key
-    1. Restart `headscale`, a new key will be generated.
+    1. Restart `slopscale`, a new key will be generated.
     1. Restart all Tailscale clients to fetch the new key
 
 ### Changes
@@ -2089,4 +2107,4 @@ tagging)
 
 ### BREAKING
 
-- Make headscale fetch DERP map from URL and file [#196](https://github.com/juanfont/headscale/pull/196)
+- Make slopscale fetch DERP map from URL and file [#196](https://github.com/juanfont/headscale/pull/196)

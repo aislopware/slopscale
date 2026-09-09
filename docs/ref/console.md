@@ -1,12 +1,12 @@
 # Admin console
 
-Headscale ships a web console at `/admin/` on the server's own address. It
+Slopscale ships a web console at `/admin/` on the server's own address. It
 lists machines, users and keys, edits the policy, approves devices and users,
 shares nodes and marks the global exit node from a browser, the same things
 the CLI and the API do.
 
 The console is a static, client-rendered application embedded in the
-`headscale` binary. It keeps no state on the server and needs no extra process:
+`slopscale` binary. It keeps no state on the server and needs no extra process:
 open `https://<your server>/admin/` and it loads.
 
 ## Signing in
@@ -14,7 +14,7 @@ open `https://<your server>/admin/` and it loads.
 The console signs in only through the [identity provider](oidc.md): the
 sign-in page has one button, *Continue with Google* (or the provider's name),
 and nothing else. The browser is sent through the provider and comes back
-signed in as the matching headscale user, holding a session cookie that lasts
+signed in as the matching slopscale user, holding a session cookie that lasts
 seven days; *Sign out* in the account menu ends it. The provider's redirect
 URI is the same `/oidc/callback` as for device logins, so nothing more has to
 be registered.
@@ -30,11 +30,11 @@ oidc:
 ```
 
 ```console
-$ export HEADSCALE_OIDC_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
-$ export HEADSCALE_OIDC_CLIENT_SECRET=GOCSPX-...
+$ export SLOPSCALE_OIDC_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
+$ export SLOPSCALE_OIDC_CLIENT_SECRET=GOCSPX-...
 ```
 
-Every key of the configuration can be set this way: `HEADSCALE_` followed by
+Every key of the configuration can be set this way: `SLOPSCALE_` followed by
 the key path with dots replaced by underscores.
 
 A user who signs in for the first time is created the same way as on a device
@@ -52,12 +52,12 @@ oidc:
 ```
 
 ```console
-$ export HEADSCALE_OIDC_ADMIN_USERS="alice@example.com bob@example.com"
+$ export SLOPSCALE_OIDC_ADMIN_USERS="alice@example.com bob@example.com"
 ```
 
 The list is checked on every sign-in and only ever promotes a member; the
 owner and users who already hold a role keep it, and removing an address
-does not demote anyone (use `headscale users set-role` for that). The
+does not demote anyone (use `slopscale users set-role` for that). The
 promotion is written to the audit log as a system `user.role.set`.
 
 Without an identity provider the console cannot sign anyone in and says so;
@@ -94,16 +94,16 @@ $ curl -X DELETE -H "Authorization: Bearer $KEY" \
     https://<your server>/api/v1/auth/sessions/7
 ```
 
-`headscale sessions list` prints the same table, `--user <id>` narrows it to one
-user, and `headscale sessions end <id>` ends a single session:
+`slopscale sessions list` prints the same table, `--user <id>` narrows it to one
+user, and `slopscale sessions end <id>` ends a single session:
 
 ```console
-$ headscale sessions list --user 3
-$ headscale sessions end 7
+$ slopscale sessions list --user 3
+$ slopscale sessions end 7
 ```
 
 `DELETE /api/v1/user/{id}/sessions`, _Sign out everywhere_ on the user's page,
-or `headscale users sign-out --identifier <id>` signs one user out of every
+or `slopscale users sign-out --identifier <id>` signs one user out of every
 browser, which is what to reach for when a laptop goes missing; it changes
 nothing else about the account. All three are recorded in the
 [audit log](audit.md) as `console.logout`, `session.end` and
@@ -119,19 +119,19 @@ shows neither an address nor a browser.
 An administrator can invite someone by email instead of waiting for them to
 find the sign-in page. _Users → Invite_ asks for the address, the
 [role](roles.md) and any [groups](access-control.md) the person should join,
-and hands back a link; `headscale invites create` does the same from the CLI:
+and hands back a link; `slopscale invites create` does the same from the CLI:
 
 ```console
-$ headscale invites create --email ada@example.com --role admin --group 3 --expiry 72h
+$ slopscale invites create --email ada@example.com --role admin --group 3 --expiry 72h
 $ curl -X POST -H "Authorization: Bearer $KEY" \
     -d '{"email":"ada@example.com","role":"admin","groupIds":["3"],"expiry":"72h"}' \
     https://<your server>/api/v1/invite
 ```
 
 `--group` is repeatable and `--expiry` defaults to `168h`, a week, with `720h`
-the longest the server accepts. `headscale invites list` shows which
-invitations are still pending, `headscale invites resend <id>` mints a fresh
-link for one, and `headscale invites delete <id>` withdraws it.
+the longest the server accepts. `slopscale invites list` shows which
+invitations are still pending, `slopscale invites resend <id>` mints a fresh
+link for one, and `slopscale invites delete <id>` withdraws it.
 
 The link is `https://<your server>/admin/login?invite=<token>` and is shown
 once: the server keeps only a hash of the token, as it does for a session
@@ -258,7 +258,7 @@ out*.
   everywhere_ next to the signed-in credential's role and scopes, and the
   server's build, addresses, DERP regions and config file values with a
   _Maintenance_ section holding the IP address backfill
-  (`headscale nodes backfillips`).
+  (`slopscale nodes backfillips`).
 
 ## Building from source
 
@@ -279,13 +279,13 @@ libraries and Cloudflare's [Kumo](https://kumo-ui.com) design system (Base UI
 components and Tailwind CSS), checked
 by TypeScript, oxlint and oxfmt. Its API types are generated from the server's
 OpenAPI document by `make web-generate` and committed. `bun run dev` in `web/`
-starts a development server that proxies `/api` and `/oidc` to a headscale on
-`http://127.0.0.1:8080` (set `HEADSCALE_URL` to point elsewhere).
+starts a development server that proxies `/api` and `/oidc` to a slopscale on
+`http://127.0.0.1:8080` (set `SLOPSCALE_URL` to point elsewhere).
 
 ### Signing in without Google
 
 The console only signs in through an identity provider, so development and
-tests need one that asks no questions. `go run ./cmd/dev` starts a headscale
+tests need one that asks no questions. `go run ./cmd/dev` starts a slopscale
 with a mock OpenID Connect provider running inside the same process: every
 sign-in comes back as `jane.doe@example.com`, who is listed in that server's
 `oidc.admin_users` and therefore opens the console as an admin.
@@ -295,7 +295,7 @@ $ go run ./cmd/dev                       # server on :8080, provider on :9100
 $ open http://127.0.0.1:8080/admin/      # Continue with single sign-on
 ```
 
-To sign in from the Vite development server instead, start headscale with
+To sign in from the Vite development server instead, start slopscale with
 its public URL set to Vite's origin, so the provider sends the browser back
 there: `go run ./cmd/dev -server-url http://localhost:5173`, then
 `bun run dev` in `web/` and open `http://localhost:5173/admin/`.

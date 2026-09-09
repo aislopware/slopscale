@@ -19,27 +19,27 @@ import (
 	"testing"
 	"time"
 
+	apiv1 "github.com/aislopware/slopscale/hscontrol/api/v1"
+	apiv2 "github.com/aislopware/slopscale/hscontrol/api/v2"
+	"github.com/aislopware/slopscale/hscontrol/capver"
+	"github.com/aislopware/slopscale/hscontrol/db"
+	derpServer "github.com/aislopware/slopscale/hscontrol/derp/server"
+	"github.com/aislopware/slopscale/hscontrol/dns"
+	"github.com/aislopware/slopscale/hscontrol/dnsprovider"
+	"github.com/aislopware/slopscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/mapper"
+	"github.com/aislopware/slopscale/hscontrol/recorder"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
+	"github.com/aislopware/slopscale/web"
 	"github.com/cenkalti/backoff/v5"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/metrics"
-	apiv1 "github.com/juanfont/headscale/hscontrol/api/v1"
-	apiv2 "github.com/juanfont/headscale/hscontrol/api/v2"
-	"github.com/juanfont/headscale/hscontrol/capver"
-	"github.com/juanfont/headscale/hscontrol/db"
-	derpServer "github.com/juanfont/headscale/hscontrol/derp/server"
-	"github.com/juanfont/headscale/hscontrol/dns"
-	"github.com/juanfont/headscale/hscontrol/dnsprovider"
-	"github.com/juanfont/headscale/hscontrol/egress"
-	"github.com/juanfont/headscale/hscontrol/mapper"
-	"github.com/juanfont/headscale/hscontrol/recorder"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
-	"github.com/juanfont/headscale/web"
 	"github.com/pkg/profile"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/acme"
@@ -57,11 +57,11 @@ var errUnsupportedLetsEncryptChallengeType = errors.New(
 const (
 	updateInterval     = 5 * time.Second
 	privateKeyFileMode = 0o600
-	headscaleDirPerm   = 0o700
+	slopscaleDirPerm   = 0o700
 )
 
-// Headscale represents the base app of the service.
-type Headscale struct {
+// Slopscale represents the base app of the service.
+type Slopscale struct {
 	cfg             *types.Config
 	state           *state.State
 	noisePrivateKey *key.MachinePrivate
@@ -93,15 +93,15 @@ type Headscale struct {
 }
 
 var (
-	profilingEnabled = envknob.Bool("HEADSCALE_DEBUG_PROFILING_ENABLED")
-	profilingPath    = envknob.String("HEADSCALE_DEBUG_PROFILING_PATH")
-	tailsqlEnabled   = envknob.Bool("HEADSCALE_DEBUG_TAILSQL_ENABLED")
-	tailsqlStateDir  = envknob.String("HEADSCALE_DEBUG_TAILSQL_STATE_DIR")
+	profilingEnabled = envknob.Bool("SLOPSCALE_DEBUG_PROFILING_ENABLED")
+	profilingPath    = envknob.String("SLOPSCALE_DEBUG_PROFILING_PATH")
+	tailsqlEnabled   = envknob.Bool("SLOPSCALE_DEBUG_TAILSQL_ENABLED")
+	tailsqlStateDir  = envknob.String("SLOPSCALE_DEBUG_TAILSQL_STATE_DIR")
 	tailsqlTSKey     = envknob.String("TS_AUTHKEY")
-	dumpConfig       = envknob.Bool("HEADSCALE_DEBUG_DUMP_CONFIG")
+	dumpConfig       = envknob.Bool("SLOPSCALE_DEBUG_DUMP_CONFIG")
 )
 
-func NewHeadscale(cfg *types.Config) (*Headscale, error) {
+func NewSlopscale(cfg *types.Config) (*Slopscale, error) {
 	var err error
 
 	if profilingEnabled {
@@ -123,7 +123,7 @@ func NewHeadscale(cfg *types.Config) (*Headscale, error) {
 		return nil, fmt.Errorf("init state: %w", err)
 	}
 
-	app := Headscale{
+	app := Slopscale{
 		cfg:               cfg,
 		noisePrivateKey:   noisePrivateKey,
 		clientStreamsOpen: sync.WaitGroup{},
@@ -193,7 +193,7 @@ func NewHeadscale(cfg *types.Config) (*Headscale, error) {
 // registration/auth URLs, upgrading to OIDC when cfg.OIDC.Issuer is set. On
 // OIDC setup failure it falls back to the CLI provider unless
 // cfg.OIDC.OnlyStartIfOIDCIsAvailable requires a hard failure.
-func setupAuthProvider(cfg *types.Config, app *Headscale) (AuthProvider, error) {
+func setupAuthProvider(cfg *types.Config, app *Slopscale) (AuthProvider, error) {
 	authProvider := AuthProvider(NewAuthProviderWeb(cfg.ServerURL))
 
 	if cfg.OIDC.Issuer == "" {
@@ -228,7 +228,7 @@ func setupAuthProvider(cfg *types.Config, app *Headscale) (AuthProvider, error) 
 func setupEmbeddedDERPServer(
 	cfg *types.Config,
 	noisePrivateKey *key.MachinePrivate,
-	app *Headscale,
+	app *Slopscale,
 ) (*derpServer.DERPServer, error) {
 	if cfg.DERP.ServerPrivateKeyPath == "" {
 		return nil, nil //nolint:nilnil // intentional: no relay key, no embedded relay
@@ -281,10 +281,10 @@ func serveHumaMux(mux http.Handler) http.HandlerFunc {
 	}
 }
 
-// Serve launches the HTTP servers that run Headscale and its API.
+// Serve launches the HTTP servers that run Slopscale and its API.
 //
 //nolint:gocognit,gocyclo,cyclop,funlen,maintidx // legacy: wires many independent listeners; splitting is a redesign
-func (h *Headscale) Serve() error {
+func (h *Slopscale) Serve() error {
 	var err error
 
 	capver.CanOldCodeBeCleanedUp()
@@ -307,7 +307,7 @@ func (h *Headscale) Serve() error {
 	}
 
 	versionInfo := types.GetVersionInfo()
-	log.Info().Str("version", versionInfo.Version).Str("commit", versionInfo.Commit).Msg("starting headscale")
+	log.Info().Str("version", versionInfo.Version).Str("commit", versionInfo.Commit).Msg("starting slopscale")
 	log.Info().
 		Str("minimum_version", capver.TailscaleVersion(capver.MinSupportedCapabilityVersion)).
 		Msg("Clients with a lower minimum version will be rejected")
@@ -401,7 +401,7 @@ func (h *Headscale) Serve() error {
 	// and the remote TCP router (served behind the API-key middleware).
 	humaMux, _ := apiv1.Handler(h.apiV1Backend())
 
-	// The Headscale v2 API. Served behind Basic/Bearer auth on the remote
+	// The Slopscale v2 API. Served behind Basic/Bearer auth on the remote
 	// listener, and over the local unix socket (local trust) so the CLI can
 	// manage OAuth clients through the same v2 keys handler the Tailscale
 	// ecosystem uses.
@@ -629,7 +629,7 @@ func (h *Headscale) Serve() error {
 				cancel()
 
 				log.Info().
-					Msg("Headscale stopped")
+					Msg("Slopscale stopped")
 
 				return
 			}
@@ -701,14 +701,14 @@ func readOrCreatePrivateKey(path string) (*key.MachinePrivate, error) {
 // Change is used to send changes to nodes.
 // All change should be enqueued here and empty will be automatically
 // ignored.
-func (h *Headscale) Change(cs ...change.Change) {
+func (h *Slopscale) Change(cs ...change.Change) {
 	h.mapBatcher.AddWork(cs...)
 }
 
-// HTTPHandler returns an [http.Handler] for the [Headscale] control server.
+// HTTPHandler returns an [http.Handler] for the [Slopscale] control server.
 // The handler serves the Tailscale control protocol including the /key
 // endpoint and /ts2021 Noise upgrade path.
-func (h *Headscale) HTTPHandler() http.Handler {
+func (h *Slopscale) HTTPHandler() http.Handler {
 	humaMux, _ := apiv1.Handler(h.apiV1Backend())
 
 	humaV2Mux, _ := apiv2.Handler(apiv2.Backend{
@@ -721,13 +721,13 @@ func (h *Headscale) HTTPHandler() http.Handler {
 }
 
 // NoisePublicKey returns the server's Noise protocol public key.
-func (h *Headscale) NoisePublicKey() key.MachinePublic {
+func (h *Slopscale) NoisePublicKey() key.MachinePublic {
 	return h.noisePrivateKey.Public()
 }
 
 // GetState returns the server's state manager for programmatic access
 // to users, nodes, policies, and other server state.
-func (h *Headscale) GetState() *state.State {
+func (h *Slopscale) GetState() *state.State {
 	return h.state
 }
 
@@ -735,7 +735,7 @@ func (h *Headscale) GetState() *state.State {
 // This is needed for test servers where the URL is not known until
 // the HTTP test server starts.
 // It panics when called outside of tests.
-func (h *Headscale) SetServerURLForTest(tb testing.TB, url string) {
+func (h *Slopscale) SetServerURLForTest(tb testing.TB, url string) {
 	tb.Helper()
 
 	h.cfg.ServerURL = url
@@ -755,7 +755,7 @@ func (h *Headscale) SetServerURLForTest(tb testing.TB, url string) {
 // StartBatcherForTest initialises and starts the map response batcher.
 // It registers a cleanup function on tb to stop the batcher.
 // It panics when called outside of tests.
-func (h *Headscale) StartBatcherForTest(tb testing.TB) {
+func (h *Slopscale) StartBatcherForTest(tb testing.TB) {
 	tb.Helper()
 
 	h.mapBatcher = mapper.NewBatcherAndMapper(h.cfg, h.state)
@@ -764,13 +764,13 @@ func (h *Headscale) StartBatcherForTest(tb testing.TB) {
 }
 
 // MapBatcher returns the map response batcher (for test use).
-func (h *Headscale) MapBatcher() *mapper.Batcher {
+func (h *Slopscale) MapBatcher() *mapper.Batcher {
 	return h.mapBatcher
 }
 
 // StartDERPForTest hands the state the embedded relay and builds the map
-// from the effective settings, as [Headscale.Serve] does.
-func (h *Headscale) StartDERPForTest(tb testing.TB) {
+// from the effective settings, as [Slopscale.Serve] does.
+func (h *Slopscale) StartDERPForTest(tb testing.TB) {
 	tb.Helper()
 
 	h.state.SetDERPRelay(h.DERPServer)
@@ -788,7 +788,7 @@ func (h *Headscale) StartDERPForTest(tb testing.TB) {
 // StartEphemeralGCForTest starts the ephemeral node garbage collector.
 // It registers a cleanup function on tb to stop the collector.
 // It panics when called outside of tests.
-func (h *Headscale) StartEphemeralGCForTest(tb testing.TB) {
+func (h *Slopscale) StartEphemeralGCForTest(tb testing.TB) {
 	tb.Helper()
 
 	go h.ephemeralGC.Start()
@@ -797,15 +797,15 @@ func (h *Headscale) StartEphemeralGCForTest(tb testing.TB) {
 }
 
 // SetExtraRecordsForTest serves records as if the extra-records file held
-// them, for tests that do not run [Headscale.Serve] and its file watcher.
-func (h *Headscale) SetExtraRecordsForTest(records []tailcfg.DNSRecord) {
+// them, for tests that do not run [Slopscale.Serve] and its file watcher.
+func (h *Slopscale) SetExtraRecordsForTest(records []tailcfg.DNSRecord) {
 	h.cfg.SetExtraRecords(records)
 	h.Change(change.ExtraRecords())
 }
 
 // apiV1Backend is the v1 API's view of the server, including whether the
 // console can sign in through the identity provider.
-func (h *Headscale) apiV1Backend() apiv1.Backend {
+func (h *Slopscale) apiV1Backend() apiv1.Backend {
 	b := apiv1.Backend{
 		State:    h.state,
 		Change:   h.Change,
@@ -824,12 +824,12 @@ func (h *Headscale) apiV1Backend() apiv1.Backend {
 }
 
 // Redirect to our TLS url.
-func (h *Headscale) redirect(w http.ResponseWriter, req *http.Request) {
+func (h *Slopscale) redirect(w http.ResponseWriter, req *http.Request) {
 	target := h.cfg.ServerURL + req.URL.RequestURI()
 	http.Redirect(w, req, target, http.StatusFound) //nolint:gosec // G710: target prefixed by trusted ServerURL
 }
 
-func (h *Headscale) scheduledTasks(ctx context.Context) {
+func (h *Slopscale) scheduledTasks(ctx context.Context) {
 	expireTicker := time.NewTicker(updateInterval)
 	defer expireTicker.Stop()
 
@@ -960,7 +960,7 @@ func (h *Headscale) scheduledTasks(ctx context.Context) {
 
 // postureBoundaryPassed reports whether a scheduled posture in use opened
 // or closed between the two instants.
-func (h *Headscale) postureBoundaryPassed(since, now time.Time) bool {
+func (h *Slopscale) postureBoundaryPassed(since, now time.Time) bool {
 	next := h.state.NextPostureBoundary(since)
 
 	return !next.IsZero() && !next.After(now)
@@ -968,7 +968,7 @@ func (h *Headscale) postureBoundaryPassed(since, now time.Time) bool {
 
 // recompilePostures rebuilds the policy at a schedule boundary and
 // publishes the result.
-func (h *Headscale) recompilePostures() {
+func (h *Slopscale) recompilePostures() {
 	c, err := h.state.RecompilePostures()
 	if err != nil {
 		log.Error().Err(err).Msg("recompiling postures at a schedule boundary")
@@ -983,7 +983,7 @@ func (h *Headscale) recompilePostures() {
 
 // expireAccess ends the temporary rules and memberships that ran out
 // between the two instants and publishes the rebuilt policy.
-func (h *Headscale) expireAccess(since, now time.Time) {
+func (h *Slopscale) expireAccess(since, now time.Time) {
 	c, err := h.state.ExpireAccess(since, now)
 	if err != nil {
 		log.Error().Err(err).Msg("ending expired temporary access")
@@ -998,7 +998,7 @@ func (h *Headscale) expireAccess(since, now time.Time) {
 
 // expireNodeAttributes drops custom posture attributes past their expiry
 // and publishes the recompute.
-func (h *Headscale) expireNodeAttributes() {
+func (h *Slopscale) expireNodeAttributes() {
 	c, err := h.state.ExpireNodeAttributes(time.Now())
 	if err != nil {
 		log.Error().Err(err).Msg("expiring node attributes")
@@ -1018,7 +1018,7 @@ const postureConnectDelay = 2 * time.Second
 // collectPostureOnConnect asks a node that just connected for its
 // identity when the setting is on and its report is missing or a day
 // old, so a new machine's serial shows up without waiting for the cycle.
-func (h *Headscale) collectPostureOnConnect(ctx context.Context, nodeID types.NodeID) {
+func (h *Slopscale) collectPostureOnConnect(ctx context.Context, nodeID types.NodeID) {
 	if !h.state.Settings().PostureIdentityOn {
 		return
 	}
@@ -1048,7 +1048,7 @@ func (h *Headscale) collectPostureOnConnect(ctx context.Context, nodeID types.No
 
 // reapRevokedPreAuthKeys destroys pre-auth keys that were revoked more than
 // cfg.PreAuthKeys.RevokedRetention ago.
-func (h *Headscale) reapRevokedPreAuthKeys() {
+func (h *Slopscale) reapRevokedPreAuthKeys() {
 	cutoff := time.Now().Add(-h.cfg.PreAuthKeys.RevokedRetention)
 
 	reaped, err := h.state.DestroyRevokedPreAuthKeysBefore(cutoff)
@@ -1060,7 +1060,7 @@ func (h *Headscale) reapRevokedPreAuthKeys() {
 }
 
 // reapExpiredAccessTokens destroys OAuth access tokens that are past their expiry.
-func (h *Headscale) reapExpiredAccessTokens() {
+func (h *Slopscale) reapExpiredAccessTokens() {
 	reaped, err := h.state.DeleteExpiredAccessTokens(time.Now())
 	if err != nil {
 		log.Error().Err(err).Msg("reaping expired oauth access tokens")
@@ -1070,7 +1070,7 @@ func (h *Headscale) reapExpiredAccessTokens() {
 }
 
 // reapExpiredSessions removes console sessions past their expiry.
-func (h *Headscale) reapExpiredSessions() {
+func (h *Slopscale) reapExpiredSessions() {
 	reaped, err := h.state.DeleteExpiredSessions(time.Now())
 	if err != nil {
 		log.Error().Err(err).Msg("reaping expired console sessions")
@@ -1080,7 +1080,7 @@ func (h *Headscale) reapExpiredSessions() {
 }
 
 // reapAuditEvents applies cfg.Audit.Retention; zero keeps everything.
-func (h *Headscale) reapAuditEvents() {
+func (h *Slopscale) reapAuditEvents() {
 	if h.cfg.Audit.Retention <= 0 {
 		return
 	}
@@ -1096,7 +1096,7 @@ func (h *Headscale) reapAuditEvents() {
 // expireNodesTick runs one pass of node expiry since lastExpiryCheck,
 // sending a change for every node that expired, and returns the checkpoint
 // to pass in on the next tick.
-func (h *Headscale) expireNodesTick(lastExpiryCheck time.Time) time.Time {
+func (h *Slopscale) expireNodesTick(lastExpiryCheck time.Time) time.Time {
 	lastExpiryCheck, expiredNodeChanges, changed := h.state.ExpireExpiredNodes(lastExpiryCheck)
 
 	if changed {
@@ -1115,7 +1115,7 @@ func (h *Headscale) expireNodesTick(lastExpiryCheck time.Time) time.Time {
 // the effective settings' frequency, or a day's wait while auto update
 // is off, after which the scheduler re-reads the settings without
 // fetching.
-func (h *Headscale) derpRefreshInterval() time.Duration {
+func (h *Slopscale) derpRefreshInterval() time.Duration {
 	if h.state.DERPFetchFailed() {
 		return derpRefreshRetry
 	}
@@ -1133,10 +1133,10 @@ const (
 	derpRefreshRetry = 5 * time.Minute
 )
 
-// refreshDERPMapInBackground runs [Headscale.refreshDERPMap] off the
+// refreshDERPMapInBackground runs [Slopscale.refreshDERPMap] off the
 // scheduler goroutine, which must keep serving expiry and health ticks
 // while a fetch backs off, and skips the run while one is in flight.
-func (h *Headscale) refreshDERPMapInBackground(ctx context.Context) {
+func (h *Slopscale) refreshDERPMapInBackground(ctx context.Context) {
 	if !h.derpRefreshing.CompareAndSwap(false, true) {
 		return
 	}
@@ -1154,7 +1154,7 @@ func (h *Headscale) refreshDERPMapInBackground(ctx context.Context) {
 // refreshDERPMap refetches the map sources, retrying with backoff until
 // ctx ends, and pushes the map when it changed. It returns an error
 // rather than applying a partial map when the fetch keeps failing.
-func (h *Headscale) refreshDERPMap(ctx context.Context) error {
+func (h *Slopscale) refreshDERPMap(ctx context.Context) error {
 	log.Info().Msg("fetching DERPMap updates")
 
 	changed, err := backoff.Retry(ctx, func() (bool, error) {
@@ -1174,7 +1174,7 @@ func (h *Headscale) refreshDERPMap(ctx context.Context) error {
 // applyExtraRecords updates the served extra DNS records and notifies nodes
 // of the change. ok mirrors the extraRecordMan update channel's closed
 // state; when false there is nothing to apply and it returns false.
-func (h *Headscale) applyExtraRecords(records []tailcfg.DNSRecord, ok bool) bool {
+func (h *Slopscale) applyExtraRecords(records []tailcfg.DNSRecord, ok bool) bool {
 	if !ok {
 		return false
 	}
@@ -1186,9 +1186,9 @@ func (h *Headscale) applyExtraRecords(records []tailcfg.DNSRecord, ok bool) bool
 	return true
 }
 
-// ensureUnixSocketIsAbsent will check if the given path for headscales unix socket is clear
+// ensureUnixSocketIsAbsent will check if the given path for slopscales unix socket is clear
 // and will remove it if it is not.
-func (h *Headscale) ensureUnixSocketIsAbsent() error {
+func (h *Slopscale) ensureUnixSocketIsAbsent() error {
 	// File does not exist, all fine
 	_, err := os.Stat(h.cfg.UnixSocket)
 	if errors.Is(err, os.ErrNotExist) {
@@ -1203,7 +1203,7 @@ func (h *Headscale) ensureUnixSocketIsAbsent() error {
 	return nil
 }
 
-func (h *Headscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
+func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(metrics.Collector(metrics.CollectorOpts{
 		Host:  false,
@@ -1261,8 +1261,8 @@ func (h *Headscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 
 	// Auth is enforced inside each Huma mux per-operation, so the whole API
 	// mounts as one handler per version: operations need an API key while the
-	// OpenAPI document and docs UI stay public. v1 is the headscale-native admin
-	// API; v2 is Headscale's v2 API, which ports some endpoints from Tailscale.
+	// OpenAPI document and docs UI stay public. v1 is the slopscale-native admin
+	// API; v2 is Slopscale's v2 API, which ports some endpoints from Tailscale.
 	r.Route("/api", func(r chi.Router) {
 		r.Handle("/v1/*", serveHumaMux(apiV1Mux))
 		r.Handle("/v2/*", serveHumaMux(apiV2Mux))
@@ -1283,7 +1283,7 @@ func (h *Headscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	return r
 }
 
-func (h *Headscale) getTLSSettings() (*tls.Config, error) {
+func (h *Slopscale) getTLSSettings() (*tls.Config, error) {
 	tlsEnabled := h.cfg.TLS.LetsEncrypt.Hostname != "" || h.cfg.TLS.CertPath != ""
 	if tlsEnabled && !strings.HasPrefix(h.cfg.ServerURL, "https://") {
 		log.Warn().Msg("listening with TLS but ServerURL does not start with https://")
@@ -1310,13 +1310,13 @@ func (h *Headscale) getTLSSettings() (*tls.Config, error) {
 		switch h.cfg.TLS.LetsEncrypt.ChallengeType {
 		case types.TLSALPN01ChallengeType:
 			// Configuration via autocert with TLS-ALPN-01 (https://tools.ietf.org/html/rfc8737)
-			// The RFC requires that the validation is done on port 443; in other words, headscale
+			// The RFC requires that the validation is done on port 443; in other words, slopscale
 			// must be reachable on port 443.
 			return certManager.TLSConfig(), nil
 
 		case types.HTTP01ChallengeType:
 			// Configuration via autocert with HTTP-01. This requires listening on
-			// port 80 for the certificate validation in addition to the headscale
+			// port 80 for the certificate validation in addition to the slopscale
 			// service, which can be configured to run on any other port.
 			server := &http.Server{
 				Addr:        h.cfg.TLS.LetsEncrypt.Listen,

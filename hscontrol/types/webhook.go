@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/egress"
 )
 
 // WebhookID identifies a webhook endpoint in the webhooks table.

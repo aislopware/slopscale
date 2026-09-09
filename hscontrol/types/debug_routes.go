@@ -6,7 +6,7 @@ import (
 	"tailscale.com/tailcfg"
 )
 
-// DebugRoutes is the JSON-shaped snapshot of the headscale primary
+// DebugRoutes is the JSON-shaped snapshot of the slopscale primary
 // route ledger exposed by the /debug/routes endpoint and consumed by
 // the integration test harness. It used to live in hscontrol/routes,
 // but the algorithm now runs inside hscontrol/state and that package
@@ -14,7 +14,7 @@ import (
 type DebugRoutes struct {
 	// AvailableRoutes maps node IDs to their advertised routes
 	// (intersection of announced and approved). Only nodes currently
-	// connected to headscale are listed.
+	// connected to slopscale are listed.
 	AvailableRoutes map[NodeID][]netip.Prefix `json:"available_routes"`
 
 	// PrimaryRoutes maps route prefixes to the node currently elected

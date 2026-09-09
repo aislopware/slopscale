@@ -9,7 +9,7 @@
   "ignorePresets": [":prHourlyLimit2"],
   "enabledManagers": ["dockerfile", "gomod", "github-actions", "custom.regex"],
   "includeForks": true,
-  "repositories": ["juanfont/headscale"],
+  "repositories": ["aislopware/slopscale"],
   "platform": "github",
   "packageRules": [
     {

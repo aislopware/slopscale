@@ -16,10 +16,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/derp"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/derp"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -39,12 +39,12 @@ func setupStormBatcher(tb testing.TB, nodeCount, workers int, policy string) (*T
 	cfg := &types.Config{
 		Database: types.DatabaseConfig{
 			Type:   types.DatabaseSqlite,
-			Sqlite: types.SqliteConfig{Path: tmpDir + "/headscale_test.db"},
+			Sqlite: types.SqliteConfig{Path: tmpDir + "/slopscale_test.db"},
 		},
 		PrefixV4:     &prefixV4,
 		PrefixV6:     &prefixV6,
 		IPAllocation: types.IPAllocationStrategySequential,
-		BaseDomain:   "headscale.test",
+		BaseDomain:   "slopscale.test",
 		Policy:       types.PolicyConfig{Mode: types.PolicyModeDB},
 		DERP: types.DERPConfig{
 			ServerEnabled: false,
@@ -62,7 +62,7 @@ func setupStormBatcher(tb testing.TB, nodeCount, workers int, policy string) (*T
 		},
 	}
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(tb, err)
 
 	users := database.CreateUsersForTest(1, "testuser")
@@ -105,7 +105,7 @@ func setupStormBatcher(tb testing.TB, nodeCount, workers int, policy string) (*T
 	}
 }
 
-// TestInitialMapNotStarvedByReconnectStorm reproduces juanfont/headscale#3346.
+// TestInitialMapNotStarvedByReconnectStorm reproduces aislopware/slopscale#3346.
 //
 // When every node redials at once (e.g. after a server upgrade restart), each
 // connection writes the NodeStore (UpdateNodeFromMapRequest + Connect) and the

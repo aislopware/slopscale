@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 )
 
 // LogType is what the entries are; the server has one log, the audit
@@ -217,8 +217,8 @@ func encodeSplunk(entries []Entry) (Request, error) {
 	for _, e := range entries {
 		event := map[string]any{
 			"time":       float64(e.Time.UnixNano()) / float64(time.Second),
-			"source":     "headscale",
-			"sourcetype": "headscale:" + e.Type,
+			"source":     "slopscale",
+			"sourcetype": "slopscale:" + e.Type,
 			"event":      e,
 		}
 
@@ -264,8 +264,8 @@ func encodeDatadog(stream types.LogStream, entries []Entry) (Request, error) {
 
 	for _, e := range entries {
 		doc := e.fields()
-		doc["ddsource"] = "headscale"
-		doc["service"] = "headscale"
+		doc["ddsource"] = "slopscale"
+		doc["service"] = "slopscale"
 		doc["ddtags"] = "type:" + e.Type + tag("tailnet", e.Tailnet) + tag("stream", stream.Name)
 		doc["message"] = e.Summary()
 		doc["timestamp"] = e.Time.UnixMilli()
@@ -301,7 +301,7 @@ func encodeAxiom(entries []Entry) (Request, error) {
 // encodeLoki is the push API's streams: one stream with the labels, its
 // values the nanosecond timestamp and the entry as a JSON line.
 func encodeLoki(stream types.LogStream, entries []Entry) (Request, error) {
-	labels := map[string]string{"job": "headscale", "type": LogType}
+	labels := map[string]string{"job": "slopscale", "type": LogType}
 	if stream.Name != "" {
 		labels["stream"] = stream.Name
 	}

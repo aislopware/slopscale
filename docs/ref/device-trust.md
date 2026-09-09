@@ -22,9 +22,9 @@ still approved and a suspended machine that is later unsuspended does not
 wait for approval again.
 
 ```console
-headscale nodes list                        # the Approved column reads "suspended"
-headscale nodes suspend --identifier 7
-headscale nodes suspend --identifier 7 --revoke
+slopscale nodes list                        # the Approved column reads "suspended"
+slopscale nodes suspend --identifier 7
+slopscale nodes suspend --identifier 7 --revoke
 ```
 
 Through the API, `POST /api/v1/node/{id}/suspend`, with
@@ -78,10 +78,10 @@ user allowed it with `tailscale set --posture-checking=true`. The server
 asks over the control connection (a "c2n" request carried by the map
 stream, answered over the noise channel), so the machine has to be
 connected. Collection is off by default; the `postureIdentityOn` setting,
-`headscale settings set --posture-identity=true` or _Collect device
+`slopscale settings set --posture-identity=true` or _Collect device
 identity_ under the console's _Settings_ turns it on. While it is on, the
 server asks each machine when it connects and again once a day, and
-`POST /api/v1/node/{id}/posture/collect`, `headscale nodes posture collect`
+`POST /api/v1/node/{id}/posture/collect`, `slopscale nodes posture collect`
 or the _Refresh_ button asks now. A client with posture checking off
 answers that it is disabled, which the posture shows so the operator knows
 to ask the user.
@@ -95,10 +95,10 @@ expiry is how a temporary marker such as an on-call rotation is made.
 Setting one recomputes the policy for the machine.
 
 ```console
-headscale nodes posture show --identifier 7
-headscale nodes posture set --identifier 7 custom:oncall=true --expiry 8h --comment "pager week"
-headscale nodes posture set --identifier 7 custom:tier=3
-headscale nodes posture delete --identifier 7 custom:oncall
+slopscale nodes posture show --identifier 7
+slopscale nodes posture set --identifier 7 custom:oncall=true --expiry 8h --comment "pager week"
+slopscale nodes posture set --identifier 7 custom:tier=3
+slopscale nodes posture delete --identifier 7 custom:oncall
 ```
 
 Through the API, `PUT /api/v1/node/{id}/attributes/{key}` with
@@ -153,7 +153,7 @@ one the server refuses a posture that uses it. A machine's source address
 counts once it has connected; a posture that uses one of the `ip:`
 attributes recomputes the policy for a machine when its address changes.
 
-`POST /api/v1/posture/check` and `headscale postures check --expr ...`
+`POST /api/v1/posture/check` and `slopscale postures check --expr ...`
 parse expressions without storing them. The console's posture editor
 colours each line, underlines a parse error where it is as it is typed,
 warns about an attribute the server never reports or a value `node:os`
@@ -176,14 +176,14 @@ source groups. The destinations are never narrowed. A posture a rule
 names cannot be deleted; remove it from the rule first.
 
 ```console
-headscale postures create --name "Current client" \
+slopscale postures create --name "Current client" \
   --expr "node:tsVersion >= '1.80'" --expr "custom:blocked NOT SET"
-headscale postures create --name "Office hours" \
+slopscale postures create --name "Office hours" \
   --days mon,tue,wed,thu,fri --start 09:00 --end 18:00 --timezone Asia/Ho_Chi_Minh
-headscale postures list
-headscale access-rules create --name "SSH from current clients" \
+slopscale postures list
+slopscale access-rules create --name "SSH from current clients" \
   --src 2 --dst 3 --protocol tcp --ports 22 --posture 1
-headscale nodes posture show --identifier 7
+slopscale nodes posture show --identifier 7
 ```
 
 Through the API, `GET`, `POST /api/v1/posture`, `GET`, `PUT`,

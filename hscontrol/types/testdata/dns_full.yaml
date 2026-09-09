@@ -19,7 +19,7 @@ dns:
     split:
       foo.bar.com:
         - 1.1.1.1
-      darp.headscale.net:
+      darp.slopscale.net:
         - 1.1.1.1
         - 8.8.8.8
 

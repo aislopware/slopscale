@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -230,7 +230,7 @@ func TestStateDebugPolicy(t *testing.T) {
 		polPath := filepath.Join(dir, "policy.hujson")
 		require.NoError(t, os.WriteFile(polPath, []byte(pol), 0o600))
 
-		cfg := persistTestConfig(filepath.Join(dir, "headscale.db"))
+		cfg := persistTestConfig(filepath.Join(dir, "slopscale.db"))
 		cfg.Policy = types.PolicyConfig{Mode: types.PolicyModeFile, Path: polPath}
 
 		s, err := NewState(cfg)
@@ -265,10 +265,10 @@ func TestStateDebugPolicy(t *testing.T) {
 func TestStateDebugOverviewCounts(t *testing.T) {
 	t.Parallel()
 
-	dbPath := t.TempDir() + "/headscale.db"
+	dbPath := t.TempDir() + "/slopscale.db"
 	cfg := persistTestConfig(dbPath)
 
-	database, err := db.NewHeadscaleDatabase(cfg)
+	database, err := db.NewSlopscaleDatabase(cfg)
 	require.NoError(t, err)
 
 	user := database.CreateUserForTest("overview-user")
@@ -358,8 +358,8 @@ func TestStateDebugPassthroughs(t *testing.T) {
 				RegionID:   7,
 				RegionName: "seven",
 				Nodes: []*tailcfg.DERPNode{
-					{Name: "7a", RegionID: 7, HostName: "derp7.headscale.test", DERPPort: 443, STUNPort: 3478},
-					{Name: "7b", RegionID: 7, HostName: "derp7b.headscale.test", DERPPort: 8443},
+					{Name: "7a", RegionID: 7, HostName: "derp7.slopscale.test", DERPPort: 443, STUNPort: 3478},
+					{Name: "7b", RegionID: 7, HostName: "derp7b.slopscale.test", DERPPort: 8443},
 				},
 			},
 		},
@@ -369,8 +369,8 @@ func TestStateDebugPassthroughs(t *testing.T) {
 	assert.Contains(t, text, "Total Regions: 1")
 	assert.Contains(t, text, "Region 7: seven")
 	assert.Contains(t, text, "  - Nodes: 2")
-	assert.Contains(t, text, "    - 7a (derp7.headscale.test:443)\n      STUN: 3478\n")
-	assert.Contains(t, text, "    - 7b (derp7b.headscale.test:8443)\n")
+	assert.Contains(t, text, "    - 7a (derp7.slopscale.test:443)\n      STUN: 3478\n")
+	assert.Contains(t, text, "    - 7b (derp7b.slopscale.test:8443)\n")
 	assert.NotContains(t, text, "STUN: 0")
 
 	info := s.DebugDERPJSON()
@@ -381,8 +381,8 @@ func TestStateDebugPassthroughs(t *testing.T) {
 		RegionID:   7,
 		RegionName: "seven",
 		Nodes: []*DebugDERPNode{
-			{Name: "7a", HostName: "derp7.headscale.test", DERPPort: 443, STUNPort: 3478},
-			{Name: "7b", HostName: "derp7b.headscale.test", DERPPort: 8443},
+			{Name: "7a", HostName: "derp7.slopscale.test", DERPPort: 443, STUNPort: 3478},
+			{Name: "7b", HostName: "derp7b.slopscale.test", DERPPort: 8443},
 		},
 	}, info.Regions[7])
 }

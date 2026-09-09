@@ -1,6 +1,6 @@
 # Debugging and troubleshooting
 
-Headscale and Tailscale provide debug and introspection capabilities that can be helpful when things don't work as
+Slopscale and Tailscale provide debug and introspection capabilities that can be helpful when things don't work as
 expected. This page explains some debugging techniques to help pinpoint problems.
 
 See also [Tailscale's Troubleshooting guide](https://tailscale.com/docs/reference/troubleshooting). It
@@ -15,16 +15,16 @@ The Tailscale client itself offers many commands to introspect its state as well
 - [Get DNS status](https://tailscale.com/docs/reference/tailscale-cli#dns): `tailscale dns status --all`
 - Client logs: `tailscale debug daemon-logs`
 - Client netmap: `tailscale debug netmap`
-- Test DERP connection: `tailscale debug derp headscale`
+- Test DERP connection: `tailscale debug derp slopscale`
 - And many more, see: `tailscale debug --help`
 
-Many of the commands are helpful when trying to understand differences between Headscale and Tailscale SaaS.
+Many of the commands are helpful when trying to understand differences between Slopscale and Tailscale SaaS.
 
-## Headscale
+## Slopscale
 
 ### Application logging
 
-The log levels `debug` and `trace` can be useful to get more information from Headscale.
+The log levels `debug` and `trace` can be useful to get more information from Slopscale.
 
 ```yaml hl_lines="3"
 log:
@@ -34,7 +34,7 @@ log:
 
 ### Database logging
 
-The database debug mode logs all database queries. Enable it to see how Headscale interacts with its database. This also
+The database debug mode logs all database queries. Enable it to see how Slopscale interacts with its database. This also
 requires the application log level to be set to either `debug` or `trace`.
 
 ```yaml hl_lines="3 7"
@@ -49,7 +49,7 @@ log:
 
 ### Metrics and debug endpoint
 
-Headscale provides a metrics and debug endpoint. It allows to introspect different aspects such as:
+Slopscale provides a metrics and debug endpoint. It allows to introspect different aspects such as:
 
 - Information about the Go runtime, memory usage and statistics
 - Connected nodes and pending registrations
@@ -73,7 +73,7 @@ additional protection despite listening on all interfaces.
 
 === "Direct access"
 
-    Access the debug interface directly on the server where Headscale is installed.
+    Access the debug interface directly on the server where Slopscale is installed.
 
     ```console
     curl http://localhost:9090/debug/
@@ -81,10 +81,10 @@ additional protection despite listening on all interfaces.
 
 === "SSH port forwarding"
 
-    Use SSH port forwarding to forward Headscale's metrics and debug port to your device.
+    Use SSH port forwarding to forward Slopscale's metrics and debug port to your device.
 
     ```console
-    ssh <HEADSCALE_SERVER> -L 9090:localhost:9090
+    ssh <SLOPSCALE_SERVER> -L 9090:localhost:9090
     ```
 
     Access the debug interface on your device by opening <http://localhost:9090/debug/> in your web browser.
@@ -98,21 +98,21 @@ additional protection despite listening on all interfaces.
     ```console
     openssl rand -hex 32 | tee debugkey.txt
     export TS_DEBUG_KEY_PATH=debugkey.txt
-    headscale serve
+    slopscale serve
     ```
 
-    Access the debug interface on your device by opening `http://<IP_OF_HEADSCALE>:9090/debug/?debugkey=<DEBUG_KEY>` in
+    Access the debug interface on your device by opening `http://<IP_OF_SLOPSCALE>:9090/debug/?debugkey=<DEBUG_KEY>` in
     your web browser. The `debugkey` parameter must be sent with every request.
 
 === "Via debug IP address"
 
     The debug endpoint expects traffic from localhost. A different debug IP address may be configured by setting the
-    `TS_ALLOW_DEBUG_IP` environment variable before starting Headscale. The debug IP address is ignored when the HTTP
+    `TS_ALLOW_DEBUG_IP` environment variable before starting Slopscale. The debug IP address is ignored when the HTTP
     header `X-Forwarded-For` is present.
 
     ```console
     export TS_ALLOW_DEBUG_IP=192.168.0.10       # IP address of your device
-    headscale serve
+    slopscale serve
     ```
 
-    Access the debug interface on your device by opening `http://<IP_OF_HEADSCALE>:9090/debug/` in your web browser.
+    Access the debug interface on your device by opening `http://<IP_OF_SLOPSCALE>:9090/debug/` in your web browser.

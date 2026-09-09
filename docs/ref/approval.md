@@ -20,9 +20,9 @@ the server collect serial numbers from clients.
 ## Settings
 
 ```console
-headscale settings get
-headscale settings set --devices-approval=true
-headscale settings set --users-approval=true
+slopscale settings get
+slopscale settings set --devices-approval=true
+slopscale settings set --users-approval=true
 ```
 
 Through the API, `GET` and `POST /api/v1/settings` with
@@ -50,7 +50,7 @@ leaves the config file's `node.expiry` and the client in charge; the
 response reports that file value as `defaultKeyExpiryDays`.
 
 ```console
-headscale settings set --key-expiry-days 90
+slopscale settings set --key-expiry-days 90
 ```
 
 The v2 API exposes it as `devicesKeyDurationDays`. The console's _Settings_
@@ -67,9 +67,9 @@ shows it as needing machine authorization (`tailscale status` reports
 in again.
 
 ```console
-headscale nodes list           # the Approved column reads "pending"
-headscale nodes approve --identifier 7
-headscale nodes approve --identifier 7 --revoke
+slopscale nodes list           # the Approved column reads "pending"
+slopscale nodes approve --identifier 7
+slopscale nodes approve --identifier 7 --revoke
 ```
 
 Through the API, `POST /api/v1/node/{id}/approve`, with
@@ -85,20 +85,20 @@ not bypass approval is created with `--preauthorized=false`
 `preauthorized` capability of the v2 keys API).
 
 ```console
-headscale preauthkeys create --user 1 --preauthorized=false
+slopscale preauthkeys create --user 1 --preauthorized=false
 ```
 
 ## Users
 
-A user waiting for approval shows as pending in `headscale users list`, with
+A user waiting for approval shows as pending in `slopscale users list`, with
 `approved: false` in the v1 user object and `"status": "needs-approval"` in
 the v2 one. A login attempt by such a user is refused with a message that the
 account awaits approval; the user exists, so an administrator can find and
 approve them.
 
 ```console
-headscale users approve --name alice
-headscale users approve --name alice --revoke
+slopscale users approve --name alice
+slopscale users approve --name alice --revoke
 ```
 
 Through the API, `POST /api/v1/user/{id}/approve`, with `{"approved": false}`

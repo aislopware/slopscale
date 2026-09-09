@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/juanfont/headscale/hscontrol/egress"
-	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -45,11 +45,11 @@ var (
 		"oidc.client_secret or oidc.client_secret_path is required when oidc.issuer is set",
 	)
 	errServerURLSuffix = errors.New(
-		"server_url cannot be part of base_domain in a way that could make the DERP and headscale server unreachable",
+		"server_url cannot be part of base_domain in a way that could make the DERP and slopscale server unreachable",
 	)
 	errServerURLSame = errors.New(
 		"server_url cannot use the same domain as base_domain in a way that could make the DERP and " +
-			"headscale server unreachable",
+			"slopscale server unreachable",
 	)
 	errInvalidPKCEMethod         = errors.New("pkce.method must be either 'plain' or 'S256'")
 	errTrustedProxyZeroRange     = errors.New("0.0.0.0/0 and ::/0 are not allowed")
@@ -124,7 +124,7 @@ type NodeConfig struct {
 	Routes RouteConfig
 }
 
-// Config contains the initial Headscale configuration.
+// Config contains the initial Slopscale configuration.
 type Config struct {
 	ServerURL           string
 	Addr                string
@@ -150,7 +150,7 @@ type Config struct {
 	ACMEURL   string
 	ACMEEmail string
 
-	// DNSConfig is the headscale representation of the DNS configuration.
+	// DNSConfig is the slopscale representation of the DNS configuration.
 	// It is kept in the config update for some settings that are
 	// not directly converted into a [tailcfg.DNSConfig].
 	DNSConfig DNSConfig
@@ -191,7 +191,7 @@ type Config struct {
 	// Egress bounds where the server's own outbound requests may go.
 	Egress EgressConfig
 
-	// Debug turns on endpoints meant for developing headscale.
+	// Debug turns on endpoints meant for developing slopscale.
 	Debug DebugConfig
 
 	// HTTPSCerts is certificate assistance for machines' MagicDNS names.
@@ -283,7 +283,7 @@ type LetsEncryptConfig struct {
 }
 
 // OIDCGroupsConfig is oidc.groups: when Sync is on, every group in the
-// login's groups claim that starts with Prefix becomes a headscale group
+// login's groups claim that starts with Prefix becomes a slopscale group
 // of the same name (prefix stripped) with the user as a member, and the
 // user leaves the synced groups the claim no longer lists. Groups made by
 // an operator are never taken over by name.
@@ -340,7 +340,7 @@ type OIDCConfig struct {
 	// configuration. The owner and users who already hold a higher role
 	// are left alone.
 	AdminUsers []string
-	// Groups mirrors the provider's groups claim into headscale groups on
+	// Groups mirrors the provider's groups claim into slopscale groups on
 	// every login; see [OIDCGroupsConfig].
 	Groups OIDCGroupsConfig
 	// MatchByEmail lets a login whose iss/sub identifier is unknown take
@@ -380,7 +380,7 @@ type TaildropConfig struct {
 }
 
 // AutoUpdateConfig controls the tailnet-wide default for client
-// auto-update. When Enabled is true, headscale emits the
+// auto-update. When Enabled is true, slopscale emits the
 // [tailcfg.NodeAttrDefaultAutoUpdate] cap with value [true] on every
 // node's CapMap; clients fall back to that default unless they have
 // opted in or out locally.
@@ -390,7 +390,7 @@ type AutoUpdateConfig struct {
 
 type CLIConfig struct {
 	Address  string
-	APIKey   string `json:"-"` // never serialise the headscale admin API key
+	APIKey   string `json:"-"` // never serialise the slopscale admin API key
 	Timeout  time.Duration
 	Insecure bool
 }
@@ -553,7 +553,7 @@ func sshRecordingConfig() SSHRecordingConfig {
 
 // EgressConfig bounds the addresses the server's own outbound requests
 // (webhooks, log streams, DERP map URLs) may reach; see
-// [github.com/juanfont/headscale/hscontrol/egress].
+// [github.com/aislopware/slopscale/hscontrol/egress].
 type EgressConfig struct {
 	// DenyPrivateTargets refuses the private ranges as well as the
 	// addresses that are always refused.
@@ -577,7 +577,7 @@ func egressConfig() EgressConfig {
 	}
 }
 
-// DebugConfig holds the endpoints that exist for developing headscale and
+// DebugConfig holds the endpoints that exist for developing slopscale and
 // are not part of the supported API.
 type DebugConfig struct {
 	// NodeAPIEnabled registers POST /api/v1/debug/node, which mints a node
@@ -591,7 +591,7 @@ func debugConfig() DebugConfig {
 	}
 }
 
-// Tuning contains advanced performance tuning parameters for Headscale.
+// Tuning contains advanced performance tuning parameters for Slopscale.
 // These settings control internal batching, timeouts, and resource allocation.
 // The defaults are carefully chosen for typical deployments and should rarely
 // need adjustment. Changes to these values can significantly impact performance
@@ -631,7 +631,7 @@ type Tuning struct {
 	// peer relationships between all nodes based on the current ACL policy, which
 	// is computationally expensive and scales with the square of the number of nodes.
 	//
-	// By batching writes, Headscale can process N operations but only rebuild once,
+	// By batching writes, Slopscale can process N operations but only rebuild once,
 	// rather than rebuilding N times. This significantly reduces CPU usage during
 	// bulk operations like initial sync or policy updates.
 	//
@@ -700,7 +700,7 @@ func (c *Config) Domain() string {
 	return u.Hostname()
 }
 
-// LoadConfig prepares and loads the Headscale configuration into Viper.
+// LoadConfig prepares and loads the Slopscale configuration into Viper.
 // This means it sets the default values, reads the configuration file and
 // environment variables, and handles deprecated configuration options.
 // It has to be called before [LoadServerConfig] and [LoadCLIConfig].
@@ -713,8 +713,8 @@ func LoadConfig(path string, isFile bool) error {
 		viper.SetConfigName("config")
 
 		if path == "" {
-			viper.AddConfigPath("/etc/headscale/")
-			viper.AddConfigPath("$HOME/.headscale")
+			viper.AddConfigPath("/etc/slopscale/")
+			viper.AddConfigPath("$HOME/.slopscale")
 			viper.AddConfigPath(".")
 		} else {
 			// For testing
@@ -722,7 +722,7 @@ func LoadConfig(path string, isFile bool) error {
 		}
 	}
 
-	envPrefix := "headscale"
+	envPrefix := "slopscale"
 	viper.SetEnvPrefix(envPrefix)
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
@@ -735,8 +735,8 @@ func LoadConfig(path string, isFile bool) error {
 	viper.SetDefault("https_certificates.ttl", time.Minute)
 	viper.SetDefault("https_certificates.rfc2136.tsig_algorithm", "hmac-sha256")
 	viper.SetDefault("ssh_recording.enabled", false)
-	viper.SetDefault("ssh_recording.dir", "/var/lib/headscale/recordings")
-	viper.SetDefault("ssh_recording.state_dir", "/var/lib/headscale/recorder")
+	viper.SetDefault("ssh_recording.dir", "/var/lib/slopscale/recordings")
+	viper.SetDefault("ssh_recording.state_dir", "/var/lib/slopscale/recorder")
 	viper.SetDefault("ssh_recording.max_session_bytes", 0)
 	viper.SetDefault("egress.deny_private_targets", false)
 	viper.SetDefault("egress.allow_loopback_targets", false)
@@ -760,8 +760,8 @@ func LoadConfig(path string, isFile bool) error {
 
 	viper.SetDefault("derp.server.enabled", true)
 	viper.SetDefault("derp.server.region_id", 999)
-	viper.SetDefault("derp.server.region_code", "headscale")
-	viper.SetDefault("derp.server.region_name", "Headscale Embedded DERP")
+	viper.SetDefault("derp.server.region_code", "slopscale")
+	viper.SetDefault("derp.server.region_name", "Slopscale Embedded DERP")
 	viper.SetDefault("derp.server.verify_clients", true)
 	viper.SetDefault("derp.server.stun.enabled", true)
 	viper.SetDefault("derp.server.stun_listen_addr", "0.0.0.0:3478")
@@ -770,7 +770,7 @@ func LoadConfig(path string, isFile bool) error {
 	viper.SetDefault("derp.auto_update_enabled", true)
 	viper.SetDefault("derp.update_frequency", "3h")
 
-	viper.SetDefault("unix_socket", "/var/run/headscale/headscale.sock")
+	viper.SetDefault("unix_socket", "/var/run/slopscale/slopscale.sock")
 	viper.SetDefault("unix_socket_permission", "0o770")
 
 	viper.SetDefault("cli.timeout", "5s")
@@ -938,7 +938,7 @@ func validateServerConfig() error {
 	}
 
 	if viper.GetString("noise.private_key_path") == "" {
-		errorText += "Fatal config error: headscale now requires a new `noise.private_key_path` field in the config " +
+		errorText += "Fatal config error: slopscale now requires a new `noise.private_key_path` field in the config " +
 			"file for the Tailscale v2 protocol\n"
 	}
 
@@ -946,10 +946,10 @@ func validateServerConfig() error {
 		(viper.GetString("tls_letsencrypt_challenge_type") == TLSALPN01ChallengeType) &&
 		(!strings.HasSuffix(viper.GetString("listen_addr"), ":443")) {
 		// this is only a warning because there could be something sitting in front of
-		// headscale that redirects the traffic (e.g. an iptables rule)
+		// slopscale that redirects the traffic (e.g. an iptables rule)
 		log.Warn().
 			Msg("Warning: when using tls_letsencrypt_hostname with TLS-ALPN-01 as challenge type, " +
-				"headscale must be reachable on port 443, i.e. listen_addr should probably end in :443")
+				"slopscale must be reachable on port 443, i.e. listen_addr should probably end in :443")
 	}
 
 	if (viper.GetString("tls_letsencrypt_challenge_type") != HTTP01ChallengeType) &&
@@ -1464,7 +1464,7 @@ func trustedProxies() ([]netip.Prefix, error) {
 }
 
 // LoadCLIConfig returns the needed configuration for the CLI client
-// of Headscale to connect to a Headscale server.
+// of Slopscale to connect to a Slopscale server.
 func LoadCLIConfig() (*Config, error) {
 	logConfig := logConfig()
 	zerolog.SetGlobalLevel(logConfig.Level)
@@ -1530,8 +1530,8 @@ func oidcConfig() (OIDCConfig, error) {
 	}, nil
 }
 
-// LoadServerConfig returns the full Headscale configuration to
-// host a Headscale server. This is called as part of `headscale serve`.
+// LoadServerConfig returns the full Slopscale configuration to
+// host a Slopscale server. This is called as part of `slopscale serve`.
 //
 //nolint:funlen // legacy: one linear read of every viper key; splitting it would only scatter the key list
 func LoadServerConfig() (*Config, error) {
@@ -1564,7 +1564,7 @@ func LoadServerConfig() (*Config, error) {
 
 	if v4NonStandard || v6NonStandard {
 		warnBanner([]string{
-			"You have overridden the default Headscale IP prefixes",
+			"You have overridden the default Slopscale IP prefixes",
 			"with a range outside of the standard CGNAT and/or ULA",
 			"ranges. This is NOT a supported configuration.",
 			"",
@@ -1629,7 +1629,7 @@ func LoadServerConfig() (*Config, error) {
 
 	// BaseDomain cannot be the same as the server URL.
 	// This is because Tailscale takes over the domain in BaseDomain,
-	// causing the headscale server and DERP to be unreachable.
+	// causing the slopscale server and DERP to be unreachable.
 	// For Tailscale upstream, the following is true:
 	// - DERP run on their own domains
 	// - Control plane runs on login.tailscale.com/controlplane.tailscale.com
@@ -1747,7 +1747,7 @@ func LoadServerConfig() (*Config, error) {
 
 // BaseDomain cannot be a suffix of the server URL.
 // This is because Tailscale takes over the domain in BaseDomain,
-// causing the headscale server and DERP to be unreachable.
+// causing the slopscale server and DERP to be unreachable.
 // For Tailscale upstream, the following is true:
 // - DERP run on their own domains.
 // - Control plane runs on login.tailscale.com/controlplane.tailscale.com.

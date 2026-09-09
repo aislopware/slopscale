@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/go-chi/chi/v5"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -30,7 +30,7 @@ type bodyCapture struct {
 // newNoiseRouterWithBodyLimit builds a chi router with the same body-limit
 // middleware used in the real Noise router but wired to a test handler that
 // captures the [io.ReadAll] result. This lets us verify the limit without
-// needing a full [Headscale] instance.
+// needing a full [Slopscale] instance.
 func newNoiseRouterWithBodyLimit(capture *bodyCapture) http.Handler {
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
@@ -206,7 +206,7 @@ func TestRegistrationHandler_OversizedBody(t *testing.T) {
 }
 
 // TestSSHActionRoute_OldPathReturns404 pins the wire-format shape of the
-// SSH check-action endpoint. Pre-alignment headscale served
+// SSH check-action endpoint. Pre-alignment slopscale served
 // /machine/ssh/action/from/{src}/to/{dst}?ssh_user=...; the current
 // endpoint is /machine/ssh/action/{src}/to/{dst}?local_user=.... If
 // someone re-adds the old route shape, this fails.
@@ -262,7 +262,7 @@ func newSSHActionRequest(t *testing.T, src, dst types.NodeID) *http.Request {
 // putTestNodeInStore creates a node via the database test helper and
 // also stages it into the in-memory [state.NodeStore] so handlers that read
 // [state.NodeStore]-backed APIs (e.g. [state.State.GetNodeByID]) can see it.
-func putTestNodeInStore(t *testing.T, app *Headscale, user *types.User, hostname string) *types.Node {
+func putTestNodeInStore(t *testing.T, app *Slopscale, user *types.User, hostname string) *types.Node {
 	t.Helper()
 
 	node := app.state.CreateNodeForTest(user, hostname)
@@ -289,7 +289,7 @@ func TestSSHActionHandler_RejectsRogueMachineKey(t *testing.T) {
 	require.NotEqual(t, dst.MachineKey, rogue, "test sanity: rogue key must differ from dst")
 
 	ns := &noiseServer{
-		headscale:  app,
+		slopscale:  app,
 		machineKey: rogue,
 	}
 
@@ -315,7 +315,7 @@ func TestSSHActionHandler_RejectsUnknownDst(t *testing.T) {
 	src := putTestNodeInStore(t, app, user, "src-node")
 
 	ns := &noiseServer{
-		headscale:  app,
+		slopscale:  app,
 		machineKey: key.NewMachine().Public(),
 	}
 
@@ -354,7 +354,7 @@ func TestSSHActionFollowUp_RejectsBindingMismatch(t *testing.T) {
 	// the outer machine-key check passes — only the binding check
 	// should reject it.
 	ns := &noiseServer{
-		headscale:  app,
+		slopscale:  app,
 		machineKey: dstOther.MachineKey,
 	}
 
@@ -415,7 +415,7 @@ func TestSSHActionHoldAndDelegate_PersistsAuthSession(t *testing.T) {
 	src := putTestNodeInStore(t, app, user, "src-node")
 	dst := putTestNodeInStore(t, app, user, "dst-node")
 
-	ns := &noiseServer{headscale: app, machineKey: dst.MachineKey}
+	ns := &noiseServer{slopscale: app, machineKey: dst.MachineKey}
 
 	rec := httptest.NewRecorder()
 	ns.SSHActionHandler(rec, newSSHActionRequest(t, src.ID, dst.ID))
@@ -455,7 +455,7 @@ func TestSSHActionHandler_RejectsMissingSessionWithoutCheck(t *testing.T) {
 	_, checkFound := app.state.SSHCheckParams(src.ID, dst.ID)
 	require.False(t, checkFound, "test setup: pair must not be subject to a check")
 
-	ns := &noiseServer{headscale: app, machineKey: dst.MachineKey}
+	ns := &noiseServer{slopscale: app, machineKey: dst.MachineKey}
 
 	missing := types.MustAuthID()
 

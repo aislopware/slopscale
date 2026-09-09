@@ -4,16 +4,16 @@ import (
 	"context"
 	"net/netip"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/hscontrol"
-	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/integration/hsic"
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/hscontrol"
+	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/integration/hsic"
 	"github.com/ory/dockertest/v3"
 	"tailscale.com/tailcfg"
 )
 
-//nolint:interfacebloat // mirrors the full headscale control-plane surface exercised by integration tests
+//nolint:interfacebloat // mirrors the full slopscale control-plane surface exercised by integration tests
 type ControlServer interface {
 	Shutdown() (string, string, error)
 	SaveLog(path string) (string, string, error)

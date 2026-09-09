@@ -90,7 +90,7 @@ function LoginPage(): ReactElement {
               <div className="flex flex-col gap-3">
                 <WaveformIcon className="size-8 text-kumo-brand" weight="duotone" />
                 <div className="flex flex-col gap-1">
-                  <h1 className="text-xl font-semibold text-kumo-strong">Sign in to headscale</h1>
+                  <h1 className="text-xl font-semibold text-kumo-strong">Sign in to slopscale</h1>
                   <p className="text-kumo-subtle">
                     {oidc === undefined
                       ? "This server has no identity provider, so the console cannot sign anyone in."
@@ -122,7 +122,7 @@ function LoginPage(): ReactElement {
                   className="w-full"
                   icon={SignInIcon}
                   onClick={() => {
-                    // The provider flow is served by headscale, not routed by
+                    // The provider flow is served by slopscale, not routed by
                     // the console, so this is a full navigation.
                     globalThis.location.assign(loginUrl(oidc.loginPath, target, invite));
                   }}

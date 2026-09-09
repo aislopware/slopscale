@@ -1,6 +1,6 @@
 # Registration methods
 
-Headscale supports multiple ways to register a node. The preferred registration method depends on the identity of a node
+Slopscale supports multiple ways to register a node. The preferred registration method depends on the identity of a node
 and your use case.
 
 ## Identity model
@@ -14,8 +14,8 @@ Tailscale's identity model distinguishes between personal and tagged nodes:
   tagged nodes, e.g. a tagged node is not allowed to [Tailscale SSH](https://tailscale.com/docs/features/tailscale-ssh)
   into a personal node.
 
-Headscale implements Tailscale's identity model and distinguishes between personal and tagged nodes where a personal
-node is owned by a Headscale user and a tagged node is owned by a tag. Tagged devices are grouped under the special user
+Slopscale implements Tailscale's identity model and distinguishes between personal and tagged nodes where a personal
+node is owned by a Slopscale user and a tagged node is owned by a tag. Tagged devices are grouped under the special user
 `tagged-devices`.
 
 ## Registration methods
@@ -26,24 +26,24 @@ authenticated key](#pre-authenticated-key). Both methods can be used to register
 ### Web authentication
 
 Web authentication is the default method to register a new node. It's interactive, where the client initiates the
-registration and the Headscale administrator needs to approve the new node before it is allowed to join the network. A
+registration and the Slopscale administrator needs to approve the new node before it is allowed to join the network. A
 node can be approved with:
 
-- Headscale CLI (described in this documentation)
-- [Headscale API](api.md)
+- Slopscale CLI (described in this documentation)
+- [Slopscale API](api.md)
 - Or delegated to an identity provider via [OpenID Connect](oidc.md)
 
-Web authentication relies on the presence of a Headscale user. Use the `headscale users` command to create a new
+Web authentication relies on the presence of a Slopscale user. Use the `slopscale users` command to create a new
 user[^1]:
 
 ```console
-headscale users create <USER>
+slopscale users create <USER>
 ```
 
 The display name and profile picture the clients show can be set at creation or later:
 
 ```console
-headscale users set --name <USER> --display-name "Alice Liddell" --picture-url https://example.com/alice.png
+slopscale users set --name <USER> --display-name "Alice Liddell" --picture-url https://example.com/alice.png
 ```
 
 === "Personal devices"
@@ -51,22 +51,22 @@ headscale users set --name <USER> --display-name "Alice Liddell" --picture-url h
     Run `tailscale up` to login your personal device:
 
     ```console
-    tailscale up --login-server <YOUR_HEADSCALE_URL>
+    tailscale up --login-server <YOUR_SLOPSCALE_URL>
     ```
 
     Usually, a browser window with further instructions is opened. This page explains how to complete the registration
-    on your Headscale server and it also prints the Auth ID required to approve the node:
+    on your Slopscale server and it also prints the Auth ID required to approve the node:
 
     ```console
-    headscale auth register --user <USER> --auth-id <AUTH_ID>
+    slopscale auth register --user <USER> --auth-id <AUTH_ID>
     ```
 
     Congrations, the registration of your personal node is complete and it should be listed as "online" in the output of
-    `headscale nodes list`. The "User" column displays `<USER>` as the owner of the node.
+    `slopscale nodes list`. The "User" column displays `<USER>` as the owner of the node.
 
 === "Tagged devices"
 
-    Your Headscale user needs to be authorized to register tagged devices. This authorization is specified in the
+    Your Slopscale user needs to be authorized to register tagged devices. This authorization is specified in the
     [`tagOwners`](https://tailscale.com/docs/reference/syntax/policy-file#tag-owners) section of the
     [policy](policy.md). A simple example looks like this:
 
@@ -82,57 +82,57 @@ headscale users set --name <USER> --display-name "Alice Liddell" --picture-url h
     Run `tailscale up` and provide at least one tag to login a tagged device:
 
     ```console
-    tailscale up --login-server <YOUR_HEADSCALE_URL> --advertise-tags tag:<TAG>
+    tailscale up --login-server <YOUR_SLOPSCALE_URL> --advertise-tags tag:<TAG>
     ```
 
     Usually, a browser window with further instructions is opened. This page explains how to complete the registration
-    on your Headscale server and it also prints the Auth ID required to approve the node:
+    on your Slopscale server and it also prints the Auth ID required to approve the node:
 
     ```console
-    headscale auth register --user <USER> --auth-id <AUTH_ID>
+    slopscale auth register --user <USER> --auth-id <AUTH_ID>
     ```
 
-    Headscale checks that `<USER>` is allowed to register a node with the specified tag(s) and then transfers ownership
+    Slopscale checks that `<USER>` is allowed to register a node with the specified tag(s) and then transfers ownership
     of the new node to the special user `tagged-devices`. The registration of a tagged node is complete and it should be
-    listed as "online" in the output of `headscale nodes list`. The "User" column displays `tagged-devices` as the owner
+    listed as "online" in the output of `slopscale nodes list`. The "User" column displays `tagged-devices` as the owner
     of the node. See the "Tags" column for the list of assigned tags.
 
 ### Pre authenticated key
 
-Registration with a pre authenticated key (or auth key) is a non-interactive way to register a new node. The Headscale
+Registration with a pre authenticated key (or auth key) is a non-interactive way to register a new node. The Slopscale
 administrator creates a preauthkey upfront and this preauthkey can then be used to register a node non-interactively.
 Its best suited for automation.
 
 === "Personal devices"
 
-    A personal node is always assigned to a Headscale user. Use the `headscale users` command to create a new user[^1]:
+    A personal node is always assigned to a Slopscale user. Use the `slopscale users` command to create a new user[^1]:
 
     ```console
-    headscale users create <USER>
+    slopscale users create <USER>
     ```
 
-    Use the `headscale user list` command to learn its `<USER_ID>` and create a new pre authenticated key for your user:
+    Use the `slopscale user list` command to learn its `<USER_ID>` and create a new pre authenticated key for your user:
 
     ```console
-    headscale preauthkeys create --user <USER_ID>
+    slopscale preauthkeys create --user <USER_ID>
     ```
 
     The above prints a pre authenticated key with the default settings (can be used once and is valid for one hour). Use
     this auth key to register a node non-interactively:
 
     ```console
-    tailscale up --login-server <YOUR_HEADSCALE_URL> --authkey <YOUR_AUTH_KEY>
+    tailscale up --login-server <YOUR_SLOPSCALE_URL> --authkey <YOUR_AUTH_KEY>
     ```
 
     Congrations, the registration of your personal node is complete and it should be listed as "online" in the output of
-    `headscale nodes list`. The "User" column displays `<USER>` as the owner of the node.
+    `slopscale nodes list`. The "User" column displays `<USER>` as the owner of the node.
 
 === "Tagged devices"
 
     Create a new pre authenticated key and provide at least one tag:
 
     ```console
-    headscale preauthkeys create --tags tag:<TAG>
+    slopscale preauthkeys create --tags tag:<TAG>
     ```
 
     The above prints a pre authenticated key with the default settings (can be used once and is valid for one hour). Use
@@ -140,19 +140,19 @@ Its best suited for automation.
     the tags are automatically read from the pre authenticated key:
 
     ```console
-    tailscale up --login-server <YOUR_HEADSCALE_URL> --authkey <YOUR_AUTH_KEY>
+    tailscale up --login-server <YOUR_SLOPSCALE_URL> --authkey <YOUR_AUTH_KEY>
     ```
 
     The registration of a tagged node is complete and it should be listed as "online" in the output of
-    `headscale nodes list`. The "User" column displays `tagged-devices` as the owner of the node. See the "Tags" column for the list of
+    `slopscale nodes list`. The "User" column displays `tagged-devices` as the owner of the node. See the "Tags" column for the list of
     assigned tags.
 
 ## Ephemeral nodes
 
 An ephemeral node is deleted when it logs out and, once it has been offline for `node.ephemeral.inactivity_timeout`,
 by the server on its own. A node is ephemeral in either of two ways: it registered with an ephemeral pre-auth key
-(`headscale preauthkeys create --ephemeral`), or it asked to be ephemeral in its register request, which a `tailscaled`
+(`slopscale preauthkeys create --ephemeral`), or it asked to be ephemeral in its register request, which a `tailscaled`
 with in-memory state (`--state=mem:`), a `tsnet` program with `Ephemeral` set and the browser client do whatever key
-they use, or with none at all through an interactive login. `headscale nodes list` and the console mark both alike.
+they use, or with none at all through an interactive login. `slopscale nodes list` and the console mark both alike.
 
-[^1]: [Ensure that the Headscale username does not end with `@`.](oidc.md#reference-a-user-in-the-policy)
+[^1]: [Ensure that the Slopscale username does not end with `@`.](oidc.md#reference-a-user-in-the-policy)

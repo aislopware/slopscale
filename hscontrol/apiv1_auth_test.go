@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -23,8 +23,8 @@ func seedAuthRequest(
 	nodeKey key.NodePublic,
 	discoKey key.DiscoPublic,
 	hostname string,
-) func(t *testing.T, app *Headscale) {
-	return func(t *testing.T, app *Headscale) {
+) func(t *testing.T, app *Slopscale) {
+	return func(t *testing.T, app *Slopscale) {
 		t.Helper()
 
 		app.state.CreateUserForTest(user)

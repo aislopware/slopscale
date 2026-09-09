@@ -9,12 +9,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/aislopware/slopscale/hscontrol/api/principal"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/api/principal"
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
 )
 
 func init() {
@@ -30,7 +30,7 @@ const (
 // of "ts-default" matches against. Allow-all, matching the cluster's behaviour
 // with no configured policy.
 const defaultPolicy = `{
-	// Headscale default policy. Allows all communication.
+	// Slopscale default policy. Allows all communication.
 	"acls": [
 		{"action": "accept", "src": ["*"], "dst": ["*:*"]},
 	],

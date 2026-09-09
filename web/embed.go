@@ -1,5 +1,5 @@
 // Package web serves the admin console: a client-rendered React app built
-// into dist/ by `make web` and embedded into the headscale binary.
+// into dist/ by `make web` and embedded into the slopscale binary.
 //
 // The console is a static bundle that talks to /api/v1 with the API key the
 // operator pastes at sign-in, so the server only has to deliver files. A

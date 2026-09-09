@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
+	"github.com/aislopware/slopscale/hscontrol/types/testcapture"
 )
 
 // The compat tests replay several hundred megabytes of captured Tailscale

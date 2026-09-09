@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/mapper"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/mapper"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,8 +20,8 @@ const validPolicy = `{"acls":[{"action":"accept","src":["*"],"dst":["*:*"]}]}`
 const invalidPolicy = `{"acls": [`
 
 // seedPolicy stores a policy in the database so reads return it.
-func seedPolicy(policy string) func(t *testing.T, app *Headscale) {
-	return func(t *testing.T, app *Headscale) {
+func seedPolicy(policy string) func(t *testing.T, app *Slopscale) {
+	return func(t *testing.T, app *Slopscale) {
 		t.Helper()
 
 		_, err := app.state.SetPolicyInDB(policy)
@@ -173,7 +173,7 @@ func TestAPIV1PolicyCheck(t *testing.T) {
 
 // createFilePolicyApp mirrors createTestApp but with file-based policy mode so
 // the policy-update-disabled path can be exercised.
-func createFilePolicyApp(t *testing.T) *Headscale {
+func createFilePolicyApp(t *testing.T) *Slopscale {
 	t.Helper()
 
 	tmpDir := t.TempDir()
@@ -184,7 +184,7 @@ func createFilePolicyApp(t *testing.T) *Headscale {
 		Database: types.DatabaseConfig{
 			Type: "sqlite3",
 			Sqlite: types.SqliteConfig{
-				Path: tmpDir + "/headscale_test.db",
+				Path: tmpDir + "/slopscale_test.db",
 			},
 		},
 		OIDC: types.OIDCConfig{},
@@ -201,7 +201,7 @@ func createFilePolicyApp(t *testing.T) *Headscale {
 		},
 	}
 
-	app, err := NewHeadscale(&cfg)
+	app, err := NewSlopscale(&cfg)
 	require.NoError(t, err)
 
 	app.mapBatcher = mapper.NewBatcherAndMapper(&cfg, app.state)

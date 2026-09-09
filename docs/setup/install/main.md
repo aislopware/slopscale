@@ -12,46 +12,43 @@ base image as official releases.
 
 ## Container images
 
-Images are available from both Docker Hub and GitHub Container Registry, tagged
-with the short commit hash of the build (e.g. `main-abc1234`):
-
-- Docker Hub: `docker.io/headscale/headscale:main-<sha>`
-- GitHub Container Registry: `ghcr.io/juanfont/headscale:main-<sha>`
+Images are on the GitHub Container Registry, tagged with the short commit hash
+of the build (e.g. `main-abc1234`): `ghcr.io/aislopware/slopscale:main-<sha>`
 
 To find the latest available tag, check the
-[GitHub Actions workflow](https://github.com/juanfont/headscale/actions/workflows/container-main.yml)
-or the [GitHub Container Registry package page](https://github.com/juanfont/headscale/pkgs/container/headscale).
+[GitHub Actions workflow](https://github.com/aislopware/slopscale/actions/workflows/container-main.yml)
+or the [GitHub Container Registry package page](https://github.com/aislopware/slopscale/pkgs/container/slopscale).
 
 For example, to run a specific development build:
 
 ```shell
 docker run \
-  --name headscale \
+  --name slopscale \
   --detach \
   --read-only \
-  --tmpfs /var/run/headscale \
-  --volume "$(pwd)/config:/etc/headscale:ro" \
-  --volume "$(pwd)/lib:/var/lib/headscale" \
+  --tmpfs /var/run/slopscale \
+  --volume "$(pwd)/config:/etc/slopscale:ro" \
+  --volume "$(pwd)/lib:/var/lib/slopscale" \
   --publish 127.0.0.1:8080:8080 \
   --publish 127.0.0.1:9090:9090 \
-  --health-cmd "CMD headscale health" \
-  docker.io/headscale/headscale:main-<sha> \
+  --health-cmd "CMD slopscale health" \
+  ghcr.io/aislopware/slopscale:main-<sha> \
   serve
 ```
 
-See [Running headscale in a container](container.md) for full container setup instructions.
+See [Running slopscale in a container](container.md) for full container setup instructions.
 
 ## Binaries
 
 Pre-built binaries from the latest successful build on `main` are available
-via [nightly.link](https://nightly.link/juanfont/headscale/workflows/container-main/main):
+via [nightly.link](https://nightly.link/aislopware/slopscale/workflows/container-main/main):
 
-| OS    | Arch  | Download                                                                                                                   |
-| ----- | ----- | -------------------------------------------------------------------------------------------------------------------------- |
-| Linux | amd64 | [headscale-linux-amd64](https://nightly.link/juanfont/headscale/workflows/container-main/main/headscale-linux-amd64.zip)   |
-| Linux | arm64 | [headscale-linux-arm64](https://nightly.link/juanfont/headscale/workflows/container-main/main/headscale-linux-arm64.zip)   |
-| macOS | amd64 | [headscale-darwin-amd64](https://nightly.link/juanfont/headscale/workflows/container-main/main/headscale-darwin-amd64.zip) |
-| macOS | arm64 | [headscale-darwin-arm64](https://nightly.link/juanfont/headscale/workflows/container-main/main/headscale-darwin-arm64.zip) |
+| OS    | Arch  | Download                                                                                                                     |
+| ----- | ----- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Linux | amd64 | [slopscale-linux-amd64](https://nightly.link/aislopware/slopscale/workflows/container-main/main/slopscale-linux-amd64.zip)   |
+| Linux | arm64 | [slopscale-linux-arm64](https://nightly.link/aislopware/slopscale/workflows/container-main/main/slopscale-linux-arm64.zip)   |
+| macOS | amd64 | [slopscale-darwin-amd64](https://nightly.link/aislopware/slopscale/workflows/container-main/main/slopscale-darwin-amd64.zip) |
+| macOS | arm64 | [slopscale-darwin-arm64](https://nightly.link/aislopware/slopscale/workflows/container-main/main/slopscale-darwin-arm64.zip) |
 
 After downloading and extracting the archive, make the binary executable and follow the
 [standalone binary installation](official.md#using-standalone-binaries-advanced)

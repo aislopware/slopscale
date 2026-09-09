@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/oauth2-proxy/mockoidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +30,7 @@ const (
 
 	// registerConfirmCSRFField is the hidden form field (and cookie) the
 	// registration confirmation interstitial uses for its CSRF token.
-	registerConfirmCSRFField = "headscale_register_confirm"
+	registerConfirmCSRFField = "slopscale_register_confirm"
 )
 
 // csrfInputRE finds the hidden CSRF input on the confirmation interstitial
@@ -53,7 +53,7 @@ func oidcUser(subject, email string, verified bool, groups ...string) mockoidc.M
 }
 
 // startMockOIDC runs an in-process OpenID Connect provider on a real loopback
-// port, because Headscale reaches the issuer with a plain [http.Client].
+// port, because Slopscale reaches the issuer with a plain [http.Client].
 // Logins pop users off a queue in order, so every test gets its own provider.
 func startMockOIDC(t *testing.T, users ...mockoidc.MockUser) *mockoidc.MockOIDC {
 	t.Helper()
@@ -76,7 +76,7 @@ func startMockOIDC(t *testing.T, users ...mockoidc.MockUser) *mockoidc.MockOIDC 
 	return provider
 }
 
-// newOIDCServer starts a mock provider queued with users and a Headscale
+// newOIDCServer starts a mock provider queued with users and a Slopscale
 // server that authenticates against it. mutate, when non-nil, adjusts the
 // OIDC config before the server starts.
 func newOIDCServer(

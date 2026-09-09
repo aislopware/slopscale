@@ -3,13 +3,13 @@ Thank you for taking the time to report this issue.
 To help us investigate and resolve this, we need more information. Please provide the following:
 
 > [!TIP]
-> Most issues turn out to be configuration errors rather than bugs. We encourage you to discuss your problem in our [Discord community](https://discord.gg/c84AZQhmpx) **before** opening an issue. The community can often help identify misconfigurations quickly, saving everyone time.
+> Most issues turn out to be configuration errors rather than bugs. We encourage you to discuss your problem in our [GitHub discussions](https://github.com/aislopware/slopscale/discussions) **before** opening an issue. The community can often help identify misconfigurations quickly, saving everyone time.
 
 ## Required Information
 
 ### Environment Details
 
-- **Headscale version**: (run `headscale version`)
+- **Slopscale version**: (run `slopscale version`)
 - **Tailscale client version**: (run `tailscale version`)
 - **Operating System**: (e.g., Ubuntu 24.04, macOS 14, Windows 11)
 - **Deployment method**: (binary, Docker, Kubernetes, etc.)
@@ -17,7 +17,7 @@ To help us investigate and resolve this, we need more information. Please provid
 
 ### Debug Information
 
-Please follow our [Debugging and Troubleshooting Guide](https://headscale.net/stable/ref/debug/) and provide:
+Please follow our [Debugging and Troubleshooting Guide](https://aislopware.github.io/slopscale/stable/ref/debug/) and provide:
 
 1. **Client netmap dump** (from affected Tailscale client):
 
@@ -45,9 +45,9 @@ Please follow our [Debugging and Troubleshooting Guide](https://headscale.net/st
    >
    > Without logs from both sides, we cannot diagnose connectivity issues.
 
-4. **Headscale server logs** with `log.level: trace` enabled
+4. **Slopscale server logs** with `log.level: trace` enabled
 
-5. **Headscale configuration** (with sensitive values redacted - see rules below)
+5. **Slopscale configuration** (with sensitive values redacted - see rules below)
 
 6. **ACL/Policy configuration** (if using ACLs)
 
@@ -77,4 +77,4 @@ When redacting sensitive information:
 
 **Note:** This issue will be automatically closed in 3 days if no additional information is provided. Once you reply with the requested information, the `needs-more-info` label will be removed automatically.
 
-If you need help gathering this information, please visit our [Discord community](https://discord.gg/c84AZQhmpx).
+If you need help gathering this information, please visit our [GitHub discussions](https://github.com/aislopware/slopscale/discussions).

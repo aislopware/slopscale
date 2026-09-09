@@ -9,7 +9,7 @@
 -DSQLITE_DEFAULT_DEFENSIVE=1
 # Performance: skip the memory-statistics bookkeeping on every allocation,
 # the expression depth accounting, the progress callback and the shared
-# cache, none of which headscale uses; stack-allocate VDBE cursors.
+# cache, none of which slopscale uses; stack-allocate VDBE cursors.
 -DSQLITE_DEFAULT_MEMSTATUS=0
 -DSQLITE_MAX_EXPR_DEPTH=0
 -DSQLITE_OMIT_PROGRESS_CALLBACK

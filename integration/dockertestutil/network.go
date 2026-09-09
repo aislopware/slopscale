@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/cenkalti/backoff/v5"
-	"github.com/juanfont/headscale/hscontrol/util"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 )

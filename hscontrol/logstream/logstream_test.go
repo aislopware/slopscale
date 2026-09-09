@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/egress"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -131,7 +131,7 @@ func TestEncodePerDestination(t *testing.T) {
 
 		lines := ndjson(t, req.Body)
 		require.Len(t, lines, 2)
-		assert.Equal(t, "headscale:configuration", lines[0]["sourcetype"])
+		assert.Equal(t, "slopscale:configuration", lines[0]["sourcetype"])
 		assert.Equal(t, "example.ts.net", lines[0]["host"])
 		assert.Contains(t, lines[0], "event")
 	})
@@ -161,7 +161,7 @@ func TestEncodePerDestination(t *testing.T) {
 		var logs []map[string]any
 		require.NoError(t, json.Unmarshal(req.Body, &logs))
 		require.Len(t, logs, 2)
-		assert.Equal(t, "headscale", logs[0]["ddsource"])
+		assert.Equal(t, "slopscale", logs[0]["ddsource"])
 		assert.Equal(t, "type:configuration,tailnet:example.ts.net,stream:siem", logs[0]["ddtags"])
 		assert.Equal(t, "user.role.set by alice on user bob: 200", logs[0]["message"])
 	})
@@ -194,7 +194,7 @@ func TestEncodePerDestination(t *testing.T) {
 		}
 		require.NoError(t, json.Unmarshal(req.Body, &push))
 		require.Len(t, push.Streams, 1)
-		assert.Equal(t, "headscale", push.Streams[0].Stream["job"])
+		assert.Equal(t, "slopscale", push.Streams[0].Stream["job"])
 		assert.Equal(t, "siem", push.Streams[0].Stream["stream"])
 		require.Len(t, push.Streams[0].Values, 2)
 		assert.Less(t, push.Streams[0].Values[0][0], push.Streams[0].Values[1][0], "nanosecond order")

@@ -13,13 +13,13 @@ Create the stream from the _Log streams_ tab of the console's
 _Integrations_ page, with the CLI, or through `/api/v1/log-stream`:
 
 ```console
-$ headscale log-streams create --name siem --destination splunk \
+$ slopscale log-streams create --name siem --destination splunk \
     --url https://splunk.example.com:8088/services/collector/event \
     --token 11111111-2222-3333-4444-555555555555
 ```
 
 The token is stored and never listed again; an update that leaves it empty
-keeps the stored one. `headscale log-streams test` ships one synthetic entry
+keeps the stored one. `slopscale log-streams test` ships one synthetic entry
 (`logstream.test`) and reports the sink's answer, and the list shows the
 newest batch's status with how many entries the sink has accepted and how
 many were dropped over the stream's life. A stream can be disabled to keep
@@ -49,7 +49,7 @@ A sink receives one object per audit event:
 ```
 
 `id` is the event's ID in the audit log, so a finding in the SIEM can be
-traced back with `headscale audit` or the console. `type` is always
+traced back with `slopscale audit` or the console. `type` is always
 `configuration`: the server has no network flow logs to stream, since it
 never sees the data plane.
 
@@ -58,11 +58,11 @@ never sees the data plane.
 | Destination | URL                                           | Credential                                   | Body                                                                                                        |
 | ----------- | --------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `http`      | any collector that takes JSON                 | optional, sent as `Authorization: Bearer`    | a JSON array of entries                                                                                     |
-| `splunk`    | the HTTP Event Collector endpoint             | the HEC token, as `Authorization: Splunk`    | one HEC event per entry, `sourcetype` `headscale:configuration`, `host` the tailnet                         |
+| `splunk`    | the HTTP Event Collector endpoint             | the HEC token, as `Authorization: Splunk`    | one HEC event per entry, `sourcetype` `slopscale:configuration`, `host` the tailnet                         |
 | `elastic`   | the index's `_bulk` URL                       | optional API key, as `Authorization: ApiKey` | a bulk request; each document is the entry with `@timestamp`                                                |
 | `datadog`   | the logs intake of your site (`/api/v2/logs`) | the API key, as `DD-API-KEY`                 | the entry's fields with `ddsource`, `service`, `ddtags` (`type`, `tailnet`, `stream`) and a `message` line  |
 | `axiom`     | the dataset's `/ingest` URL                   | the API token, as `Authorization: Bearer`    | a JSON array of entries with `_time`                                                                        |
-| `loki`      | the push API (`/loki/api/v1/push`)            | optional, sent as `Authorization: Bearer`    | one stream labelled `job=headscale`, `type`, `stream` and `tailnet`; each value is the entry as a JSON line |
+| `loki`      | the push API (`/loki/api/v1/push`)            | optional, sent as `Authorization: Bearer`    | one stream labelled `job=slopscale`, `type`, `stream` and `tailnet`; each value is the entry as a JSON line |
 
 The `http` destination fits Cribl, Panther, a Vector or Fluent Bit HTTP
 source, or your own receiver. Splunk, Datadog and Axiom refuse a stream

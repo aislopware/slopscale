@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -204,7 +204,7 @@ func TestNodeAttrsBaselineCapsAlwaysOn(t *testing.T) {
 // TestTaildropDisabledWithholdsFileSharingCap asserts the off path of
 // the Taildrop config gate. The Tailscale v2 API does not expose the
 // equivalent tailnet setting, so the nodeAttrs compat suite cannot
-// vary it; this test covers the headscale side directly.
+// vary it; this test covers the slopscale side directly.
 func TestTaildropDisabledWithholdsFileSharingCap(t *testing.T) {
 	t.Parallel()
 
@@ -402,7 +402,7 @@ func TestNodeAttrsSuggestExitNodeOnPeerCapMap(t *testing.T) {
 // the client reads from a peer entry: with dns-subdomain-resolve on a
 // node, a peer answers *.<that node> with the node's addresses only
 // when the cap is on its peer view of the node
-// (juanfont/headscale#3322). A node without the attribute must not get
+// (aislopware/slopscale#3322). A node without the attribute must not get
 // it on its peer view.
 func TestNodeAttrsDNSSubdomainResolveOnPeerCapMap(t *testing.T) {
 	t.Parallel()

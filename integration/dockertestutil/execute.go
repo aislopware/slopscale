@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/ory/dockertest/v3"
 )
 
@@ -97,7 +97,7 @@ func ExecuteCommand(
 		exitCode, err := resource.Exec(
 			cmd,
 			dockertest.ExecOptions{
-				Env:    append(env, "HEADSCALE_LOG_LEVEL=info"),
+				Env:    append(env, "SLOPSCALE_LOG_LEVEL=info"),
 				StdOut: &stdout,
 				StdErr: &stderr,
 			},

@@ -1,6 +1,6 @@
 # Groups and access rules
 
-Headscale can enforce access without a policy file. Machines and users go
+Slopscale can enforce access without a policy file. Machines and users go
 into named groups, and access rules say which groups may reach which on what
 protocol and ports. The admin console edits both under _Access controls_,
 and the same operations are on the API and the CLI. The model follows
@@ -117,9 +117,9 @@ disabling the last one opens it. Every change is audited as `group.*` or
 The CLI mirrors the API:
 
 ```console
-$ headscale groups create --name Engineering
-$ headscale groups add-user --identifier 2 --user 3
-$ headscale groups add-node --identifier 3 --node 7
-$ headscale access-rules create --name "SSH to servers" --src 2 --dst 3 --protocol tcp --ports 22
-$ headscale access-rules disable --identifier 1
+$ slopscale groups create --name Engineering
+$ slopscale groups add-user --identifier 2 --user 3
+$ slopscale groups add-node --identifier 3 --node 7
+$ slopscale access-rules create --name "SSH to servers" --src 2 --dst 3 --protocol tcp --ports 22
+$ slopscale access-rules disable --identifier 1
 ```

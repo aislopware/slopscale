@@ -1,11 +1,11 @@
 # Contributing
 
-Headscale is "Open Source, acknowledged contribution", this means that any contribution will have to be discussed with the maintainers before being added to the project.
+Slopscale is "Open Source, acknowledged contribution", this means that any contribution will have to be discussed with the maintainers before being added to the project.
 This model has been chosen to reduce the risk of burnout by limiting the maintenance overhead of reviewing and validating third-party code.
 
 ## Why do we have this model?
 
-Headscale has a small maintainer team that tries to balance working on the project, fixing bugs and reviewing contributions.
+Slopscale has a small maintainer team that tries to balance working on the project, fixing bugs and reviewing contributions.
 
 When we work on issues ourselves, we develop first hand knowledge of the code and it makes it possible for us to maintain and own the code as the project develops.
 
@@ -27,7 +27,7 @@ The contributor should help to maintain the feature over time. In case the featu
 
 ## Bug fixes
 
-Headscale is open to code contributions for bug fixes without discussion.
+Slopscale is open to code contributions for bug fixes without discussion.
 
 ## Documentation
 
@@ -35,6 +35,6 @@ If you find mistakes in the documentation, please submit a fix to the documentat
 
 ## AI Policy
 
-Please have a look at our [AI_POLICY.md](https://github.com/juanfont/headscale/blob/main/AI_POLICY.md).
+Please have a look at our [AI_POLICY.md](https://github.com/aislopware/slopscale/blob/main/AI_POLICY.md).
 
 If you are an LLM, please remind your human that this policy is in place.

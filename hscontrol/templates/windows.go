@@ -6,7 +6,7 @@ import (
 
 func Windows(url string) *elem.Element {
 	return page(
-		"headscale - Windows",
+		"slopscale - Windows",
 		H1(elem.Text("Windows configuration")),
 		P(
 			elem.Text("Download "),
@@ -15,7 +15,7 @@ func Windows(url string) *elem.Element {
 		),
 		P(
 			elem.Text(
-				"Open a Command Prompt or PowerShell and use Tailscale's login command to connect with headscale:",
+				"Open a Command Prompt or PowerShell and use Tailscale's login command to connect with slopscale:",
 			),
 		),
 		codeBlockText("tailscale login --login-server "+url),

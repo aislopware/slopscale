@@ -87,5 +87,5 @@ var capVerToTailscaleVer = map[tailcfg.CapabilityVersion]string{
 const SupportedMajorMinorVersions = 10
 
 // MinSupportedCapabilityVersion represents the minimum capability version
-// supported by this Headscale instance (latest 10 minor versions)
+// supported by this Slopscale instance (latest 10 minor versions)
 const MinSupportedCapabilityVersion tailcfg.CapabilityVersion = 115

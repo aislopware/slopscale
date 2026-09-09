@@ -1,4 +1,4 @@
--- This file is the representation of the SQLite schema of Headscale.
+-- This file is the representation of the SQLite schema of Slopscale.
 -- It is the "source of truth" and is used to validate any migrations
 -- that are run against the database to ensure it ends in the expected state.
 

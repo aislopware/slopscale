@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/aislopware/slopscale/hscontrol/mapper"
+	"github.com/aislopware/slopscale/integration/integrationutil"
 	"github.com/creachadair/command"
 	"github.com/creachadair/flax"
-	"github.com/juanfont/headscale/hscontrol/mapper"
-	"github.com/juanfont/headscale/integration/integrationutil"
 )
 
 type MapConfig struct {

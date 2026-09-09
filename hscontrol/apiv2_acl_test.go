@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	apiv2 "github.com/aislopware/slopscale/hscontrol/api/v2"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/danielgtaylor/huma/v2/humatest"
-	apiv2 "github.com/juanfont/headscale/hscontrol/api/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -22,7 +22,7 @@ const allowAllPolicy = `{"acls":[{"action":"accept","src":["*"],"dst":["*:*"]}]}
 
 // storedPolicy returns the HuJSON actually persisted in the DB (server-side
 // ground truth), or "" when none is set.
-func storedPolicy(t *testing.T, app *Headscale) string {
+func storedPolicy(t *testing.T, app *Slopscale) string {
 	t.Helper()
 
 	p, err := app.state.GetPolicy()

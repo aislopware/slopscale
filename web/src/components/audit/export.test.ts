@@ -41,7 +41,7 @@ describe(auditExportFileName, () => {
   it("names the file after the day it was taken and the format", () => {
     const day = new Date(2026, 8, 8, 13, 30);
 
-    expect(auditExportFileName("csv", day)).toBe("headscale-audit-2026-09-08.csv");
-    expect(auditExportFileName("json", day)).toBe("headscale-audit-2026-09-08.json");
+    expect(auditExportFileName("csv", day)).toBe("slopscale-audit-2026-09-08.csv");
+    expect(auditExportFileName("json", day)).toBe("slopscale-audit-2026-09-08.json");
   });
 });

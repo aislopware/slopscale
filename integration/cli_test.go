@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"testing"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/tsic"
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,8 +23,8 @@ import (
 // the matching HTTP-client Go type, so a change to the API handlers,
 // schema definitions or output encoders that breaks a command is caught here.
 
-func executeAndUnmarshal[T any](headscale ControlServer, command []string, result T) error {
-	str, err := headscale.Execute(command)
+func executeAndUnmarshal[T any](slopscale ControlServer, command []string, result T) error {
+	str, err := slopscale.Execute(command)
 	if err != nil {
 		return err
 	}
@@ -42,10 +42,10 @@ func executeAndUnmarshal[T any](headscale ControlServer, command []string, resul
 // asserting the serialisation is stable. This is the transport contract guard:
 // if the underlying type drifts in a way that loses data, the round-trip
 // breaks. The decoded value is returned so callers can assert on real fields.
-func assertJSONRoundtrip[T any](t require.TestingT, headscale ControlServer, command []string) T {
+func assertJSONRoundtrip[T any](t require.TestingT, slopscale ControlServer, command []string) T {
 	var first T
 
-	err := executeAndUnmarshal(headscale, command, &first)
+	err := executeAndUnmarshal(slopscale, command, &first)
 	require.NoError(t, err, "decoding CLI json output")
 
 	firstBytes, err := json.Marshal(first)
@@ -71,9 +71,9 @@ func sortWithID(a, b *clientv1.User) int {
 }
 
 // setupCLIScenario boots a scenario with the given users and nodes-per-user,
-// creates the headscale environment and returns the running scenario and its
-// control server. It removes the repeated NewScenario/CreateHeadscaleEnv/
-// Headscale boilerplate shared by the CLI tests. Callers still defer
+// creates the slopscale environment and returns the running scenario and its
+// control server. It removes the repeated NewScenario/CreateSlopscaleEnv/
+// Slopscale boilerplate shared by the CLI tests. Callers still defer
 // scenario.ShutdownAssertNoPanics(t) themselves so the cleanup is visible at
 // the call site.
 func setupCLIScenario(t *testing.T, testName string, users []string, nodesPerUser int) (*Scenario, ControlServer) {
@@ -87,11 +87,11 @@ func setupCLIScenario(t *testing.T, testName string, users []string, nodesPerUse
 	scenario, err := NewScenario(spec)
 	require.NoError(t, err)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName(testName))
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName(testName))
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
-	return scenario, headscale
+	return scenario, slopscale
 }

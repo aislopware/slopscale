@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -12,7 +12,7 @@ import (
 func TestApplyDefaultNodeExpiryWithCap(t *testing.T) {
 	t.Parallel()
 
-	s, err := NewState(persistTestConfig(t.TempDir() + "/headscale.db"))
+	s, err := NewState(persistTestConfig(t.TempDir() + "/slopscale.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = s.Close() })
 

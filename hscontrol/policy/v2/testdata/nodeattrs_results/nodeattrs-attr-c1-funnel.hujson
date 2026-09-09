@@ -1,6 +1,6 @@
 // nodeattrs-attr-c1-funnel
 //
-// funnel attr -- SaaS accepts; headscale rejects pending #2527
+// funnel attr -- SaaS accepts; slopscale rejects pending #2527
 //
 // Nodes with filter rules: 7 of 7
 // Captured at:    2026-05-07T08:09:10Z
@@ -9,7 +9,7 @@
 {
 	"schema_version": 1,
 	"test_id":        "nodeattrs-attr-c1-funnel",
-	"description":    "funnel attr -- SaaS accepts; headscale rejects pending #2527",
+	"description":    "funnel attr -- SaaS accepts; slopscale rejects pending #2527",
 	"category":       "nodeattrs",
 	"captured_at":    "2026-05-07T08:09:10.752217112Z",
 	"tool_version":   "tscap/dev",
@@ -20,7 +20,7 @@
 			"dns":      {"magic_dns": false, "nameservers": [], "search_paths": [], "split_dns": {}},
 			"settings": {}
 		},
-		"scenario_hujson": "                           \n{\n    \"category\": \"nodeattrs\",\n    \"description\": \"funnel attr -- SaaS accepts; headscale rejects pending #2527\",\n    \"id\": \"nodeattrs-attr-c1-funnel\",\n    \"options\": {},\n    \"policy\": {\n        \"nodeAttrs\": [\n            {\n                \"attr\": [\n                    \"funnel\"\n                ],\n                \"target\": [\n                    \"*\"\n                ]\n            }\n        ],\n        \"tagOwners\": {\n            \"tag:client\": [\n                \"odin@example.com\"\n            ],\n            \"tag:exit\": [\n                \"odin@example.com\"\n            ],\n            \"tag:prod\": [\n                \"odin@example.com\"\n            ],\n            \"tag:router\": [\n                \"odin@example.com\"\n            ],\n            \"tag:server\": [\n                \"odin@example.com\"\n            ]\n        }\n    },\n    \"tailnet\": {\n        \"dns\": {\n            \"magic_dns\": false,\n            \"nameservers\": [],\n            \"search_paths\": [],\n            \"split_dns\": {}\n        },\n        \"settings\": {}\n    },\n    \"topology\": \"../_topologies/nodeattrs.hujson\"\n}\n",
+		"scenario_hujson": "                           \n{\n    \"category\": \"nodeattrs\",\n    \"description\": \"funnel attr -- SaaS accepts; slopscale rejects pending #2527\",\n    \"id\": \"nodeattrs-attr-c1-funnel\",\n    \"options\": {},\n    \"policy\": {\n        \"nodeAttrs\": [\n            {\n                \"attr\": [\n                    \"funnel\"\n                ],\n                \"target\": [\n                    \"*\"\n                ]\n            }\n        ],\n        \"tagOwners\": {\n            \"tag:client\": [\n                \"odin@example.com\"\n            ],\n            \"tag:exit\": [\n                \"odin@example.com\"\n            ],\n            \"tag:prod\": [\n                \"odin@example.com\"\n            ],\n            \"tag:router\": [\n                \"odin@example.com\"\n            ],\n            \"tag:server\": [\n                \"odin@example.com\"\n            ]\n        }\n    },\n    \"tailnet\": {\n        \"dns\": {\n            \"magic_dns\": false,\n            \"nameservers\": [],\n            \"search_paths\": [],\n            \"split_dns\": {}\n        },\n        \"settings\": {}\n    },\n    \"topology\": \"../_topologies/nodeattrs.hujson\"\n}\n",
 		"scenario_path":   "scenarios/nodeattrs/nodeattrs-attr-c1-funnel.hujson",
 		"full_policy": {"nodeAttrs": [{"attr": ["funnel"], "target": ["*"]}], "tagOwners": {
 			"tag:client": ["odin@example.com"],

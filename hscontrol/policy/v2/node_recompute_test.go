@@ -4,7 +4,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 )
@@ -20,7 +20,7 @@ func TestNodeNeedsPeerRecompute(t *testing.T) {
 	t.Parallel()
 
 	users := types.Users{
-		{ID: 1, Name: "user1", Email: "user1@headscale.net"},
+		{ID: 1, Name: "user1", Email: "user1@slopscale.net"},
 	}
 
 	const allowAll = `{"acls":[{"action":"accept","src":["*"],"dst":["*:*"]}]}`

@@ -5,7 +5,7 @@
 // regular grants, and multiple HA pairs.
 //
 // Test data source: ../policy/v2/testdata/grant_results/via-grant-v{37..46}.hujson
-// Source format:    github.com/juanfont/headscale/hscontrol/types/testcapture
+// Source format:    github.com/aislopware/slopscale/hscontrol/types/testcapture
 
 package servertest_test
 
@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/servertest"
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
+	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -89,7 +89,7 @@ func runViaHACompat(t *testing.T, c *testcapture.Capture) {
 		srv.App.Change(changes...)
 	}
 
-	// Create nodes in SaaS node ID order so headscale assigns
+	// Create nodes in SaaS node ID order so slopscale assigns
 	// sequential DB IDs in the same relative order.
 	clients := map[string]*servertest.TestClient{}
 	order := captureNodeOrder(t, c)
@@ -201,7 +201,7 @@ func runViaHACompat(t *testing.T, c *testcapture.Capture) {
 	}
 }
 
-// compareCaptureNetmap compares headscale's [tailcfg.MapResponse] against a
+// compareCaptureNetmap compares slopscale's [tailcfg.MapResponse] against a
 // [testcapture.Node]'s [netmap.NetworkMap] data. Same logic as [compareNetmap] but
 // reads from typed [testcapture] fields instead of goldenFile strings.
 func compareCaptureNetmap(
@@ -253,7 +253,7 @@ func compareCaptureNetmap(
 		}
 	}
 
-	// Build peer summaries from headscale [tailcfg.MapResponse].
+	// Build peer summaries from slopscale [tailcfg.MapResponse].
 	gotPeers := map[string]capturePeerSummary{}
 
 	for _, peer := range nm.Peers {
@@ -297,7 +297,7 @@ func compareCaptureNetmap(
 	for name, wantPeer := range wantPeers {
 		gotPeer, visible := gotPeers[name]
 		if !visible {
-			t.Errorf("peer %s: visible in SaaS, missing in headscale (routes=%v)",
+			t.Errorf("peer %s: visible in SaaS, missing in slopscale (routes=%v)",
 				name, wantPeer.RoutePrefixes)
 
 			continue
@@ -316,7 +316,7 @@ func compareCaptureNetmap(
 	// Check for extra peers.
 	for name := range gotPeers {
 		if _, expected := wantPeers[name]; !expected {
-			t.Errorf("peer %s: visible in headscale but NOT in SaaS", name)
+			t.Errorf("peer %s: visible in slopscale but NOT in SaaS", name)
 		}
 	}
 
@@ -326,7 +326,7 @@ func compareCaptureNetmap(
 	if len(want.PacketFilterRules) > 0 {
 		gotLen := nm.PacketFilterRules.Len()
 		assert.Equalf(t, len(want.PacketFilterRules), gotLen,
-			"PacketFilter rule count mismatch (SaaS=%d, headscale=%d)",
+			"PacketFilter rule count mismatch (SaaS=%d, slopscale=%d)",
 			len(want.PacketFilterRules), gotLen,
 		)
 	}
@@ -380,8 +380,8 @@ func captureNodeOrder(t *testing.T, c *testcapture.Capture) []string {
 	return names
 }
 
-// convertCapturePolicy converts a [testcapture.Capture]'s policy for headscale,
-// replacing SaaS emails with headscale user format. Fails the test if
+// convertCapturePolicy converts a [testcapture.Capture]'s policy for slopscale,
+// replacing SaaS emails with slopscale user format. Fails the test if
 // none of the known SaaS emails are present: that would mean the
 // capture was regenerated with a new tag-owner identity and this
 // function needs updating.

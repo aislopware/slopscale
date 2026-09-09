@@ -16,9 +16,9 @@ rule may still be edited as long as its expiry is kept, extended or
 cleared.
 
 ```console
-headscale access-rules create --name "Migration window" \
+slopscale access-rules create --name "Migration window" \
   --src 2 --dst 3 --protocol tcp --ports 5432 --expires 48h
-headscale access-rules update -i 7 --name "Migration window" \
+slopscale access-rules update -i 7 --name "Migration window" \
   --src 2 --dst 3 --protocol tcp --ports 5432 --expires 2026-09-30T18:00:00Z
 ```
 
@@ -33,8 +33,8 @@ untouched. Adding the same member again for good makes the membership
 permanent; a group edit that keeps the member keeps its expiry.
 
 ```console
-headscale groups add-node -i 4 --node 12 --expires 4h
-headscale groups add-user -i 4 --user 3 --expires 2026-09-12T09:00:00Z
+slopscale groups add-node -i 4 --node 12 --expires 4h
+slopscale groups add-user -i 4 --user 3 --expires 2026-09-12T09:00:00Z
 ```
 
 The console's _Groups_ dialog on a machine or user has an _Until_ field
@@ -61,12 +61,12 @@ queue on the _Requests_ page under _Access controls_, with the number
 pending next to it in the sidebar.
 
 ```console
-headscale groups create --name "Prod" --requestable
-headscale access-requests create --group 4 --node 12 --duration 2h --reason "deploy"
-headscale access-requests list --status pending
-headscale access-requests approve -i 1 --duration 1h --note "one hour is enough"
-headscale access-requests deny -i 2 --note "ask the team lead first"
-headscale access-requests cancel -i 3
+slopscale groups create --name "Prod" --requestable
+slopscale access-requests create --group 4 --node 12 --duration 2h --reason "deploy"
+slopscale access-requests list --status pending
+slopscale access-requests approve -i 1 --duration 1h --note "one hour is enough"
+slopscale access-requests deny -i 2 --note "ask the team lead first"
+slopscale access-requests cancel -i 3
 ```
 
 Through the API, `GET /api/v1/access-request/options` lists what the

@@ -12,7 +12,7 @@ func Apple(url string) *elem.Element {
 	content = append(content, appleMacOSProfileSection(url)...)
 	content = append(content, appleTVOSSection(url)...)
 
-	return page("headscale - Apple", content...)
+	return page("slopscale - Apple", content...)
 }
 
 // appleIOSSection renders the iOS configuration instructions.
@@ -50,7 +50,7 @@ func appleIOSSection(url string) []elem.Node {
 			elem.Li(
 				nil,
 				elem.Text(
-					"Enter your credentials and log in. Headscale should now be working on your iOS device",
+					"Enter your credentials and log in. Slopscale should now be working on your iOS device",
 				),
 			),
 		),
@@ -88,7 +88,7 @@ func appleMacOSSection(url string) []elem.Node {
 				nil,
 				elem.Text("Enter "),
 				Code(elem.Text(url)),
-				elem.Text(" of the headscale instance and press "),
+				elem.Text(" of the slopscale instance and press "),
 				elem.Strong(nil, elem.Text("Add Account")),
 			),
 			elem.Li(
@@ -106,7 +106,7 @@ func appleMacOSProfileSection(url string) []elem.Node {
 		H2(elem.Text("Profiles")),
 		P(
 			elem.Text(
-				"Headscale can be set to the default server by installing a Headscale configuration profile:",
+				"Slopscale can be set to the default server by installing a Slopscale configuration profile:",
 			),
 		),
 		elem.Div(
@@ -132,7 +132,7 @@ func appleMacOSProfileSection(url string) []elem.Node {
 			elem.Li(
 				nil,
 				elem.Text("Find and install the "),
-				elem.Strong(nil, elem.Text("Headscale")),
+				elem.Strong(nil, elem.Text("Slopscale")),
 				elem.Text(" profile"),
 			),
 			elem.Li(
@@ -222,7 +222,7 @@ func appleTVOSSection(url string) []elem.Node {
 			),
 			elem.Li(
 				nil,
-				elem.Text("Headscale should now be working on your tvOS device"),
+				elem.Text("Slopscale should now be working on your tvOS device"),
 			),
 		),
 	}

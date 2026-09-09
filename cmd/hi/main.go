@@ -13,7 +13,7 @@ var runConfig RunConfig
 func main() {
 	root := command.C{
 		Name: "hi",
-		Help: "Headscale Integration test runner",
+		Help: "Slopscale Integration test runner",
 		Commands: []*command.C{
 			{
 				Name:     "run",

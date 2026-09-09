@@ -4,19 +4,19 @@
 // testdata directory, one t.Run per file. Each capture is one of:
 //
 //   - APIResponseCode != 200 — the policy was rejected by the SaaS, the
-//     captured Message is the byte-exact body the user saw, and headscale
+//     captured Message is the byte-exact body the user saw, and slopscale
 //     must reject the same input with an error string that contains the
 //     same body (substring match, allowing wrapping like "test(s)
 //     failed:\n…").
 //   - APIResponseCode == 200 — the SaaS accepted the policy (its `tests`
-//     block passed); headscale's RunTests must also pass.
+//     block passed); slopscale's RunTests must also pass.
 //
 // Captures live in testdata/policytest_results/*.hujson. Scenarios in
 // knownPolicyTesterDivergences are skipped with their tracking note —
-// these are real Tailscale ↔ headscale divergences uncovered by the
+// these are real Tailscale ↔ slopscale divergences uncovered by the
 // captures that need engine-level fixes in follow-up PRs.
 //
-// Source format: github.com/juanfont/headscale/hscontrol/types/testcapture
+// Source format: github.com/aislopware/slopscale/hscontrol/types/testcapture
 
 package v2
 
@@ -25,12 +25,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 )
 
-// knownPolicyTesterDivergences lists scenarios where headscale's evaluator
+// knownPolicyTesterDivergences lists scenarios where slopscale's evaluator
 // disagrees with Tailscale SaaS on whether the policy should be accepted.
 // Each entry is a real bug to fix in a follow-up; documenting them here
 // keeps the compat suite green and the divergence list visible.
@@ -129,16 +129,16 @@ func TestPolicyTesterCompat(t *testing.T) {
 			pm, parseErr := NewPolicyManager(policyJSON, users, nodes.ViewSlice())
 
 			// Tailscale validates and runs tests as one POST step:
-			// either failure mode produces the same 400. Headscale
+			// either failure mode produces the same 400. Slopscale
 			// splits structural validation (parse) from test
 			// evaluation (SetPolicy). For the compat assertion, the
 			// two are equivalent — whichever surfaces first carries
 			// the captured body.
 			if c.Input.APIResponseCode == 200 {
-				require.NoError(t, parseErr, "tailscale accepted this policy; headscale must parse it")
+				require.NoError(t, parseErr, "tailscale accepted this policy; slopscale must parse it")
 
 				_, setErr := pm.SetPolicy(policyJSON)
-				require.NoError(t, setErr, "tailscale accepted this policy; headscale tests should pass")
+				require.NoError(t, setErr, "tailscale accepted this policy; slopscale tests should pass")
 
 				return
 			}
@@ -153,7 +153,7 @@ func TestPolicyTesterCompat(t *testing.T) {
 				got = setErr
 			}
 
-			require.Error(t, got, "tailscale rejected; headscale must reject too")
+			require.Error(t, got, "tailscale rejected; slopscale must reject too")
 
 			if c.Input.APIResponseBody == nil || c.Input.APIResponseBody.Message == "" {
 				return
@@ -161,7 +161,7 @@ func TestPolicyTesterCompat(t *testing.T) {
 
 			want := c.Input.APIResponseBody.Message
 			if !strings.Contains(got.Error(), want) {
-				t.Errorf("error body mismatch\n  tailscale wants: %q\n  headscale got:   %q", want, got.Error())
+				t.Errorf("error body mismatch\n  tailscale wants: %q\n  slopscale got:   %q", want, got.Error())
 			}
 		})
 	}

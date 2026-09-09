@@ -69,6 +69,6 @@ func TestNoOpMapRequestSkipsPersist(t *testing.T) {
 
 	// Nothing moved, so nothing goes to the peers either: the change
 	// used to be "node added", a peer change fanned out to every node
-	// (juanfont/headscale#3417).
+	// (aislopware/slopscale#3417).
 	require.True(t, c.IsEmpty(), "no-op MapRequest should yield an empty change, got %+v", c)
 }

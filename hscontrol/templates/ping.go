@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
 	elem "github.com/chasefleming/elem-go"
 	"github.com/chasefleming/elem-go/attrs"
 	"github.com/chasefleming/elem-go/styles"
-	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 // PingResult contains the outcome of a ping request.
@@ -53,7 +53,7 @@ func PingPage(query string, result *PingResult, nodes []ConnectedNode) *elem.Ele
 		children = append(children, connectedNodeList(nodes))
 	}
 
-	return page("Ping Node - Headscale", children...)
+	return page("Ping Node - Slopscale", children...)
 }
 
 func pingExplanation() *elem.Element {

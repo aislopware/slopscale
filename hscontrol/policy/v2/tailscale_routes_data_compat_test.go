@@ -1,6 +1,6 @@
 // This file implements data-driven test runners for routes compatibility tests.
 // It loads HuJSON golden files from testdata/routes_results/routes-*.hujson,
-// captured from a Tailscale-hosted control plane, and compares headscale's route-aware
+// captured from a Tailscale-hosted control plane, and compares slopscale's route-aware
 // ACL engine output against the captured packet filter rules.
 //
 // Each capture file is a testcapture.Capture containing:
@@ -21,7 +21,7 @@
 //     CanAccess fix from issue #3157.
 //
 // Test data source: testdata/routes_results/routes-*.hujson
-// Source format:    github.com/juanfont/headscale/hscontrol/types/testcapture
+// Source format:    github.com/aislopware/slopscale/hscontrol/types/testcapture
 
 package v2
 
@@ -33,11 +33,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/policy/policyutil"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/testcapture"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/juanfont/headscale/hscontrol/policy/policyutil"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go4.org/netipx"
@@ -182,7 +182,7 @@ var subnetToSubnetFiles = []string{
 }
 
 // TestRoutesCompat is a data-driven test that loads all routes-*.hujson test
-// files and compares headscale's route-aware ACL engine output against the
+// files and compares slopscale's route-aware ACL engine output against the
 // expected behavior.
 func TestRoutesCompat(t *testing.T) {
 	t.Parallel()
@@ -208,7 +208,7 @@ func TestRoutesCompat(t *testing.T) {
 			// Build topology from JSON
 			users, nodes := buildRoutesUsersAndNodes(t, tf.Topology)
 
-			// Convert Tailscale SaaS user emails to headscale format
+			// Convert Tailscale SaaS user emails to slopscale format
 			policyJSON := convertPolicyUserEmails(tf.Input.FullPolicy)
 
 			// Parse and validate policy
@@ -484,7 +484,7 @@ func TestRoutesCompatPeerVisibility(t *testing.T) {
 			// Build topology from JSON.
 			users, nodes := buildRoutesUsersAndNodes(t, tf.Topology)
 
-			// Convert Tailscale SaaS user emails to headscale format.
+			// Convert Tailscale SaaS user emails to slopscale format.
 			policyJSON := convertPolicyUserEmails(tf.Input.FullPolicy)
 
 			// Create a PolicyManager — this compiles the global filter
@@ -685,7 +685,7 @@ func TestRoutesCompatPeerVisibility(t *testing.T) {
 	}
 }
 
-// TestRoutesCompatAutoApproval validates that headscale's auto-approval
+// TestRoutesCompatAutoApproval validates that slopscale's auto-approval
 // logic (NodeCanApproveRoute) produces the same approval decisions as
 // captured in the golden files from Tailscale SaaS.
 //
@@ -718,7 +718,7 @@ func TestRoutesCompatAutoApproval(t *testing.T) {
 			// Build topology from JSON.
 			users, nodes := buildRoutesUsersAndNodes(t, tf.Topology)
 
-			// Convert Tailscale SaaS user emails to headscale format.
+			// Convert Tailscale SaaS user emails to slopscale format.
 			policyJSON := convertPolicyUserEmails(tf.Input.FullPolicy)
 
 			// Create a PolicyManager — this resolves autoApprovers
@@ -800,7 +800,7 @@ func TestRoutesCompatAutoApproval(t *testing.T) {
 	}
 }
 
-// TestRoutesCompatReduceRoutes validates that headscale's CanAccessRoute
+// TestRoutesCompatReduceRoutes validates that slopscale's CanAccessRoute
 // produces route visibility decisions consistent with the golden file
 // captures from Tailscale SaaS.
 //
@@ -834,7 +834,7 @@ func TestRoutesCompatReduceRoutes(t *testing.T) {
 			// Build topology from JSON.
 			users, nodes := buildRoutesUsersAndNodes(t, tf.Topology)
 
-			// Convert Tailscale SaaS user emails to headscale format.
+			// Convert Tailscale SaaS user emails to slopscale format.
 			policyJSON := convertPolicyUserEmails(tf.Input.FullPolicy)
 
 			// Create a PolicyManager.
@@ -1138,7 +1138,7 @@ func TestRoutesCompatExitNodePeerVisibility(t *testing.T) {
 	}
 }
 
-// TestRoutesCompatNoPeersBeyondCaptures verifies that headscale does not
+// TestRoutesCompatNoPeersBeyondCaptures verifies that slopscale does not
 // create peer relationships beyond what the golden file captures imply.
 // For every pair of nodes NOT in the expected peer set (derived from
 // the capture SrcIPs), CanAccess must return false.
@@ -1379,10 +1379,10 @@ func prefixStrings(pfxs []netip.Prefix) []string {
 	return out
 }
 
-// TestRoutesCompatPeerAllowedIPs validates that headscale computes the same
+// TestRoutesCompatPeerAllowedIPs validates that slopscale computes the same
 // peer AllowedIPs as Tailscale SaaS. For each golden file that contains
 // netmap captures, the test compares the AllowedIPs that SaaS delivered
-// for each peer against what headscale's ReduceRoutes (the core of
+// for each peer against what slopscale's ReduceRoutes (the core of
 // RoutesForPeer) would produce.
 //
 // This is the authoritative proof that approved exit routes (0.0.0.0/0,
@@ -1424,7 +1424,7 @@ func TestRoutesCompatPeerAllowedIPs(t *testing.T) {
 		t.Run(tf.TestID, func(t *testing.T) {
 			t.Parallel()
 
-			// SaaS rejected this policy — verify headscale also rejects it.
+			// SaaS rejected this policy — verify slopscale also rejects it.
 			if tf.Error {
 				testRoutesError(t, tf)
 
@@ -1460,7 +1460,7 @@ func TestRoutesCompatPeerAllowedIPs(t *testing.T) {
 							continue
 						}
 
-						// Compute what headscale would put in AllowedIPs.
+						// Compute what slopscale would put in AllowedIPs.
 						//
 						// The SaaS netmap PrimaryRoutes tells us which
 						// subnet routes won HA election. Exit routes
@@ -1542,7 +1542,7 @@ func testRoutesError(t *testing.T, tf *testcapture.Capture) {
 	)
 }
 
-// assertRoutesErrorContains requires that headscale's error contains
+// assertRoutesErrorContains requires that slopscale's error contains
 // the Tailscale SaaS error message exactly. Divergence means an
 // emitter needs to be aligned, not papered over with a translation
 // table.
@@ -1562,7 +1562,7 @@ func assertRoutesErrorContains(
 	t.Errorf(
 		"%s: error message mismatch\n"+
 			"  want (tailscale): %q\n"+
-			"  got  (headscale): %q",
+			"  got  (slopscale): %q",
 		testID,
 		wantMsg,
 		errStr,

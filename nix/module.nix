@@ -4,72 +4,72 @@
 , ...
 }:
 let
-  cfg = config.services.headscale;
+  cfg = config.services.slopscale;
 
-  dataDir = "/var/lib/headscale";
-  runDir = "/run/headscale";
+  dataDir = "/var/lib/slopscale";
+  runDir = "/run/slopscale";
 
   cliConfig = {
     # Turn off update checks since the origin of our package
     # is nixpkgs and not Github.
     disable_check_updates = true;
 
-    unix_socket = "${runDir}/headscale.sock";
+    unix_socket = "${runDir}/slopscale.sock";
   };
 
   settingsFormat = pkgs.formats.yaml { };
-  cliConfigFile = settingsFormat.generate "headscale.yaml" cliConfig;
+  cliConfigFile = settingsFormat.generate "slopscale.yaml" cliConfig;
 
   assertRemovedOption = option: message: {
     assertion = !lib.hasAttrByPath option cfg;
     message =
-      "The option `services.headscale.${lib.options.showOption option}` was removed. " + message;
+      "The option `services.slopscale.${lib.options.showOption option}` was removed. " + message;
   };
 in
 {
   # Disable the upstream NixOS module to prevent conflicts
-  disabledModules = [ "services/networking/headscale.nix" ];
+  disabledModules = [ "services/networking/slopscale.nix" ];
 
   options = {
-    services.headscale = {
-      enable = lib.mkEnableOption "headscale, Open Source coordination server for Tailscale";
+    services.slopscale = {
+      enable = lib.mkEnableOption "slopscale, Open Source coordination server for Tailscale";
 
-      package = lib.mkPackageOption pkgs "headscale" { };
+      package = lib.mkPackageOption pkgs "slopscale" { };
 
       configFile = lib.mkOption {
         type = lib.types.path;
         readOnly = true;
-        default = settingsFormat.generate "headscale.yaml" cfg.settings;
-        defaultText = lib.literalExpression ''(pkgs.formats.yaml { }).generate "headscale.yaml" config.services.headscale.settings'';
+        default = settingsFormat.generate "slopscale.yaml" cfg.settings;
+        defaultText = lib.literalExpression ''(pkgs.formats.yaml { }).generate "slopscale.yaml" config.services.slopscale.settings'';
         description = ''
-          Path to the configuration file of headscale.
+          Path to the configuration file of slopscale.
         '';
       };
 
       user = lib.mkOption {
-        default = "headscale";
+        default = "slopscale";
         type = lib.types.str;
         description = ''
-          User account under which headscale runs.
+          User account under which slopscale runs.
 
           ::: {.note}
           If left as the default value this user will automatically be created
           on system activation, otherwise you are responsible for
-          ensuring the user exists before the headscale service starts.
+          ensuring the user exists before the slopscale service starts.
           :::
         '';
       };
 
       group = lib.mkOption {
-        default = "headscale";
+        default = "slopscale";
         type = lib.types.str;
         description = ''
-          Group under which headscale runs.
+          Group under which slopscale runs.
 
           ::: {.note}
           If left as the default value this group will automatically be created
           on system activation, otherwise you are responsible for
-          ensuring the user exists before the headscale service starts.
+          ensuring the user exists before the slopscale service starts.
           :::
         '';
       };
@@ -78,7 +78,7 @@ in
         type = lib.types.str;
         default = "127.0.0.1";
         description = ''
-          Listening address of headscale.
+          Listening address of slopscale.
         '';
         example = "0.0.0.0";
       };
@@ -87,7 +87,7 @@ in
         type = lib.types.port;
         default = 8080;
         description = ''
-          Listening port of headscale.
+          Listening port of slopscale.
         '';
         example = 443;
       };
@@ -95,7 +95,7 @@ in
       settings = lib.mkOption {
         description = ''
           Overrides to {file}`config.yaml` as a Nix attribute set.
-          Check the [example config](https://github.com/juanfont/headscale/blob/main/config-example.yaml)
+          Check the [example config](https://github.com/aislopware/slopscale/blob/main/config-example.yaml)
           for possible options.
         '';
         type = lib.types.submodule {
@@ -108,7 +108,7 @@ in
               description = ''
                 The url clients will connect to.
               '';
-              example = "https://myheadscale.example.com:443";
+              example = "https://myslopscale.example.com:443";
             };
 
             noise.private_key_path = lib.mkOption {
@@ -289,21 +289,21 @@ in
                 name = lib.mkOption {
                   type = lib.types.nullOr lib.types.str;
                   default = null;
-                  example = "headscale";
+                  example = "slopscale";
                   description = "Database name.";
                 };
 
                 user = lib.mkOption {
                   type = lib.types.nullOr lib.types.str;
                   default = null;
-                  example = "headscale";
+                  example = "slopscale";
                   description = "Database user.";
                 };
 
                 password_file = lib.mkOption {
                   type = lib.types.nullOr lib.types.path;
                   default = null;
-                  example = "/run/keys/headscale-dbpassword";
+                  example = "/run/keys/slopscale-dbpassword";
                   description = ''
                     A file containing the password corresponding to
                     {option}`database.user`.
@@ -317,7 +317,7 @@ in
                 type = lib.types.str;
                 default = "info";
                 description = ''
-                  headscale log level.
+                  slopscale log level.
                 '';
                 example = "debug";
               };
@@ -326,7 +326,7 @@ in
                 type = lib.types.str;
                 default = "text";
                 description = ''
-                  headscale log format.
+                  slopscale log format.
                 '';
                 example = "json";
               };
@@ -607,72 +607,72 @@ in
 
   imports = with lib; [
     (mkRenamedOptionModule
-      [ "services" "headscale" "derp" "autoUpdate" ]
-      [ "services" "headscale" "settings" "derp" "auto_update_enabled" ]
+      [ "services" "slopscale" "derp" "autoUpdate" ]
+      [ "services" "slopscale" "settings" "derp" "auto_update_enabled" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "derp" "auto_update_enable" ]
-      [ "services" "headscale" "settings" "derp" "auto_update_enabled" ]
+      [ "services" "slopscale" "derp" "auto_update_enable" ]
+      [ "services" "slopscale" "settings" "derp" "auto_update_enabled" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "derp" "paths" ]
-      [ "services" "headscale" "settings" "derp" "paths" ]
+      [ "services" "slopscale" "derp" "paths" ]
+      [ "services" "slopscale" "settings" "derp" "paths" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "derp" "updateFrequency" ]
-      [ "services" "headscale" "settings" "derp" "update_frequency" ]
+      [ "services" "slopscale" "derp" "updateFrequency" ]
+      [ "services" "slopscale" "settings" "derp" "update_frequency" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "derp" "urls" ]
-      [ "services" "headscale" "settings" "derp" "urls" ]
+      [ "services" "slopscale" "derp" "urls" ]
+      [ "services" "slopscale" "settings" "derp" "urls" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "ephemeralNodeInactivityTimeout" ]
-      [ "services" "headscale" "settings" "ephemeral_node_inactivity_timeout" ]
+      [ "services" "slopscale" "ephemeralNodeInactivityTimeout" ]
+      [ "services" "slopscale" "settings" "ephemeral_node_inactivity_timeout" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "logLevel" ]
-      [ "services" "headscale" "settings" "log" "level" ]
+      [ "services" "slopscale" "logLevel" ]
+      [ "services" "slopscale" "settings" "log" "level" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "openIdConnect" "clientId" ]
-      [ "services" "headscale" "settings" "oidc" "client_id" ]
+      [ "services" "slopscale" "openIdConnect" "clientId" ]
+      [ "services" "slopscale" "settings" "oidc" "client_id" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "openIdConnect" "clientSecretFile" ]
-      [ "services" "headscale" "settings" "oidc" "client_secret_path" ]
+      [ "services" "slopscale" "openIdConnect" "clientSecretFile" ]
+      [ "services" "slopscale" "settings" "oidc" "client_secret_path" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "openIdConnect" "issuer" ]
-      [ "services" "headscale" "settings" "oidc" "issuer" ]
+      [ "services" "slopscale" "openIdConnect" "issuer" ]
+      [ "services" "slopscale" "settings" "oidc" "issuer" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "serverUrl" ]
-      [ "services" "headscale" "settings" "server_url" ]
+      [ "services" "slopscale" "serverUrl" ]
+      [ "services" "slopscale" "settings" "server_url" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "tls" "certFile" ]
-      [ "services" "headscale" "settings" "tls_cert_path" ]
+      [ "services" "slopscale" "tls" "certFile" ]
+      [ "services" "slopscale" "settings" "tls_cert_path" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "tls" "keyFile" ]
-      [ "services" "headscale" "settings" "tls_key_path" ]
+      [ "services" "slopscale" "tls" "keyFile" ]
+      [ "services" "slopscale" "settings" "tls_key_path" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "tls" "letsencrypt" "challengeType" ]
-      [ "services" "headscale" "settings" "tls_letsencrypt_challenge_type" ]
+      [ "services" "slopscale" "tls" "letsencrypt" "challengeType" ]
+      [ "services" "slopscale" "settings" "tls_letsencrypt_challenge_type" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "tls" "letsencrypt" "hostname" ]
-      [ "services" "headscale" "settings" "tls_letsencrypt_hostname" ]
+      [ "services" "slopscale" "tls" "letsencrypt" "hostname" ]
+      [ "services" "slopscale" "settings" "tls_letsencrypt_hostname" ]
     )
     (mkRenamedOptionModule
-      [ "services" "headscale" "tls" "letsencrypt" "httpListen" ]
-      [ "services" "headscale" "settings" "tls_letsencrypt_listen" ]
+      [ "services" "slopscale" "tls" "letsencrypt" "httpListen" ]
+      [ "services" "slopscale" "settings" "tls_letsencrypt_listen" ]
     )
 
-    (mkRemovedOptionModule [ "services" "headscale" "openIdConnect" "domainMap" ] ''
-      Headscale no longer uses domain_map. If you're using an old version of headscale you can still set this option via services.headscale.settings.oidc.domain_map.
+    (mkRemovedOptionModule [ "services" "slopscale" "openIdConnect" "domainMap" ] ''
+      Slopscale no longer uses domain_map. If you're using an old version of slopscale you can still set this option via services.slopscale.settings.oidc.domain_map.
     '')
   ];
 
@@ -711,7 +711,7 @@ in
       ] "The strip_email_domain option got removed upstream")
     ];
 
-    services.headscale.settings = lib.mkMerge [
+    services.slopscale.settings = lib.mkMerge [
       cliConfig
       {
         listen_addr = lib.mkDefault "${cfg.address}:${toString cfg.port}";
@@ -721,31 +721,31 @@ in
     ];
 
     environment = {
-      # Headscale CLI needs a minimal config to be able to locate the unix socket
+      # Slopscale CLI needs a minimal config to be able to locate the unix socket
       # to talk to the server instance.
-      etc."headscale/config.yaml".source = cliConfigFile;
+      etc."slopscale/config.yaml".source = cliConfigFile;
 
       systemPackages = [ cfg.package ];
     };
 
-    users.groups.headscale = lib.mkIf (cfg.group == "headscale") { };
+    users.groups.slopscale = lib.mkIf (cfg.group == "slopscale") { };
 
-    users.users.headscale = lib.mkIf (cfg.user == "headscale") {
-      description = "headscale user";
+    users.users.slopscale = lib.mkIf (cfg.user == "slopscale") {
+      description = "slopscale user";
       home = dataDir;
       group = cfg.group;
       isSystemUser = true;
     };
 
-    systemd.services.headscale = {
-      description = "headscale coordination server for Tailscale";
+    systemd.services.slopscale = {
+      description = "slopscale coordination server for Tailscale";
       wants = [ "network-online.target" ];
       after = [ "network-online.target" ];
       wantedBy = [ "multi-user.target" ];
 
       script = ''
         ${lib.optionalString (cfg.settings.database.postgres.password_file != null) ''
-          export HEADSCALE_DATABASE_POSTGRES_PASS="$(head -n1 ${lib.escapeShellArg cfg.settings.database.postgres.password_file})"
+          export SLOPSCALE_DATABASE_POSTGRES_PASS="$(head -n1 ${lib.escapeShellArg cfg.settings.database.postgres.password_file})"
         ''}
 
         exec ${lib.getExe cfg.package} serve --config ${cfg.configFile}
@@ -763,11 +763,11 @@ in
           Group = cfg.group;
 
           # Hardening options
-          RuntimeDirectory = "headscale";
-          # Allow headscale group access so users can be added and use the CLI.
+          RuntimeDirectory = "slopscale";
+          # Allow slopscale group access so users can be added and use the CLI.
           RuntimeDirectoryMode = "0750";
 
-          StateDirectory = "headscale";
+          StateDirectory = "slopscale";
           StateDirectoryMode = "0750";
 
           ProtectSystem = "strict";

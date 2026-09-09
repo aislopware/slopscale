@@ -7,7 +7,7 @@ import (
 )
 
 // Design System Constants
-// These constants define the visual language for all Headscale HTML templates.
+// These constants define the visual language for all Slopscale HTML templates.
 // They ensure consistency across all pages and make it easy to maintain and update the design.
 
 // Spacing System
@@ -30,7 +30,7 @@ const (
 )
 
 // Typography System
-// EXTRACTED FROM: https://headscale.net/stable/assets/stylesheets/main.342714a4.min.css
+// EXTRACTED FROM: https://aislopware.github.io/slopscale/stable/assets/stylesheets/main.342714a4.min.css
 // Material for MkDocs typography - exact values from .md-typeset CSS.
 const (
 	// Font sizes - from .md-typeset CSS rules.
@@ -206,7 +206,7 @@ func warningBox(title, message string) *elem.Element {
 func downloadButton(href, text string) *elem.Element {
 	return elem.A(attrs.Props{
 		attrs.Href:     href,
-		attrs.Download: "headscale_macos.mobileconfig",
+		attrs.Download: "slopscale_macos.mobileconfig",
 		attrs.Style: styles.Props{
 			styles.Display:         "inline-flex",
 			styles.AlignItems:      cssCenter,

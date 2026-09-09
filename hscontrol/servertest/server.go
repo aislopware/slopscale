@@ -1,5 +1,5 @@
-// Package servertest provides an in-process test harness for Headscale's
-// control plane. It wires a real Headscale server to real Tailscale
+// Package servertest provides an in-process test harness for Slopscale's
+// control plane. It wires a real Slopscale server to real Tailscale
 // [controlclient.Direct] instances, enabling fast, deterministic tests
 // of the full control protocol without Docker or separate processes.
 package servertest
@@ -14,20 +14,20 @@ import (
 	"testing"
 	"time"
 
-	hscontrol "github.com/juanfont/headscale/hscontrol"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
+	hscontrol "github.com/aislopware/slopscale/hscontrol"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"tailscale.com/net/memnet"
 	"tailscale.com/tailcfg"
 )
 
-// TestServer is an in-process Headscale control server suitable for
+// TestServer is an in-process Slopscale control server suitable for
 // use with Tailscale's [controlclient.Direct].
 //
 // Networking uses tailscale.com/net/memnet so that all TCP
 // connections stay in-process — no real sockets are opened.
 type TestServer struct {
-	App *hscontrol.Headscale
+	App *hscontrol.Slopscale
 	URL string
 
 	memNet *memnet.Network
@@ -137,7 +137,7 @@ func WithTaildropEnabled(enabled bool) ServerOption {
 // WithOIDC makes the server authenticate interactive logins against the
 // given OpenID Connect provider instead of the CLI/web flow. The issuer must
 // already serve its discovery document when [NewServer] runs, because
-// [hscontrol.NewHeadscale] discovers the provider at construction time; a
+// [hscontrol.NewSlopscale] discovers the provider at construction time; a
 // failed discovery fails the test rather than falling back to web auth.
 // Scope is passed through unchanged, so include at least "openid".
 func WithOIDC(cfg types.OIDCConfig) ServerOption {
@@ -151,7 +151,7 @@ func WithDNS(cfg types.DNSConfig) ServerOption {
 }
 
 // WithSSHRecording configures the SSH session recorder. Enabled also needs
-// [WithRealListener] and [hscontrol.Headscale.StartSSHRecorderForTest] for
+// [WithRealListener] and [hscontrol.Slopscale.StartSSHRecorderForTest] for
 // the embedded node to join.
 func WithSSHRecording(cfg types.SSHRecordingConfig) ServerOption {
 	return func(sc *serverConfig) { sc.sshRecording = &cfg }
@@ -169,7 +169,7 @@ func WithSMTP(cfg types.SMTPConfig) ServerOption {
 	return func(c *serverConfig) { c.smtp = &cfg }
 }
 
-// NewServer creates and starts a Headscale test server.
+// NewServer creates and starts a Slopscale test server.
 // The server is fully functional and accepts real Tailscale control
 // protocol connections over Noise.
 func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
@@ -212,8 +212,8 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 			ServerEnabled:                      sc.embeddedDERP,
 			ServerPrivateKeyPath:               tmpDir + "/derp_private.key",
 			ServerRegionID:                     999,
-			ServerRegionCode:                   "headscale",
-			ServerRegionName:                   "Headscale Embedded DERP",
+			ServerRegionCode:                   "slopscale",
+			ServerRegionName:                   "Slopscale Embedded DERP",
 			ServerVerifyClients:                true,
 			STUNAddr:                           "127.0.0.1:0",
 			AutomaticallyAddEmbeddedDerpRegion: true,
@@ -230,7 +230,7 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 		Database: types.DatabaseConfig{
 			Type: "sqlite3",
 			Sqlite: types.SqliteConfig{
-				Path: tmpDir + "/headscale_test.db",
+				Path: tmpDir + "/slopscale_test.db",
 			},
 		},
 		Policy: types.PolicyConfig{
@@ -273,14 +273,14 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 	if sc.dns != nil {
 		cfg.DNSConfig = *sc.dns
 		cfg.BaseDomain = sc.dns.BaseDomain
-		// NewHeadscale rebuilds the tailcfg form from DNSConfig, the
+		// NewSlopscale rebuilds the tailcfg form from DNSConfig, the
 		// stored override and the MagicDNS zones; nil would mean "no DNS".
 		cfg.TailcfgDNSConfig = &tailcfg.DNSConfig{}
 	}
 
-	app, err := hscontrol.NewHeadscale(&cfg)
+	app, err := hscontrol.NewSlopscale(&cfg)
 	if err != nil {
-		tb.Fatalf("servertest: NewHeadscale: %v", err)
+		tb.Fatalf("servertest: NewSlopscale: %v", err)
 	}
 
 	if !sc.seededRule {
@@ -360,8 +360,8 @@ func (s *TestServer) DERP() state.DERPStatus {
 
 // Close shuts down the in-memory HTTP server and listener.
 // Subsystem cleanup (batcher, ephemeral GC) is handled by
-// [testing.TB.Cleanup] callbacks registered in [hscontrol.Headscale.StartBatcherForTest] and
-// [hscontrol.Headscale.StartEphemeralGCForTest].
+// [testing.TB.Cleanup] callbacks registered in [hscontrol.Slopscale.StartBatcherForTest] and
+// [hscontrol.Slopscale.StartEphemeralGCForTest].
 func (s *TestServer) Close() {
 	s.httpServer.Close()
 	s.ln.Close()

@@ -3,14 +3,14 @@ package integration
 import (
 	"testing"
 
-	"github.com/juanfont/headscale/integration/dockertestutil"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/tsic"
+	"github.com/aislopware/slopscale/integration/dockertestutil"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/stretchr/testify/require"
 )
 
 // This file is intended to "test the test framework", by proxy it will also test
-// some Headscale/Tailscale stuff, but mostly in very simple ways.
+// some Slopscale/Tailscale stuff, but mostly in very simple ways.
 
 func IntegrationSkip(t *testing.T) {
 	t.Helper()
@@ -27,7 +27,7 @@ func IntegrationSkip(t *testing.T) {
 // If subtests are parallel, then they will start before setup is run.
 // This might mean we approach setup slightly wrong, but for now, keep
 // the subtests sequential.
-func TestHeadscale(t *testing.T) {
+func TestSlopscale(t *testing.T) {
 	IntegrationSkip(t)
 
 	var err error
@@ -39,15 +39,15 @@ func TestHeadscale(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	t.Run("start-headscale", func(t *testing.T) {
-		headscale, err := scenario.Headscale(hsic.WithTestName("scenariohs"))
+	t.Run("start-slopscale", func(t *testing.T) {
+		slopscale, err := scenario.Slopscale(hsic.WithTestName("scenariohs"))
 		if err != nil {
 			t.Fatalf("failed to create start headcale: %s", err)
 		}
 
-		err = headscale.WaitForRunning()
+		err = slopscale.WaitForRunning()
 		if err != nil {
-			t.Fatalf("headscale failed to become ready: %s", err)
+			t.Fatalf("slopscale failed to become ready: %s", err)
 		}
 	})
 
@@ -87,15 +87,15 @@ func TestTailscaleNodesJoiningHeadcale(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	t.Run("start-headscale", func(t *testing.T) {
-		headscale, err := scenario.Headscale(hsic.WithTestName("scenariojoin"))
+	t.Run("start-slopscale", func(t *testing.T) {
+		slopscale, err := scenario.Slopscale(hsic.WithTestName("scenariojoin"))
 		if err != nil {
 			t.Fatalf("failed to create start headcale: %s", err)
 		}
 
-		err = headscale.WaitForRunning()
+		err = slopscale.WaitForRunning()
 		if err != nil {
-			t.Fatalf("headscale failed to become ready: %s", err)
+			t.Fatalf("slopscale failed to become ready: %s", err)
 		}
 	})
 
@@ -126,20 +126,20 @@ func TestTailscaleNodesJoiningHeadcale(t *testing.T) {
 		}
 	})
 
-	t.Run("join-headscale", func(t *testing.T) {
+	t.Run("join-slopscale", func(t *testing.T) {
 		key, err := scenario.CreatePreAuthKey(1, true, false)
 		if err != nil {
 			t.Fatalf("failed to create preauthkey: %s", err)
 		}
 
-		headscale, err := scenario.Headscale()
+		slopscale, err := scenario.Slopscale()
 		if err != nil {
 			t.Fatalf("failed to create start headcale: %s", err)
 		}
 
 		err = scenario.RunTailscaleUp(
 			user,
-			headscale.GetEndpoint(),
+			slopscale.GetEndpoint(),
 			key.Key,
 		)
 		if err != nil {

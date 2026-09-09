@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 )
 
 // ErrShareWithOwner is returned when a node is shared with its own owner.

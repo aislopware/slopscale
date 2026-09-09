@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/derp"
-	derpServer "github.com/juanfont/headscale/hscontrol/derp/server"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/derp"
+	derpServer "github.com/aislopware/slopscale/hscontrol/derp/server"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 )

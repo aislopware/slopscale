@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/k3sic"
-	"github.com/juanfont/headscale/integration/tsic"
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/integrationutil"
+	"github.com/aislopware/slopscale/integration/k3sic"
+	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -48,13 +48,13 @@ func k8sOperatorPolicy() *policyv2.Policy {
 }
 
 // TestK8sOperator verifies that the real Tailscale Kubernetes operator, installed
-// into a real k3s cluster via its Helm chart and pointed at an in-test Headscale,
+// into a real k3s cluster via its Helm chart and pointed at an in-test Slopscale,
 // can authenticate with OAuth client credentials, mint auth keys, and register
 // nodes that then interoperate with a regular tailnet node.
 //
-// The operator targets Headscale over plain HTTP by IP (hsic.WithoutTLS +
+// The operator targets Slopscale over plain HTTP by IP (hsic.WithoutTLS +
 // GetIPEndpoint), so the operator and proxy pods need no CA and no DNS entry for
-// Headscale. See integration/k3sic/tls-ca-baking.md for the TLS variant.
+// Slopscale. See integration/k3sic/tls-ca-baking.md for the TLS variant.
 //
 // The cluster-side steps are reusable building blocks on k3sic.K3sInContainer
 // (InstallOperator, DeployConnector, DeployEchoServer, ExposeServiceToTailnet,
@@ -76,7 +76,7 @@ func TestK8sOperator(t *testing.T) {
 
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv(
+	err = scenario.CreateSlopscaleEnv(
 		// The tsic client reaches the in-cluster proxy only via DERP (no direct
 		// path to the k3s pod network), and hsic's embedded DERP is non-TLS, so the
 		// client must reach DERP over plain-HTTP websockets — as the proxy pods do.
@@ -87,13 +87,13 @@ func TestK8sOperator(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	// Mint an OAuth client for the operator: devices:core + auth_keys scopes,
 	// tagged tag:k8s-operator. CreateOAuthClient mints the admin API key and calls
 	// the v2 keys API itself.
-	clientID, clientSecret, err := headscale.CreateOAuthClient(
+	clientID, clientSecret, err := slopscale.CreateOAuthClient(
 		t.Context(),
 		[]string{"devices:core", "auth_keys"},
 		[]string{tagK8sOperator},
@@ -125,19 +125,19 @@ func TestK8sOperator(t *testing.T) {
 	require.NoError(t, k3s.InstallHelm())
 
 	// The operator reaches the control plane by IP, but the embedded DERP map
-	// references Headscale by hostname; teach CoreDNS to resolve it so the proxy
+	// references Slopscale by hostname; teach CoreDNS to resolve it so the proxy
 	// pods can connect to DERP and get a data path to nodes outside the cluster.
-	hsIP := headscale.GetIPInNetwork(scenario.Networks()[0])
-	require.NoError(t, k3s.ConfigureCoreDNSHost(headscale.GetHostname(), hsIP))
+	hsIP := slopscale.GetIPInNetwork(scenario.Networks()[0])
+	require.NoError(t, k3s.ConfigureCoreDNSHost(slopscale.GetHostname(), hsIP))
 
 	// loginServer is the in-cluster-reachable HTTP endpoint by IP; the operator
 	// uses it for both the control plane and the management API.
-	loginServer := headscale.GetIPEndpoint()
+	loginServer := slopscale.GetIPEndpoint()
 	require.NoError(t, k3s.InstallOperator(loginServer, clientID, clientSecret))
 
 	t.Run("operator-registers", func(t *testing.T) {
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
-			nodes, err := headscale.ListNodes()
+			nodes, err := slopscale.ListNodes()
 			assert.NoError(c, err)
 			assert.True(c, hasNodeWithTag(nodes, tagK8sOperator),
 				"expected a node tagged %s registered by the operator, got %s",
@@ -150,7 +150,7 @@ func TestK8sOperator(t *testing.T) {
 		require.NoError(t, k3s.DeployConnector("k8s-egress", []string{tagK8s}, []string{"10.40.0.0/14"}))
 
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
-			nodes, err := headscale.ListNodes()
+			nodes, err := slopscale.ListNodes()
 			assert.NoError(c, err)
 			assert.True(c, hasNodeWithTag(nodes, tagK8s),
 				"expected a proxy node tagged %s registered by the operator, got %s",
@@ -169,12 +169,12 @@ func TestK8sOperator(t *testing.T) {
 
 		// The operator registers the ingress proxy as a tailnet node named after
 		// the exposed Service (<namespace>-<service>, here default-echo-ts). Read
-		// its IP from Headscale rather than the Service's LoadBalancer status,
-		// which the operator does not populate against Headscale.
+		// its IP from Slopscale rather than the Service's LoadBalancer status,
+		// which the operator does not populate against Slopscale.
 		var svcIP string
 
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
-			nodes, err := headscale.ListNodes()
+			nodes, err := slopscale.ListNodes()
 			assert.NoError(c, err)
 
 			ip, ok := nodeIPv4ByName(nodes, "echo")
@@ -196,7 +196,7 @@ func TestK8sOperator(t *testing.T) {
 	})
 
 	t.Run("proxy-group", func(t *testing.T) {
-		nodes, err := headscale.ListNodes()
+		nodes, err := slopscale.ListNodes()
 		require.NoError(t, err)
 
 		before := countNodesWithTag(nodes, tagK8s)
@@ -207,7 +207,7 @@ func TestK8sOperator(t *testing.T) {
 
 		// A ProxyGroup runs a pool of proxies; each replica registers its own node.
 		assert.EventuallyWithT(t, func(c *assert.CollectT) {
-			nodes, err := headscale.ListNodes()
+			nodes, err := slopscale.ListNodes()
 			assert.NoError(c, err)
 			assert.GreaterOrEqual(c, countNodesWithTag(nodes, tagK8s), before+replicas,
 				"expected %d more %s nodes from the ProxyGroup, got %s",

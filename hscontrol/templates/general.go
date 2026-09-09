@@ -4,11 +4,11 @@ import (
 	"github.com/chasefleming/elem-go"
 	"github.com/chasefleming/elem-go/attrs"
 	"github.com/chasefleming/elem-go/styles"
-	"github.com/juanfont/headscale/hscontrol/assets"
+	"github.com/aislopware/slopscale/hscontrol/assets"
 )
 
 // mdTypesetBody creates a body element with md-typeset styling
-// that matches the official Headscale documentation design.
+// that matches the official Slopscale documentation design.
 // Uses CSS classes with styles defined in [assets.CSS].
 func mdTypesetBody(children ...elem.Node) *elem.Element {
 	return elem.Body(
@@ -83,9 +83,9 @@ func codeBlockText(code string) *elem.Element {
 	return elem.Pre(nil, elem.Code(nil, elem.Text(code)))
 }
 
-// headscaleLogo returns the Headscale SVG logo for consistent branding across all pages.
-// The logo is styled by the .headscale-logo CSS class.
-func headscaleLogo() elem.Node {
+// slopscaleLogo returns the Slopscale SVG logo for consistent branding across all pages.
+// The logo is styled by the .slopscale-logo CSS class.
+func slopscaleLogo() elem.Node {
 	// Return the embedded SVG as-is
 	return elem.Raw(assets.SVG)
 }
@@ -104,19 +104,19 @@ func pageFooter() *elem.Element {
 		},
 		elem.Text("Powered by "),
 		elem.A(attrs.Props{
-			attrs.Href:   "https://github.com/juanfont/headscale",
+			attrs.Href:   "https://github.com/aislopware/slopscale",
 			attrs.Rel:    "noreferrer noopener",
 			attrs.Target: "_blank",
-		}, elem.Text("Headscale")),
+		}, elem.Text("Slopscale")),
 	)
 }
 
-// page renders a standard Headscale page: the given title in the document
-// head, and a body that begins with the Headscale logo, contains the supplied
+// page renders a standard Slopscale page: the given title in the document
+// head, and a body that begins with the Slopscale logo, contains the supplied
 // content nodes in order, and ends with the shared footer.
 func page(title string, content ...elem.Node) *elem.Element {
 	body := make([]elem.Node, 0, len(content)+2)
-	body = append(body, headscaleLogo())
+	body = append(body, slopscaleLogo())
 	body = append(body, content...)
 	body = append(body, pageFooter())
 

@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/integrationutil"
+	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/rs/zerolog/log"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -38,7 +38,7 @@ func TestPingAllByIP(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv(
+	err = scenario.CreateSlopscaleEnv(
 		[]tsic.Option{},
 		hsic.WithTestName("pingallbyip"),
 		// All other tests use the default sequential allocation.
@@ -46,7 +46,7 @@ func TestPingAllByIP(t *testing.T) {
 		// break basic connectivity.
 		hsic.WithIPAllocationStrategy(types.IPAllocationStrategyRandom),
 	)
-	requireNoErrHeadscaleEnv(t, err)
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -57,7 +57,7 @@ func TestPingAllByIP(t *testing.T) {
 	err = scenario.WaitForTailscaleSync()
 	requireNoErrSync(t, err)
 
-	hs, err := scenario.Headscale()
+	hs, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	// Extract node IDs for validation
@@ -76,13 +76,13 @@ func TestPingAllByIP(t *testing.T) {
 		return x.String()
 	})
 
-	// Get headscale instance for batcher debug check
-	headscale, err := scenario.Headscale()
+	// Get slopscale instance for batcher debug check
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	// Test our DebugBatcher functionality
 	t.Logf("Testing DebugBatcher functionality...")
-	requireAllClientsOnline(t, headscale, expectedNodes, true, "all clients should be connected to the batcher", integrationutil.ScaledTimeout(30*time.Second))
+	requireAllClientsOnline(t, slopscale, expectedNodes, true, "all clients should be connected to the batcher", integrationutil.ScaledTimeout(30*time.Second))
 
 	assertPingAll(t, allClients, allAddrs)
 }
@@ -99,17 +99,17 @@ func TestPingAllByIPPublicDERP(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv(
+	err = scenario.CreateSlopscaleEnv(
 		[]tsic.Option{},
 		hsic.WithTestName("pingallbyippubderp"),
 		// Explicitly use public DERP relays instead of the embedded
 		// DERP server to verify connectivity through Tailscale's
-		// infrastructure. TLS is disabled because the headscale
+		// infrastructure. TLS is disabled because the slopscale
 		// server does not need to terminate TLS for this test.
 		hsic.WithPublicDERP(),
 		hsic.WithoutTLS(),
 	)
-	requireNoErrHeadscaleEnv(t, err)
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -155,8 +155,8 @@ func testEphemeralWithOptions(t *testing.T, opts ...hsic.Option) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	headscale, err := scenario.Headscale(opts...)
-	requireNoErrHeadscaleEnv(t, err)
+	slopscale, err := scenario.Slopscale(opts...)
+	requireNoErrSlopscaleEnv(t, err)
 
 	for _, userName := range spec.Users {
 		user, err := scenario.CreateUser(userName)
@@ -174,7 +174,7 @@ func testEphemeralWithOptions(t *testing.T, opts ...hsic.Option) {
 			t.Fatalf("failed to create pre-auth key for user %s: %s", userName, err)
 		}
 
-		err = scenario.RunTailscaleUp(userName, headscale.GetEndpoint(), key.Key)
+		err = scenario.RunTailscaleUp(userName, slopscale.GetEndpoint(), key.Key)
 		if err != nil {
 			t.Fatalf("failed to run tailscale up for user %s: %s", userName, err)
 		}
@@ -208,7 +208,7 @@ func testEphemeralWithOptions(t *testing.T, opts ...hsic.Option) {
 	t.Logf("all clients logged out")
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		nodes, err := headscale.ListNodes()
+		nodes, err := slopscale.ListNodes()
 		assert.NoError(ct, err)
 		assert.Len(ct, nodes, 0, "All ephemeral nodes should be cleaned up after logout")
 	}, integrationutil.StatusReadyTimeout, 2*time.Second)
@@ -228,13 +228,13 @@ func TestEphemeral2006DeletedTooQuickly(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	headscale, err := scenario.Headscale(
+	slopscale, err := scenario.Slopscale(
 		hsic.WithTestName("ephemeral2006"),
 		hsic.WithConfigEnv(map[string]string{
-			"HEADSCALE_EPHEMERAL_NODE_INACTIVITY_TIMEOUT": "1m6s",
+			"SLOPSCALE_EPHEMERAL_NODE_INACTIVITY_TIMEOUT": "1m6s",
 		}),
 	)
-	requireNoErrHeadscaleEnv(t, err)
+	requireNoErrSlopscaleEnv(t, err)
 
 	for _, userName := range spec.Users {
 		user, err := scenario.CreateUser(userName)
@@ -252,7 +252,7 @@ func TestEphemeral2006DeletedTooQuickly(t *testing.T) {
 			t.Fatalf("failed to create pre-auth key for user %s: %s", userName, err)
 		}
 
-		err = scenario.RunTailscaleUp(userName, headscale.GetEndpoint(), key.Key)
+		err = scenario.RunTailscaleUp(userName, slopscale.GetEndpoint(), key.Key)
 		if err != nil {
 			t.Fatalf("failed to run tailscale up for user %s: %s", userName, err)
 		}
@@ -312,14 +312,14 @@ func TestEphemeral2006DeletedTooQuickly(t *testing.T) {
 	// registered.
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		for _, userName := range spec.Users {
-			nodes, err := headscale.ListNodes(userName)
+			nodes, err := slopscale.ListNodes(userName)
 			assert.NoError(ct, err)
 			assert.Len(ct, nodes, 0, "Ephemeral nodes should be expired and removed for user %s", userName)
 		}
 	}, integrationutil.ScaledTimeout(4*time.Minute), 10*time.Second)
 
 	for _, userName := range spec.Users {
-		nodes, err := headscale.ListNodes(userName)
+		nodes, err := slopscale.ListNodes(userName)
 		if err != nil {
 			log.Error().
 				Err(err).
@@ -347,8 +347,8 @@ func TestPingAllByHostname(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("pingallbyname"))
-	requireNoErrHeadscaleEnv(t, err)
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("pingallbyname"))
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -382,15 +382,15 @@ func TestTaildrop(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{},
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{},
 		hsic.WithTestName("taildrop"),
 	)
-	requireNoErrHeadscaleEnv(t, err)
+	requireNoErrSlopscaleEnv(t, err)
 
-	headscale, err := scenario.Headscale()
-	requireNoErrGetHeadscale(t, err)
+	slopscale, err := scenario.Slopscale()
+	requireNoErrGetSlopscale(t, err)
 
-	userMap, err := headscale.MapUsers()
+	userMap, err := slopscale.MapUsers()
 	require.NoError(t, err)
 
 	networks := scenario.Networks()
@@ -410,7 +410,7 @@ func TestTaildrop(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		err = client.Login(headscale.GetEndpoint(), user1Key.Key)
+		err = client.Login(slopscale.GetEndpoint(), user1Key.Key)
 		require.NoError(t, err)
 
 		err = client.WaitForRunning(integrationutil.PeerSyncTimeout())
@@ -433,7 +433,7 @@ func TestTaildrop(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		err = client.Login(headscale.GetEndpoint(), user2Key.Key)
+		err = client.Login(slopscale.GetEndpoint(), user2Key.Key)
 		require.NoError(t, err)
 
 		err = client.WaitForRunning(integrationutil.PeerSyncTimeout())
@@ -454,7 +454,7 @@ func TestTaildrop(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	err = taggedClient.Login(headscale.GetEndpoint(), taggedKey.Key)
+	err = taggedClient.Login(slopscale.GetEndpoint(), taggedKey.Key)
 	require.NoError(t, err)
 
 	err = taggedClient.WaitForRunning(integrationutil.PeerSyncTimeout())
@@ -780,8 +780,8 @@ func TestUpdateHostnameFromClient(t *testing.T) {
 	require.NoErrorf(t, err, "failed to create scenario")
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("updatehostname"))
-	requireNoErrHeadscaleEnv(t, err)
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("updatehostname"))
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -789,8 +789,8 @@ func TestUpdateHostnameFromClient(t *testing.T) {
 	err = scenario.WaitForTailscaleSync()
 	requireNoErrSync(t, err)
 
-	headscale, err := scenario.Headscale()
-	requireNoErrGetHeadscale(t, err)
+	slopscale, err := scenario.Slopscale()
+	requireNoErrGetSlopscale(t, err)
 
 	// update hostnames using the up command
 	for _, client := range allClients {
@@ -813,9 +813,9 @@ func TestUpdateHostnameFromClient(t *testing.T) {
 	var nodes []*clientv1.Node
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		err := executeAndUnmarshal(
-			headscale,
+			slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"node",
 				"list",
 				"--output",
@@ -839,9 +839,9 @@ func TestUpdateHostnameFromClient(t *testing.T) {
 	// Rename givenName in nodes
 	for _, node := range nodes {
 		givenName := fmt.Sprintf("%s-givenname", node.Id)
-		_, err = headscale.Execute(
+		_, err = slopscale.Execute(
 			[]string{
-				"headscale",
+				"slopscale",
 				"node",
 				"rename",
 				givenName,
@@ -857,7 +857,7 @@ func TestUpdateHostnameFromClient(t *testing.T) {
 		expectedDNSNames := make(map[string]string)
 		for _, node := range nodes {
 			nodeID := node.Id
-			expectedDNSNames[nodeID] = fmt.Sprintf("%s-givenname.headscale.net.", node.Id)
+			expectedDNSNames[nodeID] = fmt.Sprintf("%s-givenname.slopscale.net.", node.Id)
 		}
 
 		// Verify from each client's perspective
@@ -911,9 +911,9 @@ func TestUpdateHostnameFromClient(t *testing.T) {
 	// [state.NodeStore] batching timeout is 500ms, so we wait up to 1 second
 	assert.Eventually(t, func() bool {
 		err = executeAndUnmarshal(
-			headscale,
+			slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"node",
 				"list",
 				"--output",
@@ -949,8 +949,8 @@ func TestExpireNode(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("expirenode"))
-	requireNoErrHeadscaleEnv(t, err)
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("expirenode"))
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -979,13 +979,13 @@ func TestExpireNode(t *testing.T) {
 		}, integrationutil.StatusReadyTimeout, 1*time.Second)
 	}
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
-	// TODO(kradalby): This is Headscale specific and would not play nicely
+	// TODO(kradalby): This is Slopscale specific and would not play nicely
 	// with other implementations of the [ControlServer] interface
-	result, err := headscale.Execute([]string{
-		"headscale", "nodes", "expire", "--identifier", "1", "--output", "json",
+	result, err := slopscale.Execute([]string{
+		"slopscale", "nodes", "expire", "--identifier", "1", "--output", "json",
 	})
 	require.NoError(t, err)
 
@@ -1083,8 +1083,8 @@ func TestSetNodeExpiryInFuture(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("expirenodefuture"))
-	requireNoErrHeadscaleEnv(t, err)
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("expirenodefuture"))
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -1092,14 +1092,14 @@ func TestSetNodeExpiryInFuture(t *testing.T) {
 	err = scenario.WaitForTailscaleSync()
 	requireNoErrSync(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	targetExpiry := time.Now().Add(2 * time.Hour).Round(time.Second).UTC()
 
-	result, err := headscale.Execute(
+	result, err := slopscale.Execute(
 		[]string{
-			"headscale", "nodes", "expire",
+			"slopscale", "nodes", "expire",
 			"--identifier", "1",
 			"--output", "json",
 			"--expiry", targetExpiry.Format(time.RFC3339),
@@ -1181,8 +1181,8 @@ func TestDisableNodeExpiry(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("disableexpiry"))
-	requireNoErrHeadscaleEnv(t, err)
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("disableexpiry"))
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -1190,13 +1190,13 @@ func TestDisableNodeExpiry(t *testing.T) {
 	err = scenario.WaitForTailscaleSync()
 	requireNoErrSync(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	// First set an expiry on the node.
-	result, err := headscale.Execute(
+	result, err := slopscale.Execute(
 		[]string{
-			"headscale", "nodes", "expire",
+			"slopscale", "nodes", "expire",
 			"--identifier", "1",
 			"--output", "json",
 			"--expiry", time.Now().Add(time.Hour).Format(time.RFC3339),
@@ -1210,9 +1210,9 @@ func TestDisableNodeExpiry(t *testing.T) {
 	require.NotNil(t, node.Expiry, "node should have an expiry set")
 
 	// Now disable the expiry.
-	result, err = headscale.Execute(
+	result, err = slopscale.Execute(
 		[]string{
-			"headscale", "nodes", "expire",
+			"slopscale", "nodes", "expire",
 			"--identifier", "1",
 			"--output", "json",
 			"--disable",
@@ -1276,8 +1276,8 @@ func TestNodeOnlineStatus(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("online"))
-	requireNoErrHeadscaleEnv(t, err)
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("online"))
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -1306,7 +1306,7 @@ func TestNodeOnlineStatus(t *testing.T) {
 		}, integrationutil.ScaledTimeout(10*time.Second), integrationutil.FastPoll, "Waiting for expected peer count")
 	}
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	// Duration is chosen arbitrarily, 10m is reported in #1561
@@ -1330,21 +1330,21 @@ func TestNodeOnlineStatus(t *testing.T) {
 
 		var nodes []*clientv1.Node
 		assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-			result, err := headscale.Execute([]string{
-				"headscale", "nodes", "list", "--output", "json",
+			result, err := slopscale.Execute([]string{
+				"slopscale", "nodes", "list", "--output", "json",
 			})
 			assert.NoError(ct, err)
 
 			err = json.Unmarshal([]byte(result), &nodes)
 			assert.NoError(ct, err)
 
-			// Verify that headscale reports the nodes as online
+			// Verify that slopscale reports the nodes as online
 			for _, node := range nodes {
 				// All nodes should be online
 				assert.Truef(
 					ct,
 					node.Online,
-					"expected %s to have online status in Headscale, marked as offline %s after start",
+					"expected %s to have online status in Slopscale, marked as offline %s after start",
 					node.Name,
 					time.Since(start),
 				)
@@ -1404,11 +1404,11 @@ func TestPingAllByIPManyUpDown(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv(
+	err = scenario.CreateSlopscaleEnv(
 		[]tsic.Option{},
 		hsic.WithTestName("pingallbyipmany"),
 	)
-	requireNoErrHeadscaleEnv(t, err)
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -1425,8 +1425,8 @@ func TestPingAllByIPManyUpDown(t *testing.T) {
 		return x.String()
 	})
 
-	// Get headscale instance for batcher debug checks
-	headscale, err := scenario.Headscale()
+	// Get slopscale instance for batcher debug checks
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	// Initial check: all nodes should be connected to batcher
@@ -1438,7 +1438,7 @@ func TestPingAllByIPManyUpDown(t *testing.T) {
 		require.NoError(t, err)
 		expectedNodes = append(expectedNodes, types.NodeID(nodeID))
 	}
-	requireAllClientsOnline(t, headscale, expectedNodes, true, "all clients should be connected to batcher", integrationutil.ScaledTimeout(30*time.Second))
+	requireAllClientsOnline(t, slopscale, expectedNodes, true, "all clients should be connected to batcher", integrationutil.ScaledTimeout(30*time.Second))
 
 	assertPingAll(t, allClients, allAddrs)
 
@@ -1463,7 +1463,7 @@ func TestPingAllByIPManyUpDown(t *testing.T) {
 		t.Logf("All nodes taken down at %s", time.Now().Format(TimestampFormat))
 
 		// After taking down all nodes, verify all systems show nodes offline
-		requireAllClientsOnline(t, headscale, expectedNodes, false, fmt.Sprintf("Run %d: all nodes should be offline after Down()", run+1), integrationutil.ScaledTimeout(120*time.Second))
+		requireAllClientsOnline(t, slopscale, expectedNodes, false, fmt.Sprintf("Run %d: all nodes should be offline after Down()", run+1), integrationutil.ScaledTimeout(120*time.Second))
 
 		for _, client := range allClients {
 			c := client
@@ -1479,7 +1479,7 @@ func TestPingAllByIPManyUpDown(t *testing.T) {
 		t.Logf("All nodes brought up at %s", time.Now().Format(TimestampFormat))
 
 		// After bringing up all nodes, verify batcher shows all reconnected
-		requireAllClientsOnline(t, headscale, expectedNodes, true, fmt.Sprintf("Run %d: all nodes should be reconnected after Up()", run+1), integrationutil.ScaledTimeout(120*time.Second))
+		requireAllClientsOnline(t, slopscale, expectedNodes, true, fmt.Sprintf("Run %d: all nodes should be reconnected after Up()", run+1), integrationutil.ScaledTimeout(120*time.Second))
 
 		// Wait for sync and successful pings after nodes come back up
 		err = scenario.WaitForTailscaleSync()
@@ -1487,7 +1487,7 @@ func TestPingAllByIPManyUpDown(t *testing.T) {
 
 		t.Logf("All nodes synced up %s", time.Now().Format(TimestampFormat))
 
-		requireAllClientsOnline(t, headscale, expectedNodes, true, fmt.Sprintf("Run %d: all systems should show nodes online after reconnection", run+1), integrationutil.ScaledTimeout(60*time.Second))
+		requireAllClientsOnline(t, slopscale, expectedNodes, true, fmt.Sprintf("Run %d: all systems should show nodes online after reconnection", run+1), integrationutil.ScaledTimeout(60*time.Second))
 
 		assertPingAll(t, allClients, allAddrs)
 
@@ -1508,11 +1508,11 @@ func Test2118DeletingOnlineNodePanics(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv(
+	err = scenario.CreateSlopscaleEnv(
 		[]tsic.Option{},
 		hsic.WithTestName("deletenocrash"),
 	)
-	requireNoErrHeadscaleEnv(t, err)
+	requireNoErrSlopscaleEnv(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
 	requireNoErrListClients(t, err)
@@ -1529,15 +1529,15 @@ func Test2118DeletingOnlineNodePanics(t *testing.T) {
 
 	assertPingAll(t, allClients, allAddrs)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	// Test list all nodes after added otherUser
 	var nodeList []clientv1.Node
 	err = executeAndUnmarshal(
-		headscale,
+		slopscale,
 		[]string{
-			"headscale",
+			"slopscale",
 			"nodes",
 			"list",
 			"--output",
@@ -1551,9 +1551,9 @@ func Test2118DeletingOnlineNodePanics(t *testing.T) {
 	assert.True(t, nodeList[1].Online)
 
 	// Delete the first node, which is online
-	_, err = headscale.Execute(
+	_, err = slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"nodes",
 			"delete",
 			"--identifier",
@@ -1570,9 +1570,9 @@ func Test2118DeletingOnlineNodePanics(t *testing.T) {
 	var nodeListAfter []clientv1.Node
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
 		err = executeAndUnmarshal(
-			headscale,
+			slopscale,
 			[]string{
-				"headscale",
+				"slopscale",
 				"nodes",
 				"list",
 				"--output",
@@ -1585,9 +1585,9 @@ func Test2118DeletingOnlineNodePanics(t *testing.T) {
 	}, integrationutil.ScaledTimeout(10*time.Second), 1*time.Second)
 
 	err = executeAndUnmarshal(
-		headscale,
+		slopscale,
 		[]string{
-			"headscale",
+			"slopscale",
 			"nodes",
 			"list",
 			"--output",

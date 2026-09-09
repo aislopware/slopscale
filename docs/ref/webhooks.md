@@ -1,6 +1,6 @@
 # Webhooks
 
-A webhook is a URL Headscale posts to when something happens in the tailnet:
+A webhook is a URL Slopscale posts to when something happens in the tailnet:
 a machine joins or leaves, a user is created or changes role, the policy
 changes. Each endpoint has a secret and picks the events it wants. The
 delivery format is Tailscale's, so a receiver written for Tailscale's
@@ -13,19 +13,19 @@ Create the endpoint from the console's _Integrations_ page, with the CLI, or
 through `/api/v1/webhook`:
 
 ```console
-$ headscale webhooks create --url https://ops.example.com/headscale \
+$ slopscale webhooks create --url https://ops.example.com/slopscale \
     --event nodeCreated --event nodeDeleted --event userCreated
 ```
 
 The response carries the secret once. Store it on the receiver; a later read
-never shows it again. `headscale webhooks rotate` issues a new one, and
-`headscale webhooks test` sends a `test` event so you can check the receiver
+never shows it again. `slopscale webhooks rotate` issues a new one, and
+`slopscale webhooks test` sends a `test` event so you can check the receiver
 before anything real happens.
 
 The server keeps the last 100 deliveries per endpoint, each with the event
 type, the final HTTP status or error, how many attempts it took and how long.
 The list shows the newest one; _Deliveries_ in the console's row menu,
-`headscale webhooks deliveries`, or `GET /api/v1/webhook/{id}/deliveries`
+`slopscale webhooks deliveries`, or `GET /api/v1/webhook/{id}/deliveries`
 show the rest, newest first.
 
 ## Events
@@ -50,7 +50,7 @@ show the rest, newest first.
 | `accessRequestDenied`   | An approver turned the request down.                                                   |
 | `sshRecordingFailed`    | An SSH session could not be recorded; see [SSH session recording](ssh-recording.md).   |
 
-`GET /api/v1/webhook/event-types` and `headscale webhooks event-types` list
+`GET /api/v1/webhook/event-types` and `slopscale webhooks event-types` list
 them. The `test` event goes to every endpoint on request and needs no
 subscription.
 
@@ -71,7 +71,7 @@ one. Each event has this shape:
       "nodeID": "12",
       "deviceName": "laptop.example.com",
       "managedBy": "alice@example.com",
-      "url": "https://headscale.example.com/admin/machines/12",
+      "url": "https://slopscale.example.com/admin/machines/12",
       "expiration": "2027-03-06T09:12:44Z",
       "addresses": ["100.64.0.12", "fd7a:115c:a1e0::c"]
     }
@@ -110,7 +110,7 @@ of `<t>.<body>` under the endpoint's secret. To verify, rebuild the HMAC from
 the raw request body and compare it in constant time, and reject a `t` more
 than a few minutes away from now to stop replays. In Go,
 `webhook.Verify(secret, header, body, time.Now(), 5*time.Minute)` from
-`github.com/juanfont/headscale/hscontrol/webhook` does both. In Python:
+`github.com/aislopware/slopscale/hscontrol/webhook` does both. In Python:
 
 ```python
 import hmac, hashlib, time
@@ -151,7 +151,7 @@ Tailscale counterpart.
 Bot API's `sendMessage` URL with the chat in a `chat_id` query parameter:
 
 ```console
-$ headscale webhooks create --provider telegram \
+$ slopscale webhooks create --provider telegram \
     --url 'https://api.telegram.org/bot<token>/sendMessage?chat_id=-1001234567890' \
     --event nodeNeedsApproval --event userNeedsApproval
 ```
@@ -164,7 +164,7 @@ ID is negative; `getUpdates` on the bot shows it after a message in the group.
 posted as the notification with the tailnet as its title:
 
 ```console
-$ headscale webhooks create --provider ntfy --url https://ntfy.sh/my-tailnet-ops \
+$ slopscale webhooks create --provider ntfy --url https://ntfy.sh/my-tailnet-ops \
     --event nodeCreated --event nodeDeleted
 ```
 
@@ -176,16 +176,16 @@ notifications:
   smtp:
     host: smtp.example.com
     port: 587
-    username: headscale
+    username: slopscale
     password: "..."
-    from: "Headscale <headscale@example.com>"
+    from: "Slopscale <slopscale@example.com>"
     # starttls (default), tls for an implicit-TLS port such as 465, or
     # none for a relay on localhost.
     encryption: starttls
 ```
 
 ```console
-$ headscale webhooks create --provider email \
+$ slopscale webhooks create --provider email \
     --url 'mailto:ops@example.com, security@example.com' \
     --event nodeNeedsApproval --event userRoleUpdated
 ```

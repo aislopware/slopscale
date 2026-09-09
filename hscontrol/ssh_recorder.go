@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/recorder"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/recorder"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tsnet"
 	"tailscale.com/types/logger"
@@ -43,7 +43,7 @@ func newRecorder(cfg *types.Config, st recorder.Store, nodes recorder.NodeLookup
 // serves the upload protocol on it until the context ends. A failure to
 // come up is logged and retried, because the recorder must not take the
 // control server down with it.
-func (h *Headscale) runSSHRecorder(ctx context.Context) error {
+func (h *Slopscale) runSSHRecorder(ctx context.Context) error {
 	go h.recorder.RunSweeper(ctx)
 
 	for {
@@ -68,7 +68,7 @@ func (h *Headscale) runSSHRecorder(ctx context.Context) error {
 }
 
 // serveSSHRecorder runs one life of the recorder node.
-func (h *Headscale) serveSSHRecorder(ctx context.Context) error {
+func (h *Slopscale) serveSSHRecorder(ctx context.Context) error {
 	authKey, err := h.recorderAuthKey()
 	if err != nil {
 		return err
@@ -123,7 +123,7 @@ func (h *Headscale) serveSSHRecorder(ctx context.Context) error {
 // recorderAuthKey mints the tagged, single-use key the recorder node
 // registers with. The key is pre-authorized so the node needs no
 // approval, and short-lived so an unused one expires on its own.
-func (h *Headscale) recorderAuthKey() (string, error) {
+func (h *Slopscale) recorderAuthKey() (string, error) {
 	expiry := time.Now().Add(recorderKeyTTL)
 
 	key, err := h.state.CreatePreAuthKeyFromSpec(types.PreAuthKeySpec{
@@ -144,7 +144,7 @@ func (h *Headscale) recorderAuthKey() (string, error) {
 // from nodes only; this handler admits the source without naming a node, so
 // the recording is attributed to nothing exactly as it would be in
 // production when the source cannot be named.
-func (h *Headscale) SSHRecorderHandlerForTest() http.Handler {
+func (h *Slopscale) SSHRecorderHandlerForTest() http.Handler {
 	lookup := func(addr netip.Addr) (types.NodeView, bool) {
 		node, ok := h.state.NodeByIP(addr)
 		if ok {
@@ -158,8 +158,8 @@ func (h *Headscale) SSHRecorderHandlerForTest() http.Handler {
 }
 
 // StartSSHRecorderForTest joins the tailnet as the embedded recorder,
-// as [Headscale.Serve] does, until the test ends.
-func (h *Headscale) StartSSHRecorderForTest(tb testing.TB) {
+// as [Slopscale.Serve] does, until the test ends.
+func (h *Slopscale) StartSSHRecorderForTest(tb testing.TB) {
 	tb.Helper()
 
 	ctx, cancel := context.WithCancel(tb.Context())

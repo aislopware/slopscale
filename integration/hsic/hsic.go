@@ -24,15 +24,15 @@ import (
 	"strings"
 	"time"
 
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	clientv2 "github.com/aislopware/slopscale/gen/client/v2"
+	"github.com/aislopware/slopscale/hscontrol"
+	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
+	"github.com/aislopware/slopscale/integration/dockertestutil"
+	"github.com/aislopware/slopscale/integration/integrationutil"
 	"github.com/davecgh/go-spew/spew"
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	clientv2 "github.com/juanfont/headscale/gen/client/v2"
-	"github.com/juanfont/headscale/hscontrol"
-	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/integration/dockertestutil"
-	"github.com/juanfont/headscale/integration/integrationutil"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"go.yaml.in/yaml/v3"
@@ -45,26 +45,26 @@ const (
 	hsicHashLength                = 6
 	dockerContextPath             = "../."
 	caCertRoot                    = "/usr/local/share/ca-certificates"
-	aclPolicyPath                 = "/etc/headscale/acl.hujson"
-	tlsCertPath                   = "/etc/headscale/tls.cert"
-	tlsKeyPath                    = "/etc/headscale/tls.key"
-	headscaleDefaultPort          = 8080
+	aclPolicyPath                 = "/etc/slopscale/acl.hujson"
+	tlsCertPath                   = "/etc/slopscale/tls.cert"
+	tlsKeyPath                    = "/etc/slopscale/tls.key"
+	slopscaleDefaultPort          = 8080
 	IntegrationTestDockerFileName = "Dockerfile.integration"
 	defaultDirPerm                = 0o755
-	binHeadscale                  = "headscale"
+	binSlopscale                  = "slopscale"
 	flagOutput                    = "--output"
 	acceptJSON                    = "Accept: application/json"
 )
 
 var (
-	errHeadscaleStatusCodeNotOk    = errors.New("headscale status code not ok")
-	errInvalidHeadscaleImageFormat = errors.New(
-		"invalid HEADSCALE_INTEGRATION_HEADSCALE_IMAGE format, expected repository:tag",
+	errSlopscaleStatusCodeNotOk    = errors.New("slopscale status code not ok")
+	errInvalidSlopscaleImageFormat = errors.New(
+		"invalid SLOPSCALE_INTEGRATION_SLOPSCALE_IMAGE format, expected repository:tag",
 	)
-	errHeadscaleImageRequiredInCI = errors.New("HEADSCALE_INTEGRATION_HEADSCALE_IMAGE must be set in CI")
+	errSlopscaleImageRequiredInCI = errors.New("SLOPSCALE_INTEGRATION_SLOPSCALE_IMAGE must be set in CI")
 	errDefaultTransportNotHTTP    = errors.New("http.DefaultTransport is not an *http.Transport")
 	errInvalidPostgresImageFormat = errors.New(
-		"invalid HEADSCALE_INTEGRATION_POSTGRES_IMAGE format, expected repository:tag",
+		"invalid SLOPSCALE_INTEGRATION_POSTGRES_IMAGE format, expected repository:tag",
 	)
 )
 
@@ -73,9 +73,9 @@ type fileInContainer struct {
 	contents []byte
 }
 
-// HeadscaleInContainer is an implementation of ControlServer which
-// sets up a Headscale instance inside a container.
-type HeadscaleInContainer struct {
+// SlopscaleInContainer is an implementation of ControlServer which
+// sets up a Slopscale instance inside a container.
+type SlopscaleInContainer struct {
 	hostname string
 
 	pool      *dockertest.Pool
@@ -102,19 +102,19 @@ type HeadscaleInContainer struct {
 }
 
 // Option represent optional settings that can be given to a
-// Headscale instance.
-type Option = func(c *HeadscaleInContainer)
+// Slopscale instance.
+type Option = func(c *SlopscaleInContainer)
 
 // WithACLPolicy adds a [policyv2.Policy] to the
-// [HeadscaleInContainer] instance.
+// [SlopscaleInContainer] instance.
 func WithACLPolicy(acl *policyv2.Policy) Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		if acl == nil {
 			return
 		}
 
 		// TODO(kradalby): Move somewhere appropriate
-		hsic.env["HEADSCALE_POLICY_PATH"] = aclPolicyPath
+		hsic.env["SLOPSCALE_POLICY_PATH"] = aclPolicyPath
 
 		hsic.aclPolicy = acl
 	}
@@ -122,7 +122,7 @@ func WithACLPolicy(acl *policyv2.Policy) Option {
 
 // WithCACert adds it to the trusted surtificate of the container.
 func WithCACert(cert []byte) Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		hsic.caCerts = append(hsic.caCerts, cert)
 	}
 }
@@ -131,16 +131,16 @@ func WithCACert(cert []byte) Option {
 // Most tests should not need this. Use only for tests that
 // explicitly need to test non-TLS behavior.
 func WithoutTLS() Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		hsic.noTLS = true
 	}
 }
 
-// WithCustomTLS uses the given certificates for the Headscale instance.
+// WithCustomTLS uses the given certificates for the Slopscale instance.
 // The caCert is installed into the container's trust store and returned
-// by [HeadscaleInContainer.GetCert] so that clients can trust this server.
+// by [SlopscaleInContainer.GetCert] so that clients can trust this server.
 func WithCustomTLS(caCert, cert, key []byte) Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		hsic.tlsCACert = caCert
 		hsic.tlsCert = cert
 		hsic.tlsKey = key
@@ -149,29 +149,29 @@ func WithCustomTLS(caCert, cert, key []byte) Option {
 }
 
 // WithConfigEnv takes a map of environment variables that
-// can be used to override Headscale configuration.
+// can be used to override Slopscale configuration.
 func WithConfigEnv(configEnv map[string]string) Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		maps.Copy(hsic.env, configEnv)
 	}
 }
 
-// WithPort sets the port on where to run Headscale.
+// WithPort sets the port on where to run Slopscale.
 func WithPort(port int) Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		hsic.port = port
 	}
 }
 
 // WithExtraPorts exposes additional ports on the container (e.g. 3478/udp for STUN).
 func WithExtraPorts(ports []string) Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		hsic.extraPorts = ports
 	}
 }
 
 func WithHostPortBindings(bindings map[string][]string) Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		hsic.hostPortBindings = bindings
 	}
 }
@@ -179,7 +179,7 @@ func WithHostPortBindings(bindings map[string][]string) Option {
 // WithTestName sets a name for the test, this will be reflected
 // in the Docker container name.
 func WithTestName(testName string) Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		hash := rands.HexString(hsicHashLength)
 
 		hostname := fmt.Sprintf("hs-%s-%s", testName, hash)
@@ -187,16 +187,16 @@ func WithTestName(testName string) Option {
 	}
 }
 
-// WithHostname sets the hostname of the Headscale instance.
+// WithHostname sets the hostname of the Slopscale instance.
 func WithHostname(hostname string) Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		hsic.hostname = hostname
 	}
 }
 
 // WithFileInContainer adds a file to the container at the given path.
 func WithFileInContainer(containerPath string, contents []byte) Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		hsic.filesInContainer = append(hsic.filesInContainer,
 			fileInContainer{
 				path:     containerPath,
@@ -208,23 +208,23 @@ func WithFileInContainer(containerPath string, contents []byte) Option {
 // WithPostgres spins up a Postgres container and
 // sets it as the main database.
 func WithPostgres() Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		hsic.postgres = true
 	}
 }
 
-// WithPolicyMode sets the policy mode for headscale.
+// WithPolicyMode sets the policy mode for slopscale.
 func WithPolicyMode(mode types.PolicyMode) Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		hsic.policyMode = mode
-		hsic.env["HEADSCALE_POLICY_MODE"] = string(mode)
+		hsic.env["SLOPSCALE_POLICY_MODE"] = string(mode)
 	}
 }
 
 // WithIPAllocationStrategy sets the tests IP Allocation strategy.
 func WithIPAllocationStrategy(strategy types.IPAllocationStrategy) Option {
-	return func(hsic *HeadscaleInContainer) {
-		hsic.env["HEADSCALE_PREFIXES_ALLOCATION"] = string(strategy)
+	return func(hsic *SlopscaleInContainer) {
+		hsic.env["SLOPSCALE_PREFIXES_ALLOCATION"] = string(strategy)
 	}
 }
 
@@ -232,23 +232,23 @@ func WithIPAllocationStrategy(strategy types.IPAllocationStrategy) Option {
 // the default public DERP relay configuration. Use this for tests
 // that explicitly need to test public DERP behavior.
 func WithPublicDERP() Option {
-	return func(hsic *HeadscaleInContainer) {
-		hsic.env["HEADSCALE_DERP_URLS"] = "https://controlplane.tailscale.com/derpmap/default"
-		hsic.env["HEADSCALE_DERP_SERVER_ENABLED"] = "false"
-		delete(hsic.env, "HEADSCALE_DERP_SERVER_REGION_ID")
-		delete(hsic.env, "HEADSCALE_DERP_SERVER_REGION_CODE")
-		delete(hsic.env, "HEADSCALE_DERP_SERVER_REGION_NAME")
-		delete(hsic.env, "HEADSCALE_DERP_SERVER_STUN_LISTEN_ADDR")
-		delete(hsic.env, "HEADSCALE_DERP_SERVER_PRIVATE_KEY_PATH")
+	return func(hsic *SlopscaleInContainer) {
+		hsic.env["SLOPSCALE_DERP_URLS"] = "https://controlplane.tailscale.com/derpmap/default"
+		hsic.env["SLOPSCALE_DERP_SERVER_ENABLED"] = "false"
+		delete(hsic.env, "SLOPSCALE_DERP_SERVER_REGION_ID")
+		delete(hsic.env, "SLOPSCALE_DERP_SERVER_REGION_CODE")
+		delete(hsic.env, "SLOPSCALE_DERP_SERVER_REGION_NAME")
+		delete(hsic.env, "SLOPSCALE_DERP_SERVER_STUN_LISTEN_ADDR")
+		delete(hsic.env, "SLOPSCALE_DERP_SERVER_PRIVATE_KEY_PATH")
 		delete(hsic.env, "DERP_DEBUG_LOGS")
 		delete(hsic.env, "DERP_PROBER_DEBUG_LOGS")
 	}
 }
 
-// WithDERPConfig configures Headscale use a custom
+// WithDERPConfig configures Slopscale use a custom
 // DERP server only.
 func WithDERPConfig(derpMap tailcfg.DERPMap) Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		contents, err := yaml.Marshal(derpMap)
 		if err != nil {
 			log.Fatalf("marshalling DERP map: %s", err)
@@ -256,16 +256,16 @@ func WithDERPConfig(derpMap tailcfg.DERPMap) Option {
 			return
 		}
 
-		hsic.env["HEADSCALE_DERP_PATHS"] = "/etc/headscale/derp.yml"
+		hsic.env["SLOPSCALE_DERP_PATHS"] = "/etc/slopscale/derp.yml"
 		hsic.filesInContainer = append(hsic.filesInContainer,
 			fileInContainer{
-				path:     "/etc/headscale/derp.yml",
+				path:     "/etc/slopscale/derp.yml",
 				contents: contents,
 			})
 
 		// Disable global DERP server and embedded DERP server
-		hsic.env["HEADSCALE_DERP_URLS"] = ""
-		hsic.env["HEADSCALE_DERP_SERVER_ENABLED"] = "false"
+		hsic.env["SLOPSCALE_DERP_URLS"] = ""
+		hsic.env["SLOPSCALE_DERP_SERVER_ENABLED"] = "false"
 
 		// Envknob for enabling DERP debug logs
 		hsic.env["DERP_DEBUG_LOGS"] = "true"
@@ -275,33 +275,33 @@ func WithDERPConfig(derpMap tailcfg.DERPMap) Option {
 
 // WithTuning allows changing the tuning settings easily.
 func WithTuning(batchTimeout time.Duration, mapSessionChanSize int) Option {
-	return func(hsic *HeadscaleInContainer) {
-		hsic.env["HEADSCALE_TUNING_BATCH_CHANGE_DELAY"] = batchTimeout.String()
-		hsic.env["HEADSCALE_TUNING_NODE_MAPSESSION_BUFFERED_CHAN_SIZE"] = strconv.Itoa(
+	return func(hsic *SlopscaleInContainer) {
+		hsic.env["SLOPSCALE_TUNING_BATCH_CHANGE_DELAY"] = batchTimeout.String()
+		hsic.env["SLOPSCALE_TUNING_NODE_MAPSESSION_BUFFERED_CHAN_SIZE"] = strconv.Itoa(
 			mapSessionChanSize,
 		)
 	}
 }
 
 func WithHAProbing(interval, timeout time.Duration) Option {
-	return func(hsic *HeadscaleInContainer) {
-		hsic.env["HEADSCALE_NODE_ROUTES_HA_PROBE_INTERVAL"] = interval.String()
-		hsic.env["HEADSCALE_NODE_ROUTES_HA_PROBE_TIMEOUT"] = timeout.String()
+	return func(hsic *SlopscaleInContainer) {
+		hsic.env["SLOPSCALE_NODE_ROUTES_HA_PROBE_INTERVAL"] = interval.String()
+		hsic.env["SLOPSCALE_NODE_ROUTES_HA_PROBE_TIMEOUT"] = timeout.String()
 	}
 }
 
 func WithTimezone(timezone string) Option {
-	return func(hsic *HeadscaleInContainer) {
+	return func(hsic *SlopscaleInContainer) {
 		hsic.env["TZ"] = timezone
 	}
 }
 
-// New returns a new [HeadscaleInContainer] instance.
+// New returns a new [SlopscaleInContainer] instance.
 func New(
 	pool *dockertest.Pool,
 	networks []*dockertest.Network,
 	opts ...Option,
-) (*HeadscaleInContainer, error) {
+) (*SlopscaleInContainer, error) {
 	hash := rands.HexString(hsicHashLength)
 
 	// Include run ID in hostname for easier identification of which test run owns this container
@@ -317,9 +317,9 @@ func New(
 		hostname = "hs-" + hash
 	}
 
-	hsic := &HeadscaleInContainer{
+	hsic := &SlopscaleInContainer{
 		hostname: hostname,
-		port:     headscaleDefaultPort,
+		port:     slopscaleDefaultPort,
 
 		pool:     pool,
 		networks: networks,
@@ -347,7 +347,7 @@ func New(
 		hsic.tlsCert = certs.CertPEM
 		hsic.tlsKey = certs.KeyPEM
 
-		// Install the CA cert into the headscale container's trust
+		// Install the CA cert into the slopscale container's trust
 		// store so that tools like curl trust the server's own
 		// certificate.
 		hsic.caCerts = append(hsic.caCerts, certs.CACertPEM)
@@ -357,24 +357,24 @@ func New(
 
 	portProto := fmt.Sprintf("%d/tcp", hsic.port)
 
-	headscaleBuildOptions := &dockertest.BuildOptions{
+	slopscaleBuildOptions := &dockertest.BuildOptions{
 		Dockerfile: IntegrationTestDockerFileName,
 		ContextDir: dockerContextPath,
 	}
 
 	if hsic.postgres {
-		hsic.env["HEADSCALE_DATABASE_TYPE"] = "postgres"
-		hsic.env["HEADSCALE_DATABASE_POSTGRES_HOST"] = "postgres-" + hash
-		hsic.env["HEADSCALE_DATABASE_POSTGRES_USER"] = binHeadscale
-		hsic.env["HEADSCALE_DATABASE_POSTGRES_PASS"] = binHeadscale
-		hsic.env["HEADSCALE_DATABASE_POSTGRES_NAME"] = binHeadscale
-		delete(hsic.env, "HEADSCALE_DATABASE_SQLITE_PATH")
+		hsic.env["SLOPSCALE_DATABASE_TYPE"] = "postgres"
+		hsic.env["SLOPSCALE_DATABASE_POSTGRES_HOST"] = "postgres-" + hash
+		hsic.env["SLOPSCALE_DATABASE_POSTGRES_USER"] = binSlopscale
+		hsic.env["SLOPSCALE_DATABASE_POSTGRES_PASS"] = binSlopscale
+		hsic.env["SLOPSCALE_DATABASE_POSTGRES_NAME"] = binSlopscale
+		delete(hsic.env, "SLOPSCALE_DATABASE_SQLITE_PATH")
 
 		// Determine postgres image - use prebuilt if available, otherwise pull from registry
 		pgRepo := "postgres"
 		pgTag := "latest"
 
-		if prebuiltImage := os.Getenv("HEADSCALE_INTEGRATION_POSTGRES_IMAGE"); prebuiltImage != "" {
+		if prebuiltImage := os.Getenv("SLOPSCALE_INTEGRATION_POSTGRES_IMAGE"); prebuiltImage != "" {
 			repo, tag, found := strings.Cut(prebuiltImage, ":")
 			if !found {
 				return nil, errInvalidPostgresImageFormat
@@ -390,9 +390,9 @@ func New(
 			Tag:        pgTag,
 			Networks:   networks,
 			Env: []string{
-				"POSTGRES_USER=headscale",
-				"POSTGRES_PASSWORD=headscale",
-				"POSTGRES_DB=headscale",
+				"POSTGRES_USER=slopscale",
+				"POSTGRES_PASSWORD=slopscale",
+				"POSTGRES_DB=slopscale",
 			},
 		}
 
@@ -408,21 +408,21 @@ func New(
 	}
 
 	env := []string{
-		"HEADSCALE_DEBUG_PROFILING_ENABLED=1",
-		"HEADSCALE_DEBUG_PROFILING_PATH=/tmp/profile",
-		"HEADSCALE_DEBUG_DUMP_MAPRESPONSE_PATH=/tmp/mapresponses",
-		"HEADSCALE_DEBUG_HIGH_CARDINALITY_METRICS=1",
-		"HEADSCALE_DEBUG_DUMP_CONFIG=1",
+		"SLOPSCALE_DEBUG_PROFILING_ENABLED=1",
+		"SLOPSCALE_DEBUG_PROFILING_PATH=/tmp/profile",
+		"SLOPSCALE_DEBUG_DUMP_MAPRESPONSE_PATH=/tmp/mapresponses",
+		"SLOPSCALE_DEBUG_HIGH_CARDINALITY_METRICS=1",
+		"SLOPSCALE_DEBUG_DUMP_CONFIG=1",
 	}
 	if hsic.hasTLS() {
-		hsic.env["HEADSCALE_TLS_CERT_PATH"] = tlsCertPath
-		hsic.env["HEADSCALE_TLS_KEY_PATH"] = tlsKeyPath
+		hsic.env["SLOPSCALE_TLS_CERT_PATH"] = tlsCertPath
+		hsic.env["SLOPSCALE_TLS_KEY_PATH"] = tlsKeyPath
 	}
 
 	// Server URL and Listen Addr should not be overridable outside of
 	// the configuration passed to docker.
-	hsic.env["HEADSCALE_SERVER_URL"] = hsic.GetEndpoint()
-	hsic.env["HEADSCALE_LISTEN_ADDR"] = fmt.Sprintf("0.0.0.0:%d", hsic.port)
+	hsic.env["SLOPSCALE_SERVER_URL"] = hsic.GetEndpoint()
+	hsic.env["SLOPSCALE_LISTEN_ADDR"] = fmt.Sprintf("0.0.0.0:%d", hsic.port)
 
 	for key, value := range hsic.env {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
@@ -434,9 +434,9 @@ func New(
 		Name:         hsic.hostname,
 		ExposedPorts: append([]string{portProto, "9090/tcp"}, hsic.extraPorts...),
 		Networks:     networks,
-		// Cmd:          []string{"headscale", "serve"},
+		// Cmd:          []string{"slopscale", "serve"},
 		// TODO(kradalby): Get rid of this hack, we currently need to give us some
-		// to inject the headscale configuration further down.
+		// to inject the slopscale configuration further down.
 		Entrypoint: hsic.buildEntrypoint(),
 		Env:        env,
 	}
@@ -471,20 +471,20 @@ func New(
 	}
 
 	// Add integration test labels if running under hi tool
-	dockertestutil.DockerAddIntegrationLabels(runOptions, binHeadscale)
+	dockertestutil.DockerAddIntegrationLabels(runOptions, binSlopscale)
 
 	var container *dockertest.Resource
 
 	// Check if a pre-built image is available via environment variable
-	prebuiltImage := os.Getenv("HEADSCALE_INTEGRATION_HEADSCALE_IMAGE")
+	prebuiltImage := os.Getenv("SLOPSCALE_INTEGRATION_SLOPSCALE_IMAGE")
 
 	switch {
 	case prebuiltImage != "":
-		log.Printf("Using pre-built headscale image: %s", prebuiltImage)
+		log.Printf("Using pre-built slopscale image: %s", prebuiltImage)
 		// Parse image into repository and tag
 		repo, tag, ok := strings.Cut(prebuiltImage, ":")
 		if !ok {
-			return nil, errInvalidHeadscaleImageFormat
+			return nil, errInvalidSlopscaleImageFormat
 		}
 
 		runOptions.Repository = repo
@@ -497,13 +497,13 @@ func New(
 			dockertestutil.DockerAllowNetworkAdministration,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("running pre-built headscale container %q: %w", prebuiltImage, err)
+			return nil, fmt.Errorf("running pre-built slopscale container %q: %w", prebuiltImage, err)
 		}
 	case util.IsCI():
-		return nil, errHeadscaleImageRequiredInCI
+		return nil, errSlopscaleImageRequiredInCI
 	default:
 		container, err = pool.BuildAndRunWithBuildOptions(
-			headscaleBuildOptions,
+			slopscaleBuildOptions,
 			runOptions,
 			dockertestutil.DockerRestartPolicy,
 			dockertestutil.DockerAllowLocalIPv6,
@@ -533,7 +533,7 @@ func New(
 			if buildErr != nil {
 				// The diagnostic build also failed - this is the real error
 				return nil, fmt.Errorf(
-					"starting headscale container: %w\n\nDocker build failed. Last %d lines of output:\n%s",
+					"starting slopscale container: %w\n\nDocker build failed. Last %d lines of output:\n%s",
 					err,
 					maxLines,
 					relevantOutput,
@@ -543,7 +543,7 @@ func New(
 			if buildOutput != "" {
 				// Build succeeded on retry but container creation still failed
 				return nil, fmt.Errorf(
-					"starting headscale container: %w\n\n"+
+					"starting slopscale container: %w\n\n"+
 						"Docker build succeeded on retry, but container creation failed. "+
 						"Last %d lines of build output:\n%s",
 					err,
@@ -554,7 +554,7 @@ func New(
 
 			// No output at all - diagnostic build command may have failed
 			return nil, fmt.Errorf(
-				"starting headscale container: %w\n\n"+
+				"starting slopscale container: %w\n\n"+
 					"Unable to get diagnostic build output (command may have failed silently)",
 				err,
 			)
@@ -569,7 +569,7 @@ func New(
 	hsic.hostMetricsPort = container.GetHostPort("9090/tcp")
 
 	log.Printf(
-		"Headscale %s metrics available at http://localhost:%s/metrics (debug at http://localhost:%s/debug/)\n",
+		"Slopscale %s metrics available at http://localhost:%s/metrics (debug at http://localhost:%s/debug/)\n",
 		hsic.hostname,
 		hsic.hostMetricsPort,
 		hsic.hostMetricsPort,
@@ -583,9 +583,9 @@ func New(
 		}
 	}
 
-	err = hsic.WriteFile("/etc/headscale/config.yaml", []byte(MinimumConfigYAML()))
+	err = hsic.WriteFile("/etc/slopscale/config.yaml", []byte(MinimumConfigYAML()))
 	if err != nil {
-		return nil, fmt.Errorf("writing headscale config to container: %w", err)
+		return nil, fmt.Errorf("writing slopscale config to container: %w", err)
 	}
 
 	if hsic.aclPolicy != nil {
@@ -615,7 +615,7 @@ func New(
 	}
 
 	// Load the database from policy file on repeat until it succeeds,
-	// this is done as the container sleeps before starting headscale.
+	// this is done as the container sleeps before starting slopscale.
 	if hsic.aclPolicy != nil && hsic.policyMode == types.PolicyModeDB {
 		err := pool.Retry(hsic.reloadDatabasePolicy)
 		if err != nil {
@@ -626,12 +626,12 @@ func New(
 	return hsic, nil
 }
 
-func (t *HeadscaleInContainer) ConnectToNetwork(network *dockertest.Network) error {
+func (t *SlopscaleInContainer) ConnectToNetwork(network *dockertest.Network) error {
 	return t.container.ConnectToNetwork(network)
 }
 
-// Shutdown stops and cleans up the Headscale container.
-func (t *HeadscaleInContainer) Shutdown() (string, string, error) {
+// Shutdown stops and cleans up the Slopscale container.
+func (t *SlopscaleInContainer) Shutdown() (string, string, error) {
 	stdoutPath, stderrPath, err := t.SaveLog("/tmp/control")
 	if err != nil {
 		log.Printf(
@@ -648,7 +648,7 @@ func (t *HeadscaleInContainer) Shutdown() (string, string, error) {
 		)
 	}
 
-	// Send a interrupt signal to the "headscale" process inside the container
+	// Send a interrupt signal to the "slopscale" process inside the container
 	// allowing it to shut down gracefully and flush the profile to disk.
 	// The container will live for a bit longer due to the sleep at the end.
 	err = t.SendInterrupt()
@@ -696,12 +696,12 @@ func (t *HeadscaleInContainer) Shutdown() (string, string, error) {
 
 // WriteLogs writes the current stdout/stderr log of the container to
 // the given [io.Writer]s.
-func (t *HeadscaleInContainer) WriteLogs(stdout, stderr io.Writer) error {
+func (t *SlopscaleInContainer) WriteLogs(stdout, stderr io.Writer) error {
 	return dockertestutil.WriteLog(t.pool, t.container, stdout, stderr)
 }
 
-// ReadLog returns the current stdout and stderr logs from the headscale container.
-func (t *HeadscaleInContainer) ReadLog() (string, string, error) {
+// ReadLog returns the current stdout and stderr logs from the slopscale container.
+func (t *SlopscaleInContainer) ReadLog() (string, string, error) {
 	var stdout, stderr bytes.Buffer
 
 	err := dockertestutil.WriteLog(t.pool, t.container, &stdout, &stderr)
@@ -714,11 +714,11 @@ func (t *HeadscaleInContainer) ReadLog() (string, string, error) {
 
 // SaveLog saves the current stdout log of the container to a path
 // on the host system.
-func (t *HeadscaleInContainer) SaveLog(savePath string) (string, string, error) {
+func (t *SlopscaleInContainer) SaveLog(savePath string) (string, string, error) {
 	return dockertestutil.SaveLog(t.pool, t.container, savePath)
 }
 
-func (t *HeadscaleInContainer) SaveMetrics(savePath string) error {
+func (t *SlopscaleInContainer) SaveMetrics(savePath string) error {
 	req, err := http.NewRequestWithContext(
 		context.Background(),
 		http.MethodGet,
@@ -847,7 +847,7 @@ func extractTarToDirectory(tarData []byte, targetDir string) error {
 	return nil
 }
 
-func (t *HeadscaleInContainer) SaveProfile(savePath string) error {
+func (t *SlopscaleInContainer) SaveProfile(savePath string) error {
 	tarFile, err := t.FetchPath("/tmp/profile")
 	if err != nil {
 		return err
@@ -858,7 +858,7 @@ func (t *HeadscaleInContainer) SaveProfile(savePath string) error {
 	return extractTarToDirectory(tarFile, targetDir)
 }
 
-func (t *HeadscaleInContainer) SaveMapResponses(savePath string) error {
+func (t *SlopscaleInContainer) SaveMapResponses(savePath string) error {
 	tarFile, err := t.FetchPath("/tmp/mapresponses")
 	if err != nil {
 		return err
@@ -869,7 +869,7 @@ func (t *HeadscaleInContainer) SaveMapResponses(savePath string) error {
 	return extractTarToDirectory(tarFile, targetDir)
 }
 
-func (t *HeadscaleInContainer) SaveDatabase(savePath string) error {
+func (t *SlopscaleInContainer) SaveDatabase(savePath string) error {
 	// If using PostgreSQL, skip database file extraction
 	if t.postgres {
 		return nil
@@ -966,9 +966,9 @@ func (t *HeadscaleInContainer) SaveDatabase(savePath string) error {
 	return errors.New("no regular file found in database tar archive")
 }
 
-// Execute runs a command inside the Headscale container and returns the
+// Execute runs a command inside the Slopscale container and returns the
 // result of stdout as a string.
-func (t *HeadscaleInContainer) Execute(
+func (t *SlopscaleInContainer) Execute(
 	command []string,
 ) (string, error) {
 	stdout, stderr, err := dockertestutil.ExecuteCommand(
@@ -991,25 +991,25 @@ func (t *HeadscaleInContainer) Execute(
 }
 
 // GetPort returns the docker container port as a string.
-func (t *HeadscaleInContainer) GetPort() string {
+func (t *SlopscaleInContainer) GetPort() string {
 	return strconv.Itoa(t.port)
 }
 
 // GetHostMetricsPort returns the dynamically assigned host port for metrics/pprof access.
 // This port can be used by operators to access metrics at http://localhost:{port}/metrics
 // and debug endpoints at http://localhost:{port}/debug/ while tests are running.
-func (t *HeadscaleInContainer) GetHostMetricsPort() string {
+func (t *SlopscaleInContainer) GetHostMetricsPort() string {
 	return t.hostMetricsPort
 }
 
-// GetHealthEndpoint returns a health endpoint for the [HeadscaleInContainer]
+// GetHealthEndpoint returns a health endpoint for the [SlopscaleInContainer]
 // instance.
-func (t *HeadscaleInContainer) GetHealthEndpoint() string {
+func (t *SlopscaleInContainer) GetHealthEndpoint() string {
 	return t.GetEndpoint() + "/health"
 }
 
-// GetEndpoint returns the Headscale endpoint for the [HeadscaleInContainer].
-func (t *HeadscaleInContainer) GetEndpoint() string {
+// GetEndpoint returns the Slopscale endpoint for the [SlopscaleInContainer].
+func (t *SlopscaleInContainer) GetEndpoint() string {
 	return t.getEndpoint(false)
 }
 
@@ -1020,11 +1020,11 @@ var errOAuthSecretMissing = errors.New(`OAuth client response missing secret in 
 // returning the client id and secret. The secret is only returned once, in the
 // "key" field. It is a reusable building block for tests that need OAuth client
 // credentials (such as the Kubernetes operator).
-func (t *HeadscaleInContainer) CreateOAuthClient(
+func (t *SlopscaleInContainer) CreateOAuthClient(
 	ctx context.Context,
 	scopes, tags []string,
 ) (string, string, error) {
-	apiKey, err := t.Execute([]string{"headscale", "apikeys", "create", "--expiration", "24h"})
+	apiKey, err := t.Execute([]string{"slopscale", "apikeys", "create", "--expiration", "24h"})
 	if err != nil {
 		return "", "", fmt.Errorf("creating admin api key: %w", err)
 	}
@@ -1079,33 +1079,33 @@ func (t *HeadscaleInContainer) CreateOAuthClient(
 	return clientID, clientSecret, nil
 }
 
-// GetIPEndpoint returns the Headscale endpoint using IP address instead of hostname.
-func (t *HeadscaleInContainer) GetIPEndpoint() string {
+// GetIPEndpoint returns the Slopscale endpoint using IP address instead of hostname.
+func (t *SlopscaleInContainer) GetIPEndpoint() string {
 	return t.getEndpoint(true)
 }
 
 // GetCert returns the CA certificate that clients should trust to
 // verify this server's TLS certificate.
-func (t *HeadscaleInContainer) GetCert() []byte {
+func (t *SlopscaleInContainer) GetCert() []byte {
 	return t.tlsCACert
 }
 
-// GetHostname returns the hostname of the [HeadscaleInContainer].
-func (t *HeadscaleInContainer) GetHostname() string {
+// GetHostname returns the hostname of the [SlopscaleInContainer].
+func (t *SlopscaleInContainer) GetHostname() string {
 	return t.hostname
 }
 
-// GetIPInNetwork returns the IP address of the [HeadscaleInContainer] in the given network.
-func (t *HeadscaleInContainer) GetIPInNetwork(network *dockertest.Network) string {
+// GetIPInNetwork returns the IP address of the [SlopscaleInContainer] in the given network.
+func (t *SlopscaleInContainer) GetIPInNetwork(network *dockertest.Network) string {
 	return t.container.GetIPInNetwork(network)
 }
 
-// WaitForRunning blocks until the Headscale instance is ready to
+// WaitForRunning blocks until the Slopscale instance is ready to
 // serve clients.
-func (t *HeadscaleInContainer) WaitForRunning() error {
+func (t *SlopscaleInContainer) WaitForRunning() error {
 	url := t.GetHealthEndpoint()
 
-	log.Printf("waiting for headscale to be ready at %s", url)
+	log.Printf("waiting for slopscale to be ready at %s", url)
 
 	client := &http.Client{}
 
@@ -1123,29 +1123,29 @@ func (t *HeadscaleInContainer) WaitForRunning() error {
 	return t.pool.Retry(func() error {
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, http.NoBody)
 		if err != nil {
-			return fmt.Errorf("building headscale readiness request: %w", err)
+			return fmt.Errorf("building slopscale readiness request: %w", err)
 		}
 
 		resp, err := client.Do(req)
 		if err != nil {
-			return fmt.Errorf("headscale is not ready: %w", err)
+			return fmt.Errorf("slopscale is not ready: %w", err)
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			return errHeadscaleStatusCodeNotOk
+			return errSlopscaleStatusCodeNotOk
 		}
 
 		return nil
 	})
 }
 
-// CreateUser adds a new user to the Headscale instance.
-func (t *HeadscaleInContainer) CreateUser(
+// CreateUser adds a new user to the Slopscale instance.
+func (t *SlopscaleInContainer) CreateUser(
 	user string,
 ) (*clientv1.User, error) {
 	command := []string{
-		binHeadscale,
+		binSlopscale,
 		"users",
 		"create",
 		user,
@@ -1188,9 +1188,9 @@ type AuthKeyOptions struct {
 
 // CreateAuthKeyWithOptions creates a new "authorisation key" with the specified options.
 // This supports both user-owned and tags-only auth keys.
-func (t *HeadscaleInContainer) CreateAuthKeyWithOptions(opts AuthKeyOptions) (*clientv1.PreAuthKey, error) {
+func (t *SlopscaleInContainer) CreateAuthKeyWithOptions(opts AuthKeyOptions) (*clientv1.PreAuthKey, error) {
 	command := []string{
-		binHeadscale,
+		binSlopscale,
 	}
 
 	// Only add --user flag if User is specified
@@ -1240,8 +1240,8 @@ func (t *HeadscaleInContainer) CreateAuthKeyWithOptions(opts AuthKeyOptions) (*c
 }
 
 // CreateAuthKey creates a new "authorisation key" for a User that can be used
-// to authorise a TailscaleClient with the [HeadscaleInContainer] instance.
-func (t *HeadscaleInContainer) CreateAuthKey(
+// to authorise a TailscaleClient with the [SlopscaleInContainer] instance.
+func (t *SlopscaleInContainer) CreateAuthKey(
 	user uint64,
 	reusable bool,
 	ephemeral bool,
@@ -1255,7 +1255,7 @@ func (t *HeadscaleInContainer) CreateAuthKey(
 
 // CreateAuthKeyWithTags creates a new "authorisation key" for a User with the specified tags.
 // This is used to create tagged PreAuthKeys for testing the tags-as-identity model.
-func (t *HeadscaleInContainer) CreateAuthKeyWithTags(
+func (t *SlopscaleInContainer) CreateAuthKeyWithTags(
 	user uint64,
 	reusable bool,
 	ephemeral bool,
@@ -1270,11 +1270,11 @@ func (t *HeadscaleInContainer) CreateAuthKeyWithTags(
 }
 
 // DeleteAuthKey deletes an "authorisation key" by ID.
-func (t *HeadscaleInContainer) DeleteAuthKey(
+func (t *SlopscaleInContainer) DeleteAuthKey(
 	id uint64,
 ) error {
 	command := []string{
-		binHeadscale,
+		binSlopscale,
 		"preauthkeys",
 		"delete",
 		"--id",
@@ -1295,10 +1295,10 @@ func (t *HeadscaleInContainer) DeleteAuthKey(
 	return nil
 }
 
-// ListNodes lists the currently registered Nodes in headscale.
+// ListNodes lists the currently registered Nodes in slopscale.
 // Optionally a list of usernames can be passed to get users for
 // specific users.
-func (t *HeadscaleInContainer) ListNodes(
+func (t *SlopscaleInContainer) ListNodes(
 	users ...string,
 ) ([]*clientv1.Node, error) {
 	var ret []*clientv1.Node
@@ -1326,13 +1326,13 @@ func (t *HeadscaleInContainer) ListNodes(
 	}
 
 	if len(users) == 0 {
-		err := execUnmarshal([]string{binHeadscale, "nodes", "list", flagOutput, "json"})
+		err := execUnmarshal([]string{binSlopscale, "nodes", "list", flagOutput, "json"})
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		for _, user := range users {
-			command := []string{binHeadscale, "--user", user, "nodes", "list", flagOutput, "json"}
+			command := []string{binSlopscale, "--user", user, "nodes", "list", flagOutput, "json"}
 
 			err := execUnmarshal(command)
 			if err != nil {
@@ -1351,9 +1351,9 @@ func (t *HeadscaleInContainer) ListNodes(
 	return ret, nil
 }
 
-func (t *HeadscaleInContainer) DeleteNode(nodeID uint64) error {
+func (t *SlopscaleInContainer) DeleteNode(nodeID uint64) error {
 	command := []string{
-		binHeadscale,
+		binSlopscale,
 		"nodes",
 		"delete",
 		"--identifier",
@@ -1375,7 +1375,7 @@ func (t *HeadscaleInContainer) DeleteNode(nodeID uint64) error {
 	return nil
 }
 
-func (t *HeadscaleInContainer) NodesByUser() (map[string][]*clientv1.Node, error) {
+func (t *SlopscaleInContainer) NodesByUser() (map[string][]*clientv1.Node, error) {
 	nodes, err := t.ListNodes()
 	if err != nil {
 		return nil, err
@@ -1391,7 +1391,7 @@ func (t *HeadscaleInContainer) NodesByUser() (map[string][]*clientv1.Node, error
 	return userMap, nil
 }
 
-func (t *HeadscaleInContainer) NodesByName() (map[string]*clientv1.Node, error) {
+func (t *SlopscaleInContainer) NodesByName() (map[string]*clientv1.Node, error) {
 	nodes, err := t.ListNodes()
 	if err != nil {
 		return nil, err
@@ -1405,9 +1405,9 @@ func (t *HeadscaleInContainer) NodesByName() (map[string]*clientv1.Node, error) 
 	return nameMap, nil
 }
 
-// ListUsers returns a list of users from Headscale.
-func (t *HeadscaleInContainer) ListUsers() ([]*clientv1.User, error) {
-	command := []string{binHeadscale, "users", "list", flagOutput, "json"}
+// ListUsers returns a list of users from Slopscale.
+func (t *SlopscaleInContainer) ListUsers() ([]*clientv1.User, error) {
+	command := []string{binSlopscale, "users", "list", flagOutput, "json"}
 
 	result, _, err := dockertestutil.ExecuteCommand(
 		t.container,
@@ -1428,9 +1428,9 @@ func (t *HeadscaleInContainer) ListUsers() ([]*clientv1.User, error) {
 	return users, nil
 }
 
-// MapUsers returns a map of users from Headscale. It is keyed by the
+// MapUsers returns a map of users from Slopscale. It is keyed by the
 // user name.
-func (t *HeadscaleInContainer) MapUsers() (map[string]*clientv1.User, error) {
+func (t *SlopscaleInContainer) MapUsers() (map[string]*clientv1.User, error) {
 	users, err := t.ListUsers()
 	if err != nil {
 		return nil, err
@@ -1444,10 +1444,10 @@ func (t *HeadscaleInContainer) MapUsers() (map[string]*clientv1.User, error) {
 	return userMap, nil
 }
 
-// DeleteUser deletes a user from the Headscale instance.
-func (t *HeadscaleInContainer) DeleteUser(userID uint64) error {
+// DeleteUser deletes a user from the Slopscale instance.
+func (t *SlopscaleInContainer) DeleteUser(userID uint64) error {
 	command := []string{
-		binHeadscale,
+		binSlopscale,
 		"users",
 		"delete",
 		"--identifier",
@@ -1469,7 +1469,7 @@ func (t *HeadscaleInContainer) DeleteUser(userID uint64) error {
 	return nil
 }
 
-func (t *HeadscaleInContainer) SetPolicy(pol *policyv2.Policy) error {
+func (t *SlopscaleInContainer) SetPolicy(pol *policyv2.Policy) error {
 	err := t.writePolicy(pol)
 	if err != nil {
 		return fmt.Errorf("writing policy file: %w", err)
@@ -1493,11 +1493,11 @@ func (t *HeadscaleInContainer) SetPolicy(pol *policyv2.Policy) error {
 	return nil
 }
 
-func (t *HeadscaleInContainer) PID() (int, error) {
-	// Use pidof to find the headscale process, which is more reliable than grep
+func (t *SlopscaleInContainer) PID() (int, error) {
+	// Use pidof to find the slopscale process, which is more reliable than grep
 	// as it only looks for the actual binary name, not processes that contain
-	// "headscale" in their command line (like the dlv debugger).
-	output, err := t.Execute([]string{"pidof", binHeadscale})
+	// "slopscale" in their command line (like the dlv debugger).
+	output, err := t.Execute([]string{"pidof", binSlopscale})
 	if err != nil {
 		// pidof returns exit code 1 when no process is found
 		return 0, os.ErrNotExist
@@ -1535,40 +1535,40 @@ func (t *HeadscaleInContainer) PID() (int, error) {
 	}
 }
 
-// Reload sends a SIGHUP to the headscale process to reload internals,
+// Reload sends a SIGHUP to the slopscale process to reload internals,
 // for example Policy from file.
-func (t *HeadscaleInContainer) Reload() error {
+func (t *SlopscaleInContainer) Reload() error {
 	pid, err := t.PID()
 	if err != nil {
-		return fmt.Errorf("getting headscale PID: %w", err)
+		return fmt.Errorf("getting slopscale PID: %w", err)
 	}
 
 	_, err = t.Execute([]string{"kill", "-HUP", strconv.Itoa(pid)})
 	if err != nil {
-		return fmt.Errorf("reloading headscale with HUP: %w", err)
+		return fmt.Errorf("reloading slopscale with HUP: %w", err)
 	}
 
 	return nil
 }
 
-// Restart restarts the headscale container. The on-disk database and keys
+// Restart restarts the slopscale container. The on-disk database and keys
 // persist across the restart, but all in-memory state is dropped — including
 // the bounded cache of pending authentication sessions. This reproduces a
 // control-plane restart, one of the real-world cases where a pending SSH-check
 // auth session is lost.
-func (t *HeadscaleInContainer) Restart() error {
+func (t *SlopscaleInContainer) Restart() error {
 	err := t.pool.Client.RestartContainer(t.container.Container.ID, 30)
 	if err != nil {
-		return fmt.Errorf("restarting headscale container %s: %w", t.hostname, err)
+		return fmt.Errorf("restarting slopscale container %s: %w", t.hostname, err)
 	}
 
 	return t.WaitForRunning()
 }
 
 // ApproveRoutes approves routes for a node.
-func (t *HeadscaleInContainer) ApproveRoutes(id uint64, routes []netip.Prefix) (*clientv1.Node, error) {
+func (t *SlopscaleInContainer) ApproveRoutes(id uint64, routes []netip.Prefix) (*clientv1.Node, error) {
 	command := []string{
-		binHeadscale, "nodes", "approve-routes",
+		binSlopscale, "nodes", "approve-routes",
 		flagOutput, "json",
 		"--identifier", strconv.FormatUint(id, 10),
 		"--routes=" + strings.Join(util.PrefixesToString(routes), ","),
@@ -1598,12 +1598,12 @@ func (t *HeadscaleInContainer) ApproveRoutes(id uint64, routes []netip.Prefix) (
 	return node, nil
 }
 
-// SetNodeTags sets tags on a node via the headscale CLI.
-// This simulates what the Tailscale admin console UI does - it calls the headscale
-// SetTags API which is exposed via the CLI command: headscale nodes tag -i <id> -t <tags>.
-func (t *HeadscaleInContainer) SetNodeTags(nodeID uint64, tags []string) error {
+// SetNodeTags sets tags on a node via the slopscale CLI.
+// This simulates what the Tailscale admin console UI does - it calls the slopscale
+// SetTags API which is exposed via the CLI command: slopscale nodes tag -i <id> -t <tags>.
+func (t *SlopscaleInContainer) SetNodeTags(nodeID uint64, tags []string) error {
 	command := []string{
-		binHeadscale, "nodes", "tag",
+		binSlopscale, "nodes", "tag",
 		"--identifier", strconv.FormatUint(nodeID, 10),
 		flagOutput, "json",
 	}
@@ -1628,19 +1628,19 @@ func (t *HeadscaleInContainer) SetNodeTags(nodeID uint64, tags []string) error {
 	return nil
 }
 
-// WriteFile save file inside the Headscale container.
-func (t *HeadscaleInContainer) WriteFile(containerPath string, data []byte) error {
+// WriteFile save file inside the Slopscale container.
+func (t *SlopscaleInContainer) WriteFile(containerPath string, data []byte) error {
 	return integrationutil.WriteFileToContainer(t.pool, t.container, containerPath, data)
 }
 
-// FetchPath gets a path from inside the Headscale container and returns a tar
+// FetchPath gets a path from inside the Slopscale container and returns a tar
 // file as byte array.
-func (t *HeadscaleInContainer) FetchPath(containerPath string) ([]byte, error) {
+func (t *SlopscaleInContainer) FetchPath(containerPath string) ([]byte, error) {
 	return integrationutil.FetchPathFromContainer(t.pool, t.container, containerPath)
 }
 
-func (t *HeadscaleInContainer) SendInterrupt() error {
-	pid, err := t.Execute([]string{"pidof", binHeadscale})
+func (t *SlopscaleInContainer) SendInterrupt() error {
+	pid, err := t.Execute([]string{"pidof", binSlopscale})
 	if err != nil {
 		return err
 	}
@@ -1653,32 +1653,32 @@ func (t *HeadscaleInContainer) SendInterrupt() error {
 	return nil
 }
 
-func (t *HeadscaleInContainer) GetAllMapReponses() (map[types.NodeID][]tailcfg.MapResponse, error) {
+func (t *SlopscaleInContainer) GetAllMapReponses() (map[types.NodeID][]tailcfg.MapResponse, error) {
 	return t.debugJSON[map[types.NodeID][]tailcfg.MapResponse]("mapresponses")
 }
 
 // PrimaryRoutes fetches the primary routes from the debug endpoint.
-func (t *HeadscaleInContainer) PrimaryRoutes() (*types.DebugRoutes, error) {
+func (t *SlopscaleInContainer) PrimaryRoutes() (*types.DebugRoutes, error) {
 	return t.debugJSON[*types.DebugRoutes]("routes")
 }
 
 // DebugBatcher fetches the batcher debug information from the debug endpoint.
-func (t *HeadscaleInContainer) DebugBatcher() (*hscontrol.DebugBatcherInfo, error) {
+func (t *SlopscaleInContainer) DebugBatcher() (*hscontrol.DebugBatcherInfo, error) {
 	return t.debugJSON[*hscontrol.DebugBatcherInfo]("batcher")
 }
 
 // DebugNodeStore fetches the [state.NodeStore] data from the debug endpoint.
-func (t *HeadscaleInContainer) DebugNodeStore() (map[types.NodeID]types.Node, error) {
+func (t *SlopscaleInContainer) DebugNodeStore() (map[types.NodeID]types.Node, error) {
 	return t.debugJSON[map[types.NodeID]types.Node]("nodestore")
 }
 
 // DebugFilter fetches the current filter rules from the debug endpoint.
-func (t *HeadscaleInContainer) DebugFilter() ([]tailcfg.FilterRule, error) {
+func (t *SlopscaleInContainer) DebugFilter() ([]tailcfg.FilterRule, error) {
 	return t.debugJSON[[]tailcfg.FilterRule]("filter")
 }
 
 // DebugPolicy fetches the current policy from the debug endpoint.
-func (t *HeadscaleInContainer) DebugPolicy() (string, error) {
+func (t *SlopscaleInContainer) DebugPolicy() (string, error) {
 	// Execute curl inside the container to access the debug endpoint locally
 	command := []string{
 		"curl", "-s", "http://localhost:9090/debug/policy",
@@ -1694,13 +1694,13 @@ func (t *HeadscaleInContainer) DebugPolicy() (string, error) {
 
 // hasTLS reports whether the container was configured with a TLS certificate
 // and key.
-func (t *HeadscaleInContainer) hasTLS() bool {
+func (t *SlopscaleInContainer) hasTLS() bool {
 	return len(t.tlsCert) != 0 && len(t.tlsKey) != 0
 }
 
-// httpClient returns an HTTP client that trusts this Headscale's TLS CA when TLS
+// httpClient returns an HTTP client that trusts this Slopscale's TLS CA when TLS
 // is enabled, or a default client when it serves plain HTTP.
-func (t *HeadscaleInContainer) httpClient() *http.Client {
+func (t *SlopscaleInContainer) httpClient() *http.Client {
 	if !t.hasTLS() {
 		return &http.Client{Timeout: 30 * time.Second}
 	}
@@ -1716,8 +1716,8 @@ func (t *HeadscaleInContainer) httpClient() *http.Client {
 	}
 }
 
-// getEndpoint returns the Headscale endpoint, optionally using IP address instead of hostname.
-func (t *HeadscaleInContainer) getEndpoint(useIP bool) string {
+// getEndpoint returns the Slopscale endpoint, optionally using IP address instead of hostname.
+func (t *SlopscaleInContainer) getEndpoint(useIP bool) string {
 	var host string
 	if useIP && len(t.networks) > 0 {
 		// Use IP address from the first network
@@ -1735,11 +1735,11 @@ func (t *HeadscaleInContainer) getEndpoint(useIP bool) string {
 	return "http://" + hostEndpoint
 }
 
-// reloadDatabasePolicy tells headscale to reload the policy from the database.
-func (t *HeadscaleInContainer) reloadDatabasePolicy() error {
+// reloadDatabasePolicy tells slopscale to reload the policy from the database.
+func (t *SlopscaleInContainer) reloadDatabasePolicy() error {
 	_, err := t.Execute(
 		[]string{
-			binHeadscale,
+			binSlopscale,
 			"policy",
 			"set",
 			"-f",
@@ -1754,7 +1754,7 @@ func (t *HeadscaleInContainer) reloadDatabasePolicy() error {
 }
 
 // writePolicy marshals pol and writes it to the policy file inside the container.
-func (t *HeadscaleInContainer) writePolicy(pol *policyv2.Policy) error {
+func (t *SlopscaleInContainer) writePolicy(pol *policyv2.Policy) error {
 	pBytes, err := json.Marshal(pol)
 	if err != nil {
 		return fmt.Errorf("marshalling policy: %w", err)
@@ -1762,14 +1762,14 @@ func (t *HeadscaleInContainer) writePolicy(pol *policyv2.Policy) error {
 
 	err = t.WriteFile(aclPolicyPath, pBytes)
 	if err != nil {
-		return fmt.Errorf("writing policy to headscale container: %w", err)
+		return fmt.Errorf("writing policy to slopscale container: %w", err)
 	}
 
 	return nil
 }
 
 // debugJSON fetches and decodes a JSON-returning debug endpoint by name.
-func (t *HeadscaleInContainer) debugJSON[T any](endpoint string) (T, error) {
+func (t *SlopscaleInContainer) debugJSON[T any](endpoint string) (T, error) {
 	var res T
 
 	// Execute curl inside the container to access the debug endpoint locally
@@ -1796,16 +1796,16 @@ func (t *HeadscaleInContainer) debugJSON[T any](endpoint string) (T, error) {
 // 2. Wait for config.yaml (always written after container start)
 // 3. Wait for CA certs if configured
 // 4. Update CA certificates
-// 5. Run headscale serve
+// 5. Run slopscale serve
 // 6. Sleep at end to keep container alive for log collection on shutdown.
-func (t *HeadscaleInContainer) buildEntrypoint() []string {
+func (t *SlopscaleInContainer) buildEntrypoint() []string {
 	var commands []string
 
 	// Wait for network to be ready, then for config.yaml to be written
 	// (always written after container start).
 	commands = append(commands,
 		"while ! ip route show default >/dev/null 2>&1; do sleep 0.1; done",
-		"while [ ! -f /etc/headscale/config.yaml ]; do sleep 0.1; done")
+		"while [ ! -f /etc/slopscale/config.yaml ]; do sleep 0.1; done")
 
 	// If CA certs are configured, wait for them to be written
 	if len(t.caCerts) > 0 {
@@ -1813,11 +1813,11 @@ func (t *HeadscaleInContainer) buildEntrypoint() []string {
 			fmt.Sprintf("while [ ! -f %s/user-0.crt ]; do sleep 0.1; done", caCertRoot))
 	}
 
-	// Update CA certificates, run headscale serve, then keep the container
-	// alive after headscale exits for log collection.
+	// Update CA certificates, run slopscale serve, then keep the container
+	// alive after slopscale exits for log collection.
 	commands = append(commands,
 		"update-ca-certificates",
-		"/usr/local/bin/headscale serve",
+		"/usr/local/bin/slopscale serve",
 		"/bin/sleep 30")
 
 	return []string{"/bin/bash", "-c", strings.Join(commands, " ; ")}

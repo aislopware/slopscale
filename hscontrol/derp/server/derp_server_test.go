@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/coder/websocket"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/derp"
@@ -53,8 +53,8 @@ func testServerSettings() types.DERPServerSettings {
 	return types.DERPServerSettings{
 		Enabled:    true,
 		RegionID:   999,
-		RegionCode: "headscale",
-		RegionName: "Headscale Embedded DERP",
+		RegionCode: "slopscale",
+		RegionName: "Slopscale Embedded DERP",
 		STUNAddr:   "127.0.0.1:0",
 	}
 }

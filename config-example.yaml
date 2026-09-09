@@ -1,14 +1,14 @@
 ---
-# headscale will look for a configuration file named `config.yaml` (or `config.json`) in the following order:
+# slopscale will look for a configuration file named `config.yaml` (or `config.json`) in the following order:
 #
-# - `/etc/headscale`
-# - `~/.headscale`
+# - `/etc/slopscale`
+# - `~/.slopscale`
 # - current working directory
 
 # The url clients will connect to.
 # Typically this will be a domain like:
 #
-# https://myheadscale.example.com:443
+# https://myslopscale.example.com:443
 #
 server_url: http://127.0.0.1:8080
 
@@ -33,10 +33,10 @@ trusted_proxies: []
 # The Noise section includes specific configuration for the
 # TS2021 Noise protocol
 noise:
-  # The Noise private key is used to encrypt the traffic between headscale and
+  # The Noise private key is used to encrypt the traffic between slopscale and
   # Tailscale clients when using the new Noise-based protocol. A missing key
   # will be automatically generated.
-  private_key_path: /var/lib/headscale/noise_private.key
+  private_key_path: /var/lib/slopscale/noise_private.key
 
 # List of IP prefixes to allocate tailaddresses from.
 # Each prefix consists of either an IPv4 or IPv6 address,
@@ -62,7 +62,7 @@ prefixes:
 
   # Strategy used for allocation of IPs to nodes, available options:
   # - sequential (default): assigns the next free IP from the previous given
-  #   IP. A best-effort approach is used and Headscale might leave holes in the
+  #   IP. A best-effort approach is used and Slopscale might leave holes in the
   #   IP range or fill up existing holes in the IP range.
   # - random: assigns the next free IP from a pseudo-random IP generator (crypto/rand).
   allocation: sequential
@@ -71,13 +71,13 @@ prefixes:
 # connection cannot be established.
 # https://tailscale.com/blog/how-tailscale-works/#encrypted-tcp-relays-derp
 #
-# Headscale needs a list of DERP servers that can be presented to the clients.
+# Slopscale needs a list of DERP servers that can be presented to the clients.
 # DERP relays carry traffic between machines that cannot connect directly
 # and help them find each other (STUN). Everything below except `paths`,
 # `private_key_path` and `automatically_add_embedded_derp_region` can also
 # be changed while the server runs, from the admin console's Relays page,
-# `headscale derp set` or PUT /api/v1/derp; settings set that way are stored
-# in the database and replace this section until `headscale derp reset`.
+# `slopscale derp set` or PUT /api/v1/derp; settings set that way are stored
+# in the database and replace this section until `slopscale derp reset`.
 derp:
   server:
     # Runs the embedded DERP relay on the server_url and publishes it to
@@ -93,8 +93,8 @@ derp:
     region_id: 999
 
     # Region code and name are displayed in the Tailscale UI to identify a DERP region
-    region_code: "headscale"
-    region_name: "Headscale Embedded DERP"
+    region_code: "slopscale"
+    region_name: "Slopscale Embedded DERP"
 
     # Only allow clients associated with this server access
     verify_clients: true
@@ -105,10 +105,10 @@ derp:
     # For more details on how this works, check this great article: https://tailscale.com/blog/how-tailscale-works/
     stun_listen_addr: "0.0.0.0:3478"
 
-    # Private key used to encrypt the traffic between headscale DERP and
+    # Private key used to encrypt the traffic between slopscale DERP and
     # Tailscale clients. A missing key will be automatically generated.
     # Defaults to derp_server_private.key next to the noise private key.
-    private_key_path: /var/lib/headscale/derp_server_private.key
+    private_key_path: /var/lib/slopscale/derp_server_private.key
 
     # This flag can be used, so the DERP map entry for the embedded DERP server is not written automatically,
     # it enables the creation of your very own DERP map entry using a locally available file with the parameter DERP.paths
@@ -131,14 +131,14 @@ derp:
   #
   # This option is mostly interesting for people hosting their own DERP servers:
   # https://tailscale.com/docs/reference/derp-servers/custom-derp-servers
-  # https://headscale.net/stable/ref/derp/
+  # https://aislopware.github.io/slopscale/stable/ref/derp/
   #
   # Relays you run can also be added at runtime from the console, so a
   # file is only needed for what the console cannot express (region
   # scores, removing one of Tailscale's regions).
   #
   # paths:
-  #   - /etc/headscale/derp-example.yaml
+  #   - /etc/slopscale/derp-example.yaml
   paths: []
 
   # If enabled, a worker will be set up to periodically
@@ -149,7 +149,7 @@ derp:
   # How often should we check for DERP updates?
   update_frequency: 3h
 
-# Disables the automatic check for headscale updates on startup
+# Disables the automatic check for slopscale updates on startup
 disable_check_updates: false
 
 # Node lifecycle configuration.
@@ -161,7 +161,7 @@ node:
   # If a client explicitly requests a specific expiry, the client value is used.
   #
   # Setting the value to "0" means no default expiry (nodes never expire unless
-  # explicitly expired via `headscale nodes expire`).
+  # explicitly expired via `slopscale nodes expire`).
   #
   # Tailscale SaaS uses 180d; set to a positive duration to match that behaviour.
   #
@@ -174,7 +174,7 @@ node:
 
   # HA subnet router health probing.
   #
-  # When HA routes exist (2+ nodes advertising the same prefix), headscale
+  # When HA routes exist (2+ nodes advertising the same prefix), slopscale
   # pings each HA node every probe_interval via the Noise channel. If a node
   # fails to respond within probe_timeout it is marked unhealthy and the
   # primary role moves to the next healthy node. A node that later responds
@@ -215,7 +215,7 @@ database:
 
   # SQLite config
   sqlite:
-    path: /var/lib/headscale/db.sqlite
+    path: /var/lib/slopscale/db.sqlite
 
     # Enable WAL mode for SQLite. This is recommended for production environments.
     # https://www.sqlite.org/wal.html
@@ -233,7 +233,7 @@ database:
   #   # If using a Unix socket to connect to Postgres, set the socket path in the 'host' field and leave 'port' blank.
   #   host: localhost
   #   port: 5432
-  #   name: headscale
+  #   name: slopscale
   #   user: foo
   #   pass: bar
   #   max_open_conns: 10
@@ -245,10 +245,10 @@ database:
   #   ssl: false
 
 ### TLS configuration
-# See: https://headscale.net/stable/ref/tls/
+# See: https://aislopware.github.io/slopscale/stable/ref/tls/
 
 ## Let's Encrypt / ACME
-# Headscale supports automatically requesting and setting up
+# Slopscale supports automatically requesting and setting up
 # TLS for a domain with Let's Encrypt.
 
 # URL to ACME directory
@@ -261,7 +261,7 @@ acme_email: ""
 tls_letsencrypt_hostname: ""
 
 # Path to store certificates and metadata needed by letsencrypt
-tls_letsencrypt_cache_dir: /var/lib/headscale/cache
+tls_letsencrypt_cache_dir: /var/lib/slopscale/cache
 
 # Type of ACME challenge to use, currently supported types:
 # HTTP-01 or TLS-ALPN-01
@@ -284,7 +284,7 @@ log:
   format: text
 
 ## Policy
-# Headscale supports a wide range of Tailscale policy features such as ACLs and
+# Slopscale supports a wide range of Tailscale policy features such as ACLs and
 # Grants. Please have a look at their docs to better understand the concepts:
 # ACLs: https://tailscale.com/docs/features/access-control/acls
 # Grants: https://tailscale.com/docs/features/access-control/grants
@@ -299,20 +299,20 @@ policy:
   # Path of a MaxMind country database (GeoLite2-Country.mmdb or
   # GeoIP2-Country.mmdb). When set, postures can check ip:country, the
   # country of the address a node connects to the control server from.
-  # geoip_database: /var/lib/headscale/GeoLite2-Country.mmdb
+  # geoip_database: /var/lib/slopscale/GeoLite2-Country.mmdb
 
 ## Notifications
 #
 # Email webhooks (provider "email", URL "mailto:...") send through this
-# server; see https://headscale.net/development/ref/webhooks/#notifications.
+# server; see https://aislopware.github.io/slopscale/development/ref/webhooks/#notifications.
 # Leave host unset to refuse email endpoints.
 # notifications:
 #   smtp:
 #     host: smtp.example.com
 #     port: 587
-#     username: headscale
+#     username: slopscale
 #     password: ""
-#     from: "Headscale <headscale@example.com>"
+#     from: "Slopscale <slopscale@example.com>"
 #     # starttls (default), tls for an implicit-TLS port such as 465, or
 #     # none for a relay on localhost.
 #     encryption: starttls
@@ -322,7 +322,7 @@ policy:
 # Let machines get Let's Encrypt certificates for their MagicDNS names
 # with `tailscale cert`. The base domain must be a real zone the server
 # can publish TXT records in; see
-# https://headscale.net/development/ref/https-certificates/.
+# https://aislopware.github.io/slopscale/development/ref/https-certificates/.
 # https_certificates:
 #   enabled: false
 #   # cloudflare, rfc2136 or command.
@@ -347,15 +347,15 @@ policy:
 ## SSH session recording
 #
 # Run a session recorder inside the server. It joins the tailnet as
-# `headscale-recorder` (tag:headscale-recorder) and records every session
+# `slopscale-recorder` (tag:slopscale-recorder) and records every session
 # that Tailscale SSH admits, unless a rule names another recorder; see
-# https://headscale.net/development/ref/ssh-recording/.
+# https://aislopware.github.io/slopscale/development/ref/ssh-recording/.
 # ssh_recording:
 #   enabled: false
 #   # One asciinema file per session.
-#   dir: /var/lib/headscale/recordings
+#   dir: /var/lib/slopscale/recordings
 #   # The recorder node's keys.
-#   state_dir: /var/lib/headscale/recorder
+#   state_dir: /var/lib/slopscale/recorder
 #   # Delete recordings older than this; unset keeps them.
 #   retention: 2160h
 #   # Refuse to store more than this from one session; what arrived is kept
@@ -364,7 +364,7 @@ policy:
 
 ## Outbound requests
 #
-# Where headscale's own HTTP clients may go: webhook receivers, log stream
+# Where slopscale's own HTTP clients may go: webhook receivers, log stream
 # sinks and DERP map URLs. Loopback, link-local (169.254.0.0/16, fe80::/10)
 # and unspecified addresses are always refused, so an operator-supplied URL
 # cannot reach the server's own services or a cloud metadata endpoint. Both
@@ -383,14 +383,14 @@ policy:
 # Off by default and not part of the supported API.
 # debug:
 #   # Serve POST /api/v1/debug/node, which mints a node from key material
-#   # the caller supplies (`headscale debug create-node`). Development only:
+#   # the caller supplies (`slopscale debug create-node`). Development only:
 #   # while it is off the operation is not registered and is absent from the
 #   # OpenAPI document the server serves.
 #   node_api_enabled: false
 
 ## DNS
 #
-# headscale supports Tailscale's DNS configuration and MagicDNS.
+# slopscale supports Tailscale's DNS configuration and MagicDNS.
 # Please have a look to their docs to better understand the concepts:
 #
 # - https://tailscale.com/docs/features/magicdns
@@ -406,7 +406,7 @@ policy:
 # overwrite /etc/resolv.conf.
 # https://tailscale.com/docs/reference/faq/dns-resolv-conf
 #
-# If you want stop Headscale from managing the DNS configuration
+# If you want stop Slopscale from managing the DNS configuration
 # all the fields under `dns` should be set to empty values.
 dns:
   # Whether to use MagicDNS
@@ -420,7 +420,7 @@ dns:
   base_domain: example.com
 
   # Whether to use the local DNS settings of a node or override the local DNS
-  # settings (default) and force the use of Headscale's DNS configuration.
+  # settings (default) and force the use of Slopscale's DNS configuration.
   override_local_dns: true
 
   # List of DNS servers to expose to clients.
@@ -440,7 +440,7 @@ dns:
     split: {}
       # foo.bar.com:
       #   - 1.1.1.1
-      # darp.headscale.net:
+      # darp.slopscale.net:
       #   - 1.1.1.1
       #   - 8.8.8.8
 
@@ -456,7 +456,7 @@ dns:
       global: []
       # - 1.1.1.1
       split: {}
-      # darp.headscale.net:
+      # darp.slopscale.net:
       #   - 1.1.1.1
       #   - 8.8.8.8
 
@@ -466,7 +466,7 @@ dns:
 
   # Extra DNS records
   # so far only A and AAAA records are supported (on the tailscale side)
-  # See: https://headscale.net/stable/ref/dns/
+  # See: https://aislopware.github.io/slopscale/stable/ref/dns/
   extra_records: []
   #   - name: "grafana.myvpn.example.com"
   #     type: "A"
@@ -476,16 +476,16 @@ dns:
   #   - { name: "prometheus.myvpn.example.com", type: "A", value: "100.64.0.3" }
   #
   # Alternatively, extra DNS records can be loaded from a JSON file.
-  # Headscale processes this file on each change.
-  # extra_records_path: /var/lib/headscale/extra-records.json
+  # Slopscale processes this file on each change.
+  # extra_records_path: /var/lib/slopscale/extra-records.json
 
 # Unix socket used for the CLI to connect without authentication
 # Note: for production you will want to set this to something like:
-unix_socket: /var/run/headscale/headscale.sock
+unix_socket: /var/run/slopscale/slopscale.sock
 unix_socket_permission: "0770"
 
 # OpenID Connect
-# https://headscale.net/stable/ref/oidc/
+# https://aislopware.github.io/slopscale/stable/ref/oidc/
 # oidc:
 #   # Block startup until the identity provider is available and healthy.
 #   only_start_if_oidc_is_available: true
@@ -494,11 +494,11 @@ unix_socket_permission: "0770"
 #   issuer: "https://your-oidc.issuer.com/path"
 #
 #   # Client ID from the identity provider. Like every key here it may
-#   # come from the environment instead: HEADSCALE_OIDC_CLIENT_ID.
+#   # come from the environment instead: SLOPSCALE_OIDC_CLIENT_ID.
 #   client_id: "your-oidc-client-id"
 #
 #   # Client secret generated by the identity provider, or
-#   # HEADSCALE_OIDC_CLIENT_SECRET in the environment.
+#   # SLOPSCALE_OIDC_CLIENT_SECRET in the environment.
 #   # Note: client_secret and client_secret_path are mutually exclusive.
 #   client_secret: "your-oidc-client-secret"
 #   # Alternatively, set `client_secret_path` to read the secret from the file.
@@ -545,7 +545,7 @@ unix_socket_permission: "0770"
 #   # Only accept users which are members of at least one group in the
 #   # allowed_groups list.
 #   allowed_groups:
-#     - /headscale
+#     - /slopscale
 #
 #   # Users whose email address is listed here are made admins when they
 #   # sign in, so the admin console can be administered without granting
@@ -555,7 +555,7 @@ unix_socket_permission: "0770"
 #   admin_users:
 #     - alice@example.com
 #
-#   # Mirror the groups claim into headscale groups on every sign-in: each
+#   # Mirror the groups claim into slopscale groups on every sign-in: each
 #   # claimed group becomes a group of the same name with the user in it,
 #   # and the user leaves the synced groups the claim no longer lists. A
 #   # prefix limits the sync to the claims that carry it and is stripped
@@ -578,7 +578,7 @@ unix_socket_permission: "0770"
 #     method: S256
 
 # Audit log
-# https://headscale.net/stable/ref/audit/
+# https://aislopware.github.io/slopscale/stable/ref/audit/
 # Every writing API request is recorded with its caller and outcome.
 audit:
   # How long events are kept; the collector runs hourly. "0" keeps them
@@ -591,8 +591,8 @@ audit:
 # server. To disable logging on the client side, please refer to:
 # https://tailscale.com/docs/features/logging#opt-out-of-client-logging
 logtail:
-  # Enable logtail for tailscale nodes of this Headscale instance.
-  # As there is currently no support for overriding the log server in Headscale, this is
+  # Enable logtail for tailscale nodes of this Slopscale instance.
+  # As there is currently no support for overriding the log server in Slopscale, this is
   # disabled by default. Enabling this will make your clients send logs to Tailscale Inc.
   enabled: false
 
@@ -601,7 +601,7 @@ logtail:
 # send files to each other.
 # https://tailscale.com/docs/features/taildrop
 taildrop:
-  # Enable or disable Taildrop tailnet-wide. When disabled, headscale
+  # Enable or disable Taildrop tailnet-wide. When disabled, slopscale
   # withholds `https://tailscale.com/cap/file-sharing` from every
   # node's CapMap.
   enabled: true

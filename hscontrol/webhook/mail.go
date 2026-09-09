@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 )
 
 // Mailer sends an email endpoint's messages. [SMTPMailer] is the one the
@@ -84,10 +84,10 @@ func mailBody(event types.WebhookEvent) string {
 // the server.
 func ntfyTitle(event types.WebhookEvent) string {
 	if event.Tailnet != "" {
-		return "headscale " + event.Tailnet
+		return "slopscale " + event.Tailnet
 	}
 
-	return "headscale"
+	return "slopscale"
 }
 
 // SMTPMailer sends through one SMTP server, per [types.SMTPConfig].
@@ -257,7 +257,7 @@ func message(from *mail.Address, to []string, subject, body string) string {
 	b.WriteString("MIME-Version: 1.0\r\n")
 	b.WriteString("Content-Type: text/plain; charset=utf-8\r\n")
 	b.WriteString("Content-Transfer-Encoding: 8bit\r\n")
-	b.WriteString("X-Mailer: headscale\r\n")
+	b.WriteString("X-Mailer: slopscale\r\n")
 	b.WriteString("\r\n")
 	b.WriteString(body)
 

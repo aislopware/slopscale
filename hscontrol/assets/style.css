@@ -213,7 +213,7 @@ input:focus-visible {
 }
 
 /* Logo */
-.headscale-logo {
+.slopscale-logo {
   display: block;
   width: 400px;
   max-width: 100%;
@@ -223,7 +223,7 @@ input:focus-visible {
 }
 
 @media (max-width: 768px) {
-  .headscale-logo {
+  .slopscale-logo {
     width: 200px;
   }
 }

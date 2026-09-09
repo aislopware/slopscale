@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/gen/jet/table"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	jet "github.com/go-jet/jet/v2/sqlite"
-	"github.com/juanfont/headscale/gen/jet/table"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
 )
 
 var (

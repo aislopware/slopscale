@@ -11,12 +11,12 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/capver"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/wire"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/metrics"
-	"github.com/juanfont/headscale/hscontrol/capver"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/wire"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/http2"
@@ -76,7 +76,7 @@ const (
 )
 
 type noiseServer struct {
-	headscale *Headscale
+	slopscale *Slopscale
 
 	httpBaseConfig *http.Server
 	http2Server    *http2.Server
@@ -90,7 +90,7 @@ type noiseServer struct {
 
 // NoiseUpgradeHandler is to upgrade the connection and hijack the [net.Conn]
 // in order to use the Noise-based TS2021 protocol. Listens in /ts2021.
-func (h *Headscale) NoiseUpgradeHandler(
+func (h *Slopscale) NoiseUpgradeHandler(
 	writer http.ResponseWriter,
 	req *http.Request,
 ) {
@@ -98,12 +98,12 @@ func (h *Headscale) NoiseUpgradeHandler(
 
 	upgrade := req.Header.Get("Upgrade")
 	if upgrade == "" {
-		// This probably means that the user is running Headscale behind an
+		// This probably means that the user is running Slopscale behind an
 		// improperly configured reverse proxy. TS2021 requires WebSockets to
-		// be passed to Headscale. Let's give them a hint.
+		// be passed to Slopscale. Let's give them a hint.
 		log.Warn().
 			Caller().
-			Msg("no upgrade header in TS2021 request. If headscale is behind a reverse proxy, " +
+			Msg("no upgrade header in TS2021 request. If slopscale is behind a reverse proxy, " +
 				"make sure it is configured to pass WebSockets through.")
 		http.Error(writer, "Internal error", http.StatusInternalServerError)
 
@@ -111,7 +111,7 @@ func (h *Headscale) NoiseUpgradeHandler(
 	}
 
 	ns := noiseServer{
-		headscale: h,
+		slopscale: h,
 		challenge: key.NewChallenge(),
 	}
 
@@ -216,7 +216,7 @@ func (h *Headscale) NoiseUpgradeHandler(
 
 		// Clients post the serialised answer to a c2n request the server
 		// sent as a [tailcfg.PingRequest] here; see [State.CollectPosture].
-		r.Post("/c2n-response", ns.headscale.C2NResponseHandler)
+		r.Post("/c2n-response", ns.slopscale.C2NResponseHandler)
 	})
 
 	ns.httpBaseConfig = &http.Server{
@@ -288,7 +288,7 @@ func (ns *noiseServer) NotImplementedHandler(writer http.ResponseWriter, req *ht
 // PingResponseHandler handles HEAD requests from clients responding to a
 // [tailcfg.PingRequest]. The client calls this endpoint to prove connectivity.
 // The unguessable ping ID serves as authentication.
-func (h *Headscale) PingResponseHandler(
+func (h *Slopscale) PingResponseHandler(
 	writer http.ResponseWriter,
 	req *http.Request,
 ) {
@@ -316,7 +316,7 @@ const c2nMaxResponse = 1 << 20
 
 // C2NResponseHandler receives the answer a client posts to a c2n request.
 // The unguessable id serves as authentication, as for pings.
-func (h *Headscale) C2NResponseHandler(writer http.ResponseWriter, req *http.Request) {
+func (h *Slopscale) C2NResponseHandler(writer http.ResponseWriter, req *http.Request) {
 	id := req.URL.Query().Get("id")
 	if id == "" {
 		http.Error(writer, "missing c2n ID", http.StatusBadRequest)
@@ -395,7 +395,7 @@ func (ns *noiseServer) SSHActionHandler(
 	// throwaway machine key and pollute lastSSHAuth for arbitrary
 	// (src, dst) pairs, defeating SSH check-mode's stolen-key
 	// protections.
-	dstNode, ok := ns.headscale.state.GetNodeByID(dstNodeID)
+	dstNode, ok := ns.slopscale.state.GetNodeByID(dstNodeID)
 	if !ok {
 		httpError(writer, NewHTTPError(
 			http.StatusNotFound,
@@ -499,10 +499,10 @@ func (ns *noiseServer) PollNetMapHandler(
 	// middleware has already rewritten from the forwarding headers.
 	addrPort, err := netip.ParseAddrPort(req.RemoteAddr)
 	if err == nil {
-		ns.headscale.Change(ns.headscale.state.NoteNodeSourceAddr(nv.ID(), addrPort.Addr()))
+		ns.slopscale.Change(ns.slopscale.state.NoteNodeSourceAddr(nv.ID(), addrPort.Addr()))
 	}
 
-	sess := ns.headscale.newMapSession(req.Context(), mapRequest, writer, nv)
+	sess := ns.slopscale.newMapSession(req.Context(), mapRequest, writer, nv)
 	sess.log.Trace().Caller().Msg("a node sending a MapRequest with Noise protocol")
 
 	if !sess.isStreaming() {
@@ -544,7 +544,7 @@ func (ns *noiseServer) RegistrationHandler(
 		return
 	}
 
-	registerResponse, err := ns.headscale.handleRegister(req.Context(), registerRequest, ns.conn.Peer())
+	registerResponse, err := ns.slopscale.handleRegister(req.Context(), registerRequest, ns.conn.Peer())
 	if err != nil {
 		if httpErr, ok := errors.AsType[HTTPError](err); ok {
 			registerResponse = &tailcfg.RegisterResponse{Error: httpErr.Msg}
@@ -633,11 +633,11 @@ func (ns *noiseServer) sshAction(
 
 	// The final action replaces the rule's, so it carries the
 	// recorders the rule would have.
-	action.Recorders, action.OnRecordingFailure = ns.headscale.state.SSHRecordingFor(srcNodeID, dstNodeID)
+	action.Recorders, action.OnRecordingFailure = ns.slopscale.state.SSHRecordingFor(srcNodeID, dstNodeID)
 
 	// Look up check params from the server's own policy rather than
 	// trusting URL parameters, which the client could tamper with.
-	checkPeriod, checkFound := ns.headscale.state.SSHCheckParams(
+	checkPeriod, checkFound := ns.slopscale.state.SSHCheckParams(
 		srcNodeID, dstNodeID,
 	)
 
@@ -652,7 +652,7 @@ func (ns *noiseServer) sshAction(
 
 	// Initial request — check if auto-approval applies.
 	if checkFound && checkPeriod > 0 {
-		if lastAuth, ok := ns.headscale.state.GetLastSSHAuth(
+		if lastAuth, ok := ns.slopscale.state.GetLastSSHAuth(
 			srcNodeID, dstNodeID,
 		); ok && time.Since(lastAuth) < checkPeriod {
 			reqLog.Trace().Caller().
@@ -679,7 +679,7 @@ func (ns *noiseServer) sshActionHoldAndDelegate(
 	srcNodeID, dstNodeID types.NodeID,
 ) (*tailcfg.SSHAction, error) {
 	holdURL, err := url.Parse(
-		ns.headscale.cfg.ServerURL +
+		ns.slopscale.cfg.ServerURL +
 			"/machine/ssh/action/$SRC_NODE_ID/to/$DST_NODE_ID" +
 			"?local_user=$LOCAL_USER",
 	)
@@ -700,12 +700,12 @@ func (ns *noiseServer) sshActionHoldAndDelegate(
 		)
 	}
 
-	ns.headscale.state.SetAuthCacheEntry(
+	ns.slopscale.state.SetAuthCacheEntry(
 		authID,
 		types.NewSSHCheckAuthRequest(srcNodeID, dstNodeID),
 	)
 
-	authURL := ns.headscale.authProvider.AuthURL(authID)
+	authURL := ns.slopscale.authProvider.AuthURL(authID)
 
 	q := holdURL.Query()
 	q.Set("auth_id", authID.String())
@@ -716,9 +716,9 @@ func (ns *noiseServer) sshActionHoldAndDelegate(
 	// TODO(kradalby): here we can also send a very tiny mapresponse
 	// "popping" the url and opening it for the user.
 	action.Message = fmt.Sprintf(
-		"# Headscale SSH requires an additional check.\n"+
+		"# Slopscale SSH requires an additional check.\n"+
 			"# To authenticate, visit: %s\n"+
-			"# Authentication checked with Headscale SSH.\n",
+			"# Authentication checked with Slopscale SSH.\n",
 		authURL,
 	)
 
@@ -751,7 +751,7 @@ func (ns *noiseServer) sshActionFollowUp(
 
 	reqLog = reqLog.With().Str("auth_id", authID.String()).Logger()
 
-	auth, ok := ns.headscale.state.GetAuthCacheEntry(authID)
+	auth, ok := ns.slopscale.state.GetAuthCacheEntry(authID)
 	if !ok {
 		// The session is gone (expired, evicted, or lost on a control-plane
 		// restart). A bare error dead-ends the client: it keeps polling this
@@ -830,7 +830,7 @@ func (ns *noiseServer) sshActionFollowUp(
 
 	// Record the successful auth for future auto-approval.
 	if checkFound {
-		ns.headscale.state.SetLastSSHAuth(srcNodeID, dstNodeID)
+		ns.slopscale.state.SetLastSSHAuth(srcNodeID, dstNodeID)
 
 		reqLog.Trace().Caller().
 			Msg("auth recorded for auto-approval")
@@ -845,7 +845,7 @@ var errNodeKeyUnknown = errors.New("node key unknown")
 
 // serveNodeGone answers a map request from a node key the server does not
 // know with the node's own entry expired, so the client logs in again
-// instead of retrying a 404 for good (juanfont/headscale#3410). A node
+// instead of retrying a 404 for good (aislopware/slopscale#3410). A node
 // deleted while polling gets the same frame from its stream; this covers
 // the client that reconnects afterwards, or after the server restarted.
 func (ns *noiseServer) serveNodeGone(ctx context.Context, writer http.ResponseWriter, mapRequest tailcfg.MapRequest) {
@@ -854,7 +854,7 @@ func (ns *noiseServer) serveNodeGone(ctx context.Context, writer http.ResponseWr
 		MachineKey: ns.machineKey,
 		Hostname:   "unknown",
 	}
-	sess := ns.headscale.newMapSession(ctx, mapRequest, writer, unknown.View())
+	sess := ns.slopscale.newMapSession(ctx, mapRequest, writer, unknown.View())
 
 	sess.log.Info().Caller().Msg("map request from an unknown node key, telling it to log in again")
 
@@ -867,7 +867,7 @@ func (ns *noiseServer) serveNodeGone(ctx context.Context, writer http.ResponseWr
 // getAndValidateNode retrieves the node from the database using the NodeKey
 // and validates that it matches the MachineKey from the Noise session.
 func (ns *noiseServer) getAndValidateNode(mapRequest tailcfg.MapRequest) (types.NodeView, error) {
-	nv, ok := ns.headscale.state.GetNodeByNodeKey(mapRequest.NodeKey)
+	nv, ok := ns.slopscale.state.GetNodeByNodeKey(mapRequest.NodeKey)
 	if !ok {
 		return types.NodeView{}, errNodeKeyUnknown
 	}

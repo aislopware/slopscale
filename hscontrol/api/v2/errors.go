@@ -5,11 +5,11 @@ import (
 	"encoding/hex"
 	"errors"
 
+	"github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/egress"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 )
 
@@ -32,7 +32,7 @@ type apiErrorData struct {
 
 // tailscaleErrorTransformer rewrites Huma's RFC 9457 error model into the
 // Tailscale error shape. It is registered on the v2 API config only, so the
-// headscale-native v1 API keeps emitting problem+json. Non-error bodies pass
+// slopscale-native v1 API keeps emitting problem+json. Non-error bodies pass
 // through untouched.
 func tailscaleErrorTransformer(_ huma.Context, _ string, v any) (any, error) {
 	em, ok := v.(*huma.ErrorModel)

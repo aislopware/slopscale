@@ -6,15 +6,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // seedPreAuthKeys creates a user-owned key and a tagged (system-created) key;
 // the tagged key exercises the user:null path.
-func seedPreAuthKeys() func(t *testing.T, app *Headscale) {
-	return func(t *testing.T, app *Headscale) {
+func seedPreAuthKeys() func(t *testing.T, app *Slopscale) {
+	return func(t *testing.T, app *Slopscale) {
 		t.Helper()
 
 		user := app.state.CreateUserForTest("alice")
@@ -115,7 +115,7 @@ func TestAPIV1CreatePreAuthKey(t *testing.T) {
 		assert.Equal(t, http.StatusOK, ok.status, "body: %s", ok.body)
 	})
 
-	// Without tagOwners no tag can be validated, so headscale's historical
+	// Without tagOwners no tag can be validated, so slopscale's historical
 	// behaviour stands: any well-formed tag is taken.
 	t.Run("undefined tag without a policy is accepted", func(t *testing.T) {
 		t.Parallel()

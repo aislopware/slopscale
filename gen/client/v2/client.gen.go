@@ -412,13 +412,13 @@ type SetDNSSplitJSONBody map[string]*[]string
 
 // ListKeysParams defines parameters for ListKeys.
 type ListKeysParams struct {
-	// All Accepted for compatibility; Headscale returns all keys.
+	// All Accepted for compatibility; Slopscale returns all keys.
 	All *bool `form:"all,omitempty" json:"all,omitempty"`
 }
 
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
-	// Type Filter by user type; Headscale users are all "member".
+	// Type Filter by user type; Slopscale users are all "member".
 	Type *string `form:"type,omitempty" json:"type,omitempty"`
 
 	// Role Filter by role: owner, admin, network-admin, it-admin, auditor, member.
@@ -914,7 +914,7 @@ type ClientInterface interface {
 
 	// UpdateTailnetSettingsWithBody Update tailnet settings
 	//
-	// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
+	// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Slopscale and cannot be changed here.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -925,7 +925,7 @@ type ClientInterface interface {
 
 	// UpdateTailnetSettings Update tailnet settings
 	//
-	// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
+	// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Slopscale and cannot be changed here.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -1039,7 +1039,7 @@ type ClientInterface interface {
 
 	// TestWebhook Test webhook
 	//
-	// Posts a test event now. Tailscale queues it; Headscale delivers it before answering, so a failing receiver shows as a 502.
+	// Posts a test event now. Tailscale queues it; Slopscale delivers it before answering, so a failing receiver shows as a 502.
 	//
 	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -1824,7 +1824,7 @@ func (c *Client) GetTailnetSettings(ctx context.Context, tailnet string, reqEdit
 
 // UpdateTailnetSettingsWithBody Update tailnet settings
 //
-// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
+// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Slopscale and cannot be changed here.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -1845,7 +1845,7 @@ func (c *Client) UpdateTailnetSettingsWithBody(ctx context.Context, tailnet stri
 
 // UpdateTailnetSettings Update tailnet settings
 //
-// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
+// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Slopscale and cannot be changed here.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -2099,7 +2099,7 @@ func (c *Client) RotateWebhookSecret(ctx context.Context, endpointId string, req
 
 // TestWebhook Test webhook
 //
-// Posts a test event now. Tailscale queues it; Headscale delivers it before answering, so a failing receiver shows as a 502.
+// Posts a test event now. Tailscale queues it; Slopscale delivers it before answering, so a failing receiver shows as a 502.
 //
 // Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -4456,7 +4456,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateTailnetSettingsWithBodyWithResponse Update tailnet settings
 	//
-	// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
+	// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Slopscale and cannot be changed here.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -4467,7 +4467,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateTailnetSettingsWithResponse Update tailnet settings
 	//
-	// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
+	// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Slopscale and cannot be changed here.
 	//
 	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -4599,7 +4599,7 @@ type ClientWithResponsesInterface interface {
 
 	// TestWebhookWithResponse Test webhook
 	//
-	// Posts a test event now. Tailscale queues it; Headscale delivers it before answering, so a failing receiver shows as a 502.
+	// Posts a test event now. Tailscale queues it; Slopscale delivers it before answering, so a failing receiver shows as a 502.
 	//
 	// Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -8480,7 +8480,7 @@ func (c *ClientWithResponses) GetTailnetSettingsWithResponse(ctx context.Context
 
 // UpdateTailnetSettingsWithBodyWithResponse Update tailnet settings
 //
-// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
+// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Slopscale and cannot be changed here.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -8497,7 +8497,7 @@ func (c *ClientWithResponses) UpdateTailnetSettingsWithBodyWithResponse(ctx cont
 
 // UpdateTailnetSettingsWithResponse Update tailnet settings
 //
-// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Headscale and cannot be changed here.
+// Changes devicesApprovalOn, usersApprovalOn and devicesKeyDurationDays; the other settings are file-based in Slopscale and cannot be changed here.
 //
 // Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -8713,7 +8713,7 @@ func (c *ClientWithResponses) RotateWebhookSecretWithResponse(ctx context.Contex
 
 // TestWebhookWithResponse Test webhook
 //
-// Posts a test event now. Tailscale queues it; Headscale delivers it before answering, so a failing receiver shows as a 502.
+// Posts a test event now. Tailscale queues it; Slopscale delivers it before answering, so a failing receiver shows as a 502.
 //
 // Requires the `webhooks` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //

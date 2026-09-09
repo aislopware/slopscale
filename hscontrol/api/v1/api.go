@@ -1,4 +1,4 @@
-// Package apiv1 is the code-first Huma implementation of the Headscale v1 API.
+// Package apiv1 is the code-first Huma implementation of the Slopscale v1 API.
 // Handlers are a thin adapter over hscontrol/state; Huma emits the OpenAPI 3.1
 // spec from the Go definitions (see Spec), and that spec drives the client.
 //
@@ -12,16 +12,16 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/aislopware/slopscale/hscontrol/api/principal"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/recorder"
+	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
-	"github.com/juanfont/headscale/hscontrol/api/principal"
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/recorder"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
 )
 
 // Backend is the dependency surface the v1 API needs from the control plane:
@@ -55,8 +55,8 @@ type ConsoleLogin struct {
 // declared bearer security and required scope (see authMiddleware);
 // locally-trusted requests bypass it via WithLocalTrust.
 func NewAPI(router chi.Router, backend Backend) huma.API {
-	config := huma.DefaultConfig("Headscale API", "v1")
-	config.Info.Description = "Headscale control server API."
+	config := huma.DefaultConfig("Slopscale API", "v1")
+	config.Info.Description = "Slopscale control server API."
 
 	// Version the OpenAPI/docs routes under /api/v1 so a future v2 owns its own.
 	// These register as plain mux routes, not operations, so they never appear

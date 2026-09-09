@@ -6,18 +6,18 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/api/principal"
+	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/scope"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/juanfont/headscale/hscontrol/api/principal"
-	"github.com/juanfont/headscale/hscontrol/audit"
-	"github.com/juanfont/headscale/hscontrol/scope"
-	"github.com/juanfont/headscale/hscontrol/types"
 )
 
 func init() {
 	registrations = append(registrations, registerUsers)
 }
 
-// Headscale models no user type and has a single tailnet, so those fields
+// Slopscale models no user type and has a single tailnet, so those fields
 // are fixed strings: every account is a member of tailnet 1. The role is
 // the user's real admin role and the status reflects users approval.
 const (
@@ -30,7 +30,7 @@ const (
 	tagTailscaleCompat = "Tailscale compat"
 )
 
-// User is the Tailscale user response. Identity fields map from the Headscale
+// User is the Tailscale user response. Identity fields map from the Slopscale
 // user; type/status/tailnetId are constants (see above); role is the user's
 // admin role; the device fields are aggregated from the user's nodes.
 type User struct {
@@ -53,8 +53,8 @@ type (
 		UserID string `doc:"User id (the decimal user id)." path:"id"`
 	}
 	listUsersInput struct {
-		Tailnet string `doc:"Tailnet; must be \"-\" (the single Headscale tailnet)."                  path:"tailnet"`
-		Type    string `doc:"Filter by user type; Headscale users are all \"member\"."                query:"type"`
+		Tailnet string `doc:"Tailnet; must be \"-\" (the single Slopscale tailnet)."                  path:"tailnet"`
+		Type    string `doc:"Filter by user type; Slopscale users are all \"member\"."                query:"type"`
 		Role    string `doc:"Filter by role: owner, admin, network-admin, it-admin, auditor, member." query:"role"`
 	}
 
@@ -103,7 +103,7 @@ func registerUsers(api huma.API, b Backend) {
 		out := &listUsersOutput{}
 		out.Body.Users = []User{}
 
-		// Headscale has only "member"-type users. A filter for any other type,
+		// Slopscale has only "member"-type users. A filter for any other type,
 		// or for a role that is not one, matches nothing, so return the empty
 		// envelope.
 		if !matchesMember(in.Type) || (in.Role != "" && !types.Role(in.Role).Valid()) {
@@ -190,13 +190,13 @@ func lookupUser(b Backend, rawID string) (types.UserView, error) {
 	return user.View(), nil
 }
 
-// matchesMember reports whether an optional type filter selects Headscale's
+// matchesMember reports whether an optional type filter selects Slopscale's
 // only user type. An empty value means "no filter".
 func matchesMember(filter string) bool {
 	return filter == "" || filter == userTypeMember
 }
 
-// userFromView maps a Headscale user onto the Tailscale User through the
+// userFromView maps a Slopscale user onto the Tailscale User through the
 // UserView accessors. deviceCount, lastSeen, and currentlyConnected are
 // aggregated from the user's nodes in the NodeStore.
 func userFromView(b Backend, view types.UserView) User {

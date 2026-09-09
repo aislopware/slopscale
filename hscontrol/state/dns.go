@@ -3,8 +3,8 @@ package state
 import (
 	"fmt"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/change"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/change"
 )
 
 // DNSStatus is the DNS configuration as the API reports it: what the

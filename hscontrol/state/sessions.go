@@ -3,8 +3,8 @@ package state
 import (
 	"time"
 
-	hsdb "github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/types"
+	hsdb "github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/types"
 )
 
 // CreateSession signs userID in to the admin console for

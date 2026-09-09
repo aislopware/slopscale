@@ -6,24 +6,24 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/tsic"
-	"github.com/juanfont/headscale/integration/tsric"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/tsic"
+	"github.com/aislopware/slopscale/integration/tsric"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // TestTailscaleRustAxum tests that the tailscale-rs axum example can join a
-// headscale network and serve HTTP to other peers on the tailnet.
+// slopscale network and serve HTTP to other peers on the tailnet.
 //
 // Architecture:
 //
-//	headscale (control) <--- tsic (probe client) --curl--> tsric (axum server)
+//	slopscale (control) <--- tsic (probe client) --curl--> tsric (axum server)
 //
 // The test:
-//  1. Creates a headscale environment with one regular Tailscale client (tsic)
+//  1. Creates a slopscale environment with one regular Tailscale client (tsic)
 //  2. Creates a tailscale-rs container running the axum example (tsric)
-//  3. Verifies the tsric node registers with headscale
+//  3. Verifies the tsric node registers with slopscale
 //  4. Uses the tsic client to curl the axum web server through the tailnet
 func TestTailscaleRustAxum(t *testing.T) {
 	IntegrationSkip(t)
@@ -41,7 +41,7 @@ func TestTailscaleRustAxum(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv(
+	err = scenario.CreateSlopscaleEnv(
 		[]tsic.Option{},
 		hsic.WithTestName("tailscalers"),
 		// The embedded DERP server uses a self-signed cert that
@@ -49,14 +49,14 @@ func TestTailscaleRustAxum(t *testing.T) {
 		// we route DERP through Tailscale's public relays.
 		hsic.WithPublicDERP(),
 		// TODO: drop WithoutTLS once tailscale-rs lets us inject the
-		// headscale CA into its trust chain; until then the control
+		// slopscale CA into its trust chain; until then the control
 		// plane has to be plain HTTP for the Rust client to register.
 		hsic.WithoutTLS(),
 	)
-	requireNoErrHeadscaleEnv(t, err)
+	requireNoErrSlopscaleEnv(t, err)
 
-	// Get the headscale instance and probe client
-	headscale, err := scenario.Headscale()
+	// Get the slopscale instance and probe client
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	allClients, err := scenario.ListTailscaleClients()
@@ -66,7 +66,7 @@ func TestTailscaleRustAxum(t *testing.T) {
 	probeClient := allClients[0]
 
 	// Create auth key for the tailscale-rs node
-	users, err := headscale.ListUsers()
+	users, err := slopscale.ListUsers()
 	require.NoError(t, err)
 	require.NotEmpty(t, users, "expected at least one user")
 
@@ -82,30 +82,30 @@ func TestTailscaleRustAxum(t *testing.T) {
 
 	require.NotZero(t, userID, "user1 not found")
 
-	pak, err := headscale.CreateAuthKey(userID, false, true)
+	pak, err := slopscale.CreateAuthKey(userID, false, true)
 	require.NoError(t, err)
 
-	// Determine the network and headscale connection details
+	// Determine the network and slopscale connection details
 	networks := scenario.Networks()
 	require.NotEmpty(t, networks)
 
 	network := networks[0]
-	headscaleIP := headscale.GetIPInNetwork(network)
-	headscaleHostname := headscale.GetHostname()
-	headscaleEndpoint := headscale.GetEndpoint()
+	slopscaleIP := slopscale.GetIPInNetwork(network)
+	slopscaleHostname := slopscale.GetHostname()
+	slopscaleEndpoint := slopscale.GetEndpoint()
 
-	t.Logf("Headscale endpoint: %s (hostname: %s, IP: %s)",
-		headscaleEndpoint, headscaleHostname, headscaleIP)
+	t.Logf("Slopscale endpoint: %s (hostname: %s, IP: %s)",
+		slopscaleEndpoint, slopscaleHostname, slopscaleIP)
 
 	// Create the tailscale-rs container
 	tsrsOpts := []tsric.Option{
 		tsric.WithNetwork(network),
-		tsric.WithHeadscaleURL(headscaleEndpoint),
+		tsric.WithSlopscaleURL(slopscaleEndpoint),
 		tsric.WithAuthKey(pak.Key),
-		tsric.WithExtraHosts([]string{headscaleHostname + ":" + headscaleIP}),
+		tsric.WithExtraHosts([]string{slopscaleHostname + ":" + slopscaleIP}),
 	}
 
-	cert := headscale.GetCert()
+	cert := slopscale.GetCert()
 	if len(cert) > 0 {
 		tsrsOpts = append(tsrsOpts, tsric.WithCACert(cert))
 	}
@@ -122,7 +122,7 @@ func TestTailscaleRustAxum(t *testing.T) {
 		}
 	}()
 
-	// Wait for the tailscale-rs node to appear in headscale's node list.
+	// Wait for the tailscale-rs node to appear in slopscale's node list.
 	// Verify it gets both IPv4 and IPv6 addresses and has the expected hostname.
 	var (
 		rustNodeIPv4 string
@@ -130,10 +130,10 @@ func TestTailscaleRustAxum(t *testing.T) {
 		rustNodeName string
 	)
 
-	t.Log("Waiting for tailscale-rs node to register with headscale...")
+	t.Log("Waiting for tailscale-rs node to register with slopscale...")
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		nodes, listErr := headscale.ListNodes()
+		nodes, listErr := slopscale.ListNodes()
 		assert.NoError(c, listErr)
 
 		// Expect 2 nodes: 1 tsic probe + 1 tsric
@@ -157,7 +157,7 @@ func TestTailscaleRustAxum(t *testing.T) {
 		}
 
 		assert.NotEmpty(c, rustNodeIPv4, "tailscale-rs node should have an IPv4 address")
-	}, 120*time.Second, 2*time.Second, "tailscale-rs node should register with headscale")
+	}, 120*time.Second, 2*time.Second, "tailscale-rs node should register with slopscale")
 
 	require.NotEmpty(t, rustNodeIPv4, "failed to find tailscale-rs node IP")
 
@@ -165,9 +165,9 @@ func TestTailscaleRustAxum(t *testing.T) {
 		rustNodeName, rustNodeIPv4, rustNodeIPv6)
 
 	// Verify IPv6 was allocated. The axum example only listens on IPv4,
-	// so we can't curl via IPv6, but headscale should still assign both.
+	// so we can't curl via IPv6, but slopscale should still assign both.
 	assert.NotEmpty(t, rustNodeIPv6,
-		"headscale should assign both IPv4 and IPv6 to the tailscale-rs node")
+		"slopscale should assign both IPv4 and IPv6 to the tailscale-rs node")
 
 	// Verify the hostname propagated correctly from the config
 	assert.True(t, strings.HasPrefix(rustNodeName, "tsrs-"),

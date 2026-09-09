@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/policy/matcher"
-	"github.com/juanfont/headscale/hscontrol/util"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/aislopware/slopscale/hscontrol/policy/matcher"
+	"github.com/aislopware/slopscale/hscontrol/util"
+	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog"
 	"go4.org/netipx"
 	"tailscale.com/net/tsaddr"
@@ -109,7 +109,7 @@ func (id NodeID) String() string {
 	return strconv.FormatUint(id.Uint64(), util.Base10)
 }
 
-// Node is a Headscale client.
+// Node is a Slopscale client.
 //
 //nolint:dupl // The field list is mirrored by the regeneration guard in types_clone.go on purpose.
 type Node struct {
@@ -135,7 +135,7 @@ type Node struct {
 	// a valid name set by the [User]
 	//
 	// GivenName is the name used in all DNS related
-	// parts of headscale.
+	// parts of slopscale.
 	GivenName string
 
 	// UserID identifies the owning user for user-owned nodes.
@@ -161,7 +161,7 @@ type Node struct {
 	Expiry *time.Time
 
 	// LastSeen is when the node was last in contact with
-	// headscale. It is best effort and not persisted.
+	// slopscale. It is best effort and not persisted.
 	LastSeen *time.Time
 
 	// ApprovedRoutes is a list of routes that the node is allowed to announce

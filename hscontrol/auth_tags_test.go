@@ -4,10 +4,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/db"
-	"github.com/juanfont/headscale/hscontrol/mapper"
-	"github.com/juanfont/headscale/hscontrol/state"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/mapper"
+	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -15,7 +15,7 @@ import (
 )
 
 // createTestAppWithNodeExpiry creates a test app with a specific node.expiry config.
-func createTestAppWithNodeExpiry(t *testing.T, nodeExpiry time.Duration) *Headscale {
+func createTestAppWithNodeExpiry(t *testing.T, nodeExpiry time.Duration) *Slopscale {
 	t.Helper()
 
 	tmpDir := t.TempDir()
@@ -29,7 +29,7 @@ func createTestAppWithNodeExpiry(t *testing.T, nodeExpiry time.Duration) *Headsc
 		Database: types.DatabaseConfig{
 			Type: "sqlite3",
 			Sqlite: types.SqliteConfig{
-				Path: tmpDir + "/headscale_test.db",
+				Path: tmpDir + "/slopscale_test.db",
 			},
 		},
 		OIDC: types.OIDCConfig{},
@@ -46,7 +46,7 @@ func createTestAppWithNodeExpiry(t *testing.T, nodeExpiry time.Duration) *Headsc
 		},
 	}
 
-	app, err := NewHeadscale(&cfg)
+	app, err := NewSlopscale(&cfg)
 	require.NoError(t, err)
 
 	app.mapBatcher = mapper.NewBatcherAndMapper(&cfg, app.state)
@@ -1412,7 +1412,7 @@ func TestIssue3371_TaggedNodeLogoutReloginSingleUseKey(t *testing.T) {
 	user := app.state.CreateUserForTest("tag-logout-user")
 	tags := []string{"tag:tag1"}
 
-	// `headscale preauthkeys create --tags tag:tag1` (single-use).
+	// `slopscale preauthkeys create --tags tag:tag1` (single-use).
 	pak, err := app.state.CreatePreAuthKey(user.TypedID(), false, false, nil, tags)
 	require.NoError(t, err)
 
@@ -1423,7 +1423,7 @@ func TestIssue3371_TaggedNodeLogoutReloginSingleUseKey(t *testing.T) {
 	regReq := tailcfg.RegisterRequest{
 		Auth:     &tailcfg.RegisterResponseAuth{AuthKey: pak.Key},
 		NodeKey:  nodeKey.Public(),
-		Hostinfo: &tailcfg.Hostinfo{Hostname: "headscale-debug"},
+		Hostinfo: &tailcfg.Hostinfo{Hostname: "slopscale-debug"},
 	}
 
 	resp, err := app.handleRegister(t.Context(), regReq, machineKey.Public())
@@ -1466,7 +1466,7 @@ func TestIssue3371_TaggedNodeLogoutReloginSingleUseKey(t *testing.T) {
 	reloginReq := tailcfg.RegisterRequest{
 		Auth:     &tailcfg.RegisterResponseAuth{AuthKey: pak2.Key},
 		NodeKey:  nodeKey2.Public(),
-		Hostinfo: &tailcfg.Hostinfo{Hostname: "headscale-debug"},
+		Hostinfo: &tailcfg.Hostinfo{Hostname: "slopscale-debug"},
 	}
 
 	reloginResp, err := app.handleRegister(t.Context(), reloginReq, machineKey.Public())
@@ -1504,7 +1504,7 @@ func TestIssue3371_TaggedNodeLogoutReloginReusableKey(t *testing.T) {
 	user := app.state.CreateUserForTest("tag-logout-reusable")
 	tags := []string{"tag:tag1"}
 
-	// `headscale preauthkeys create --reusable --tags tag:tag1`.
+	// `slopscale preauthkeys create --reusable --tags tag:tag1`.
 	pak, err := app.state.CreatePreAuthKey(user.TypedID(), true, false, nil, tags)
 	require.NoError(t, err)
 
@@ -1659,7 +1659,7 @@ func TestIssue3371_UserOwnedNodeLogoutStillExpires(t *testing.T) {
 
 // TestIssue3371_TaggedNodeFutureExpirySurvivesRelogin is the discriminator
 // guard rail for the fix. A tagged node may carry a DELIBERATE future expiry
-// set by an admin (`headscale nodes expire`); TestTaggedNodeCanHaveKeyExpiry
+// set by an admin (`slopscale nodes expire`); TestTaggedNodeCanHaveKeyExpiry
 // establishes that is legal. The #3371 fix clears only a STALE PAST expiry (the
 // logout stamp) on re-registration — it must NOT wipe a future expiry. This
 // test locks that boundary: without care, a "tagged => clear expiry" fix would
@@ -1693,7 +1693,7 @@ func TestIssue3371_TaggedNodeFutureExpirySurvivesRelogin(t *testing.T) {
 	require.True(t, found)
 	require.True(t, node.IsTagged())
 
-	// Admin sets a deliberate future expiry (`headscale nodes expire`).
+	// Admin sets a deliberate future expiry (`slopscale nodes expire`).
 	future := time.Now().Add(24 * time.Hour)
 	_, _, err = app.state.SetNodeExpiry(node.ID(), &future)
 	require.NoError(t, err)

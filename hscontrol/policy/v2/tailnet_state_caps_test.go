@@ -4,8 +4,8 @@ import (
 	"net/netip"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/google/go-cmp/cmp"
-	"github.com/juanfont/headscale/hscontrol/types"
 	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tailcfg/nodecap"

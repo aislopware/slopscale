@@ -32,7 +32,7 @@ const (
 	FastPoll = 200 * time.Millisecond
 
 	// SlowPoll: cross-container reads (tailscale status, curl,
-	// headscale API) where each tick pays a docker exec round-trip.
+	// slopscale API) where each tick pays a docker exec round-trip.
 	SlowPoll = 500 * time.Millisecond
 
 	// PingPoll: gap between full ping-matrix sweeps.

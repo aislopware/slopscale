@@ -1,4 +1,4 @@
--- PostgreSQL schema of Headscale. It mirrors schema.sql (the SQLite source of
+-- PostgreSQL schema of Slopscale. It mirrors schema.sql (the SQLite source of
 -- truth) with PostgreSQL types, and matches column for column what the
 -- previous GORM AutoMigrate produced, so an existing deployment and a fresh
 -- one end up identical. Validated by TestPostgresSchemaMatchesGolden.

@@ -1,46 +1,46 @@
 # Official releases
 
-Official releases for headscale are available as binaries for various platforms and DEB packages for Debian and Ubuntu.
-Both are available on the [GitHub releases page](https://github.com/juanfont/headscale/releases).
+Official releases for slopscale are available as binaries for various platforms and DEB packages for Debian and Ubuntu.
+Both are available on the [GitHub releases page](https://github.com/aislopware/slopscale/releases).
 
 ## Using packages for Debian/Ubuntu (recommended)
 
-It is recommended to use our DEB packages to install headscale on a Debian based system as those packages configure a
-local user to run headscale, provide a default configuration and ship with a systemd service file. Supported
+It is recommended to use our DEB packages to install slopscale on a Debian based system as those packages configure a
+local user to run slopscale, provide a default configuration and ship with a systemd service file. Supported
 distributions are Ubuntu 22.04 or newer, Debian 12 or newer.
 
-1. Download the [latest headscale package](https://github.com/juanfont/headscale/releases/latest) for your platform (`.deb` for Ubuntu and Debian).
+1. Download the [latest slopscale package](https://github.com/aislopware/slopscale/releases/latest) for your platform (`.deb` for Ubuntu and Debian).
 
     ```shell
-    HEADSCALE_VERSION="" # See above URL for latest version, e.g. "X.Y.Z" (NOTE: do not add the "v" prefix!)
-    HEADSCALE_ARCH="" # Your system architecture, e.g. "amd64"
-    wget --output-document=headscale.deb \
-     "https://github.com/juanfont/headscale/releases/download/v${HEADSCALE_VERSION}/headscale_${HEADSCALE_VERSION}_linux_${HEADSCALE_ARCH}.deb"
+    SLOPSCALE_VERSION="" # See above URL for latest version, e.g. "X.Y.Z" (NOTE: do not add the "v" prefix!)
+    SLOPSCALE_ARCH="" # Your system architecture, e.g. "amd64"
+    wget --output-document=slopscale.deb \
+     "https://github.com/aislopware/slopscale/releases/download/v${SLOPSCALE_VERSION}/slopscale_${SLOPSCALE_VERSION}_linux_${SLOPSCALE_ARCH}.deb"
     ```
 
-1. Install headscale:
+1. Install slopscale:
 
     ```shell
-    sudo apt install ./headscale.deb
+    sudo apt install ./slopscale.deb
     ```
 
-1. [Configure headscale by editing the configuration file](../../ref/configuration.md). An up-to date example
-   configuration file is also available in `/usr/share/doc/headscale/examples/config-example.yaml`:
+1. [Configure slopscale by editing the configuration file](../../ref/configuration.md). An up-to date example
+   configuration file is also available in `/usr/share/doc/slopscale/examples/config-example.yaml`:
 
     ```shell
-    sudo nano /etc/headscale/config.yaml
+    sudo nano /etc/slopscale/config.yaml
     ```
 
-1. Restart headscale to pick up configuration changes:
+1. Restart slopscale to pick up configuration changes:
 
     ```shell
-    sudo systemctl restart headscale
+    sudo systemctl restart slopscale
     ```
 
-1. Verify that headscale is running as intended:
+1. Verify that slopscale is running as intended:
 
     ```shell
-    sudo systemctl status headscale
+    sudo systemctl status slopscale
     ```
 
 Continue on the [getting started page](../../usage/getting-started.md) to register your first machine.
@@ -50,55 +50,54 @@ Continue on the [getting started page](../../usage/getting-started.md) to regist
 !!! warning "Advanced"
 
     This installation method is considered advanced as one needs to take care of the local user and the systemd
-    service themselves. If possible, use the [DEB packages](#using-packages-for-debianubuntu-recommended) or a
-    [community package](community.md) instead.
+    service themselves. If possible, use the [DEB packages](#using-packages-for-debianubuntu-recommended) instead.
 
-This section describes the installation of headscale according to the [Requirements and
-assumptions](../requirements.md#assumptions). Headscale is run by a dedicated local user and the service itself is
+This section describes the installation of slopscale according to the [Requirements and
+assumptions](../requirements.md#assumptions). Slopscale is run by a dedicated local user and the service itself is
 managed by systemd.
 
-1. Download the latest [`headscale` binary from GitHub's release page](https://github.com/juanfont/headscale/releases):
+1. Download the latest [`slopscale` binary from GitHub's release page](https://github.com/aislopware/slopscale/releases):
 
     ```shell
-    sudo wget --output-document=/usr/bin/headscale \
-    https://github.com/juanfont/headscale/releases/download/v<HEADSCALE VERSION>/headscale_<HEADSCALE VERSION>_linux_<ARCH>
+    sudo wget --output-document=/usr/bin/slopscale \
+    https://github.com/aislopware/slopscale/releases/download/v<SLOPSCALE VERSION>/slopscale_<SLOPSCALE VERSION>_linux_<ARCH>
     ```
 
-1. Make `headscale` executable:
+1. Make `slopscale` executable:
 
     ```shell
-    sudo chmod +x /usr/bin/headscale
+    sudo chmod +x /usr/bin/slopscale
     ```
 
-1. Add a dedicated local user to run headscale:
+1. Add a dedicated local user to run slopscale:
 
     ```shell
     sudo useradd \
      --create-home \
-     --home-dir /var/lib/headscale/ \
+     --home-dir /var/lib/slopscale/ \
      --system \
      --user-group \
      --shell /usr/sbin/nologin \
-     headscale
+     slopscale
     ```
 
-1. Download the example configuration for your chosen version and save it as: `/etc/headscale/config.yaml`. Adjust the
+1. Download the example configuration for your chosen version and save it as: `/etc/slopscale/config.yaml`. Adjust the
    configuration to suit your local environment. See [Configuration](../../ref/configuration.md) for details.
 
     ```shell
-    sudo mkdir -p /etc/headscale
-    sudo nano /etc/headscale/config.yaml
+    sudo mkdir -p /etc/slopscale
+    sudo nano /etc/slopscale/config.yaml
     ```
 
-1. Copy [headscale's systemd service file](https://github.com/juanfont/headscale/blob/main/packaging/systemd/headscale.service)
-   to `/etc/systemd/system/headscale.service` and adjust it to suit your local setup. The following parameters likely need
+1. Copy [slopscale's systemd service file](https://github.com/aislopware/slopscale/blob/main/packaging/systemd/slopscale.service)
+   to `/etc/systemd/system/slopscale.service` and adjust it to suit your local setup. The following parameters likely need
    to be modified: `ExecStart`, `WorkingDirectory`, `ReadWritePaths`.
 
-1. In `/etc/headscale/config.yaml`, override the default `headscale` unix socket with a path that is writable by the
-   `headscale` user or group:
+1. In `/etc/slopscale/config.yaml`, override the default `slopscale` unix socket with a path that is writable by the
+   `slopscale` user or group:
 
     ```yaml title="config.yaml"
-    unix_socket: /var/run/headscale/headscale.sock
+    unix_socket: /var/run/slopscale/slopscale.sock
     ```
 
 1. Reload systemd to load the new configuration file:
@@ -107,16 +106,16 @@ managed by systemd.
     systemctl daemon-reload
     ```
 
-1. Enable and start the new headscale service:
+1. Enable and start the new slopscale service:
 
     ```shell
-    systemctl enable --now headscale
+    systemctl enable --now slopscale
     ```
 
-1. Verify that headscale is running as intended:
+1. Verify that slopscale is running as intended:
 
     ```shell
-    systemctl status headscale
+    systemctl status slopscale
     ```
 
 Continue on the [getting started page](../../usage/getting-started.md) to register your first machine.

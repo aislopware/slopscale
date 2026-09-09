@@ -1,11 +1,11 @@
-# Running the operator against a private-CA TLS Headscale
+# Running the operator against a private-CA TLS Slopscale
 
 `TestK8sOperator` points the Tailscale Kubernetes operator at an **HTTP**
-Headscale (`hsic.WithoutTLS`, `loginServer = http://<ip>:<port>`). That keeps
+Slopscale (`hsic.WithoutTLS`, `loginServer = http://<ip>:<port>`). That keeps
 the harness small: the operator and proxy pods need no CA, so there is no image
 baking, no containerd import, and no CoreDNS hostname mapping.
 
-This note records how to run the same test against a **TLS** Headscale serving a
+This note records how to run the same test against a **TLS** Slopscale serving a
 private CA, in case a future test needs to exercise realistic TLS. It is not
 wired up; reconstruct it from here.
 
@@ -28,7 +28,7 @@ file that cannot be projected in. So the CA has to be baked into the images.
 
 ## The recipe
 
-1. Serve Headscale with TLS (the `hsic` default) and grab `headscale.GetCert()`.
+1. Serve Slopscale with TLS (the `hsic` default) and grab `slopscale.GetCert()`.
    Pass it to the cluster so in-container `helm`/`kubectl` trust it.
 
 2. Bake the CA into derived operator and proxy images. For each of
@@ -36,7 +36,7 @@ file that cannot be projected in. So the CA has to be baked into the images.
 
    ```Dockerfile
    FROM <base>
-   COPY headscale-ca.crt /usr/local/share/ca-certificates/headscale-ca.crt
+   COPY slopscale-ca.crt /usr/local/share/ca-certificates/slopscale-ca.crt
    RUN update-ca-certificates
    ```
 
@@ -48,8 +48,8 @@ file that cannot be projected in. So the CA has to be baked into the images.
    ctr --namespace k8s.io images import <tarball>
    ```
 
-   Tag the derived images `headscale.local/...:<tag>-ca` and run them with
-   `imagePullPolicy: Never` (the `headscale.local/` prefix is never resolved by
+   Tag the derived images `slopscale.local/...:<tag>-ca` and run them with
+   `imagePullPolicy: Never` (the `slopscale.local/` prefix is never resolved by
    a registry).
 
 3. Wire the derived images into the chart via `operatorConfig.image` /
@@ -58,10 +58,10 @@ file that cannot be projected in. So the CA has to be baked into the images.
    **and** set `imagePullPolicy: Never`; Connectors must reference that
    ProxyClass explicitly (`defaultProxyClass` does not apply to them).
 
-4. Pods resolve Headscale through CoreDNS, not the container's `/etc/hosts`, and
-   the cert's only SAN is the Headscale hostname (dialing by IP fails TLS
+4. Pods resolve Slopscale through CoreDNS, not the container's `/etc/hosts`, and
+   the cert's only SAN is the Slopscale hostname (dialing by IP fails TLS
    verification). Install a `coredns-custom` ConfigMap mapping the hostname to
-   the Headscale IP and gate on the `kube-dns` Service having ready endpoints
+   the Slopscale IP and gate on the `kube-dns` Service having ready endpoints
    before starting the operator.
 
 The full implementation lived in `integration/k3sic/k3sic.go` and

@@ -1,11 +1,11 @@
-// Tests pinned against captures for juanfont/headscale#3212.
+// Tests pinned against captures for aislopware/slopscale#3212.
 //
 // The captures were taken on 2026-04-28 against a live Tailscale SaaS
 // tailnet. They reproduce the literal #3212 setup: an ACL granting
 // access to autogroup:internet:* combined with autoApprovers.exitNode
 // approving exit routes on tagged exit nodes. SaaS surfaces those exit
 // nodes as peers in the ACL source's netmap with 0.0.0.0/0 and ::/0 in
-// AllowedIPs. Headscale must do the same — that is the user-visible UX
+// AllowedIPs. Slopscale must do the same — that is the user-visible UX
 // driving `tailscale exit-node list`.
 //
 // Captures live under testdata/issue_3212/ rather than testdata/
@@ -25,19 +25,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/types/testcapture"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/types/testcapture"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/net/tsaddr"
 )
 
 // TestIssue3212AutogroupInternetExitVisibility loads the b17/b18
-// SaaS captures and asserts headscale's BuildPeerMap surfaces every
+// SaaS captures and asserts slopscale's BuildPeerMap surfaces every
 // exit-route advertiser to every ACL-source node — matching the peer
 // list in the captured netmap.
 //
-// The bug fixed by this PR (#3212) was that headscale skipped
+// The bug fixed by this PR (#3212) was that slopscale skipped
 // autogroup:internet during FilterRule compilation, which silently
 // dropped the matchers that Node.CanAccess reads via DestsIsTheInternet.
 // The captures pin the SaaS-equivalent expectation as a regression

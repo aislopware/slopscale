@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	clientv1 "github.com/juanfont/headscale/gen/client/v1"
-	"github.com/juanfont/headscale/integration/hsic"
-	"github.com/juanfont/headscale/integration/integrationutil"
-	"github.com/juanfont/headscale/integration/tsic"
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/integration/hsic"
+	"github.com/aislopware/slopscale/integration/integrationutil"
+	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -39,19 +39,19 @@ func TestAPIAuthenticationBypass(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("apiauthbypass"))
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("apiauthbypass"))
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	// Create an API key using the CLI
 	var validAPIKey string
 
 	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
-		apiKeyOutput, err := headscale.Execute(
+		apiKeyOutput, err := slopscale.Execute(
 			[]string{
-				"headscale",
+				"slopscale",
 				"apikeys",
 				"create",
 				"--expiration",
@@ -64,7 +64,7 @@ func TestAPIAuthenticationBypass(t *testing.T) {
 	}, integrationutil.ScaledTimeout(20*time.Second), 1*time.Second)
 
 	// Get the API endpoint
-	endpoint := headscale.GetEndpoint()
+	endpoint := slopscale.GetEndpoint()
 	apiURL := endpoint + "/api/v1/user"
 
 	// Create HTTP client
@@ -248,16 +248,16 @@ func TestAPIAuthenticationBypassCurl(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv([]tsic.Option{}, hsic.WithTestName("apiauthcurl"))
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("apiauthcurl"))
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	// Create a valid API key
-	apiKeyOutput, err := headscale.Execute(
+	apiKeyOutput, err := slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"apikeys",
 			"create",
 			"--expiration",
@@ -268,12 +268,12 @@ func TestAPIAuthenticationBypassCurl(t *testing.T) {
 
 	validAPIKey := strings.TrimSpace(apiKeyOutput)
 
-	endpoint := headscale.GetEndpoint()
+	endpoint := slopscale.GetEndpoint()
 	apiURL := endpoint + "/api/v1/user"
 
 	t.Run("Curl_NoAuth", func(t *testing.T) {
-		// Execute curl from inside the headscale container without auth
-		curlOutput, err := headscale.Execute(
+		// Execute curl from inside the slopscale container without auth
+		curlOutput, err := slopscale.Execute(
 			[]string{
 				"curl",
 				"-s",
@@ -325,7 +325,7 @@ func TestAPIAuthenticationBypassCurl(t *testing.T) {
 
 	t.Run("Curl_InvalidAuth", func(t *testing.T) {
 		// Execute curl with invalid auth header
-		curlOutput, err := headscale.Execute(
+		curlOutput, err := slopscale.Execute(
 			[]string{
 				"curl",
 				"-s",
@@ -367,7 +367,7 @@ func TestAPIAuthenticationBypassCurl(t *testing.T) {
 
 	t.Run("Curl_ValidAuth", func(t *testing.T) {
 		// Execute curl with valid API key
-		curlOutput, err := headscale.Execute(
+		curlOutput, err := slopscale.Execute(
 			[]string{
 				"curl",
 				"-s",
@@ -430,19 +430,19 @@ func TestRemoteCLIAuthenticationBypass(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv(
+	err = scenario.CreateSlopscaleEnv(
 		[]tsic.Option{},
 		hsic.WithTestName("remotecliauth"),
 	)
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	// Create a valid API key
-	apiKeyOutput, err := headscale.Execute(
+	apiKeyOutput, err := slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"apikeys",
 			"create",
 			"--expiration",
@@ -455,18 +455,18 @@ func TestRemoteCLIAuthenticationBypass(t *testing.T) {
 
 	// Get the remote HTTP API endpoint as host:port; the CLI dials it over TLS
 	// with --insecure to skip verification of the test certificate.
-	remoteAddr := strings.TrimPrefix(strings.TrimPrefix(headscale.GetEndpoint(), "https://"), "http://")
+	remoteAddr := strings.TrimPrefix(strings.TrimPrefix(slopscale.GetEndpoint(), "https://"), "http://")
 
 	t.Run("Remote_NoAPIKey", func(t *testing.T) {
 		// Test 1: Try to use CLI without API key (should fail)
-		// When HEADSCALE_CLI_ADDRESS is set but HEADSCALE_CLI_API_KEY is not set,
+		// When SLOPSCALE_CLI_ADDRESS is set but SLOPSCALE_CLI_API_KEY is not set,
 		// the CLI should fail immediately
-		_, err := headscale.Execute(
+		_, err := slopscale.Execute(
 			[]string{
 				"sh",
 				"-c",
 				fmt.Sprintf(
-					"HEADSCALE_CLI_ADDRESS=%s HEADSCALE_CLI_INSECURE=true headscale users list --output json 2>&1",
+					"SLOPSCALE_CLI_ADDRESS=%s SLOPSCALE_CLI_INSECURE=true slopscale users list --output json 2>&1",
 					remoteAddr,
 				),
 			},
@@ -479,13 +479,13 @@ func TestRemoteCLIAuthenticationBypass(t *testing.T) {
 
 	t.Run("Remote_InvalidAPIKey", func(t *testing.T) {
 		// Test 2: Try to use CLI with invalid API key (should fail with auth error)
-		output, err := headscale.Execute(
+		output, err := slopscale.Execute(
 			[]string{
 				"sh",
 				"-c",
 				fmt.Sprintf(
-					"HEADSCALE_CLI_ADDRESS=%s HEADSCALE_CLI_API_KEY=invalid-key-12345 "+
-						"HEADSCALE_CLI_INSECURE=true headscale users list --output json 2>&1",
+					"SLOPSCALE_CLI_ADDRESS=%s SLOPSCALE_CLI_API_KEY=invalid-key-12345 "+
+						"SLOPSCALE_CLI_INSECURE=true slopscale users list --output json 2>&1",
 					remoteAddr,
 				),
 			},
@@ -514,13 +514,13 @@ func TestRemoteCLIAuthenticationBypass(t *testing.T) {
 
 	t.Run("Remote_ValidAPIKey", func(t *testing.T) {
 		// Test 3: Use CLI with valid API key (should succeed)
-		output, err := headscale.Execute(
+		output, err := slopscale.Execute(
 			[]string{
 				"sh",
 				"-c",
 				fmt.Sprintf(
-					"HEADSCALE_CLI_ADDRESS=%s HEADSCALE_CLI_API_KEY=%s "+
-						"HEADSCALE_CLI_INSECURE=true headscale users list --output json",
+					"SLOPSCALE_CLI_ADDRESS=%s SLOPSCALE_CLI_API_KEY=%s "+
+						"SLOPSCALE_CLI_INSECURE=true slopscale users list --output json",
 					remoteAddr,
 					validAPIKey,
 				),
@@ -549,7 +549,7 @@ func TestRemoteCLIAuthenticationBypass(t *testing.T) {
 	})
 }
 
-// TestCLIWithConfigAuthenticationBypass tests that the headscale CLI
+// TestCLIWithConfigAuthenticationBypass tests that the slopscale CLI
 // with --config flag does not have authentication bypass issues when
 // connecting to a remote server.
 // Note: When using --config with local unix socket, no auth is needed.
@@ -566,19 +566,19 @@ func TestCLIWithConfigAuthenticationBypass(t *testing.T) {
 	require.NoError(t, err)
 	defer scenario.ShutdownAssertNoPanics(t)
 
-	err = scenario.CreateHeadscaleEnv(
+	err = scenario.CreateSlopscaleEnv(
 		[]tsic.Option{},
 		hsic.WithTestName("cliconfigauth"),
 	)
 	require.NoError(t, err)
 
-	headscale, err := scenario.Headscale()
+	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
 	// Create a valid API key
-	apiKeyOutput, err := headscale.Execute(
+	apiKeyOutput, err := slopscale.Execute(
 		[]string{
-			"headscale",
+			"slopscale",
 			"apikeys",
 			"create",
 			"--expiration",
@@ -591,7 +591,7 @@ func TestCLIWithConfigAuthenticationBypass(t *testing.T) {
 
 	// Remote HTTP API endpoint as host:port; the CLI dials it over TLS with
 	// insecure verification skipped for the test certificate.
-	remoteAddr := strings.TrimPrefix(strings.TrimPrefix(headscale.GetEndpoint(), "https://"), "http://")
+	remoteAddr := strings.TrimPrefix(strings.TrimPrefix(slopscale.GetEndpoint(), "https://"), "http://")
 
 	// Create a config file for testing
 	configWithoutKey := fmt.Sprintf(`
@@ -619,13 +619,13 @@ cli:
 
 	t.Run("CLI_Config_NoAPIKey", func(t *testing.T) {
 		// Create config file without API key
-		err := headscale.WriteFile("/tmp/config_no_key.yaml", []byte(configWithoutKey))
+		err := slopscale.WriteFile("/tmp/config_no_key.yaml", []byte(configWithoutKey))
 		require.NoError(t, err)
 
 		// Try to use CLI with config that has no API key
-		_, err = headscale.Execute(
+		_, err = slopscale.Execute(
 			[]string{
-				"headscale",
+				"slopscale",
 				"--config", "/tmp/config_no_key.yaml",
 				"users", "list",
 				"--output", "json",
@@ -639,14 +639,14 @@ cli:
 
 	t.Run("CLI_Config_InvalidAPIKey", func(t *testing.T) {
 		// Create config file with invalid API key
-		err := headscale.WriteFile("/tmp/config_invalid_key.yaml", []byte(configWithInvalidKey))
+		err := slopscale.WriteFile("/tmp/config_invalid_key.yaml", []byte(configWithInvalidKey))
 		require.NoError(t, err)
 
 		// Try to use CLI with invalid API key
-		output, err := headscale.Execute(
+		output, err := slopscale.Execute(
 			[]string{
 				"sh", "-c",
-				"headscale --config /tmp/config_invalid_key.yaml users list --output json 2>&1",
+				"slopscale --config /tmp/config_invalid_key.yaml users list --output json 2>&1",
 			},
 		)
 
@@ -673,13 +673,13 @@ cli:
 
 	t.Run("CLI_Config_ValidAPIKey", func(t *testing.T) {
 		// Create config file with valid API key
-		err := headscale.WriteFile("/tmp/config_valid_key.yaml", []byte(configWithValidKey))
+		err := slopscale.WriteFile("/tmp/config_valid_key.yaml", []byte(configWithValidKey))
 		require.NoError(t, err)
 
 		// Use CLI with valid API key
-		output, err := headscale.Execute(
+		output, err := slopscale.Execute(
 			[]string{
-				"headscale",
+				"slopscale",
 				"--config", "/tmp/config_valid_key.yaml",
 				"users", "list",
 				"--output", "json",

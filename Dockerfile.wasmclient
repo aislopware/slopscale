@@ -4,7 +4,7 @@
 # GOOS=js/GOARCH=wasm and packages it with Go's wasm_exec Node runner. The
 # container idles; the integration test execs
 #   node /app/wasm_exec_node.js /app/client.wasm <control-url>
-# to drive a real browser-style WebSocket GET against headscale's /ts2021,
+# to drive a real browser-style WebSocket GET against slopscale's /ts2021,
 # guarding the regression in issue #3357.
 
 FROM golang:1.27.1-alpine AS build
@@ -26,5 +26,5 @@ FROM node:26-alpine
 WORKDIR /app
 COPY --from=build /out/ /app/
 
-# Idle; the test execs the client on demand with the headscale control URL.
+# Idle; the test execs the client on demand with the slopscale control URL.
 ENTRYPOINT ["tail", "-f", "/dev/null"]

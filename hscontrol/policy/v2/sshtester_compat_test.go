@@ -1,6 +1,6 @@
 // Replay golden HuJSON captures under testdata/sshtest_results/*.hujson:
-// the 200 path requires headscale's evaluateSSHTests to pass; the
-// non-200 path requires headscale to reject the same input with the
+// the 200 path requires slopscale's evaluateSSHTests to pass; the
+// non-200 path requires slopscale to reject the same input with the
 // captured error body as a substring. Divergences are listed in
 // knownSSHTesterDivergences with the engine gap each represents.
 
@@ -15,10 +15,10 @@ import (
 )
 
 // knownSSHTesterDivergences names the engine gap for each capture where
-// headscale and upstream disagree.
+// slopscale and upstream disagree.
 var knownSSHTesterDivergences = map[string]string{
 	"sshtest-malformed-dst-bare-ipv6": "bare-IPv6 sshTests dst: upstream parse-accepts then engine-rejects;" +
-		" headscale accepts (IPv4 mirror passes both sides)",
+		" slopscale accepts (IPv4 mirror passes both sides)",
 }
 
 func TestSSHTesterCompat(t *testing.T) {
@@ -54,11 +54,11 @@ func TestSSHTesterCompat(t *testing.T) {
 
 			if c.Input.APIResponseCode == 200 {
 				require.NoError(t, parseErr,
-					"tailscale accepted this policy; headscale must parse it")
+					"tailscale accepted this policy; slopscale must parse it")
 
 				_, setErr := pm.SetPolicy(policyJSON)
 				require.NoError(t, setErr,
-					"tailscale accepted this policy; headscale sshTests must pass")
+					"tailscale accepted this policy; slopscale sshTests must pass")
 
 				return
 			}
@@ -73,7 +73,7 @@ func TestSSHTesterCompat(t *testing.T) {
 				got = setErr
 			}
 
-			require.Error(t, got, "tailscale rejected; headscale must reject too")
+			require.Error(t, got, "tailscale rejected; slopscale must reject too")
 
 			if c.Input.APIResponseBody == nil || c.Input.APIResponseBody.Message == "" {
 				return
@@ -81,7 +81,7 @@ func TestSSHTesterCompat(t *testing.T) {
 
 			want := c.Input.APIResponseBody.Message
 			if !strings.Contains(got.Error(), want) {
-				t.Errorf("error body mismatch\n  tailscale wants: %q\n  headscale got:   %q", want, got.Error())
+				t.Errorf("error body mismatch\n  tailscale wants: %q\n  slopscale got:   %q", want, got.Error())
 			}
 		})
 	}

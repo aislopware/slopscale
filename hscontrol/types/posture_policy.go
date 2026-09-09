@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/posture"
+	"github.com/aislopware/slopscale/hscontrol/posture"
 )
 
 // PostureID identifies a posture in the postures table.

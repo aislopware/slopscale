@@ -11,7 +11,7 @@ jobs:
   # When a non-bot user comments on a needs-more-info issue, remove the label.
   remove-label-on-response:
     if: >-
-      github.repository == 'juanfont/headscale' &&
+      github.repository == 'aislopware/slopscale' &&
       github.event_name == 'issue_comment' &&
       github.event.comment.user.type != 'Bot' &&
       contains(github.event.issue.labels.*.name, 'needs-more-info')
@@ -29,7 +29,7 @@ jobs:
   # On schedule, close issues that have had no human response for 3 days.
   close-stale:
     if: >-
-      github.repository == 'juanfont/headscale' &&
+      github.repository == 'aislopware/slopscale' &&
       github.event_name != 'issue_comment'
     runs-on: ubuntu-latest
     permissions:

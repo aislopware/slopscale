@@ -23,8 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/egress"
-	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
 )
 
@@ -229,7 +229,7 @@ func (d *Dispatcher) Test(ctx context.Context, endpoint types.Webhook) error {
 
 	defer func() { <-d.slots }()
 
-	event := d.event(types.EventTest, "This is a test event from headscale.", nil)
+	event := d.event(types.EventTest, "This is a test event from slopscale.", nil)
 
 	started := time.Now()
 	status, err := d.deliver(ctx, endpoint, event)
@@ -375,7 +375,7 @@ func (d *Dispatcher) deliver(ctx context.Context, endpoint types.Webhook, event 
 	now := time.Now()
 
 	req.Header.Set("Content-Type", payload.ContentType)
-	req.Header.Set("User-Agent", "headscale-webhook/1")
+	req.Header.Set("User-Agent", "slopscale-webhook/1")
 	req.Header.Set(SignatureHeader, Sign(endpoint.Secret, now, payload.Body))
 
 	if endpoint.ProviderType == types.WebhookProviderNtfy {
@@ -442,7 +442,7 @@ func deliveryStatus(status int, err error) string {
 
 	case errors.Is(err, ErrRedirected), errors.Is(err, ErrNoMailer),
 		errors.Is(err, ErrQueueFull), errors.Is(err, ErrClosed):
-		// headscale's own words about its own state, with nothing of the
+		// slopscale's own words about its own state, with nothing of the
 		// receiver's network in them.
 		return err.Error()
 

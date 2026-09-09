@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/juanfont/headscale/hscontrol/policy"
-	policyv2 "github.com/juanfont/headscale/hscontrol/policy/v2"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util/zlog/zf"
+	"github.com/aislopware/slopscale/hscontrol/policy"
+	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tailcfg/nodecap"
@@ -104,7 +104,7 @@ func (b *MapResponseBuilder) WithSelfNode() *MapResponseBuilder {
 }
 
 // suspendedMessageID keys the health message a suspended node shows.
-const suspendedMessageID tailcfg.DisplayMessageID = "headscale-suspended"
+const suspendedMessageID tailcfg.DisplayMessageID = "slopscale-suspended"
 
 // suspensionMessages tells a suspended client why it lost its peers, and
 // clears the message again once the suspension is lifted. The client
@@ -390,7 +390,7 @@ func (b *MapResponseBuilder) buildTailPeers(peers views.Slice[types.NodeView]) (
 				Uint64("map.viewer.node.id", b.nodeID.Uint64()).
 				Msgf(
 					"dropping peer %d from map response: invalid node data; "+
-						"fix with `headscale nodes rename %d <name>`",
+						"fix with `slopscale nodes rename %d <name>`",
 					peer.ID(),
 					peer.ID(),
 				)

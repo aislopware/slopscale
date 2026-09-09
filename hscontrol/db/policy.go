@@ -6,10 +6,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/aislopware/slopscale/gen/jet/table"
+	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/hscontrol/util"
 	jet "github.com/go-jet/jet/v2/sqlite"
-	"github.com/juanfont/headscale/gen/jet/table"
-	"github.com/juanfont/headscale/hscontrol/types"
-	"github.com/juanfont/headscale/hscontrol/util"
 )
 
 // SetPolicy sets the policy in the database.
@@ -75,7 +75,7 @@ func PolicyBytes(q Querier, cfg *types.Config) ([]byte, error) {
 	case types.PolicyModeFile:
 		path := cfg.Policy.Path
 
-		// It is fine to start headscale without a policy file.
+		// It is fine to start slopscale without a policy file.
 		if path == "" {
 			return nil, nil
 		}
