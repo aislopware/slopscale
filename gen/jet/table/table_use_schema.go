@@ -40,6 +40,7 @@ func UseSchema(schema string) {
 	Sessions = Sessions.FromSchema(schema)
 	Settings = Settings.FromSchema(schema)
 	SSHRecordings = SSHRecordings.FromSchema(schema)
+	TkaAums = TkaAums.FromSchema(schema)
 	UserInvites = UserInvites.FromSchema(schema)
 	Users = Users.FromSchema(schema)
 	VipServices = VipServices.FromSchema(schema)

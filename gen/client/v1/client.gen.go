@@ -1484,6 +1484,45 @@ type SshRecordingOutputBody struct {
 	Recording SSHRecording `json:"recording"`
 }
 
+// TailnetLock defines model for TailnetLock.
+type TailnetLock struct {
+	// DisabledAt Last switched off.
+	DisabledAt *time.Time `json:"disabledAt,omitempty"`
+
+	// Enabled Whether the lock is on.
+	Enabled bool `json:"enabled"`
+
+	// EnabledAt Last switched on.
+	EnabledAt *time.Time `json:"enabledAt,omitempty"`
+
+	// Head The latest update while on.
+	Head string `json:"head"`
+
+	// Keys The trusted keys while on.
+	Keys []TailnetLockKey `json:"keys"`
+
+	// SignedNodeIds Nodes with a signature.
+	SignedNodeIds []string `json:"signedNodeIds"`
+
+	// SupportDisablementAvailable Whether the API can switch it off.
+	SupportDisablementAvailable bool `json:"supportDisablementAvailable"`
+
+	// UnsignedNodeIds Nodes without one.
+	UnsignedNodeIds []string `json:"unsignedNodeIds"`
+}
+
+// TailnetLockKey defines model for TailnetLockKey.
+type TailnetLockKey struct {
+	// Id The key's identifier, hex.
+	Id string `json:"id"`
+
+	// Public The public key in tlpub: form.
+	Public string `json:"public"`
+
+	// Votes The key's weight when the authority decides.
+	Votes int64 `json:"votes"`
+}
+
 // UpdateServiceRequestBody defines model for UpdateServiceRequestBody.
 type UpdateServiceRequestBody struct {
 	Comment     *string   `json:"comment,omitempty"`
@@ -3394,6 +3433,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/ssh-recording/{id}/cast (the `DownloadSSHRecording` operationId).
 	DownloadSSHRecording(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTailnetLock Get tailnet lock
+	//
+	// Whether tailnet lock is on, the trusted signing keys and which nodes are signed. The lock is switched on from a node with `tailscale lock init`.
+	//
+	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/tailnet-lock (the `GetTailnetLock` operationId).
+	GetTailnetLock(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DisableTailnetLock Disable tailnet lock
+	//
+	// Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` on a node works with any disablement secret.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with POST /api/v1/tailnet-lock/disable (the `DisableTailnetLock` operationId).
+	DisableTailnetLock(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListUsers List users
 	//
@@ -6658,6 +6715,44 @@ func (c *Client) GetSSHRecording(ctx context.Context, id string, reqEditors ...R
 // Corresponds with GET /api/v1/ssh-recording/{id}/cast (the `DownloadSSHRecording` operationId).
 func (c *Client) DownloadSSHRecording(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadSSHRecordingRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetTailnetLock Get tailnet lock
+//
+// Whether tailnet lock is on, the trusted signing keys and which nodes are signed. The lock is switched on from a node with `tailscale lock init`.
+//
+// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/tailnet-lock (the `GetTailnetLock` operationId).
+func (c *Client) GetTailnetLock(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTailnetLockRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DisableTailnetLock Disable tailnet lock
+//
+// Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` on a node works with any disablement secret.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with POST /api/v1/tailnet-lock/disable (the `DisableTailnetLock` operationId).
+func (c *Client) DisableTailnetLock(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisableTailnetLockRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -11695,6 +11790,60 @@ func NewDownloadSSHRecordingRequest(server string, id string) (*http.Request, er
 	return req, nil
 }
 
+// NewGetTailnetLockRequest constructs an http.Request for the GetTailnetLock method
+func NewGetTailnetLockRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/tailnet-lock")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDisableTailnetLockRequest constructs an http.Request for the DisableTailnetLock method
+func NewDisableTailnetLockRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/tailnet-lock/disable")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListUsersRequest constructs an http.Request for the ListUsers method
 func NewListUsersRequest(server string, params *ListUsersParams) (*http.Request, error) {
 	var err error
@@ -14026,6 +14175,28 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/ssh-recording/{id}/cast (the `DownloadSSHRecording` operationId).
 	DownloadSSHRecordingWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DownloadSSHRecordingResponse, error)
+
+	// GetTailnetLockWithResponse Get tailnet lock
+	//
+	// Whether tailnet lock is on, the trusted signing keys and which nodes are signed. The lock is switched on from a node with `tailscale lock init`.
+	//
+	// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/tailnet-lock (the `GetTailnetLock` operationId).
+	GetTailnetLockWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTailnetLockResponse, error)
+
+	// DisableTailnetLockWithResponse Disable tailnet lock
+	//
+	// Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` on a node works with any disablement secret.
+	//
+	// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/tailnet-lock/disable (the `DisableTailnetLock` operationId).
+	DisableTailnetLockWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DisableTailnetLockResponse, error)
 
 	// ListUsersWithResponse List users
 	//
@@ -19705,6 +19876,102 @@ func (r DownloadSSHRecordingResponse) ContentType() string {
 	return ""
 }
 
+type GetTailnetLockResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TailnetLock
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetTailnetLockResponse) GetJSON200() *TailnetLock {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetTailnetLockResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetTailnetLockResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTailnetLockResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTailnetLockResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetTailnetLockResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DisableTailnetLockResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TailnetLock
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DisableTailnetLockResponse) GetJSON200() *TailnetLock {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DisableTailnetLockResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DisableTailnetLockResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DisableTailnetLockResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DisableTailnetLockResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DisableTailnetLockResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -23109,6 +23376,40 @@ func (c *ClientWithResponses) DownloadSSHRecordingWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParseDownloadSSHRecordingResponse(rsp)
+}
+
+// GetTailnetLockWithResponse Get tailnet lock
+//
+// Whether tailnet lock is on, the trusted signing keys and which nodes are signed. The lock is switched on from a node with `tailscale lock init`.
+//
+// Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/tailnet-lock (the `GetTailnetLock` operationId).
+func (c *ClientWithResponses) GetTailnetLockWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTailnetLockResponse, error) {
+	rsp, err := c.GetTailnetLock(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTailnetLockResponse(rsp)
+}
+
+// DisableTailnetLockWithResponse Disable tailnet lock
+//
+// Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` on a node works with any disablement secret.
+//
+// Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/tailnet-lock/disable (the `DisableTailnetLock` operationId).
+func (c *ClientWithResponses) DisableTailnetLockWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DisableTailnetLockResponse, error) {
+	rsp, err := c.DisableTailnetLock(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDisableTailnetLockResponse(rsp)
 }
 
 // ListUsersWithResponse List users
@@ -27267,6 +27568,72 @@ func ParseDownloadSSHRecordingResponse(rsp *http.Response) (*DownloadSSHRecordin
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetTailnetLockResponse parses an HTTP response from a GetTailnetLockWithResponse call
+func ParseGetTailnetLockResponse(rsp *http.Response) (*GetTailnetLockResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTailnetLockResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TailnetLock
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDisableTailnetLockResponse parses an HTTP response from a DisableTailnetLockWithResponse call
+func ParseDisableTailnetLockResponse(rsp *http.Response) (*DisableTailnetLockResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DisableTailnetLockResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TailnetLock
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest ErrorModel
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

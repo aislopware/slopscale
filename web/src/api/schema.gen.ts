@@ -1729,6 +1729,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tailnet-lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get tailnet lock
+         * @description Whether tailnet lock is on, the trusted signing keys and which nodes are signed. The lock is switched on from a node with `tailscale lock init`.
+         *
+         *     Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getTailnetLock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tailnet-lock/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable tailnet lock
+         * @description Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` on a node works with any disablement secret.
+         *
+         *     Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["disableTailnetLock"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user": {
         parameters: {
             query?: never;
@@ -3110,6 +3154,41 @@ export interface components {
         SshRecordingOutputBody: {
             recording: components["schemas"]["SSHRecording"];
         };
+        TailnetLock: {
+            /**
+             * Format: date-time
+             * @description Last switched off.
+             */
+            disabledAt?: string;
+            /** @description Whether the lock is on. */
+            enabled: boolean;
+            /**
+             * Format: date-time
+             * @description Last switched on.
+             */
+            enabledAt?: string;
+            /** @description The latest update while on. */
+            head: string;
+            /** @description The trusted keys while on. */
+            keys: components["schemas"]["TailnetLockKey"][];
+            /** @description Nodes with a signature. */
+            signedNodeIds: string[];
+            /** @description Whether the API can switch it off. */
+            supportDisablementAvailable: boolean;
+            /** @description Nodes without one. */
+            unsignedNodeIds: string[];
+        };
+        TailnetLockKey: {
+            /** @description The key's identifier, hex. */
+            id: string;
+            /** @description The public key in tlpub: form. */
+            public: string;
+            /**
+             * Format: int64
+             * @description The key's weight when the authority decides.
+             */
+            votes: number;
+        };
         UpdateServiceRequestBody: {
             comment?: string;
             displayName?: string;
@@ -3357,6 +3436,8 @@ export type SetUserRoleRequestBody = components['schemas']['SetUserRoleRequestBo
 export type ShareNodeRequestBody = components['schemas']['ShareNodeRequestBody'];
 export type SshRecording = components['schemas']['SSHRecording'];
 export type SshRecordingOutputBody = components['schemas']['SshRecordingOutputBody'];
+export type TailnetLock = components['schemas']['TailnetLock'];
+export type TailnetLockKey = components['schemas']['TailnetLockKey'];
 export type UpdateServiceRequestBody = components['schemas']['UpdateServiceRequestBody'];
 export type UpdateSettingsRequestBody = components['schemas']['UpdateSettingsRequestBody'];
 export type UpdateUserRequestBody = components['schemas']['UpdateUserRequestBody'];
@@ -6999,6 +7080,64 @@ export interface operations {
                 };
                 content: {
                     "application/x-asciicast": string;
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getTailnetLock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TailnetLock"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    disableTailnetLock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TailnetLock"];
                 };
             };
             /** @description Error */

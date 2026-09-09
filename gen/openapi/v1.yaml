@@ -2657,6 +2657,68 @@ components:
       required:
         - recording
       type: object
+    TailnetLock:
+      additionalProperties: false
+      properties:
+        disabledAt:
+          description: Last switched off.
+          format: date-time
+          type: string
+        enabled:
+          description: Whether the lock is on.
+          type: boolean
+        enabledAt:
+          description: Last switched on.
+          format: date-time
+          type: string
+        head:
+          description: The latest update while on.
+          type: string
+        keys:
+          description: The trusted keys while on.
+          items:
+            $ref: "#/components/schemas/TailnetLockKey"
+          type: array
+        signedNodeIds:
+          description: Nodes with a signature.
+          items:
+            type: string
+          type: array
+        supportDisablementAvailable:
+          description: Whether the API can switch it off.
+          type: boolean
+        unsignedNodeIds:
+          description: Nodes without one.
+          items:
+            type: string
+          type: array
+      required:
+        - enabled
+        - head
+        - keys
+        - supportDisablementAvailable
+        - signedNodeIds
+        - unsignedNodeIds
+      type: object
+    TailnetLockKey:
+      additionalProperties: false
+      properties:
+        id:
+          description: The key's identifier, hex.
+          type: string
+        public:
+          description: "The public key in tlpub: form."
+          type: string
+        votes:
+          description: The key's weight when the authority decides.
+          format: int64
+          minimum: 0
+          type: integer
+      required:
+        - id
+        - public
+        - votes
+      type: object
     UpdateServiceRequestBody:
       additionalProperties: false
       properties:
@@ -6621,6 +6683,59 @@ paths:
       tags:
         - SSH recordings
       x-required-scope: logs:configuration:read
+  /api/v1/tailnet-lock:
+    get:
+      description: |-
+        Whether tailnet lock is on, the trusted signing keys and which nodes are signed. The lock is switched on from a node with `tailscale lock init`.
+
+        Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getTailnetLock
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TailnetLock"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get tailnet lock
+      tags:
+        - Settings
+      x-required-scope: feature_settings:read
+  /api/v1/tailnet-lock/disable:
+    post:
+      description: |-
+        Switches the lock off with the disablement secret the initialising client minted for the operator (`tailscale lock init --gen-disablement-for-support`). Every node drops its lock state and its node key signature. Refused when no such secret was recorded; `tailscale lock disable <secret>` on a node works with any disablement secret.
+
+        Requires the `feature_settings` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: disableTailnetLock
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TailnetLock"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Disable tailnet lock
+      tags:
+        - Settings
+      x-audit-action: tailnet_lock.disable
+      x-required-scope: feature_settings
   /api/v1/user:
     get:
       description: Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).

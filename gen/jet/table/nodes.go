@@ -41,6 +41,8 @@ type nodesTable struct {
 	Ephemeral        sqlite.ColumnBool
 	VipServices      sqlite.ColumnString
 	ApprovedServices sqlite.ColumnString
+	KeySignature     sqlite.ColumnString
+	NlKey            sqlite.ColumnString
 	CreatedAt        sqlite.ColumnTimestamp
 	UpdatedAt        sqlite.ColumnTimestamp
 	DeletedAt        sqlite.ColumnTimestamp
@@ -109,11 +111,13 @@ func newNodesTableImpl(schemaName, tableName, alias string) nodesTable {
 		EphemeralColumn        = sqlite.BoolColumn("ephemeral")
 		VipServicesColumn      = sqlite.StringColumn("vip_services")
 		ApprovedServicesColumn = sqlite.StringColumn("approved_services")
+		KeySignatureColumn     = sqlite.StringColumn("key_signature")
+		NlKeyColumn            = sqlite.StringColumn("nl_key")
 		CreatedAtColumn        = sqlite.TimestampColumn("created_at")
 		UpdatedAtColumn        = sqlite.TimestampColumn("updated_at")
 		DeletedAtColumn        = sqlite.TimestampColumn("deleted_at")
-		allColumns             = sqlite.ColumnList{IDColumn, MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, GlobalExitNodeColumn, EphemeralColumn, VipServicesColumn, ApprovedServicesColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
-		mutableColumns         = sqlite.ColumnList{MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, GlobalExitNodeColumn, EphemeralColumn, VipServicesColumn, ApprovedServicesColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
+		allColumns             = sqlite.ColumnList{IDColumn, MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, GlobalExitNodeColumn, EphemeralColumn, VipServicesColumn, ApprovedServicesColumn, KeySignatureColumn, NlKeyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
+		mutableColumns         = sqlite.ColumnList{MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, GlobalExitNodeColumn, EphemeralColumn, VipServicesColumn, ApprovedServicesColumn, KeySignatureColumn, NlKeyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
 		defaultColumns         = sqlite.ColumnList{GlobalExitNodeColumn, EphemeralColumn}
 	)
 
@@ -145,6 +149,8 @@ func newNodesTableImpl(schemaName, tableName, alias string) nodesTable {
 		Ephemeral:        EphemeralColumn,
 		VipServices:      VipServicesColumn,
 		ApprovedServices: ApprovedServicesColumn,
+		KeySignature:     KeySignatureColumn,
+		NlKey:            NlKeyColumn,
 		CreatedAt:        CreatedAtColumn,
 		UpdatedAt:        UpdatedAtColumn,
 		DeletedAt:        DeletedAtColumn,
