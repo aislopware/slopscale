@@ -45,6 +45,10 @@ const (
 	// PEM; it is made on first use and shared by every server on the
 	// same database. See [State.IDTokenSigner].
 	SettingIDTokenKey SettingKey = "id_token_signing_key"
+	// SettingTailnetLock holds the tailnet lock state as JSON
+	// ([TailnetLockSettings]); the authority's log is the tka_aums
+	// table. See [State.TailnetLock].
+	SettingTailnetLock SettingKey = "tailnet_lock"
 )
 
 // Key expiry bounds: a cap shorter than an hour would log nodes out

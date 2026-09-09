@@ -162,6 +162,13 @@ CREATE TABLE nodes(
   -- an auto-approver let it host. The node hosts the intersection.
   vip_services text,
   approved_services text,
+  -- key_signature is the tailnet lock signature over the node key, a
+  -- serialised tka.NodeKeySignature as base64, set while the lock is on;
+  -- peers drop a node without one. nl_key is the node's own tailnet lock
+  -- public key (tailcfg.RegisterRequest.NLKey), which may rotate that
+  -- signature when the node key changes. See docs/ref/tailnet-lock.md.
+  key_signature text,
+  nl_key text,
 
   created_at datetime,
   updated_at datetime,
@@ -590,3 +597,16 @@ CREATE TABLE vip_services(
   updated_at datetime
 );
 CREATE UNIQUE INDEX idx_vip_services_name ON vip_services(name);
+
+-- tka_aums is the tailnet lock authority's log: every authority update
+-- message (tka.AUM) the server has verified, serialised as base64 and
+-- keyed by its hash, with prev_hash linking the chain. Whether the lock
+-- is on, which AUM is the genesis and the disablement secrets live in
+-- the settings table under tailnet_lock. See docs/ref/tailnet-lock.md.
+CREATE TABLE tka_aums(
+  hash text PRIMARY KEY,
+  prev_hash text,
+  aum text NOT NULL,
+  committed_at datetime
+);
+CREATE INDEX idx_tka_aums_prev_hash ON tka_aums(prev_hash);

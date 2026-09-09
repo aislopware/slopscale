@@ -153,6 +153,10 @@ COL nodes.global_exit_node boolean null=YES default=false
 COL nodes.suspended_at timestamp with time zone null=YES
 COL nodes.posture text null=YES
 COL nodes.ephemeral boolean null=YES default=false
+COL nodes.vip_services text null=YES
+COL nodes.approved_services text null=YES
+COL nodes.key_signature text null=YES
+COL nodes.nl_key text null=YES
 COL oauth_access_tokens.id bigint null=NO default=nextval('oauth_access_tokens_id_seq'::regclass)
 COL oauth_access_tokens.prefix text null=YES
 COL oauth_access_tokens.hash bytea null=YES
@@ -222,6 +226,10 @@ COL ssh_recordings.command text null=YES
 COL ssh_recordings.size bigint null=NO default=0
 COL ssh_recordings.path text null=NO
 COL ssh_recordings.complete boolean null=NO default=false
+COL tka_aums.hash text null=NO
+COL tka_aums.prev_hash text null=YES
+COL tka_aums.aum text null=NO
+COL tka_aums.committed_at timestamp with time zone null=YES
 COL user_invites.id bigint null=NO default=nextval('user_invites_id_seq'::regclass)
 COL user_invites.token_hash bytea null=NO
 COL user_invites.email text null=NO
@@ -244,6 +252,15 @@ COL users.provider text null=YES
 COL users.profile_pic_url text null=YES
 COL users.role text null=YES
 COL users.approved_at timestamp with time zone null=YES
+COL vip_services.id bigint null=NO default=nextval('vip_services_id_seq'::regclass)
+COL vip_services.name text null=NO
+COL vip_services.display_name text null=YES
+COL vip_services.comment text null=YES
+COL vip_services.ports text null=YES
+COL vip_services.ipv4 text null=YES
+COL vip_services.ipv6 text null=YES
+COL vip_services.created_at timestamp with time zone null=YES
+COL vip_services.updated_at timestamp with time zone null=YES
 COL webhook_deliveries.id bigint null=NO default=nextval('webhook_deliveries_id_seq'::regclass)
 COL webhook_deliveries.webhook_id bigint null=NO
 COL webhook_deliveries.event_type text null=NO
@@ -272,6 +289,7 @@ IDX CREATE INDEX idx_nodes_user_id ON public.nodes USING btree (user_id)
 IDX CREATE INDEX idx_policies_deleted_at ON public.policies USING btree (deleted_at)
 IDX CREATE INDEX idx_pre_auth_keys_key ON public.pre_auth_keys USING btree (key)
 IDX CREATE INDEX idx_ssh_recordings_started ON public.ssh_recordings USING btree (started_at)
+IDX CREATE INDEX idx_tka_aums_prev_hash ON public.tka_aums USING btree (prev_hash)
 IDX CREATE INDEX idx_user_invites_email ON public.user_invites USING btree (email)
 IDX CREATE INDEX idx_users_deleted_at ON public.users USING btree (deleted_at)
 IDX CREATE INDEX idx_webhook_deliveries_webhook ON public.webhook_deliveries USING btree (webhook_id, id)
@@ -311,6 +329,7 @@ IDX CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON public.pre_auth_keys USING b
 IDX CREATE UNIQUE INDEX idx_provider_identifier ON public.users USING btree (provider_identifier) WHERE (provider_identifier IS NOT NULL)
 IDX CREATE UNIQUE INDEX idx_sessions_token_hash ON public.sessions USING btree (token_hash)
 IDX CREATE UNIQUE INDEX idx_user_invites_token_hash ON public.user_invites USING btree (token_hash)
+IDX CREATE UNIQUE INDEX idx_vip_services_name ON public.vip_services USING btree (name)
 IDX CREATE UNIQUE INDEX log_streams_pkey ON public.log_streams USING btree (id)
 IDX CREATE UNIQUE INDEX migrations_pkey ON public.migrations USING btree (id)
 IDX CREATE UNIQUE INDEX network_groups_pkey ON public.network_groups USING btree (id)
@@ -329,8 +348,10 @@ IDX CREATE UNIQUE INDEX pre_auth_keys_pkey ON public.pre_auth_keys USING btree (
 IDX CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (id)
 IDX CREATE UNIQUE INDEX settings_pkey ON public.settings USING btree (key)
 IDX CREATE UNIQUE INDEX ssh_recordings_pkey ON public.ssh_recordings USING btree (id)
+IDX CREATE UNIQUE INDEX tka_aums_pkey ON public.tka_aums USING btree (hash)
 IDX CREATE UNIQUE INDEX user_invites_pkey ON public.user_invites USING btree (id)
 IDX CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)
+IDX CREATE UNIQUE INDEX vip_services_pkey ON public.vip_services USING btree (id)
 IDX CREATE UNIQUE INDEX webhook_deliveries_pkey ON public.webhook_deliveries USING btree (id)
 IDX CREATE UNIQUE INDEX webhooks_pkey ON public.webhooks USING btree (id)
 CON access_requests access_requests_duration_seconds_not_null NOT NULL duration_seconds
@@ -473,6 +494,9 @@ CON ssh_recordings ssh_recordings_path_not_null NOT NULL path
 CON ssh_recordings ssh_recordings_pkey PRIMARY KEY (id)
 CON ssh_recordings ssh_recordings_size_not_null NOT NULL size
 CON ssh_recordings ssh_recordings_started_at_not_null NOT NULL started_at
+CON tka_aums tka_aums_aum_not_null NOT NULL aum
+CON tka_aums tka_aums_hash_not_null NOT NULL hash
+CON tka_aums tka_aums_pkey PRIMARY KEY (hash)
 CON user_invites user_invites_email_not_null NOT NULL email
 CON user_invites user_invites_id_not_null NOT NULL id
 CON user_invites user_invites_pkey PRIMARY KEY (id)
@@ -480,6 +504,9 @@ CON user_invites user_invites_role_not_null NOT NULL role
 CON user_invites user_invites_token_hash_not_null NOT NULL token_hash
 CON users users_id_not_null NOT NULL id
 CON users users_pkey PRIMARY KEY (id)
+CON vip_services vip_services_id_not_null NOT NULL id
+CON vip_services vip_services_name_not_null NOT NULL name
+CON vip_services vip_services_pkey PRIMARY KEY (id)
 CON webhook_deliveries fk_webhook_deliveries_webhook FOREIGN KEY (webhook_id) REFERENCES webhooks(id) ON DELETE CASCADE
 CON webhook_deliveries webhook_deliveries_attempts_not_null NOT NULL attempts
 CON webhook_deliveries webhook_deliveries_created_at_not_null NOT NULL created_at

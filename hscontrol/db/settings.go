@@ -72,9 +72,9 @@ func (hsdb *HSDatabase) LoadSettings() (types.Settings, error) {
 			settings.KeyExpiry = d
 
 			continue
-		case types.SettingDNS, types.SettingDERP, types.SettingIDTokenKey:
+		case types.SettingDNS, types.SettingDERP, types.SettingIDTokenKey, types.SettingTailnetLock:
 			// Hold JSON or key material and are read by LoadDNSSettings,
-			// LoadDERPSettings and LoadIDTokenKey.
+			// LoadDERPSettings, LoadIDTokenKey and LoadTailnetLock.
 			continue
 		default:
 			continue

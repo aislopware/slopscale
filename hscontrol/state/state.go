@@ -40,6 +40,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
+	"tailscale.com/types/tkatype"
 	"tailscale.com/types/views"
 	"tailscale.com/util/dnsname"
 )
@@ -148,6 +149,9 @@ type State struct {
 	access atomic.Pointer[types.AccessModel]
 	// vipServices holds the tailnet's services; see [State.VIPServices].
 	vipServices atomic.Pointer[[]types.VIPService]
+	// tailnetLock is the tailnet lock authority's log and settings; see
+	// [State.TailnetLock].
+	tailnetLock *tailnetLock
 	// accessSwept marks that [State.ExpireAccess] has run once; see there.
 	accessSwept atomic.Bool
 	// polMan handles policy evaluation and management
@@ -326,6 +330,11 @@ func NewState(cfg *types.Config) (*State, error) {
 	}
 
 	_, err = s.loadVIPServices()
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.loadTailnetLock()
 	if err != nil {
 		return nil, err
 	}
@@ -1831,6 +1840,29 @@ func preserveNetInfo(
 	return netInfoFromMapRequest(nodeID, existingHostinfo, validHostinfo)
 }
 
+// applyLockKeys records what a re-registration tells about tailnet lock
+// on node, before its node key is replaced with newKey: the client's lock
+// key, and the verified signature when it sent one. Without one the
+// signature stays while the node key does, and goes when the key changes,
+// since it signed the old key.
+func applyLockKeys(
+	node *types.Node,
+	newKey key.NodePublic,
+	nlKey key.NLPublic,
+	verified tkatype.MarshaledSignature,
+) {
+	if !nlKey.IsZero() {
+		node.NLKey = nlKey
+	}
+
+	switch {
+	case len(verified) > 0:
+		node.KeySignature = verified
+	case node.NodeKey != newKey:
+		node.KeySignature = nil
+	}
+}
+
 // newNodeParams contains parameters for creating a new node.
 type newNodeParams struct {
 	User           types.User
@@ -1846,6 +1878,12 @@ type newNodeParams struct {
 	// Ephemeral is what the client asked for in its register request; an
 	// ephemeral pre-auth key makes the node ephemeral on its own.
 	Ephemeral bool
+
+	// NLKey is the client's tailnet lock key; KeySignature the node key
+	// signature it registered with, already checked against the
+	// authority (see [State.tailnetLockSignature]).
+	NLKey        key.NLPublic
+	KeySignature tkatype.MarshaledSignature
 
 	// Optional: Pre-auth key specific fields
 	PreAuthKey *types.PreAuthKey
@@ -2212,8 +2250,13 @@ func (s *State) HandleNodeFromPreAuthKey(
 		// valid after the mutation.
 		priorNode := existingNodeSameUser.AsStruct()
 
+		// Checked outside the update: the lock takes its own mutex and
+		// writes the NodeStore itself.
+		keySignature := s.tailnetLockSignature(regReq.NodeKey, hostname, regReq.NodeKeySignature)
+
 		// Update existing node - NodeStore first, then database
 		updatedNodeView, ok := s.nodeStore.UpdateNode(existingNodeSameUser.ID(), func(node *types.Node) {
+			applyLockKeys(node, regReq.NodeKey, regReq.NLKey, keySignature)
 			node.NodeKey = regReq.NodeKey
 			setHostname(node, hostname)
 
@@ -2419,6 +2462,8 @@ func (s *State) HandleNodeFromPreAuthKey(
 			Expiry:                 reqExpiry,
 			RegisterMethod:         util.RegisterMethodAuthKey,
 			Ephemeral:              regReq.Ephemeral,
+			NLKey:                  regReq.NLKey,
+			KeySignature:           s.tailnetLockSignature(regReq.NodeKey, hostname, regReq.NodeKeySignature),
 			PreAuthKey:             pak,
 			ExistingNodeForNetinfo: differentUserNode,
 		})
@@ -3204,6 +3249,8 @@ func (s *State) createNewNodeFromAuth(
 		Expiry:                 cmp.Or(expiry, regData.Expiry),
 		RegisterMethod:         registrationMethod,
 		Ephemeral:              regData.Ephemeral,
+		NLKey:                  regData.NLKey,
+		KeySignature:           s.tailnetLockSignature(regData.NodeKey, hostname, regData.NodeKeySignature),
 		ExistingNodeForNetinfo: existingNodeForNetinfo,
 	})
 }
@@ -3592,8 +3639,11 @@ func (s *State) applyAuthNodeUpdate(params authNodeUpdateParams) (types.NodeView
 		return types.NodeView{}, ErrNodeKeyInUse
 	}
 
+	keySignature := s.tailnetLockSignature(regData.NodeKey, params.Hostname, regData.NodeKeySignature)
+
 	// Update existing node in [NodeStore] - validation passed, safe to mutate
 	updatedNodeView, ok := s.nodeStore.UpdateNode(params.ExistingNode.ID(), func(node *types.Node) {
+		applyLockKeys(node, regData.NodeKey, regData.NLKey, keySignature)
 		s.mutateNodeForAuthUpdate(node, params, requestTags, oldTags)
 	})
 	if !ok {
@@ -3650,6 +3700,8 @@ func (s *State) createAndSaveNewNode(params newNodeParams) (types.NodeView, erro
 		Expiry:         params.Expiry,
 		ApprovedAt:     s.approvedAtRegistration(params.PreAuthKey),
 		Ephemeral:      params.Ephemeral,
+		NLKey:          params.NLKey,
+		KeySignature:   params.KeySignature,
 	}
 
 	assignNodeOwnership(&nodeToRegister, params)

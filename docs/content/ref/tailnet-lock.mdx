@@ -1,0 +1,103 @@
+---
+title: "Tailnet lock"
+---
+
+Tailnet lock lets the machines of a tailnet check each other's keys,
+the way [Tailscale's tailnet lock](https://tailscale.com/kb/1226/tailnet-lock)
+does, so a control server that is compromised, or an operator who is
+coerced, cannot slip a machine into the tailnet unnoticed. A small set of
+_signing nodes_ hold private keys that never leave them; every machine's
+node key must carry a signature from one of those keys before the other
+machines talk to it. The server only stores and hands out what the
+signing nodes decide, and can prove nothing on its own.
+
+## How it works
+
+1. **Initialise from a signing node.** On a machine owned by the owner or
+   an admin, `tailscale lock init tlpub:… tlpub:…` names the trusted
+   keys (its own and any others), generates a disablement secret for
+   emergencies, and proposes the genesis of the authority to the server.
+   The server answers with every machine's node key and lock key; the
+   node signs each and sends the signatures back, and the lock is on.
+   `--gen-disablement-for-support` mints a second secret the server keeps
+   for the operator, which is what the console and the API switch the
+   lock off with; without it, only a secret held on a machine can.
+2. **Every machine follows.** The server tells each machine the head of
+   the authority's log in every map response; a machine that is behind
+   bootstraps from the genesis or syncs the updates it is missing, over
+   its control connection, and checks each one against the keys it
+   already trusts. The signatures ride on the machines' netmap entries: a
+   machine drops any peer whose key carries no valid signature and shows
+   itself as locked out while its own key has none.
+3. **New machines are signed.** A machine that joins after the lock is on
+   gets no traffic until a signing node signs it: `tailscale lock sign
+   nodekey:…` there, or a pre-signed auth key made with `tailscale lock
+   sign <auth key>` on a signing node, which signs the machine as it
+   joins. `tailscale lock status` on any machine lists who is waiting.
+4. **Keys rotate on their own.** Each machine also has a lock key of its
+   own, named in its signature, so when its node key changes (an expired
+   login, a fresh login) the server hands it the old signature and the
+   machine signs the new key with the old one attached. Nobody has to
+   sign a machine twice.
+5. **Keys are added and removed from a signing node.** `tailscale lock
+   add`, `remove` and `revoke-keys` produce updates signed by a trusted
+   key; the server verifies them, appends them to the log, and every
+   machine syncs. Removing a key re-signs the machines it had signed
+   first.
+6. **Switching off** takes a disablement secret: `tailscale lock disable
+   <secret>` on a machine, or the console's _Switch off_ (and
+   `POST /api/v1/tailnet-lock/disable`) with the support secret. The
+   server empties the log, keeps the secret so every machine that still
+   has the lock on fetches it and verifies it against its own copy of the
+   authority, and drops the signatures.
+
+The server keeps the authority's log in the `tka_aums` table and the
+lock's state under the `tailnet_lock` key of the settings table, so a
+restart, or another server on the same database, carries on where it
+left off. Every machine carries the `tailnet-lock` capability, so
+`tailscale lock` works on any of them; what a machine may do is decided
+by the signing keys, not by the server.
+
+## What the server checks
+
+- Only a machine owned by the owner or an admin may initialise the lock,
+  and only while it is off. Every machine must be signed before the lock
+  switches on; a missing or invalid signature refuses the whole request.
+- A signature submitted with `tailscale lock sign`, in a registration,
+  or as a rotation is verified against the authority before it is stored.
+  A registration whose signature does not verify still succeeds, but the
+  machine stays unsigned, so it is locked out until a signing node signs
+  it, rather than locked out of logging in.
+- Updates a machine sends are verified against the log; one that does
+  not chain from a known state or is not signed by a trusted key is
+  refused. A disablement secret is checked against the authority's
+  disablement values.
+
+## Status and switching off
+
+```console
+slopscale lock status
+slopscale lock disable
+```
+
+`GET /api/v1/tailnet-lock` returns whether the lock is on, the head of
+the log, the trusted keys with their votes, which machines are signed
+and which are waiting, and whether the support secret is available;
+`POST /api/v1/tailnet-lock/disable` switches the lock off with it and
+answers 409 when none was recorded. Both are under the
+`feature_settings` scope (`feature_settings:read` to read), which the
+owner and admins hold. The console shows the same on the _Settings_
+page's _Tailnet_ tab, with _Switch off_ behind a confirmation. Switching
+the lock off is audited as `tailnet_lock.disable`.
+
+The v2 API has no counterpart, because Tailscale's API has none.
+
+## Limitations
+
+- The server does not compact the log. A tailnet that rotates keys
+  thousands of times keeps every update; that is far beyond a normal
+  tailnet's lifetime.
+- Servers on the same database each load the log at start and keep
+  their own copy in memory; run one server while the lock changes.
+- The lock says nothing about who may _use_ the tailnet: the
+  [policy](/ref/policy) still decides what a signed machine may reach.

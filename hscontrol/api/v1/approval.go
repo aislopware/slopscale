@@ -11,6 +11,9 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
+// tagSettings groups the settings operations in the OpenAPI document.
+const tagSettings = "Settings"
+
 func init() {
 	registrations = append(registrations, registerApproval)
 }
@@ -167,7 +170,7 @@ func registerApproval(api huma.API, b Backend) {
 		Method:      http.MethodGet,
 		Path:        "/api/v1/settings",
 		Summary:     "Get settings",
-		Tags:        []string{"Settings"},
+		Tags:        []string{tagSettings},
 		Security:    bearerAuth,
 	}, scope.FeatureSettingsRead), func(_ context.Context, _ *struct{}) (*settingsOutput, error) {
 		return &settingsOutput{Body: settingsFrom(b.State.Settings(), b.Cfg)}, nil
@@ -180,7 +183,7 @@ func registerApproval(api huma.API, b Backend) {
 		Summary:     "Update settings",
 		Description: "Changes the given switches. Switching device or users approval off " +
 			"approves every node or user that was waiting.",
-		Tags:     []string{"Settings"},
+		Tags:     []string{tagSettings},
 		Security: bearerAuth,
 	}, scope.FeatureSettings), "settings.set", "", ""), func(
 		ctx context.Context, in *updateSettingsInput,

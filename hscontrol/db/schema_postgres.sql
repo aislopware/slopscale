@@ -111,6 +111,8 @@ CREATE TABLE nodes(
   ephemeral boolean DEFAULT false,
   vip_services text,
   approved_services text,
+  key_signature text,
+  nl_key text,
   CONSTRAINT fk_nodes_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_nodes_auth_key FOREIGN KEY(auth_key_id) REFERENCES pre_auth_keys(id)
 );
@@ -452,3 +454,11 @@ CREATE TABLE vip_services(
   updated_at timestamptz
 );
 CREATE UNIQUE INDEX idx_vip_services_name ON vip_services(name);
+
+CREATE TABLE tka_aums(
+  hash text PRIMARY KEY,
+  prev_hash text,
+  aum text NOT NULL,
+  committed_at timestamptz
+);
+CREATE INDEX idx_tka_aums_prev_hash ON tka_aums(prev_hash);

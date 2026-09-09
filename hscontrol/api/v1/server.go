@@ -93,7 +93,7 @@ func registerServer(api huma.API, b Backend) {
 		Path:        "/api/v1/server",
 		Summary:     "Get server info",
 		Description: "The build, addresses and config file values of the running server.",
-		Tags:        []string{"Settings"},
+		Tags:        []string{tagSettings},
 		Security:    bearerAuth,
 	}, scope.FeatureSettingsRead), func(_ context.Context, _ *struct{}) (*serverInfoOutput, error) {
 		return &serverInfoOutput{Body: serverInfoFrom(

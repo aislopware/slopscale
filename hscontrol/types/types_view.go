@@ -16,6 +16,7 @@ import (
 	"github.com/go-json-experiment/json/jsontext"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
+	"tailscale.com/types/tkatype"
 	"tailscale.com/types/views"
 )
 
@@ -313,6 +314,16 @@ func (v NodeView) Services() NodeServicesView { return v.ж.Services.View() }
 // hosts the ones it also reports.
 func (v NodeView) ApprovedServices() views.Slice[string] { return views.SliceOf(v.ж.ApprovedServices) }
 
+// KeySignature is the tailnet lock signature over the node key, a
+// serialised tka.NodeKeySignature, while the lock is on: peers drop
+// a node without one. NLKey is the node's own tailnet lock public
+// key, which may rotate that signature when the node key changes.
+// See docs/ref/tailnet-lock.md.
+func (v NodeView) KeySignature() views.ByteSlice[tkatype.MarshaledSignature] {
+	return views.ByteSliceOf(v.ж.KeySignature)
+}
+func (v NodeView) NLKey() key.NLPublic { return v.ж.NLKey }
+
 // SourceAddr is the address the node's control connection last came
 // from, as the trusted-proxy middleware resolved it. It is runtime
 // state, never stored, and feeds the ip: posture attributes.
@@ -408,6 +419,8 @@ var _NodeViewNeedsRegeneration = Node(struct {
 	Attributes       []NodeAttribute
 	Services         *NodeServices
 	ApprovedServices []string
+	KeySignature     tkatype.MarshaledSignature
+	NLKey            key.NLPublic
 	SourceAddr       netip.Addr
 	SharedWith       []UserID
 	GlobalExitNode   bool

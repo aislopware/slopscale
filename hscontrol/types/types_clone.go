@@ -12,6 +12,7 @@ import (
 
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
+	"tailscale.com/types/tkatype"
 )
 
 // Clone makes a deep copy of User.
@@ -89,6 +90,7 @@ func (src *Node) Clone() *Node {
 	dst.Attributes = append(src.Attributes[:0:0], src.Attributes...)
 	dst.Services = src.Services.Clone()
 	dst.ApprovedServices = append(src.ApprovedServices[:0:0], src.ApprovedServices...)
+	dst.KeySignature = append(src.KeySignature[:0:0], src.KeySignature...)
 	dst.SharedWith = append(src.SharedWith[:0:0], src.SharedWith...)
 	if dst.DeletedAt != nil {
 		dst.DeletedAt = new(*src.DeletedAt)
@@ -127,6 +129,8 @@ var _NodeCloneNeedsRegeneration = Node(struct {
 	Attributes       []NodeAttribute
 	Services         *NodeServices
 	ApprovedServices []string
+	KeySignature     tkatype.MarshaledSignature
+	NLKey            key.NLPublic
 	SourceAddr       netip.Addr
 	SharedWith       []UserID
 	GlobalExitNode   bool

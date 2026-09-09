@@ -490,6 +490,26 @@ A policy change and an approval or service change landing in the same
 batch no longer lose the self node the second one asked for: the batcher
 folds what a dropped repeat asked for into the change it keeps.
 
+### Tailnet lock
+
+Tailnet lock works with the stock client: `tailscale lock init` on a
+machine owned by the owner or an admin proposes the authority, the server
+has the node sign every machine and switches the lock on, and from then on
+every machine drops a peer whose node key carries no signature from a
+trusted key, so a compromised control server cannot add a machine
+unnoticed. The server keeps the authority's log in the database, hands
+every machine the head so it bootstraps or syncs over its control
+connection, verifies and stores the signatures `tailscale lock sign` and
+pre-signed auth keys bring, hands a machine whose key changes its old
+signature so it re-signs the new one by itself, and serves `add`,
+`remove`, `revoke-keys` and `disable`. `slopscale lock status` and
+`GET /api/v1/tailnet-lock` show the state, the trusted keys and which
+machines are waiting for a signature; `slopscale lock disable`,
+`POST /api/v1/tailnet-lock/disable` and the console's _Switch off_ on the
+_Settings_ page switch it off with the secret minted by
+`--gen-disablement-for-support`. See
+[Tailnet lock](https://aislopware.github.io/slopscale/ref/tailnet-lock/).
+
 ### Identity tokens
 
 `tailscale id-token <audience>` works: the server signs a JSON Web Token

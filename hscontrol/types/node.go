@@ -19,6 +19,7 @@ import (
 	"tailscale.com/tailcfg"
 	"tailscale.com/tailcfg/nodecap"
 	"tailscale.com/types/key"
+	"tailscale.com/types/tkatype"
 	"tailscale.com/types/views"
 	"tailscale.com/util/dnsname"
 )
@@ -202,6 +203,14 @@ type Node struct {
 	// there, the way [Node.ApprovedRoutes] works for routes. The node
 	// hosts the ones it also reports.
 	ApprovedServices []string
+
+	// KeySignature is the tailnet lock signature over the node key, a
+	// serialised tka.NodeKeySignature, while the lock is on: peers drop
+	// a node without one. NLKey is the node's own tailnet lock public
+	// key, which may rotate that signature when the node key changes.
+	// See docs/ref/tailnet-lock.md.
+	KeySignature tkatype.MarshaledSignature
+	NLKey        key.NLPublic
 
 	// SourceAddr is the address the node's control connection last came
 	// from, as the trusted-proxy middleware resolved it. It is runtime
@@ -1438,6 +1447,11 @@ func (nv NodeView) tailNode(
 
 		MachineAuthorized: nv.IsAdmitted() && !nv.IsExpired(),
 		Expired:           nv.IsExpired(),
+
+		// The tailnet lock signature over the key; a client with the
+		// lock on drops a peer without one and reports itself locked
+		// out without its own.
+		KeySignature: nv.KeySignature().AsSlice(),
 	}
 
 	// LastSeen is when the node was last online, nil only for a node that

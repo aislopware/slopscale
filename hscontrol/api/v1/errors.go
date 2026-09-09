@@ -149,7 +149,9 @@ func mapError(msg string, err error) error {
 		errors.Is(err, types.ErrPostureInUse),
 		errors.Is(err, types.ErrAccessRequestDecided),
 		errors.Is(err, types.ErrAccessRequestPendingExists),
-		errors.Is(err, types.ErrVIPServiceNameTaken):
+		errors.Is(err, types.ErrVIPServiceNameTaken),
+		errors.Is(err, types.ErrTailnetLockDisabled),
+		errors.Is(err, types.ErrTailnetLockNoSupportSecret):
 		return huma.Error409Conflict(msg, err)
 
 	case errors.Is(err, state.ErrCannotChangeOwnRole),

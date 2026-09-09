@@ -209,6 +209,10 @@ func (h *Slopscale) NoiseUpgradeHandler(
 		// 2025 (tailcfg says it was never useful), so nothing stores it.
 		r.Post("/update-health", ns.NotImplementedHandler)
 
+		// Tailnet lock: `tailscale lock` and the client's own sync talk
+		// to these; see machine_tailnet_lock.go.
+		r.Route("/tka", ns.tkaRoutes)
+
 		r.Route("/webclient", func(_ chi.Router) {})
 
 		r.Post("/c2n", ns.NotImplementedHandler)

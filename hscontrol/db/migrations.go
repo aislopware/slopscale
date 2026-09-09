@@ -642,7 +642,45 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609170900-vip-services",
 			run: migrateVIPServices,
 		},
+		{
+			// Tailnet lock: the authority's AUM log and the node columns
+			// for the node key signature and the node's lock key.
+			id:  "202609180900-tailnet-lock",
+			run: migrateTailnetLock,
+		},
 	}
+}
+
+// migrateTailnetLock (202609180900) creates the tka_aums table and adds
+// the nodes columns for the node key signature and the tailnet lock key.
+func migrateTailnetLock(tx *Tx) error {
+	for _, col := range []string{"key_signature", "nl_key"} {
+		err := tx.ex.addColumnIfMissing("nodes", col, typeText)
+		if err != nil {
+			return err
+		}
+	}
+
+	return createTables(tx, []tableDefinition{
+		{
+			name: "tka_aums",
+			sqlite: `CREATE TABLE tka_aums(
+  hash text PRIMARY KEY,
+  prev_hash text,
+  aum text NOT NULL,
+  committed_at datetime
+)`,
+			postgres: `CREATE TABLE tka_aums(
+  hash text PRIMARY KEY,
+  prev_hash text,
+  aum text NOT NULL,
+  committed_at timestamptz
+)`,
+			indexes: []string{
+				`CREATE INDEX idx_tka_aums_prev_hash ON tka_aums(prev_hash)`,
+			},
+		},
+	})
 }
 
 // migrateVIPServices (202609170900) creates the vip_services table and

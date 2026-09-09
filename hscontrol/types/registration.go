@@ -6,6 +6,7 @@ import (
 
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
+	"tailscale.com/types/tkatype"
 )
 
 // RegistrationData is the payload cached for a pending node registration.
@@ -56,4 +57,10 @@ type RegistrationData struct {
 	// Ephemeral is [tailcfg.RegisterRequest.Ephemeral]: the client asks
 	// to be deleted once it stops being active.
 	Ephemeral bool
+
+	// NLKey is [tailcfg.RegisterRequest.NLKey], the client's tailnet
+	// lock key, and NodeKeySignature the node key signature it sent, if
+	// any; see docs/ref/tailnet-lock.md.
+	NLKey            key.NLPublic
+	NodeKeySignature tkatype.MarshaledSignature
 }

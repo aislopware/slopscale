@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding"
+	"encoding/base64"
 	"encoding/json/v2"
 	"fmt"
 	"net/netip"
@@ -50,9 +51,13 @@ type nodeRow struct {
 	// the JSON list of names. See schema.sql.
 	VipServices      *string
 	ApprovedServices *string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	DeletedAt        *time.Time
+	// KeySignature is the tailnet lock node key signature as base64;
+	// NlKey the node's lock key in tlpub: form. See schema.sql.
+	KeySignature *string
+	NlKey        *string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	DeletedAt    *time.Time
 }
 
 // nodeRecord is the destination of node queries: the node with its owning
@@ -193,7 +198,33 @@ func (r *nodeRow) node() (*types.Node, error) {
 		}
 	}
 
+	err = r.lockKeys(node)
+	if err != nil {
+		return nil, err
+	}
+
 	return node, nil
+}
+
+// lockKeys decodes the tailnet lock columns into node.
+func (r *nodeRow) lockKeys(node *types.Node) error {
+	if r.KeySignature != nil && *r.KeySignature != "" {
+		sig, err := base64.StdEncoding.DecodeString(*r.KeySignature)
+		if err != nil {
+			return fmt.Errorf("node %d key_signature: %w", r.ID, err)
+		}
+
+		node.KeySignature = sig
+	}
+
+	if r.NlKey != nil && *r.NlKey != "" {
+		err := node.NLKey.UnmarshalText([]byte(*r.NlKey))
+		if err != nil {
+			return fmt.Errorf("node %d nl_key: %w", r.ID, err)
+		}
+	}
+
+	return nil
 }
 
 // nodeRowFrom serialises node for INSERT/UPDATE ... MODEL.
@@ -274,6 +305,21 @@ func nodeRowFrom(node *types.Node) (nodeRow, error) {
 		}
 
 		row.ApprovedServices = &approved
+	}
+
+	if len(node.KeySignature) > 0 {
+		row.KeySignature = new(base64.StdEncoding.EncodeToString(node.KeySignature))
+	}
+
+	if !node.NLKey.IsZero() {
+		var nlKey []byte
+
+		nlKey, err = node.NLKey.MarshalText()
+		if err != nil {
+			return nodeRow{}, fmt.Errorf("nl_key: %w", err)
+		}
+
+		row.NlKey = new(string(nlKey))
 	}
 
 	return row, nil

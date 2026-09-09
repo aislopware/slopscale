@@ -1,6 +1,7 @@
 package db
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -16,6 +17,7 @@ import (
 	jet "github.com/go-jet/jet/v2/sqlite"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/types/key"
+	"tailscale.com/types/tkatype"
 	"tailscale.com/util/dnsname"
 )
 
@@ -407,6 +409,8 @@ func nodeUpdateColumns(update NodeUpdate) jet.ColumnList {
 		table.Nodes.ApprovedRoutes,
 		table.Nodes.VipServices,
 		table.Nodes.ApprovedServices,
+		table.Nodes.KeySignature,
+		table.Nodes.NlKey,
 		table.Nodes.UpdatedAt,
 	}
 
@@ -456,6 +460,8 @@ func (r *nodeRow) updateArgs(update NodeUpdate) []any {
 		r.ApprovedRoutes,
 		optional(r.VipServices),
 		optional(r.ApprovedServices),
+		optional(r.KeySignature),
+		optional(r.NlKey),
 		r.UpdatedAt,
 	}
 
@@ -631,6 +637,43 @@ func (hsdb *HSDatabase) NodeSetApprovedServices(nodeID types.NodeID, names []str
 
 	return hsdb.Write(func(tx *Tx) error {
 		return updateNodeColumn(tx, nodeID, table.Nodes.ApprovedServices, column)
+	})
+}
+
+// NodeSetKeySignatures stores the tailnet lock node key signature of
+// every listed node in one transaction; a nil signature clears it.
+func (hsdb *HSDatabase) NodeSetKeySignatures(signatures map[types.NodeID]tkatype.MarshaledSignature) error {
+	return hsdb.Write(func(tx *Tx) error {
+		for nodeID, sig := range signatures {
+			var column *string
+			if len(sig) > 0 {
+				column = new(base64.StdEncoding.EncodeToString(sig))
+			}
+
+			err := updateNodeColumn(tx, nodeID, table.Nodes.KeySignature, column)
+			if err != nil {
+				return fmt.Errorf("setting node %d key signature: %w", nodeID, err)
+			}
+		}
+
+		return nil
+	})
+}
+
+// NodeClearKeySignatures drops every node's tailnet lock signature, for
+// when the lock is switched off.
+func (hsdb *HSDatabase) NodeClearKeySignatures() error {
+	return hsdb.Write(func(tx *Tx) error {
+		_, err := tx.executor().exec(
+			table.Nodes.UPDATE(table.Nodes.KeySignature, table.Nodes.UpdatedAt).
+				SET(jet.NULL, time.Now()).
+				WHERE(table.Nodes.KeySignature.IS_NOT_NULL()),
+		)
+		if err != nil {
+			return fmt.Errorf("clearing node key signatures: %w", err)
+		}
+
+		return nil
 	})
 }
 

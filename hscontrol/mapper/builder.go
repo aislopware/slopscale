@@ -102,7 +102,13 @@ func (b *MapResponseBuilder) WithSelfNode() *MapResponseBuilder {
 		}
 	}
 
+	// Every node may take part in tailnet lock: the cap lets the client
+	// run `tailscale lock init` and follow the authority once one exists;
+	// TKAInfo carries the head to sync to, or that the lock is off.
+	tailnode.CapMap[nodecap.TailnetLock] = nil
+
 	b.resp.Node = tailnode
+	b.resp.TKAInfo = b.mapper.state.TKAInfo()
 	b.resp.DisplayMessages = displayMessages(nv, b.mapper.cfg.ServerURL)
 	b.resp.ControlDialPlan = b.mapper.cfg.DialPlan()
 

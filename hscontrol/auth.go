@@ -64,6 +64,19 @@ func (h *Slopscale) handleRegister(
 		return h.waitForFollowup(ctx, req, machineKey)
 	}
 
+	// While tailnet lock is on, a machine whose node key changes or
+	// expired gets its stored signature back and registers again with a
+	// new key and a rotation signature, before anything else looks at
+	// the request.
+	if old := h.state.TailnetLockRotation(machineKey, req.NodeKey, req.NodeKeySignature); len(old) > 0 {
+		log.Debug().
+			Str("machine.key", machineKey.ShortString()).
+			Str("node.key", req.NodeKey.ShortString()).
+			Msg("tailnet lock: handing the node its old key signature to re-sign")
+
+		return &tailcfg.RegisterResponse{NodeKeySignature: old}, nil
+	}
+
 	// If the register request does not contain a Auth struct, it means we are logging
 	// out an existing node (legacy logout path for clients that send Auth=nil).
 	if req.Auth == nil {
@@ -446,11 +459,13 @@ func registrationDataFromRequest(
 	}
 
 	regData := &types.RegistrationData{
-		MachineKey: machineKey,
-		NodeKey:    req.NodeKey,
-		Hostname:   hostname,
-		Hostinfo:   req.Hostinfo,
-		Ephemeral:  req.Ephemeral,
+		MachineKey:       machineKey,
+		NodeKey:          req.NodeKey,
+		Hostname:         hostname,
+		Hostinfo:         req.Hostinfo,
+		Ephemeral:        req.Ephemeral,
+		NLKey:            req.NLKey,
+		NodeKeySignature: req.NodeKeySignature,
 	}
 
 	if !req.Expiry.IsZero() {

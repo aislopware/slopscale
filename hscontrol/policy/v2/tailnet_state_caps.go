@@ -70,7 +70,8 @@ func PeerCapMap(peer types.NodeView, peerSelfCaps tailcfg.NodeCapMap, globalExit
 // unmodelledTailnetStateCaps lists [tailcfg.NodeCapability] values
 // stripped on both sides of the compat diff. Order:
 //
-//  1. Caps gated on a user-role concept slopscale does not model.
+//  1. Caps gated on state the anonymised captures do not carry: user
+//     roles, tailnet lock, services.
 //  2. Caps gated on a tailnet feature slopscale does not implement.
 //  3. Caps that are tailnet-state metadata (display name, key
 //     duration, etc.) where the values are not derivable from
@@ -95,13 +96,12 @@ var unmodelledTailnetStateCaps = []nodecap.Cap{
 	// reason.
 	nodecap.Owner,
 
-	// --- 2. Feature not implemented ---
-
 	// [tailcfg.CapabilityTailnetLock]: tailnet-lock signs node keys
 	// with a tailnet-wide signing key so peers can detect silent
 	// re-keying by the control plane. Client reads at
-	// ipn/ipnlocal/local.go:1752 (b.capTailnetLock). Slopscale has no
-	// tailnet-lock implementation.
+	// ipn/ipnlocal/local.go:1752 (b.capTailnetLock). The mapper stamps
+	// it on every self node (see docs/ref/tailnet-lock.md); the
+	// captures carry no lock state, so it is stripped here.
 	nodecap.TailnetLock,
 
 	// [tailcfg.NodeAttrServiceHost]: marks a node as approved to host
@@ -111,6 +111,8 @@ var unmodelledTailnetStateCaps = []nodecap.Cap{
 	// stampServiceCaps), but the anonymised captures carry no
 	// services, so the replayed tailnet cannot reproduce the mapping.
 	nodecap.ServiceHost,
+
+	// --- 2. Feature not implemented ---
 
 	// [tailcfg.NodeAttrStoreAppCRoutes]: tells an app-connector node
 	// to persist learned routes across restarts. Client reads via
