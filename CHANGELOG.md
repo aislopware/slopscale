@@ -523,6 +523,73 @@ machine without a password. A machine waiting for approval, suspended or
 expired gets no token. See
 [Identity tokens](https://aislopware.github.io/slopscale/ref/identity-tokens/).
 
+### Apps and app connectors
+
+An app is a set of domains reached through app connectors, Tailscale's
+feature: a machine running `tailscale set --advertise-connector` and
+carrying one of the app's tags resolves the domains, advertises a route
+for every address it learns and forwards the traffic, and the server
+approves those single-address routes as they appear, so the operator
+only ever approves a real subnet. Every machine gets split DNS for the
+app's domains pointing at the connectors it can reach, the way the
+hosted control plane does, so a query reaches a connector and it learns
+the address; nothing has to be set up under DNS. Wildcards
+(`*.example.com`) work, an app can pin routes the connectors always
+advertise, `*` picks every tagged machine running the connector, and a
+connector is a tagged machine, as with Tailscale. `slopscale apps` manages them, the console has an _Apps_ page
+under _Connectivity_ with each connector's learned and pending routes,
+and the v1 API has `/api/v1/apps` under the `policy_file` scope. See
+[Apps](https://aislopware.github.io/slopscale/ref/apps/).
+
+### Posture integrations
+
+The server can ask CrowdStrike Falcon, SentinelOne, Microsoft Intune,
+Jamf Pro, Kandji and Kolide what they know about each machine, matched by
+the serial number the client reports, and write the answer as posture
+attributes with the prefix and names Tailscale's integrations use
+(`falcon:ztaScore`, `intune:complianceState`, `jamfPro:fileVaultStatus`,
+`kolide:authState` and the rest), so a posture written for Tailscale works
+unchanged. Every enabled integration syncs every fifteen minutes, when it
+is saved and on request; a provider that fails keeps the previous
+attributes and shows the error on the integration. One enabled
+integration per provider. The console's _Integrations › Device posture_
+page sets them up with a connection test, `slopscale posture-integrations`
+does the same from the shell, and the v1 API has
+`/api/v1/posture-integrations` under the `devices:posture_attributes`
+scope; secrets are stored and never returned. See
+[Device trust](https://aislopware.github.io/slopscale/ref/device-trust/).
+
+### SSH from the console
+
+A machine page has an _SSH_ button that opens a terminal in the browser
+to any online machine running Tailscale SSH. The console runs Tailscale's
+own in-browser client, compiled to WebAssembly and served with the
+console, which joins the tailnet as an ephemeral machine of the operator's
+own with a one-time key from `POST /api/v1/ssh-session`; whether the
+session is allowed is the SSH policy's decision, as for any other machine
+of theirs, and the machine disappears when the tab closes. An operator
+whose role does not read devices can only open a session to a machine a
+machine of theirs already sees. `make web`
+builds the client (`make wasm` alone builds only it), and a console built
+without it says so on the terminal page.
+
+### Funnel ingress shuts down promptly
+
+Stopping the embedded Funnel ingress closes the connections it is relaying
+from both ends, so a client that holds a connection open without sending
+anything no longer keeps the server from shutting down.
+
+### Relay latency and the access graph
+
+Every client reports how far each relay is; the console's _Relays ›
+Latency_ page and `GET /api/v1/derp/latency` show, per region, how many
+clients prefer it and their median and 90th-percentile latency, and a
+machine's page shows its own report with its home relay. _Access
+controls › Graph_ and `GET /api/v1/access-graph?node=` show, for one
+machine, which peers it can reach and which can reach it, with the
+ports, computed from the compiled policy exactly as the clients receive
+it. The machine object carries `netInfo`, `appConnector` and `sshServer`.
+
 ### Machines set their own attributes
 
 A machine can set its own `custom:` posture attributes over its control

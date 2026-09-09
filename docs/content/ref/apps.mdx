@@ -1,0 +1,126 @@
+---
+title: "Apps"
+---
+
+An app is a set of domains reached through app connectors, following
+[Tailscale's app connectors](https://tailscale.com/kb/1281/app-connectors).
+Instead of routing all Internet traffic through an exit node or advertising
+broad subnets, an app connector lets devices on your tailnet reach specific
+applications and SaaS domains (such as `example.com` or `*.example.com`)
+through designated connector nodes in your network.
+
+## How it works
+
+1. **Connector node.** A machine runs the app connector service and advertises
+   itself as a connector.
+2. **App definition.** An operator defines the app with its domains, static
+   routes, and connector selectors.
+3. **Route learning and approval.** The connector resolves the app's domains,
+   advertises single-address host routes for the learned IPs, and the server
+   approves them automatically.
+4. **DNS.** The server sends every machine split DNS for the app's domains
+   that points at the connectors, so queries reach a connector and it
+   learns the addresses.
+
+## Setting up a connector node
+
+A connector node must be a [tagged machine](/ref/tags) because connectors
+act as shared network infrastructure; user-owned machines cannot serve as
+connectors.
+
+On the machine, advertise the connector service:
+
+```console
+tailscale set --advertise-connector
+```
+
+When registering a new node, pass `--advertise-connector` to `tailscale up`
+along with the node's tags:
+
+```console
+sudo tailscale up --login-server <YOUR_SLOPSCALE_URL> --auth-key <KEY> \
+  --advertise-connector
+```
+
+The node reports to the server that it runs the app connector service. The
+server sends app definitions to matching connector nodes using the
+`tailscale.com/app-connectors` node capability.
+
+## Defining apps
+
+An app has:
+
+- **Name**: 1 to 63 characters.
+- **Description**: an optional summary.
+- **Domains**: domain names or wildcard domains the connectors watch and
+  resolve, such as `example.com` or `*.example.com`.
+- **Connectors**: node tag selectors (such as `tag:connector`) that specify
+  which connector nodes serve the app, or `*` to select every tagged machine
+  running the connector. If omitted, `*` is the default.
+- **Routes**: optional static CIDR prefixes (such as `198.51.100.0/24`) that
+  connectors always advertise. Full internet routes (`0.0.0.0/0` and `::/0`)
+  are refused.
+
+### Learned and static routes
+
+Connector nodes watch the app's configured domains and resolve them. Whenever
+a connector learns an address for a domain, it advertises a host route
+(`/32` for IPv4 or `/128` for IPv6).
+
+The server approves learned single-address routes automatically. If an app
+defines static `routes`, any prefix within those routes is also approved
+automatically for the app's connectors. Any other advertised routes, such
+as broader subnets (`10.0.0.0/16`) or exit routes, are not covered by the app
+and require manual approval by an operator (or policy `autoApprovers.routes`).
+
+When an app is deleted, routes its connectors already had approved stay
+approved on the nodes.
+
+## DNS
+
+The server sends every machine split DNS for the app's domains, pointing
+at the connectors' DNS endpoints over the tailnet, the way Tailscale's
+control plane does: a query for `example.com` goes to a connector, the
+connector answers it and learns the addresses in the answer. A machine
+sees only the connectors it has as peers, online ones first, and a
+connector is never sent its own apps. A wildcard domain (`*.example.com`)
+routes the base domain too. Nothing has to be configured under
+[DNS](/ref/dns); a split DNS rule for the same domain, if one exists,
+comes first.
+
+A connector answers a peer's query only when the policy lets that peer
+send traffic to the internet through it, which is the same access the
+peer needs for the addresses the connector learns: a rule with
+`autogroup:internet` or the addresses themselves as the destination and
+the peer as the source.
+
+## Console and API
+
+The admin console has an _Apps_ page under _Connectivity_ (`Connectivity › Apps`),
+listing configured apps, their domains, connector selectors, static routes,
+and the connector nodes assigned to each app with counts of learned and pending
+routes.
+
+From the CLI:
+
+```console
+slopscale apps list
+slopscale apps show --id 1
+slopscale apps create --name "Internal Tools" \
+  --domain tools.corp.example.com --domain "*.tools.corp.example.com" \
+  --connector tag:connector \
+  --route 192.0.2.0/24
+slopscale apps update --id 1 --route 198.51.100.0/24
+slopscale apps delete --id 1
+```
+
+Through the API:
+
+- `GET /api/v1/apps`: list all apps (requires `policy_file:read`).
+- `POST /api/v1/apps`: create an app (requires `policy_file`).
+- `GET /api/v1/app/{id}`: retrieve an app (requires `policy_file:read`).
+- `PUT /api/v1/app/{id}`: update an app definition (requires `policy_file`).
+- `DELETE /api/v1/app/{id}`: delete an app (requires `policy_file`).
+
+Creating, updating and deleting an app are audited as `app.create`,
+`app.update` and `app.delete`.

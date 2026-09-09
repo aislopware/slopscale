@@ -55,3 +55,96 @@ The server signs only for the machine that asks: the node key in the
 request must be the one bound to the connection, and the machine must
 be approved and not suspended. An expired key, a machine waiting for
 approval or a suspended one gets a `403`.
+
+## Federating with a cloud
+
+A machine's identity token lets it assume a cloud identity without a stored
+credential, the way Tailscale's workload identity federation does. The server
+acts as an OpenID Connect issuer: the issuer is the server URL, tokens are
+signed with ES256, discovery is at `/.well-known/openid-configuration`, and keys
+are at `/.well-known/jwks.json`. Cloud providers verify the signature and
+evaluate the claims listed above to issue short-lived credentials.
+
+### AWS
+
+Register the server once as an OpenID Connect provider:
+`aws iam create-open-id-connect-provider --url https://control.example.com --client-id-list sts.amazonaws.com`.
+The client ID is the audience the machines will ask for; any string works as
+long as the trust policy names it.
+
+A role trust policy allows `sts:AssumeRoleWithWebIdentity`, sets the `Federated`
+principal to the provider ARN, and checks `"control.example.com:aud": "sts.amazonaws.com"`
+and `"control.example.com:sub": "laptop.ts.example.com"` (`StringEquals`, or
+`StringLike` with `*.ts.example.com` for a fleet):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::123456789012:oidc-provider/control.example.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "control.example.com:aud": "sts.amazonaws.com",
+          "control.example.com:sub": "laptop.ts.example.com"
+        }
+      }
+    }
+  ]
+}
+```
+
+On the machine, assume the role with
+`aws sts assume-role-with-web-identity --role-arn ... --role-session-name laptop --web-identity-token "$(tailscale id-token sts.amazonaws.com)"`
+(with `TAILSCALE_USE_WIP_CODE=1` as above), or write the token to a file and
+set `AWS_ROLE_ARN` and `AWS_WEB_IDENTITY_TOKEN_FILE`, or use
+`credential_process`. The token lasts five minutes, so a helper that refreshes
+the file is needed for long jobs.
+
+AWS fetches the JWKS itself, so the server must be reachable from the internet
+over HTTPS with a publicly trusted certificate.
+
+### Google Cloud
+
+Create a workload identity pool and an OIDC provider:
+`gcloud iam workload-identity-pools create tailnet --location=global` and
+`gcloud iam workload-identity-pools providers create-oidc slopscale --location=global --workload-identity-pool=tailnet --issuer-uri=https://control.example.com --allowed-audiences=gcp --attribute-mapping="google.subject=assertion.sub,attribute.node=assertion.node,attribute.domain=assertion.domain"`.
+The `tags` claim is a list, so map single-valued claims only;
+`--jwk-json-path` uploads the key set when the server is not reachable from
+Google.
+
+Grant `roles/iam.workloadIdentityUser` on a service account to
+`principal://iam.googleapis.com/projects/NUMBER/locations/global/workloadIdentityPools/tailnet/subject/laptop.ts.example.com`
+(or `principalSet://.../attribute.domain/ts.example.com` for every machine).
+
+`gcloud iam workload-identity-pools create-cred-config ... --executable-command='tailscale id-token gcp' --executable-output-file=...`
+is the documented way to plug an executable in. The executable must print the
+JSON Google expects (`{"version":1,"success":true,"token_type":"urn:ietf:params:oauth:token-type:jwt","id_token":"...","expiration_time":...}`),
+so a two-line wrapper script is needed:
+
+```console
+token=$(tailscale id-token gcp)
+printf '{"version":1,"success":true,"token_type":"urn:ietf:params:oauth:token-type:jwt","id_token":"%s"}\n' "$token"
+```
+
+### HashiCorp Vault
+
+Enable the JWT auth method and configure it against the server's discovery URL:
+
+```console
+vault auth enable jwt
+vault write auth/jwt/config oidc_discovery_url="https://control.example.com" bound_issuer="https://control.example.com"
+vault write auth/jwt/role/machines role_type=jwt bound_audiences=vault user_claim=sub \
+  bound_claims_type=glob bound_claims='{"sub":"*.ts.example.com"}' policies=default ttl=1h
+vault write auth/jwt/login role=machines jwt="$(tailscale id-token vault)"
+```
+
+The `bound_claims` field can also pin `tags` (a list claim; Vault matches any
+element) so only `tag:ci` machines may log in.
+
+The token names the machine, not a person. A stolen token is worth five minutes
+and only what the cloud role allows.

@@ -134,6 +134,132 @@ policy trusts. An attribute the machine sets is a custom attribute like
 any other, with the comment _Set by the machine_, and the audit log
 records it as `node.attribute.set` with the machine as the actor.
 
+## Posture integrations
+
+Posture integrations query external endpoint management (MDM) and endpoint
+detection and response (EDR) services for device state and turn the answers into
+prefixed posture attributes, following
+[Tailscale's device posture integrations](https://tailscale.com/docs/features/device-posture#supported-posture-providers).
+The attribute names match Tailscale's naming conventions, so existing postures
+work without changes.
+
+### Providers and requirements
+
+Slopscale supports six posture providers:
+
+- **CrowdStrike Falcon** (`falcon:`): requires an OAuth client ID (`clientId`)
+  and secret (`clientSecret`). The API base URL (`baseUrl`) defaults to
+  `https://api.crowdstrike.com`.
+- **SentinelOne** (`sentinelOne:`): requires the console URL (`baseUrl`) and an
+  API token (`apiToken`).
+- **Microsoft Intune** (`intune:`): requires the Entra tenant ID (`tenantId`),
+  client ID (`clientId`), and client secret (`clientSecret`). The API base URL
+  defaults to `https://graph.microsoft.com`.
+- **Jamf Pro** (`jamfPro:`): requires the Jamf Pro server URL (`baseUrl`),
+  client ID (`clientId`), and client secret (`clientSecret`).
+- **Kandji** (`kandji:`): requires the tenant URL (`baseUrl`) and an API token
+  (`apiToken`).
+- **Kolide** (`kolide:`): requires an API token (`apiToken`). The API base URL
+  defaults to `https://api.kolide.com`.
+
+Any provided base URL must be an `http` or `https` origin.
+
+### Attributes written by providers
+
+Each provider writes attributes prefixed with its namespace:
+
+- **CrowdStrike Falcon** (`falcon:`):
+  - `falcon:ztaScore` (number): The Zero Trust Assessment score, 0 to 100.
+- **SentinelOne** (`sentinelOne:`):
+  - `sentinelOne:operationalState` (string): The agent's operational state.
+  - `sentinelOne:activeThreats` (number): Unresolved threats on the device.
+  - `sentinelOne:agentVersion` (string): The installed agent version.
+  - `sentinelOne:encryptedApplications` (boolean): Whether disk encryption is on.
+  - `sentinelOne:firewallEnabled` (boolean): Whether the firewall is on.
+  - `sentinelOne:infected` (boolean): Whether the agent reports an infection.
+- **Microsoft Intune** (`intune:`):
+  - `intune:complianceState` (string): `compliant`, `noncompliant`, `inGracePeriod` or `unknown`.
+  - `intune:azureADRegistered` (boolean): Whether the device is registered in Entra.
+  - `intune:deviceRegistrationState` (string): `registered`, `notRegistered` or `revoked`.
+  - `intune:isSupervised` (boolean): Whether the device is supervised.
+  - `intune:isEncrypted` (boolean): Whether the disk is encrypted.
+  - `intune:managedDeviceOwnerType` (string): `company`, `personal` or `unknown`.
+- **Jamf Pro** (`jamfPro:`):
+  - `jamfPro:remoteManaged` (boolean): Whether MDM manages the computer.
+  - `jamfPro:supervised` (boolean): Whether the computer is supervised.
+  - `jamfPro:firewallEnabled` (boolean): Whether the firewall is on.
+  - `jamfPro:fileVaultStatus` (string): `ALL_ENCRYPTED`, `SOME_ENCRYPTED` or `NOT_ENCRYPTED`.
+  - `jamfPro:SIPEnabled` (string): `ENABLED` or `DISABLED`.
+- **Kandji** (`kandji:`):
+  - `kandji:mdmEnabled` (boolean): Whether MDM is enabled on the device.
+  - `kandji:agentInstalled` (boolean): Whether the Kandji agent is installed.
+- **Kolide** (`kolide:`):
+  - `kolide:authState` (string): `Good`, `Notified`, `Will Block` or `Blocked`.
+
+### Machine matching and synchronization
+
+Machines are matched to provider records by the serial number the client
+reports. [Identity collection](#identity-collection) must be on
+(`slopscale settings set --posture-identity=true` or _Collect device identity_
+in console Settings), and the client must report its serial number with posture
+checking enabled (`tailscale set --posture-checking=true`).
+
+Only **one enabled integration per provider** is allowed at a time, because each
+provider owns its attribute prefix.
+
+- **Scheduled sync**: A worker goroutine syncs every enabled provider every 15
+  minutes.
+- **Sync on save**: Creating or updating an enabled integration syncs it at once
+  so the attributes exist before an operator writes rules against them.
+- **Sync now**: An operator can trigger an immediate sync at any time via _Sync now_
+  in the console or `POST /api/v1/posture-integration/{id}/sync`.
+
+If a provider sync fails (for example, if the provider API is unreachable or
+credentials are rejected), the server keeps the previous attributes on machines
+so a transient failure does not disconnect devices from rules. The error is
+recorded on the integration in `lastError` and shown in the console.
+
+### Example postures
+
+Integration attributes are used directly in posture expressions:
+
+```text
+falcon:ztaScore >= 80
+intune:complianceState == 'compliant'
+```
+
+### Console and API
+
+Posture integrations are managed in the console under _Integrations › Device posture_.
+
+```console
+slopscale posture-integrations providers
+slopscale posture-integrations list
+slopscale posture-integrations check --provider kolide --name "Kolide Fleet" --api-token "kld_..."
+slopscale posture-integrations create --provider kolide --name "Kolide Fleet" --api-token "kld_..."
+slopscale posture-integrations create --provider intune --name "Entra Intune" \
+  --tenant-id "00000000-0000-0000-0000-000000000000" \
+  --client-id "11111111-1111-1111-1111-111111111111" \
+  --client-secret "sec_..."
+slopscale posture-integrations sync --id 1
+slopscale posture-integrations delete --id 1
+```
+
+`slopscale posture-integrations check` verifies credentials with the
+provider before saving. An integration syncs on save and every 15 minutes,
+or immediately with `sync`.
+
+Through the API:
+
+- `GET /api/v1/posture-integrations`: list integrations (requires `devices:posture_attributes:read`).
+- `POST /api/v1/posture-integrations`: create an integration (requires `devices:posture_attributes`).
+- `GET /api/v1/posture-integration/{id}`: get an integration (requires `devices:posture_attributes:read`).
+- `PUT /api/v1/posture-integration/{id}`: update an integration (requires `devices:posture_attributes`). An omitted secret keeps the stored value.
+- `DELETE /api/v1/posture-integration/{id}`: delete an integration and clear its attributes (requires `devices:posture_attributes`).
+- `POST /api/v1/posture-integration/{id}/sync`: sync an integration immediately (requires `devices:posture_attributes`).
+- `POST /api/v1/posture-integrations/check`: verify credentials against the provider without saving (requires `devices:posture_attributes`).
+- `GET /api/v1/posture-integrations/providers`: list supported providers and their attributes catalog (requires `devices:posture_attributes:read`).
+
 ## Postures
 
 A posture names conditions a machine must meet. It has a list of

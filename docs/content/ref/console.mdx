@@ -185,8 +185,7 @@ the user it created.
 The sidebar starts with the overview and is then grouped by what you are
 doing. *Tailnet* holds machines and users. *Access* holds the access controls
 and, for everyone, the page to ask for temporary access. *Connectivity* holds
-networks, routes, DNS and relays. *Logs* holds the audit log and the SSH
-session recordings. *Administration* holds the settings, the keys and the
+networks, routes, services, apps, DNS and relays. *Logs* holds the audit log and the [SSH session recordings](/ref/ssh-recording). *Administration* holds the settings, the keys and the
 integrations. An item with several parts, such as _Access controls_, _DNS_,
 _Relays_, _Settings_, _Keys_ or _Integrations_, opens into a page per part,
 each with its own address.
@@ -209,7 +208,9 @@ out*.
   its own every fifteen seconds while the tab is open.
   Each machine has a detail page with its keys, routes and services (approve
   with a switch), sharing and the global exit node switch, plus rename, tag,
-  expire and remove.
+  expire and remove. For an online machine running Tailscale SSH, an _SSH_
+  button opens a terminal in the browser; see
+  [SSH from the console](#ssh-from-the-console).
   A warning the client reports about itself, such as a subnet router whose
   kernel drops forwarded packets, shows at the top of the page until the client
   stops reporting it or goes offline.
@@ -227,7 +228,8 @@ out*.
   new secret for an API key that keeps its id and scopes). New keys and
   client secrets are shown once, with a copy button.
 - **Access controls**: a page each for the [rules, groups](/ref/access-control)
-  and [postures](/ref/device-trust), the queue of
+  and [postures](/ref/device-trust), the access [graph](/ref/access-control#access-graph)
+  showing who can reach what, the queue of
   [access requests](/ref/temporary-access), and the [policy](/ref/policy) file
   in an editor that colours HuJSON, underlines what the server would refuse
   as you type (an unknown key, a group no section defines, an autogroup on
@@ -245,26 +247,57 @@ out*.
   no network owns.
 - **Services**: [services](/ref/services) with their addresses, DNS name and
   hosts, and a switch to approve each host.
+- **Apps**: [apps](/ref/apps) reached through app connectors, with their domains,
+  connector selectors, static routes, and the connector nodes with their learned
+  and pending routes.
 - **DNS**: a page each for nameservers with MagicDNS and search domains, split
   DNS for every machine or for some groups, and extra records, all changed at
   runtime; see [DNS](/ref/dns).
 - **Relays**: a page each for the DERP map machines receive, the map sources
-  and refetch schedule, the relays you run yourself, and the embedded relay.
-- **Integrations**: a page for webhooks, endpoints that receive signed event
-  notifications, with their subscriptions and last delivery (create, edit,
-  test, rotate the secret and delete; see [Webhooks](/ref/webhooks)), and one
-  for log streams, which ship the audit log to a SIEM in batches.
+  and refetch schedule, the relays you run yourself, the embedded relay, and
+  relay [latency](/ref/derp#latency) reporting measured round trips and home
+  regions across the tailnet.
+- **Integrations**: a page each for
+  [device posture integrations](/ref/device-trust#posture-integrations)
+  (CrowdStrike Falcon, SentinelOne, Microsoft Intune, Jamf Pro, Kandji, Kolide),
+  webhooks (endpoints that receive signed event notifications, with their
+  subscriptions and last delivery; see [Webhooks](/ref/webhooks)), and log
+  streams, which ship the audit log to a SIEM in batches.
 - **Audit log**: who changed what, newest first, with filters by action, user
   and time, and _Export_ as CSV or JSON with the same filters; see
   [Audit log](/ref/audit).
 - **Settings**: a page each for the tailnet switches
   ([device and user approval](/ref/approval), device trust, the key expiry cap,
-  SSH recording, and the state of [tailnet lock](/ref/tailnet-lock) with
+  [SSH recording](/ref/ssh-recording), and the state of [tailnet lock](/ref/tailnet-lock) with
   _Switch off_), the console [sessions](#sessions) with _End_ and _Sign out
   everywhere_ next to the signed-in credential's role and scopes, and the
   server's build, addresses, DERP regions and config file values with a
   _Maintenance_ section holding the IP address backfill
   (`slopscale nodes backfillips`).
+
+## SSH from the console
+
+The machine page's _SSH_ button opens a terminal in the browser for an online
+machine that runs Tailscale SSH (`tailscale set --ssh`, which the machine
+record reports as `sshServer`).
+
+The console runs Tailscale's in-browser client (WebAssembly), which joins the
+tailnet as an ephemeral machine owned by the signed-in user with a one-time key
+valid five minutes (`POST /api/v1/ssh-session`). Because the client connects as
+a machine of that user, the SSH [policy](/ref/policy) decides whether the
+session is allowed exactly as for any other machine of theirs:
+`autogroup:member` and user rules match the signed-in user, while a tagged
+machine needs a rule that admits the user. The ephemeral machine disappears
+when the tab closes. A user whose role does not read devices can only open a
+session to a machine of their own or one a machine of theirs already sees
+under the policy; any other machine is reported as not found.
+
+Connecting from the browser needs the target machine's [DERP relays](/ref/derp)
+to be reachable over websockets (`wss:`). The
+[embedded relay](/ref/derp#embedded-derp) supports it; a relay that does not
+answers with a connection that never comes up.
+
+A console built without `make wasm` shows a notice on the terminal page.
 
 ## Building from source
 
@@ -277,8 +310,13 @@ $ make build
 ```
 
 `make web` needs [bun](https://bun.sh) (the Nix development shell provides it).
-A binary built without it still serves `/admin/`, with a page saying the
-console is missing, and the API works as usual.
+`make web` now also runs `make wasm`, which compiles
+`tailscale.com/cmd/tsconnect/wasm` with the Go toolchain (about 30 MB raw,
+7 MB gzipped, embedded gzipped), and the client is served under
+`/admin/tsconnect/`. Running `make wasm` alone builds only the WebAssembly
+client. A binary built without `make web` still serves `/admin/`, with a page
+saying the console is missing, and the API works as usual. A console built
+without `make wasm` shows a notice on the terminal page.
 
 The console lives in `web/`: React with the TanStack router, query and table
 libraries and Cloudflare's [Kumo](https://kumo-ui.com) design system (Base UI
@@ -316,8 +354,10 @@ provider without a browser.
 
 The console lives under `/admin/` on the same origin as the API, so a
 [reverse proxy](/ref/integration/reverse-proxy) that forwards the whole host
-needs no extra rules. It sends a `Content-Security-Policy` that only allows its
-own origin; do not embed it in another site's frame.
+needs no extra rules. It sends a `Content-Security-Policy` that allows its own
+origin, `'wasm-unsafe-eval'` for the in-browser client, and `connect-src wss:`
+so the client can reach DERP relays over WebSockets; do not embed it in another
+site's frame.
 
 If you prefer the console not to be reachable, block `/admin/` at the proxy.
 Everything it does is also available through the API with the same key, so

@@ -244,6 +244,36 @@ Any Tailscale client may be used to introspect the DERP map and to check for con
 Additional DERP related metrics and information is available via the [metrics and debug
 endpoint](/ref/debug#metrics-and-debug-endpoint).
 
+## Latency
+
+Every connected client measures its round-trip latency to each relay region in
+the DERP map and reports its measurements back to the control server when it
+connects and whenever its network changes.
+
+```console
+$ slopscale derp latency
+```
+
+`slopscale derp latency` displays a table of regions with their ID, name, how
+many machines have chosen that region as their preferred relay, the number of
+reporting machines, and their median and 90th percentile (p90) round-trip
+latency:
+
+```text
+ID    Name              Preferred by  Reporting  Median  p90
+1     New York City     3             5          12.4ms  18.2ms
+2     San Francisco     0             0          -       -
+999   Embedded relay    2             4           8.1ms  11.5ms
+```
+
+The admin console under _Relays › Latency_ and the API endpoint
+`GET /api/v1/derp/latency` (requiring `devices:core:read`) show the same
+per-region metrics. The report also highlights machines behind hard NATs
+that must relay traffic.
+
+On each machine's page in the console, the client's own network report shows its
+preferred relay region, measured latency to every region, and NAT properties.
+
 ## Limitations
 
 - The embedded DERP server can't be used for Tailscale's captive portal checks as it doesn't support the `/generate_204`

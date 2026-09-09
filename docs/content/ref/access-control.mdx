@@ -125,3 +125,17 @@ $ slopscale groups add-node --identifier 3 --node 7
 $ slopscale access-rules create --name "SSH to servers" --src 2 --dst 3 --protocol tcp --ports 22
 $ slopscale access-rules disable --identifier 1
 ```
+
+## Access graph
+
+`slopscale nodes access-graph --node <id>`, `GET /api/v1/access-graph?node=`
+(requiring `policy_file:read`) and the console's _Access controls › Graph_ page
+show, for a machine, which peers it can reach and which can reach it, with the
+ports, routes and SSH logins:
+
+```console
+$ slopscale nodes access-graph --node 7
+```
+
+The access graph is computed from the compiled policy exactly as the clients
+receive it, showing effective connectivity across the tailnet.
