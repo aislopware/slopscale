@@ -1,4 +1,5 @@
 import { LinkProvider } from "@cloudflare/kumo/utils";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -56,9 +57,11 @@ function app(path: string): ReactElement {
   });
 
   return (
-    <LinkProvider component={AppLink}>
-      <RouterProvider router={router} />
-    </LinkProvider>
+    <QueryClientProvider client={new QueryClient()}>
+      <LinkProvider component={AppLink}>
+        <RouterProvider router={router} />
+      </LinkProvider>
+    </QueryClientProvider>
   );
 }
 

@@ -1,7 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 
-import { onSignOut } from "~/auth/session.ts";
+import { onSessionEnd } from "~/auth/ended.ts";
 import { RouteError, RouteNotFound } from "~/components/ui/error-page.tsx";
 import { routeTree } from "~/routeTree.gen.ts";
 
@@ -34,8 +34,8 @@ export const router = createRouter({
   defaultNotFoundComponent: RouteNotFound,
 });
 
-// Signing out drops everything the session could see and re-runs the guards.
-onSignOut(() => {
+// The end of the session drops everything it could see and re-runs the guards.
+onSessionEnd(() => {
   queryClient.clear();
   void router.invalidate();
 });

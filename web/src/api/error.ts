@@ -19,7 +19,7 @@ export const problemSchema = object({
 /** RFC 9457 problem details as the server sends them. */
 export type Problem = InferOutput<typeof problemSchema>;
 
-const statusUnauthorized = 401;
+export const statusUnauthorized = 401;
 const statusForbidden = 403;
 const statusNotFound = 404;
 

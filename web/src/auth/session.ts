@@ -1,23 +1,11 @@
 import { fetchClient } from "~/api/client.ts";
+import { sessionEnded } from "~/auth/ended.ts";
 
 /**
  * The console signs in only through the identity provider. The browser holds an HttpOnly cookie the
  * console cannot read, so there is no client-side sign-in state: whether the operator is signed in
  * is the server's answer to `/api/v1/whoami`, asked by the route guards.
  */
-
-type Listener = () => void;
-
-const listeners = new Set<Listener>();
-
-/** Runs listener after a sign-out, so the router can drop its caches and re-run the guards. */
-export function onSignOut(listener: Listener): () => void {
-  listeners.add(listener);
-
-  return () => {
-    listeners.delete(listener);
-  };
-}
 
 /**
  * Ends the session on the server, which clears its cookie, then lets the router re-run the guards
@@ -31,9 +19,7 @@ export async function signOut(): Promise<void> {
     // Nothing to keep here; the session is either gone or unreachable.
   }
 
-  for (const listener of listeners) {
-    listener();
-  }
+  sessionEnded();
 }
 
 /** The console's own path for a router location, as the server's redirect parameter wants it. */

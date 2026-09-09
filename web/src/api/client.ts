@@ -3,19 +3,27 @@ import type { Middleware } from "openapi-fetch";
 import createQueryClient from "openapi-react-query";
 import { safeParse } from "valibot";
 
-import { ApiError, problemSchema } from "~/api/error.ts";
+import { ApiError, problemSchema, statusUnauthorized } from "~/api/error.ts";
 import type { Problem } from "~/api/error.ts";
 import type { paths } from "~/api/schema.gen.ts";
+import { sessionEnded } from "~/auth/ended.ts";
+
+/** The guards' own question; its 401 is the answer they are asking for, not news. */
+const whoami = "/api/v1/whoami";
 
 /**
  * The session cookie rides along on every same-origin request, so there is no credential to attach.
- * Errors become `ApiError`; a 401 (the session ended or expired) is left to the route guards, which
- * send the operator back to sign-in.
+ * Errors become `ApiError`. A 401 on anything but the guards' own question means the session ended
+ * under an open page, so the router is told and sends the operator back to sign-in.
  */
 const problems: Middleware = {
-  async onResponse({ response }) {
+  async onResponse({ request, response }) {
     if (response.ok) {
       return response;
+    }
+
+    if (response.status === statusUnauthorized && !new URL(request.url).pathname.endsWith(whoami)) {
+      sessionEnded();
     }
 
     const problem = await readProblem(response);

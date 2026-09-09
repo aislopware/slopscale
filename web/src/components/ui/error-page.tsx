@@ -12,11 +12,13 @@ import {
   SignInIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useMatches, useRouter } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { useMemo } from "react";
 import type { ReactElement, ReactNode } from "react";
 
+import { meQuery } from "~/auth/me.ts";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
 import { Frame, FramePanel } from "~/components/ui/frame.tsx";
@@ -193,15 +195,23 @@ function BackButton(): ReactElement {
   );
 }
 
-/** Sign in and come back here: the router's address, which is what the login page navigates to. */
+/**
+ * Sign in and come back here: the router's address, which is what the login page navigates to. The
+ * guards' cached answer said the operator was signed in, so it goes before the sign-in page asks
+ * again, or it would send the operator straight back to this page.
+ */
 function SignInButton(): ReactElement {
   const here = useLocation({ select: (location) => location.href });
+  const queryClient = useQueryClient();
 
   return (
     <LinkButton
       href={`/login?redirect=${encodeURIComponent(here)}`}
       variant="primary"
       icon={SignInIcon}
+      onClick={() => {
+        queryClient.removeQueries({ queryKey: meQuery.queryKey });
+      }}
     >
       Sign in
     </LinkButton>
