@@ -215,6 +215,57 @@ func TestProxyDeliversByServerName(t *testing.T) {
 
 // TestProxyRefusals proves a connection without a server name, for an
 // unknown name, or that the node refuses is closed without delivering.
+// TestProxyShutdownClosesIdleConnections proves a shutdown does not wait
+// for a client that holds its connection open without sending anything:
+// the splice is closed from both ends and Serve returns.
+func TestProxyShutdownClosesIdleConnections(t *testing.T) {
+	t.Parallel()
+
+	node := newFakeNode(t)
+
+	var dialer net.Dialer
+
+	p := New(dialer.DialContext, mapResolver{"web.example.com": node.peerAPI(t)})
+
+	var lc net.ListenConfig
+
+	ln, err := lc.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		_ = p.Serve(ctx, ln)
+	}()
+
+	// The handshake completes through the node, then the client goes quiet.
+	conn, err := dialTLS(t, ln.Addr(), &tls.Config{
+		ServerName:         "web.example.com",
+		InsecureSkipVerify: true,
+	})
+	require.NoError(t, err)
+
+	defer conn.Close()
+
+	require.Eventually(t, func() bool { return node.accepted.Load() == 1 }, 5*time.Second, 10*time.Millisecond)
+
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Serve did not return after the context ended")
+	}
+
+	// The client sees its side closed too.
+	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_, err = conn.Read(make([]byte, 1))
+	require.Error(t, err)
+}
+
 func TestProxyRefusals(t *testing.T) {
 	t.Parallel()
 

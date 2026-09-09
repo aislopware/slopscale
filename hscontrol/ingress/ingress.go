@@ -132,9 +132,13 @@ func (p *Proxy) Serve(ctx context.Context, ln net.Listener) error {
 	}
 }
 
-// HandleConn delivers one accepted connection and closes it when done.
+// HandleConn delivers one accepted connection and closes it when done,
+// or when the context ends: a shutdown must not wait for an idle client.
 func (p *Proxy) HandleConn(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
+
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
 
 	err := p.deliver(ctx, conn)
 	if err != nil && ctx.Err() == nil {
@@ -161,6 +165,11 @@ func (p *Proxy) deliver(ctx context.Context, conn net.Conn) error {
 		return fmt.Errorf("opening ingress to %s for %s: %w", peerAPI, target, err)
 	}
 	defer peer.Close()
+
+	// The splice ends when either side closes; on shutdown that is us,
+	// on both sides, so a copy blocked on a silent peer returns too.
+	stop := context.AfterFunc(ctx, func() { _ = peer.Close() })
+	defer stop()
 
 	connLogger(conn).Debug().Str("host", host).Stringer("peerAPI", peerAPI).Msg("Funnel ingress connection opened")
 
