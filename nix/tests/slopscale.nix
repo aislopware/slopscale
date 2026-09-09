@@ -31,6 +31,8 @@ in
       peer2 = peer;
 
       slopscale = {
+        # The module under test is this repository's, not the headscale one in nixpkgs.
+        imports = [ ../module.nix ];
         services = {
           slopscale = {
             enable = true;

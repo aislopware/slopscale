@@ -27,8 +27,8 @@ let
   };
 in
 {
-  # Disable the upstream NixOS module to prevent conflicts
-  disabledModules = [ "services/networking/slopscale.nix" ];
+  # Keep nixpkgs' headscale module out so a system cannot end up with both.
+  disabledModules = [ "services/networking/headscale.nix" ];
 
   options = {
     services.slopscale = {
