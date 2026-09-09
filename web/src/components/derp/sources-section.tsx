@@ -87,7 +87,7 @@ export function SourcesSection({
             url === tailscaleMapUrl ? (
               <span className="text-xs text-kumo-subtle">Tailscale</span>
             ) : undefined,
-          removeLabel: `Remove map URL ${url}`,
+          menuLabel: `Actions for map URL ${url}`,
           onRemove: () => {
             mutations.apply(withoutUrl(settings, url), `Removed ${url}`);
           },

@@ -1,5 +1,6 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { ArrowsClockwiseIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
+import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
+import { ArrowsClockwiseIcon, PencilSimpleIcon, PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { ReactElement } from "react";
@@ -18,6 +19,7 @@ import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { AttributeText } from "~/components/ui/expression-text.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
@@ -225,45 +227,17 @@ function CustomAttributes({
         ) : null}
       </SectionRow>
       {posture.custom.map((attribute) => (
-        <SectionRow
+        <AttributeRow
           key={attribute.key}
-          className="flex flex-wrap items-center justify-between gap-3 py-3"
-        >
-          <button
-            type="button"
-            disabled={!canEdit}
-            className="flex min-w-0 flex-col gap-0.5 text-left disabled:cursor-default"
-            onClick={() => {
-              setEditing(attribute);
-            }}
-          >
-            <AttributeText name={attribute.key} value={attribute.value} />
-            <span className="text-xs text-kumo-subtle">
-              {attribute.expiresAt === undefined ? (
-                "Does not expire"
-              ) : (
-                <>
-                  Expires <RelativeTime value={attribute.expiresAt} />
-                </>
-              )}
-              {attribute.comment === undefined || attribute.comment === ""
-                ? null
-                : ` · ${attribute.comment}`}
-            </span>
-          </button>
-          {canEdit ? (
-            <Button
-              variant="ghost"
-              shape="square"
-              size="sm"
-              aria-label={`Remove ${attribute.key}`}
-              icon={<TrashIcon size={iconSize} />}
-              onClick={() => {
-                setRemoving(attribute.key);
-              }}
-            />
-          ) : null}
-        </SectionRow>
+          attribute={attribute}
+          canEdit={canEdit}
+          onEdit={() => {
+            setEditing(attribute);
+          }}
+          onRemove={() => {
+            setRemoving(attribute.key);
+          }}
+        />
       ))}
       <AttributeDialog
         node={node}
@@ -293,5 +267,54 @@ function CustomAttributes({
         }}
       />
     </>
+  );
+}
+
+/** One custom attribute: the row opens the editor, the menu edits or removes it. */
+function AttributeRow({
+  attribute,
+  canEdit,
+  onEdit,
+  onRemove,
+}: {
+  readonly attribute: CustomAttribute;
+  readonly canEdit: boolean;
+  readonly onEdit: () => void;
+  readonly onRemove: () => void;
+}): ReactElement {
+  return (
+    <SectionRow className="flex flex-wrap items-center justify-between gap-3 py-3">
+      <button
+        type="button"
+        disabled={!canEdit}
+        className="flex min-w-0 flex-col gap-0.5 text-left disabled:cursor-default"
+        onClick={onEdit}
+      >
+        <AttributeText name={attribute.key} value={attribute.value} />
+        <span className="text-xs text-kumo-subtle">
+          {attribute.expiresAt === undefined ? (
+            "Does not expire"
+          ) : (
+            <>
+              Expires <RelativeTime value={attribute.expiresAt} />
+            </>
+          )}
+          {attribute.comment === undefined || attribute.comment === ""
+            ? null
+            : ` · ${attribute.comment}`}
+        </span>
+      </button>
+      {canEdit ? (
+        <RowMenu label={`Actions for ${attribute.key}`}>
+          <DropdownMenu.Item icon={PencilSimpleIcon} onClick={onEdit}>
+            Edit…
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item icon={TrashIcon} variant="danger" onClick={onRemove}>
+            Remove…
+          </DropdownMenu.Item>
+        </RowMenu>
+      ) : null}
+    </SectionRow>
   );
 }

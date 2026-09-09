@@ -1,11 +1,10 @@
-import { Button } from "@cloudflare/kumo/components/button";
+import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { TrashIcon } from "@phosphor-icons/react";
 import type { ReactElement, ReactNode } from "react";
 
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 import type { SectionEmptyProps } from "~/components/ui/section.tsx";
-
-const iconSize = 16;
 
 export interface Entry {
   readonly key: string;
@@ -16,10 +15,11 @@ export interface Entry {
   readonly control?: ReactNode;
   /** Absent when the entry cannot be removed, such as the base domain. */
   readonly onRemove?: (() => void) | undefined;
-  readonly removeLabel?: string;
+  /** Accessible name of the row menu, such as "Actions for nameserver 1.1.1.1". */
+  readonly menuLabel?: string;
 }
 
-/** Rows of values with a remove button each, and a quiet line when there are none. */
+/** Rows of values with a row menu each, and a quiet line when there are none. */
 export function EntryList({
   entries,
   empty,
@@ -48,13 +48,17 @@ export function EntryList({
             <div className="flex shrink-0 items-center gap-3">
               {entry.control}
               {canEdit && entry.onRemove !== undefined ? (
-                <RemoveButton
-                  label={entry.removeLabel ?? "Remove"}
-                  disabled={pending}
-                  onRemove={() => {
-                    entry.onRemove?.();
-                  }}
-                />
+                <RowMenu label={entry.menuLabel ?? "Actions"} disabled={pending}>
+                  <DropdownMenu.Item
+                    icon={TrashIcon}
+                    variant="danger"
+                    onClick={() => {
+                      entry.onRemove?.();
+                    }}
+                  >
+                    Remove
+                  </DropdownMenu.Item>
+                </RowMenu>
               ) : null}
             </div>
           ) : null}
@@ -64,41 +68,17 @@ export function EntryList({
   );
 }
 
-function RemoveButton({
-  label,
-  disabled,
-  onRemove,
-}: {
-  readonly label: string;
-  readonly disabled: boolean;
-  readonly onRemove: () => void;
-}): ReactElement {
-  return (
-    <Button
-      variant="ghost"
-      shape="square"
-      size="sm"
-      icon={<TrashIcon size={iconSize} />}
-      aria-label={label}
-      disabled={disabled}
-      onClick={onRemove}
-    />
-  );
-}
-
 /**
- * The room a row's remove button takes, for a row that has none but whose control must end on the
- * same edge as the rows that do. It renders the button itself, hidden, so the two cannot drift
- * apart when the button changes.
+ * The room a row's menu takes, for a row that has none but whose control must end on the same edge
+ * as the rows that do. It renders the trigger itself, hidden, so the two cannot drift apart when
+ * the trigger changes.
  */
 export function EntryActionSpacer(): ReactElement {
   return (
     <span aria-hidden className="invisible">
-      <RemoveButton label="" disabled onRemove={noop} />
+      <RowMenu label="" disabled>
+        {null}
+      </RowMenu>
     </span>
   );
-}
-
-function noop(): void {
-  // The spacer is not interactive.
 }

@@ -91,7 +91,7 @@ export function NameserversSection({
               }}
             />
           ),
-          removeLabel: `Remove nameserver ${ns}`,
+          menuLabel: `Actions for nameserver ${ns}`,
           onRemove: () => {
             mutations.apply(withoutNameserver(settings, ns), `Removed ${ns}`);
           },

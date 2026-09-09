@@ -1,4 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
+import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { UsersThreeIcon, XIcon } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -12,6 +13,7 @@ import { MembershipDialog } from "~/components/access/membership-dialog.tsx";
 import { groupsOfNode, isBuiltin } from "~/components/access/model.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
 import { ownerId } from "~/components/machines/owner.ts";
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { userLabel } from "~/lib/node.ts";
@@ -141,16 +143,11 @@ function GroupRow({
         <span className="truncate text-xs text-kumo-subtle">{origin}</span>
       </span>
       {removable ? (
-        <Button
-          variant="ghost"
-          shape="square"
-          size="sm"
-          icon={XIcon}
-          aria-label={`Remove direct membership of ${group.name}`}
-          title="Remove direct membership"
-          loading={pending}
-          onClick={onRemove}
-        />
+        <RowMenu label={`Actions for group ${group.name}`} disabled={pending}>
+          <DropdownMenu.Item icon={XIcon} variant="danger" onClick={onRemove}>
+            Remove direct membership
+          </DropdownMenu.Item>
+        </RowMenu>
       ) : null}
     </SectionRow>
   );

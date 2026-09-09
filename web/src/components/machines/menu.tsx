@@ -32,7 +32,7 @@ import { RoutesDialog } from "~/components/machines/routes-dialog.tsx";
 import { ShareDialog } from "~/components/machines/share-dialog.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { toast } from "~/components/ui/toast.ts";
-import { advertisesExit, isTagged } from "~/lib/node.ts";
+import { advertisesExit, isTagged, nodeName } from "~/lib/node.ts";
 
 type Dialog = "rename" | "tags" | "routes" | "share" | "suspend" | "expire" | "delete";
 
@@ -87,7 +87,7 @@ export function MachineMenu({
           <DropdownMenu.Content align="end">{items}</DropdownMenu.Content>
         </DropdownMenu>
       ) : (
-        <RowMenu label="Actions">{items}</RowMenu>
+        <RowMenu label={`Actions for ${nodeName(node)}`}>{items}</RowMenu>
       )}
       <MachineDialogs
         dialog={dialog}

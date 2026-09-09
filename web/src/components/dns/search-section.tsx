@@ -44,7 +44,7 @@ export function SearchDomainsSection({
     entries.push({
       key: domain,
       value: domain,
-      removeLabel: `Remove search domain ${domain}`,
+      menuLabel: `Actions for search domain ${domain}`,
       onRemove: () => {
         mutations.apply(withoutSearchDomain(settings, domain), `Removed ${domain}`);
       },

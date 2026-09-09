@@ -1,4 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
+import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { ShareNetworkIcon, XIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
@@ -10,6 +11,7 @@ import { useNodeMutations } from "~/components/machines/mutations.ts";
 import { ownerId } from "~/components/machines/owner.ts";
 import { ShareDialog } from "~/components/machines/share-dialog.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { isTagged, userLabel } from "~/lib/node.ts";
 
@@ -102,15 +104,11 @@ function ShareRow({
         <span className="truncate">{label}</span>
       </span>
       {canEdit ? (
-        <Button
-          variant="ghost"
-          shape="square"
-          size="sm"
-          icon={XIcon}
-          aria-label={`Stop sharing with ${label}`}
-          loading={pending}
-          onClick={onRemove}
-        />
+        <RowMenu label={`Actions for share with ${label}`} disabled={pending}>
+          <DropdownMenu.Item icon={XIcon} variant="danger" onClick={onRemove}>
+            Stop sharing
+          </DropdownMenu.Item>
+        </RowMenu>
       ) : null}
     </SectionRow>
   );
