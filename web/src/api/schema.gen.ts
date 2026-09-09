@@ -1100,6 +1100,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/node/{nodeId}/app-connector-routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get learned app connector routes
+         * @description Asks the connected node which addresses it has resolved for the domains it answers for as an app connector. A node that is not a connector answers with none.
+         *
+         *     Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getNodeAppConnectorRoutes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/node/{nodeId}/approve": {
         parameters: {
             query?: never;
@@ -1190,6 +1212,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/node/{nodeId}/client-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get node client update status
+         * @description Asks the connected node whether it would update its own Tailscale installation and whether an update is already running. See /ref/device-management.
+         *
+         *     Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getNodeClientUpdate"];
+        put?: never;
+        /**
+         * Update the node's Tailscale client
+         * @description Asks the connected node to update itself now. The client refuses unless its owner opted in with `tailscale set --auto-update` or TS_ALLOW_REMOTE_UPDATE, and while it is serving SSH sessions unless force is set.
+         *
+         *     Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["startNodeClientUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/node/{nodeId}/diagnostics/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download a node diagnostic
+         * @description Asks the connected node for one of the dumps it hands over for support and answers with it as the client wrote it: prefs,netmap,metrics,goroutines,sockstats,tka-log. A client built without its debug endpoints refuses.
+         *
+         *     Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getNodeDiagnostic"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/node/{nodeId}/expire": {
         parameters: {
             query?: never;
@@ -1226,6 +1298,50 @@ export interface paths {
          *     Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         post: operations["setGlobalExitNode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/node/{nodeId}/hardware-attestation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Reset hardware attestation
+         * @description Forgets what the machine's hardware attestation key proved, so the next map request that carries a valid signature starts the record again. The client is not touched and keeps its key.
+         *
+         *     Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["resetNodeHardwareAttestation"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/node/{nodeId}/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get node client health
+         * @description Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why.
+         *
+         *     Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getNodeClientHealth"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1296,6 +1412,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/node/{nodeId}/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get node preferences
+         * @description Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does.
+         *
+         *     Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getNodePreferences"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change node preferences
+         * @description Changes the preferences the body names on the connected node and answers with what the client ended up with. Needs the machine to have opted in by running `tailscale set --remote-config` on it, which hands the tailnet admin its whole local API; without that the node answers 409.
+         *
+         *     Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        patch: operations["updateNodePreferences"];
+        trace?: never;
+    };
     "/api/v1/node/{nodeId}/rename/{newName}": {
         parameters: {
             query?: never;
@@ -1353,6 +1497,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/node/{nodeId}/ssh-usernames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get node SSH username hints
+         * @description Asks the connected node which logins it would suggest for a Tailscale SSH session, so the console's terminal can offer them. The hints are not an authorisation; the SSH policy still decides. Visible to whoever may open a session to the node: without the devices:core:read scope, a node of the caller's own or one their machines can already reach.
+         */
+        get: operations["getNodeSSHUsernames"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/node/{nodeId}/suspend": {
         parameters: {
             query?: never;
@@ -1389,6 +1553,28 @@ export interface paths {
          * @description Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
         post: operations["setTags"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/node/{nodeId}/tls-cert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get node TLS certificate status
+         * @description Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed.
+         *
+         *     Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getNodeTLSCertStatus"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1435,6 +1621,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nodes/client-update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update several nodes' Tailscale clients
+         * @description Asks each named node to update itself, a few at a time, and answers with one result per node in the order asked. A node that is offline or refuses fails on its own; the others still start.
+         *
+         *     Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["startNodesClientUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/oauth-client": {
         parameters: {
             query?: never;
@@ -1444,7 +1652,7 @@ export interface paths {
         };
         /**
          * List OAuth clients
-         * @description Every client that can mint v2 API tokens; revoked clients are gone.
+         * @description Every client and federated identity that can mint v2 API tokens; revoked ones are gone.
          *
          *     Requires the `oauth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -1452,7 +1660,7 @@ export interface paths {
         put?: never;
         /**
          * Create OAuth client
-         * @description The client secret is in this response only. Scopes may not exceed the caller's own.
+         * @description The client secret is in this response only, and a federated identity has none. Scopes may not exceed the caller's own.
          *
          *     Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -1482,7 +1690,13 @@ export interface paths {
         delete: operations["revokeOAuthClient"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update OAuth client
+         * @description Changes the description, scopes, tags and, for a federated identity, its trust conditions. The secret is untouched, so the client keeps working across an update.
+         *
+         *     Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        patch: operations["updateOAuthClient"];
         trace?: never;
     };
     "/api/v1/policy": {
@@ -2610,14 +2824,29 @@ export interface components {
             role?: string;
         };
         CreateOAuthClientOutputBody: {
-            clientSecret: string;
+            clientSecret?: string;
             oauthClient: components["schemas"]["OAuthClient"];
         };
         CreateOAuthClientRequestBody: {
+            /** @description Federated: the audience the JWT must carry. */
+            audience?: string;
+            /** @description Federated: further claims the JWT must carry. */
+            customClaimRules?: {
+                [key: string]: string;
+            };
             /** @description What the client is for. */
             description?: string;
+            /** @description Federated: the https URL of the OIDC issuer. */
+            issuer?: string;
+            /**
+             * @description client (the default) or federated.
+             * @enum {string}
+             */
+            keyType?: "" | "client" | "federated";
             /** @description Scopes the client may grant; at least one. */
             scopes: string[];
+            /** @description Federated: the subject the JWT must equal. */
+            subject?: string;
             /** @description Tags the client may put on its tokens. */
             tags?: string[] | null;
         };
@@ -3239,6 +3468,8 @@ export interface components {
             givenName: string;
             /** @description true when every client is told to prefer this exit node. */
             globalExitNode: boolean;
+            /** @description What the machine's hardware attestation key proved; absent until the client signs a map request with one. */
+            hardwareAttestation?: components["schemas"]["NodeHardwareAttestation"];
             /** Format: uint64 */
             id: string;
             ipAddresses: string[];
@@ -3253,6 +3484,8 @@ export interface components {
             preAuthKey: components["schemas"]["NodePreAuthKey"];
             /** @enum {string} */
             registerMethod: "REGISTER_METHOD_UNSPECIFIED" | "REGISTER_METHOD_AUTH_KEY" | "REGISTER_METHOD_CLI" | "REGISTER_METHOD_OIDC";
+            /** @description true while the client delegated remote configuration to the control plane (tailscale set --remote-config). */
+            remoteConfig: boolean;
             /** @description IDs of the users the node is shared with. */
             sharedWith: string[];
             /** @description true while the client runs Tailscale SSH (tailscale set --ssh). */
@@ -3263,9 +3496,53 @@ export interface components {
             /** Format: date-time */
             suspendedAt: string | null;
             tags: string[];
+            /** @description The TPM the client found; absent when it reported none. */
+            tpm?: components["schemas"]["NodeTPM"];
             /** @description true when a newer stable Tailscale client exists than the one the node runs; see latestClientVersion on the server info. */
             updateAvailable: boolean;
             user: components["schemas"]["User"];
+        };
+        NodeAppConnectorRoutes: {
+            domains: {
+                [key: string]: string[] | null;
+            };
+        };
+        NodeClientHealth: {
+            /** @description The warnings the client would show its user. */
+            warnings: components["schemas"]["NodeClientWarning"][];
+        };
+        NodeClientUpdate: {
+            /** @description Whether the machine's owner allows control to update it. */
+            enabled: boolean;
+            /** @description The reason the client gave for refusing, empty when it did not. */
+            error?: string;
+            /** @description Whether an update is running. */
+            started: boolean;
+            /** @description Whether the platform can update itself at all. */
+            supported: boolean;
+        };
+        NodeClientUpdateResult: {
+            /** @description Why the node did not start, empty when it did. */
+            error?: string;
+            /** Format: uint64 */
+            nodeId: string;
+            started: boolean;
+        };
+        NodeClientWarning: {
+            /**
+             * Format: date-time
+             * @description When it went wrong.
+             */
+            brokenSince?: string;
+            /** @description The warnable's identifier. */
+            code: string;
+            /** @description Whether the client thinks traffic is affected. */
+            impactsConnectivity: boolean;
+            /** @description How bad the client considers it. */
+            severity: string;
+            /** @description What the client would tell its own user. */
+            text: string;
+            title: string;
         };
         NodeDERPLatency: {
             code: string;
@@ -3287,6 +3564,22 @@ export interface components {
             name: string;
             /** Format: int64 */
             regionId: number;
+        };
+        NodeHardwareAttestation: {
+            /** @description true when the last map request carried a valid signature by the key; it is the node:hardwareAttested posture attribute. */
+            attested: boolean;
+            /**
+             * Format: date-time
+             * @description When attestation was last gained; it is not refreshed per request.
+             */
+            attestedAt: string | null;
+            /** @description The key that last verified, as hwattestpub:<hex>. */
+            key: string;
+            /**
+             * Format: date-time
+             * @description When a signature last arrived under a new key; null while it never did.
+             */
+            keyChangedAt: string | null;
         };
         NodeNetInfo: {
             /** @description Whether a UPnP, NAT-PMP or PCP mapping is open. */
@@ -3344,6 +3637,28 @@ export interface components {
             used: boolean;
             user: components["schemas"]["User"];
         };
+        NodePreferences: {
+            acceptDns: boolean;
+            acceptRoutes: boolean;
+            /** @description Whether the client offers to be an app connector. */
+            advertiseConnector: boolean;
+            advertiseExitNode: boolean;
+            advertiseRoutes: string[];
+            autoUpdateApply: boolean;
+            autoUpdateCheck: boolean;
+            /** @description The exit node in use, by stable id or address. */
+            exitNode: string;
+            exitNodeAllowLanAccess: boolean;
+            hostname: string;
+            postureChecking: boolean;
+            /** @description Whether the client runs Tailscale SSH. */
+            runSsh: boolean;
+            /** @description Whether the client blocks incoming traffic. */
+            shieldsUp: boolean;
+        };
+        NodesClientUpdate: {
+            results: components["schemas"]["NodeClientUpdateResult"][];
+        };
         NodeService: {
             /** @description true when the node advertises the service. */
             active: boolean;
@@ -3352,13 +3667,59 @@ export interface components {
             /** @description The protocol and ports the node serves it on. */
             ports: string[];
         };
+        NodeSSHUsernames: {
+            usernames: string[];
+        };
+        NodeTLSCertStatus: {
+            error?: string;
+            expired: boolean;
+            /** @description The client has never fetched one. */
+            missing: boolean;
+            valid: boolean;
+        };
+        NodeTPM: {
+            /**
+             * Format: int64
+             * @description The firmware version.
+             */
+            firmwareVersion: number;
+            /** @description The four-letter manufacturer code, such as MSFT. */
+            manufacturer: string;
+            /**
+             * Format: int64
+             * @description The vendor-defined model.
+             */
+            model: number;
+            /**
+             * Format: int64
+             * @description The TPM 2.0 specification revision.
+             */
+            specRevision: number;
+            /** @description The vendor string. */
+            vendor: string;
+        };
         OAuthClient: {
+            /** @description Federated: the audience the JWT must carry. */
+            audience: string;
             clientId: string;
             /** Format: date-time */
             createdAt: string | null;
+            /** @description Federated: further claims the JWT must carry. */
+            customClaimRules: {
+                [key: string]: string;
+            };
             description: string;
+            /** @description Federated: the OIDC issuer that signs the presented JWT. */
+            issuer: string;
+            /**
+             * @description client or federated.
+             * @enum {string}
+             */
+            keyType: "client" | "federated";
             /** @description Scopes the client may grant its tokens. */
             scopes: string[];
+            /** @description Federated: the subject the JWT must equal. */
+            subject: string;
             /** @description Tags the client may put on its tokens. */
             tags: string[];
             /**
@@ -3747,6 +4108,16 @@ export interface components {
             /** @description A suggested login name. */
             username: string;
         };
+        StartNodeClientUpdateRequestBody: {
+            /** @description Update even while the node is serving SSH sessions. */
+            force?: boolean;
+        };
+        StartNodesClientUpdateRequestBody: {
+            /** @description Update even while a node is serving SSH sessions. */
+            force?: boolean;
+            /** @description The nodes to update. */
+            nodeIds: string[] | null;
+        };
         TailnetLock: {
             /**
              * Format: date-time
@@ -3781,6 +4152,42 @@ export interface components {
              * @description The key's weight when the authority decides.
              */
             votes: number;
+        };
+        UpdateNodePreferencesRequestBody: {
+            acceptDns?: boolean;
+            acceptRoutes?: boolean;
+            advertiseConnector?: boolean;
+            advertiseExitNode?: boolean;
+            advertiseRoutes?: string[];
+            autoUpdateApply?: boolean;
+            autoUpdateCheck?: boolean;
+            /** @description A stable node id or address; empty clears it. */
+            exitNode?: string;
+            exitNodeAllowLanAccess?: boolean;
+            hostname?: string;
+            postureChecking?: boolean;
+            runSsh?: boolean;
+            shieldsUp?: boolean;
+        };
+        UpdateOAuthClientOutputBody: {
+            oauthClient: components["schemas"]["OAuthClient"];
+        };
+        UpdateOAuthClientRequestBody: {
+            /** @description Federated: the audience the JWT must carry. */
+            audience?: string;
+            /** @description Federated: replaces the rules; {} clears them. */
+            customClaimRules?: {
+                [key: string]: string;
+            };
+            description?: string;
+            /** @description Federated: the https URL of the OIDC issuer. */
+            issuer?: string;
+            /** @description Replaces the scopes; at least one. */
+            scopes?: string[];
+            /** @description Federated: the subject the JWT must equal. */
+            subject?: string;
+            /** @description Replaces the tags; [] clears them. */
+            tags?: string[];
         };
         UpdateServiceRequestBody: {
             comment?: string;
@@ -4000,13 +4407,24 @@ export type NetworkOutputBody = components['schemas']['NetworkOutputBody'];
 export type NetworkRequestBody = components['schemas']['NetworkRequestBody'];
 export type NetworkRouter = components['schemas']['NetworkRouter'];
 export type Node = components['schemas']['Node'];
+export type NodeAppConnectorRoutes = components['schemas']['NodeAppConnectorRoutes'];
+export type NodeClientHealth = components['schemas']['NodeClientHealth'];
+export type NodeClientUpdate = components['schemas']['NodeClientUpdate'];
+export type NodeClientUpdateResult = components['schemas']['NodeClientUpdateResult'];
+export type NodeClientWarning = components['schemas']['NodeClientWarning'];
 export type NodeDerpLatency = components['schemas']['NodeDERPLatency'];
+export type NodeHardwareAttestation = components['schemas']['NodeHardwareAttestation'];
 export type NodeNetInfo = components['schemas']['NodeNetInfo'];
 export type NodeOutputBody = components['schemas']['NodeOutputBody'];
 export type NodePosture = components['schemas']['NodePosture'];
 export type NodePosturesOutputBody = components['schemas']['NodePosturesOutputBody'];
 export type NodePreAuthKey = components['schemas']['NodePreAuthKey'];
+export type NodePreferences = components['schemas']['NodePreferences'];
+export type NodesClientUpdate = components['schemas']['NodesClientUpdate'];
 export type NodeService = components['schemas']['NodeService'];
+export type NodeSshUsernames = components['schemas']['NodeSSHUsernames'];
+export type NodeTlsCertStatus = components['schemas']['NodeTLSCertStatus'];
+export type NodeTpm = components['schemas']['NodeTPM'];
 export type OAuthClient = components['schemas']['OAuthClient'];
 export type PolicyRequestBody = components['schemas']['PolicyRequestBody'];
 export type PolicyResponseBody = components['schemas']['PolicyResponseBody'];
@@ -4055,8 +4473,13 @@ export type SshRecording = components['schemas']['SSHRecording'];
 export type SshRecordingOutputBody = components['schemas']['SshRecordingOutputBody'];
 export type SshSession = components['schemas']['SSHSession'];
 export type SshSessionTarget = components['schemas']['SSHSessionTarget'];
+export type StartNodeClientUpdateRequestBody = components['schemas']['StartNodeClientUpdateRequestBody'];
+export type StartNodesClientUpdateRequestBody = components['schemas']['StartNodesClientUpdateRequestBody'];
 export type TailnetLock = components['schemas']['TailnetLock'];
 export type TailnetLockKey = components['schemas']['TailnetLockKey'];
+export type UpdateNodePreferencesRequestBody = components['schemas']['UpdateNodePreferencesRequestBody'];
+export type UpdateOAuthClientOutputBody = components['schemas']['UpdateOAuthClientOutputBody'];
+export type UpdateOAuthClientRequestBody = components['schemas']['UpdateOAuthClientRequestBody'];
 export type UpdateServiceRequestBody = components['schemas']['UpdateServiceRequestBody'];
 export type UpdateSettingsRequestBody = components['schemas']['UpdateSettingsRequestBody'];
 export type UpdateUserRequestBody = components['schemas']['UpdateUserRequestBody'];
@@ -6479,6 +6902,37 @@ export interface operations {
             };
         };
     };
+    getNodeAppConnectorRoutes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeAppConnectorRoutes"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     approveNode: {
         parameters: {
             query?: never;
@@ -6652,6 +7106,104 @@ export interface operations {
             };
         };
     };
+    getNodeClientUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeClientUpdate"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    startNodeClientUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StartNodeClientUpdateRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeClientUpdate"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getNodeDiagnostic: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "prefs" | "netmap" | "metrics" | "goroutines" | "sockstats" | "tka-log";
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The diagnostic, as the client wrote it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     expireNode: {
         parameters: {
             query?: never;
@@ -6709,6 +7261,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NodeOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    resetNodeHardwareAttestation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getNodeClientHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeClientHealth"];
                 };
             };
             /** @description Error */
@@ -6802,6 +7416,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NodePosturesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getNodePreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodePreferences"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updateNodePreferences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateNodePreferencesRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodePreferences"];
                 };
             };
             /** @description Error */
@@ -6914,6 +7594,37 @@ export interface operations {
             };
         };
     };
+    getNodeSSHUsernames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeSSHUsernames"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     suspendNode: {
         parameters: {
             query?: never;
@@ -6984,6 +7695,37 @@ export interface operations {
             };
         };
     };
+    getNodeTLSCertStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeTLSCertStatus"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     backfillNodeIPs: {
         parameters: {
             query?: {
@@ -7034,6 +7776,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NodeOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    startNodesClientUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartNodesClientUpdateRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodesClientUpdate"];
                 };
             };
             /** @description Error */
@@ -7127,6 +7902,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevokeOAuthClientOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updateOAuthClient: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clientId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOAuthClientRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateOAuthClientOutputBody"];
                 };
             };
             /** @description Error */

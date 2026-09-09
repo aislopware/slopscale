@@ -669,13 +669,30 @@ components:
           $ref: "#/components/schemas/OAuthClient"
       required:
         - oauthClient
-        - clientSecret
       type: object
     CreateOAuthClientRequestBody:
       additionalProperties: false
       properties:
+        audience:
+          description: "Federated: the audience the JWT must carry."
+          type: string
+        customClaimRules:
+          additionalProperties:
+            type: string
+          description: "Federated: further claims the JWT must carry."
+          type: object
         description:
           description: What the client is for.
+          type: string
+        issuer:
+          description: "Federated: the https URL of the OIDC issuer."
+          type: string
+        keyType:
+          description: client (the default) or federated.
+          enum:
+            - ""
+            - client
+            - federated
           type: string
         scopes:
           description: Scopes the client may grant; at least one.
@@ -683,6 +700,9 @@ components:
             type: string
           minItems: 1
           type: array
+        subject:
+          description: "Federated: the subject the JWT must equal."
+          type: string
         tags:
           description: Tags the client may put on its tokens.
           items:
@@ -2118,6 +2138,9 @@ components:
         globalExitNode:
           description: true when every client is told to prefer this exit node.
           type: boolean
+        hardwareAttestation:
+          $ref: "#/components/schemas/NodeHardwareAttestation"
+          description: What the machine's hardware attestation key proved; absent until the client signs a map request with one.
         id:
           format: uint64
           type: string
@@ -2150,6 +2173,9 @@ components:
             - REGISTER_METHOD_CLI
             - REGISTER_METHOD_OIDC
           type: string
+        remoteConfig:
+          description: true while the client delegated remote configuration to the control plane (tailscale set --remote-config).
+          type: boolean
         sharedWith:
           description: IDs of the users the node is shared with.
           items:
@@ -2174,6 +2200,9 @@ components:
           items:
             type: string
           type: array
+        tpm:
+          $ref: "#/components/schemas/NodeTPM"
+          description: The TPM the client found; absent when it reported none.
         updateAvailable:
           description: true when a newer stable Tailscale client exists than the one the node runs; see latestClientVersion on the server info.
           type: boolean
@@ -2213,6 +2242,95 @@ components:
         - appConnector
         - sshServer
         - clientWarnings
+        - remoteConfig
+      type: object
+    NodeAppConnectorRoutes:
+      additionalProperties: false
+      properties:
+        domains:
+          additionalProperties:
+            items:
+              type: string
+            type:
+              - array
+              - "null"
+          type: object
+      required:
+        - domains
+      type: object
+    NodeClientHealth:
+      additionalProperties: false
+      properties:
+        warnings:
+          description: The warnings the client would show its user.
+          items:
+            $ref: "#/components/schemas/NodeClientWarning"
+          type: array
+      required:
+        - warnings
+      type: object
+    NodeClientUpdate:
+      additionalProperties: false
+      properties:
+        enabled:
+          description: Whether the machine's owner allows control to update it.
+          type: boolean
+        error:
+          description: The reason the client gave for refusing, empty when it did not.
+          type: string
+        started:
+          description: Whether an update is running.
+          type: boolean
+        supported:
+          description: Whether the platform can update itself at all.
+          type: boolean
+      required:
+        - enabled
+        - supported
+        - started
+      type: object
+    NodeClientUpdateResult:
+      additionalProperties: false
+      properties:
+        error:
+          description: Why the node did not start, empty when it did.
+          type: string
+        nodeId:
+          format: uint64
+          type: string
+        started:
+          type: boolean
+      required:
+        - nodeId
+        - started
+      type: object
+    NodeClientWarning:
+      additionalProperties: false
+      properties:
+        brokenSince:
+          description: When it went wrong.
+          format: date-time
+          type: string
+        code:
+          description: The warnable's identifier.
+          type: string
+        impactsConnectivity:
+          description: Whether the client thinks traffic is affected.
+          type: boolean
+        severity:
+          description: How bad the client considers it.
+          type: string
+        text:
+          description: What the client would tell its own user.
+          type: string
+        title:
+          type: string
+      required:
+        - code
+        - severity
+        - title
+        - text
+        - impactsConnectivity
       type: object
     NodeDERPLatency:
       additionalProperties: false
@@ -2243,6 +2361,33 @@ components:
         - ms
         - ipv4Ms
         - ipv6Ms
+      type: object
+    NodeHardwareAttestation:
+      additionalProperties: false
+      properties:
+        attested:
+          description: true when the last map request carried a valid signature by the key; it is the node:hardwareAttested posture attribute.
+          type: boolean
+        attestedAt:
+          description: When attestation was last gained; it is not refreshed per request.
+          format: date-time
+          type:
+            - string
+            - "null"
+        key:
+          description: The key that last verified, as hwattestpub:<hex>.
+          type: string
+        keyChangedAt:
+          description: When a signature last arrived under a new key; null while it never did.
+          format: date-time
+          type:
+            - string
+            - "null"
+      required:
+        - attested
+        - attestedAt
+        - keyChangedAt
+        - key
       type: object
     NodeNetInfo:
       additionalProperties: false
@@ -2393,6 +2538,66 @@ components:
         - aclTags
         - preauthorized
       type: object
+    NodePreferences:
+      additionalProperties: false
+      properties:
+        acceptDns:
+          type: boolean
+        acceptRoutes:
+          type: boolean
+        advertiseConnector:
+          description: Whether the client offers to be an app connector.
+          type: boolean
+        advertiseExitNode:
+          type: boolean
+        advertiseRoutes:
+          items:
+            type: string
+          type: array
+        autoUpdateApply:
+          type: boolean
+        autoUpdateCheck:
+          type: boolean
+        exitNode:
+          description: The exit node in use, by stable id or address.
+          type: string
+        exitNodeAllowLanAccess:
+          type: boolean
+        hostname:
+          type: string
+        postureChecking:
+          type: boolean
+        runSsh:
+          description: Whether the client runs Tailscale SSH.
+          type: boolean
+        shieldsUp:
+          description: Whether the client blocks incoming traffic.
+          type: boolean
+      required:
+        - advertiseRoutes
+        - advertiseExitNode
+        - acceptRoutes
+        - acceptDns
+        - exitNode
+        - exitNodeAllowLanAccess
+        - runSsh
+        - shieldsUp
+        - hostname
+        - autoUpdateCheck
+        - autoUpdateApply
+        - advertiseConnector
+        - postureChecking
+      type: object
+    NodeSSHUsernames:
+      additionalProperties: false
+      properties:
+        usernames:
+          items:
+            type: string
+          type: array
+      required:
+        - usernames
+      type: object
     NodeService:
       additionalProperties: false
       properties:
@@ -2412,9 +2617,68 @@ components:
         - ports
         - active
       type: object
+    NodeTLSCertStatus:
+      additionalProperties: false
+      properties:
+        error:
+          type: string
+        expired:
+          type: boolean
+        missing:
+          description: The client has never fetched one.
+          type: boolean
+        valid:
+          type: boolean
+      required:
+        - valid
+        - missing
+        - expired
+      type: object
+    NodeTPM:
+      additionalProperties: false
+      properties:
+        firmwareVersion:
+          description: The firmware version.
+          format: int64
+          minimum: 0
+          type: integer
+        manufacturer:
+          description: The four-letter manufacturer code, such as MSFT.
+          type: string
+        model:
+          description: The vendor-defined model.
+          format: int64
+          type: integer
+        specRevision:
+          description: The TPM 2.0 specification revision.
+          format: int64
+          type: integer
+        vendor:
+          description: The vendor string.
+          type: string
+      required:
+        - manufacturer
+        - vendor
+        - model
+        - firmwareVersion
+        - specRevision
+      type: object
+    NodesClientUpdate:
+      additionalProperties: false
+      properties:
+        results:
+          items:
+            $ref: "#/components/schemas/NodeClientUpdateResult"
+          type: array
+      required:
+        - results
+      type: object
     OAuthClient:
       additionalProperties: false
       properties:
+        audience:
+          description: "Federated: the audience the JWT must carry."
+          type: string
         clientId:
           type: string
         createdAt:
@@ -2422,13 +2686,30 @@ components:
           type:
             - string
             - "null"
+        customClaimRules:
+          additionalProperties:
+            type: string
+          description: "Federated: further claims the JWT must carry."
+          type: object
         description:
+          type: string
+        issuer:
+          description: "Federated: the OIDC issuer that signs the presented JWT."
+          type: string
+        keyType:
+          description: client or federated.
+          enum:
+            - client
+            - federated
           type: string
         scopes:
           description: Scopes the client may grant its tokens.
           items:
             type: string
           type: array
+        subject:
+          description: "Federated: the subject the JWT must equal."
+          type: string
         tags:
           description: Tags the client may put on its tokens.
           items:
@@ -2442,9 +2723,14 @@ components:
             - "null"
       required:
         - clientId
+        - keyType
         - description
         - scopes
         - tags
+        - issuer
+        - audience
+        - subject
+        - customClaimRules
         - userId
         - createdAt
       type: object
@@ -3390,6 +3676,29 @@ components:
       required:
         - recording
       type: object
+    StartNodeClientUpdateRequestBody:
+      additionalProperties: false
+      properties:
+        force:
+          description: Update even while the node is serving SSH sessions.
+          type: boolean
+      type: object
+    StartNodesClientUpdateRequestBody:
+      additionalProperties: false
+      properties:
+        force:
+          description: Update even while a node is serving SSH sessions.
+          type: boolean
+        nodeIds:
+          description: The nodes to update.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - nodeIds
+      type: object
     TailnetLock:
       additionalProperties: false
       properties:
@@ -3451,6 +3760,77 @@ components:
         - id
         - public
         - votes
+      type: object
+    UpdateNodePreferencesRequestBody:
+      additionalProperties: false
+      properties:
+        acceptDns:
+          type: boolean
+        acceptRoutes:
+          type: boolean
+        advertiseConnector:
+          type: boolean
+        advertiseExitNode:
+          type: boolean
+        advertiseRoutes:
+          items:
+            type: string
+          type: array
+        autoUpdateApply:
+          type: boolean
+        autoUpdateCheck:
+          type: boolean
+        exitNode:
+          description: A stable node id or address; empty clears it.
+          type: string
+        exitNodeAllowLanAccess:
+          type: boolean
+        hostname:
+          type: string
+        postureChecking:
+          type: boolean
+        runSsh:
+          type: boolean
+        shieldsUp:
+          type: boolean
+      type: object
+    UpdateOAuthClientOutputBody:
+      additionalProperties: false
+      properties:
+        oauthClient:
+          $ref: "#/components/schemas/OAuthClient"
+      required:
+        - oauthClient
+      type: object
+    UpdateOAuthClientRequestBody:
+      additionalProperties: false
+      properties:
+        audience:
+          description: "Federated: the audience the JWT must carry."
+          type: string
+        customClaimRules:
+          additionalProperties:
+            type: string
+          description: "Federated: replaces the rules; {} clears them."
+          type: object
+        description:
+          type: string
+        issuer:
+          description: "Federated: the https URL of the OIDC issuer."
+          type: string
+        scopes:
+          description: Replaces the scopes; at least one.
+          items:
+            type: string
+          type: array
+        subject:
+          description: "Federated: the subject the JWT must equal."
+          type: string
+        tags:
+          description: Replaces the tags; [] clears them.
+          items:
+            type: string
+          type: array
       type: object
     UpdateServiceRequestBody:
       additionalProperties: false
@@ -6231,6 +6611,39 @@ paths:
       tags:
         - Nodes
       x-required-scope: devices:core:read
+  /api/v1/node/{nodeId}/app-connector-routes:
+    get:
+      description: |-
+        Asks the connected node which addresses it has resolved for the domains it answers for as an app connector. A node that is not a connector answers with none.
+
+        Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getNodeAppConnectorRoutes
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeAppConnectorRoutes"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get learned app connector routes
+      tags:
+        - Nodes
+      x-required-scope: devices:core:read
   /api/v1/node/{nodeId}/approve:
     post:
       description: |-
@@ -6427,6 +6840,125 @@ paths:
         - Nodes
       x-audit-action: node.attribute.set
       x-required-scope: devices:posture_attributes
+  /api/v1/node/{nodeId}/client-update:
+    get:
+      description: |-
+        Asks the connected node whether it would update its own Tailscale installation and whether an update is already running. See /ref/device-management.
+
+        Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getNodeClientUpdate
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeClientUpdate"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get node client update status
+      tags:
+        - Nodes
+      x-required-scope: devices:core:read
+    post:
+      description: |-
+        Asks the connected node to update itself now. The client refuses unless its owner opted in with `tailscale set --auto-update` or TS_ALLOW_REMOTE_UPDATE, and while it is serving SSH sessions unless force is set.
+
+        Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: startNodeClientUpdate
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartNodeClientUpdateRequestBody"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeClientUpdate"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Update the node's Tailscale client
+      tags:
+        - Nodes
+      x-audit-action: node.client_update.start
+      x-required-scope: devices:core
+  /api/v1/node/{nodeId}/diagnostics/{kind}:
+    get:
+      description: |-
+        Asks the connected node for one of the dumps it hands over for support and answers with it as the client wrote it: prefs,netmap,metrics,goroutines,sockstats,tka-log. A client built without its debug endpoints refuses.
+
+        Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getNodeDiagnostic
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+        - in: path
+          name: kind
+          required: true
+          schema:
+            enum:
+              - prefs
+              - netmap
+              - metrics
+              - goroutines
+              - sockstats
+              - tka-log
+            type: string
+      responses:
+        "200":
+          content:
+            application/octet-stream:
+              schema:
+                contentMediaType: application/octet-stream
+                format: binary
+                type: string
+          description: The diagnostic, as the client wrote it.
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Download a node diagnostic
+      tags:
+        - Nodes
+      x-audit-action: node.diagnostics.read
+      x-required-scope: devices:core
   /api/v1/node/{nodeId}/expire:
     post:
       description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -6502,6 +7034,73 @@ paths:
         - Nodes
       x-audit-action: node.global_exit_node.set
       x-required-scope: devices:routes
+  /api/v1/node/{nodeId}/hardware-attestation:
+    delete:
+      description: |-
+        Forgets what the machine's hardware attestation key proved, so the next map request that carries a valid signature starts the record again. The client is not touched and keeps its key.
+
+        Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: resetNodeHardwareAttestation
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Reset hardware attestation
+      tags:
+        - Nodes
+      x-audit-action: node.attestation.reset
+      x-required-scope: devices:core
+  /api/v1/node/{nodeId}/health:
+    get:
+      description: |-
+        Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why.
+
+        Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getNodeClientHealth
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeClientHealth"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get node client health
+      tags:
+        - Nodes
+      x-required-scope: devices:core:read
   /api/v1/node/{nodeId}/posture:
     get:
       description: |-
@@ -6599,6 +7198,78 @@ paths:
       tags:
         - Access control
       x-required-scope: devices:posture_attributes:read
+  /api/v1/node/{nodeId}/preferences:
+    get:
+      description: |-
+        Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does.
+
+        Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getNodePreferences
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodePreferences"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get node preferences
+      tags:
+        - Nodes
+      x-required-scope: devices:core:read
+    patch:
+      description: |-
+        Changes the preferences the body names on the connected node and answers with what the client ended up with. Needs the machine to have opted in by running `tailscale set --remote-config` on it, which hands the tailnet admin its whole local API; without that the node answers 409.
+
+        Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateNodePreferences
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNodePreferencesRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodePreferences"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Change node preferences
+      tags:
+        - Nodes
+      x-audit-action: node.preferences.update
+      x-required-scope: devices:core
   /api/v1/node/{nodeId}/rename/{newName}:
     post:
       description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -6706,6 +7377,35 @@ paths:
       tags:
         - Nodes
       x-audit-action: node.unshare
+  /api/v1/node/{nodeId}/ssh-usernames:
+    get:
+      description: "Asks the connected node which logins it would suggest for a Tailscale SSH session, so the console's terminal can offer them. The hints are not an authorisation; the SSH policy still decides. Visible to whoever may open a session to the node: without the devices:core:read scope, a node of the caller's own or one their machines can already reach."
+      operationId: getNodeSSHUsernames
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeSSHUsernames"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get node SSH username hints
+      tags:
+        - Nodes
   /api/v1/node/{nodeId}/suspend:
     post:
       description: |-
@@ -6782,10 +7482,76 @@ paths:
         - Nodes
       x-audit-action: node.tags.set
       x-required-scope: devices:core
+  /api/v1/node/{nodeId}/tls-cert:
+    get:
+      description: |-
+        Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed.
+
+        Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getNodeTLSCertStatus
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeTLSCertStatus"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get node TLS certificate status
+      tags:
+        - Nodes
+      x-required-scope: devices:core:read
+  /api/v1/nodes/client-update:
+    post:
+      description: |-
+        Asks each named node to update itself, a few at a time, and answers with one result per node in the order asked. A node that is offline or refuses fails on its own; the others still start.
+
+        Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: startNodesClientUpdate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartNodesClientUpdateRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodesClientUpdate"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Update several nodes' Tailscale clients
+      tags:
+        - Nodes
+      x-audit-action: node.client_update.start
+      x-required-scope: devices:core
   /api/v1/oauth-client:
     get:
       description: |-
-        Every client that can mint v2 API tokens; revoked clients are gone.
+        Every client and federated identity that can mint v2 API tokens; revoked ones are gone.
 
         Requires the `oauth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: listOAuthClients
@@ -6810,7 +7576,7 @@ paths:
       x-required-scope: oauth_keys:read
     post:
       description: |-
-        The client secret is in this response only. Scopes may not exceed the caller's own.
+        The client secret is in this response only, and a federated identity has none. Scopes may not exceed the caller's own.
 
         Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: createOAuthClient
@@ -6872,6 +7638,44 @@ paths:
       tags:
         - OAuthClients
       x-audit-action: oauthclient.revoke
+      x-required-scope: oauth_keys
+    patch:
+      description: |-
+        Changes the description, scopes, tags and, for a federated identity, its trust conditions. The secret is untouched, so the client keeps working across an update.
+
+        Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateOAuthClient
+      parameters:
+        - in: path
+          name: clientId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOAuthClientRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdateOAuthClientOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Update OAuth client
+      tags:
+        - OAuthClients
+      x-audit-action: oauthclient.update
       x-required-scope: oauth_keys
   /api/v1/policy:
     get:

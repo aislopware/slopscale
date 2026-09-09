@@ -17,35 +17,36 @@ type nodesTable struct {
 	sqlite.Table
 
 	// Columns
-	ID               sqlite.ColumnInteger
-	MachineKey       sqlite.ColumnString
-	NodeKey          sqlite.ColumnString
-	DiscoKey         sqlite.ColumnString
-	Endpoints        sqlite.ColumnString
-	HostInfo         sqlite.ColumnString
-	Ipv4             sqlite.ColumnString
-	Ipv6             sqlite.ColumnString
-	Hostname         sqlite.ColumnString
-	GivenName        sqlite.ColumnString
-	UserID           sqlite.ColumnInteger
-	RegisterMethod   sqlite.ColumnString
-	Tags             sqlite.ColumnString
-	AuthKeyID        sqlite.ColumnInteger
-	LastSeen         sqlite.ColumnTimestamp
-	Expiry           sqlite.ColumnTimestamp
-	ApprovedRoutes   sqlite.ColumnString
-	ApprovedAt       sqlite.ColumnTimestamp
-	SuspendedAt      sqlite.ColumnTimestamp
-	Posture          sqlite.ColumnString
-	GlobalExitNode   sqlite.ColumnBool
-	Ephemeral        sqlite.ColumnBool
-	VipServices      sqlite.ColumnString
-	ApprovedServices sqlite.ColumnString
-	KeySignature     sqlite.ColumnString
-	NlKey            sqlite.ColumnString
-	CreatedAt        sqlite.ColumnTimestamp
-	UpdatedAt        sqlite.ColumnTimestamp
-	DeletedAt        sqlite.ColumnTimestamp
+	ID                  sqlite.ColumnInteger
+	MachineKey          sqlite.ColumnString
+	NodeKey             sqlite.ColumnString
+	DiscoKey            sqlite.ColumnString
+	Endpoints           sqlite.ColumnString
+	HostInfo            sqlite.ColumnString
+	Ipv4                sqlite.ColumnString
+	Ipv6                sqlite.ColumnString
+	Hostname            sqlite.ColumnString
+	GivenName           sqlite.ColumnString
+	UserID              sqlite.ColumnInteger
+	RegisterMethod      sqlite.ColumnString
+	Tags                sqlite.ColumnString
+	AuthKeyID           sqlite.ColumnInteger
+	LastSeen            sqlite.ColumnTimestamp
+	Expiry              sqlite.ColumnTimestamp
+	ApprovedRoutes      sqlite.ColumnString
+	ApprovedAt          sqlite.ColumnTimestamp
+	SuspendedAt         sqlite.ColumnTimestamp
+	Posture             sqlite.ColumnString
+	HardwareAttestation sqlite.ColumnString
+	GlobalExitNode      sqlite.ColumnBool
+	Ephemeral           sqlite.ColumnBool
+	VipServices         sqlite.ColumnString
+	ApprovedServices    sqlite.ColumnString
+	KeySignature        sqlite.ColumnString
+	NlKey               sqlite.ColumnString
+	CreatedAt           sqlite.ColumnTimestamp
+	UpdatedAt           sqlite.ColumnTimestamp
+	DeletedAt           sqlite.ColumnTimestamp
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -87,73 +88,75 @@ func newNodesTable(schemaName, tableName, alias string) *NodesTable {
 
 func newNodesTableImpl(schemaName, tableName, alias string) nodesTable {
 	var (
-		IDColumn               = sqlite.IntegerColumn("id")
-		MachineKeyColumn       = sqlite.StringColumn("machine_key")
-		NodeKeyColumn          = sqlite.StringColumn("node_key")
-		DiscoKeyColumn         = sqlite.StringColumn("disco_key")
-		EndpointsColumn        = sqlite.StringColumn("endpoints")
-		HostInfoColumn         = sqlite.StringColumn("host_info")
-		Ipv4Column             = sqlite.StringColumn("ipv4")
-		Ipv6Column             = sqlite.StringColumn("ipv6")
-		HostnameColumn         = sqlite.StringColumn("hostname")
-		GivenNameColumn        = sqlite.StringColumn("given_name")
-		UserIDColumn           = sqlite.IntegerColumn("user_id")
-		RegisterMethodColumn   = sqlite.StringColumn("register_method")
-		TagsColumn             = sqlite.StringColumn("tags")
-		AuthKeyIDColumn        = sqlite.IntegerColumn("auth_key_id")
-		LastSeenColumn         = sqlite.TimestampColumn("last_seen")
-		ExpiryColumn           = sqlite.TimestampColumn("expiry")
-		ApprovedRoutesColumn   = sqlite.StringColumn("approved_routes")
-		ApprovedAtColumn       = sqlite.TimestampColumn("approved_at")
-		SuspendedAtColumn      = sqlite.TimestampColumn("suspended_at")
-		PostureColumn          = sqlite.StringColumn("posture")
-		GlobalExitNodeColumn   = sqlite.BoolColumn("global_exit_node")
-		EphemeralColumn        = sqlite.BoolColumn("ephemeral")
-		VipServicesColumn      = sqlite.StringColumn("vip_services")
-		ApprovedServicesColumn = sqlite.StringColumn("approved_services")
-		KeySignatureColumn     = sqlite.StringColumn("key_signature")
-		NlKeyColumn            = sqlite.StringColumn("nl_key")
-		CreatedAtColumn        = sqlite.TimestampColumn("created_at")
-		UpdatedAtColumn        = sqlite.TimestampColumn("updated_at")
-		DeletedAtColumn        = sqlite.TimestampColumn("deleted_at")
-		allColumns             = sqlite.ColumnList{IDColumn, MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, GlobalExitNodeColumn, EphemeralColumn, VipServicesColumn, ApprovedServicesColumn, KeySignatureColumn, NlKeyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
-		mutableColumns         = sqlite.ColumnList{MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, GlobalExitNodeColumn, EphemeralColumn, VipServicesColumn, ApprovedServicesColumn, KeySignatureColumn, NlKeyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
-		defaultColumns         = sqlite.ColumnList{GlobalExitNodeColumn, EphemeralColumn}
+		IDColumn                  = sqlite.IntegerColumn("id")
+		MachineKeyColumn          = sqlite.StringColumn("machine_key")
+		NodeKeyColumn             = sqlite.StringColumn("node_key")
+		DiscoKeyColumn            = sqlite.StringColumn("disco_key")
+		EndpointsColumn           = sqlite.StringColumn("endpoints")
+		HostInfoColumn            = sqlite.StringColumn("host_info")
+		Ipv4Column                = sqlite.StringColumn("ipv4")
+		Ipv6Column                = sqlite.StringColumn("ipv6")
+		HostnameColumn            = sqlite.StringColumn("hostname")
+		GivenNameColumn           = sqlite.StringColumn("given_name")
+		UserIDColumn              = sqlite.IntegerColumn("user_id")
+		RegisterMethodColumn      = sqlite.StringColumn("register_method")
+		TagsColumn                = sqlite.StringColumn("tags")
+		AuthKeyIDColumn           = sqlite.IntegerColumn("auth_key_id")
+		LastSeenColumn            = sqlite.TimestampColumn("last_seen")
+		ExpiryColumn              = sqlite.TimestampColumn("expiry")
+		ApprovedRoutesColumn      = sqlite.StringColumn("approved_routes")
+		ApprovedAtColumn          = sqlite.TimestampColumn("approved_at")
+		SuspendedAtColumn         = sqlite.TimestampColumn("suspended_at")
+		PostureColumn             = sqlite.StringColumn("posture")
+		HardwareAttestationColumn = sqlite.StringColumn("hardware_attestation")
+		GlobalExitNodeColumn      = sqlite.BoolColumn("global_exit_node")
+		EphemeralColumn           = sqlite.BoolColumn("ephemeral")
+		VipServicesColumn         = sqlite.StringColumn("vip_services")
+		ApprovedServicesColumn    = sqlite.StringColumn("approved_services")
+		KeySignatureColumn        = sqlite.StringColumn("key_signature")
+		NlKeyColumn               = sqlite.StringColumn("nl_key")
+		CreatedAtColumn           = sqlite.TimestampColumn("created_at")
+		UpdatedAtColumn           = sqlite.TimestampColumn("updated_at")
+		DeletedAtColumn           = sqlite.TimestampColumn("deleted_at")
+		allColumns                = sqlite.ColumnList{IDColumn, MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, HardwareAttestationColumn, GlobalExitNodeColumn, EphemeralColumn, VipServicesColumn, ApprovedServicesColumn, KeySignatureColumn, NlKeyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
+		mutableColumns            = sqlite.ColumnList{MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, HardwareAttestationColumn, GlobalExitNodeColumn, EphemeralColumn, VipServicesColumn, ApprovedServicesColumn, KeySignatureColumn, NlKeyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
+		defaultColumns            = sqlite.ColumnList{GlobalExitNodeColumn, EphemeralColumn}
 	)
 
 	return nodesTable{
 		Table: sqlite.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		ID:               IDColumn,
-		MachineKey:       MachineKeyColumn,
-		NodeKey:          NodeKeyColumn,
-		DiscoKey:         DiscoKeyColumn,
-		Endpoints:        EndpointsColumn,
-		HostInfo:         HostInfoColumn,
-		Ipv4:             Ipv4Column,
-		Ipv6:             Ipv6Column,
-		Hostname:         HostnameColumn,
-		GivenName:        GivenNameColumn,
-		UserID:           UserIDColumn,
-		RegisterMethod:   RegisterMethodColumn,
-		Tags:             TagsColumn,
-		AuthKeyID:        AuthKeyIDColumn,
-		LastSeen:         LastSeenColumn,
-		Expiry:           ExpiryColumn,
-		ApprovedRoutes:   ApprovedRoutesColumn,
-		ApprovedAt:       ApprovedAtColumn,
-		SuspendedAt:      SuspendedAtColumn,
-		Posture:          PostureColumn,
-		GlobalExitNode:   GlobalExitNodeColumn,
-		Ephemeral:        EphemeralColumn,
-		VipServices:      VipServicesColumn,
-		ApprovedServices: ApprovedServicesColumn,
-		KeySignature:     KeySignatureColumn,
-		NlKey:            NlKeyColumn,
-		CreatedAt:        CreatedAtColumn,
-		UpdatedAt:        UpdatedAtColumn,
-		DeletedAt:        DeletedAtColumn,
+		ID:                  IDColumn,
+		MachineKey:          MachineKeyColumn,
+		NodeKey:             NodeKeyColumn,
+		DiscoKey:            DiscoKeyColumn,
+		Endpoints:           EndpointsColumn,
+		HostInfo:            HostInfoColumn,
+		Ipv4:                Ipv4Column,
+		Ipv6:                Ipv6Column,
+		Hostname:            HostnameColumn,
+		GivenName:           GivenNameColumn,
+		UserID:              UserIDColumn,
+		RegisterMethod:      RegisterMethodColumn,
+		Tags:                TagsColumn,
+		AuthKeyID:           AuthKeyIDColumn,
+		LastSeen:            LastSeenColumn,
+		Expiry:              ExpiryColumn,
+		ApprovedRoutes:      ApprovedRoutesColumn,
+		ApprovedAt:          ApprovedAtColumn,
+		SuspendedAt:         SuspendedAtColumn,
+		Posture:             PostureColumn,
+		HardwareAttestation: HardwareAttestationColumn,
+		GlobalExitNode:      GlobalExitNodeColumn,
+		Ephemeral:           EphemeralColumn,
+		VipServices:         VipServicesColumn,
+		ApprovedServices:    ApprovedServicesColumn,
+		KeySignature:        KeySignatureColumn,
+		NlKey:               NlKeyColumn,
+		CreatedAt:           CreatedAtColumn,
+		UpdatedAt:           UpdatedAtColumn,
+		DeletedAt:           DeletedAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

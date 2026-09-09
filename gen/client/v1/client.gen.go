@@ -18,6 +18,27 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for CreateOAuthClientRequestBodyKeyType.
+const (
+	CreateOAuthClientRequestBodyKeyTypeClient    CreateOAuthClientRequestBodyKeyType = "client"
+	CreateOAuthClientRequestBodyKeyTypeEmpty     CreateOAuthClientRequestBodyKeyType = ""
+	CreateOAuthClientRequestBodyKeyTypeFederated CreateOAuthClientRequestBodyKeyType = "federated"
+)
+
+// Valid indicates whether the value is a known member of the CreateOAuthClientRequestBodyKeyType enum.
+func (e CreateOAuthClientRequestBodyKeyType) Valid() bool {
+	switch e {
+	case CreateOAuthClientRequestBodyKeyTypeClient:
+		return true
+	case CreateOAuthClientRequestBodyKeyTypeEmpty:
+		return true
+	case CreateOAuthClientRequestBodyKeyTypeFederated:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DERPMapRegionSource.
 const (
 	Config    DERPMapRegionSource = "config"
@@ -117,6 +138,24 @@ func (e NodeRegisterMethod) Valid() bool {
 	case REGISTERMETHODOIDC:
 		return true
 	case REGISTERMETHODUNSPECIFIED:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OAuthClientKeyType.
+const (
+	OAuthClientKeyTypeClient    OAuthClientKeyType = "client"
+	OAuthClientKeyTypeFederated OAuthClientKeyType = "federated"
+)
+
+// Valid indicates whether the value is a known member of the OAuthClientKeyType enum.
+func (e OAuthClientKeyType) Valid() bool {
+	switch e {
+	case OAuthClientKeyTypeClient:
+		return true
+	case OAuthClientKeyTypeFederated:
 		return true
 	default:
 		return false
@@ -285,6 +324,36 @@ func (e ExportAuditEventsParamsFormat) Valid() bool {
 	case Csv:
 		return true
 	case Json:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetNodeDiagnosticParamsKind.
+const (
+	Goroutines GetNodeDiagnosticParamsKind = "goroutines"
+	Metrics    GetNodeDiagnosticParamsKind = "metrics"
+	Netmap     GetNodeDiagnosticParamsKind = "netmap"
+	Prefs      GetNodeDiagnosticParamsKind = "prefs"
+	Sockstats  GetNodeDiagnosticParamsKind = "sockstats"
+	TkaLog     GetNodeDiagnosticParamsKind = "tka-log"
+)
+
+// Valid indicates whether the value is a known member of the GetNodeDiagnosticParamsKind enum.
+func (e GetNodeDiagnosticParamsKind) Valid() bool {
+	switch e {
+	case Goroutines:
+		return true
+	case Metrics:
+		return true
+	case Netmap:
+		return true
+	case Prefs:
+		return true
+	case Sockstats:
+		return true
+	case TkaLog:
 		return true
 	default:
 		return false
@@ -609,21 +678,39 @@ type CreateInviteRequestBody struct {
 
 // CreateOAuthClientOutputBody defines model for CreateOAuthClientOutputBody.
 type CreateOAuthClientOutputBody struct {
-	ClientSecret string      `json:"clientSecret"`
+	ClientSecret *string     `json:"clientSecret,omitempty"`
 	OauthClient  OAuthClient `json:"oauthClient"`
 }
 
 // CreateOAuthClientRequestBody defines model for CreateOAuthClientRequestBody.
 type CreateOAuthClientRequestBody struct {
+	// Audience Federated: the audience the JWT must carry.
+	Audience *string `json:"audience,omitempty"`
+
+	// CustomClaimRules Federated: further claims the JWT must carry.
+	CustomClaimRules *map[string]string `json:"customClaimRules,omitempty"`
+
 	// Description What the client is for.
 	Description *string `json:"description,omitempty"`
+
+	// Issuer Federated: the https URL of the OIDC issuer.
+	Issuer *string `json:"issuer,omitempty"`
+
+	// KeyType client (the default) or federated.
+	KeyType *CreateOAuthClientRequestBodyKeyType `json:"keyType,omitempty"`
 
 	// Scopes Scopes the client may grant; at least one.
 	Scopes []string `json:"scopes"`
 
+	// Subject Federated: the subject the JWT must equal.
+	Subject *string `json:"subject,omitempty"`
+
 	// Tags Tags the client may put on its tokens.
 	Tags *[]string `json:"tags,omitempty"`
 }
+
+// CreateOAuthClientRequestBodyKeyType client (the default) or federated.
+type CreateOAuthClientRequestBodyKeyType string
 
 // CreatePreAuthKeyRequestBody defines model for CreatePreAuthKeyRequestBody.
 type CreatePreAuthKeyRequestBody struct {
@@ -1363,12 +1450,15 @@ type Node struct {
 	GivenName     string `json:"givenName"`
 
 	// GlobalExitNode true when every client is told to prefer this exit node.
-	GlobalExitNode bool       `json:"globalExitNode"`
-	Id             string     `json:"id"`
-	IpAddresses    []string   `json:"ipAddresses"`
-	LastSeen       *time.Time `json:"lastSeen"`
-	MachineKey     string     `json:"machineKey"`
-	Name           string     `json:"name"`
+	GlobalExitNode bool `json:"globalExitNode"`
+
+	// HardwareAttestation What the machine's hardware attestation key proved; absent until the client signs a map request with one.
+	HardwareAttestation *NodeHardwareAttestation `json:"hardwareAttestation,omitempty"`
+	Id                  string                   `json:"id"`
+	IpAddresses         []string                 `json:"ipAddresses"`
+	LastSeen            *time.Time               `json:"lastSeen"`
+	MachineKey          string                   `json:"machineKey"`
+	Name                string                   `json:"name"`
 
 	// NetInfo The client's last network report; absent until it connects.
 	NetInfo        *NodeNetInfo       `json:"netInfo,omitempty"`
@@ -1376,6 +1466,9 @@ type Node struct {
 	Online         bool               `json:"online"`
 	PreAuthKey     NodePreAuthKey     `json:"preAuthKey"`
 	RegisterMethod NodeRegisterMethod `json:"registerMethod"`
+
+	// RemoteConfig true while the client delegated remote configuration to the control plane (tailscale set --remote-config).
+	RemoteConfig bool `json:"remoteConfig"`
 
 	// SharedWith IDs of the users the node is shared with.
 	SharedWith []string `json:"sharedWith"`
@@ -1389,6 +1482,9 @@ type Node struct {
 	SuspendedAt *time.Time `json:"suspendedAt"`
 	Tags        []string   `json:"tags"`
 
+	// Tpm The TPM the client found; absent when it reported none.
+	Tpm *NodeTPM `json:"tpm,omitempty"`
+
 	// UpdateAvailable true when a newer stable Tailscale client exists than the one the node runs; see latestClientVersion on the server info.
 	UpdateAvailable bool `json:"updateAvailable"`
 	User            User `json:"user"`
@@ -1396,6 +1492,59 @@ type Node struct {
 
 // NodeRegisterMethod defines model for Node.RegisterMethod.
 type NodeRegisterMethod string
+
+// NodeAppConnectorRoutes defines model for NodeAppConnectorRoutes.
+type NodeAppConnectorRoutes struct {
+	Domains map[string]*[]string `json:"domains"`
+}
+
+// NodeClientHealth defines model for NodeClientHealth.
+type NodeClientHealth struct {
+	// Warnings The warnings the client would show its user.
+	Warnings []NodeClientWarning `json:"warnings"`
+}
+
+// NodeClientUpdate defines model for NodeClientUpdate.
+type NodeClientUpdate struct {
+	// Enabled Whether the machine's owner allows control to update it.
+	Enabled bool `json:"enabled"`
+
+	// Error The reason the client gave for refusing, empty when it did not.
+	Error *string `json:"error,omitempty"`
+
+	// Started Whether an update is running.
+	Started bool `json:"started"`
+
+	// Supported Whether the platform can update itself at all.
+	Supported bool `json:"supported"`
+}
+
+// NodeClientUpdateResult defines model for NodeClientUpdateResult.
+type NodeClientUpdateResult struct {
+	// Error Why the node did not start, empty when it did.
+	Error   *string `json:"error,omitempty"`
+	NodeId  string  `json:"nodeId"`
+	Started bool    `json:"started"`
+}
+
+// NodeClientWarning defines model for NodeClientWarning.
+type NodeClientWarning struct {
+	// BrokenSince When it went wrong.
+	BrokenSince *time.Time `json:"brokenSince,omitempty"`
+
+	// Code The warnable's identifier.
+	Code string `json:"code"`
+
+	// ImpactsConnectivity Whether the client thinks traffic is affected.
+	ImpactsConnectivity bool `json:"impactsConnectivity"`
+
+	// Severity How bad the client considers it.
+	Severity string `json:"severity"`
+
+	// Text What the client would tell its own user.
+	Text  string `json:"text"`
+	Title string `json:"title"`
+}
 
 // NodeDERPLatency defines model for NodeDERPLatency.
 type NodeDERPLatency struct {
@@ -1411,6 +1560,21 @@ type NodeDERPLatency struct {
 	Ms       float64 `json:"ms"`
 	Name     string  `json:"name"`
 	RegionId int64   `json:"regionId"`
+}
+
+// NodeHardwareAttestation defines model for NodeHardwareAttestation.
+type NodeHardwareAttestation struct {
+	// Attested true when the last map request carried a valid signature by the key; it is the node:hardwareAttested posture attribute.
+	Attested bool `json:"attested"`
+
+	// AttestedAt When attestation was last gained; it is not refreshed per request.
+	AttestedAt *time.Time `json:"attestedAt"`
+
+	// Key The key that last verified, as hwattestpub:<hex>.
+	Key string `json:"key"`
+
+	// KeyChangedAt When a signature last arrived under a new key; null while it never did.
+	KeyChangedAt *time.Time `json:"keyChangedAt"`
 }
 
 // NodeNetInfo defines model for NodeNetInfo.
@@ -1480,6 +1644,36 @@ type NodePreAuthKey struct {
 	User          User       `json:"user"`
 }
 
+// NodePreferences defines model for NodePreferences.
+type NodePreferences struct {
+	AcceptDns    bool `json:"acceptDns"`
+	AcceptRoutes bool `json:"acceptRoutes"`
+
+	// AdvertiseConnector Whether the client offers to be an app connector.
+	AdvertiseConnector bool     `json:"advertiseConnector"`
+	AdvertiseExitNode  bool     `json:"advertiseExitNode"`
+	AdvertiseRoutes    []string `json:"advertiseRoutes"`
+	AutoUpdateApply    bool     `json:"autoUpdateApply"`
+	AutoUpdateCheck    bool     `json:"autoUpdateCheck"`
+
+	// ExitNode The exit node in use, by stable id or address.
+	ExitNode               string `json:"exitNode"`
+	ExitNodeAllowLanAccess bool   `json:"exitNodeAllowLanAccess"`
+	Hostname               string `json:"hostname"`
+	PostureChecking        bool   `json:"postureChecking"`
+
+	// RunSsh Whether the client runs Tailscale SSH.
+	RunSsh bool `json:"runSsh"`
+
+	// ShieldsUp Whether the client blocks incoming traffic.
+	ShieldsUp bool `json:"shieldsUp"`
+}
+
+// NodeSSHUsernames defines model for NodeSSHUsernames.
+type NodeSSHUsernames struct {
+	Usernames []string `json:"usernames"`
+}
+
 // NodeService defines model for NodeService.
 type NodeService struct {
 	// Active true when the node advertises the service.
@@ -1492,14 +1686,61 @@ type NodeService struct {
 	Ports []string `json:"ports"`
 }
 
+// NodeTLSCertStatus defines model for NodeTLSCertStatus.
+type NodeTLSCertStatus struct {
+	Error   *string `json:"error,omitempty"`
+	Expired bool    `json:"expired"`
+
+	// Missing The client has never fetched one.
+	Missing bool `json:"missing"`
+	Valid   bool `json:"valid"`
+}
+
+// NodeTPM defines model for NodeTPM.
+type NodeTPM struct {
+	// FirmwareVersion The firmware version.
+	FirmwareVersion int64 `json:"firmwareVersion"`
+
+	// Manufacturer The four-letter manufacturer code, such as MSFT.
+	Manufacturer string `json:"manufacturer"`
+
+	// Model The vendor-defined model.
+	Model int64 `json:"model"`
+
+	// SpecRevision The TPM 2.0 specification revision.
+	SpecRevision int64 `json:"specRevision"`
+
+	// Vendor The vendor string.
+	Vendor string `json:"vendor"`
+}
+
+// NodesClientUpdate defines model for NodesClientUpdate.
+type NodesClientUpdate struct {
+	Results []NodeClientUpdateResult `json:"results"`
+}
+
 // OAuthClient defines model for OAuthClient.
 type OAuthClient struct {
-	ClientId    string     `json:"clientId"`
-	CreatedAt   *time.Time `json:"createdAt"`
-	Description string     `json:"description"`
+	// Audience Federated: the audience the JWT must carry.
+	Audience  string     `json:"audience"`
+	ClientId  string     `json:"clientId"`
+	CreatedAt *time.Time `json:"createdAt"`
+
+	// CustomClaimRules Federated: further claims the JWT must carry.
+	CustomClaimRules map[string]string `json:"customClaimRules"`
+	Description      string            `json:"description"`
+
+	// Issuer Federated: the OIDC issuer that signs the presented JWT.
+	Issuer string `json:"issuer"`
+
+	// KeyType client or federated.
+	KeyType OAuthClientKeyType `json:"keyType"`
 
 	// Scopes Scopes the client may grant its tokens.
 	Scopes []string `json:"scopes"`
+
+	// Subject Federated: the subject the JWT must equal.
+	Subject string `json:"subject"`
 
 	// Tags Tags the client may put on its tokens.
 	Tags []string `json:"tags"`
@@ -1507,6 +1748,9 @@ type OAuthClient struct {
 	// UserId Creating user id; null for the socket.
 	UserId *string `json:"userId"`
 }
+
+// OAuthClientKeyType client or federated.
+type OAuthClientKeyType string
 
 // PolicyRequestBody defines model for PolicyRequestBody.
 type PolicyRequestBody struct {
@@ -1972,6 +2216,21 @@ type SshRecordingOutputBody struct {
 	Recording SSHRecording `json:"recording"`
 }
 
+// StartNodeClientUpdateRequestBody defines model for StartNodeClientUpdateRequestBody.
+type StartNodeClientUpdateRequestBody struct {
+	// Force Update even while the node is serving SSH sessions.
+	Force *bool `json:"force,omitempty"`
+}
+
+// StartNodesClientUpdateRequestBody defines model for StartNodesClientUpdateRequestBody.
+type StartNodesClientUpdateRequestBody struct {
+	// Force Update even while a node is serving SSH sessions.
+	Force *bool `json:"force,omitempty"`
+
+	// NodeIds The nodes to update.
+	NodeIds *[]string `json:"nodeIds"`
+}
+
 // TailnetLock defines model for TailnetLock.
 type TailnetLock struct {
 	// DisabledAt Last switched off.
@@ -2009,6 +2268,52 @@ type TailnetLockKey struct {
 
 	// Votes The key's weight when the authority decides.
 	Votes int64 `json:"votes"`
+}
+
+// UpdateNodePreferencesRequestBody defines model for UpdateNodePreferencesRequestBody.
+type UpdateNodePreferencesRequestBody struct {
+	AcceptDns          *bool     `json:"acceptDns,omitempty"`
+	AcceptRoutes       *bool     `json:"acceptRoutes,omitempty"`
+	AdvertiseConnector *bool     `json:"advertiseConnector,omitempty"`
+	AdvertiseExitNode  *bool     `json:"advertiseExitNode,omitempty"`
+	AdvertiseRoutes    *[]string `json:"advertiseRoutes,omitempty"`
+	AutoUpdateApply    *bool     `json:"autoUpdateApply,omitempty"`
+	AutoUpdateCheck    *bool     `json:"autoUpdateCheck,omitempty"`
+
+	// ExitNode A stable node id or address; empty clears it.
+	ExitNode               *string `json:"exitNode,omitempty"`
+	ExitNodeAllowLanAccess *bool   `json:"exitNodeAllowLanAccess,omitempty"`
+	Hostname               *string `json:"hostname,omitempty"`
+	PostureChecking        *bool   `json:"postureChecking,omitempty"`
+	RunSsh                 *bool   `json:"runSsh,omitempty"`
+	ShieldsUp              *bool   `json:"shieldsUp,omitempty"`
+}
+
+// UpdateOAuthClientOutputBody defines model for UpdateOAuthClientOutputBody.
+type UpdateOAuthClientOutputBody struct {
+	OauthClient OAuthClient `json:"oauthClient"`
+}
+
+// UpdateOAuthClientRequestBody defines model for UpdateOAuthClientRequestBody.
+type UpdateOAuthClientRequestBody struct {
+	// Audience Federated: the audience the JWT must carry.
+	Audience *string `json:"audience,omitempty"`
+
+	// CustomClaimRules Federated: replaces the rules; {} clears them.
+	CustomClaimRules *map[string]string `json:"customClaimRules,omitempty"`
+	Description      *string            `json:"description,omitempty"`
+
+	// Issuer Federated: the https URL of the OIDC issuer.
+	Issuer *string `json:"issuer,omitempty"`
+
+	// Scopes Replaces the scopes; at least one.
+	Scopes *[]string `json:"scopes,omitempty"`
+
+	// Subject Federated: the subject the JWT must equal.
+	Subject *string `json:"subject,omitempty"`
+
+	// Tags Replaces the tags; [] clears them.
+	Tags *[]string `json:"tags,omitempty"`
 }
 
 // UpdateServiceRequestBody defines model for UpdateServiceRequestBody.
@@ -2224,6 +2529,9 @@ type RegisterNodeParams struct {
 	Key  *string `form:"key,omitempty" json:"key,omitempty"`
 }
 
+// GetNodeDiagnosticParamsKind defines parameters for GetNodeDiagnostic.
+type GetNodeDiagnosticParamsKind string
+
 // DeletePreAuthKeyParams defines parameters for DeletePreAuthKey.
 type DeletePreAuthKeyParams struct {
 	Id *string `form:"id,omitempty" json:"id,omitempty"`
@@ -2344,11 +2652,17 @@ type SetApprovedServicesJSONRequestBody = SetApprovedServicesRequestBody
 // SetNodeAttributeJSONRequestBody defines body for SetNodeAttribute for application/json ContentType.
 type SetNodeAttributeJSONRequestBody = SetAttributeRequestBody
 
+// StartNodeClientUpdateJSONRequestBody defines body for StartNodeClientUpdate for application/json ContentType.
+type StartNodeClientUpdateJSONRequestBody = StartNodeClientUpdateRequestBody
+
 // ExpireNodeJSONRequestBody defines body for ExpireNode for application/json ContentType.
 type ExpireNodeJSONRequestBody = ExpireNodeRequestBody
 
 // SetGlobalExitNodeJSONRequestBody defines body for SetGlobalExitNode for application/json ContentType.
 type SetGlobalExitNodeJSONRequestBody = SetGlobalExitNodeRequestBody
+
+// UpdateNodePreferencesJSONRequestBody defines body for UpdateNodePreferences for application/json ContentType.
+type UpdateNodePreferencesJSONRequestBody = UpdateNodePreferencesRequestBody
 
 // ShareNodeJSONRequestBody defines body for ShareNode for application/json ContentType.
 type ShareNodeJSONRequestBody = ShareNodeRequestBody
@@ -2359,8 +2673,14 @@ type SuspendNodeJSONRequestBody = SetSuspensionRequestBody
 // SetTagsJSONRequestBody defines body for SetTags for application/json ContentType.
 type SetTagsJSONRequestBody = SetTagsRequestBody
 
+// StartNodesClientUpdateJSONRequestBody defines body for StartNodesClientUpdate for application/json ContentType.
+type StartNodesClientUpdateJSONRequestBody = StartNodesClientUpdateRequestBody
+
 // CreateOAuthClientJSONRequestBody defines body for CreateOAuthClient for application/json ContentType.
 type CreateOAuthClientJSONRequestBody = CreateOAuthClientRequestBody
+
+// UpdateOAuthClientJSONRequestBody defines body for UpdateOAuthClient for application/json ContentType.
+type UpdateOAuthClientJSONRequestBody = UpdateOAuthClientRequestBody
 
 // SetPolicyJSONRequestBody defines body for SetPolicy for application/json ContentType.
 type SetPolicyJSONRequestBody = PolicyRequestBody
@@ -3448,6 +3768,15 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/node/{nodeId} (the `GetNode` operationId).
 	GetNode(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetNodeAppConnectorRoutes Get learned app connector routes
+	//
+	// Asks the connected node which addresses it has resolved for the domains it answers for as an app connector. A node that is not a connector answers with none.
+	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/app-connector-routes (the `GetNodeAppConnectorRoutes` operationId).
+	GetNodeAppConnectorRoutes(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ApproveNodeWithBody Approve node
 	//
 	// Admits a node that registered while device approval was on, or withdraws the approval again. A node waiting for approval stays registered but has no peers and is not visible to any.
@@ -3539,6 +3868,46 @@ type ClientInterface interface {
 	// Corresponds with PUT /api/v1/node/{nodeId}/attributes/{key} (the `SetNodeAttribute` operationId).
 	SetNodeAttribute(ctx context.Context, nodeId string, key string, body SetNodeAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetNodeClientUpdate Get node client update status
+	//
+	// Asks the connected node whether it would update its own Tailscale installation and whether an update is already running. See /ref/device-management.
+	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/client-update (the `GetNodeClientUpdate` operationId).
+	GetNodeClientUpdate(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StartNodeClientUpdateWithBody Update the node's Tailscale client
+	//
+	// Asks the connected node to update itself now. The client refuses unless its owner opted in with `tailscale set --auto-update` or TS_ALLOW_REMOTE_UPDATE, and while it is serving SSH sessions unless force is set.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/client-update (the `StartNodeClientUpdate` operationId).
+	StartNodeClientUpdateWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StartNodeClientUpdate Update the node's Tailscale client
+	//
+	// Asks the connected node to update itself now. The client refuses unless its owner opted in with `tailscale set --auto-update` or TS_ALLOW_REMOTE_UPDATE, and while it is serving SSH sessions unless force is set.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/client-update (the `StartNodeClientUpdate` operationId).
+	StartNodeClientUpdate(ctx context.Context, nodeId string, body StartNodeClientUpdateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetNodeDiagnostic Download a node diagnostic
+	//
+	// Asks the connected node for one of the dumps it hands over for support and answers with it as the client wrote it: prefs,netmap,metrics,goroutines,sockstats,tka-log. A client built without its debug endpoints refuses.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/diagnostics/{kind} (the `GetNodeDiagnostic` operationId).
+	GetNodeDiagnostic(ctx context.Context, nodeId string, kind GetNodeDiagnosticParamsKind, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ExpireNodeWithBody Expire node
 	//
 	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -3579,6 +3948,24 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/node/{nodeId}/global-exit-node (the `SetGlobalExitNode` operationId).
 	SetGlobalExitNode(ctx context.Context, nodeId string, body SetGlobalExitNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ResetNodeHardwareAttestation Reset hardware attestation
+	//
+	// Forgets what the machine's hardware attestation key proved, so the next map request that carries a valid signature starts the record again. The client is not touched and keeps its key.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v1/node/{nodeId}/hardware-attestation (the `ResetNodeHardwareAttestation` operationId).
+	ResetNodeHardwareAttestation(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetNodeClientHealth Get node client health
+	//
+	// Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why.
+	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/health (the `GetNodeClientHealth` operationId).
+	GetNodeClientHealth(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetNodePosture Get node posture
 	//
 	// Returns the attribute map the policy evaluates for the node, the identity the server collected and the custom attributes. See docs/ref/device-trust.md.
@@ -3603,6 +3990,37 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/node/{nodeId}/postures (the `ListNodePostures` operationId).
 	ListNodePostures(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetNodePreferences Get node preferences
+	//
+	// Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does.
+	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/preferences (the `GetNodePreferences` operationId).
+	GetNodePreferences(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateNodePreferencesWithBody Change node preferences
+	//
+	// Changes the preferences the body names on the connected node and answers with what the client ended up with. Needs the machine to have opted in by running `tailscale set --remote-config` on it, which hands the tailnet admin its whole local API; without that the node answers 409.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/node/{nodeId}/preferences (the `UpdateNodePreferences` operationId).
+	UpdateNodePreferencesWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateNodePreferences Change node preferences
+	//
+	// Changes the preferences the body names on the connected node and answers with what the client ended up with. Needs the machine to have opted in by running `tailscale set --remote-config` on it, which hands the tailnet admin its whole local API; without that the node answers 409.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/node/{nodeId}/preferences (the `UpdateNodePreferences` operationId).
+	UpdateNodePreferences(ctx context.Context, nodeId string, body UpdateNodePreferencesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RenameNode Rename node
 	//
@@ -3633,6 +4051,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with DELETE /api/v1/node/{nodeId}/share/{userId} (the `UnshareNode` operationId).
 	UnshareNode(ctx context.Context, nodeId string, userId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetNodeSSHUsernames Get node SSH username hints
+	//
+	// Asks the connected node which logins it would suggest for a Tailscale SSH session, so the console's terminal can offer them. The hints are not an authorisation; the SSH policy still decides. Visible to whoever may open a session to the node: without the devices:core:read scope, a node of the caller's own or one their machines can already reach.
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/ssh-usernames (the `GetNodeSSHUsernames` operationId).
+	GetNodeSSHUsernames(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SuspendNodeWithBody Suspend node
 	//
@@ -3674,9 +4099,40 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/node/{nodeId}/tags (the `SetTags` operationId).
 	SetTags(ctx context.Context, nodeId string, body SetTagsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetNodeTLSCertStatus Get node TLS certificate status
+	//
+	// Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed.
+	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/tls-cert (the `GetNodeTLSCertStatus` operationId).
+	GetNodeTLSCertStatus(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StartNodesClientUpdateWithBody Update several nodes' Tailscale clients
+	//
+	// Asks each named node to update itself, a few at a time, and answers with one result per node in the order asked. A node that is offline or refuses fails on its own; the others still start.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/nodes/client-update (the `StartNodesClientUpdate` operationId).
+	StartNodesClientUpdateWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StartNodesClientUpdate Update several nodes' Tailscale clients
+	//
+	// Asks each named node to update itself, a few at a time, and answers with one result per node in the order asked. A node that is offline or refuses fails on its own; the others still start.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/nodes/client-update (the `StartNodesClientUpdate` operationId).
+	StartNodesClientUpdate(ctx context.Context, body StartNodesClientUpdateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListOAuthClients List OAuth clients
 	//
-	// Every client that can mint v2 API tokens; revoked clients are gone.
+	// Every client and federated identity that can mint v2 API tokens; revoked ones are gone.
 	//
 	// Requires the `oauth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -3685,7 +4141,7 @@ type ClientInterface interface {
 
 	// CreateOAuthClientWithBody Create OAuth client
 	//
-	// The client secret is in this response only. Scopes may not exceed the caller's own.
+	// The client secret is in this response only, and a federated identity has none. Scopes may not exceed the caller's own.
 	//
 	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -3696,7 +4152,7 @@ type ClientInterface interface {
 
 	// CreateOAuthClient Create OAuth client
 	//
-	// The client secret is in this response only. Scopes may not exceed the caller's own.
+	// The client secret is in this response only, and a federated identity has none. Scopes may not exceed the caller's own.
 	//
 	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -3713,6 +4169,28 @@ type ClientInterface interface {
 	//
 	// Corresponds with DELETE /api/v1/oauth-client/{clientId} (the `RevokeOAuthClient` operationId).
 	RevokeOAuthClient(ctx context.Context, clientId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateOAuthClientWithBody Update OAuth client
+	//
+	// Changes the description, scopes, tags and, for a federated identity, its trust conditions. The secret is untouched, so the client keeps working across an update.
+	//
+	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/oauth-client/{clientId} (the `UpdateOAuthClient` operationId).
+	UpdateOAuthClientWithBody(ctx context.Context, clientId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateOAuthClient Update OAuth client
+	//
+	// Changes the description, scopes, tags and, for a federated identity, its trust conditions. The secret is untouched, so the client keeps working across an update.
+	//
+	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/oauth-client/{clientId} (the `UpdateOAuthClient` operationId).
+	UpdateOAuthClient(ctx context.Context, clientId string, body UpdateOAuthClientJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPolicy Get policy
 	//
@@ -6413,6 +6891,25 @@ func (c *Client) GetNode(ctx context.Context, nodeId string, reqEditors ...Reque
 	return c.Client.Do(req)
 }
 
+// GetNodeAppConnectorRoutes Get learned app connector routes
+//
+// Asks the connected node which addresses it has resolved for the domains it answers for as an app connector. A node that is not a connector answers with none.
+//
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/app-connector-routes (the `GetNodeAppConnectorRoutes` operationId).
+func (c *Client) GetNodeAppConnectorRoutes(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNodeAppConnectorRoutesRequest(c.Server, nodeId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ApproveNodeWithBody Approve node
 //
 // Admits a node that registered while device approval was on, or withdraws the approval again. A node waiting for approval stays registered but has no peers and is not visible to any.
@@ -6594,6 +7091,86 @@ func (c *Client) SetNodeAttribute(ctx context.Context, nodeId string, key string
 	return c.Client.Do(req)
 }
 
+// GetNodeClientUpdate Get node client update status
+//
+// Asks the connected node whether it would update its own Tailscale installation and whether an update is already running. See /ref/device-management.
+//
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/client-update (the `GetNodeClientUpdate` operationId).
+func (c *Client) GetNodeClientUpdate(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNodeClientUpdateRequest(c.Server, nodeId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StartNodeClientUpdateWithBody Update the node's Tailscale client
+//
+// Asks the connected node to update itself now. The client refuses unless its owner opted in with `tailscale set --auto-update` or TS_ALLOW_REMOTE_UPDATE, and while it is serving SSH sessions unless force is set.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/node/{nodeId}/client-update (the `StartNodeClientUpdate` operationId).
+func (c *Client) StartNodeClientUpdateWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStartNodeClientUpdateRequestWithBody(c.Server, nodeId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StartNodeClientUpdate Update the node's Tailscale client
+//
+// Asks the connected node to update itself now. The client refuses unless its owner opted in with `tailscale set --auto-update` or TS_ALLOW_REMOTE_UPDATE, and while it is serving SSH sessions unless force is set.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/node/{nodeId}/client-update (the `StartNodeClientUpdate` operationId).
+func (c *Client) StartNodeClientUpdate(ctx context.Context, nodeId string, body StartNodeClientUpdateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStartNodeClientUpdateRequest(c.Server, nodeId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetNodeDiagnostic Download a node diagnostic
+//
+// Asks the connected node for one of the dumps it hands over for support and answers with it as the client wrote it: prefs,netmap,metrics,goroutines,sockstats,tka-log. A client built without its debug endpoints refuses.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/diagnostics/{kind} (the `GetNodeDiagnostic` operationId).
+func (c *Client) GetNodeDiagnostic(ctx context.Context, nodeId string, kind GetNodeDiagnosticParamsKind, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNodeDiagnosticRequest(c.Server, nodeId, kind)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ExpireNodeWithBody Expire node
 //
 // Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -6674,6 +7251,44 @@ func (c *Client) SetGlobalExitNode(ctx context.Context, nodeId string, body SetG
 	return c.Client.Do(req)
 }
 
+// ResetNodeHardwareAttestation Reset hardware attestation
+//
+// Forgets what the machine's hardware attestation key proved, so the next map request that carries a valid signature starts the record again. The client is not touched and keeps its key.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v1/node/{nodeId}/hardware-attestation (the `ResetNodeHardwareAttestation` operationId).
+func (c *Client) ResetNodeHardwareAttestation(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResetNodeHardwareAttestationRequest(c.Server, nodeId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetNodeClientHealth Get node client health
+//
+// Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why.
+//
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/health (the `GetNodeClientHealth` operationId).
+func (c *Client) GetNodeClientHealth(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNodeClientHealthRequest(c.Server, nodeId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetNodePosture Get node posture
 //
 // Returns the attribute map the policy evaluates for the node, the identity the server collected and the custom attributes. See docs/ref/device-trust.md.
@@ -6719,6 +7334,67 @@ func (c *Client) CollectNodePosture(ctx context.Context, nodeId string, reqEdito
 // Corresponds with GET /api/v1/node/{nodeId}/postures (the `ListNodePostures` operationId).
 func (c *Client) ListNodePostures(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListNodePosturesRequest(c.Server, nodeId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetNodePreferences Get node preferences
+//
+// Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does.
+//
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/preferences (the `GetNodePreferences` operationId).
+func (c *Client) GetNodePreferences(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNodePreferencesRequest(c.Server, nodeId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateNodePreferencesWithBody Change node preferences
+//
+// Changes the preferences the body names on the connected node and answers with what the client ended up with. Needs the machine to have opted in by running `tailscale set --remote-config` on it, which hands the tailnet admin its whole local API; without that the node answers 409.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/node/{nodeId}/preferences (the `UpdateNodePreferences` operationId).
+func (c *Client) UpdateNodePreferencesWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateNodePreferencesRequestWithBody(c.Server, nodeId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateNodePreferences Change node preferences
+//
+// Changes the preferences the body names on the connected node and answers with what the client ended up with. Needs the machine to have opted in by running `tailscale set --remote-config` on it, which hands the tailnet admin its whole local API; without that the node answers 409.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/node/{nodeId}/preferences (the `UpdateNodePreferences` operationId).
+func (c *Client) UpdateNodePreferences(ctx context.Context, nodeId string, body UpdateNodePreferencesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateNodePreferencesRequest(c.Server, nodeId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -6789,6 +7465,23 @@ func (c *Client) ShareNode(ctx context.Context, nodeId string, body ShareNodeJSO
 // Corresponds with DELETE /api/v1/node/{nodeId}/share/{userId} (the `UnshareNode` operationId).
 func (c *Client) UnshareNode(ctx context.Context, nodeId string, userId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUnshareNodeRequest(c.Server, nodeId, userId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetNodeSSHUsernames Get node SSH username hints
+//
+// Asks the connected node which logins it would suggest for a Tailscale SSH session, so the console's terminal can offer them. The hints are not an authorisation; the SSH policy still decides. Visible to whoever may open a session to the node: without the devices:core:read scope, a node of the caller's own or one their machines can already reach.
+//
+// Corresponds with GET /api/v1/node/{nodeId}/ssh-usernames (the `GetNodeSSHUsernames` operationId).
+func (c *Client) GetNodeSSHUsernames(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNodeSSHUsernamesRequest(c.Server, nodeId)
 	if err != nil {
 		return nil, err
 	}
@@ -6879,9 +7572,70 @@ func (c *Client) SetTags(ctx context.Context, nodeId string, body SetTagsJSONReq
 	return c.Client.Do(req)
 }
 
+// GetNodeTLSCertStatus Get node TLS certificate status
+//
+// Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed.
+//
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/tls-cert (the `GetNodeTLSCertStatus` operationId).
+func (c *Client) GetNodeTLSCertStatus(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNodeTLSCertStatusRequest(c.Server, nodeId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StartNodesClientUpdateWithBody Update several nodes' Tailscale clients
+//
+// Asks each named node to update itself, a few at a time, and answers with one result per node in the order asked. A node that is offline or refuses fails on its own; the others still start.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/nodes/client-update (the `StartNodesClientUpdate` operationId).
+func (c *Client) StartNodesClientUpdateWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStartNodesClientUpdateRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StartNodesClientUpdate Update several nodes' Tailscale clients
+//
+// Asks each named node to update itself, a few at a time, and answers with one result per node in the order asked. A node that is offline or refuses fails on its own; the others still start.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/nodes/client-update (the `StartNodesClientUpdate` operationId).
+func (c *Client) StartNodesClientUpdate(ctx context.Context, body StartNodesClientUpdateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStartNodesClientUpdateRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListOAuthClients List OAuth clients
 //
-// Every client that can mint v2 API tokens; revoked clients are gone.
+// Every client and federated identity that can mint v2 API tokens; revoked ones are gone.
 //
 // Requires the `oauth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -6900,7 +7654,7 @@ func (c *Client) ListOAuthClients(ctx context.Context, reqEditors ...RequestEdit
 
 // CreateOAuthClientWithBody Create OAuth client
 //
-// The client secret is in this response only. Scopes may not exceed the caller's own.
+// The client secret is in this response only, and a federated identity has none. Scopes may not exceed the caller's own.
 //
 // Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -6921,7 +7675,7 @@ func (c *Client) CreateOAuthClientWithBody(ctx context.Context, contentType stri
 
 // CreateOAuthClient Create OAuth client
 //
-// The client secret is in this response only. Scopes may not exceed the caller's own.
+// The client secret is in this response only, and a federated identity has none. Scopes may not exceed the caller's own.
 //
 // Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -6949,6 +7703,48 @@ func (c *Client) CreateOAuthClient(ctx context.Context, body CreateOAuthClientJS
 // Corresponds with DELETE /api/v1/oauth-client/{clientId} (the `RevokeOAuthClient` operationId).
 func (c *Client) RevokeOAuthClient(ctx context.Context, clientId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRevokeOAuthClientRequest(c.Server, clientId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateOAuthClientWithBody Update OAuth client
+//
+// Changes the description, scopes, tags and, for a federated identity, its trust conditions. The secret is untouched, so the client keeps working across an update.
+//
+// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/oauth-client/{clientId} (the `UpdateOAuthClient` operationId).
+func (c *Client) UpdateOAuthClientWithBody(ctx context.Context, clientId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateOAuthClientRequestWithBody(c.Server, clientId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateOAuthClient Update OAuth client
+//
+// Changes the description, scopes, tags and, for a federated identity, its trust conditions. The secret is untouched, so the client keeps working across an update.
+//
+// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/oauth-client/{clientId} (the `UpdateOAuthClient` operationId).
+func (c *Client) UpdateOAuthClient(ctx context.Context, clientId string, body UpdateOAuthClientJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateOAuthClientRequest(c.Server, clientId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -11523,6 +12319,40 @@ func NewGetNodeRequest(server string, nodeId string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewGetNodeAppConnectorRoutesRequest constructs an http.Request for the GetNodeAppConnectorRoutes method
+func NewGetNodeAppConnectorRoutesRequest(server string, nodeId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/app-connector-routes", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewApproveNodeRequest calls the generic ApproveNode builder with application/json body
 func NewApproveNodeRequest(server string, nodeId string, body ApproveNodeJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -11759,6 +12589,128 @@ func NewSetNodeAttributeRequestWithBody(server string, nodeId string, key string
 	return req, nil
 }
 
+// NewGetNodeClientUpdateRequest constructs an http.Request for the GetNodeClientUpdate method
+func NewGetNodeClientUpdateRequest(server string, nodeId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/client-update", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewStartNodeClientUpdateRequest calls the generic StartNodeClientUpdate builder with application/json body
+func NewStartNodeClientUpdateRequest(server string, nodeId string, body StartNodeClientUpdateJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewStartNodeClientUpdateRequestWithBody(server, nodeId, "application/json", bodyReader)
+}
+
+// NewStartNodeClientUpdateRequestWithBody constructs an http.Request for the StartNodeClientUpdate method, with any body, and a specified content type
+func NewStartNodeClientUpdateRequestWithBody(server string, nodeId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/client-update", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetNodeDiagnosticRequest constructs an http.Request for the GetNodeDiagnostic method
+func NewGetNodeDiagnosticRequest(server string, nodeId string, kind GetNodeDiagnosticParamsKind) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "kind", kind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/diagnostics/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewExpireNodeRequest calls the generic ExpireNode builder with application/json body
 func NewExpireNodeRequest(server string, nodeId string, body ExpireNodeJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -11849,6 +12801,74 @@ func NewSetGlobalExitNodeRequestWithBody(server string, nodeId string, contentTy
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewResetNodeHardwareAttestationRequest constructs an http.Request for the ResetNodeHardwareAttestation method
+func NewResetNodeHardwareAttestationRequest(server string, nodeId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/hardware-attestation", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetNodeClientHealthRequest constructs an http.Request for the GetNodeClientHealth method
+func NewGetNodeClientHealthRequest(server string, nodeId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/health", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -11951,6 +12971,87 @@ func NewListNodePosturesRequest(server string, nodeId string) (*http.Request, er
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewGetNodePreferencesRequest constructs an http.Request for the GetNodePreferences method
+func NewGetNodePreferencesRequest(server string, nodeId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/preferences", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateNodePreferencesRequest calls the generic UpdateNodePreferences builder with application/json body
+func NewUpdateNodePreferencesRequest(server string, nodeId string, body UpdateNodePreferencesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateNodePreferencesRequestWithBody(server, nodeId, "application/json", bodyReader)
+}
+
+// NewUpdateNodePreferencesRequestWithBody constructs an http.Request for the UpdateNodePreferences method, with any body, and a specified content type
+func NewUpdateNodePreferencesRequestWithBody(server string, nodeId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/preferences", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -12084,6 +13185,40 @@ func NewUnshareNodeRequest(server string, nodeId string, userId string) (*http.R
 	return req, nil
 }
 
+// NewGetNodeSSHUsernamesRequest constructs an http.Request for the GetNodeSSHUsernames method
+func NewGetNodeSSHUsernamesRequest(server string, nodeId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/ssh-usernames", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewSuspendNodeRequest calls the generic SuspendNode builder with application/json body
 func NewSuspendNodeRequest(server string, nodeId string, body SuspendNodeJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -12159,6 +13294,80 @@ func NewSetTagsRequestWithBody(server string, nodeId string, contentType string,
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/node/%s/tags", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetNodeTLSCertStatusRequest constructs an http.Request for the GetNodeTLSCertStatus method
+func NewGetNodeTLSCertStatusRequest(server string, nodeId string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/tls-cert", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewStartNodesClientUpdateRequest calls the generic StartNodesClientUpdate builder with application/json body
+func NewStartNodesClientUpdateRequest(server string, body StartNodesClientUpdateJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewStartNodesClientUpdateRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewStartNodesClientUpdateRequestWithBody constructs an http.Request for the StartNodesClientUpdate method, with any body, and a specified content type
+func NewStartNodesClientUpdateRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/nodes/client-update")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -12275,6 +13484,53 @@ func NewRevokeOAuthClientRequest(server string, clientId string) (*http.Request,
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewUpdateOAuthClientRequest calls the generic UpdateOAuthClient builder with application/json body
+func NewUpdateOAuthClientRequest(server string, clientId string, body UpdateOAuthClientJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateOAuthClientRequestWithBody(server, clientId, "application/json", bodyReader)
+}
+
+// NewUpdateOAuthClientRequestWithBody constructs an http.Request for the UpdateOAuthClient method, with any body, and a specified content type
+func NewUpdateOAuthClientRequestWithBody(server string, clientId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "clientId", clientId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/oauth-client/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -15388,6 +16644,17 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/node/{nodeId} (the `GetNode` operationId).
 	GetNodeWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodeResponse, error)
 
+	// GetNodeAppConnectorRoutesWithResponse Get learned app connector routes
+	//
+	// Asks the connected node which addresses it has resolved for the domains it answers for as an app connector. A node that is not a connector answers with none.
+	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/app-connector-routes (the `GetNodeAppConnectorRoutes` operationId).
+	GetNodeAppConnectorRoutesWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodeAppConnectorRoutesResponse, error)
+
 	// ApproveNodeWithBodyWithResponse Approve node
 	//
 	// Admits a node that registered while device approval was on, or withdraws the approval again. A node waiting for approval stays registered but has no peers and is not visible to any.
@@ -15481,6 +16748,50 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /api/v1/node/{nodeId}/attributes/{key} (the `SetNodeAttribute` operationId).
 	SetNodeAttributeWithResponse(ctx context.Context, nodeId string, key string, body SetNodeAttributeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetNodeAttributeResponse, error)
 
+	// GetNodeClientUpdateWithResponse Get node client update status
+	//
+	// Asks the connected node whether it would update its own Tailscale installation and whether an update is already running. See /ref/device-management.
+	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/client-update (the `GetNodeClientUpdate` operationId).
+	GetNodeClientUpdateWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodeClientUpdateResponse, error)
+
+	// StartNodeClientUpdateWithBodyWithResponse Update the node's Tailscale client
+	//
+	// Asks the connected node to update itself now. The client refuses unless its owner opted in with `tailscale set --auto-update` or TS_ALLOW_REMOTE_UPDATE, and while it is serving SSH sessions unless force is set.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/client-update (the `StartNodeClientUpdate` operationId).
+	StartNodeClientUpdateWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*StartNodeClientUpdateResponse, error)
+
+	// StartNodeClientUpdateWithResponse Update the node's Tailscale client
+	//
+	// Asks the connected node to update itself now. The client refuses unless its owner opted in with `tailscale set --auto-update` or TS_ALLOW_REMOTE_UPDATE, and while it is serving SSH sessions unless force is set.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/client-update (the `StartNodeClientUpdate` operationId).
+	StartNodeClientUpdateWithResponse(ctx context.Context, nodeId string, body StartNodeClientUpdateJSONRequestBody, reqEditors ...RequestEditorFn) (*StartNodeClientUpdateResponse, error)
+
+	// GetNodeDiagnosticWithResponse Download a node diagnostic
+	//
+	// Asks the connected node for one of the dumps it hands over for support and answers with it as the client wrote it: prefs,netmap,metrics,goroutines,sockstats,tka-log. A client built without its debug endpoints refuses.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/diagnostics/{kind} (the `GetNodeDiagnostic` operationId).
+	GetNodeDiagnosticWithResponse(ctx context.Context, nodeId string, kind GetNodeDiagnosticParamsKind, reqEditors ...RequestEditorFn) (*GetNodeDiagnosticResponse, error)
+
 	// ExpireNodeWithBodyWithResponse Expire node
 	//
 	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -15521,6 +16832,28 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/node/{nodeId}/global-exit-node (the `SetGlobalExitNode` operationId).
 	SetGlobalExitNodeWithResponse(ctx context.Context, nodeId string, body SetGlobalExitNodeJSONRequestBody, reqEditors ...RequestEditorFn) (*SetGlobalExitNodeResponse, error)
 
+	// ResetNodeHardwareAttestationWithResponse Reset hardware attestation
+	//
+	// Forgets what the machine's hardware attestation key proved, so the next map request that carries a valid signature starts the record again. The client is not touched and keeps its key.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/node/{nodeId}/hardware-attestation (the `ResetNodeHardwareAttestation` operationId).
+	ResetNodeHardwareAttestationWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*ResetNodeHardwareAttestationResponse, error)
+
+	// GetNodeClientHealthWithResponse Get node client health
+	//
+	// Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why.
+	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/health (the `GetNodeClientHealth` operationId).
+	GetNodeClientHealthWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodeClientHealthResponse, error)
+
 	// GetNodePostureWithResponse Get node posture
 	//
 	// Returns the attribute map the policy evaluates for the node, the identity the server collected and the custom attributes. See docs/ref/device-trust.md.
@@ -15551,6 +16884,39 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/node/{nodeId}/postures (the `ListNodePostures` operationId).
 	ListNodePosturesWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*ListNodePosturesResponse, error)
+
+	// GetNodePreferencesWithResponse Get node preferences
+	//
+	// Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does.
+	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/preferences (the `GetNodePreferences` operationId).
+	GetNodePreferencesWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodePreferencesResponse, error)
+
+	// UpdateNodePreferencesWithBodyWithResponse Change node preferences
+	//
+	// Changes the preferences the body names on the connected node and answers with what the client ended up with. Needs the machine to have opted in by running `tailscale set --remote-config` on it, which hands the tailnet admin its whole local API; without that the node answers 409.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/node/{nodeId}/preferences (the `UpdateNodePreferences` operationId).
+	UpdateNodePreferencesWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateNodePreferencesResponse, error)
+
+	// UpdateNodePreferencesWithResponse Change node preferences
+	//
+	// Changes the preferences the body names on the connected node and answers with what the client ended up with. Needs the machine to have opted in by running `tailscale set --remote-config` on it, which hands the tailnet admin its whole local API; without that the node answers 409.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/node/{nodeId}/preferences (the `UpdateNodePreferences` operationId).
+	UpdateNodePreferencesWithResponse(ctx context.Context, nodeId string, body UpdateNodePreferencesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateNodePreferencesResponse, error)
 
 	// RenameNodeWithResponse Rename node
 	//
@@ -15585,6 +16951,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with DELETE /api/v1/node/{nodeId}/share/{userId} (the `UnshareNode` operationId).
 	UnshareNodeWithResponse(ctx context.Context, nodeId string, userId string, reqEditors ...RequestEditorFn) (*UnshareNodeResponse, error)
+
+	// GetNodeSSHUsernamesWithResponse Get node SSH username hints
+	//
+	// Asks the connected node which logins it would suggest for a Tailscale SSH session, so the console's terminal can offer them. The hints are not an authorisation; the SSH policy still decides. Visible to whoever may open a session to the node: without the devices:core:read scope, a node of the caller's own or one their machines can already reach.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/ssh-usernames (the `GetNodeSSHUsernames` operationId).
+	GetNodeSSHUsernamesWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodeSSHUsernamesResponse, error)
 
 	// SuspendNodeWithBodyWithResponse Suspend node
 	//
@@ -15626,9 +17001,42 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/node/{nodeId}/tags (the `SetTags` operationId).
 	SetTagsWithResponse(ctx context.Context, nodeId string, body SetTagsJSONRequestBody, reqEditors ...RequestEditorFn) (*SetTagsResponse, error)
 
+	// GetNodeTLSCertStatusWithResponse Get node TLS certificate status
+	//
+	// Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed.
+	//
+	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/node/{nodeId}/tls-cert (the `GetNodeTLSCertStatus` operationId).
+	GetNodeTLSCertStatusWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodeTLSCertStatusResponse, error)
+
+	// StartNodesClientUpdateWithBodyWithResponse Update several nodes' Tailscale clients
+	//
+	// Asks each named node to update itself, a few at a time, and answers with one result per node in the order asked. A node that is offline or refuses fails on its own; the others still start.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/nodes/client-update (the `StartNodesClientUpdate` operationId).
+	StartNodesClientUpdateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*StartNodesClientUpdateResponse, error)
+
+	// StartNodesClientUpdateWithResponse Update several nodes' Tailscale clients
+	//
+	// Asks each named node to update itself, a few at a time, and answers with one result per node in the order asked. A node that is offline or refuses fails on its own; the others still start.
+	//
+	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/nodes/client-update (the `StartNodesClientUpdate` operationId).
+	StartNodesClientUpdateWithResponse(ctx context.Context, body StartNodesClientUpdateJSONRequestBody, reqEditors ...RequestEditorFn) (*StartNodesClientUpdateResponse, error)
+
 	// ListOAuthClientsWithResponse List OAuth clients
 	//
-	// Every client that can mint v2 API tokens; revoked clients are gone.
+	// Every client and federated identity that can mint v2 API tokens; revoked ones are gone.
 	//
 	// Requires the `oauth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -15639,7 +17047,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOAuthClientWithBodyWithResponse Create OAuth client
 	//
-	// The client secret is in this response only. Scopes may not exceed the caller's own.
+	// The client secret is in this response only, and a federated identity has none. Scopes may not exceed the caller's own.
 	//
 	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -15650,7 +17058,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOAuthClientWithResponse Create OAuth client
 	//
-	// The client secret is in this response only. Scopes may not exceed the caller's own.
+	// The client secret is in this response only, and a federated identity has none. Scopes may not exceed the caller's own.
 	//
 	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -15669,6 +17077,28 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with DELETE /api/v1/oauth-client/{clientId} (the `RevokeOAuthClient` operationId).
 	RevokeOAuthClientWithResponse(ctx context.Context, clientId string, reqEditors ...RequestEditorFn) (*RevokeOAuthClientResponse, error)
+
+	// UpdateOAuthClientWithBodyWithResponse Update OAuth client
+	//
+	// Changes the description, scopes, tags and, for a federated identity, its trust conditions. The secret is untouched, so the client keeps working across an update.
+	//
+	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/oauth-client/{clientId} (the `UpdateOAuthClient` operationId).
+	UpdateOAuthClientWithBodyWithResponse(ctx context.Context, clientId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateOAuthClientResponse, error)
+
+	// UpdateOAuthClientWithResponse Update OAuth client
+	//
+	// Changes the description, scopes, tags and, for a federated identity, its trust conditions. The secret is untouched, so the client keeps working across an update.
+	//
+	// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/oauth-client/{clientId} (the `UpdateOAuthClient` operationId).
+	UpdateOAuthClientWithResponse(ctx context.Context, clientId string, body UpdateOAuthClientJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateOAuthClientResponse, error)
 
 	// GetPolicyWithResponse Get policy
 	//
@@ -20135,6 +21565,54 @@ func (r GetNodeResponse) ContentType() string {
 	return ""
 }
 
+type GetNodeAppConnectorRoutesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodeAppConnectorRoutes
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetNodeAppConnectorRoutesResponse) GetJSON200() *NodeAppConnectorRoutes {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetNodeAppConnectorRoutesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetNodeAppConnectorRoutesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNodeAppConnectorRoutesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNodeAppConnectorRoutesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetNodeAppConnectorRoutesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ApproveNodeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -20375,6 +21853,143 @@ func (r SetNodeAttributeResponse) ContentType() string {
 	return ""
 }
 
+type GetNodeClientUpdateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodeClientUpdate
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetNodeClientUpdateResponse) GetJSON200() *NodeClientUpdate {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetNodeClientUpdateResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetNodeClientUpdateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNodeClientUpdateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNodeClientUpdateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetNodeClientUpdateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type StartNodeClientUpdateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodeClientUpdate
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r StartNodeClientUpdateResponse) GetJSON200() *NodeClientUpdate {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r StartNodeClientUpdateResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r StartNodeClientUpdateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StartNodeClientUpdateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StartNodeClientUpdateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StartNodeClientUpdateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetNodeDiagnosticResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetNodeDiagnosticResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetNodeDiagnosticResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNodeDiagnosticResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNodeDiagnosticResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetNodeDiagnosticResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ExpireNodeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -20465,6 +22080,102 @@ func (r SetGlobalExitNodeResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r SetGlobalExitNodeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ResetNodeHardwareAttestationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodeOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ResetNodeHardwareAttestationResponse) GetJSON200() *NodeOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ResetNodeHardwareAttestationResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ResetNodeHardwareAttestationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ResetNodeHardwareAttestationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ResetNodeHardwareAttestationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ResetNodeHardwareAttestationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetNodeClientHealthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodeClientHealth
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetNodeClientHealthResponse) GetJSON200() *NodeClientHealth {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetNodeClientHealthResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetNodeClientHealthResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNodeClientHealthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNodeClientHealthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetNodeClientHealthResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -20615,6 +22326,102 @@ func (r ListNodePosturesResponse) ContentType() string {
 	return ""
 }
 
+type GetNodePreferencesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodePreferences
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetNodePreferencesResponse) GetJSON200() *NodePreferences {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetNodePreferencesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetNodePreferencesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNodePreferencesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNodePreferencesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetNodePreferencesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateNodePreferencesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodePreferences
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateNodePreferencesResponse) GetJSON200() *NodePreferences {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateNodePreferencesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateNodePreferencesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateNodePreferencesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateNodePreferencesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateNodePreferencesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type RenameNodeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -20759,6 +22566,54 @@ func (r UnshareNodeResponse) ContentType() string {
 	return ""
 }
 
+type GetNodeSSHUsernamesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodeSSHUsernames
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetNodeSSHUsernamesResponse) GetJSON200() *NodeSSHUsernames {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetNodeSSHUsernamesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetNodeSSHUsernamesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNodeSSHUsernamesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNodeSSHUsernamesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetNodeSSHUsernamesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type SuspendNodeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -20849,6 +22704,102 @@ func (r SetTagsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r SetTagsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetNodeTLSCertStatusResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodeTLSCertStatus
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetNodeTLSCertStatusResponse) GetJSON200() *NodeTLSCertStatus {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetNodeTLSCertStatusResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetNodeTLSCertStatusResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNodeTLSCertStatusResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNodeTLSCertStatusResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetNodeTLSCertStatusResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type StartNodesClientUpdateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodesClientUpdate
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r StartNodesClientUpdateResponse) GetJSON200() *NodesClientUpdate {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r StartNodesClientUpdateResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r StartNodesClientUpdateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StartNodesClientUpdateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StartNodesClientUpdateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StartNodesClientUpdateResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -20993,6 +22944,54 @@ func (r RevokeOAuthClientResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r RevokeOAuthClientResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateOAuthClientResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UpdateOAuthClientOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateOAuthClientResponse) GetJSON200() *UpdateOAuthClientOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateOAuthClientResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateOAuthClientResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateOAuthClientResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateOAuthClientResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateOAuthClientResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -25254,6 +27253,23 @@ func (c *ClientWithResponses) GetNodeWithResponse(ctx context.Context, nodeId st
 	return ParseGetNodeResponse(rsp)
 }
 
+// GetNodeAppConnectorRoutesWithResponse Get learned app connector routes
+//
+// Asks the connected node which addresses it has resolved for the domains it answers for as an app connector. A node that is not a connector answers with none.
+//
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/app-connector-routes (the `GetNodeAppConnectorRoutes` operationId).
+func (c *ClientWithResponses) GetNodeAppConnectorRoutesWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodeAppConnectorRoutesResponse, error) {
+	rsp, err := c.GetNodeAppConnectorRoutes(ctx, nodeId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNodeAppConnectorRoutesResponse(rsp)
+}
+
 // ApproveNodeWithBodyWithResponse Approve node
 //
 // Admits a node that registered while device approval was on, or withdraws the approval again. A node waiting for approval stays registered but has no peers and is not visible to any.
@@ -25401,6 +27417,74 @@ func (c *ClientWithResponses) SetNodeAttributeWithResponse(ctx context.Context, 
 	return ParseSetNodeAttributeResponse(rsp)
 }
 
+// GetNodeClientUpdateWithResponse Get node client update status
+//
+// Asks the connected node whether it would update its own Tailscale installation and whether an update is already running. See /ref/device-management.
+//
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/client-update (the `GetNodeClientUpdate` operationId).
+func (c *ClientWithResponses) GetNodeClientUpdateWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodeClientUpdateResponse, error) {
+	rsp, err := c.GetNodeClientUpdate(ctx, nodeId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNodeClientUpdateResponse(rsp)
+}
+
+// StartNodeClientUpdateWithBodyWithResponse Update the node's Tailscale client
+//
+// Asks the connected node to update itself now. The client refuses unless its owner opted in with `tailscale set --auto-update` or TS_ALLOW_REMOTE_UPDATE, and while it is serving SSH sessions unless force is set.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/client-update (the `StartNodeClientUpdate` operationId).
+func (c *ClientWithResponses) StartNodeClientUpdateWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*StartNodeClientUpdateResponse, error) {
+	rsp, err := c.StartNodeClientUpdateWithBody(ctx, nodeId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStartNodeClientUpdateResponse(rsp)
+}
+
+// StartNodeClientUpdateWithResponse Update the node's Tailscale client
+//
+// Asks the connected node to update itself now. The client refuses unless its owner opted in with `tailscale set --auto-update` or TS_ALLOW_REMOTE_UPDATE, and while it is serving SSH sessions unless force is set.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/client-update (the `StartNodeClientUpdate` operationId).
+func (c *ClientWithResponses) StartNodeClientUpdateWithResponse(ctx context.Context, nodeId string, body StartNodeClientUpdateJSONRequestBody, reqEditors ...RequestEditorFn) (*StartNodeClientUpdateResponse, error) {
+	rsp, err := c.StartNodeClientUpdate(ctx, nodeId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStartNodeClientUpdateResponse(rsp)
+}
+
+// GetNodeDiagnosticWithResponse Download a node diagnostic
+//
+// Asks the connected node for one of the dumps it hands over for support and answers with it as the client wrote it: prefs,netmap,metrics,goroutines,sockstats,tka-log. A client built without its debug endpoints refuses.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/diagnostics/{kind} (the `GetNodeDiagnostic` operationId).
+func (c *ClientWithResponses) GetNodeDiagnosticWithResponse(ctx context.Context, nodeId string, kind GetNodeDiagnosticParamsKind, reqEditors ...RequestEditorFn) (*GetNodeDiagnosticResponse, error) {
+	rsp, err := c.GetNodeDiagnostic(ctx, nodeId, kind, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNodeDiagnosticResponse(rsp)
+}
+
 // ExpireNodeWithBodyWithResponse Expire node
 //
 // Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -25465,6 +27549,40 @@ func (c *ClientWithResponses) SetGlobalExitNodeWithResponse(ctx context.Context,
 	return ParseSetGlobalExitNodeResponse(rsp)
 }
 
+// ResetNodeHardwareAttestationWithResponse Reset hardware attestation
+//
+// Forgets what the machine's hardware attestation key proved, so the next map request that carries a valid signature starts the record again. The client is not touched and keeps its key.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/node/{nodeId}/hardware-attestation (the `ResetNodeHardwareAttestation` operationId).
+func (c *ClientWithResponses) ResetNodeHardwareAttestationWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*ResetNodeHardwareAttestationResponse, error) {
+	rsp, err := c.ResetNodeHardwareAttestation(ctx, nodeId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResetNodeHardwareAttestationResponse(rsp)
+}
+
+// GetNodeClientHealthWithResponse Get node client health
+//
+// Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why.
+//
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/health (the `GetNodeClientHealth` operationId).
+func (c *ClientWithResponses) GetNodeClientHealthWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodeClientHealthResponse, error) {
+	rsp, err := c.GetNodeClientHealth(ctx, nodeId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNodeClientHealthResponse(rsp)
+}
+
 // GetNodePostureWithResponse Get node posture
 //
 // Returns the attribute map the policy evaluates for the node, the identity the server collected and the custom attributes. See docs/ref/device-trust.md.
@@ -25512,6 +27630,57 @@ func (c *ClientWithResponses) ListNodePosturesWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseListNodePosturesResponse(rsp)
+}
+
+// GetNodePreferencesWithResponse Get node preferences
+//
+// Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does.
+//
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/preferences (the `GetNodePreferences` operationId).
+func (c *ClientWithResponses) GetNodePreferencesWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodePreferencesResponse, error) {
+	rsp, err := c.GetNodePreferences(ctx, nodeId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNodePreferencesResponse(rsp)
+}
+
+// UpdateNodePreferencesWithBodyWithResponse Change node preferences
+//
+// Changes the preferences the body names on the connected node and answers with what the client ended up with. Needs the machine to have opted in by running `tailscale set --remote-config` on it, which hands the tailnet admin its whole local API; without that the node answers 409.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/node/{nodeId}/preferences (the `UpdateNodePreferences` operationId).
+func (c *ClientWithResponses) UpdateNodePreferencesWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateNodePreferencesResponse, error) {
+	rsp, err := c.UpdateNodePreferencesWithBody(ctx, nodeId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateNodePreferencesResponse(rsp)
+}
+
+// UpdateNodePreferencesWithResponse Change node preferences
+//
+// Changes the preferences the body names on the connected node and answers with what the client ended up with. Needs the machine to have opted in by running `tailscale set --remote-config` on it, which hands the tailnet admin its whole local API; without that the node answers 409.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/node/{nodeId}/preferences (the `UpdateNodePreferences` operationId).
+func (c *ClientWithResponses) UpdateNodePreferencesWithResponse(ctx context.Context, nodeId string, body UpdateNodePreferencesJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateNodePreferencesResponse, error) {
+	rsp, err := c.UpdateNodePreferences(ctx, nodeId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateNodePreferencesResponse(rsp)
 }
 
 // RenameNodeWithResponse Rename node
@@ -25570,6 +27739,21 @@ func (c *ClientWithResponses) UnshareNodeWithResponse(ctx context.Context, nodeI
 		return nil, err
 	}
 	return ParseUnshareNodeResponse(rsp)
+}
+
+// GetNodeSSHUsernamesWithResponse Get node SSH username hints
+//
+// Asks the connected node which logins it would suggest for a Tailscale SSH session, so the console's terminal can offer them. The hints are not an authorisation; the SSH policy still decides. Visible to whoever may open a session to the node: without the devices:core:read scope, a node of the caller's own or one their machines can already reach.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/ssh-usernames (the `GetNodeSSHUsernames` operationId).
+func (c *ClientWithResponses) GetNodeSSHUsernamesWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodeSSHUsernamesResponse, error) {
+	rsp, err := c.GetNodeSSHUsernames(ctx, nodeId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNodeSSHUsernamesResponse(rsp)
 }
 
 // SuspendNodeWithBodyWithResponse Suspend node
@@ -25636,9 +27820,60 @@ func (c *ClientWithResponses) SetTagsWithResponse(ctx context.Context, nodeId st
 	return ParseSetTagsResponse(rsp)
 }
 
+// GetNodeTLSCertStatusWithResponse Get node TLS certificate status
+//
+// Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed.
+//
+// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/node/{nodeId}/tls-cert (the `GetNodeTLSCertStatus` operationId).
+func (c *ClientWithResponses) GetNodeTLSCertStatusWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*GetNodeTLSCertStatusResponse, error) {
+	rsp, err := c.GetNodeTLSCertStatus(ctx, nodeId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNodeTLSCertStatusResponse(rsp)
+}
+
+// StartNodesClientUpdateWithBodyWithResponse Update several nodes' Tailscale clients
+//
+// Asks each named node to update itself, a few at a time, and answers with one result per node in the order asked. A node that is offline or refuses fails on its own; the others still start.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/nodes/client-update (the `StartNodesClientUpdate` operationId).
+func (c *ClientWithResponses) StartNodesClientUpdateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*StartNodesClientUpdateResponse, error) {
+	rsp, err := c.StartNodesClientUpdateWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStartNodesClientUpdateResponse(rsp)
+}
+
+// StartNodesClientUpdateWithResponse Update several nodes' Tailscale clients
+//
+// Asks each named node to update itself, a few at a time, and answers with one result per node in the order asked. A node that is offline or refuses fails on its own; the others still start.
+//
+// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/nodes/client-update (the `StartNodesClientUpdate` operationId).
+func (c *ClientWithResponses) StartNodesClientUpdateWithResponse(ctx context.Context, body StartNodesClientUpdateJSONRequestBody, reqEditors ...RequestEditorFn) (*StartNodesClientUpdateResponse, error) {
+	rsp, err := c.StartNodesClientUpdate(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStartNodesClientUpdateResponse(rsp)
+}
+
 // ListOAuthClientsWithResponse List OAuth clients
 //
-// Every client that can mint v2 API tokens; revoked clients are gone.
+// Every client and federated identity that can mint v2 API tokens; revoked ones are gone.
 //
 // Requires the `oauth_keys:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -25655,7 +27890,7 @@ func (c *ClientWithResponses) ListOAuthClientsWithResponse(ctx context.Context, 
 
 // CreateOAuthClientWithBodyWithResponse Create OAuth client
 //
-// The client secret is in this response only. Scopes may not exceed the caller's own.
+// The client secret is in this response only, and a federated identity has none. Scopes may not exceed the caller's own.
 //
 // Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -25672,7 +27907,7 @@ func (c *ClientWithResponses) CreateOAuthClientWithBodyWithResponse(ctx context.
 
 // CreateOAuthClientWithResponse Create OAuth client
 //
-// The client secret is in this response only. Scopes may not exceed the caller's own.
+// The client secret is in this response only, and a federated identity has none. Scopes may not exceed the caller's own.
 //
 // Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -25702,6 +27937,40 @@ func (c *ClientWithResponses) RevokeOAuthClientWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseRevokeOAuthClientResponse(rsp)
+}
+
+// UpdateOAuthClientWithBodyWithResponse Update OAuth client
+//
+// Changes the description, scopes, tags and, for a federated identity, its trust conditions. The secret is untouched, so the client keeps working across an update.
+//
+// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/oauth-client/{clientId} (the `UpdateOAuthClient` operationId).
+func (c *ClientWithResponses) UpdateOAuthClientWithBodyWithResponse(ctx context.Context, clientId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateOAuthClientResponse, error) {
+	rsp, err := c.UpdateOAuthClientWithBody(ctx, clientId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateOAuthClientResponse(rsp)
+}
+
+// UpdateOAuthClientWithResponse Update OAuth client
+//
+// Changes the description, scopes, tags and, for a federated identity, its trust conditions. The secret is untouched, so the client keeps working across an update.
+//
+// Requires the `oauth_keys` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/oauth-client/{clientId} (the `UpdateOAuthClient` operationId).
+func (c *ClientWithResponses) UpdateOAuthClientWithResponse(ctx context.Context, clientId string, body UpdateOAuthClientJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateOAuthClientResponse, error) {
+	rsp, err := c.UpdateOAuthClient(ctx, clientId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateOAuthClientResponse(rsp)
 }
 
 // GetPolicyWithResponse Get policy
@@ -29499,6 +31768,39 @@ func ParseGetNodeResponse(rsp *http.Response) (*GetNodeResponse, error) {
 	return response, nil
 }
 
+// ParseGetNodeAppConnectorRoutesResponse parses an HTTP response from a GetNodeAppConnectorRoutesWithResponse call
+func ParseGetNodeAppConnectorRoutesResponse(rsp *http.Response) (*GetNodeAppConnectorRoutesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNodeAppConnectorRoutesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodeAppConnectorRoutes
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseApproveNodeResponse parses an HTTP response from a ApproveNodeWithResponse call
 func ParseApproveNodeResponse(rsp *http.Response) (*ApproveNodeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -29664,6 +31966,98 @@ func ParseSetNodeAttributeResponse(rsp *http.Response) (*SetNodeAttributeRespons
 	return response, nil
 }
 
+// ParseGetNodeClientUpdateResponse parses an HTTP response from a GetNodeClientUpdateWithResponse call
+func ParseGetNodeClientUpdateResponse(rsp *http.Response) (*GetNodeClientUpdateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNodeClientUpdateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodeClientUpdate
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseStartNodeClientUpdateResponse parses an HTTP response from a StartNodeClientUpdateWithResponse call
+func ParseStartNodeClientUpdateResponse(rsp *http.Response) (*StartNodeClientUpdateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StartNodeClientUpdateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodeClientUpdate
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetNodeDiagnosticResponse parses an HTTP response from a GetNodeDiagnosticWithResponse call
+func ParseGetNodeDiagnosticResponse(rsp *http.Response) (*GetNodeDiagnosticResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNodeDiagnosticResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseExpireNodeResponse parses an HTTP response from a ExpireNodeWithResponse call
 func ParseExpireNodeResponse(rsp *http.Response) (*ExpireNodeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -29713,6 +32107,72 @@ func ParseSetGlobalExitNodeResponse(rsp *http.Response) (*SetGlobalExitNodeRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest NodeOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseResetNodeHardwareAttestationResponse parses an HTTP response from a ResetNodeHardwareAttestationWithResponse call
+func ParseResetNodeHardwareAttestationResponse(rsp *http.Response) (*ResetNodeHardwareAttestationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ResetNodeHardwareAttestationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodeOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetNodeClientHealthResponse parses an HTTP response from a GetNodeClientHealthWithResponse call
+func ParseGetNodeClientHealthResponse(rsp *http.Response) (*GetNodeClientHealthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNodeClientHealthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodeClientHealth
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -29829,6 +32289,72 @@ func ParseListNodePosturesResponse(rsp *http.Response) (*ListNodePosturesRespons
 	return response, nil
 }
 
+// ParseGetNodePreferencesResponse parses an HTTP response from a GetNodePreferencesWithResponse call
+func ParseGetNodePreferencesResponse(rsp *http.Response) (*GetNodePreferencesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNodePreferencesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodePreferences
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateNodePreferencesResponse parses an HTTP response from a UpdateNodePreferencesWithResponse call
+func ParseUpdateNodePreferencesResponse(rsp *http.Response) (*UpdateNodePreferencesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateNodePreferencesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodePreferences
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseRenameNodeResponse parses an HTTP response from a RenameNodeWithResponse call
 func ParseRenameNodeResponse(rsp *http.Response) (*RenameNodeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -29928,6 +32454,39 @@ func ParseUnshareNodeResponse(rsp *http.Response) (*UnshareNodeResponse, error) 
 	return response, nil
 }
 
+// ParseGetNodeSSHUsernamesResponse parses an HTTP response from a GetNodeSSHUsernamesWithResponse call
+func ParseGetNodeSSHUsernamesResponse(rsp *http.Response) (*GetNodeSSHUsernamesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNodeSSHUsernamesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodeSSHUsernames
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseSuspendNodeResponse parses an HTTP response from a SuspendNodeWithResponse call
 func ParseSuspendNodeResponse(rsp *http.Response) (*SuspendNodeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -29977,6 +32536,72 @@ func ParseSetTagsResponse(rsp *http.Response) (*SetTagsResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest NodeOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetNodeTLSCertStatusResponse parses an HTTP response from a GetNodeTLSCertStatusWithResponse call
+func ParseGetNodeTLSCertStatusResponse(rsp *http.Response) (*GetNodeTLSCertStatusResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNodeTLSCertStatusResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodeTLSCertStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseStartNodesClientUpdateResponse parses an HTTP response from a StartNodesClientUpdateWithResponse call
+func ParseStartNodesClientUpdateResponse(rsp *http.Response) (*StartNodesClientUpdateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StartNodesClientUpdateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodesClientUpdate
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -30076,6 +32701,39 @@ func ParseRevokeOAuthClientResponse(rsp *http.Response) (*RevokeOAuthClientRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest RevokeOAuthClientOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateOAuthClientResponse parses an HTTP response from a UpdateOAuthClientWithResponse call
+func ParseUpdateOAuthClientResponse(rsp *http.Response) (*UpdateOAuthClientResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateOAuthClientResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UpdateOAuthClientOutputBody
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

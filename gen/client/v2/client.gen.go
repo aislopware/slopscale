@@ -72,22 +72,66 @@ func (e UpdateWebhookRequestProviderType) Valid() bool {
 	}
 }
 
+// ApiError defines model for ApiError.
+type ApiError struct {
+	Data    *[]ApiErrorData `json:"data,omitempty"`
+	Message string          `json:"message"`
+	Status  int64           `json:"status"`
+}
+
+// ApiErrorData defines model for ApiErrorData.
+type ApiErrorData struct {
+	Errors *[]string `json:"errors,omitempty"`
+	User   *string   `json:"user,omitempty"`
+}
+
+// ClientConnectivity defines model for ClientConnectivity.
+type ClientConnectivity struct {
+	ClientSupports        ClientSupports               `json:"clientSupports"`
+	Endpoints             []string                     `json:"endpoints"`
+	Latency               map[string]DERPRegionLatency `json:"latency"`
+	MappingVariesByDestIP bool                         `json:"mappingVariesByDestIP"`
+}
+
+// ClientSupports defines model for ClientSupports.
+type ClientSupports struct {
+	HairPinning bool `json:"hairPinning"`
+	Ipv6        bool `json:"ipv6"`
+	Pcp         bool `json:"pcp"`
+	Pmp         bool `json:"pmp"`
+	Udp         bool `json:"udp"`
+	Upnp        bool `json:"upnp"`
+}
+
 // CreateKeyRequest defines model for CreateKeyRequest.
 type CreateKeyRequest struct {
-	Capabilities *KeyCapabilities `json:"capabilities,omitempty"`
-	Description  *string          `json:"description,omitempty"`
+	Audience         *string            `json:"audience,omitempty"`
+	Capabilities     *KeyCapabilities   `json:"capabilities,omitempty"`
+	CustomClaimRules *map[string]string `json:"customClaimRules,omitempty"`
+	Description      *string            `json:"description,omitempty"`
 
 	// ExpirySeconds Lifetime in seconds; default 90d for auth keys
-	ExpirySeconds *int64 `json:"expirySeconds,omitempty"`
+	ExpirySeconds *int64  `json:"expirySeconds,omitempty"`
+	Issuer        *string `json:"issuer,omitempty"`
 
 	// KeyType Key kind: "auth" (default) or "client" (OAuth client).
 	KeyType *string `json:"keyType,omitempty"`
 
-	// Scopes OAuth scopes granted to the client. keyType=client only.
-	Scopes *[]string `json:"scopes,omitempty"`
+	// Scopes OAuth scopes granted to the client. keyType=client or federated.
+	Scopes  *[]string `json:"scopes,omitempty"`
+	Subject *string   `json:"subject,omitempty"`
 
-	// Tags Tags the client may assign. keyType=client only.
+	// Tags Tags the client may assign. keyType=client or federated.
 	Tags *[]string `json:"tags,omitempty"`
+}
+
+// CreatePostureIntegrationRequest defines model for CreatePostureIntegrationRequest.
+type CreatePostureIntegrationRequest struct {
+	ClientId     *string `json:"clientId,omitempty"`
+	ClientSecret *string `json:"clientSecret,omitempty"`
+	CloudId      *string `json:"cloudId,omitempty"`
+	Provider     string  `json:"provider"`
+	TenantId     *string `json:"tenantId,omitempty"`
 }
 
 // CreateWebhookRequest defines model for CreateWebhookRequest.
@@ -100,16 +144,40 @@ type CreateWebhookRequest struct {
 // CreateWebhookRequestProviderType defines model for CreateWebhookRequest.ProviderType.
 type CreateWebhookRequestProviderType string
 
+// DERPRegionLatency defines model for DERPRegionLatency.
+type DERPRegionLatency struct {
+	LatencyMs float64 `json:"latencyMs"`
+	Preferred *bool   `json:"preferred,omitempty"`
+}
+
+// DNSConfiguration defines model for DNSConfiguration.
+type DNSConfiguration struct {
+	Nameservers []DNSResolver               `json:"nameservers"`
+	Preferences DNSConfigurationPreferences `json:"preferences"`
+	SearchPaths []string                    `json:"searchPaths"`
+	SplitDNS    map[string]*[]DNSResolver   `json:"splitDNS"`
+}
+
+// DNSConfigurationPreferences defines model for DNSConfigurationPreferences.
+type DNSConfigurationPreferences struct {
+	MagicDNS         *bool `json:"magicDNS,omitempty"`
+	OverrideLocalDNS *bool `json:"overrideLocalDNS,omitempty"`
+}
+
 // DNSNameservers defines model for DNSNameservers.
 type DNSNameservers struct {
-	Dns              []string `json:"dns"`
-	MagicDNS         *bool    `json:"magicDNS,omitempty"`
-	OverrideLocalDns *bool    `json:"overrideLocalDns,omitempty"`
+	Dns []string `json:"dns"`
 }
 
 // DNSPreferences defines model for DNSPreferences.
 type DNSPreferences struct {
 	MagicDNS bool `json:"magicDNS"`
+}
+
+// DNSResolver defines model for DNSResolver.
+type DNSResolver struct {
+	Address         string `json:"address"`
+	UseWithExitNode *bool  `json:"useWithExitNode,omitempty"`
 }
 
 // DNSSearchPaths defines model for DNSSearchPaths.
@@ -122,26 +190,35 @@ type DeleteKeyOutputBody = map[string]interface{}
 
 // Device defines model for Device.
 type Device struct {
-	Addresses         []string   `json:"addresses"`
-	AdvertisedRoutes  *[]string  `json:"advertisedRoutes,omitempty"`
-	Authorized        bool       `json:"authorized"`
-	ClientVersion     string     `json:"clientVersion"`
-	Created           time.Time  `json:"created"`
-	EnabledRoutes     *[]string  `json:"enabledRoutes,omitempty"`
-	Expires           *time.Time `json:"expires,omitempty"`
-	Hostname          string     `json:"hostname"`
-	Id                string     `json:"id"`
-	IsEphemeral       bool       `json:"isEphemeral"`
-	KeyExpiryDisabled bool       `json:"keyExpiryDisabled"`
-	LastSeen          *time.Time `json:"lastSeen,omitempty"`
-	MachineKey        string     `json:"machineKey"`
-	Name              string     `json:"name"`
-	NodeId            string     `json:"nodeId"`
-	NodeKey           string     `json:"nodeKey"`
-	Os                string     `json:"os"`
-	Tags              []string   `json:"tags"`
-	UpdateAvailable   bool       `json:"updateAvailable"`
-	User              string     `json:"user"`
+	Addresses                 []string               `json:"addresses"`
+	AdvertisedRoutes          *[]string              `json:"advertisedRoutes,omitempty"`
+	Authorized                bool                   `json:"authorized"`
+	BlocksIncomingConnections bool                   `json:"blocksIncomingConnections"`
+	ClientConnectivity        *ClientConnectivity    `json:"clientConnectivity,omitempty"`
+	ClientVersion             string                 `json:"clientVersion"`
+	ConnectedToControl        bool                   `json:"connectedToControl"`
+	Created                   time.Time              `json:"created"`
+	Distro                    *Distro                `json:"distro,omitempty"`
+	EnabledRoutes             *[]string              `json:"enabledRoutes,omitempty"`
+	Expires                   *time.Time             `json:"expires,omitempty"`
+	Hostname                  string                 `json:"hostname"`
+	Id                        string                 `json:"id"`
+	IsEphemeral               bool                   `json:"isEphemeral"`
+	IsExternal                bool                   `json:"isExternal"`
+	KeyExpiryDisabled         bool                   `json:"keyExpiryDisabled"`
+	LastSeen                  *time.Time             `json:"lastSeen,omitempty"`
+	MachineKey                string                 `json:"machineKey"`
+	Name                      string                 `json:"name"`
+	NodeId                    string                 `json:"nodeId"`
+	NodeKey                   string                 `json:"nodeKey"`
+	Os                        string                 `json:"os"`
+	PostureIdentity           *DevicePostureIdentity `json:"postureIdentity,omitempty"`
+	SshEnabled                *bool                  `json:"sshEnabled,omitempty"`
+	Tags                      []string               `json:"tags"`
+	TailnetLockError          string                 `json:"tailnetLockError"`
+	TailnetLockKey            string                 `json:"tailnetLockKey"`
+	UpdateAvailable           bool                   `json:"updateAvailable"`
+	User                      string                 `json:"user"`
 }
 
 // DeviceAttributes defines model for DeviceAttributes.
@@ -149,10 +226,23 @@ type DeviceAttributes struct {
 	Attributes map[string]interface{} `json:"attributes"`
 }
 
+// DevicePostureIdentity defines model for DevicePostureIdentity.
+type DevicePostureIdentity struct {
+	Disabled      bool     `json:"disabled"`
+	SerialNumbers []string `json:"serialNumbers"`
+}
+
 // DeviceRoutes defines model for DeviceRoutes.
 type DeviceRoutes struct {
 	AdvertisedRoutes []string `json:"advertisedRoutes"`
 	EnabledRoutes    []string `json:"enabledRoutes"`
+}
+
+// Distro defines model for Distro.
+type Distro struct {
+	CodeName string `json:"codeName"`
+	Name     string `json:"name"`
+	Version  string `json:"version"`
 }
 
 // EmptyOutputBody defines model for EmptyOutputBody.
@@ -203,19 +293,23 @@ type ErrorModel struct {
 
 // Key defines model for Key.
 type Key struct {
-	Capabilities  KeyCapabilities `json:"capabilities"`
-	Created       time.Time       `json:"created"`
-	Description   *string         `json:"description,omitempty"`
-	Expires       *time.Time      `json:"expires,omitempty"`
-	ExpirySeconds *int64          `json:"expirySeconds,omitempty"`
-	Id            string          `json:"id"`
-	Invalid       bool            `json:"invalid"`
-	Key           *string         `json:"key,omitempty"`
-	KeyType       string          `json:"keyType"`
-	Revoked       *time.Time      `json:"revoked,omitempty"`
-	Scopes        *[]string       `json:"scopes,omitempty"`
-	Tags          *[]string       `json:"tags,omitempty"`
-	UserId        *string         `json:"userId,omitempty"`
+	Audience         *string            `json:"audience,omitempty"`
+	Capabilities     KeyCapabilities    `json:"capabilities"`
+	Created          time.Time          `json:"created"`
+	CustomClaimRules *map[string]string `json:"customClaimRules,omitempty"`
+	Description      *string            `json:"description,omitempty"`
+	Expires          *time.Time         `json:"expires,omitempty"`
+	ExpirySeconds    *int64             `json:"expirySeconds,omitempty"`
+	Id               string             `json:"id"`
+	Invalid          bool               `json:"invalid"`
+	Issuer           *string            `json:"issuer,omitempty"`
+	Key              *string            `json:"key,omitempty"`
+	KeyType          string             `json:"keyType"`
+	Revoked          *time.Time         `json:"revoked,omitempty"`
+	Scopes           *[]string          `json:"scopes,omitempty"`
+	Subject          *string            `json:"subject,omitempty"`
+	Tags             *[]string          `json:"tags,omitempty"`
+	UserId           *string            `json:"userId,omitempty"`
 }
 
 // KeyCapabilities defines model for KeyCapabilities.
@@ -246,6 +340,11 @@ type ListKeysOutputBody struct {
 	Keys []Key `json:"keys"`
 }
 
+// ListPostureIntegrationsOutputBody defines model for ListPostureIntegrationsOutputBody.
+type ListPostureIntegrationsOutputBody struct {
+	Integrations []PostureIntegration `json:"integrations"`
+}
+
 // ListUsersOutputBody defines model for ListUsersOutputBody.
 type ListUsersOutputBody struct {
 	Users []User `json:"users"`
@@ -259,6 +358,22 @@ type ListVIPServicesOutputBody struct {
 // ListWebhooksOutputBody defines model for ListWebhooksOutputBody.
 type ListWebhooksOutputBody struct {
 	Webhooks []WebhookEndpoint `json:"webhooks"`
+}
+
+// LogstreamConfiguration defines model for LogstreamConfiguration.
+type LogstreamConfiguration struct {
+	DestinationType string `json:"destinationType"`
+	LogType         string `json:"logType"`
+	Url             string `json:"url"`
+}
+
+// PostureIntegration defines model for PostureIntegration.
+type PostureIntegration struct {
+	ClientId *string `json:"clientId,omitempty"`
+	CloudId  *string `json:"cloudId,omitempty"`
+	Id       string  `json:"id"`
+	Provider string  `json:"provider"`
+	TenantId *string `json:"tenantId,omitempty"`
 }
 
 // PutVIPServiceRequest defines model for PutVIPServiceRequest.
@@ -285,6 +400,18 @@ type SetDeviceAttribute struct {
 // SetKeyRequest defines model for SetKeyRequest.
 type SetKeyRequest struct {
 	KeyExpiryDisabled bool `json:"keyExpiryDisabled"`
+}
+
+// SetLogstreamConfigurationRequest defines model for SetLogstreamConfigurationRequest.
+type SetLogstreamConfigurationRequest struct {
+	CompressionFormat   *string `json:"compressionFormat,omitempty"`
+	DestinationType     string  `json:"destinationType"`
+	GcsBucket           *string `json:"gcsBucket,omitempty"`
+	S3Bucket            *string `json:"s3Bucket,omitempty"`
+	Token               *string `json:"token,omitempty"`
+	UploadPeriodMinutes *int64  `json:"uploadPeriodMinutes,omitempty"`
+	Url                 string  `json:"url"`
+	User                *string `json:"user,omitempty"`
 }
 
 // SetNameRequest defines model for SetNameRequest.
@@ -321,6 +448,28 @@ type TailnetSettings struct {
 	RegionalRoutingOn                      bool   `json:"regionalRoutingOn"`
 	UsersApprovalOn                        bool   `json:"usersApprovalOn"`
 	UsersRoleAllowedToJoinExternalTailnets string `json:"usersRoleAllowedToJoinExternalTailnets"`
+}
+
+// UpdateKeyRequest defines model for UpdateKeyRequest.
+type UpdateKeyRequest struct {
+	Audience         *string            `json:"audience,omitempty"`
+	CustomClaimRules *map[string]string `json:"customClaimRules,omitempty"`
+	Description      *string            `json:"description,omitempty"`
+	Issuer           *string            `json:"issuer,omitempty"`
+
+	// KeyType Key kind: "client" (default) or "federated".
+	KeyType *string   `json:"keyType,omitempty"`
+	Scopes  *[]string `json:"scopes,omitempty"`
+	Subject *string   `json:"subject,omitempty"`
+	Tags    *[]string `json:"tags,omitempty"`
+}
+
+// UpdatePostureIntegrationRequest defines model for UpdatePostureIntegrationRequest.
+type UpdatePostureIntegrationRequest struct {
+	ClientId     *string `json:"clientId,omitempty"`
+	ClientSecret *string `json:"clientSecret,omitempty"`
+	CloudId      *string `json:"cloudId,omitempty"`
+	TenantId     *string `json:"tenantId,omitempty"`
 }
 
 // UpdateTailnetSettings defines model for UpdateTailnetSettings.
@@ -423,6 +572,9 @@ type SetACLParams struct {
 	Accept  *string `json:"Accept,omitempty"`
 }
 
+// ValidateACLJSONBody defines parameters for ValidateACL.
+type ValidateACLJSONBody = openapi_types.File
+
 // ListDevicesParams defines parameters for ListDevices.
 type ListDevicesParams struct {
 	Fields *string `form:"fields,omitempty" json:"fields,omitempty"`
@@ -467,8 +619,17 @@ type SetDeviceRoutesJSONRequestBody = SetSubnetRoutesRequest
 // SetDeviceTagsJSONRequestBody defines body for SetDeviceTags for application/json ContentType.
 type SetDeviceTagsJSONRequestBody = SetTagsRequest
 
+// UpdatePostureIntegrationJSONRequestBody defines body for UpdatePostureIntegration for application/json ContentType.
+type UpdatePostureIntegrationJSONRequestBody = UpdatePostureIntegrationRequest
+
 // SetACLJSONRequestBody defines body for SetACL for application/json ContentType.
 type SetACLJSONRequestBody = SetACLJSONBody
+
+// ValidateACLJSONRequestBody defines body for ValidateACL for application/json ContentType.
+type ValidateACLJSONRequestBody = ValidateACLJSONBody
+
+// SetDNSConfigurationJSONRequestBody defines body for SetDNSConfiguration for application/json ContentType.
+type SetDNSConfigurationJSONRequestBody = DNSConfiguration
 
 // SetDNSNameserversJSONRequestBody defines body for SetDNSNameservers for application/json ContentType.
 type SetDNSNameserversJSONRequestBody = SetNameserversInputBody
@@ -487,6 +648,15 @@ type SetDNSSplitJSONRequestBody SetDNSSplitJSONBody
 
 // CreateKeyJSONRequestBody defines body for CreateKey for application/json ContentType.
 type CreateKeyJSONRequestBody = CreateKeyRequest
+
+// SetKeyJSONRequestBody defines body for SetKey for application/json ContentType.
+type SetKeyJSONRequestBody = UpdateKeyRequest
+
+// SetLogstreamConfigurationJSONRequestBody defines body for SetLogstreamConfiguration for application/json ContentType.
+type SetLogstreamConfigurationJSONRequestBody = SetLogstreamConfigurationRequest
+
+// CreatePostureIntegrationJSONRequestBody defines body for CreatePostureIntegration for application/json ContentType.
+type CreatePostureIntegrationJSONRequestBody = CreatePostureIntegrationRequest
 
 // UpdateTailnetSettingsJSONRequestBody defines body for UpdateTailnetSettings for application/json ContentType.
 type UpdateTailnetSettingsJSONRequestBody = UpdateTailnetSettings
@@ -723,6 +893,42 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v2/device/{id}/tags (the `SetDeviceTags` operationId).
 	SetDeviceTags(ctx context.Context, id string, body SetDeviceTagsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeletePostureIntegration Delete a posture integration
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v2/posture/integrations/{id} (the `DeletePostureIntegration` operationId).
+	DeletePostureIntegration(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetPostureIntegration Get a posture integration
+	//
+	// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v2/posture/integrations/{id} (the `GetPostureIntegration` operationId).
+	GetPostureIntegration(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdatePostureIntegrationWithBody Update a posture integration
+	//
+	// A field left out keeps its stored value, clientSecret included.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v2/posture/integrations/{id} (the `UpdatePostureIntegration` operationId).
+	UpdatePostureIntegrationWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdatePostureIntegration Update a posture integration
+	//
+	// A field left out keeps its stored value, clientSecret included.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v2/posture/integrations/{id} (the `UpdatePostureIntegration` operationId).
+	UpdatePostureIntegration(ctx context.Context, id string, body UpdatePostureIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetACL Get the policy file
 	//
 	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -748,12 +954,63 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v2/tailnet/{tailnet}/acl (the `SetACL` operationId).
 	SetACL(ctx context.Context, tailnet string, params *SetACLParams, body SetACLJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ValidateACLWithBody Validate a policy file
+	//
+	// Checks a policy document (JSON or HuJSON) against the tailnet's users and nodes and runs its tests, without storing it. A body of just `{"tests":[…]}`, or a bare list of tests, runs those tests against the policy in force instead. Both outcomes answer 200: the message is empty when everything passed and carries the failure when it did not.
+	//
+	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v2/tailnet/{tailnet}/acl/validate (the `ValidateACL` operationId).
+	ValidateACLWithBody(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ValidateACL Validate a policy file
+	//
+	// Checks a policy document (JSON or HuJSON) against the tailnet's users and nodes and runs its tests, without storing it. A body of just `{"tests":[…]}`, or a bare list of tests, runs those tests against the policy in force instead. Both outcomes answer 200: the message is empty when everything passed and carries the failure when it did not.
+	//
+	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v2/tailnet/{tailnet}/acl/validate (the `ValidateACL` operationId).
+	ValidateACL(ctx context.Context, tailnet string, body ValidateACLJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListDevices List devices
 	//
 	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
 	// Corresponds with GET /api/v2/tailnet/{tailnet}/devices (the `ListDevices` operationId).
 	ListDevices(ctx context.Context, tailnet string, params *ListDevicesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetDNSConfiguration Get the whole DNS configuration
+	//
+	// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v2/tailnet/{tailnet}/dns/configuration (the `GetDNSConfiguration` operationId).
+	GetDNSConfiguration(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetDNSConfigurationWithBody Replace the whole DNS configuration
+	//
+	// Replaces the nameservers, split DNS, search paths and preferences in one write. magicDNS is set in the config file; the request is accepted only when it repeats the current value. Extra records, which this shape has no field for, are left alone.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v2/tailnet/{tailnet}/dns/configuration (the `SetDNSConfiguration` operationId).
+	SetDNSConfigurationWithBody(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetDNSConfiguration Replace the whole DNS configuration
+	//
+	// Replaces the nameservers, split DNS, search paths and preferences in one write. magicDNS is set in the config file; the request is accepted only when it repeats the current value. Extra records, which this shape has no field for, are left alone.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v2/tailnet/{tailnet}/dns/configuration (the `SetDNSConfiguration` operationId).
+	SetDNSConfiguration(ctx context.Context, tailnet string, body SetDNSConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetDNSNameservers Get DNS nameservers
 	//
@@ -931,6 +1188,91 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v2/tailnet/{tailnet}/keys/{keyId} (the `GetKey` operationId).
 	GetKey(ctx context.Context, tailnet string, keyId string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetKeyWithBody Update an OAuth client or federated identity
+	//
+	// Replaces the scopes, tags, description and (for a federated identity) trust conditions, keeping an OAuth client's secret. Requires the `oauth_keys` scope (an admin API key is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v2/tailnet/{tailnet}/keys/{keyId} (the `SetKey` operationId).
+	SetKeyWithBody(ctx context.Context, tailnet string, keyId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetKey Update an OAuth client or federated identity
+	//
+	// Replaces the scopes, tags, description and (for a federated identity) trust conditions, keeping an OAuth client's secret. Requires the `oauth_keys` scope (an admin API key is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v2/tailnet/{tailnet}/keys/{keyId} (the `SetKey` operationId).
+	SetKey(ctx context.Context, tailnet string, keyId string, body SetKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteLogstreamConfiguration Delete the log stream configuration
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `DeleteLogstreamConfiguration` operationId).
+	DeleteLogstreamConfiguration(ctx context.Context, tailnet string, logType string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetLogstreamConfiguration Get the log stream configuration
+	//
+	// The audit log stream this API owns. Streams created in the console are separate and are not returned here.
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `GetLogstreamConfiguration` operationId).
+	GetLogstreamConfiguration(ctx context.Context, tailnet string, logType string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetLogstreamConfigurationWithBody Set the log stream configuration
+	//
+	// Creates or replaces the audit log stream this API owns.
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `SetLogstreamConfiguration` operationId).
+	SetLogstreamConfigurationWithBody(ctx context.Context, tailnet string, logType string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetLogstreamConfiguration Set the log stream configuration
+	//
+	// Creates or replaces the audit log stream this API owns.
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `SetLogstreamConfiguration` operationId).
+	SetLogstreamConfiguration(ctx context.Context, tailnet string, logType string, body SetLogstreamConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListPostureIntegrations List posture integrations
+	//
+	// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v2/tailnet/{tailnet}/posture/integrations (the `ListPostureIntegrations` operationId).
+	ListPostureIntegrations(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreatePostureIntegrationWithBody Create a posture integration
+	//
+	// cloudId is the provider's endpoint: an https:// origin, or one of the CrowdStrike cloud names (us-1, us-2, eu-1, us-gov-1) for falcon.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v2/tailnet/{tailnet}/posture/integrations (the `CreatePostureIntegration` operationId).
+	CreatePostureIntegrationWithBody(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreatePostureIntegration Create a posture integration
+	//
+	// cloudId is the provider's endpoint: an https:// origin, or one of the CrowdStrike cloud names (us-1, us-2, eu-1, us-gov-1) for falcon.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v2/tailnet/{tailnet}/posture/integrations (the `CreatePostureIntegration` operationId).
+	CreatePostureIntegration(ctx context.Context, tailnet string, body CreatePostureIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetTailnetSettings Get tailnet settings
 	//
@@ -1436,6 +1778,82 @@ func (c *Client) SetDeviceTags(ctx context.Context, id string, body SetDeviceTag
 	return c.Client.Do(req)
 }
 
+// DeletePostureIntegration Delete a posture integration
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v2/posture/integrations/{id} (the `DeletePostureIntegration` operationId).
+func (c *Client) DeletePostureIntegration(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeletePostureIntegrationRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetPostureIntegration Get a posture integration
+//
+// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v2/posture/integrations/{id} (the `GetPostureIntegration` operationId).
+func (c *Client) GetPostureIntegration(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetPostureIntegrationRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdatePostureIntegrationWithBody Update a posture integration
+//
+// A field left out keeps its stored value, clientSecret included.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v2/posture/integrations/{id} (the `UpdatePostureIntegration` operationId).
+func (c *Client) UpdatePostureIntegrationWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdatePostureIntegrationRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdatePostureIntegration Update a posture integration
+//
+// A field left out keeps its stored value, clientSecret included.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v2/posture/integrations/{id} (the `UpdatePostureIntegration` operationId).
+func (c *Client) UpdatePostureIntegration(ctx context.Context, id string, body UpdatePostureIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdatePostureIntegrationRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetACL Get the policy file
 //
 // Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -1491,6 +1909,48 @@ func (c *Client) SetACL(ctx context.Context, tailnet string, params *SetACLParam
 	return c.Client.Do(req)
 }
 
+// ValidateACLWithBody Validate a policy file
+//
+// Checks a policy document (JSON or HuJSON) against the tailnet's users and nodes and runs its tests, without storing it. A body of just `{"tests":[…]}`, or a bare list of tests, runs those tests against the policy in force instead. Both outcomes answer 200: the message is empty when everything passed and carries the failure when it did not.
+//
+// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v2/tailnet/{tailnet}/acl/validate (the `ValidateACL` operationId).
+func (c *Client) ValidateACLWithBody(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewValidateACLRequestWithBody(c.Server, tailnet, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ValidateACL Validate a policy file
+//
+// Checks a policy document (JSON or HuJSON) against the tailnet's users and nodes and runs its tests, without storing it. A body of just `{"tests":[…]}`, or a bare list of tests, runs those tests against the policy in force instead. Both outcomes answer 200: the message is empty when everything passed and carries the failure when it did not.
+//
+// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v2/tailnet/{tailnet}/acl/validate (the `ValidateACL` operationId).
+func (c *Client) ValidateACL(ctx context.Context, tailnet string, body ValidateACLJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewValidateACLRequest(c.Server, tailnet, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListDevices List devices
 //
 // Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -1498,6 +1958,65 @@ func (c *Client) SetACL(ctx context.Context, tailnet string, params *SetACLParam
 // Corresponds with GET /api/v2/tailnet/{tailnet}/devices (the `ListDevices` operationId).
 func (c *Client) ListDevices(ctx context.Context, tailnet string, params *ListDevicesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListDevicesRequest(c.Server, tailnet, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetDNSConfiguration Get the whole DNS configuration
+//
+// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v2/tailnet/{tailnet}/dns/configuration (the `GetDNSConfiguration` operationId).
+func (c *Client) GetDNSConfiguration(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetDNSConfigurationRequest(c.Server, tailnet)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetDNSConfigurationWithBody Replace the whole DNS configuration
+//
+// Replaces the nameservers, split DNS, search paths and preferences in one write. magicDNS is set in the config file; the request is accepted only when it repeats the current value. Extra records, which this shape has no field for, are left alone.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v2/tailnet/{tailnet}/dns/configuration (the `SetDNSConfiguration` operationId).
+func (c *Client) SetDNSConfigurationWithBody(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetDNSConfigurationRequestWithBody(c.Server, tailnet, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetDNSConfiguration Replace the whole DNS configuration
+//
+// Replaces the nameservers, split DNS, search paths and preferences in one write. magicDNS is set in the config file; the request is accepted only when it repeats the current value. Extra records, which this shape has no field for, are left alone.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v2/tailnet/{tailnet}/dns/configuration (the `SetDNSConfiguration` operationId).
+func (c *Client) SetDNSConfiguration(ctx context.Context, tailnet string, body SetDNSConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetDNSConfigurationRequest(c.Server, tailnet, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1865,6 +2384,181 @@ func (c *Client) DeleteKey(ctx context.Context, tailnet string, keyId string, re
 // Corresponds with GET /api/v2/tailnet/{tailnet}/keys/{keyId} (the `GetKey` operationId).
 func (c *Client) GetKey(ctx context.Context, tailnet string, keyId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetKeyRequest(c.Server, tailnet, keyId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetKeyWithBody Update an OAuth client or federated identity
+//
+// Replaces the scopes, tags, description and (for a federated identity) trust conditions, keeping an OAuth client's secret. Requires the `oauth_keys` scope (an admin API key is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v2/tailnet/{tailnet}/keys/{keyId} (the `SetKey` operationId).
+func (c *Client) SetKeyWithBody(ctx context.Context, tailnet string, keyId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetKeyRequestWithBody(c.Server, tailnet, keyId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetKey Update an OAuth client or federated identity
+//
+// Replaces the scopes, tags, description and (for a federated identity) trust conditions, keeping an OAuth client's secret. Requires the `oauth_keys` scope (an admin API key is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v2/tailnet/{tailnet}/keys/{keyId} (the `SetKey` operationId).
+func (c *Client) SetKey(ctx context.Context, tailnet string, keyId string, body SetKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetKeyRequest(c.Server, tailnet, keyId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteLogstreamConfiguration Delete the log stream configuration
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `DeleteLogstreamConfiguration` operationId).
+func (c *Client) DeleteLogstreamConfiguration(ctx context.Context, tailnet string, logType string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteLogstreamConfigurationRequest(c.Server, tailnet, logType)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetLogstreamConfiguration Get the log stream configuration
+//
+// The audit log stream this API owns. Streams created in the console are separate and are not returned here.
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `GetLogstreamConfiguration` operationId).
+func (c *Client) GetLogstreamConfiguration(ctx context.Context, tailnet string, logType string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetLogstreamConfigurationRequest(c.Server, tailnet, logType)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetLogstreamConfigurationWithBody Set the log stream configuration
+//
+// Creates or replaces the audit log stream this API owns.
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `SetLogstreamConfiguration` operationId).
+func (c *Client) SetLogstreamConfigurationWithBody(ctx context.Context, tailnet string, logType string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetLogstreamConfigurationRequestWithBody(c.Server, tailnet, logType, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetLogstreamConfiguration Set the log stream configuration
+//
+// Creates or replaces the audit log stream this API owns.
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `SetLogstreamConfiguration` operationId).
+func (c *Client) SetLogstreamConfiguration(ctx context.Context, tailnet string, logType string, body SetLogstreamConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetLogstreamConfigurationRequest(c.Server, tailnet, logType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListPostureIntegrations List posture integrations
+//
+// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v2/tailnet/{tailnet}/posture/integrations (the `ListPostureIntegrations` operationId).
+func (c *Client) ListPostureIntegrations(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPostureIntegrationsRequest(c.Server, tailnet)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreatePostureIntegrationWithBody Create a posture integration
+//
+// cloudId is the provider's endpoint: an https:// origin, or one of the CrowdStrike cloud names (us-1, us-2, eu-1, us-gov-1) for falcon.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v2/tailnet/{tailnet}/posture/integrations (the `CreatePostureIntegration` operationId).
+func (c *Client) CreatePostureIntegrationWithBody(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreatePostureIntegrationRequestWithBody(c.Server, tailnet, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreatePostureIntegration Create a posture integration
+//
+// cloudId is the provider's endpoint: an https:// origin, or one of the CrowdStrike cloud names (us-1, us-2, eu-1, us-gov-1) for falcon.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v2/tailnet/{tailnet}/posture/integrations (the `CreatePostureIntegration` operationId).
+func (c *Client) CreatePostureIntegration(ctx context.Context, tailnet string, body CreatePostureIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreatePostureIntegrationRequest(c.Server, tailnet, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2853,6 +3547,121 @@ func NewSetDeviceTagsRequestWithBody(server string, id string, contentType strin
 	return req, nil
 }
 
+// NewDeletePostureIntegrationRequest constructs an http.Request for the DeletePostureIntegration method
+func NewDeletePostureIntegrationRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/posture/integrations/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetPostureIntegrationRequest constructs an http.Request for the GetPostureIntegration method
+func NewGetPostureIntegrationRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/posture/integrations/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdatePostureIntegrationRequest calls the generic UpdatePostureIntegration builder with application/json body
+func NewUpdatePostureIntegrationRequest(server string, id string, body UpdatePostureIntegrationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdatePostureIntegrationRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdatePostureIntegrationRequestWithBody constructs an http.Request for the UpdatePostureIntegration method, with any body, and a specified content type
+func NewUpdatePostureIntegrationRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/posture/integrations/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetACLRequest constructs an http.Request for the GetACL method
 func NewGetACLRequest(server string, tailnet string, params *GetACLParams) (*http.Request, error) {
 	var err error
@@ -3002,6 +3811,53 @@ func NewSetACLRequestWithBody(server string, tailnet string, params *SetACLParam
 	return req, nil
 }
 
+// NewValidateACLRequest calls the generic ValidateACL builder with application/json body
+func NewValidateACLRequest(server string, tailnet string, body ValidateACLJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewValidateACLRequestWithBody(server, tailnet, "application/json", bodyReader)
+}
+
+// NewValidateACLRequestWithBody constructs an http.Request for the ValidateACL method, with any body, and a specified content type
+func NewValidateACLRequestWithBody(server string, tailnet string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/acl/validate", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListDevicesRequest constructs an http.Request for the ListDevices method
 func NewListDevicesRequest(server string, tailnet string, params *ListDevicesParams) (*http.Request, error) {
 	var err error
@@ -3059,6 +3915,87 @@ func NewListDevicesRequest(server string, tailnet string, params *ListDevicesPar
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewGetDNSConfigurationRequest constructs an http.Request for the GetDNSConfiguration method
+func NewGetDNSConfigurationRequest(server string, tailnet string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/dns/configuration", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetDNSConfigurationRequest calls the generic SetDNSConfiguration builder with application/json body
+func NewSetDNSConfigurationRequest(server string, tailnet string, body SetDNSConfigurationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetDNSConfigurationRequestWithBody(server, tailnet, "application/json", bodyReader)
+}
+
+// NewSetDNSConfigurationRequestWithBody constructs an http.Request for the SetDNSConfiguration method, with any body, and a specified content type
+func NewSetDNSConfigurationRequestWithBody(server string, tailnet string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/dns/configuration", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -3620,6 +4557,277 @@ func NewGetKeyRequest(server string, tailnet string, keyId string) (*http.Reques
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewSetKeyRequest calls the generic SetKey builder with application/json body
+func NewSetKeyRequest(server string, tailnet string, keyId string, body SetKeyJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetKeyRequestWithBody(server, tailnet, keyId, "application/json", bodyReader)
+}
+
+// NewSetKeyRequestWithBody constructs an http.Request for the SetKey method, with any body, and a specified content type
+func NewSetKeyRequestWithBody(server string, tailnet string, keyId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "keyId", keyId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/keys/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteLogstreamConfigurationRequest constructs an http.Request for the DeleteLogstreamConfiguration method
+func NewDeleteLogstreamConfigurationRequest(server string, tailnet string, logType string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "logType", logType, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/logging/%s/stream", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetLogstreamConfigurationRequest constructs an http.Request for the GetLogstreamConfiguration method
+func NewGetLogstreamConfigurationRequest(server string, tailnet string, logType string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "logType", logType, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/logging/%s/stream", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetLogstreamConfigurationRequest calls the generic SetLogstreamConfiguration builder with application/json body
+func NewSetLogstreamConfigurationRequest(server string, tailnet string, logType string, body SetLogstreamConfigurationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetLogstreamConfigurationRequestWithBody(server, tailnet, logType, "application/json", bodyReader)
+}
+
+// NewSetLogstreamConfigurationRequestWithBody constructs an http.Request for the SetLogstreamConfiguration method, with any body, and a specified content type
+func NewSetLogstreamConfigurationRequestWithBody(server string, tailnet string, logType string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "logType", logType, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/logging/%s/stream", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListPostureIntegrationsRequest constructs an http.Request for the ListPostureIntegrations method
+func NewListPostureIntegrationsRequest(server string, tailnet string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/posture/integrations", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreatePostureIntegrationRequest calls the generic CreatePostureIntegration builder with application/json body
+func NewCreatePostureIntegrationRequest(server string, tailnet string, body CreatePostureIntegrationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreatePostureIntegrationRequestWithBody(server, tailnet, "application/json", bodyReader)
+}
+
+// NewCreatePostureIntegrationRequestWithBody constructs an http.Request for the CreatePostureIntegration method, with any body, and a specified content type
+func NewCreatePostureIntegrationRequestWithBody(server string, tailnet string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/posture/integrations", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -4551,6 +5759,46 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v2/device/{id}/tags (the `SetDeviceTags` operationId).
 	SetDeviceTagsWithResponse(ctx context.Context, id string, body SetDeviceTagsJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDeviceTagsResponse, error)
 
+	// DeletePostureIntegrationWithResponse Delete a posture integration
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v2/posture/integrations/{id} (the `DeletePostureIntegration` operationId).
+	DeletePostureIntegrationWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeletePostureIntegrationResponse, error)
+
+	// GetPostureIntegrationWithResponse Get a posture integration
+	//
+	// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v2/posture/integrations/{id} (the `GetPostureIntegration` operationId).
+	GetPostureIntegrationWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetPostureIntegrationResponse, error)
+
+	// UpdatePostureIntegrationWithBodyWithResponse Update a posture integration
+	//
+	// A field left out keeps its stored value, clientSecret included.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v2/posture/integrations/{id} (the `UpdatePostureIntegration` operationId).
+	UpdatePostureIntegrationWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePostureIntegrationResponse, error)
+
+	// UpdatePostureIntegrationWithResponse Update a posture integration
+	//
+	// A field left out keeps its stored value, clientSecret included.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v2/posture/integrations/{id} (the `UpdatePostureIntegration` operationId).
+	UpdatePostureIntegrationWithResponse(ctx context.Context, id string, body UpdatePostureIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePostureIntegrationResponse, error)
+
 	// GetACLWithResponse Get the policy file
 	//
 	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -4578,6 +5826,28 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v2/tailnet/{tailnet}/acl (the `SetACL` operationId).
 	SetACLWithResponse(ctx context.Context, tailnet string, params *SetACLParams, body SetACLJSONRequestBody, reqEditors ...RequestEditorFn) (*SetACLResponse, error)
 
+	// ValidateACLWithBodyWithResponse Validate a policy file
+	//
+	// Checks a policy document (JSON or HuJSON) against the tailnet's users and nodes and runs its tests, without storing it. A body of just `{"tests":[…]}`, or a bare list of tests, runs those tests against the policy in force instead. Both outcomes answer 200: the message is empty when everything passed and carries the failure when it did not.
+	//
+	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/tailnet/{tailnet}/acl/validate (the `ValidateACL` operationId).
+	ValidateACLWithBodyWithResponse(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ValidateACLResponse, error)
+
+	// ValidateACLWithResponse Validate a policy file
+	//
+	// Checks a policy document (JSON or HuJSON) against the tailnet's users and nodes and runs its tests, without storing it. A body of just `{"tests":[…]}`, or a bare list of tests, runs those tests against the policy in force instead. Both outcomes answer 200: the message is empty when everything passed and carries the failure when it did not.
+	//
+	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/tailnet/{tailnet}/acl/validate (the `ValidateACL` operationId).
+	ValidateACLWithResponse(ctx context.Context, tailnet string, body ValidateACLJSONRequestBody, reqEditors ...RequestEditorFn) (*ValidateACLResponse, error)
+
 	// ListDevicesWithResponse List devices
 	//
 	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -4586,6 +5856,37 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v2/tailnet/{tailnet}/devices (the `ListDevices` operationId).
 	ListDevicesWithResponse(ctx context.Context, tailnet string, params *ListDevicesParams, reqEditors ...RequestEditorFn) (*ListDevicesResponse, error)
+
+	// GetDNSConfigurationWithResponse Get the whole DNS configuration
+	//
+	// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v2/tailnet/{tailnet}/dns/configuration (the `GetDNSConfiguration` operationId).
+	GetDNSConfigurationWithResponse(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*GetDNSConfigurationResponse, error)
+
+	// SetDNSConfigurationWithBodyWithResponse Replace the whole DNS configuration
+	//
+	// Replaces the nameservers, split DNS, search paths and preferences in one write. magicDNS is set in the config file; the request is accepted only when it repeats the current value. Extra records, which this shape has no field for, are left alone.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/tailnet/{tailnet}/dns/configuration (the `SetDNSConfiguration` operationId).
+	SetDNSConfigurationWithBodyWithResponse(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetDNSConfigurationResponse, error)
+
+	// SetDNSConfigurationWithResponse Replace the whole DNS configuration
+	//
+	// Replaces the nameservers, split DNS, search paths and preferences in one write. magicDNS is set in the config file; the request is accepted only when it repeats the current value. Extra records, which this shape has no field for, are left alone.
+	//
+	// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/tailnet/{tailnet}/dns/configuration (the `SetDNSConfiguration` operationId).
+	SetDNSConfigurationWithResponse(ctx context.Context, tailnet string, body SetDNSConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDNSConfigurationResponse, error)
 
 	// GetDNSNameserversWithResponse Get DNS nameservers
 	//
@@ -4777,6 +6078,97 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v2/tailnet/{tailnet}/keys/{keyId} (the `GetKey` operationId).
 	GetKeyWithResponse(ctx context.Context, tailnet string, keyId string, reqEditors ...RequestEditorFn) (*GetKeyResponse, error)
+
+	// SetKeyWithBodyWithResponse Update an OAuth client or federated identity
+	//
+	// Replaces the scopes, tags, description and (for a federated identity) trust conditions, keeping an OAuth client's secret. Requires the `oauth_keys` scope (an admin API key is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v2/tailnet/{tailnet}/keys/{keyId} (the `SetKey` operationId).
+	SetKeyWithBodyWithResponse(ctx context.Context, tailnet string, keyId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetKeyResponse, error)
+
+	// SetKeyWithResponse Update an OAuth client or federated identity
+	//
+	// Replaces the scopes, tags, description and (for a federated identity) trust conditions, keeping an OAuth client's secret. Requires the `oauth_keys` scope (an admin API key is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v2/tailnet/{tailnet}/keys/{keyId} (the `SetKey` operationId).
+	SetKeyWithResponse(ctx context.Context, tailnet string, keyId string, body SetKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*SetKeyResponse, error)
+
+	// DeleteLogstreamConfigurationWithResponse Delete the log stream configuration
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `DeleteLogstreamConfiguration` operationId).
+	DeleteLogstreamConfigurationWithResponse(ctx context.Context, tailnet string, logType string, reqEditors ...RequestEditorFn) (*DeleteLogstreamConfigurationResponse, error)
+
+	// GetLogstreamConfigurationWithResponse Get the log stream configuration
+	//
+	// The audit log stream this API owns. Streams created in the console are separate and are not returned here.
+	//
+	// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `GetLogstreamConfiguration` operationId).
+	GetLogstreamConfigurationWithResponse(ctx context.Context, tailnet string, logType string, reqEditors ...RequestEditorFn) (*GetLogstreamConfigurationResponse, error)
+
+	// SetLogstreamConfigurationWithBodyWithResponse Set the log stream configuration
+	//
+	// Creates or replaces the audit log stream this API owns.
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `SetLogstreamConfiguration` operationId).
+	SetLogstreamConfigurationWithBodyWithResponse(ctx context.Context, tailnet string, logType string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetLogstreamConfigurationResponse, error)
+
+	// SetLogstreamConfigurationWithResponse Set the log stream configuration
+	//
+	// Creates or replaces the audit log stream this API owns.
+	//
+	// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `SetLogstreamConfiguration` operationId).
+	SetLogstreamConfigurationWithResponse(ctx context.Context, tailnet string, logType string, body SetLogstreamConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*SetLogstreamConfigurationResponse, error)
+
+	// ListPostureIntegrationsWithResponse List posture integrations
+	//
+	// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v2/tailnet/{tailnet}/posture/integrations (the `ListPostureIntegrations` operationId).
+	ListPostureIntegrationsWithResponse(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*ListPostureIntegrationsResponse, error)
+
+	// CreatePostureIntegrationWithBodyWithResponse Create a posture integration
+	//
+	// cloudId is the provider's endpoint: an https:// origin, or one of the CrowdStrike cloud names (us-1, us-2, eu-1, us-gov-1) for falcon.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/tailnet/{tailnet}/posture/integrations (the `CreatePostureIntegration` operationId).
+	CreatePostureIntegrationWithBodyWithResponse(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePostureIntegrationResponse, error)
+
+	// CreatePostureIntegrationWithResponse Create a posture integration
+	//
+	// cloudId is the provider's endpoint: an https:// origin, or one of the CrowdStrike cloud names (us-1, us-2, eu-1, us-gov-1) for falcon.
+	//
+	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v2/tailnet/{tailnet}/posture/integrations (the `CreatePostureIntegration` operationId).
+	CreatePostureIntegrationWithResponse(ctx context.Context, tailnet string, body CreatePostureIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePostureIntegrationResponse, error)
 
 	// GetTailnetSettingsWithResponse Get tailnet settings
 	//
@@ -5869,6 +7261,241 @@ func (r SetDeviceTagsResponse) ContentType() string {
 	return ""
 }
 
+type DeletePostureIntegrationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmptyOutputBody
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeletePostureIntegrationResponse) GetJSON200() *EmptyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeletePostureIntegrationResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeletePostureIntegrationResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeletePostureIntegrationResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r DeletePostureIntegrationResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r DeletePostureIntegrationResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r DeletePostureIntegrationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeletePostureIntegrationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeletePostureIntegrationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeletePostureIntegrationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetPostureIntegrationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PostureIntegration
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetPostureIntegrationResponse) GetJSON200() *PostureIntegration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetPostureIntegrationResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetPostureIntegrationResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetPostureIntegrationResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r GetPostureIntegrationResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r GetPostureIntegrationResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetPostureIntegrationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetPostureIntegrationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetPostureIntegrationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetPostureIntegrationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdatePostureIntegrationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PostureIntegration
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *ErrorModel
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdatePostureIntegrationResponse) GetJSON200() *PostureIntegration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r UpdatePostureIntegrationResponse) GetApplicationproblemJSON400() *ErrorModel {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r UpdatePostureIntegrationResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r UpdatePostureIntegrationResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r UpdatePostureIntegrationResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r UpdatePostureIntegrationResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r UpdatePostureIntegrationResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdatePostureIntegrationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdatePostureIntegrationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdatePostureIntegrationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdatePostureIntegrationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetACLResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -6021,6 +7648,89 @@ func (r SetACLResponse) ContentType() string {
 	return ""
 }
 
+type ValidateACLResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ApiError
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *ErrorModel
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ValidateACLResponse) GetJSON200() *ApiError {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ValidateACLResponse) GetApplicationproblemJSON400() *ErrorModel {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ValidateACLResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ValidateACLResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ValidateACLResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ValidateACLResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r ValidateACLResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ValidateACLResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ValidateACLResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ValidateACLResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ValidateACLResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListDevicesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -6091,6 +7801,165 @@ func (r ListDevicesResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListDevicesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetDNSConfigurationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DNSConfiguration
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetDNSConfigurationResponse) GetJSON200() *DNSConfiguration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetDNSConfigurationResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetDNSConfigurationResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetDNSConfigurationResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r GetDNSConfigurationResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r GetDNSConfigurationResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetDNSConfigurationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetDNSConfigurationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetDNSConfigurationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetDNSConfigurationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetDNSConfigurationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *DNSConfiguration
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *ErrorModel
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetDNSConfigurationResponse) GetJSON200() *DNSConfiguration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SetDNSConfigurationResponse) GetApplicationproblemJSON400() *ErrorModel {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SetDNSConfigurationResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SetDNSConfigurationResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SetDNSConfigurationResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r SetDNSConfigurationResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r SetDNSConfigurationResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r SetDNSConfigurationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetDNSConfigurationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetDNSConfigurationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetDNSConfigurationResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -7121,6 +8990,483 @@ func (r GetKeyResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetKeyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Key
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *ErrorModel
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetKeyResponse) GetJSON200() *Key {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SetKeyResponse) GetApplicationproblemJSON400() *ErrorModel {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SetKeyResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SetKeyResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SetKeyResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r SetKeyResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r SetKeyResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r SetKeyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetKeyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetKeyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetKeyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteLogstreamConfigurationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmptyOutputBody
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteLogstreamConfigurationResponse) GetJSON200() *EmptyOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteLogstreamConfigurationResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteLogstreamConfigurationResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteLogstreamConfigurationResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r DeleteLogstreamConfigurationResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r DeleteLogstreamConfigurationResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteLogstreamConfigurationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteLogstreamConfigurationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteLogstreamConfigurationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteLogstreamConfigurationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetLogstreamConfigurationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *LogstreamConfiguration
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetLogstreamConfigurationResponse) GetJSON200() *LogstreamConfiguration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetLogstreamConfigurationResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetLogstreamConfigurationResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetLogstreamConfigurationResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r GetLogstreamConfigurationResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r GetLogstreamConfigurationResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetLogstreamConfigurationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetLogstreamConfigurationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetLogstreamConfigurationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetLogstreamConfigurationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetLogstreamConfigurationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *LogstreamConfiguration
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *ErrorModel
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetLogstreamConfigurationResponse) GetJSON200() *LogstreamConfiguration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SetLogstreamConfigurationResponse) GetApplicationproblemJSON400() *ErrorModel {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SetLogstreamConfigurationResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SetLogstreamConfigurationResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SetLogstreamConfigurationResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r SetLogstreamConfigurationResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r SetLogstreamConfigurationResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r SetLogstreamConfigurationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetLogstreamConfigurationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetLogstreamConfigurationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetLogstreamConfigurationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListPostureIntegrationsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListPostureIntegrationsOutputBody
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListPostureIntegrationsResponse) GetJSON200() *ListPostureIntegrationsOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListPostureIntegrationsResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListPostureIntegrationsResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListPostureIntegrationsResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ListPostureIntegrationsResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r ListPostureIntegrationsResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ListPostureIntegrationsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListPostureIntegrationsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListPostureIntegrationsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListPostureIntegrationsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreatePostureIntegrationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PostureIntegration
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *ErrorModel
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CreatePostureIntegrationResponse) GetJSON200() *PostureIntegration {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r CreatePostureIntegrationResponse) GetApplicationproblemJSON400() *ErrorModel {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r CreatePostureIntegrationResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreatePostureIntegrationResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CreatePostureIntegrationResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r CreatePostureIntegrationResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r CreatePostureIntegrationResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r CreatePostureIntegrationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreatePostureIntegrationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreatePostureIntegrationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreatePostureIntegrationResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -8784,6 +11130,70 @@ func (c *ClientWithResponses) SetDeviceTagsWithResponse(ctx context.Context, id 
 	return ParseSetDeviceTagsResponse(rsp)
 }
 
+// DeletePostureIntegrationWithResponse Delete a posture integration
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v2/posture/integrations/{id} (the `DeletePostureIntegration` operationId).
+func (c *ClientWithResponses) DeletePostureIntegrationWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeletePostureIntegrationResponse, error) {
+	rsp, err := c.DeletePostureIntegration(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeletePostureIntegrationResponse(rsp)
+}
+
+// GetPostureIntegrationWithResponse Get a posture integration
+//
+// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v2/posture/integrations/{id} (the `GetPostureIntegration` operationId).
+func (c *ClientWithResponses) GetPostureIntegrationWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetPostureIntegrationResponse, error) {
+	rsp, err := c.GetPostureIntegration(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetPostureIntegrationResponse(rsp)
+}
+
+// UpdatePostureIntegrationWithBodyWithResponse Update a posture integration
+//
+// A field left out keeps its stored value, clientSecret included.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v2/posture/integrations/{id} (the `UpdatePostureIntegration` operationId).
+func (c *ClientWithResponses) UpdatePostureIntegrationWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePostureIntegrationResponse, error) {
+	rsp, err := c.UpdatePostureIntegrationWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdatePostureIntegrationResponse(rsp)
+}
+
+// UpdatePostureIntegrationWithResponse Update a posture integration
+//
+// A field left out keeps its stored value, clientSecret included.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v2/posture/integrations/{id} (the `UpdatePostureIntegration` operationId).
+func (c *ClientWithResponses) UpdatePostureIntegrationWithResponse(ctx context.Context, id string, body UpdatePostureIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePostureIntegrationResponse, error) {
+	rsp, err := c.UpdatePostureIntegration(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdatePostureIntegrationResponse(rsp)
+}
+
 // GetACLWithResponse Get the policy file
 //
 // Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -8829,6 +11239,40 @@ func (c *ClientWithResponses) SetACLWithResponse(ctx context.Context, tailnet st
 	return ParseSetACLResponse(rsp)
 }
 
+// ValidateACLWithBodyWithResponse Validate a policy file
+//
+// Checks a policy document (JSON or HuJSON) against the tailnet's users and nodes and runs its tests, without storing it. A body of just `{"tests":[…]}`, or a bare list of tests, runs those tests against the policy in force instead. Both outcomes answer 200: the message is empty when everything passed and carries the failure when it did not.
+//
+// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/tailnet/{tailnet}/acl/validate (the `ValidateACL` operationId).
+func (c *ClientWithResponses) ValidateACLWithBodyWithResponse(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ValidateACLResponse, error) {
+	rsp, err := c.ValidateACLWithBody(ctx, tailnet, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseValidateACLResponse(rsp)
+}
+
+// ValidateACLWithResponse Validate a policy file
+//
+// Checks a policy document (JSON or HuJSON) against the tailnet's users and nodes and runs its tests, without storing it. A body of just `{"tests":[…]}`, or a bare list of tests, runs those tests against the policy in force instead. Both outcomes answer 200: the message is empty when everything passed and carries the failure when it did not.
+//
+// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/tailnet/{tailnet}/acl/validate (the `ValidateACL` operationId).
+func (c *ClientWithResponses) ValidateACLWithResponse(ctx context.Context, tailnet string, body ValidateACLJSONRequestBody, reqEditors ...RequestEditorFn) (*ValidateACLResponse, error) {
+	rsp, err := c.ValidateACL(ctx, tailnet, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseValidateACLResponse(rsp)
+}
+
 // ListDevicesWithResponse List devices
 //
 // Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -8842,6 +11286,55 @@ func (c *ClientWithResponses) ListDevicesWithResponse(ctx context.Context, tailn
 		return nil, err
 	}
 	return ParseListDevicesResponse(rsp)
+}
+
+// GetDNSConfigurationWithResponse Get the whole DNS configuration
+//
+// Requires the `dns:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v2/tailnet/{tailnet}/dns/configuration (the `GetDNSConfiguration` operationId).
+func (c *ClientWithResponses) GetDNSConfigurationWithResponse(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*GetDNSConfigurationResponse, error) {
+	rsp, err := c.GetDNSConfiguration(ctx, tailnet, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetDNSConfigurationResponse(rsp)
+}
+
+// SetDNSConfigurationWithBodyWithResponse Replace the whole DNS configuration
+//
+// Replaces the nameservers, split DNS, search paths and preferences in one write. magicDNS is set in the config file; the request is accepted only when it repeats the current value. Extra records, which this shape has no field for, are left alone.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/tailnet/{tailnet}/dns/configuration (the `SetDNSConfiguration` operationId).
+func (c *ClientWithResponses) SetDNSConfigurationWithBodyWithResponse(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetDNSConfigurationResponse, error) {
+	rsp, err := c.SetDNSConfigurationWithBody(ctx, tailnet, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetDNSConfigurationResponse(rsp)
+}
+
+// SetDNSConfigurationWithResponse Replace the whole DNS configuration
+//
+// Replaces the nameservers, split DNS, search paths and preferences in one write. magicDNS is set in the config file; the request is accepted only when it repeats the current value. Extra records, which this shape has no field for, are left alone.
+//
+// Requires the `dns` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/tailnet/{tailnet}/dns/configuration (the `SetDNSConfiguration` operationId).
+func (c *ClientWithResponses) SetDNSConfigurationWithResponse(ctx context.Context, tailnet string, body SetDNSConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*SetDNSConfigurationResponse, error) {
+	rsp, err := c.SetDNSConfiguration(ctx, tailnet, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetDNSConfigurationResponse(rsp)
 }
 
 // GetDNSNameserversWithResponse Get DNS nameservers
@@ -9147,6 +11640,151 @@ func (c *ClientWithResponses) GetKeyWithResponse(ctx context.Context, tailnet st
 		return nil, err
 	}
 	return ParseGetKeyResponse(rsp)
+}
+
+// SetKeyWithBodyWithResponse Update an OAuth client or federated identity
+//
+// Replaces the scopes, tags, description and (for a federated identity) trust conditions, keeping an OAuth client's secret. Requires the `oauth_keys` scope (an admin API key is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v2/tailnet/{tailnet}/keys/{keyId} (the `SetKey` operationId).
+func (c *ClientWithResponses) SetKeyWithBodyWithResponse(ctx context.Context, tailnet string, keyId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetKeyResponse, error) {
+	rsp, err := c.SetKeyWithBody(ctx, tailnet, keyId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetKeyResponse(rsp)
+}
+
+// SetKeyWithResponse Update an OAuth client or federated identity
+//
+// Replaces the scopes, tags, description and (for a federated identity) trust conditions, keeping an OAuth client's secret. Requires the `oauth_keys` scope (an admin API key is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v2/tailnet/{tailnet}/keys/{keyId} (the `SetKey` operationId).
+func (c *ClientWithResponses) SetKeyWithResponse(ctx context.Context, tailnet string, keyId string, body SetKeyJSONRequestBody, reqEditors ...RequestEditorFn) (*SetKeyResponse, error) {
+	rsp, err := c.SetKey(ctx, tailnet, keyId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetKeyResponse(rsp)
+}
+
+// DeleteLogstreamConfigurationWithResponse Delete the log stream configuration
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `DeleteLogstreamConfiguration` operationId).
+func (c *ClientWithResponses) DeleteLogstreamConfigurationWithResponse(ctx context.Context, tailnet string, logType string, reqEditors ...RequestEditorFn) (*DeleteLogstreamConfigurationResponse, error) {
+	rsp, err := c.DeleteLogstreamConfiguration(ctx, tailnet, logType, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteLogstreamConfigurationResponse(rsp)
+}
+
+// GetLogstreamConfigurationWithResponse Get the log stream configuration
+//
+// The audit log stream this API owns. Streams created in the console are separate and are not returned here.
+//
+// Requires the `logs:configuration:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `GetLogstreamConfiguration` operationId).
+func (c *ClientWithResponses) GetLogstreamConfigurationWithResponse(ctx context.Context, tailnet string, logType string, reqEditors ...RequestEditorFn) (*GetLogstreamConfigurationResponse, error) {
+	rsp, err := c.GetLogstreamConfiguration(ctx, tailnet, logType, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetLogstreamConfigurationResponse(rsp)
+}
+
+// SetLogstreamConfigurationWithBodyWithResponse Set the log stream configuration
+//
+// Creates or replaces the audit log stream this API owns.
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `SetLogstreamConfiguration` operationId).
+func (c *ClientWithResponses) SetLogstreamConfigurationWithBodyWithResponse(ctx context.Context, tailnet string, logType string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetLogstreamConfigurationResponse, error) {
+	rsp, err := c.SetLogstreamConfigurationWithBody(ctx, tailnet, logType, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetLogstreamConfigurationResponse(rsp)
+}
+
+// SetLogstreamConfigurationWithResponse Set the log stream configuration
+//
+// Creates or replaces the audit log stream this API owns.
+//
+// Requires the `logs:configuration` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v2/tailnet/{tailnet}/logging/{logType}/stream (the `SetLogstreamConfiguration` operationId).
+func (c *ClientWithResponses) SetLogstreamConfigurationWithResponse(ctx context.Context, tailnet string, logType string, body SetLogstreamConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*SetLogstreamConfigurationResponse, error) {
+	rsp, err := c.SetLogstreamConfiguration(ctx, tailnet, logType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetLogstreamConfigurationResponse(rsp)
+}
+
+// ListPostureIntegrationsWithResponse List posture integrations
+//
+// Requires the `devices:posture_attributes:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v2/tailnet/{tailnet}/posture/integrations (the `ListPostureIntegrations` operationId).
+func (c *ClientWithResponses) ListPostureIntegrationsWithResponse(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*ListPostureIntegrationsResponse, error) {
+	rsp, err := c.ListPostureIntegrations(ctx, tailnet, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListPostureIntegrationsResponse(rsp)
+}
+
+// CreatePostureIntegrationWithBodyWithResponse Create a posture integration
+//
+// cloudId is the provider's endpoint: an https:// origin, or one of the CrowdStrike cloud names (us-1, us-2, eu-1, us-gov-1) for falcon.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/tailnet/{tailnet}/posture/integrations (the `CreatePostureIntegration` operationId).
+func (c *ClientWithResponses) CreatePostureIntegrationWithBodyWithResponse(ctx context.Context, tailnet string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePostureIntegrationResponse, error) {
+	rsp, err := c.CreatePostureIntegrationWithBody(ctx, tailnet, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePostureIntegrationResponse(rsp)
+}
+
+// CreatePostureIntegrationWithResponse Create a posture integration
+//
+// cloudId is the provider's endpoint: an https:// origin, or one of the CrowdStrike cloud names (us-1, us-2, eu-1, us-gov-1) for falcon.
+//
+// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v2/tailnet/{tailnet}/posture/integrations (the `CreatePostureIntegration` operationId).
+func (c *ClientWithResponses) CreatePostureIntegrationWithResponse(ctx context.Context, tailnet string, body CreatePostureIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePostureIntegrationResponse, error) {
+	rsp, err := c.CreatePostureIntegration(ctx, tailnet, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePostureIntegrationResponse(rsp)
 }
 
 // GetTailnetSettingsWithResponse Get tailnet settings
@@ -10206,6 +12844,196 @@ func ParseSetDeviceTagsResponse(rsp *http.Response) (*SetDeviceTagsResponse, err
 	return response, nil
 }
 
+// ParseDeletePostureIntegrationResponse parses an HTTP response from a DeletePostureIntegrationWithResponse call
+func ParseDeletePostureIntegrationResponse(rsp *http.Response) (*DeletePostureIntegrationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeletePostureIntegrationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmptyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetPostureIntegrationResponse parses an HTTP response from a GetPostureIntegrationWithResponse call
+func ParseGetPostureIntegrationResponse(rsp *http.Response) (*GetPostureIntegrationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetPostureIntegrationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PostureIntegration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdatePostureIntegrationResponse parses an HTTP response from a UpdatePostureIntegrationWithResponse call
+func ParseUpdatePostureIntegrationResponse(rsp *http.Response) (*UpdatePostureIntegrationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdatePostureIntegrationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PostureIntegration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetACLResponse parses an HTTP response from a GetACLWithResponse call
 func ParseGetACLResponse(rsp *http.Response) (*GetACLResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -10334,6 +13162,74 @@ func ParseSetACLResponse(rsp *http.Response) (*SetACLResponse, error) {
 	return response, nil
 }
 
+// ParseValidateACLResponse parses an HTTP response from a ValidateACLWithResponse call
+func ParseValidateACLResponse(rsp *http.Response) (*ValidateACLResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ValidateACLResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ApiError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListDevicesResponse parses an HTTP response from a ListDevicesWithResponse call
 func ParseListDevicesResponse(rsp *http.Response) (*ListDevicesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -10354,6 +13250,135 @@ func ParseListDevicesResponse(rsp *http.Response) (*ListDevicesResponse, error) 
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetDNSConfigurationResponse parses an HTTP response from a GetDNSConfigurationWithResponse call
+func ParseGetDNSConfigurationResponse(rsp *http.Response) (*GetDNSConfigurationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetDNSConfigurationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DNSConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetDNSConfigurationResponse parses an HTTP response from a SetDNSConfigurationWithResponse call
+func ParseSetDNSConfigurationResponse(rsp *http.Response) (*SetDNSConfigurationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetDNSConfigurationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest DNSConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorModel
@@ -11189,6 +14214,393 @@ func ParseGetKeyResponse(rsp *http.Response) (*GetKeyResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetKeyResponse parses an HTTP response from a SetKeyWithResponse call
+func ParseSetKeyResponse(rsp *http.Response) (*SetKeyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetKeyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Key
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteLogstreamConfigurationResponse parses an HTTP response from a DeleteLogstreamConfigurationWithResponse call
+func ParseDeleteLogstreamConfigurationResponse(rsp *http.Response) (*DeleteLogstreamConfigurationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteLogstreamConfigurationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmptyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetLogstreamConfigurationResponse parses an HTTP response from a GetLogstreamConfigurationWithResponse call
+func ParseGetLogstreamConfigurationResponse(rsp *http.Response) (*GetLogstreamConfigurationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetLogstreamConfigurationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LogstreamConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetLogstreamConfigurationResponse parses an HTTP response from a SetLogstreamConfigurationWithResponse call
+func ParseSetLogstreamConfigurationResponse(rsp *http.Response) (*SetLogstreamConfigurationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetLogstreamConfigurationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LogstreamConfiguration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListPostureIntegrationsResponse parses an HTTP response from a ListPostureIntegrationsWithResponse call
+func ParseListPostureIntegrationsResponse(rsp *http.Response) (*ListPostureIntegrationsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListPostureIntegrationsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListPostureIntegrationsOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreatePostureIntegrationResponse parses an HTTP response from a CreatePostureIntegrationWithResponse call
+func ParseCreatePostureIntegrationResponse(rsp *http.Response) (*CreatePostureIntegrationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreatePostureIntegrationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PostureIntegration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorModel

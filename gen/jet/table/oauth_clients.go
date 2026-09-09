@@ -17,15 +17,20 @@ type oAuthClientsTable struct {
 	sqlite.Table
 
 	// Columns
-	ID          sqlite.ColumnInteger
-	ClientID    sqlite.ColumnString
-	SecretHash  sqlite.ColumnBlob
-	Scopes      sqlite.ColumnString
-	Tags        sqlite.ColumnString
-	Description sqlite.ColumnString
-	UserID      sqlite.ColumnInteger
-	CreatedAt   sqlite.ColumnTimestamp
-	Revoked     sqlite.ColumnTimestamp
+	ID               sqlite.ColumnInteger
+	ClientID         sqlite.ColumnString
+	SecretHash       sqlite.ColumnBlob
+	Scopes           sqlite.ColumnString
+	Tags             sqlite.ColumnString
+	Description      sqlite.ColumnString
+	UserID           sqlite.ColumnInteger
+	CreatedAt        sqlite.ColumnTimestamp
+	Revoked          sqlite.ColumnTimestamp
+	KeyType          sqlite.ColumnString
+	Issuer           sqlite.ColumnString
+	Audience         sqlite.ColumnString
+	Subject          sqlite.ColumnString
+	CustomClaimRules sqlite.ColumnString
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -67,33 +72,43 @@ func newOAuthClientsTable(schemaName, tableName, alias string) *OAuthClientsTabl
 
 func newOAuthClientsTableImpl(schemaName, tableName, alias string) oAuthClientsTable {
 	var (
-		IDColumn          = sqlite.IntegerColumn("id")
-		ClientIDColumn    = sqlite.StringColumn("client_id")
-		SecretHashColumn  = sqlite.BlobColumn("secret_hash")
-		ScopesColumn      = sqlite.StringColumn("scopes")
-		TagsColumn        = sqlite.StringColumn("tags")
-		DescriptionColumn = sqlite.StringColumn("description")
-		UserIDColumn      = sqlite.IntegerColumn("user_id")
-		CreatedAtColumn   = sqlite.TimestampColumn("created_at")
-		RevokedColumn     = sqlite.TimestampColumn("revoked")
-		allColumns        = sqlite.ColumnList{IDColumn, ClientIDColumn, SecretHashColumn, ScopesColumn, TagsColumn, DescriptionColumn, UserIDColumn, CreatedAtColumn, RevokedColumn}
-		mutableColumns    = sqlite.ColumnList{ClientIDColumn, SecretHashColumn, ScopesColumn, TagsColumn, DescriptionColumn, UserIDColumn, CreatedAtColumn, RevokedColumn}
-		defaultColumns    = sqlite.ColumnList{}
+		IDColumn               = sqlite.IntegerColumn("id")
+		ClientIDColumn         = sqlite.StringColumn("client_id")
+		SecretHashColumn       = sqlite.BlobColumn("secret_hash")
+		ScopesColumn           = sqlite.StringColumn("scopes")
+		TagsColumn             = sqlite.StringColumn("tags")
+		DescriptionColumn      = sqlite.StringColumn("description")
+		UserIDColumn           = sqlite.IntegerColumn("user_id")
+		CreatedAtColumn        = sqlite.TimestampColumn("created_at")
+		RevokedColumn          = sqlite.TimestampColumn("revoked")
+		KeyTypeColumn          = sqlite.StringColumn("key_type")
+		IssuerColumn           = sqlite.StringColumn("issuer")
+		AudienceColumn         = sqlite.StringColumn("audience")
+		SubjectColumn          = sqlite.StringColumn("subject")
+		CustomClaimRulesColumn = sqlite.StringColumn("custom_claim_rules")
+		allColumns             = sqlite.ColumnList{IDColumn, ClientIDColumn, SecretHashColumn, ScopesColumn, TagsColumn, DescriptionColumn, UserIDColumn, CreatedAtColumn, RevokedColumn, KeyTypeColumn, IssuerColumn, AudienceColumn, SubjectColumn, CustomClaimRulesColumn}
+		mutableColumns         = sqlite.ColumnList{ClientIDColumn, SecretHashColumn, ScopesColumn, TagsColumn, DescriptionColumn, UserIDColumn, CreatedAtColumn, RevokedColumn, KeyTypeColumn, IssuerColumn, AudienceColumn, SubjectColumn, CustomClaimRulesColumn}
+		defaultColumns         = sqlite.ColumnList{}
 	)
 
 	return oAuthClientsTable{
 		Table: sqlite.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		ID:          IDColumn,
-		ClientID:    ClientIDColumn,
-		SecretHash:  SecretHashColumn,
-		Scopes:      ScopesColumn,
-		Tags:        TagsColumn,
-		Description: DescriptionColumn,
-		UserID:      UserIDColumn,
-		CreatedAt:   CreatedAtColumn,
-		Revoked:     RevokedColumn,
+		ID:               IDColumn,
+		ClientID:         ClientIDColumn,
+		SecretHash:       SecretHashColumn,
+		Scopes:           ScopesColumn,
+		Tags:             TagsColumn,
+		Description:      DescriptionColumn,
+		UserID:           UserIDColumn,
+		CreatedAt:        CreatedAtColumn,
+		Revoked:          RevokedColumn,
+		KeyType:          KeyTypeColumn,
+		Issuer:           IssuerColumn,
+		Audience:         AudienceColumn,
+		Subject:          SubjectColumn,
+		CustomClaimRules: CustomClaimRulesColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,
