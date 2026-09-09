@@ -94,11 +94,9 @@ function count(number: number, noun: string): string {
 function ProblemsSummary({
   problems,
   verifying,
-  empty,
 }: {
   readonly problems: readonly EditorProblem[];
   readonly verifying: boolean;
-  readonly empty: boolean;
 }): ReactNode {
   const errors = problems.filter((problem) => problem.severity === "error").length;
   const warnings = problems.filter((problem) => problem.severity === "warning").length;
@@ -126,7 +124,7 @@ function ProblemsSummary({
     return <span>Checking…</span>;
   }
 
-  return empty ? null : (
+  return (
     <span className="flex items-center gap-1">
       <CheckCircleIcon size={iconSize} weight="fill" className="text-kumo-success" aria-hidden />
       No problems
@@ -163,7 +161,7 @@ export function PolicyEditor({
 
   return (
     <Frame>
-      <FrameBand className="flex items-center justify-between gap-3 text-xs text-kumo-subtle">
+      <FrameBand className="flex items-center justify-between gap-3 px-5 text-sm text-kumo-subtle">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex h-lh items-center">
             <FileCodeIcon size={iconSize} aria-hidden />
@@ -177,8 +175,14 @@ export function PolicyEditor({
               <span>Read only</span>
             </>
           ) : null}
-          <span aria-hidden>·</span>
-          <ProblemsSummary problems={problems} verifying={verifying} empty={value.trim() === ""} />
+          {value.trim() === "" ? null : (
+            <>
+              <span aria-hidden>·</span>
+              <span aria-live="polite">
+                <ProblemsSummary problems={problems} verifying={verifying} />
+              </span>
+            </>
+          )}
         </div>
         {dirty ? (
           <Button variant="ghost" size="xs" onClick={onDiscard}>

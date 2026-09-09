@@ -81,14 +81,6 @@ function completeKey(node: SyntaxNode, place: Place, taken: JsonNode): Completio
   return { from: node.from, to: node.to, options, validFor: /^"[\w#]*"?$/v };
 }
 
-const roleAliases = [
-  "autogroup:owner",
-  "autogroup:admin",
-  "autogroup:network-admin",
-  "autogroup:it-admin",
-  "autogroup:auditor",
-];
-
 function named(values: readonly string[], type: string, detail?: string): Completion[] {
   return values.map((value) => ({
     label: value,
@@ -115,12 +107,12 @@ function aliasesFor(side: Side, names: Names, users: readonly string[]): Complet
   ];
 }
 
+/** Owners and auto approvers: users, groups and tags, which is all the server takes there. */
 function approvers(names: Names, users: readonly string[]): Completion[] {
   return [
     ...named(users, "user", "user"),
     ...named([...names.groups], "group", "group"),
     ...named([...names.tags], "tag", "tag"),
-    ...named(roleAliases, "autogroup"),
   ];
 }
 

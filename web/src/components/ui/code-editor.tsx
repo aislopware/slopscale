@@ -119,7 +119,7 @@ const theme = EditorView.theme({
   },
   ".cm-tooltip.cm-tooltip-hover, .cm-tooltip-lint": {
     fontFamily: "var(--font-sans)",
-    fontSize: "0.8125rem",
+    fontSize: "0.875rem",
     maxWidth: "28rem",
   },
   ".cm-diagnostic": { padding: "0.375rem 0.625rem 0.375rem 0.75rem", marginLeft: "0" },
@@ -181,20 +181,28 @@ interface EditorOptions {
   readonly placeholder: string;
   readonly minimal: boolean;
   readonly extensions: Extension;
+  /** Attributes on the editable element besides the label: an id, aria-describedby, aria-invalid. */
+  readonly attributes: Readonly<Record<string, string>>;
   readonly emit: RefObject<(next: string) => void>;
 }
 
 interface Created {
   readonly editor: EditorView;
   readonly compartment: Compartment;
+  readonly attributes: Compartment;
 }
 
 function isFromProp(transaction: Transaction): boolean {
   return transaction.annotation(fromProp) === true;
 }
 
+function contentAttributes(label: string, extra: Readonly<Record<string, string>>): Extension {
+  return EditorView.contentAttributes.of({ ...extra, "aria-label": label });
+}
+
 function createEditor(parent: HTMLElement, options: EditorOptions): Created {
   const compartment = new Compartment();
+  const attributes = new Compartment();
   const listener = EditorView.updateListener.of((update) => {
     if (update.docChanged && !update.transactions.some(isFromProp)) {
       options.emit.current(update.state.doc.toString());
@@ -207,7 +215,7 @@ function createEditor(parent: HTMLElement, options: EditorOptions): Created {
     syntaxHighlighting(highlightStyle),
     keymap.of([indentWithTab]),
     EditorView.lineWrapping,
-    EditorView.contentAttributes.of({ "aria-label": options.label }),
+    attributes.of(contentAttributes(options.label, options.attributes)),
     theme,
     compartment.of(EditorState.readOnly.of(options.readOnly)),
     listener,
@@ -219,7 +227,7 @@ function createEditor(parent: HTMLElement, options: EditorOptions): Created {
 
   const state = EditorState.create({ doc: options.doc, extensions });
 
-  return { editor: new EditorView({ parent, state }), compartment };
+  return { editor: new EditorView({ parent, state }), compartment, attributes };
 }
 
 export interface CodeEditorProps {
@@ -235,12 +243,15 @@ export interface CodeEditorProps {
   readonly minimal?: boolean;
   /** Problems found outside the editor, shown as diagnostics and moved along with later edits. */
   readonly problems?: readonly EditorProblem[];
+  /** Attributes on the editable element, so a field's label and messages can point at it. */
+  readonly attributes?: Readonly<Record<string, string>>;
   readonly className?: string;
   readonly "aria-label": string;
 }
 
 const noProblems: readonly EditorProblem[] = [];
 const noExtensions: Extension = [];
+const noAttributes: Readonly<Record<string, string>> = {};
 
 /** A controlled CodeMirror 6 editor. It fills its parent, so the parent sets the height. */
 export function CodeEditor({
@@ -251,14 +262,16 @@ export function CodeEditor({
   extensions = noExtensions,
   minimal = false,
   problems = noProblems,
+  attributes = noAttributes,
   className,
   "aria-label": label,
 }: CodeEditorProps): ReactElement {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView>(null);
   const editable = useRef<Compartment>(null);
+  const attributed = useRef<Compartment>(null);
   const emit = useRef(onChange);
-  const initial = useRef({ doc: value, readOnly, placeholder, minimal, extensions });
+  const initial = useRef({ doc: value, readOnly, placeholder, minimal, extensions, attributes });
 
   useEffect(() => {
     emit.current = onChange;
@@ -271,13 +284,26 @@ export function CodeEditor({
 
     view.current = created?.editor ?? null;
     editable.current = created?.compartment ?? null;
+    attributed.current = created?.attributes ?? null;
 
     return (): void => {
       created?.editor.destroy();
       view.current = null;
       editable.current = null;
+      attributed.current = null;
     };
   }, [label]);
+
+  useEffect(() => {
+    const editor = view.current;
+    const compartment = attributed.current;
+
+    if (editor === null || compartment === null) {
+      return;
+    }
+
+    editor.dispatch({ effects: compartment.reconfigure(contentAttributes(label, attributes)) });
+  }, [label, attributes]);
 
   useEffect(() => {
     const editor = view.current;

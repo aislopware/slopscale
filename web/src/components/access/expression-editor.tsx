@@ -1,6 +1,7 @@
-import { Field } from "@cloudflare/kumo/components/field";
+import { fieldVariants } from "@cloudflare/kumo/components/field";
+import { Label } from "@cloudflare/kumo/components/label";
 import { cn } from "@cloudflare/kumo/utils";
-import { useMemo } from "react";
+import { useEffect, useId, useMemo, useRef } from "react";
 import type { ReactElement } from "react";
 
 import { CodeEditor } from "~/components/ui/code-editor.tsx";
@@ -84,7 +85,9 @@ export interface ExpressionEditorProps {
 /**
  * Posture expressions, one per line, in an editor the size of a field: every token is coloured, the
  * parser underlines a mistake as it is typed, attributes and operators complete, and the server's
- * answer lands on the line it is about.
+ * answer lands on the line it is about. The field is laid out by hand because Kumo's Field ties its
+ * label and messages to a form control through Base UI, and CodeMirror's editable element is not
+ * one: the ids here do that tying, and a click on the label focuses the editor.
  */
 export function ExpressionEditor({
   label,
@@ -96,13 +99,32 @@ export function ExpressionEditor({
 }: ExpressionEditorProps): ReactElement {
   const problems = useMemo(() => serverLineProblems(value, serverErrors), [value, serverErrors]);
   const error = firstExpressionError(value, serverErrors);
+  const id = useId();
+  const editorId = `${id}-editor`;
+  const noteId = `${id}-note`;
+  const field = useRef<HTMLDivElement>(null);
+  const attributes = useMemo(
+    () => ({ id: editorId, "aria-describedby": noteId, "aria-invalid": String(error !== null) }),
+    [editorId, noteId, error],
+  );
+
+  // A label's "for" only reaches form controls, so the click is wired to the editor by hand.
+  useEffect(() => {
+    const element = field.current?.querySelector("label");
+    const focus = (): void => {
+      field.current?.querySelector<HTMLElement>(".cm-content")?.focus();
+    };
+
+    element?.addEventListener("click", focus);
+
+    return (): void => {
+      element?.removeEventListener("click", focus);
+    };
+  }, []);
 
   return (
-    <Field
-      label={label}
-      description={description}
-      {...(error === null ? {} : { error: { message: error, match: true } })}
-    >
+    <div ref={field} className={fieldVariants()}>
+      <Label htmlFor={editorId}>{label}</Label>
       <div
         className={cn(
           "rounded-md bg-kumo-base ring ring-kumo-line focus-within:ring-[1.5px] focus-within:ring-kumo-focus/50",
@@ -116,9 +138,19 @@ export function ExpressionEditor({
           placeholder={placeholder}
           extensions={extensions}
           problems={problems}
+          attributes={attributes}
           aria-label={label}
         />
       </div>
-    </Field>
+      {error === null ? (
+        <p id={noteId} className="text-sm leading-snug text-kumo-subtle">
+          {description}
+        </p>
+      ) : (
+        <p id={noteId} role="alert" className="text-sm leading-snug text-kumo-danger">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

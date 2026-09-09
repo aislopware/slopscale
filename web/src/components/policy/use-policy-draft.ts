@@ -138,6 +138,9 @@ export function usePolicyDraft({
     () => [...lint.problems, ...(verdict?.text === text ? verdict.problems : noProblems)],
     [lint, verdict, text],
   );
+  // From the first keystroke until the server has answered about this exact text, the draft is
+  // being checked: the pause before the request counts, or "No problems" would show too early.
+  const verifying = clean && text.trim() !== "" && verdict?.text !== text;
 
   const save = api.useMutation("put", "/api/v1/policy", {
     onSuccess: async (saved) => {
@@ -184,7 +187,7 @@ export function usePolicyDraft({
     dirty,
     issue,
     problems,
-    verifying: verify.isPending,
+    verifying,
     checking: check.isPending,
     saving: save.isPending,
     check: () => {
