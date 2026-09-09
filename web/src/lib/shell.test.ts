@@ -65,6 +65,40 @@ describe(shellTokens, () => {
     ]);
   });
 
+  it("lets sudo take options before the program", () => {
+    expect(words("sudo -E -u root tailscale up")).toStrictEqual([
+      "command:sudo",
+      "flag:-E",
+      "flag:-u",
+      "command:root",
+      "arg:tailscale",
+      "arg:up",
+    ]);
+  });
+
+  it("keeps a redirection apart from the words around it", () => {
+    expect(words("make build 2>&1 | tee log >> all.log")).toStrictEqual([
+      "command:make",
+      "arg:build",
+      "operator:2>&1",
+      "operator:|",
+      "command:tee",
+      "arg:log",
+      "operator:>>",
+      "arg:all.log",
+    ]);
+  });
+
+  it("keeps a quoted word whole, operators and all", () => {
+    expect(words(`sh -c "a | b && c" 'd;e' -`)).toStrictEqual([
+      "command:sh",
+      "flag:-c",
+      `arg:"a | b && c"`,
+      "arg:'d;e'",
+      "flag:-",
+    ]);
+  });
+
   it("keeps a line continuation and the newline it precedes", () => {
     expect(shellTokens("a \\\n  b").map((token) => token.kind)).toStrictEqual([
       "command",

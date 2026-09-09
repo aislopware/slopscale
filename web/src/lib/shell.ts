@@ -26,9 +26,13 @@ export interface ShellToken {
 }
 
 const space = /\s+/vy;
-const operator = /\|\||&&|[\|;]|\\(?=\n)/vy;
-/** A word ends at whitespace or an operator; a quoted run keeps both inside it. */
-const word = /(?:"[^"]*"|'[^']*'|[^\s\|;\u0026"'])+/vy;
+/** Control operators end a command; redirections (`2>&1`, `>>`, `<`) do not. */
+const operator = /\|\||&&|[\|;]|\d*>>?(?:&\d+)?|<|\\(?=\n)/vy;
+const control = /^(?:\|\||&&|[\|;])$/v;
+/** A word ends at whitespace or an operator; a quoted run or a <placeholder> keeps both inside it. */
+const word = /(?:"[^"]*"|'[^']*'|<[^\s<>]+>|[^\s\|;\u0026"'<>])+/vy;
+/** A word that opens with a placeholder, which would otherwise read as a redirection. */
+const placeholderStart = /<[^\s<>]+>/vy;
 const assignment = /^(?<name>[A-Za-z_]\w*)=(?<value>.*)$/sv;
 const flag = /^(?<flag>-[^=]*)(?:=(?<value>.*))?$/sv;
 const placeholder = /^<[^<>]+>$/v;
@@ -83,11 +87,16 @@ function classify(
     };
   }
 
+  const flagged = flag.exec(text)?.groups?.["flag"];
+
   if (expectCommand) {
+    // An option before the program, as in `sudo -E tailscale`, leaves the program still to come.
+    if (flagged !== undefined) {
+      return { tokens: [{ kind: "flag", text, from }], expectCommand };
+    }
+
     return { tokens: [{ kind: "command", text, from }], expectCommand: text === "sudo" };
   }
-
-  const flagged = flag.exec(text)?.groups?.["flag"];
 
   if (flagged !== undefined) {
     const value = text.length > flagged.length ? text.slice(flagged.length + 1) : undefined;
@@ -111,10 +120,13 @@ function step(command: string, from: number, expectCommand: boolean): Step {
     return { tokens: [{ kind: "space", text: blank, from }], expectCommand };
   }
 
-  const op = at(operator, command, from);
+  const op = at(placeholderStart, command, from) === null ? at(operator, command, from) : null;
 
   if (op !== null) {
-    return { tokens: [{ kind: "operator", text: op, from }], expectCommand: op !== "\\" };
+    return {
+      tokens: [{ kind: "operator", text: op, from }],
+      expectCommand: control.test(op) || expectCommand,
+    };
   }
 
   // Anything else is a word, since a word may hold any character the first two do not claim.
@@ -123,8 +135,9 @@ function step(command: string, from: number, expectCommand: boolean): Step {
 
 /**
  * Splits a shell command line into words and says what each one does. It reads the shapes the
- * console hands out (pipes, `&&`, `;`, sudo, environment assignments, `--flag=value`, a `\` at the
- * end of a line) and does not try to be a shell: quoting only keeps a word together.
+ * console hands out (pipes, `&&`, `;`, sudo and its options, environment assignments,
+ * `--flag=value`, redirections, a `\` at the end of a line) and does not try to be a shell: quoting
+ * only keeps a word together.
  */
 export function shellTokens(command: string): ShellToken[] {
   const tokens: ShellToken[] = [];

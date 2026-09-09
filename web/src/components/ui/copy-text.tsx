@@ -68,6 +68,8 @@ export function CopyText({
           className="relative top-px shrink-0 text-kumo-subtle group-hover/copy:text-kumo-default"
         />
       )}
+      {/* The tick says it to a sighted user; this says it to a screen reader. */}
+      <output className="sr-only">{copied ? "Copied" : ""}</output>
     </button>
   );
 }
