@@ -2,7 +2,7 @@ import { Breadcrumbs } from "@cloudflare/kumo/components/breadcrumbs";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Sidebar } from "@cloudflare/kumo/components/sidebar";
 import { cn } from "@cloudflare/kumo/utils";
-import { MagnifyingGlassIcon, SignOutIcon, WaveformIcon } from "@phosphor-icons/react";
+import { MagnifyingGlassIcon, SignOutIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
 import { useState } from "react";
@@ -13,6 +13,7 @@ import type { Me } from "~/auth/me.ts";
 import { can, displayName, roleLabel } from "~/auth/me.ts";
 import { signOut } from "~/auth/session.ts";
 import { pendingCount } from "~/components/access/request-model.ts";
+import { Mark } from "~/components/layout/mark.tsx";
 import type { NavBadge, NavItem, NavPath, NavPlace } from "~/components/layout/nav.ts";
 import { isActive, pagesOf, placeOf, visibleGroups } from "~/components/layout/nav.ts";
 import { QuickSearch } from "~/components/layout/quick-search.tsx";
@@ -252,9 +253,9 @@ function CountBadge({ count }: { readonly count: number }): ReactElement | null 
 function Brand(): ReactElement {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2 px-2 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0">
-      <WaveformIcon className="size-5 shrink-0 text-kumo-brand" weight="duotone" />
+      <Mark className="size-5 shrink-0 text-kumo-brand" />
       <span className="flex-1 truncate font-semibold text-kumo-strong group-data-[state=collapsed]/sidebar:hidden">
-        headscale
+        slopscale
       </span>
     </div>
   );
@@ -275,7 +276,7 @@ function Trail({ place }: { readonly place: NavPlace | undefined }): ReactElemen
       <Sidebar.Trigger className="md:hidden" aria-label="Open navigation" />
       <Breadcrumbs>
         {current === undefined || last === null ? (
-          <Breadcrumbs.Current>{current?.label ?? leaf ?? "headscale"}</Breadcrumbs.Current>
+          <Breadcrumbs.Current>{current?.label ?? leaf ?? "slopscale"}</Breadcrumbs.Current>
         ) : (
           <>
             <Breadcrumbs.Link href={current.children?.[0]?.to ?? current.to}>
