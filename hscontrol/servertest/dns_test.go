@@ -207,14 +207,18 @@ func TestDNSSettingsEndToEnd(t *testing.T) {
 		status, body := apiCall(t, client, ownerKey, http.MethodGet, v2+"/nameservers", nil)
 		require.Equal(t, http.StatusOK, status, body)
 		assert.Equal(t, []any{"9.9.9.9", "https://dns.nextdns.io/abc123"}, body["dns"])
-		assert.Equal(t, true, body["magicDNS"])
+		assert.Len(t, body, 1, "the nameservers body carries dns and nothing else, as the clients expect")
 
 		status, body = apiCall(t, client, ownerKey, http.MethodPost, v2+"/nameservers", map[string]any{
 			"dns": []string{"8.8.8.8"},
 		})
 		require.Equal(t, http.StatusOK, status, body)
 		assert.Equal(t, []any{"8.8.8.8"}, body["dns"])
-		assert.Equal(t, true, body["overrideLocalDns"], "the flag is kept unless given")
+
+		status, body = apiCall(t, client, ownerKey, http.MethodGet, v2+"/configuration", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, true, field(t, body, "preferences", "overrideLocalDNS"),
+			"the flag is kept unless given, and is read from the configuration")
 
 		status, body = apiCall(t, client, ownerKey, http.MethodGet, v2+"/preferences", nil)
 		require.Equal(t, http.StatusOK, status, body)

@@ -17,12 +17,13 @@ func init() {
 	registrations = append(registrations, registerDNS)
 }
 
-// DNSNameservers is the Tailscale nameservers body. overrideLocalDns is a
-// Slopscale addition: Tailscale keeps it in its console only.
+// DNSNameservers is the Tailscale nameservers body. It carries the
+// nameserver list and nothing else: Tailscale's clients decode this
+// response into a map of string lists, so a Slopscale addition next to
+// "dns" would break every one of them. The flags that belong to the same
+// settings are read from /dns/preferences and /dns/configuration.
 type DNSNameservers struct {
-	DNS              []string `json:"dns"                        nullable:"false"`
-	MagicDNS         bool     `json:"magicDNS,omitempty"`
-	OverrideLocalDNS bool     `json:"overrideLocalDns,omitempty"`
+	DNS []string `json:"dns" nullable:"false"`
 }
 
 // DNSPreferences is the Tailscale preferences body. MagicDNS is set in the
@@ -136,11 +137,7 @@ func registerDNSNameservers(api huma.API, b Backend) {
 
 		st := b.State.DNS()
 
-		return &nameserversOutput{Body: DNSNameservers{
-			DNS:              emptyIfNil(st.Effective.Nameservers),
-			MagicDNS:         st.MagicDNS,
-			OverrideLocalDNS: st.Effective.OverrideLocalDNS,
-		}}, nil
+		return &nameserversOutput{Body: DNSNameservers{DNS: emptyIfNil(st.Effective.Nameservers)}}, nil
 	})
 
 	huma.Register(api, audit.Declare(principal.RequireScope(huma.Operation{
@@ -172,11 +169,7 @@ func registerDNSNameservers(api huma.API, b Backend) {
 		audit.Detail(ctx, "nameservers", effective.Nameservers)
 		b.Change(c)
 
-		return &nameserversOutput{Body: DNSNameservers{
-			DNS:              emptyIfNil(effective.Nameservers),
-			MagicDNS:         b.Cfg.DNSConfig.MagicDNS,
-			OverrideLocalDNS: effective.OverrideLocalDNS,
-		}}, nil
+		return &nameserversOutput{Body: DNSNameservers{DNS: emptyIfNil(effective.Nameservers)}}, nil
 	})
 }
 

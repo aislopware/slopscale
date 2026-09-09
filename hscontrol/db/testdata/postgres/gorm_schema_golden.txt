@@ -165,6 +165,7 @@ COL nodes.vip_services text null=YES
 COL nodes.approved_services text null=YES
 COL nodes.key_signature text null=YES
 COL nodes.nl_key text null=YES
+COL nodes.hardware_attestation text null=YES
 COL oauth_access_tokens.id bigint null=NO default=nextval('oauth_access_tokens_id_seq'::regclass)
 COL oauth_access_tokens.prefix text null=YES
 COL oauth_access_tokens.hash bytea null=YES
@@ -182,6 +183,11 @@ COL oauth_clients.description text null=YES
 COL oauth_clients.user_id bigint null=YES
 COL oauth_clients.created_at timestamp with time zone null=YES
 COL oauth_clients.revoked timestamp with time zone null=YES
+COL oauth_clients.key_type text null=YES
+COL oauth_clients.issuer text null=YES
+COL oauth_clients.audience text null=YES
+COL oauth_clients.subject text null=YES
+COL oauth_clients.custom_claim_rules text null=YES
 COL policies.id bigint null=NO default=nextval('policies_id_seq'::regclass)
 COL policies.created_at timestamp with time zone null=YES
 COL policies.updated_at timestamp with time zone null=YES

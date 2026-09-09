@@ -67,7 +67,12 @@ CREATE TABLE oauth_clients(
   description text,
   user_id bigint,
   created_at timestamptz,
-  revoked timestamptz
+  revoked timestamptz,
+  key_type text,
+  issuer text,
+  audience text,
+  subject text,
+  custom_claim_rules text
 );
 CREATE UNIQUE INDEX idx_oauth_clients_client_id ON oauth_clients(client_id);
 
@@ -113,6 +118,7 @@ CREATE TABLE nodes(
   approved_services text,
   key_signature text,
   nl_key text,
+  hardware_attestation text,
   CONSTRAINT fk_nodes_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_nodes_auth_key FOREIGN KEY(auth_key_id) REFERENCES pre_auth_keys(id)
 );

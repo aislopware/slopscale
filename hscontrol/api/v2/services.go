@@ -65,6 +65,12 @@ type (
 // shape has no field for.
 const displayNameAnnotation = "displayName"
 
+// portsDoNotValidate is the sentinel the Kubernetes operator sends while
+// it does not yet know which ports a service listens on. Tailscale takes
+// it as "accept the service without checking its ports"; slopscale stores
+// no ports for it, so the service reads back with an empty port list.
+const portsDoNotValidate = "do-not-validate"
+
 // putVIPService is the PUT create-or-update body for registerServices: it
 // creates the service when it does not exist yet and updates it otherwise.
 func (b Backend) putVIPService(ctx context.Context, in *putVIPServiceInput) (*vipServiceOutput, error) {
@@ -88,7 +94,7 @@ func (b Backend) putVIPService(ctx context.Context, in *putVIPServiceInput) (*vi
 	displayName := in.Body.Annotations[displayNameAnnotation]
 	ports := in.Body.Ports
 
-	if ports == nil {
+	if len(ports) == 0 || (len(ports) == 1 && ports[0] == portsDoNotValidate) {
 		ports = []string{}
 	}
 

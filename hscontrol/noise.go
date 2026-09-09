@@ -313,9 +313,10 @@ func (h *Slopscale) PingResponseHandler(
 	}
 }
 
-// c2nMaxResponse bounds a c2n answer; a posture identity is a few
-// hundred bytes.
-const c2nMaxResponse = 1 << 20
+// c2nMaxResponse bounds a c2n answer. A posture identity is a few hundred
+// bytes, but a diagnostic dump is not: a redacted netmap on a large
+// tailnet and a goroutine dump on a busy client both run to megabytes.
+const c2nMaxResponse = 4 << 20
 
 // C2NResponseHandler receives the answer a client posts to a c2n request.
 // The unguessable id serves as authentication, as for pings.

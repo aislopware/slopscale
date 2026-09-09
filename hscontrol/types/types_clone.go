@@ -87,6 +87,9 @@ func (src *Node) Clone() *Node {
 		dst.SuspendedAt = new(*src.SuspendedAt)
 	}
 	dst.Posture = src.Posture.Clone()
+	if dst.HardwareAttestation != nil {
+		dst.HardwareAttestation = new(*src.HardwareAttestation)
+	}
 	dst.Attributes = append(src.Attributes[:0:0], src.Attributes...)
 	dst.Services = src.Services.Clone()
 	dst.ApprovedServices = append(src.ApprovedServices[:0:0], src.ApprovedServices...)
@@ -104,46 +107,47 @@ func (src *Node) Clone() *Node {
 
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _NodeCloneNeedsRegeneration = Node(struct {
-	ID               NodeID
-	MachineKey       key.MachinePublic
-	NodeKey          key.NodePublic
-	DiscoKey         key.DiscoPublic
-	Endpoints        AddrPorts
-	Hostinfo         *tailcfg.Hostinfo
-	IPv4             *netip.Addr
-	IPv6             *netip.Addr
-	Hostname         string
-	GivenName        string
-	UserID           *uint
-	User             *User
-	RegisterMethod   string
-	Tags             Strings
-	AuthKeyID        *uint64
-	AuthKey          *PreAuthKey
-	Expiry           *time.Time
-	LastSeen         *time.Time
-	ApprovedRoutes   Prefixes
-	ApprovedAt       *time.Time
-	SuspendedAt      *time.Time
-	Posture          *PostureIdentity
-	Attributes       []NodeAttribute
-	Services         *NodeServices
-	ApprovedServices []string
-	KeySignature     tkatype.MarshaledSignature
-	NLKey            key.NLPublic
-	SourceAddr       netip.Addr
-	SharedWith       []UserID
-	GlobalExitNode   bool
-	Ephemeral        bool
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	DeletedAt        *time.Time
-	IsOnline         *bool
-	Unhealthy        bool
-	ActiveSessions   int
-	SessionEpoch     uint64
-	CapVer           tailcfg.CapabilityVersion
-	ClientWarnings   []string
+	ID                  NodeID
+	MachineKey          key.MachinePublic
+	NodeKey             key.NodePublic
+	DiscoKey            key.DiscoPublic
+	Endpoints           AddrPorts
+	Hostinfo            *tailcfg.Hostinfo
+	IPv4                *netip.Addr
+	IPv6                *netip.Addr
+	Hostname            string
+	GivenName           string
+	UserID              *uint
+	User                *User
+	RegisterMethod      string
+	Tags                Strings
+	AuthKeyID           *uint64
+	AuthKey             *PreAuthKey
+	Expiry              *time.Time
+	LastSeen            *time.Time
+	ApprovedRoutes      Prefixes
+	ApprovedAt          *time.Time
+	SuspendedAt         *time.Time
+	Posture             *PostureIdentity
+	HardwareAttestation *HardwareAttestation
+	Attributes          []NodeAttribute
+	Services            *NodeServices
+	ApprovedServices    []string
+	KeySignature        tkatype.MarshaledSignature
+	NLKey               key.NLPublic
+	SourceAddr          netip.Addr
+	SharedWith          []UserID
+	GlobalExitNode      bool
+	Ephemeral           bool
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	DeletedAt           *time.Time
+	IsOnline            *bool
+	Unhealthy           bool
+	ActiveSessions      int
+	SessionEpoch        uint64
+	CapVer              tailcfg.CapabilityVersion
+	ClientWarnings      []string
 }{})
 
 // Clone makes a deep copy of PreAuthKey.
@@ -252,4 +256,23 @@ func (src *NodeServices) Clone() *NodeServices {
 var _NodeServicesCloneNeedsRegeneration = NodeServices(struct {
 	Hash     string
 	Services []tailcfg.VIPService
+}{})
+
+// Clone makes a deep copy of HardwareAttestation.
+// The result aliases no memory with the original.
+func (src *HardwareAttestation) Clone() *HardwareAttestation {
+	if src == nil {
+		return nil
+	}
+	dst := new(HardwareAttestation)
+	*dst = *src
+	return dst
+}
+
+// A compilation failure here means this code must be regenerated, with the command at the top of this file.
+var _HardwareAttestationCloneNeedsRegeneration = HardwareAttestation(struct {
+	Key          key.HardwareAttestationPublic
+	Attested     bool
+	AttestedAt   time.Time
+	KeyChangedAt time.Time
 }{})

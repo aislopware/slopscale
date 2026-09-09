@@ -660,7 +660,38 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609181100-posture-integrations",
 			run: migratePostureIntegrations,
 		},
+		{
+			// Hardware attestation: nodes gain hardware_attestation, what
+			// the client's TPM-backed key proved on its last map request.
+			// See docs/ref/device-trust.md.
+			id: "202609190900-node-hardware-attestation",
+			run: func(tx *Tx) error {
+				return tx.ex.addColumnIfMissing("nodes", "hardware_attestation", typeText)
+			},
+		},
+		{
+			// Federated identities: oauth_clients gains the key type and
+			// the trust conditions a workload's JWT is checked against.
+			// Existing rows keep an empty key type, which reads as a
+			// client-credentials client.
+			id:  "202609191000-oauth-federated-identity",
+			run: migrateFederatedIdentity,
+		},
 	}
+}
+
+// migrateFederatedIdentity (202609191000) adds the columns that turn a row
+// of oauth_clients into a federated identity: its kind, and the issuer,
+// audience, subject and claim rules a presented JWT must satisfy.
+func migrateFederatedIdentity(tx *Tx) error {
+	for _, column := range []string{"key_type", "issuer", "audience", "subject", "custom_claim_rules"} {
+		err := tx.ex.addColumnIfMissing("oauth_clients", column, typeText)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // migrateTailnetLock (202609180900) creates the tka_aums table and adds

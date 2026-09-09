@@ -188,6 +188,12 @@ type Node struct {
 	// nil until the server asked. Only [State.CollectPosture] writes it.
 	Posture *PostureIdentity
 
+	// HardwareAttestation is what the client's TPM-backed attestation
+	// key proved on its last map request, nil for a client that never
+	// sent one. Only [State.UpdateNodeFromMapRequest] writes it, and
+	// only when the state changes.
+	HardwareAttestation *HardwareAttestation
+
 	// Attributes are the custom posture attributes set through the API,
 	// in key order, expired ones included until the sweeper drops them.
 	// Only the attribute operations on State write them.

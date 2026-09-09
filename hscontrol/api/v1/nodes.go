@@ -106,6 +106,41 @@ type Node struct {
 	// from the warn-* flags of its last map request.
 	//nolint:lll // doc tag
 	ClientWarnings []string `doc:"Problems the client reports about itself: ip-forwarding-off for a subnet router whose kernel drops forwarded packets, router-unhealthy for a broken route setup, etc-apt-source-disabled when the Tailscale apt source is commented out. A newer client may report flags not listed here. Empty while the client reports none, while it is offline, and after a restart of the server until it polls again." json:"clientWarnings" nullable:"false"`
+
+	// HardwareAttestation is what the client's TPM-backed key proved on
+	// its last map request.
+	//nolint:lll // doc tag
+	HardwareAttestation *NodeHardwareAttestation `doc:"What the machine's hardware attestation key proved; absent until the client signs a map request with one." json:"hardwareAttestation,omitempty"`
+
+	// TPM is what the client found, whether or not it attests with it.
+	TPM *NodeTPM `doc:"The TPM the client found; absent when it reported none." json:"tpm,omitempty"`
+
+	// RemoteConfig is what the client reports once its user hands
+	// configuration to the control plane.
+	//nolint:lll // doc tag
+	RemoteConfig bool `doc:"true while the client delegated remote configuration to the control plane (tailscale set --remote-config)." json:"remoteConfig"`
+}
+
+// NodeHardwareAttestation is the state of a machine's hardware
+// attestation, as the last map request left it.
+type NodeHardwareAttestation struct {
+	//nolint:lll // doc tag
+	Attested bool `doc:"true when the last map request carried a valid signature by the key; it is the node:hardwareAttested posture attribute." json:"attested"`
+	//nolint:lll // doc tag
+	AttestedAt *time.Time `doc:"When attestation was last gained; it is not refreshed per request." json:"attestedAt" nullable:"true"`
+	//nolint:lll // doc tag
+	KeyChangedAt *time.Time `doc:"When a signature last arrived under a new key; null while it never did." json:"keyChangedAt" nullable:"true"`
+	Key          string     `doc:"The key that last verified, as hwattestpub:<hex>."                       json:"key"`
+}
+
+// NodeTPM is [tailcfg.TPMInfo], what the client reports about the TPM it
+// found on the machine.
+type NodeTPM struct {
+	Manufacturer    string `doc:"The four-letter manufacturer code, such as MSFT." json:"manufacturer"`
+	Vendor          string `doc:"The vendor string."                               json:"vendor"`
+	Model           int    `doc:"The vendor-defined model."                        json:"model"`
+	FirmwareVersion uint64 `doc:"The firmware version."                            json:"firmwareVersion"`
+	SpecRevision    int    `doc:"The TPM 2.0 specification revision."              json:"specRevision"`
 }
 
 // NodeService is one service a node reports hosting.
@@ -195,6 +230,10 @@ type expireNodeInput struct {
 type renameNodeInput struct {
 	NodeID  string `format:"uint64" path:"nodeId"`
 	NewName string `path:"newName"`
+}
+
+type resetNodeHardwareAttestationInput struct {
+	NodeID string `format:"uint64" path:"nodeId"`
 }
 
 type setTagsInput struct {
@@ -392,6 +431,38 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		ctx context.Context, in *setTagsInput,
 	) (*nodeOutput, error) {
 		return handleSetTags(ctx, b, in)
+	})
+
+	huma.Register(api, audited(withScope(huma.Operation{
+		OperationID: "resetNodeHardwareAttestation",
+		Method:      http.MethodDelete,
+		Path:        "/api/v1/node/{nodeId}/hardware-attestation",
+		Summary:     "Reset hardware attestation",
+		Description: "Forgets what the machine's hardware attestation key proved, so the next map request " +
+			"that carries a valid signature starts the record again. The client is not touched and keeps its key.",
+		Tags:     []string{"Nodes"},
+		Security: bearerAuth,
+	}, scope.DevicesCore), "node.attestation.reset", "node", "nodeId"), func(
+		ctx context.Context, in *resetNodeHardwareAttestationInput,
+	) (*nodeOutput, error) {
+		nodeID, err := parseNodeID(in.NodeID)
+		if err != nil {
+			return nil, err
+		}
+
+		node, nodeChange, err := b.State.ResetHardwareAttestation(nodeID)
+		if err != nil {
+			return nil, mapError("resetting hardware attestation", err)
+		}
+
+		audit.Target(ctx, "", "", node.GivenName())
+
+		b.Change(nodeChange)
+
+		out := &nodeOutput{}
+		out.Body.Node = b.nodeFromView(node)
+
+		return out, nil
 	})
 }
 
@@ -767,6 +838,17 @@ func (b Backend) nodeFromView(view types.NodeView) Node {
 		n.AppConnector = hi.AppConnector().EqualBool(true)
 		n.SSHServer = hi.SSH_HostKeys().Len() > 0
 		n.NetInfo = netInfoFrom(view, b.derpRegions())
+		n.RemoteConfig = hi.RemoteConfig()
+
+		if tpm, ok := hi.TPM().GetOk(); ok {
+			n.TPM = &NodeTPM{
+				Manufacturer:    tpm.Manufacturer,
+				Vendor:          tpm.Vendor,
+				Model:           tpm.Model,
+				FirmwareVersion: tpm.FirmwareVersion,
+				SpecRevision:    tpm.SpecRevision,
+			}
+		}
 	}
 
 	return n
@@ -831,7 +913,32 @@ func nodeFromView(view types.NodeView) Node {
 		n.Expiry = &at
 	}
 
+	n.HardwareAttestation = hardwareAttestationFrom(view.HardwareAttestation())
+
 	return n
+}
+
+// hardwareAttestationFrom renders a node's attestation record, nil for a
+// node that never signed a map request with an attestation key.
+func hardwareAttestationFrom(view types.HardwareAttestationView) *NodeHardwareAttestation {
+	if !view.Valid() {
+		return nil
+	}
+
+	out := &NodeHardwareAttestation{
+		Attested: view.Attested(),
+		Key:      view.Key().String(),
+	}
+
+	if at := view.AttestedAt(); !at.IsZero() {
+		out.AttestedAt = &at
+	}
+
+	if at := view.KeyChangedAt(); !at.IsZero() {
+		out.KeyChangedAt = &at
+	}
+
+	return out
 }
 
 // nodePreAuthKeyFromView builds the embedded NodePreAuthKey, masking the key to

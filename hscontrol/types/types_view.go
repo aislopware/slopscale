@@ -20,7 +20,7 @@ import (
 	"tailscale.com/types/views"
 )
 
-//go:generate go run tailscale.com/cmd/cloner  -clonefunc=false -type=User,Node,PreAuthKey,PostureIdentity,NodeAttribute,NodeServices
+//go:generate go run tailscale.com/cmd/cloner  -clonefunc=false -type=User,Node,PreAuthKey,PostureIdentity,NodeAttribute,NodeServices,HardwareAttestation
 
 // View returns a read-only view of User.
 func (p *User) View() UserView {
@@ -298,6 +298,14 @@ func (v NodeView) SuspendedAt() views.ValuePointer[time.Time] {
 // nil until the server asked. Only [State.CollectPosture] writes it.
 func (v NodeView) Posture() PostureIdentityView { return v.ж.Posture.View() }
 
+// HardwareAttestation is what the client's TPM-backed attestation
+// key proved on its last map request, nil for a client that never
+// sent one. Only [State.UpdateNodeFromMapRequest] writes it, and
+// only when the state changes.
+func (v NodeView) HardwareAttestation() HardwareAttestationView {
+	return v.ж.HardwareAttestation.View()
+}
+
 // Attributes are the custom posture attributes set through the API,
 // in key order, expired ones included until the sweeper drops them.
 // Only the attribute operations on State write them.
@@ -394,46 +402,47 @@ func (v NodeView) String() string                      { return v.ж.String() }
 
 // A compilation failure here means this code must be regenerated, with the command at the top of this file.
 var _NodeViewNeedsRegeneration = Node(struct {
-	ID               NodeID
-	MachineKey       key.MachinePublic
-	NodeKey          key.NodePublic
-	DiscoKey         key.DiscoPublic
-	Endpoints        AddrPorts
-	Hostinfo         *tailcfg.Hostinfo
-	IPv4             *netip.Addr
-	IPv6             *netip.Addr
-	Hostname         string
-	GivenName        string
-	UserID           *uint
-	User             *User
-	RegisterMethod   string
-	Tags             Strings
-	AuthKeyID        *uint64
-	AuthKey          *PreAuthKey
-	Expiry           *time.Time
-	LastSeen         *time.Time
-	ApprovedRoutes   Prefixes
-	ApprovedAt       *time.Time
-	SuspendedAt      *time.Time
-	Posture          *PostureIdentity
-	Attributes       []NodeAttribute
-	Services         *NodeServices
-	ApprovedServices []string
-	KeySignature     tkatype.MarshaledSignature
-	NLKey            key.NLPublic
-	SourceAddr       netip.Addr
-	SharedWith       []UserID
-	GlobalExitNode   bool
-	Ephemeral        bool
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	DeletedAt        *time.Time
-	IsOnline         *bool
-	Unhealthy        bool
-	ActiveSessions   int
-	SessionEpoch     uint64
-	CapVer           tailcfg.CapabilityVersion
-	ClientWarnings   []string
+	ID                  NodeID
+	MachineKey          key.MachinePublic
+	NodeKey             key.NodePublic
+	DiscoKey            key.DiscoPublic
+	Endpoints           AddrPorts
+	Hostinfo            *tailcfg.Hostinfo
+	IPv4                *netip.Addr
+	IPv6                *netip.Addr
+	Hostname            string
+	GivenName           string
+	UserID              *uint
+	User                *User
+	RegisterMethod      string
+	Tags                Strings
+	AuthKeyID           *uint64
+	AuthKey             *PreAuthKey
+	Expiry              *time.Time
+	LastSeen            *time.Time
+	ApprovedRoutes      Prefixes
+	ApprovedAt          *time.Time
+	SuspendedAt         *time.Time
+	Posture             *PostureIdentity
+	HardwareAttestation *HardwareAttestation
+	Attributes          []NodeAttribute
+	Services            *NodeServices
+	ApprovedServices    []string
+	KeySignature        tkatype.MarshaledSignature
+	NLKey               key.NLPublic
+	SourceAddr          netip.Addr
+	SharedWith          []UserID
+	GlobalExitNode      bool
+	Ephemeral           bool
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	DeletedAt           *time.Time
+	IsOnline            *bool
+	Unhealthy           bool
+	ActiveSessions      int
+	SessionEpoch        uint64
+	CapVer              tailcfg.CapabilityVersion
+	ClientWarnings      []string
 }{})
 
 // View returns a read-only view of PreAuthKey.
@@ -825,4 +834,101 @@ func (v NodeServicesView) Services() tailcfg.VIPService { panic("unsupported") }
 var _NodeServicesViewNeedsRegeneration = NodeServices(struct {
 	Hash     string
 	Services []tailcfg.VIPService
+}{})
+
+// View returns a read-only view of HardwareAttestation.
+func (p *HardwareAttestation) View() HardwareAttestationView {
+	return HardwareAttestationView{ж: p}
+}
+
+// HardwareAttestationView provides a read-only view over HardwareAttestation.
+//
+// Its methods should only be called if `Valid()` returns true.
+type HardwareAttestationView struct {
+	// ж is the underlying mutable value, named with a hard-to-type
+	// character that looks pointy like a pointer.
+	// It is named distinctively to make you think of how dangerous it is to escape
+	// to callers. You must not let callers be able to mutate it.
+	ж *HardwareAttestation
+}
+
+// Valid reports whether v's underlying value is non-nil.
+func (v HardwareAttestationView) Valid() bool { return v.ж != nil }
+
+// AsStruct returns a clone of the underlying value which aliases no memory with
+// the original.
+func (v HardwareAttestationView) AsStruct() *HardwareAttestation {
+	if v.ж == nil {
+		return nil
+	}
+	return v.ж.Clone()
+}
+
+// MarshalJSON implements [jsonv1.Marshaler].
+func (v HardwareAttestationView) MarshalJSON() ([]byte, error) {
+	return jsonv1.Marshal(v.ж)
+}
+
+// MarshalJSONTo implements [jsonv2.MarshalerTo].
+func (v HardwareAttestationView) MarshalJSONTo(enc *jsontext.Encoder) error {
+	return jsonv2.MarshalEncode(enc, v.ж)
+}
+
+// UnmarshalJSON implements [jsonv1.Unmarshaler].
+func (v *HardwareAttestationView) UnmarshalJSON(b []byte) error {
+	if v.ж != nil {
+		return errors.New("already initialized")
+	}
+	if len(b) == 0 {
+		return nil
+	}
+	var x HardwareAttestation
+	if err := jsonv1.Unmarshal(b, &x); err != nil {
+		return err
+	}
+	v.ж = &x
+	return nil
+}
+
+// UnmarshalJSONFrom implements [jsonv2.UnmarshalerFrom].
+func (v *HardwareAttestationView) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+	if v.ж != nil {
+		return errors.New("already initialized")
+	}
+	var x HardwareAttestation
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
+		return err
+	}
+	v.ж = &x
+	return nil
+}
+
+// Key is the last key that verified. It stays after attestation is
+// lost so an operator can see which key the machine used.
+func (v HardwareAttestationView) Key() key.HardwareAttestationPublic { return v.ж.Key }
+
+// Attested says the node's last map request carried a valid
+// signature by Key over its current node key. It is what the
+// node:hardwareAttested posture attribute reports, so a machine that
+// stops signing loses the attribute on its next request.
+func (v HardwareAttestationView) Attested() bool { return v.ж.Attested }
+
+// AttestedAt is when Attested last became true, not when the last
+// signature arrived: a machine that keeps attesting keeps the time
+// of the map request that first proved it.
+func (v HardwareAttestationView) AttestedAt() time.Time { return v.ж.AttestedAt }
+
+// KeyChangedAt is when a valid signature last arrived under a key
+// other than the stored one, zero while the key never changed. A
+// cleared TPM or a reinstall legitimately produces a new key, so the
+// new one replaces the old, but the change is recorded and audited
+// because it also looks like a machine being impersonated.
+func (v HardwareAttestationView) KeyChangedAt() time.Time { return v.ж.KeyChangedAt }
+
+// A compilation failure here means this code must be regenerated, with the command at the top of this file.
+var _HardwareAttestationViewNeedsRegeneration = HardwareAttestation(struct {
+	Key          key.HardwareAttestationPublic
+	Attested     bool
+	AttestedAt   time.Time
+	KeyChangedAt time.Time
 }{})

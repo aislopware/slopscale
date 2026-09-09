@@ -45,8 +45,10 @@ var selfEnforcedOps = map[string]bool{
 	"DELETE /api/v1/auth/sessions/{id}": true,
 
 	// A browser SSH session mints a key for the caller's own user; the
-	// SSH policy decides what that user may reach.
-	"POST /api/v1/ssh-session": true,
+	// SSH policy decides what that user may reach. The username hints the
+	// terminal offers follow the same visibility rule.
+	"POST /api/v1/ssh-session":                true,
+	"GET /api/v1/node/{nodeId}/ssh-usernames": true,
 }
 
 // TestEveryAuthenticatedOperationDeclaresScope guarantees no v1 operation

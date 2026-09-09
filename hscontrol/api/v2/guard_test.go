@@ -20,6 +20,7 @@ var selfEnforcedKeyOps = map[string]bool{
 	"POST /api/v2/tailnet/{tailnet}/keys":           true,
 	"GET /api/v2/tailnet/{tailnet}/keys":            true,
 	"GET /api/v2/tailnet/{tailnet}/keys/{keyId}":    true,
+	"PUT /api/v2/tailnet/{tailnet}/keys/{keyId}":    true,
 	"DELETE /api/v2/tailnet/{tailnet}/keys/{keyId}": true,
 }
 
@@ -87,6 +88,8 @@ func TestEveryWritingOperationIsAudited(t *testing.T) {
 var nonHumaRoutes = map[string]string{
 	"POST /api/v2/oauth/token": "RFC 6749 form request and error body; authenticates the client " +
 		"itself and records its own audit event (see oauth.go)",
+	"POST /api/v2/oauth/token-exchange": "RFC 6749 form request and error body; verifies the " +
+		"presented JWT itself and records its own audit event (see token_exchange.go)",
 	"GET /api/v2/docs":             "the rendered API documentation, public",
 	"GET /api/v2/openapi.json":     "the generated OpenAPI 3.1 document, public",
 	"GET /api/v2/openapi.yaml":     "the generated OpenAPI 3.1 document, public",

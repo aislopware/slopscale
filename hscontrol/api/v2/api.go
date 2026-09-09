@@ -103,9 +103,11 @@ func NewAPI(router chi.Router, backend Backend) huma.API {
 
 	Register(api, backend)
 
-	// The OAuth token endpoint is a plain route, not a Huma operation (see
-	// oauth.go); register it on the same router.
+	// The OAuth token and token-exchange endpoints are plain routes, not
+	// Huma operations (see oauth.go and token_exchange.go); register them
+	// on the same router.
 	registerOAuthToken(router, backend)
+	registerOAuthTokenExchange(router, backend)
 
 	return api
 }

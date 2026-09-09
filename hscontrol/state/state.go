@@ -2617,10 +2617,23 @@ func (s *State) UpdateNodeFromMapRequest(
 		capChanged         bool
 		persistWorthy      bool
 		prevRegion         tailcfg.DERPRegionID
+		attestation        attestationMove
 	)
 	// Snapshot the primary assignment so we can tell whether the
 	// Hostinfo + auto-approval that follows shifted any prefix.
 	prevRoutes := s.nodeStore.PrimaryRoutes()
+
+	// Verifying the client's hardware attestation signature is a
+	// signature check per request, which has no business inside the
+	// batched NodeStore write; only the verdict goes in.
+	now := time.Now()
+	attestedKey, attested := key.HardwareAttestationPublic{}, false
+
+	if !req.HardwareAttestationKey.IsZero() {
+		if current, exists := s.nodeStore.GetNode(id); exists {
+			attestedKey, attested = verifyHardwareAttestation(req, current.NodeKey(), now)
+		}
+	}
 
 	// We need to ensure we update the node as it is in the [NodeStore] at
 	// the time of the request.
@@ -2634,6 +2647,8 @@ func (s *State) UpdateNodeFromMapRequest(
 		}
 
 		currentNode.ClientWarnings = clientWarnings(req.DebugFlags)
+
+		attestation = applyHardwareAttestation(currentNode, attestedKey, attested, now)
 
 		peerChange := currentNode.PeerChangeFromMapRequest(req)
 
@@ -2664,7 +2679,7 @@ func (s *State) UpdateNodeFromMapRequest(
 		// LastSeen is best-effort and rides along the next substantive write.
 		// PeerChangeFromMapRequest always stamps LastSeen, so test the other
 		// fields explicitly.
-		persistWorthy = peerChangePersistWorthy(peerChange) || hostinfoChanged
+		persistWorthy = peerChangePersistWorthy(peerChange) || hostinfoChanged || attestation.moved()
 
 		// If there is no changes and nothing to save,
 		// return early.
@@ -2756,6 +2771,17 @@ func (s *State) UpdateNodeFromMapRequest(
 
 	if !ok {
 		return change.Change{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, id)
+	}
+
+	// The attestation record is a column of its own, so it is written
+	// here rather than by the full-row update persistNodeToDB does; that
+	// update follows, because a transition is persist-worthy, and turns
+	// the flipped node:hardwareAttested attribute into a policy change.
+	if attestation.moved() {
+		err := s.recordHardwareAttestation(updatedNode, attestation)
+		if err != nil {
+			return change.Change{}, err
+		}
 	}
 
 	if routeChange {

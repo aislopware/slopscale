@@ -81,6 +81,82 @@ operator is OAuth-only. Supporting OAuth lets all of them drive Slopscale.
 - Credentials/tokens are stored like API keys: a public id/prefix plus an
   **Argon2id** hash of the secret (no JWT, no signing keys). `OAuthClient` and
   `OAuthAccessToken` live in `types/oauth.go` and `db/oauth.go`.
+- **Updating a client** is `PUT /api/v2/tailnet/-/keys/{keyId}` with
+  `{"keyType":"client","scopes":[…],"tags":[…],"description":"…"}`
+  (`keys_update.go`), which the provider's `tailscale_oauth_client` resource
+  uses on an in-place change. It replaces the grant wholesale and never
+  re-exposes the secret; the same tag-ownership rules as create apply
+  (`authorizeClientGrant`).
+
+## Federated identities
+
+`keyType:"federated"` on the keys endpoint registers a **workload identity**
+(`federated.go`): a CI job or cloud workload presents the OIDC JWT its own
+platform signed and gets a Slopscale access token back, so no long-lived secret
+has to be stored anywhere.
+
+- Create/update with `{"keyType":"federated","scopes":[…],"tags":[…],
+"description":"…","audience":"…","issuer":"https://…","subject":"…",
+"customClaimRules":{"claim":"value"}}`. Issuer, audience and subject are
+  required; the issuer must be an `http(s)` URL that passes the egress guard.
+- Exchange at `POST /api/v2/oauth/token-exchange` (`token_exchange.go`), a
+  plain form handler like the token endpoint: `grant_type` (optional; the Go
+  client omits it), `client_id` and `jwt`. It verifies the signature against
+  the issuer's JWKS via `github.com/coreos/go-oidc/v3`, checks `iss`, `aud`,
+  `sub`, `exp`, `nbf` and `iat` with 60s of leeway, then every custom claim
+  rule (a list-valued claim satisfies a rule when it contains the value), and
+  mints a one-hour access token carrying the identity's scopes and tags.
+- Discovery documents are cached per issuer for an hour, bounded to 32 issuers,
+  and fetched through `egress.Transport()` because the issuer is operator
+  input. Every exchange, refused or not, is audited as `oauth.token.exchange`.
+
+## Endpoints beyond the core
+
+- **Policy validation** `POST /api/v2/tailnet/-/acl/validate` (`acl_validate.go`).
+  The provider's `tailscale_acl` plan modifier calls it on every plan. The body
+  is either a policy (JSON or HuJSON), which is compiled without being stored,
+  or `{"tests":[…]}` / a bare `[…]` list of ACL tests, which run against the
+  **policy in force**. Both answer `200`: an empty `message` means it passed, a
+  non-empty one carries the failure and the per-test detail in `data`.
+- **Raw policy** `GET /api/v2/tailnet/-/acl` with `Accept: application/hujson`
+  returns the stored bytes untouched with an `ETag`, so a conditional write
+  round-trips comments and trailing commas.
+- **Whole-tailnet DNS** `GET`/`POST /api/v2/tailnet/-/dns/configuration`
+  (`dns_configuration.go`) is what `tailscale_dns_configuration` reads and
+  writes in one call. `useWithExitNode` and `overrideLocalDNS` are honoured
+  (they exist in `types.DNSSettings`); `magicDNS` comes from the config file, so
+  a POST may only repeat the value in force. The POST replaces every aspect at
+  once, so unlike the single-aspect endpoints it never prunes a flag silently —
+  an inconsistent request is a `400` naming the problem.
+  The single-aspect `dns/nameservers` body carries **only** `dns`: Tailscale's
+  clients decode that response into a `map[string][]string`, so any extra
+  member breaks them. Read `overrideLocalDNS` and `magicDNS` from
+  `dns/configuration` and `dns/preferences`.
+- **Posture integrations** `GET`/`POST /api/v2/tailnet/-/posture/integrations`
+  and `GET`/`PATCH`/`DELETE /api/v2/posture/integrations/{id}`
+  (`posture_integrations.go`) wire Tailscale's
+  `{id, provider, cloudId, clientId, tenantId, clientSecret}` onto
+  `types.PostureIntegration`. Tailscale's provider names are mapped
+  (`jamfpro` ↔ slopscale's `jamf`, a CrowdStrike `cloudId` region such as
+  `us-1` onto the Falcon API host); a provider slopscale has no integration for
+  is a `400` naming it. The secret is write-only. Scope
+  `devices:posture_attributes`.
+- **Log streaming** `GET`/`PUT`/`DELETE /api/v2/tailnet/-/logging/{logType}/stream`
+  (`logging.go`). `configuration` maps onto the audit log streams; `network` is
+  a `404` saying network flow logs are not available on slopscale, because the
+  client, not the control server, produces them. `destinationType` must be one
+  of `types.LogStreamDestinations` (http, splunk, elastic, datadog, axiom,
+  loki); anything else is a `400` listing the supported ones, as are the S3 and
+  GCS fields. The API owns exactly one stream, named
+  `tailscale-api:configuration`, so a `PUT` replaces rather than adds. Scopes
+  `logs:configuration:read` and `logs:configuration`.
+- **`fields=all` on a device** (`devices_fields.go`) adds
+  `blocksIncomingConnections`, `isExternal` (always false: slopscale has no
+  shared-in devices), `connectedToControl`, `tailnetLockKey`,
+  `tailnetLockError`, `sshEnabled`, `distro`, `postureIdentity` and
+  `clientConnectivity` (endpoints, `mappingVariesByDestIP`, per-DERP-region
+  `latency` keyed by region **name**, and `clientSupports`). The default field
+  set stays exactly Tailscale's.
 
 ## Adding an endpoint
 

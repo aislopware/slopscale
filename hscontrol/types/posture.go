@@ -179,6 +179,14 @@ const (
 	AttrDeviceModel    = "node:deviceModel"
 	AttrPackage        = "node:package"
 	AttrTagged         = "node:tagged"
+	// AttrHardwareAttested is true only while the machine's last map
+	// request carried a valid signature by its hardware attestation key;
+	// it is always present, so a policy can require it with == true and
+	// a machine that stops signing loses it on its next request.
+	AttrHardwareAttested = "node:hardwareAttested"
+	// AttrTPM says the client found a TPM, whether or not it attests
+	// with it. It is absent for a client that reported no Hostinfo.
+	AttrTPM = "node:tpm"
 )
 
 // ReleaseTrack values of [AttrTSReleaseTrack].
@@ -197,7 +205,8 @@ type PostureAttributes map[string]any
 // attributes, dropping expired ones.
 func (node *Node) postureAttributes(now time.Time) PostureAttributes {
 	attrs := PostureAttributes{
-		AttrTagged: node.IsTagged(),
+		AttrTagged:           node.IsTagged(),
+		AttrHardwareAttested: node.attested(),
 	}
 
 	// Only what the client actually reported: an attribute that is absent
@@ -212,6 +221,11 @@ func (node *Node) postureAttributes(now time.Time) PostureAttributes {
 		setReported(attrs, AttrDistroVersion, hi.DistroVersion)
 		setReported(attrs, AttrDeviceModel, hi.DeviceModel)
 		setReported(attrs, AttrPackage, hi.Package)
+
+		// A TPM is a fact about the hardware, not a string the client
+		// filled in, so it is present as false whenever there is a
+		// report at all.
+		attrs[AttrTPM] = hi.TPM != nil
 
 		if v := clientVersion(hi.IPNVersion); v != "" {
 			attrs[AttrTSVersion] = v
@@ -257,6 +271,10 @@ func (node *Node) postureInputsEqual(other *Node) bool {
 		return false
 	}
 
+	if node.attested() != other.attested() {
+		return false
+	}
+
 	if !hostinfoPostureEqual(node.Hostinfo, other.Hostinfo) {
 		return false
 	}
@@ -268,6 +286,12 @@ func (node *Node) postureInputsEqual(other *Node) bool {
 	return slices.EqualFunc(node.Attributes, other.Attributes, func(a, b NodeAttribute) bool {
 		return a.Key == b.Key && a.Value == b.Value
 	})
+}
+
+// attested reports what [AttrHardwareAttested] holds: the node's last map
+// request proved its hardware attestation key.
+func (node *Node) attested() bool {
+	return node.HardwareAttestation != nil && node.HardwareAttestation.Attested
 }
 
 func (node *Node) serialNumbers() []string {
@@ -294,7 +318,8 @@ func hostinfoPostureEqual(a, b *tailcfg.Hostinfo) bool {
 		a.Distro == b.Distro &&
 		a.DistroVersion == b.DistroVersion &&
 		a.DeviceModel == b.DeviceModel &&
-		a.Package == b.Package
+		a.Package == b.Package &&
+		(a.TPM != nil) == (b.TPM != nil)
 }
 
 // PostureAttributes returns the node's attribute map now.

@@ -45,8 +45,11 @@ type nodeRow struct {
 	ApprovedAt     *time.Time
 	SuspendedAt    *time.Time
 	Posture        *string
-	GlobalExitNode bool
-	Ephemeral      bool
+	// HardwareAttestation is the JSON of [types.HardwareAttestation],
+	// NULL for a node that never signed a map request with one.
+	HardwareAttestation *string
+	GlobalExitNode      bool
+	Ephemeral           bool
 	// VipServices is the JSON of [types.NodeServices]; ApprovedServices
 	// the JSON list of names. See schema.sql.
 	VipServices      *string
@@ -172,6 +175,15 @@ func (r *nodeRow) node() (*types.Node, error) {
 		}
 	}
 
+	if r.HardwareAttestation != nil && hasJSONValue(*r.HardwareAttestation) {
+		node.HardwareAttestation = new(types.HardwareAttestation)
+
+		err = unmarshalJSONColumn(*r.HardwareAttestation, node.HardwareAttestation)
+		if err != nil {
+			return nil, fmt.Errorf("node %d hardware_attestation: %w", r.ID, err)
+		}
+	}
+
 	err = unmarshalJSONColumn(r.Tags, &node.Tags)
 	if err != nil {
 		return nil, fmt.Errorf("node %d tags: %w", r.ID, err)
@@ -268,6 +280,17 @@ func nodeRowFrom(node *types.Node) (nodeRow, error) {
 		}
 
 		row.Posture = &posture
+	}
+
+	if node.HardwareAttestation != nil {
+		var attestation string
+
+		attestation, err = marshalJSONColumn(node.HardwareAttestation)
+		if err != nil {
+			return nodeRow{}, fmt.Errorf("hardware_attestation: %w", err)
+		}
+
+		row.HardwareAttestation = &attestation
 	}
 
 	row.HostInfo, err = marshalJSONColumn(node.Hostinfo)
@@ -439,15 +462,20 @@ func preAuthKeyRowFrom(key *types.PreAuthKey) (preAuthKeyRow, error) {
 
 // oauthClientRow is a row of the oauth_clients table.
 type oauthClientRow struct {
-	ID          uint64 `sql:"primary_key"`
-	ClientID    string
-	SecretHash  []byte
-	Scopes      string
-	Tags        string
-	Description string
-	UserID      *uint
-	CreatedAt   *time.Time
-	Revoked     *time.Time
+	ID               uint64 `sql:"primary_key"`
+	ClientID         string
+	SecretHash       []byte
+	Scopes           string
+	Tags             string
+	Description      string
+	UserID           *uint
+	CreatedAt        *time.Time
+	Revoked          *time.Time
+	KeyType          string
+	Issuer           string
+	Audience         string
+	Subject          string
+	CustomClaimRules string
 }
 
 func (r *oauthClientRow) client() (*types.OAuthClient, error) {
@@ -459,6 +487,10 @@ func (r *oauthClientRow) client() (*types.OAuthClient, error) {
 		UserID:      r.UserID,
 		CreatedAt:   r.CreatedAt,
 		Revoked:     r.Revoked,
+		KeyType:     r.KeyType,
+		Issuer:      r.Issuer,
+		Audience:    r.Audience,
+		Subject:     r.Subject,
 	}
 
 	err := unmarshalJSONColumn(r.Scopes, &client.Scopes)
@@ -469,6 +501,11 @@ func (r *oauthClientRow) client() (*types.OAuthClient, error) {
 	err = unmarshalJSONColumn(r.Tags, &client.Tags)
 	if err != nil {
 		return nil, fmt.Errorf("oauth client %d tags: %w", r.ID, err)
+	}
+
+	err = unmarshalJSONColumn(r.CustomClaimRules, &client.CustomClaimRules)
+	if err != nil {
+		return nil, fmt.Errorf("oauth client %d custom claim rules: %w", r.ID, err)
 	}
 
 	return client, nil
@@ -485,16 +522,26 @@ func oauthClientRowFrom(client *types.OAuthClient) (oauthClientRow, error) {
 		return oauthClientRow{}, fmt.Errorf("tags: %w", err)
 	}
 
+	rules, err := marshalJSONColumn(client.CustomClaimRules)
+	if err != nil {
+		return oauthClientRow{}, fmt.Errorf("custom claim rules: %w", err)
+	}
+
 	return oauthClientRow{
-		ID:          client.ID,
-		ClientID:    client.ClientID,
-		SecretHash:  client.SecretHash,
-		Scopes:      scopes,
-		Tags:        tags,
-		Description: client.Description,
-		UserID:      client.UserID,
-		CreatedAt:   client.CreatedAt,
-		Revoked:     client.Revoked,
+		ID:               client.ID,
+		ClientID:         client.ClientID,
+		SecretHash:       client.SecretHash,
+		Scopes:           scopes,
+		Tags:             tags,
+		Description:      client.Description,
+		UserID:           client.UserID,
+		CreatedAt:        client.CreatedAt,
+		Revoked:          client.Revoked,
+		KeyType:          client.KeyType,
+		Issuer:           client.Issuer,
+		Audience:         client.Audience,
+		Subject:          client.Subject,
+		CustomClaimRules: rules,
 	}, nil
 }
 

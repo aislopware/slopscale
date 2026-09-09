@@ -604,6 +604,28 @@ func (hsdb *HSDatabase) NodeSetPosture(nodeID types.NodeID, posture *types.Postu
 	})
 }
 
+// NodeSetHardwareAttestation stores what the node's attestation key
+// proved, or clears the record when attestation is nil.
+func (hsdb *HSDatabase) NodeSetHardwareAttestation(
+	nodeID types.NodeID,
+	attestation *types.HardwareAttestation,
+) error {
+	var column *string
+
+	if attestation != nil {
+		encoded, err := marshalJSONColumn(attestation)
+		if err != nil {
+			return err
+		}
+
+		column = &encoded
+	}
+
+	return hsdb.Write(func(tx *Tx) error {
+		return updateNodeColumn(tx, nodeID, table.Nodes.HardwareAttestation, column)
+	})
+}
+
 // NodeSetServices stores what the node reported hosting over c2n.
 func (hsdb *HSDatabase) NodeSetServices(nodeID types.NodeID, services *types.NodeServices) error {
 	var column *string

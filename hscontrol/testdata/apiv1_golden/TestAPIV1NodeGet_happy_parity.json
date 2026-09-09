@@ -50,6 +50,7 @@
         }
       },
       "registerMethod": "REGISTER_METHOD_AUTH_KEY",
+      "remoteConfig": false,
       "sharedWith": [],
       "sshServer": false,
       "subnetRoutes": [],

@@ -27,7 +27,10 @@ const (
 	keyTypeAuth = "auth"
 	// keyTypeClient is an OAuth client (client-credentials). Multiplexed onto the
 	// keys resource exactly as Tailscale does.
-	keyTypeClient = "client"
+	keyTypeClient = types.OAuthKeyTypeClient
+	// keyTypeFederated is a federated identity: an OAuth principal with no
+	// secret, which mints tokens by presenting a JWT its own issuer signed.
+	keyTypeFederated = types.OAuthKeyTypeFederated
 )
 
 // KeyCapabilities maps a resource to the actions a key permits. Slopscale
@@ -63,10 +66,18 @@ type CreateKeyRequest struct {
 	Capabilities  *KeyCapabilities `json:"capabilities,omitempty"`
 	ExpirySeconds int64            `doc:"Lifetime in seconds; default 90d for auth keys" json:"expirySeconds,omitempty"`
 	Description   string           `json:"description,omitempty"                         maxLength:"50"`
-	// Scopes and Tags are top-level and apply only to keyType "client" (an OAuth
-	// client). Auth-key tags live under Capabilities.Devices.Create.Tags.
-	Scopes []string `doc:"OAuth scopes granted to the client. keyType=client only." json:"scopes,omitempty"`
-	Tags   []string `doc:"Tags the client may assign. keyType=client only."         json:"tags,omitempty"`
+	// Scopes and Tags are top-level and apply to keyType "client" and
+	// "federated". Auth-key tags live under Capabilities.Devices.Create.Tags.
+	Scopes []string `doc:"OAuth scopes granted to the client. keyType=client or federated." json:"scopes,omitempty"`
+	Tags   []string `doc:"Tags the client may assign. keyType=client or federated."         json:"tags,omitempty"`
+
+	// The trust conditions of a federated identity (keyType "federated"):
+	// which issuer signs the JWT, and the audience, subject and further
+	// claims it must carry.
+	Audience         string            `json:"audience,omitempty"`
+	Issuer           string            `json:"issuer,omitempty"`
+	Subject          string            `json:"subject,omitempty"`
+	CustomClaimRules map[string]string `json:"customClaimRules,omitempty"`
 }
 
 // Key is the Tailscale key response, shared by auth keys and OAuth clients.
@@ -86,6 +97,12 @@ type Key struct {
 	Scopes        []string        `json:"scopes,omitempty"`
 	Tags          []string        `json:"tags,omitempty"`
 	UserID        string          `json:"userId,omitempty"`
+
+	// Echoed back for a federated identity only.
+	Audience         string            `json:"audience,omitempty"`
+	Issuer           string            `json:"issuer,omitempty"`
+	Subject          string            `json:"subject,omitempty"`
+	CustomClaimRules map[string]string `json:"customClaimRules,omitempty"`
 }
 
 type (
@@ -207,8 +224,11 @@ func handleCreateKey(ctx context.Context, b Backend, in *createKeyInput) (*keyOu
 		return nil, err
 	}
 
-	if in.Body.KeyType == keyTypeClient {
+	switch in.Body.KeyType {
+	case keyTypeClient:
 		return createOAuthClient(ctx, b, in.Body)
+	case keyTypeFederated:
+		return createFederatedIdentity(ctx, b, in.Body)
 	}
 
 	return createAuthKey(ctx, b, in.Body)
@@ -434,43 +454,9 @@ func createOAuthClient(ctx context.Context, b Backend, body CreateKeyRequest) (*
 		return nil, huma.Error400BadRequest("an OAuth client must declare at least one scope")
 	}
 
-	// Tailscale: tags are mandatory when the scopes include devices:core or
-	// auth_keys, because such a client mints tagged, tailnet-owned credentials.
-	if scope.RequiresTags(scope.Parse(body.Scopes)) && len(body.Tags) == 0 {
-		return nil, huma.Error400BadRequest(
-			"tags are required when scopes include devices:core or auth_keys",
-		)
-	}
-
-	// A client may not be granted authority its creator lacks: its scopes must
-	// each be within the creator's grant (an OAuth token's scopes or an API
-	// key owner's role), otherwise an oauth_keys credential could mint an
-	// all-access client and escalate. Tags are additionally bounded for an
-	// OAuth token, which must stay within its own tags, each defined in policy
-	// (matching SetNodeTags); an API key keeps the historical syntax-only tag
-	// validation.
-	p := caller(ctx)
-
-	for _, s := range body.Scopes {
-		if !p.Allows(scope.Scope(s)) {
-			return nil, huma.Error403Forbidden(
-				"client may not be granted scope " + s + " beyond the creating credential",
-			)
-		}
-	}
-
-	if tokenTags, isOAuth := principalTags(ctx); isOAuth {
-		for _, tag := range body.Tags {
-			if !b.State.TagExists(tag) {
-				return nil, huma.Error400BadRequest("tag " + tag + " is not defined in policy")
-			}
-
-			if !b.State.TagOwnedByTags(tag, tokenTags) {
-				return nil, huma.Error403Forbidden(
-					"client may not be granted tag " + tag + " beyond the creating token",
-				)
-			}
-		}
+	err = authorizeClientGrant(ctx, b, body.Scopes, body.Tags)
+	if err != nil {
+		return nil, err
 	}
 
 	var creator *uint
@@ -583,12 +569,19 @@ func keyFromStored(pak *types.PreAuthKey) Key {
 func oauthClientToKey(client *types.OAuthClient, secret string) Key {
 	key := Key{
 		ID:          client.ClientID,
-		KeyType:     keyTypeClient,
+		KeyType:     client.Kind(),
 		Key:         secret,
 		Description: client.Description,
 		Created:     timeOrZero(client.CreatedAt),
 		Scopes:      emptyIfNil(client.Scopes),
 		Tags:        emptyIfNil(client.Tags),
+	}
+
+	if client.IsFederated() {
+		key.Audience = client.Audience
+		key.Issuer = client.Issuer
+		key.Subject = client.Subject
+		key.CustomClaimRules = client.CustomClaimRules
 	}
 
 	if client.Revoked != nil {

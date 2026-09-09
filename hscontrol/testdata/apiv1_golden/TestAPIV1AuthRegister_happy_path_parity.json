@@ -27,6 +27,7 @@
       "online": false,
       "preAuthKey": null,
       "registerMethod": "REGISTER_METHOD_CLI",
+      "remoteConfig": false,
       "sharedWith": [],
       "sshServer": false,
       "subnetRoutes": [],

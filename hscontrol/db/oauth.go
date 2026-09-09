@@ -180,6 +180,7 @@ func (hsdb *HSDatabase) CreateOAuthClient(
 	client := types.OAuthClient{
 		ClientID:    clientID,
 		SecretHash:  hash,
+		KeyType:     types.OAuthKeyTypeClient,
 		Scopes:      scopes,
 		Tags:        tags,
 		Description: description,
@@ -263,9 +264,11 @@ func (hsdb *HSDatabase) AuthenticateOAuthClient(secretStr string) (*types.OAuthC
 	}
 
 	client, err := getOAuthClient(hsdb, clientID)
-	if err != nil {
+	if err != nil || client.IsFederated() {
 		// Hash against a dummy so an unknown client id costs the same as a
-		// known one; otherwise the response time enumerates client ids.
+		// known one; otherwise the response time enumerates client ids. A
+		// federated identity holds no secret, so it is never a hit here
+		// however its (empty) hash would compare.
 		_ = verifySecret(dummySecretHash(), secret)
 
 		return nil, ErrOAuthClientNotFound
@@ -530,4 +533,161 @@ func (hsdb *HSDatabase) DeleteExpiredAccessTokens(cutoff time.Time) (int64, erro
 				AND(table.OAuthAccessTokens.Expiration.LT(jet.TimestampExp(timeArg(cutoff)))),
 		),
 	)
+}
+
+// UpdateOAuthClient replaces a client's scopes, tags and description. The
+// secret is untouched: Tailscale's SetOAuthClient is a wholesale update of
+// the configuration, not a rotation, so a client keeps working across one.
+func (hsdb *HSDatabase) UpdateOAuthClient(
+	clientID string,
+	scopes, tags []string,
+	description string,
+) (*types.OAuthClient, error) {
+	tags, err := validateACLTags(tags)
+	if err != nil {
+		return nil, err
+	}
+
+	scopes = set.SetOf(scopes).Slice()
+	slices.Sort(scopes)
+
+	row, err := oauthClientRowFrom(&types.OAuthClient{
+		Scopes: scopes, Tags: tags, Description: description,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var client *types.OAuthClient
+
+	err = hsdb.Write(func(tx *Tx) error {
+		affected, execErr := tx.ex.exec(
+			table.OAuthClients.UPDATE(
+				table.OAuthClients.Scopes, table.OAuthClients.Tags, table.OAuthClients.Description,
+			).SET(row.Scopes, row.Tags, row.Description).
+				WHERE(table.OAuthClients.ClientID.EQ(jet.String(clientID))),
+		)
+		if execErr != nil {
+			return execErr
+		}
+
+		if affected == 0 {
+			return ErrOAuthClientNotFound
+		}
+
+		client, execErr = getOAuthClient(tx, clientID)
+
+		return execErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return client, nil
+}
+
+// CreateFederatedIdentity stores a federated identity: an OAuth principal
+// with no secret, which mints access tokens by presenting a JWT its own
+// issuer signed. It shares the oauth_clients table and the client id
+// namespace with client-credentials clients, as Tailscale shares the keys
+// resource between them.
+func (hsdb *HSDatabase) CreateFederatedIdentity(
+	spec types.FederatedIdentitySpec,
+) (*types.OAuthClient, error) {
+	client, err := federatedIdentityFrom(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now().UTC()
+	client.ClientID = rands.HexString(oauthClientIDLength)
+	client.UserID = spec.CreatorUserID
+	client.CreatedAt = &now
+
+	err = insertOAuthClient(hsdb, client)
+	if err != nil {
+		return nil, fmt.Errorf("saving federated identity: %w", err)
+	}
+
+	return client, nil
+}
+
+// UpdateFederatedIdentity replaces a federated identity's scopes, tags,
+// description and trust conditions.
+func (hsdb *HSDatabase) UpdateFederatedIdentity(
+	clientID string,
+	spec types.FederatedIdentitySpec,
+) (*types.OAuthClient, error) {
+	replacement, err := federatedIdentityFrom(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	row, err := oauthClientRowFrom(replacement)
+	if err != nil {
+		return nil, err
+	}
+
+	var updated *types.OAuthClient
+
+	err = hsdb.Write(func(tx *Tx) error {
+		existing, findErr := getOAuthClient(tx, clientID)
+		if findErr != nil {
+			return ErrOAuthClientNotFound
+		}
+
+		if !existing.IsFederated() {
+			return ErrOAuthClientNotFound
+		}
+
+		affected, execErr := tx.ex.exec(
+			table.OAuthClients.UPDATE(
+				table.OAuthClients.Scopes, table.OAuthClients.Tags, table.OAuthClients.Description,
+				table.OAuthClients.Issuer, table.OAuthClients.Audience, table.OAuthClients.Subject,
+				table.OAuthClients.CustomClaimRules,
+			).SET(
+				row.Scopes, row.Tags, row.Description,
+				row.Issuer, row.Audience, row.Subject, row.CustomClaimRules,
+			).WHERE(table.OAuthClients.ClientID.EQ(jet.String(clientID))),
+		)
+		if execErr != nil {
+			return execErr
+		}
+
+		if affected == 0 {
+			return ErrOAuthClientNotFound
+		}
+
+		updated, execErr = getOAuthClient(tx, clientID)
+
+		return execErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return updated, nil
+}
+
+// federatedIdentityFrom normalizes a spec into the row's value form: tags
+// validated, scopes deduplicated and sorted, as for a client.
+func federatedIdentityFrom(spec types.FederatedIdentitySpec) (*types.OAuthClient, error) {
+	tags, err := validateACLTags(spec.Tags)
+	if err != nil {
+		return nil, err
+	}
+
+	scopes := set.SetOf(spec.Scopes).Slice()
+	slices.Sort(scopes)
+
+	return &types.OAuthClient{
+		KeyType:          types.OAuthKeyTypeFederated,
+		Scopes:           scopes,
+		Tags:             tags,
+		Description:      spec.Description,
+		Issuer:           spec.Issuer,
+		Audience:         spec.Audience,
+		Subject:          spec.Subject,
+		CustomClaimRules: spec.CustomClaimRules,
+	}, nil
 }

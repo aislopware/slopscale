@@ -121,6 +121,8 @@ var badRequestErrors = []error{
 	types.ErrPostureIntegrationProvider,
 	types.ErrPostureIntegrationName,
 	types.ErrPostureIntegrationConfig,
+	state.ErrUnknownDiagnostic,
+	types.ErrPreferencesInvalid,
 }
 
 // notFoundErrors are the missing records; mapError answers them with 404.
@@ -168,6 +170,8 @@ var conflictErrors = []error{
 	state.ErrPostureProviderEnabled,
 	types.ErrTailnetLockDisabled,
 	types.ErrTailnetLockNoSupportSecret,
+	state.ErrNodeNotConnected,
+	state.ErrRemoteConfigOff,
 }
 
 // isAnyOf reports whether err is, or wraps, one of the targets.

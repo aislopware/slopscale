@@ -89,6 +89,9 @@ CREATE UNIQUE INDEX idx_api_keys_prefix ON api_keys(prefix);
 -- OAuth 2.0 client-credentials clients for the v2 API. client_id is public and
 -- embedded in the secret (hskey-client-<client_id>-<secret>); only the bcrypt
 -- hash of the secret is stored. Mirrors the api_keys security model.
+-- key_type tells a client from a federated identity, which holds no secret and
+-- authenticates with a JWT its issuer signed; the issuer/audience/subject and
+-- custom_claim_rules columns are that identity's trust conditions.
 CREATE TABLE oauth_clients(
   id integer PRIMARY KEY AUTOINCREMENT,
   client_id text,
@@ -98,7 +101,12 @@ CREATE TABLE oauth_clients(
   description text,
   user_id integer,
   created_at datetime,
-  revoked datetime
+  revoked datetime,
+  key_type text,
+  issuer text,
+  audience text,
+  subject text,
+  custom_claim_rules text
 );
 CREATE UNIQUE INDEX idx_oauth_clients_client_id ON oauth_clients(client_id);
 
@@ -147,6 +155,10 @@ CREATE TABLE nodes(
   -- posture is the device identity the client reported over c2n as
   -- JSON (types.PostureIdentity), NULL until the server asked.
   posture text,
+  -- hardware_attestation is what the client's TPM-backed attestation key
+  -- proved on its last map request as JSON
+  -- (types.HardwareAttestation), NULL until it signs one.
+  hardware_attestation text,
   -- global_exit_node marks an exit node every client is told to prefer:
   -- it gets suggest-exit-node and every node auto-exit-node.
   global_exit_node numeric DEFAULT false,

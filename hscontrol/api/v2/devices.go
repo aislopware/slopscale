@@ -44,9 +44,26 @@ type Device struct {
 	ClientVersion     string     `json:"clientVersion"`
 	UpdateAvailable   bool       `json:"updateAvailable"`
 
+	// BlocksIncomingConnections is the client's shields-up setting.
+	BlocksIncomingConnections bool `json:"blocksIncomingConnections"`
+	// IsExternal marks a device shared in from another tailnet, which
+	// slopscale has no equivalent of: sharing here is between nodes of the
+	// one tailnet, so this is always false.
+	IsExternal bool `json:"isExternal"`
+	// ConnectedToControl is whether the device holds a map poll now.
+	ConnectedToControl bool `json:"connectedToControl"`
+	// TailnetLockKey is the device's tailnet lock key, empty until it has
+	// one; TailnetLockError says why the device is not lock-signed.
+	TailnetLockKey   string `json:"tailnetLockKey"`
+	TailnetLockError string `json:"tailnetLockError"`
+
 	// Populated only when fields=all is requested.
-	AdvertisedRoutes []string `json:"advertisedRoutes,omitempty"`
-	EnabledRoutes    []string `json:"enabledRoutes,omitempty"`
+	AdvertisedRoutes   []string               `json:"advertisedRoutes,omitempty"`
+	EnabledRoutes      []string               `json:"enabledRoutes,omitempty"`
+	SSHEnabled         bool                   `json:"sshEnabled,omitempty"`
+	PostureIdentity    *DevicePostureIdentity `json:"postureIdentity,omitempty"`
+	ClientConnectivity *ClientConnectivity    `json:"clientConnectivity,omitempty"`
+	Distro             *Distro                `json:"distro,omitempty"`
 }
 
 // DeviceRoutes is the GET /device/{id}/routes response: what the node announces
@@ -254,7 +271,7 @@ func handleGetDevice(b Backend, in *deviceByIDInput) (*deviceOutput, error) {
 		return nil, err
 	}
 
-	return &deviceOutput{Body: deviceFromView(node, in.Fields == "all")}, nil
+	return &deviceOutput{Body: deviceFromView(b, node, in.Fields == "all")}, nil
 }
 
 func handleListDevices(b Backend, in *listDevicesInput) (*listDevicesOutput, error) {
@@ -270,7 +287,7 @@ func handleListDevices(b Backend, in *listDevicesInput) (*listDevicesOutput, err
 	out.Body.Devices = make([]Device, 0, nodes.Len())
 
 	for _, node := range nodes.All() {
-		out.Body.Devices = append(out.Body.Devices, deviceFromView(node, allFields))
+		out.Body.Devices = append(out.Body.Devices, deviceFromView(b, node, allFields))
 	}
 
 	return out, nil
@@ -479,27 +496,35 @@ func parseRoutes(routes []string) ([]netip.Prefix, error) {
 }
 
 // deviceFromView maps a Slopscale node onto the Tailscale Device, reading
-// through the [types.NodeView] accessors. allFields gates the route slices,
-// which Tailscale only returns for fields=all.
-func deviceFromView(view types.NodeView, allFields bool) Device {
+// through the [types.NodeView] accessors. allFields gates the slices and
+// nested objects Tailscale only returns for fields=all.
+func deviceFromView(b Backend, view types.NodeView, allFields bool) Device {
 	id := view.StringID()
+	online := view.IsOnline().Valid() && view.IsOnline().Get()
 
 	d := Device{
-		Addresses:         emptyIfNil(view.IPsAsString()),
-		Name:              view.GivenName(),
-		ID:                id,
-		NodeID:            id,
-		Authorized:        view.IsApproved(),
-		User:              deviceUser(view),
-		Tags:              emptyIfNil(view.Tags().AsSlice()),
-		KeyExpiryDisabled: !view.Expiry().Valid(),
-		Created:           view.CreatedAt(),
-		Hostname:          view.Hostname(),
-		IsEphemeral:       view.IsEphemeral(),
-		MachineKey:        view.MachineKey().String(),
-		NodeKey:           view.NodeKey().String(),
-		OS:                hostinfoOS(view),
-		ClientVersion:     hostinfoVersion(view),
+		Addresses:          emptyIfNil(view.IPsAsString()),
+		Name:               view.GivenName(),
+		ID:                 id,
+		NodeID:             id,
+		Authorized:         view.IsApproved(),
+		User:               deviceUser(view),
+		Tags:               emptyIfNil(view.Tags().AsSlice()),
+		KeyExpiryDisabled:  !view.Expiry().Valid(),
+		Created:            view.CreatedAt(),
+		Hostname:           view.Hostname(),
+		IsEphemeral:        view.IsEphemeral(),
+		MachineKey:         view.MachineKey().String(),
+		NodeKey:            view.NodeKey().String(),
+		OS:                 hostinfoOS(view),
+		ClientVersion:      hostinfoVersion(view),
+		ConnectedToControl: online,
+		TailnetLockKey:     tailnetLockKey(view),
+		TailnetLockError:   tailnetLockError(b, view),
+	}
+
+	if hi := view.Hostinfo(); hi.Valid() {
+		d.BlocksIncomingConnections = hi.ShieldsUp()
 	}
 
 	if view.Expiry().Valid() {
@@ -508,7 +533,7 @@ func deviceFromView(view types.NodeView, allFields bool) Device {
 	}
 
 	// LastSeen is reported only when the device is offline, matching tailcfg.
-	if view.LastSeen().Valid() && view.IsOnline().Valid() && !view.IsOnline().Get() {
+	if view.LastSeen().Valid() && !online {
 		ls := view.LastSeen().Get()
 		d.LastSeen = &ls
 	}
@@ -516,6 +541,7 @@ func deviceFromView(view types.NodeView, allFields bool) Device {
 	if allFields {
 		d.AdvertisedRoutes = emptyIfNil(util.PrefixesToString(view.AnnouncedRoutes()))
 		d.EnabledRoutes = emptyIfNil(util.PrefixesToString(view.ApprovedRoutes().AsSlice()))
+		addDeviceDetail(b, view, &d)
 	}
 
 	return d

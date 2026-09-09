@@ -340,7 +340,7 @@ func (s *State) CollectVIPServices(
 		return change.Change{}, ErrNodeNotConnected
 	}
 
-	resp, err := s.c2nRoundTrip(ctx, nodeID, http.MethodGet, "/vip-services", dispatch)
+	resp, err := s.c2nRoundTrip(ctx, nodeID, c2nCall{method: http.MethodGet, path: "/vip-services"}, dispatch)
 	if err != nil {
 		return change.Change{}, err
 	}

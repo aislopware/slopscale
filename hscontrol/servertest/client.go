@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +21,7 @@ import (
 	"tailscale.com/control/controlclient"
 	_ "tailscale.com/feature/c2n" // answers c2n pings
 	"tailscale.com/health"
+	"tailscale.com/ipn"
 	"tailscale.com/net/netmon"
 	"tailscale.com/net/tsdial"
 	"tailscale.com/tailcfg"
@@ -85,9 +88,33 @@ type clientConfig struct {
 	debugFlags []string
 	serials    []string
 	posture    bool
+	// attestationKey signs every map request the way a TPM-backed key
+	// does; see [WithHardwareAttestation].
+	attestationKey key.HardwareAttestationKey
 	// services is what the client answers to the server's c2n
 	// /vip-services request, with the hash it stamps in its Hostinfo.
 	services []tailcfg.VIPService
+
+	// c2nMu guards the answers the c2n handler mutates: an update the
+	// server starts and the preferences it edits.
+	c2nMu sync.Mutex
+	// clientUpdate is what the client answers to /update; nil makes it
+	// answer as a build without the client update feature does.
+	clientUpdate *tailcfg.C2NUpdateResponse
+	// clientHealth is what the client answers to /debug/health.
+	clientHealth health.State
+	// sshUsernames are the login hints the client suggests.
+	sshUsernames []string
+	// appConnectorRoutes are the domains the client answers for as an app
+	// connector, with the addresses it resolved for each.
+	appConnectorRoutes map[string][]netip.Addr
+	// tlsCert is what the client answers to /tls-cert-status; nil makes it
+	// report a certificate it never fetched.
+	tlsCert *tailcfg.C2NTLSCertInfo
+	// prefs are the preferences the client serves and, while remoteConfig
+	// is on, lets the server edit through its local API.
+	prefs        ipn.Prefs
+	remoteConfig bool
 }
 
 // WithHostinfo lets a test shape the [tailcfg.Hostinfo] the client
@@ -113,6 +140,50 @@ func WithSerialNumbers(serials ...string) ClientOption {
 func WithVIPServices(services ...tailcfg.VIPService) ClientOption {
 	return func(c *clientConfig) {
 		c.services = services
+	}
+}
+
+// WithClientUpdate makes the client answer the server's c2n /update
+// request with resp. A POST flips Started when the answer says the update
+// is both enabled and supported, the way the real client does once it
+// starts one. Without the option the client answers as a build without
+// the client update feature does.
+func WithClientUpdate(resp tailcfg.C2NUpdateResponse) ClientOption {
+	return func(c *clientConfig) { c.clientUpdate = &resp }
+}
+
+// WithClientHealth makes the client report these warnings when the server
+// asks for its health.
+func WithClientHealth(state health.State) ClientOption {
+	return func(c *clientConfig) { c.clientHealth = state }
+}
+
+// WithSSHUsernames makes the client suggest these logins for a Tailscale
+// SSH session to it.
+func WithSSHUsernames(usernames ...string) ClientOption {
+	return func(c *clientConfig) { c.sshUsernames = usernames }
+}
+
+// WithAppConnectorRoutes makes the client report these learned routes as
+// an app connector.
+func WithAppConnectorRoutes(domains map[string][]netip.Addr) ClientOption {
+	return func(c *clientConfig) { c.appConnectorRoutes = domains }
+}
+
+// WithTLSCert makes the client report info about the certificate it
+// caches for its own name.
+func WithTLSCert(info tailcfg.C2NTLSCertInfo) ClientOption {
+	return func(c *clientConfig) { c.tlsCert = &info }
+}
+
+// WithClientPrefs gives the client the preferences it serves. With
+// remoteConfig the client reports the opt-in in its Hostinfo and lets the
+// server edit them through the c2n local API proxy, as a machine that ran
+// `tailscale set --remote-config` does; without it the proxy answers 403.
+func WithClientPrefs(prefs ipn.Prefs, remoteConfig bool) ClientOption {
+	return func(c *clientConfig) {
+		c.prefs = prefs
+		c.remoteConfig = remoteConfig
 	}
 }
 
@@ -242,8 +313,12 @@ func newTestClient(tb testing.TB, server *TestServer, name, hostname, authKey st
 		hostinfo.ServicesHash = VIPServicesHash(cc.services)
 	}
 
+	if cc.remoteConfig {
+		hostinfo.RemoteConfig = true
+	}
+
 	direct, err := controlclient.NewDirect(controlclient.Options{
-		Persist:              persist.Persist{},
+		Persist:              persist.Persist{AttestationKey: cc.attestationKey},
 		GetMachinePrivateKey: func() (key.MachinePrivate, error) { return machineKey, nil },
 		ServerURL:            server.URL,
 		AuthKey:              authKey,
@@ -893,8 +968,132 @@ func c2nHandler(cc *clientConfig) http.Handler {
 
 		_ = json.NewEncoder(w).Encode(resp)
 	})
+	mux.HandleFunc("GET /debug/health", func(w http.ResponseWriter, _ *http.Request) {
+		writeC2NJSON(w, cc.clientHealth)
+	})
+	mux.HandleFunc("GET /ssh/usernames", func(w http.ResponseWriter, _ *http.Request) {
+		writeC2NJSON(w, tailcfg.C2NSSHUsernamesResponse{Usernames: cc.sshUsernames})
+	})
+	mux.HandleFunc("GET /appconnector/routes", func(w http.ResponseWriter, _ *http.Request) {
+		writeC2NJSON(w, tailcfg.C2NAppConnectorDomainRoutesResponse{Domains: cc.appConnectorRoutes})
+	})
+	mux.HandleFunc("GET /tls-cert-status", func(w http.ResponseWriter, _ *http.Request) {
+		info := tailcfg.C2NTLSCertInfo{Missing: true}
+		if cc.tlsCert != nil {
+			info = *cc.tlsCert
+		}
+
+		writeC2NJSON(w, info)
+	})
+
+	registerC2NUpdate(mux, cc)
+	registerC2NPrefs(mux, cc)
+	registerC2NDiagnostics(mux)
 
 	return mux
+}
+
+// registerC2NUpdate answers the remote update request. A POST starts the
+// update when the machine allows one, and records that it did so a later
+// GET reports it, the way the real client does.
+func registerC2NUpdate(mux *http.ServeMux, cc *clientConfig) {
+	mux.HandleFunc("/update", func(w http.ResponseWriter, r *http.Request) {
+		cc.c2nMu.Lock()
+		defer cc.c2nMu.Unlock()
+
+		if cc.clientUpdate == nil {
+			http.Error(w, "clientupdate extension not found", http.StatusInternalServerError)
+
+			return
+		}
+
+		resp := *cc.clientUpdate
+
+		if r.Method == http.MethodPost {
+			switch {
+			case !resp.Enabled:
+				resp.Err = "not enabled"
+			case !resp.Supported:
+				resp.Err = "not supported"
+			default:
+				cc.clientUpdate.Started = true
+				resp.Started = true
+				resp.Err = ""
+			}
+		}
+
+		writeC2NJSON(w, resp)
+	})
+}
+
+// registerC2NPrefs answers the preferences the client serves for debugging
+// and, when the machine opted into remote configuration, the local API
+// proxy the server edits them through.
+func registerC2NPrefs(mux *http.ServeMux, cc *clientConfig) {
+	mux.HandleFunc("GET /debug/prefs", func(w http.ResponseWriter, _ *http.Request) {
+		cc.c2nMu.Lock()
+		defer cc.c2nMu.Unlock()
+
+		writeC2NJSON(w, cc.prefs)
+	})
+	mux.HandleFunc("/remoteapi/localapi/v0/prefs", func(w http.ResponseWriter, r *http.Request) {
+		if !cc.remoteConfig {
+			http.Error(w, "remote config not enabled by local machine", http.StatusForbidden)
+
+			return
+		}
+
+		cc.c2nMu.Lock()
+		defer cc.c2nMu.Unlock()
+
+		if r.Method == http.MethodPatch {
+			masked := new(ipn.MaskedPrefs)
+
+			err := json.NewDecoder(r.Body).Decode(masked)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+
+				return
+			}
+
+			cc.prefs.ApplyEdits(masked)
+		}
+
+		writeC2NJSON(w, cc.prefs)
+	})
+}
+
+// registerC2NDiagnostics answers the support dumps with stand-ins shaped
+// like the real ones: the server hands them to the operator untouched, so
+// only the content type and the fact that they arrive matter.
+func registerC2NDiagnostics(mux *http.ServeMux) {
+	mux.HandleFunc("GET /debug/netmap", func(w http.ResponseWriter, _ *http.Request) {
+		writeC2NJSON(w, tailcfg.C2NDebugNetmapResponse{Current: json.RawMessage(`{"Peers":[]}`)})
+	})
+	mux.HandleFunc("GET /debug/tka/log", func(w http.ResponseWriter, _ *http.Request) {
+		writeC2NJSON(w, map[string]any{"updates": []any{}})
+	})
+	mux.HandleFunc("GET /debug/metrics", func(w http.ResponseWriter, _ *http.Request) {
+		writeC2NText(w, "servertest_metric 1\n")
+	})
+	mux.HandleFunc("GET /debug/goroutines", func(w http.ResponseWriter, _ *http.Request) {
+		writeC2NText(w, "goroutine 1 [running]:\n")
+	})
+	mux.HandleFunc("POST /sockstats", func(w http.ResponseWriter, _ *http.Request) {
+		writeC2NText(w, "logid: servertest\n")
+	})
+}
+
+func writeC2NJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeC2NText(w http.ResponseWriter, body string) {
+	w.Header().Set("Content-Type", "text/plain")
+
+	_, _ = io.WriteString(w, body)
 }
 
 // VIPServicesHash is the hash tailscaled stamps in Hostinfo.ServicesHash
