@@ -9,6 +9,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/api/principal"
+	"github.com/juanfont/headscale/hscontrol/api/tagguard"
 	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -362,12 +363,9 @@ func handleSetDeviceTags(ctx context.Context, b Backend, in *setTagsInput) (*emp
 	// devices:core scope alone must not let a token stamp an arbitrary policy
 	// tag (e.g. tag:prod) onto any node. SetNodeTags still enforces that each
 	// tag exists in policy.
-	if tokenTags, isOAuth := principalTags(ctx); isOAuth {
-		for _, tag := range in.Body.Tags {
-			if !b.State.TagOwnedByTags(tag, tokenTags) {
-				return nil, huma.Error403Forbidden("token may not assign tag " + tag)
-			}
-		}
+	err = tagguard.AssignOwned(ctx, b.State, in.Body.Tags)
+	if err != nil {
+		return nil, err
 	}
 
 	_, nodeChange, err := b.State.SetNodeTags(node.ID(), in.Body.Tags)

@@ -92,6 +92,47 @@ func TestAPIV1CreatePreAuthKey(t *testing.T) {
 		assertStatus(t, res, http.StatusBadRequest)
 	})
 
+	// A tag no rule can name would mint a node nobody can reach.
+	t.Run("undefined tag with a policy is refused", func(t *testing.T) {
+		t.Parallel()
+
+		h := newAPIV1Harness(t)
+		user := h.app.state.CreateUserForTest("alice")
+
+		_, err := h.app.state.SetPolicy([]byte(
+			`{"tagOwners":{"tag:ci":["` + user.Name + `@"]},` +
+				`"acls":[{"action":"accept","src":["*"],"dst":["*:*"]}]}`,
+		))
+		require.NoError(t, err)
+
+		res := h.callHuma(http.MethodPost, "/api/v1/preauthkey",
+			[]byte(`{"aclTags":["tag:nonexistent"]}`))
+		assertStatus(t, res, http.StatusBadRequest)
+		assert.Contains(t, string(res.body), "is not defined in the policy")
+
+		ok := h.callHuma(http.MethodPost, "/api/v1/preauthkey",
+			[]byte(`{"aclTags":["tag:ci"]}`))
+		assert.Equal(t, http.StatusOK, ok.status, "body: %s", ok.body)
+	})
+
+	// Without tagOwners no tag can be validated, so headscale's historical
+	// behaviour stands: any well-formed tag is taken.
+	t.Run("undefined tag without a policy is accepted", func(t *testing.T) {
+		t.Parallel()
+
+		h := newAPIV1Harness(t)
+
+		res := h.callHuma(http.MethodPost, "/api/v1/preauthkey",
+			[]byte(`{"aclTags":["tag:nonexistent"]}`))
+		require.Equal(t, http.StatusOK, res.status, "body: %s", res.body)
+
+		var got struct {
+			PreAuthKey map[string]any `json:"preAuthKey"`
+		}
+		require.NoError(t, json.Unmarshal(res.body, &got))
+		assert.Equal(t, []any{"tag:nonexistent"}, got.PreAuthKey["aclTags"])
+	})
+
 	t.Run("nonexistent user parity", func(t *testing.T) {
 		t.Parallel()
 

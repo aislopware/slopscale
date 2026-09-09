@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/api/tagguard"
 	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -100,71 +101,7 @@ func registerPreAuthKeys(api huma.API, b Backend) {
 	}, scope.AuthKeys), "preauthkey.create", "preauthkey", ""), func(
 		ctx context.Context, in *createPreAuthKeyInput,
 	) (*preAuthKeyOutput, error) {
-		user, err := parsePreAuthKeyUser(in.Body.User)
-		if err != nil {
-			return nil, err
-		}
-
-		err = validateTags(in.Body.ACLTags)
-		if err != nil {
-			return nil, err
-		}
-
-		// CreatePreAuthKey requires a non-nil pointer; zero-stamp when unset.
-		var expiration time.Time
-		if in.Body.Expiration != nil {
-			expiration = *in.Body.Expiration
-
-			audit.Detail(ctx, "expiration", expiration.Format(time.RFC3339))
-		}
-
-		var userID *types.UserID
-
-		if user != 0 {
-			u, getErr := b.State.GetUserByID(user)
-			if getErr != nil {
-				return nil, mapError("creating pre-auth key", getErr)
-			}
-
-			userID = u.TypedID()
-
-			audit.Detail(ctx, "userId", formatID(u.ID))
-		}
-
-		preauthorized := in.Body.Preauthorized == nil || *in.Body.Preauthorized
-
-		groupIDs, err := keyGroups(ctx, b, in.Body.GroupIDs)
-		if err != nil {
-			return nil, err
-		}
-
-		audit.Detail(ctx, "reusable", in.Body.Reusable)
-		audit.Detail(ctx, "ephemeral", in.Body.Ephemeral)
-		audit.Detail(ctx, "preauthorized", preauthorized)
-		audit.Detail(ctx, "tags", nonNilTags(in.Body.ACLTags))
-
-		preAuthKey, err := b.State.CreatePreAuthKeyFromSpec(types.PreAuthKeySpec{
-			UserID:        userID,
-			Reusable:      in.Body.Reusable,
-			Ephemeral:     in.Body.Ephemeral,
-			Preauthorized: preauthorized,
-			Expiration:    &expiration,
-			Tags:          in.Body.ACLTags,
-			Groups:        groupIDs,
-		})
-		if err != nil {
-			// A key that is neither tagged nor user-owned is invalid input (400).
-			return nil, mapError("creating pre-auth key", err)
-		}
-
-		// The created key has no prefix on hand, so it is named by its id;
-		// the key itself is a secret and never audited.
-		audit.Target(ctx, "", preAuthKey.StringID(), "")
-
-		out := &preAuthKeyOutput{}
-		out.Body.PreAuthKey = preAuthKeyNewToResponse(preAuthKey)
-
-		return out, nil
+		return handleCreatePreAuthKey(ctx, b, in)
 	})
 
 	huma.Register(api, audited(withScope(huma.Operation{
@@ -391,6 +328,130 @@ func keyGroups(ctx context.Context, b Backend, ids []string) ([]types.GroupID, e
 	}
 
 	return groupIDs, nil
+}
+
+// handleCreatePreAuthKey mints a pre-auth key. Ownership is tags XOR user:
+// tags make a tagged key, no tags make a key owned by the named user, or by
+// the calling credential's own user.
+func handleCreatePreAuthKey(ctx context.Context, b Backend, in *createPreAuthKeyInput) (*preAuthKeyOutput, error) {
+	user, err := parsePreAuthKeyUser(in.Body.User)
+	if err != nil {
+		return nil, err
+	}
+
+	err = validateKeyTags(b, in.Body.ACLTags)
+	if err != nil {
+		return nil, err
+	}
+
+	err = authorizeKeyOwnership(ctx, b, in.Body.ACLTags, user)
+	if err != nil {
+		return nil, err
+	}
+
+	// CreatePreAuthKey requires a non-nil pointer; zero-stamp when unset.
+	var expiration time.Time
+	if in.Body.Expiration != nil {
+		expiration = *in.Body.Expiration
+
+		audit.Detail(ctx, "expiration", expiration.Format(time.RFC3339))
+	}
+
+	var userID *types.UserID
+
+	if user != 0 {
+		u, getErr := b.State.GetUserByID(user)
+		if getErr != nil {
+			return nil, mapError("creating pre-auth key", getErr)
+		}
+
+		userID = u.TypedID()
+
+		audit.Detail(ctx, "userId", formatID(u.ID))
+	}
+
+	preauthorized := in.Body.Preauthorized == nil || *in.Body.Preauthorized
+
+	groupIDs, err := keyGroups(ctx, b, in.Body.GroupIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	audit.Detail(ctx, "reusable", in.Body.Reusable)
+	audit.Detail(ctx, "ephemeral", in.Body.Ephemeral)
+	audit.Detail(ctx, "preauthorized", preauthorized)
+	audit.Detail(ctx, "tags", nonNilTags(in.Body.ACLTags))
+
+	preAuthKey, err := b.State.CreatePreAuthKeyFromSpec(types.PreAuthKeySpec{
+		UserID:        userID,
+		Reusable:      in.Body.Reusable,
+		Ephemeral:     in.Body.Ephemeral,
+		Preauthorized: preauthorized,
+		Expiration:    &expiration,
+		Tags:          in.Body.ACLTags,
+		Groups:        groupIDs,
+	})
+	if err != nil {
+		// A key that is neither tagged nor user-owned is invalid input (400).
+		return nil, mapError("creating pre-auth key", err)
+	}
+
+	// The created key has no prefix on hand, so it is named by its id;
+	// the key itself is a secret and never audited.
+	audit.Target(ctx, "", preAuthKey.StringID(), "")
+
+	out := &preAuthKeyOutput{}
+	out.Body.PreAuthKey = preAuthKeyNewToResponse(preAuthKey)
+
+	return out, nil
+}
+
+// authorizeKeyOwnership gates who the key may belong to. An OAuth token acts
+// for the tailnet through its tags: it may mint a tagged key only, only with
+// tags its own tags own, and never a key that belongs to a user. v2 gates the
+// same way (createAuthKey). Any other credential is bounded by its role.
+func authorizeKeyOwnership(ctx context.Context, b Backend, tags []string, user types.UserID) error {
+	var err error
+
+	if len(tags) == 0 {
+		err = tagguard.UntaggedKey(ctx)
+	} else {
+		err = tagguard.Assign(ctx, b.State, tags)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if user != 0 {
+		return tagguard.ActForUser(ctx, "create an auth key")
+	}
+
+	return nil
+}
+
+// validateKeyTags checks a pre-auth key's tags: the syntax, and that the
+// policy defines each one, as [state.State.SetNodeTags] does. A key
+// carrying an unknown tag mints a node no rule can name. A tailnet with
+// no tagOwners at all keeps headscale's historical behaviour and takes
+// any well-formed tag.
+func validateKeyTags(b Backend, tags []string) error {
+	err := validateTags(tags)
+	if err != nil {
+		return err
+	}
+
+	if !b.State.HasTagOwners() {
+		return nil
+	}
+
+	for _, tag := range tags {
+		if !b.State.TagExists(tag) {
+			return huma.Error400BadRequest("tag " + tag + " is not defined in the policy")
+		}
+	}
+
+	return nil
 }
 
 // validateTags rejects the first malformed tag as a 400.

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/api/tagguard"
 	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -352,7 +353,7 @@ func createAuthKey(ctx context.Context, b Backend, body CreateKeyRequest) (*keyO
 		create = body.Capabilities.Devices.Create
 	}
 
-	tokenTags, isOAuth := principalTags(ctx)
+	_, isOAuth := principalTags(ctx)
 
 	var userID *types.UserID
 
@@ -362,24 +363,15 @@ func createAuthKey(ctx context.Context, b Backend, body CreateKeyRequest) (*keyO
 		// grant (held directly, or owned by a held tag) and defined in policy,
 		// matching SetNodeTags. An admin key keeps the historical behaviour of
 		// validating only tag syntax (db.validateACLTags).
-		if isOAuth {
-			for _, tag := range create.Tags {
-				if !b.State.TagExists(tag) {
-					return nil, huma.Error400BadRequest("tag " + tag + " is not defined in policy")
-				}
-
-				if !b.State.TagOwnedByTags(tag, tokenTags) {
-					return nil, huma.Error403Forbidden(
-						"token may not assign tag " + tag,
-					)
-				}
-			}
+		err = tagguard.Assign(ctx, b.State, create.Tags)
+		if err != nil {
+			return nil, err
 		}
 
 	case isOAuth:
 		// OAuth-minted keys are tailnet/tag-owned; an untagged (user-owned) key
 		// cannot be created from a token.
-		return nil, huma.Error403Forbidden("an OAuth client must create tagged auth keys")
+		return nil, tagguard.UntaggedKey(ctx)
 
 	default:
 		uid, ok := ownerUser(ctx)

@@ -10,6 +10,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/juanfont/headscale/hscontrol/api/principal"
 	apiv2 "github.com/juanfont/headscale/hscontrol/api/v2"
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
@@ -36,6 +37,10 @@ func newKeyTestAPI(t *testing.T) (*Headscale, humatest.TestAPI) {
 	app := createTestApp(t)
 
 	_, api := humatest.New(t, apiv2.Config())
+	// The harness mounts no auth middleware, so nothing attaches a
+	// principal and the handlers' own checks would see one with no
+	// authority. Mark it locally trusted, as the socket mount is.
+	api.UseMiddleware(principal.LocalTrustMiddleware)
 	apiv2.Register(api, apiv2.Backend{State: app.state})
 
 	return app, api

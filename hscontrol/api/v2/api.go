@@ -24,6 +24,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 	"github.com/juanfont/headscale/hscontrol/api/principal"
+	"github.com/juanfont/headscale/hscontrol/api/tagguard"
 	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/state"
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -158,12 +159,13 @@ func authMiddleware(api huma.API, b Backend) func(huma.Context, func(huma.Contex
 }
 
 // caller returns the request's principal. The middleware attaches one to
-// every authenticated request; a locally trusted request carries
-// [principal.Local].
+// every authenticated request, and [WithLocalTrust] to a request over the
+// socket; a request that carries none reaches here only through a coding
+// mistake and gets [principal.None], which may do nothing.
 func caller(ctx context.Context) principal.Principal {
 	p, ok := principal.From(ctx)
 	if !ok {
-		return principal.Local()
+		return principal.None()
 	}
 
 	return p
@@ -178,11 +180,10 @@ func ownerUser(ctx context.Context) (types.UserID, bool) {
 
 // principalTags returns the tags granted to the request's OAuth access token,
 // and whether the request authenticated with one. Only a token is bounded by
-// tags; an API key keeps the historical syntax-only tag validation.
+// tags; an API key keeps the historical syntax-only tag validation. The rules
+// themselves live in [tagguard], which v1 gates through as well.
 func principalTags(ctx context.Context) ([]string, bool) {
-	p := caller(ctx)
-
-	return p.Tags, p.IsOAuth()
+	return tagguard.PrincipalTags(ctx)
 }
 
 // requireDefaultTailnet rejects any tailnet other than "-". Headscale is

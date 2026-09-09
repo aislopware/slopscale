@@ -1052,6 +1052,24 @@ func (pm *PolicyManager) TagOwnedByTags(tag string, ownerTags []string) bool {
 	return walk(Tag(tag))
 }
 
+// HasTagOwners reports whether the policy defines any tag at all.
+// Without one no tag can be validated, so callers keep headscale's
+// historical behaviour of taking any well-formed tag.
+func (pm *PolicyManager) HasTagOwners() bool {
+	if pm == nil {
+		return false
+	}
+
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	if pm.pol == nil {
+		return false
+	}
+
+	return len(pm.pol.TagOwners) > 0
+}
+
 // TagExists reports whether the given tag is defined in the policy.
 func (pm *PolicyManager) TagExists(tag string) bool {
 	if pm == nil {
