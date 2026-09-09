@@ -1,7 +1,4 @@
-import { safeParse } from "valibot";
-
-import { ApiError, problemSchema } from "~/api/error.ts";
-import type { Problem } from "~/api/error.ts";
+import { refusal } from "~/api/client.ts";
 
 /** How long the blob URL outlives the click that started the download. */
 const revokeDelayMs = 1000;
@@ -61,17 +58,18 @@ function decodeName(value: string, fallback: string): string {
 
 /**
  * Fetches a file with the console's own credentials (the session cookie rides along on a
- * same-origin request) and saves it under the name the server asked for. A refusal is raised as an
- * {@link ApiError} carrying the problem document, so the caller shows what the server said rather
- * than a status code.
+ * same-origin request) and saves it under the name the server asked for. The body is a blob rather
+ * than a document the typed client could parse, so the request is a plain fetch; a refusal goes
+ * through the same handling as every other API call, which raises the problem document as an
+ * `ApiError` and ends the session on a 401.
  */
 export async function downloadFile(url: string, fallbackName: string): Promise<void> {
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new ApiError(
-      response.status,
-      await readProblem(response),
+    throw await refusal(
+      url,
+      response,
       `The server refused the download (${String(response.status)}).`,
     );
   }
@@ -79,19 +77,4 @@ export async function downloadFile(url: string, fallbackName: string): Promise<v
   const name = dispositionFileName(response.headers.get("content-disposition"), fallbackName);
 
   saveBlob(await response.blob(), name);
-}
-
-/** The RFC 9457 body of a refusal, or undefined when the server sent something else. */
-async function readProblem(response: Response): Promise<Problem | undefined> {
-  if (!(response.headers.get("content-type") ?? "").includes("json")) {
-    return undefined;
-  }
-
-  try {
-    const parsed = safeParse(problemSchema, await response.json());
-
-    return parsed.success ? parsed.output : undefined;
-  } catch {
-    return undefined;
-  }
 }

@@ -3,10 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { Node, User } from "~/api/queries.ts";
 import type { NodeClientUpdateResult } from "~/api/schema.gen.ts";
 import {
+  clientUpdatePlanSummary,
   clientUpdateSummary,
-  outdatedSelection,
+  planClientUpdates,
   summariseClientUpdates,
 } from "~/components/machines/bulk.ts";
+import { visibleSelection } from "~/components/machines/selection.tsx";
+import { nodeName } from "~/lib/node.ts";
 
 const stamp = "2026-01-01T12:00:00Z";
 
@@ -80,13 +83,72 @@ const current = node("2");
 const offline = node("3", { updateAvailable: true, online: false });
 const everything = [behind, current, offline];
 
-describe(outdatedSelection, () => {
+describe(planClientUpdates, () => {
   it("keeps only the ticked machines that are connected and behind", () => {
-    expect(outdatedSelection(everything, new Set(["1", "2", "3"]))).toStrictEqual(["1"]);
+    expect(planClientUpdates(everything, new Set(["1", "2", "3"]))).toStrictEqual({
+      eligible: ["1"],
+      offline: 1,
+      current: 1,
+    });
   });
 
   it("ignores a machine that is not ticked", () => {
-    expect(outdatedSelection(everything, new Set(["2"]))).toStrictEqual([]);
+    expect(planClientUpdates(everything, new Set(["2"]))).toStrictEqual({
+      eligible: [],
+      offline: 0,
+      current: 1,
+    });
+  });
+});
+
+describe(clientUpdatePlanSummary, () => {
+  it("says how many will be asked when nothing is stepped over", () => {
+    expect(clientUpdatePlanSummary({ eligible: ["1", "2"], offline: 0, current: 0 })).toBe(
+      "2 machines will be asked to update.",
+    );
+  });
+
+  it("names what it is stepping over, so a run is no surprise", () => {
+    expect(clientUpdatePlanSummary({ eligible: ["1"], offline: 2, current: 3 })).toBe(
+      "1 machine will be asked to update. Skipping 2 offline and 3 already current.",
+    );
+  });
+});
+
+/**
+ * The search box narrows the table without narrowing the collection behind it, so what a bulk
+ * action reaches has to come from the rows the table would show. These replay that: the ids are the
+ * table's filtered model, and the selection is what the page holds between renders.
+ */
+describe("a selection under a search", () => {
+  const matching = (query: string): string[] =>
+    everything
+      .filter((candidate) => nodeName(candidate).includes(query))
+      .map((candidate) => candidate.id);
+
+  it("selects every match and nothing behind the search", () => {
+    const ids = matching("machine-1");
+    const chosen = new Set(ids);
+    const selected = visibleSelection(ids, chosen);
+
+    expect([...selected]).toStrictEqual(["1"]);
+    expect(planClientUpdates(everything, selected).eligible).toStrictEqual(["1"]);
+  });
+
+  it("drops the ids a narrower search hides instead of acting on them", () => {
+    const chosen = new Set(matching("machine-"));
+
+    expect([...chosen]).toStrictEqual(["1", "2", "3"]);
+
+    const narrowed = visibleSelection(matching("machine-3"), chosen);
+
+    expect([...narrowed]).toStrictEqual(["3"]);
+    // The one machine still showing is offline, so an update would reach nobody.
+    expect(planClientUpdates(everything, narrowed)).toStrictEqual({
+      eligible: [],
+      offline: 1,
+      current: 0,
+    });
   });
 });
 

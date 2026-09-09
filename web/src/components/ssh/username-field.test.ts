@@ -1,24 +1,69 @@
 import { describe, expect, it } from "vitest";
 
-import { shouldPrefillUsername } from "~/components/ssh/username-field.tsx";
+import { usernamePrefillStep } from "~/components/ssh/username-field.tsx";
 
-describe(shouldPrefillUsername, () => {
+/** Replays a sequence of field states, carrying the consumed flag the page keeps in a ref. */
+function replay(
+  steps: readonly { readonly draft: string; readonly suggestions: readonly string[] }[],
+): (string | null)[] {
+  let used = false;
+
+  return steps.map((step) => {
+    const { insert, consumed } = usernamePrefillStep(step.draft, step.suggestions, used);
+
+    used = consumed;
+
+    return insert;
+  });
+}
+
+describe(usernamePrefillStep, () => {
   it("fills an empty field from the machine's only suggestion", () => {
-    expect(shouldPrefillUsername("", ["alice"], false)).toBe(true);
-  });
-
-  // The server's guess and the operator's own typing land in the same field, and whichever got
-  // there first is the one that meant something.
-  it("never writes over a field that already says something", () => {
-    expect(shouldPrefillUsername("root", ["alice"], false)).toBe(false);
-  });
-
-  it("fills once only, so a field cleared to type another account stays cleared", () => {
-    expect(shouldPrefillUsername("", ["alice"], true)).toBe(false);
+    expect(usernamePrefillStep("", ["alice"], false)).toStrictEqual({
+      insert: "alice",
+      consumed: true,
+    });
   });
 
   it("does not pick between accounts, and has nothing to offer without one", () => {
-    expect(shouldPrefillUsername("", [], false)).toBe(false);
-    expect(shouldPrefillUsername("", ["alice", "root"], false)).toBe(false);
+    expect(usernamePrefillStep("", [], false)).toStrictEqual({ insert: null, consumed: false });
+    expect(usernamePrefillStep("", ["alice", "root"], false)).toStrictEqual({
+      insert: null,
+      consumed: false,
+    });
+  });
+
+  // The server answers first often enough: the session it hands back names an account, and the
+  // machine's own suggestion arrives after it. Clearing that answer must not bring another one in.
+  it("leaves the field empty after the operator clears the server's prefill", () => {
+    const inserts = replay([
+      { draft: "", suggestions: [] },
+      { draft: "root", suggestions: [] },
+      { draft: "root", suggestions: ["alice"] },
+      { draft: "", suggestions: ["alice"] },
+    ]);
+
+    expect(inserts).toStrictEqual([null, null, null, null]);
+  });
+
+  it("inserts the machine's suggestion once, and not again once it is cleared", () => {
+    const inserts = replay([
+      { draft: "", suggestions: ["alice"] },
+      { draft: "alice", suggestions: ["alice"] },
+      { draft: "", suggestions: ["alice"] },
+    ]);
+
+    expect(inserts).toStrictEqual(["alice", null, null]);
+  });
+
+  it("never writes over a field the operator typed in", () => {
+    const inserts = replay([
+      { draft: "", suggestions: [] },
+      { draft: "r", suggestions: [] },
+      { draft: "ro", suggestions: ["alice"] },
+      { draft: "root", suggestions: ["alice"] },
+    ]);
+
+    expect(inserts).toStrictEqual([null, null, null, null]);
   });
 });

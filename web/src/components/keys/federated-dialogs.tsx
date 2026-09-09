@@ -59,7 +59,7 @@ export function CreateFederatedIdentityDialog({
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        size="base"
+        size="lg"
         title={created === null ? "New federated identity" : "Federated identity created"}
         description={
           created === null
@@ -104,28 +104,32 @@ export function FederatedIdentityFields({
 }): ReactElement {
   return (
     <>
-      <Input
-        label="Issuer"
-        type="url"
-        required
-        value={issuer}
-        placeholder="https://token.actions.githubusercontent.com"
-        description="The https URL of the OIDC provider that signs workload tokens."
-        {...(issuerError === undefined ? {} : { error: issuerError })}
-        onChange={(event) => {
-          onIssuerChange(event.target.value);
-        }}
-      />
-      <Input
-        label="Audience"
-        required
-        value={audience}
-        placeholder={defaultAudience || "https://scale.example.com"}
-        description="The audience the OIDC token must carry. Default suggestion: server URL."
-        onChange={(event) => {
-          onAudienceChange(event.target.value);
-        }}
-      />
+      {/* The two halves of who is trusted, side by side where there is room for them: the form is
+          long, and a wide dialog with one field per line pushes the claim rules off the screen. */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Input
+          label="Issuer"
+          type="url"
+          required
+          value={issuer}
+          placeholder="https://token.actions.githubusercontent.com"
+          description="The https URL of the OIDC provider that signs workload tokens."
+          {...(issuerError === undefined ? {} : { error: issuerError })}
+          onChange={(event) => {
+            onIssuerChange(event.target.value);
+          }}
+        />
+        <Input
+          label="Audience"
+          required
+          value={audience}
+          placeholder={defaultAudience || "https://scale.example.com"}
+          description="The audience the OIDC token must carry. Default suggestion: server URL."
+          onChange={(event) => {
+            onAudienceChange(event.target.value);
+          }}
+        />
+      </div>
       <Input
         label="Subject"
         required
@@ -267,7 +271,7 @@ export function CreatedFederatedIdentity({
   readonly onDone: () => void;
 }): ReactElement {
   const exchange = tokenExchangeCommand(serverUrl, client.clientId);
-  const snippet = githubActionsSnippet(client.audience);
+  const snippet = githubActionsSnippet(client.audience, serverUrl, client.clientId);
 
   return (
     <div className="flex flex-col gap-4">
@@ -277,7 +281,7 @@ export function CreatedFederatedIdentity({
         description="No secret is stored. Workloads present their OIDC token from the issuer to trade for an API token."
       />
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs font-medium text-kumo-default">Client ID</span>
+        <span className="text-sm font-medium text-kumo-default">Client ID</span>
         <div className="rounded-lg bg-kumo-tint p-3 ring ring-kumo-line">
           <CopyText
             value={client.clientId}
@@ -289,7 +293,7 @@ export function CreatedFederatedIdentity({
       </div>
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-kumo-default">Token exchange</span>
+          <span className="text-sm font-medium text-kumo-default">Token exchange</span>
           <CopyText value={exchange} label="Copy token exchange command" />
         </div>
         <div className="overflow-x-auto rounded-lg bg-kumo-tint p-3 ring ring-kumo-line">
@@ -298,7 +302,7 @@ export function CreatedFederatedIdentity({
       </div>
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-kumo-default">GitHub Actions snippet</span>
+          <span className="text-sm font-medium text-kumo-default">GitHub Actions snippet</span>
           <CopyText value={snippet} label="Copy GitHub Actions snippet" />
         </div>
         <div className="overflow-x-auto rounded-lg bg-kumo-tint p-3 ring ring-kumo-line">

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { NodePreferences } from "~/api/schema.gen.ts";
 import {
+  canSavePreferences,
   exitNodeLabel,
   hasPreferenceChanges,
   preferenceChanges,
@@ -72,6 +73,32 @@ describe(preferenceChanges, () => {
     const changes = preferenceChanges({ ...current, advertiseRoutes: ["10.0.0.0/24"] }, current);
 
     expect(changes).toStrictEqual({ advertiseRoutes: ["10.0.0.0/24"] });
+  });
+});
+
+// An empty hostname is a preference, not a half-filled field: it tells the client to use the
+// machine's own operating system name, which is what most machines run with.
+describe(canSavePreferences, () => {
+  it("saves a switch while the hostname field is empty, and sends only the switch", () => {
+    const nameless = { ...current, hostname: "" };
+    const changes = preferenceChanges({ ...nameless, shieldsUp: true }, nameless);
+
+    expect(changes).toStrictEqual({ shieldsUp: true });
+    expect(canSavePreferences(changes, false)).toBe(true);
+  });
+
+  it("sends the empty hostname as a change when the operator cleared it", () => {
+    const changes = preferenceChanges({ ...current, hostname: "" }, current);
+
+    expect(changes).toStrictEqual({ hostname: "" });
+    expect(canSavePreferences(changes, false)).toBe(true);
+  });
+
+  it("holds the form while a list is half typed, and while nothing changed", () => {
+    const changes = preferenceChanges({ ...current, acceptRoutes: true }, current);
+
+    expect(canSavePreferences(changes, true)).toBe(false);
+    expect(canSavePreferences({}, false)).toBe(false);
   });
 });
 

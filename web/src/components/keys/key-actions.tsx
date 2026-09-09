@@ -3,6 +3,7 @@ import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import {
   ArrowsClockwiseIcon,
   ClockCounterClockwiseIcon,
+  EyeIcon,
   PencilSimpleIcon,
   TrashIcon,
 } from "@phosphor-icons/react";
@@ -45,6 +46,14 @@ export interface EditEntry {
 }
 
 /**
+ * The read-only view of a record. It changes nothing, so it is never disabled by the caller's
+ * credentials: an operator who may read a key may read what it says.
+ */
+export interface DetailsEntry {
+  readonly onSelect: () => void;
+}
+
+/**
  * The rotate entry: the dialog belongs to the caller, because minting a secret ends in a one-time
  * reveal rather than in a yes/no answer.
  */
@@ -58,6 +67,7 @@ export interface KeyActionsProps {
   /** Accessible name of the trigger, such as "Actions for key tskey-abc". */
   readonly label: string;
   readonly disabled?: boolean;
+  readonly details?: DetailsEntry | undefined;
   readonly edit?: EditEntry | undefined;
   /** Present only for a credential whose secret can be replaced in place, such as an API key. */
   readonly rotate?: RotateEntry;
@@ -68,10 +78,75 @@ export interface KeyActionsProps {
 
 type Dialog = "expire" | "delete";
 
+/**
+ * The entries above the destructive ones: reading the record, editing it and rotating its secret.
+ * Only the first is offered to a caller whose credentials may not change keys, since it changes
+ * nothing.
+ */
+function ReadEntries({
+  details,
+  disabled,
+  edit,
+  rotate,
+}: {
+  readonly details: DetailsEntry | undefined;
+  readonly disabled: boolean;
+  readonly edit: EditEntry | undefined;
+  readonly rotate: RotateEntry | undefined;
+}): ReactElement {
+  return (
+    <>
+      {details === undefined ? null : (
+        <DropdownMenu.Item
+          icon={EyeIcon}
+          onClick={() => {
+            details.onSelect();
+          }}
+        >
+          View details…
+        </DropdownMenu.Item>
+      )}
+      {edit === undefined ? null : (
+        <>
+          <DisabledReason reason={disabled ? readOnlyReason : edit.reason}>
+            <DropdownMenu.Item
+              icon={PencilSimpleIcon}
+              disabled={disabled || edit.reason !== undefined}
+              onClick={() => {
+                edit.onSelect();
+              }}
+            >
+              Edit…
+            </DropdownMenu.Item>
+          </DisabledReason>
+          <DropdownMenu.Separator />
+        </>
+      )}
+      {rotate === undefined ? null : (
+        <>
+          <DisabledReason reason={disabled ? readOnlyReason : rotate.reason}>
+            <DropdownMenu.Item
+              icon={ArrowsClockwiseIcon}
+              disabled={disabled || rotate.reason !== undefined}
+              onClick={() => {
+                rotate.onSelect();
+              }}
+            >
+              Rotate secret…
+            </DropdownMenu.Item>
+          </DisabledReason>
+          <DropdownMenu.Separator />
+        </>
+      )}
+    </>
+  );
+}
+
 /** The row menu the key tables use: expire the key, or delete it outright. */
 export function KeyActions({
   label,
   disabled = false,
+  details,
   edit,
   rotate,
   expire,
@@ -85,38 +160,7 @@ export function KeyActions({
   return (
     <>
       <RowMenu label={label}>
-        {edit === undefined ? null : (
-          <>
-            <DisabledReason reason={disabled ? readOnlyReason : edit.reason}>
-              <DropdownMenu.Item
-                icon={PencilSimpleIcon}
-                disabled={disabled || edit.reason !== undefined}
-                onClick={() => {
-                  edit.onSelect();
-                }}
-              >
-                Edit…
-              </DropdownMenu.Item>
-            </DisabledReason>
-            <DropdownMenu.Separator />
-          </>
-        )}
-        {rotate === undefined ? null : (
-          <>
-            <DisabledReason reason={disabled ? readOnlyReason : rotate.reason}>
-              <DropdownMenu.Item
-                icon={ArrowsClockwiseIcon}
-                disabled={disabled || rotate.reason !== undefined}
-                onClick={() => {
-                  rotate.onSelect();
-                }}
-              >
-                Rotate secret…
-              </DropdownMenu.Item>
-            </DisabledReason>
-            <DropdownMenu.Separator />
-          </>
-        )}
+        <ReadEntries details={details} disabled={disabled} edit={edit} rotate={rotate} />
         {expire === undefined ? null : (
           <>
             <DropdownMenu.Item

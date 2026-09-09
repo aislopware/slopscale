@@ -12,16 +12,17 @@ import type { NodeClientWarning } from "~/api/schema.gen.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import {
+  connectivityNote,
   diagnosticFileName,
   diagnosticLabels,
-  warningLabel,
+  severityLabel,
   warningTone,
 } from "~/components/machines/health-model.ts";
-import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
-import { Status } from "~/components/ui/status.tsx";
+import { Status, StatusDetail } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { downloadFile } from "~/lib/download.ts";
+import { formatAbsolute, formatRelative, parseTime } from "~/lib/time.ts";
 
 const caretSize = 14;
 const buttonIconSize = 12;
@@ -94,9 +95,12 @@ function Report({
   if (error !== undefined) {
     return (
       <SectionRow>
-        <Status tone="danger" className="items-baseline whitespace-normal">
-          {error}
-        </Status>
+        <StatusDetail
+          tone="danger"
+          label="Failed"
+          title="The machine did not answer"
+          detail={error}
+        />
       </SectionRow>
     );
   }
@@ -126,19 +130,42 @@ function Report({
   );
 }
 
+/**
+ * One warning: the state in a word with the client's own title beside it, and everything the client
+ * said — its text, whether traffic is affected, how long it has been wrong — one hover, tap or
+ * focus away. A status is a state, so the sentences stay out of it.
+ */
 function Warning({ warning }: { readonly warning: NodeClientWarning }): ReactElement {
   return (
-    <SectionRow className="flex flex-col gap-1 py-3">
-      <Status tone={warningTone(warning.severity)} className="items-baseline whitespace-normal">
-        {warningLabel(warning)}
-      </Status>
-      <p className="text-kumo-subtle">{warning.text}</p>
-      {warning.brokenSince === undefined ? null : (
-        <p className="text-xs text-kumo-subtle">
-          since <RelativeTime value={warning.brokenSince} />
-        </p>
-      )}
+    <SectionRow className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3">
+      <StatusDetail
+        tone={warningTone(warning.severity)}
+        label={severityLabel(warning.severity)}
+        title={warning.title}
+        detail={<WarningDetail warning={warning} />}
+      />
+      <span className="min-w-0 flex-1 text-kumo-default">{warning.title}</span>
     </SectionRow>
+  );
+}
+
+/**
+ * What the client would tell its own user, with the note it adds about traffic and since when. The
+ * timestamp is written out rather than hung off a tooltip: this is already the popover, and a
+ * tooltip inside one is a hover the pointer cannot reach.
+ */
+function WarningDetail({ warning }: { readonly warning: NodeClientWarning }): ReactElement {
+  const note = connectivityNote(warning);
+  const since = parseTime(warning.brokenSince);
+
+  return (
+    <span className="flex flex-col gap-1">
+      <span>{warning.text}</span>
+      {note === undefined ? null : <span className="text-kumo-warning">{note}</span>}
+      {since === null ? null : (
+        <span>{`Since ${formatRelative(since)}, ${formatAbsolute(since)}`}</span>
+      )}
+    </span>
   );
 }
 

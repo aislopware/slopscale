@@ -50,7 +50,7 @@ export function EditOAuthClientDialog({
 
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="base" title={title} description={description}>
+      <DialogContent size="lg" title={title} description={description}>
         {/* Keyed by the client alone: Base UI unmounts the body on close, so every open starts from
             the record as it is then, and nothing remounts the form while it is up. */}
         <EditOAuthClientForm

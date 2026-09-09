@@ -18,7 +18,7 @@ import {
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { Section } from "~/components/ui/section.tsx";
-import { Status } from "~/components/ui/status.tsx";
+import { Status, StatusDetail } from "~/components/ui/status.tsx";
 
 /**
  * How the machine reaches the rest of the tailnet: the relay region it homes on, and what its own
@@ -26,10 +26,11 @@ import { Status } from "~/components/ui/status.tsx";
  * believes rather than something the server measured.
  */
 export function ConnectivitySection({ node }: { readonly node: Node }): ReactElement {
-  // Only a machine that serves something has a certificate to keep, and only a connected one can be
-  // asked, so nothing else is: the question is a live round trip to the client.
-  const serving = node.funnelEnabled || node.announcedServices.length > 0;
-  const cert = useQuery({ ...nodeTlsCertQuery(node.id), enabled: node.online && serving });
+  // Any machine may hold a certificate for its own name: ordinary HTTPS Serve fetches one without
+  // Funnel or a VIP service, and one fetched by hand is a certificate all the same. Only a
+  // connected machine is asked, because the question is a live round trip to the client, which
+  // answers "no certificate" as cheaply as it answers with one.
+  const cert = useQuery({ ...nodeTlsCertQuery(node.id), enabled: node.online });
   const { netInfo } = node;
   const others = netInfo === undefined ? [] : otherLatencies(netInfo);
 
@@ -42,7 +43,7 @@ export function ConnectivitySection({ node }: { readonly node: Node }): ReactEle
       ) : (
         <DefinitionList items={facts(netInfo)} />
       )}
-      {node.online && serving ? (
+      {node.online ? (
         <DefinitionList
           className="border-t border-kumo-hairline"
           items={[
@@ -102,8 +103,9 @@ function CertStatus({
 }
 
 /**
- * The state as a word with the reason under it. A row of this list holds one line and truncates it,
- * so a sentence put where "Valid" goes would be cut off and read as a state of its own.
+ * The state as a word, with the reason one hover, tap or focus away. A row of this list holds one
+ * line and truncates it, so a sentence put where "Valid" goes would be cut off and read as a state
+ * of its own.
  */
 function CertProblem({
   label,
@@ -112,12 +114,7 @@ function CertProblem({
   readonly label: string;
   readonly reason: string;
 }): ReactElement {
-  return (
-    <span className="flex flex-col items-end gap-0.5 whitespace-normal">
-      <Status tone="danger">{label}</Status>
-      <span className="text-xs text-kumo-subtle">{reason}</span>
-    </span>
-  );
+  return <StatusDetail tone="danger" label={label} detail={reason} />;
 }
 
 function facts(netInfo: NodeNetInfo): Definition[] {

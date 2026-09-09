@@ -124,15 +124,48 @@ function report(action: BulkAction, done: number, failures: readonly string[]): 
   );
 }
 
+/** What a bulk client update would do to the selection, before it is started. */
+export interface ClientUpdatePlan {
+  /** The machines the request would reach: ticked, connected and behind a newer release. */
+  readonly eligible: readonly string[];
+  /** Ticked but not connected: the request is a live round trip, so there is nobody to ask. */
+  readonly offline: number;
+  /** Ticked and already on the newest release its client knows about. */
+  readonly current: number;
+}
+
 /**
- * The machines a bulk client update would reach: ticked, connected and behind a newer release. The
- * request is a live round trip to each client, so asking an offline or up-to-date machine would
- * only collect a refusal.
+ * Which of the ticked machines an update would reach and which it would step over. The request is a
+ * live round trip to each client, so asking an offline or up-to-date machine would only collect a
+ * refusal; the dialog says how many of each before anything is sent. A connected client that is
+ * behind may still refuse — only it knows whether its platform can update itself — and that answer
+ * comes back in the results.
  */
-export function outdatedSelection(nodes: readonly Node[], selected: ReadonlySet<string>): string[] {
-  return nodes
-    .filter((node) => selected.has(node.id) && node.online && node.updateAvailable)
-    .map((node) => node.id);
+export function planClientUpdates(
+  nodes: readonly Node[],
+  selected: ReadonlySet<string>,
+): ClientUpdatePlan {
+  const ticked = nodes.filter((node) => selected.has(node.id));
+
+  return {
+    eligible: ticked.filter((node) => node.online && node.updateAvailable).map((node) => node.id),
+    offline: ticked.filter((node) => !node.online).length,
+    current: ticked.filter((node) => node.online && !node.updateAvailable).length,
+  };
+}
+
+/**
+ * The plan in words for the dialog that asks first: how many machines will be asked, and how many
+ * of the ticked ones are stepped over and why.
+ */
+export function clientUpdatePlanSummary(plan: ClientUpdatePlan): string {
+  const asked = `${plural(plan.eligible.length, "machine")} will be asked to update.`;
+  const skipped = [
+    ...(plan.offline === 0 ? [] : [`${String(plan.offline)} offline`]),
+    ...(plan.current === 0 ? [] : [`${String(plan.current)} already current`]),
+  ];
+
+  return skipped.length === 0 ? asked : `${asked} Skipping ${skipped.join(" and ")}.`;
 }
 
 /** One machine that did not take the update on, and what its client said about it. */

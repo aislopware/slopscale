@@ -22,6 +22,7 @@ import type { Node, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import {
+  ClientUpdateDialog,
   DeleteDialog,
   ExpireDialog,
   RenameDialog,
@@ -43,6 +44,7 @@ type Dialog =
   | "routes"
   | "share"
   | "attestation"
+  | "update"
   | "suspend"
   | "expire"
   | "delete";
@@ -162,26 +164,18 @@ function SuspendItem({
 
 /**
  * Asks the machine to update itself. Only while it is connected and behind: the request is a live
- * round trip to the client, and the client is the one that decides, so the answer is reported.
+ * round trip to the client, and the client is the one that decides, so the answer is reported. The
+ * update restarts Tailscale on the machine, so the dialog asks before anything is sent.
  */
-function UpdateClientItem({
-  node,
-  mutations,
-}: {
-  readonly node: Node;
-  readonly mutations: ReturnType<typeof useNodeMutations>;
-}): ReactElement {
+function UpdateClientItem({ onOpen }: { readonly onOpen: (dialog: Dialog) => void }): ReactElement {
   return (
     <DropdownMenu.Item
       icon={ArrowsClockwiseIcon}
       onClick={() => {
-        mutations.updateClient.mutate(
-          { params: { path: { nodeId: node.id } }, body: {} },
-          { onSuccess: reportClientUpdate },
-        );
+        onOpen("update");
       }}
     >
-      Update client
+      Update client…
     </DropdownMenu.Item>
   );
 }
@@ -287,9 +281,7 @@ function MachineMenuItems({
       >
         Share…
       </DropdownMenu.Item>
-      {core && node.updateAvailable && node.online ? (
-        <UpdateClientItem node={node} mutations={mutations} />
-      ) : null}
+      {core && node.updateAvailable && node.online ? <UpdateClientItem onOpen={onOpen} /> : null}
       {core && node.hardwareAttestation !== undefined ? (
         <DropdownMenu.Item
           icon={FingerprintIcon}
@@ -355,6 +347,23 @@ function MachineDialogs({
       <RoutesDialog open={dialog === "routes"} {...props} />
       <ShareDialog open={dialog === "share"} users={users} {...props} />
       <ResetAttestationDialog open={dialog === "attestation"} {...props} />
+      <ClientUpdateDialog
+        name={nodeName(node)}
+        open={dialog === "update"}
+        onOpenChange={onOpenChange}
+        pending={mutations.updateClient.isPending}
+        onConfirm={() => {
+          mutations.updateClient.mutate(
+            { params: { path: { nodeId: node.id } }, body: {} },
+            {
+              onSuccess: (update) => {
+                onOpenChange(false);
+                reportClientUpdate(update);
+              },
+            },
+          );
+        }}
+      />
       <SuspendDialog open={dialog === "suspend"} {...props} />
       <ExpireDialog open={dialog === "expire"} {...props} />
       <DeleteDialog open={dialog === "delete"} {...props} />

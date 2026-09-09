@@ -3,12 +3,14 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { Collapsible } from "@cloudflare/kumo/components/collapsible";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { ArrowsClockwiseIcon, CaretRightIcon } from "@phosphor-icons/react";
+import { useState } from "react";
 import type { ReactElement } from "react";
 
 import type { Node } from "~/api/queries.ts";
 import type { NodeHardwareAttestation, NodeTpm } from "~/api/schema.gen.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
+import { ClientUpdateDialog } from "~/components/machines/dialogs.tsx";
 import { reportClientUpdate, useNodeMutations } from "~/components/machines/mutations.ts";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
@@ -85,26 +87,43 @@ function Client({ node, me }: { readonly node: Node; readonly me: Me }): ReactEl
 /**
  * Asks the machine to update its own Tailscale installation. The control plane cannot push an
  * update: the client decides, and refuses unless its owner allowed it, so the answer is reported
- * rather than assumed.
+ * rather than assumed. It asks first, because the client restarts Tailscale to take one on.
  */
 function UpdateNow({ node }: { readonly node: Node }): ReactElement {
   const { updateClient } = useNodeMutations();
+  const [asking, setAsking] = useState(false);
 
   return (
-    <Button
-      variant="secondary"
-      size="sm"
-      icon={<ArrowsClockwiseIcon size={buttonIconSize} />}
-      loading={updateClient.isPending}
-      onClick={() => {
-        updateClient.mutate(
-          { params: { path: { nodeId: node.id } }, body: {} },
-          { onSuccess: reportClientUpdate },
-        );
-      }}
-    >
-      Update now
-    </Button>
+    <>
+      <Button
+        variant="secondary"
+        size="sm"
+        icon={<ArrowsClockwiseIcon size={buttonIconSize} />}
+        loading={updateClient.isPending}
+        onClick={() => {
+          setAsking(true);
+        }}
+      >
+        Update now
+      </Button>
+      <ClientUpdateDialog
+        name={nodeName(node)}
+        open={asking}
+        onOpenChange={setAsking}
+        pending={updateClient.isPending}
+        onConfirm={() => {
+          updateClient.mutate(
+            { params: { path: { nodeId: node.id } }, body: {} },
+            {
+              onSuccess: (update) => {
+                setAsking(false);
+                reportClientUpdate(update);
+              },
+            },
+          );
+        }}
+      />
+    </>
   );
 }
 

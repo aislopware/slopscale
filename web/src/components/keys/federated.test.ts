@@ -71,6 +71,30 @@ describe("claim rule editor state", () => {
     expect(roundTrip).toStrictEqual(record);
   });
 
+  // Assigned into an object literal, a rule named __proto__ sets the prototype and disappears; the
+  // identity would then be created without the condition the operator asked for.
+  it("keeps a claim named after a property of every object", () => {
+    const rules = [
+      { id: "1", claim: "__proto__", value: "allowed" },
+      { id: "2", claim: "constructor", value: "also allowed" },
+    ];
+
+    expect(validateClaimRules(rules)).toBeUndefined();
+    expect(JSON.stringify(claimRulesToRecord(rules))).toBe(
+      '{"__proto__":"allowed","constructor":"also allowed"}',
+    );
+  });
+
+  // The server compares the claim against the token exactly, so the spaces around a value are part
+  // of what the operator asked for: trimming them would change the condition without an edit.
+  it("keeps claims and values exactly as they were typed", () => {
+    const record = { " workflow ": " Deploy " };
+    const roundTrip = claimRulesToRecord(recordToClaimRules(record));
+
+    expect(roundTrip).toStrictEqual(record);
+    expect(JSON.stringify(roundTrip)).toBe('{" workflow ":" Deploy "}');
+  });
+
   it("validates empty and duplicate rules", () => {
     const invalid = addClaimRule([], "claimOnly", "");
     expect(validateClaimRules(invalid)).toBe("Both claim and value are required for each rule.");
@@ -167,6 +191,27 @@ describe(diffOAuthClient, () => {
     createdAt: null,
   };
 
+  // Opening the editor on a record and saving another field must not rewrite its claim rules.
+  it("sends nothing for a claim rule nobody touched, whitespace and all", () => {
+    const client: OAuthClient = {
+      ...federatedClient,
+      customClaimRules: { workflow: " Deploy " },
+    };
+    const rules = recordToClaimRules(client.customClaimRules);
+
+    const patch = diffOAuthClient(client, {
+      description: client.description,
+      scopes: client.scopes,
+      tags: client.tags,
+      issuer: client.issuer,
+      audience: client.audience,
+      subject: client.subject,
+      customClaimRules: claimRulesToRecord(rules),
+    });
+
+    expect(patch).toStrictEqual({});
+  });
+
   it("returns an empty patch when unchanged", () => {
     const patch = diffOAuthClient(federatedClient, {
       description: "Original description",
@@ -232,9 +277,44 @@ describe("exchange and snippet helpers", () => {
     );
   });
 
-  it("builds the GitHub Actions snippet", () => {
-    const snippet = githubActionsSnippet("https://scale.example.com");
-    expect(snippet).toContain("permissions:\n  id-token: write");
-    expect(snippet).toContain('audience=https://scale.example.com"');
+  it("builds a workflow fragment that mints a token and exchanges it", () => {
+    const lines = githubActionsSnippet(
+      "https://scale.example.com",
+      "https://scale.example.com",
+      "id123",
+    ).split("\n");
+
+    expect(lines).toStrictEqual([
+      "permissions:",
+      "  id-token: write",
+      "",
+      "steps:",
+      "  - name: Request an OIDC token",
+      "    run: |",
+      "      ID_TOKEN=$(curl -sSf \\",
+      '        -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \\',
+      '        "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https%3A%2F%2Fscale.example.com" | jq -r .value)',
+      '      echo "::add-mask::$ID_TOKEN"',
+      '      echo "ID_TOKEN=$ID_TOKEN" >> "$GITHUB_ENV"',
+      "  - name: Exchange it for an API token",
+      "    run: |",
+      "      curl -sSf -X POST 'https://scale.example.com/api/v2/oauth/token-exchange' \\",
+      "        -d client_id='id123' \\",
+      '        --data-urlencode jwt="$ID_TOKEN"',
+    ]);
+  });
+
+  // An audience with a & in it would end the query parameter, a # would start a fragment, and a
+  // quote in a client id would close the string the shell is reading.
+  it("encodes and quotes what an operator may have typed", () => {
+    const snippet = githubActionsSnippet(
+      "urn:example:a&b#c'd",
+      "https://scale.example.com",
+      "id'123",
+    );
+
+    expect(snippet).toContain('audience=urn%3Aexample%3Aa%26b%23c%27d"');
+    expect(snippet).not.toContain("a&b");
+    expect(snippet).toContain(String.raw`-d client_id='id'\''123'`);
   });
 });

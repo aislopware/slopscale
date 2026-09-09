@@ -2,18 +2,35 @@ import { Input } from "@cloudflare/kumo/components/input";
 import { useId } from "react";
 import type { ReactElement } from "react";
 
+export interface UsernamePrefill {
+  /** The account to put in the field now, or null to leave it as it is. */
+  readonly insert: string | null;
+  /** Whether the one chance to fill the field has been used, which the caller keeps for next time. */
+  readonly consumed: boolean;
+}
+
 /**
- * Whether the machine's own answer should fill the field. Only once, only while the field is still
- * empty, and only when the machine named exactly one account: anything else would be the console
- * guessing, and filling a field the operator has already typed in — or the server has already
- * answered for — would take the choice back off them.
+ * What to do with the username field on this render. The field is filled once at most: the server's
+ * guess and the machine's own suggestion are both offers, and whichever reaches the field first is
+ * the one that meant something. Anything in the field — the server's answer, the machine's
+ * suggestion or the operator's typing — uses that one chance up, so a field cleared afterwards
+ * stays cleared instead of filling itself again with the account the operator just deleted.
  */
-export function shouldPrefillUsername(
+export function usernamePrefillStep(
   draft: string,
   suggestions: readonly string[],
-  prefilled: boolean,
-): boolean {
-  return !prefilled && draft === "" && suggestions.length === 1;
+  consumed: boolean,
+): UsernamePrefill {
+  if (consumed || draft !== "") {
+    return { insert: null, consumed: true };
+  }
+
+  // One account is a suggestion; two are a choice, and choosing is the operator's.
+  if (suggestions.length === 1) {
+    return { insert: suggestions[0] ?? "", consumed: true };
+  }
+
+  return { insert: null, consumed: false };
 }
 
 /**

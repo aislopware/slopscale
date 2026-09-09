@@ -5,11 +5,13 @@ import type { ReactElement } from "react";
 
 import type { Node } from "~/api/queries.ts";
 import {
-  outdatedSelection,
+  clientUpdatePlanSummary,
+  planClientUpdates,
   useClientUpdateBulk,
   useMachineBulk,
 } from "~/components/machines/bulk.ts";
 import type { BulkAction, ClientUpdateOutcome } from "~/components/machines/bulk.ts";
+import { BulkClientUpdateDialog } from "~/components/machines/dialogs.tsx";
 import type { MachineSelection } from "~/components/machines/selection.tsx";
 import { plural } from "~/components/overview/plural.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
@@ -32,8 +34,9 @@ export function MachineBulkBar({
   const bulk = useMachineBulk();
   const updates = useClientUpdateBulk();
   const [confirming, setConfirming] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const ids = [...selection.selected];
-  const outdated = outdatedSelection(nodes, selection.selected);
+  const plan = planClientUpdates(nodes, selection.selected);
   const busy = bulk.running !== null || updates.running;
 
   async function run(action: BulkAction): Promise<void> {
@@ -47,12 +50,13 @@ export function MachineBulkBar({
   }
 
   async function runUpdates(): Promise<void> {
-    await updates.run(nodes, outdated);
+    await updates.run(nodes, plan.eligible);
+    setUpdating(false);
     selection.clear();
   }
 
-  // The band goes when the last tick does, but the refusals dialog keeps its place in the tree: a
-  // run clears the selection, and a dialog that moved would be torn down as it opened.
+  // The band goes when the last tick does, but the two dialogs keep their place in the tree: a run
+  // clears the selection, and a dialog that moved would be torn down as it opened or closed.
   return (
     <>
       {ids.length === 0 ? null : (
@@ -78,13 +82,13 @@ export function MachineBulkBar({
               variant="secondary"
               size="sm"
               icon={ArrowsClockwiseIcon}
-              disabled={busy || outdated.length === 0}
+              disabled={busy || plan.eligible.length === 0}
               loading={updates.running}
               onClick={() => {
-                void runUpdates();
+                setUpdating(true);
               }}
             >
-              Update clients
+              Update clients…
             </Button>
             <Button
               variant="secondary"
@@ -133,6 +137,15 @@ export function MachineBulkBar({
           />
         </>
       )}
+      <BulkClientUpdateDialog
+        summary={clientUpdatePlanSummary(plan)}
+        open={updating}
+        onOpenChange={setUpdating}
+        pending={updates.running}
+        onConfirm={() => {
+          void runUpdates();
+        }}
+      />
       <Refusals outcome={updates.outcome} onDismiss={dismissRefusals} />
     </>
   );

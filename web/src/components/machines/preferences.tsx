@@ -3,7 +3,7 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { PencilSimpleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import { nodePreferencesQuery } from "~/api/queries.ts";
@@ -20,8 +20,9 @@ import {
 import { CopyText } from "~/components/ui/copy-text.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
+import { HelpTip } from "~/components/ui/hover-popover.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
-import { Status } from "~/components/ui/status.tsx";
+import { Status, StatusDetail } from "~/components/ui/status.tsx";
 
 const buttonIconSize = 12;
 
@@ -108,9 +109,12 @@ function Body({
   if (error !== undefined) {
     return (
       <SectionRow>
-        <Status tone="danger" className="items-baseline whitespace-normal">
-          {error}
-        </Status>
+        <StatusDetail
+          tone="danger"
+          label="Failed"
+          title="The machine did not answer"
+          detail={error}
+        />
       </SectionRow>
     );
   }
@@ -130,22 +134,63 @@ function facts(preferences: NodePreferences): Definition[] {
   return [
     {
       key: "hostname",
-      label: "Hostname",
-      value: preferences.hostname,
-      copy: preferences.hostname,
+      label: (
+        <Label text="Hostname">
+          What the machine calls itself. Empty means it uses its own operating system hostname.
+        </Label>
+      ),
+      value: preferences.hostname === "" ? <Default /> : preferences.hostname,
+      ...(preferences.hostname === "" ? {} : { copy: preferences.hostname }),
     },
-    { key: "exitNode", label: "Exit node", value: exitNodeLabel(preferences) },
+    {
+      key: "exitNode",
+      label: (
+        <Label text="Exit node">
+          The machine whose internet connection this one uses. None means it routes for itself.
+        </Label>
+      ),
+      value: exitNodeLabel(preferences),
+    },
     {
       key: "advertiseRoutes",
-      label: "Advertised routes",
+      label: (
+        <Label text="Advertised routes">
+          The prefixes the machine offers to route. They still need approving before any peer uses
+          them.
+        </Label>
+      ),
       value: <Routes routes={preferences.advertiseRoutes} />,
     },
-    ...preferenceSwitches.map(({ key, label }) => ({
+    ...preferenceSwitches.map(({ key, label, hint }) => ({
       key,
-      label,
+      label: <Label text={label}>{hint}</Label>,
       value: <OnOff on={preferences[key]} />,
     })),
   ];
+}
+
+/**
+ * A short label with what the setting does behind it. The labels of this list cannot shrink, so a
+ * sentence in one of them takes the room the value needs at half a column and stacks on a phone.
+ */
+function Label({
+  text,
+  children,
+}: {
+  readonly text: string;
+  readonly children: ReactNode;
+}): ReactElement {
+  return (
+    <span className="flex items-baseline gap-1.5">
+      <span>{text}</span>
+      <HelpTip label={text}>{children}</HelpTip>
+    </span>
+  );
+}
+
+/** What the client does with the field left empty, where the value would otherwise be blank. */
+function Default(): ReactElement {
+  return <span className="text-kumo-subtle">Its own hostname</span>;
 }
 
 /** A route is an identifier the operator picks out of a list, so it is a pill, not a state. */

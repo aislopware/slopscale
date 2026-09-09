@@ -87,7 +87,6 @@ function MachinesPage(): ReactElement {
   const machines = nodes.data.nodes;
   const rows = filterNodes(machines, view);
   const deferred = useDeferredValue(view.query);
-  const selection = useMachineSelection(rows.map((node) => node.id));
   const mayAct = can(me, "devices:core");
 
   const table = useAppTable({
@@ -99,6 +98,11 @@ function MachinesPage(): ReactElement {
     meta: { me, users: users.data?.users ?? emptyUsers },
   });
 
+  // What a bulk action reaches is what the operator can see: the chips and the search box both
+  // narrow the list, but only the chips narrow `rows`, so the ticks and the candidates come from
+  // the table's filtered model instead — every matching machine, paging aside.
+  const matching = table.getFilteredRowModel().rows;
+  const selection = useMachineSelection(matching.map((row) => row.id));
   const shown = table.getRowModel().rows.length;
 
   // Typing narrows the list as the operator types, so a keystroke replaces the URL rather than
@@ -151,7 +155,7 @@ function MachinesPage(): ReactElement {
           chips={machineChips(view, users.data?.users, setFilters)}
           onClearAll={clearFilters}
         />
-        <MachineBulkBar selection={selection} nodes={rows} />
+        <MachineBulkBar selection={selection} nodes={matching.map((row) => row.original)} />
         <SelectionProvider selection={selection}>
           <table.AppTable>
             <DataTable

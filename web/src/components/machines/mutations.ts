@@ -131,8 +131,11 @@ export function useNodeMutations(): NodeMutations {
       },
     }),
     // The answer says whether the client took it on, so the caller reports it with
-    // `reportClientUpdate`; only a failed request is a toast of its own.
+    // `reportClientUpdate`; only a failed request is a toast of its own. A client that took it on
+    // restarts Tailscale, so everything the machine answered for — its record, its health, its
+    // preferences, its certificate — is asked again, the way the bulk path does it.
     updateClient: api.useMutation("post", "/api/v1/node/{nodeId}/client-update", {
+      onSuccess: refresh,
       onError: (error) => {
         toast.error("Could not reach the machine", error);
       },

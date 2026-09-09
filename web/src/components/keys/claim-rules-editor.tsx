@@ -41,7 +41,7 @@ export function ClaimRulesEditor({
           <span id={labelId} className="text-sm font-medium text-kumo-default">
             Custom claim rules
           </span>
-          <p className="text-xs text-kumo-subtle">
+          <p className="text-sm text-kumo-subtle">
             Additional claims that must match in the workload&apos;s OIDC token.
           </p>
         </div>
@@ -50,7 +50,7 @@ export function ClaimRulesEditor({
         </Button>
       </div>
       {entries.length === 0 ? (
-        <p className="text-xs text-kumo-subtle">No custom claim rules defined.</p>
+        <p className="text-sm text-kumo-subtle">No custom claim rules defined.</p>
       ) : (
         <div className="flex flex-col gap-2">
           {entries.map((entry, index) => (
@@ -88,7 +88,7 @@ export function ClaimRulesEditor({
         </div>
       )}
       {error === undefined ? null : (
-        <p role="alert" className="text-xs text-kumo-danger">
+        <p role="alert" className="text-sm text-kumo-danger">
           {error}
         </p>
       )}

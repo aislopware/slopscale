@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import type { NodeClientWarning } from "~/api/schema.gen.ts";
 import {
+  connectivityNote,
   diagnosticFileName,
-  warningLabel,
+  severityLabel,
   warningTone,
 } from "~/components/machines/health-model.ts";
 
@@ -30,14 +31,23 @@ describe(warningTone, () => {
   });
 });
 
-describe(warningLabel, () => {
-  it("leaves the title alone while traffic still flows", () => {
-    expect(warningLabel(warning())).toBe("Starting up");
+describe(severityLabel, () => {
+  it("says the state in one word, whatever the client titled it", () => {
+    expect(severityLabel("high")).toBe("Unhealthy");
+    expect(severityLabel("medium")).toBe("Warning");
+    expect(severityLabel("low")).toBe("Notice");
   });
 
-  it("folds the connectivity note into the label instead of a second badge", () => {
-    expect(warningLabel(warning({ impactsConnectivity: true }))).toBe(
-      "Starting up · affects connectivity",
+  it("falls back to a word rather than showing a severity nobody knows", () => {
+    expect(severityLabel("catastrophic")).toBe("Warning");
+  });
+});
+
+describe(connectivityNote, () => {
+  it("says so only when the client says traffic is affected", () => {
+    expect(connectivityNote(warning())).toBeUndefined();
+    expect(connectivityNote(warning({ impactsConnectivity: true }))).toBe(
+      "The client says this affects connectivity.",
     );
   });
 });

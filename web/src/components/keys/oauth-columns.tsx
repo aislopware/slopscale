@@ -7,10 +7,10 @@ import type { OAuthClient, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { emptyUsers } from "~/components/keys/api-columns.tsx";
-import { KeyPrefix } from "~/components/keys/cells.tsx";
 import { issuerHost } from "~/components/keys/federated.ts";
 import { KeyActions } from "~/components/keys/key-actions.tsx";
 import { useOAuthClientMutations } from "~/components/keys/mutations.ts";
+import { OAuthClientDetailsDialog } from "~/components/keys/oauth-details-dialog.tsx";
 import { EditOAuthClientDialog } from "~/components/keys/oauth-dialogs.tsx";
 import { scopeLabel } from "~/components/keys/scopes.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
@@ -38,7 +38,7 @@ export const oauthClientColumns = helper.columns([
     header: "Kind",
     enableSorting: true,
     cell: ({ getValue }) => <span className="text-kumo-default">{getValue()}</span>,
-    meta: { className: "min-w-32 whitespace-nowrap" },
+    meta: { className: "hidden min-w-32 whitespace-nowrap sm:table-cell" },
   }),
   // Scopes are the column that gives way first: they wrap onto as many lines as they need, so the
   // tags beside them keep the width one pill asks for.
@@ -98,37 +98,69 @@ export const oauthClientColumns = helper.columns([
   }),
 ]);
 
+/**
+ * What the row says under the client id. The subject and the issuer host each take a line of their
+ * own and truncate on their own: on one line the host took the room the subject needed, which left
+ * a federated subject as "repo:acm…" even on a wide screen. The whole value is in the details
+ * dialog, and in the title of each line for a pointer that hovers it.
+ */
 function ClientSubtext({ client }: { readonly client: OAuthClient }): ReactElement | null {
   if (client.keyType === "federated") {
     const host = issuerHost(client.issuer);
     return (
-      <div className="flex min-w-0 items-baseline gap-1 text-xs">
-        <span className="truncate text-kumo-default">{client.subject}</span>
-        {host === "" ? null : <span className="shrink-0 text-kumo-subtle">{`(${host})`}</span>}
+      <div className="flex min-w-0 flex-col text-sm">
+        <span className="truncate text-kumo-default" title={client.subject}>
+          {client.subject}
+        </span>
+        {host === "" ? null : (
+          <span className="truncate text-kumo-subtle" title={client.issuer}>
+            {host}
+          </span>
+        )}
       </div>
     );
   }
   if (client.description === "") {
     return null;
   }
-  return <span className="truncate text-xs text-kumo-subtle">{client.description}</span>;
+  return (
+    <span className="truncate text-sm text-kumo-subtle" title={client.description}>
+      {client.description}
+    </span>
+  );
 }
 
 /**
  * The client id with subject/issuer host for federated rows or description under it. The cell is
  * capped rather than left to grow: a federated subject is a long line, and a column that widens to
- * fit one pushes the tags beside it under the pinned actions.
+ * fit one pushes the tags beside it under the pinned actions. The id opens the details, where the
+ * values are whole and copyable, so a truncated line is never the end of the story.
  */
 function ClientCell({ client }: { readonly client: OAuthClient }): ReactElement {
+  const [showing, setShowing] = useState(false);
   const isFederated = client.keyType === "federated";
 
   return (
     <div className="flex max-w-72 min-w-0 flex-col gap-0.5">
-      <KeyPrefix text={client.clientId} copy={client.clientId} label="Copy client id" />
+      <button
+        type="button"
+        title={`Details for ${client.clientId}`}
+        className="-mx-1 max-w-full truncate rounded-sm px-1 text-left font-mono text-[0.9em] text-kumo-default hover:bg-kumo-tint hover:underline focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none"
+        onClick={(event) => {
+          // The row itself is not a link, but the actions column is; keep the click here.
+          event.stopPropagation();
+          setShowing(true);
+        }}
+      >
+        {client.clientId}
+      </button>
       <ClientSubtext client={client} />
       {isFederated && client.description !== "" ? (
-        <span className="truncate text-xs text-kumo-subtle">{client.description}</span>
+        <span className="truncate text-sm text-kumo-subtle" title={client.description}>
+          {client.description}
+        </span>
       ) : null}
+      <OAuthClientDetailsDialog client={client} open={showing} onOpenChange={setShowing} />
     </div>
   );
 }
@@ -190,6 +222,7 @@ function ClientMenu({
   readonly me?: Me | undefined;
 }): ReactElement {
   const [editing, setEditing] = useState(false);
+  const [showing, setShowing] = useState(false);
   const { revoke } = useOAuthClientMutations();
   const isFederated = client.keyType === "federated";
   const resourceType = isFederated ? "identity" : "OAuth client";
@@ -199,6 +232,11 @@ function ClientMenu({
       <KeyActions
         label={`Actions for ${resourceType} ${client.clientId}`}
         disabled={disabled}
+        details={{
+          onSelect: () => {
+            setShowing(true);
+          },
+        }}
         edit={{
           onSelect: () => {
             setEditing(true);
@@ -227,6 +265,7 @@ function ClientMenu({
         }}
       />
       <EditOAuthClientDialog client={client} me={me} open={editing} onOpenChange={setEditing} />
+      <OAuthClientDetailsDialog client={client} open={showing} onOpenChange={setShowing} />
     </>
   );
 }

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
+import { errorMessage } from "~/api/error.ts";
 import { nodeAppConnectorRoutesQuery } from "~/api/queries.ts";
 import type { App, Node } from "~/api/queries.ts";
 import { appsForNode, learnedRoutes } from "~/components/apps/model.ts";
@@ -15,6 +16,9 @@ import { TableFooter } from "~/components/table/toolbar.tsx";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 
 const buttonIconSize = 12;
+
+/** One array for "there is nothing to show", so a failed answer does not rebuild the table. */
+const emptyRoutes: LearnedRoute[] = [];
 
 /**
  * What the machine serves as an app connector: the apps whose tags it carries, how many addresses
@@ -91,7 +95,10 @@ function LearnedRoutesSection({ node }: { readonly node: Node }): ReactElement {
     ...nodeAppConnectorRoutesQuery(node.id),
     enabled: node.online,
   });
-  const rows = learnedRoutes(routes.data?.domains ?? {});
+  // What the machine last said is only current while the last question was answered: a refused
+  // refetch leaves the previous answer in the cache, and showing it as what the connector believes
+  // now would be worse than showing nothing.
+  const rows = routes.isError ? emptyRoutes : learnedRoutes(routes.data?.domains ?? {});
   const table = useAppTable({ data: rows, columns, getRowId: (row) => row.domain });
 
   return (
@@ -118,13 +125,13 @@ function LearnedRoutesSection({ node }: { readonly node: Node }): ReactElement {
       <table.AppTable>
         <DataTable
           empty={
-            <SectionEmpty
-              title="Nothing learned yet"
-              description={
-                node.online
-                  ? "The machine resolves a domain the first time something asks for it."
-                  : "Connect the machine to see what it resolved."
-              }
+            <LearnedRoutesEmpty
+              online={node.online}
+              loading={routes.isPending}
+              error={routes.isError ? errorMessage(routes.error) : undefined}
+              onRetry={() => {
+                void routes.refetch();
+              }}
             />
           }
           footer={
@@ -135,6 +142,62 @@ function LearnedRoutesSection({ node }: { readonly node: Node }): ReactElement {
         />
       </table.AppTable>
     </Section>
+  );
+}
+
+/**
+ * Why the table is empty: the machine is offline, it has not answered yet, it answered with
+ * nothing, or the question failed. A failure says what the server said and offers to ask again,
+ * because a connector with no routes and a connector nobody could ask are different problems.
+ */
+function LearnedRoutesEmpty({
+  online,
+  loading,
+  error,
+  onRetry,
+}: {
+  readonly online: boolean;
+  readonly loading: boolean;
+  readonly error: string | undefined;
+  readonly onRetry: () => void;
+}): ReactElement {
+  if (!online) {
+    return (
+      <SectionEmpty
+        title="Nothing to ask"
+        description="Connect the machine to see what it resolved."
+      />
+    );
+  }
+
+  if (error !== undefined) {
+    return (
+      <SectionEmpty
+        title="Could not ask the machine"
+        description={error}
+        contents={
+          <Button variant="secondary" size="sm" icon={ArrowsClockwiseIcon} onClick={onRetry}>
+            Try again
+          </Button>
+        }
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <SectionEmpty
+        title="Asking the machine…"
+        description="The addresses come from the client itself, over its control connection."
+      />
+    );
+  }
+
+  return (
+    <SectionEmpty
+      title="Nothing learned yet"
+      description="The machine resolves a domain the first time something asks for it."
+    />
   );
 }
 

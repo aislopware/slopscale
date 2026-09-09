@@ -12,7 +12,7 @@ import type { NodePreferences } from "~/api/schema.gen.ts";
 import { TagInput, usePendingLists } from "~/components/apps/tag-input.tsx";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import {
-  hasPreferenceChanges,
+  canSavePreferences,
   preferenceChanges,
   preferenceSwitches,
 } from "~/components/machines/preferences-model.ts";
@@ -84,9 +84,7 @@ function PreferencesForm({
     },
   });
   const changes = preferenceChanges(draft, baseline);
-  // A hostname is what the machine calls itself, so an empty one is not a change to send.
-  const incomplete =
-    lists.pending || draft.hostname.trim() === "" || !hasPreferenceChanges(changes);
+  const incomplete = !canSavePreferences(changes, lists.pending);
 
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -103,7 +101,9 @@ function PreferencesForm({
     <form onSubmit={submit} className="flex flex-col gap-4">
       <Input
         label="Hostname"
-        description="What the machine calls itself; the tailnet name follows it unless the machine was renamed here."
+        required={false}
+        description="What the machine calls itself; the tailnet name follows it unless the machine was renamed here. Leave it empty to use the machine's own operating system hostname."
+        placeholder="Its own hostname"
         value={draft.hostname}
         spellCheck={false}
         onChange={(event) => {
@@ -149,10 +149,11 @@ function Switches({
 }): ReactElement {
   return (
     <div className="flex flex-col gap-3 border-t border-kumo-line pt-4">
-      {preferenceSwitches.map(({ key, label }) => (
+      {preferenceSwitches.map(({ key, label, hint }) => (
         <Switch
           key={key}
           label={label}
+          labelTooltip={hint}
           controlFirst
           checked={draft[key]}
           onCheckedChange={(on) => {

@@ -289,6 +289,75 @@ export function ResetAttestationDialog({
   );
 }
 
+/** What a client does when it takes an update on, which is why both dialogs ask first. */
+const updateWarning =
+  "The client downloads the release and restarts Tailscale itself, so the machine drops its connections for a moment.";
+
+/**
+ * Asks before one machine is told to update its Tailscale client. The update interrupts whatever is
+ * running over the tailnet on that machine and the control plane cannot take it back, so it is a
+ * question rather than a button that acts.
+ */
+export function ClientUpdateDialog({
+  name,
+  open,
+  onOpenChange,
+  pending,
+  onConfirm,
+}: {
+  readonly name: string;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly pending: boolean;
+  readonly onConfirm: () => void;
+}): ReactElement {
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      destructive={false}
+      title="Update the Tailscale client?"
+      description={`${name} is asked to update itself. ${updateWarning}`}
+      confirmLabel="Update client"
+      loading={pending}
+      onConfirm={onConfirm}
+    />
+  );
+}
+
+/**
+ * The same question for a selection, with the count it would reach and the ticked machines it steps
+ * over: an operator who ticked forty rows should see that eleven of them are offline before the
+ * requests go out, not afterwards in a list of refusals.
+ */
+export function BulkClientUpdateDialog({
+  summary,
+  open,
+  onOpenChange,
+  pending,
+  onConfirm,
+}: {
+  /** "3 machines will be asked to update. Skipping 1 offline." */
+  readonly summary: string;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly pending: boolean;
+  readonly onConfirm: () => void;
+}): ReactElement {
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      destructive={false}
+      title="Update the ticked clients?"
+      description={`${summary} ${updateWarning}`}
+      confirmLabel="Update clients"
+      loading={pending}
+      onConfirm={onConfirm}
+    />
+  );
+}
+
 /**
  * Removing a machine is not undoable and the tailnet keeps working without it, so it asks for the
  * name to be typed rather than for one more click.

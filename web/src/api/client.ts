@@ -22,15 +22,31 @@ const problems: Middleware = {
       return response;
     }
 
-    if (response.status === statusUnauthorized && !new URL(request.url).pathname.endsWith(whoami)) {
-      sessionEnded();
-    }
-
-    const problem = await readProblem(response);
-
-    throw new ApiError(response.status, problem, `${response.status} ${response.statusText}`);
+    throw await refusal(request.url, response, `${response.status} ${response.statusText}`);
   },
 };
+
+/**
+ * What the console throws for a request the server refused, wherever the request came from: the
+ * problem document as the error's message, and the session ended when the cookie stopped working,
+ * so a download that outlives its session sends the operator back to sign-in like any other call
+ * rather than leaving an expired page up behind a toast.
+ */
+export async function refusal(
+  url: string,
+  response: Response,
+  fallback: string,
+): Promise<ApiError> {
+  // A caller outside the typed client passes a path rather than an absolute URL.
+  if (
+    response.status === statusUnauthorized &&
+    !new URL(url, globalThis.location.href).pathname.endsWith(whoami)
+  ) {
+    sessionEnded();
+  }
+
+  return new ApiError(response.status, await readProblem(response), fallback);
+}
 
 async function readProblem(response: Response): Promise<Problem | undefined> {
   const contentType = response.headers.get("content-type") ?? "";

@@ -10,7 +10,7 @@ import { api } from "~/api/client.ts";
 import { nodeSshUsernamesQuery } from "~/api/queries.ts";
 import type { Node } from "~/api/queries.ts";
 import { SSHTerminal } from "~/components/ssh/terminal.tsx";
-import { shouldPrefillUsername, UsernameField } from "~/components/ssh/username-field.tsx";
+import { UsernameField, usernamePrefillStep } from "~/components/ssh/username-field.tsx";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { Callout } from "~/components/ui/callout.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
@@ -122,16 +122,18 @@ function SSHPage(): ReactElement {
   const waiting = waitingMessage(state.status);
   const note = sessionDetail(state);
 
-  // The machine's own answer fills the field once, and only while it is still empty: the server's
-  // guess and the operator's own typing both land in the same field, and whichever got there first
-  // is the one that meant something. The ref is what keeps it from happening a second time when the
-  // field is cleared to type a different account.
-  const prefilled = useRef(false);
+  // The field is filled once at most, from the server's session or from the machine's suggestion,
+  // and the ref remembers that the chance has been used: anything that reached the field, including
+  // the operator's own typing, uses it up, so a field cleared afterwards stays cleared.
+  const prefill = useRef(false);
 
   useEffect(() => {
-    if (shouldPrefillUsername(username, usernames, prefilled.current)) {
-      prefilled.current = true;
-      setUsername(usernames[0] ?? "");
+    const step = usernamePrefillStep(username, usernames, prefill.current);
+
+    prefill.current = step.consumed;
+
+    if (step.insert !== null) {
+      setUsername(step.insert);
     }
   }, [username, usernames, setUsername]);
 

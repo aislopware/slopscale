@@ -41,17 +41,18 @@ export function updateClaimRule(
   return entries.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry));
 }
 
-/** Converts editor entries to an object map of claim -> value. */
+/**
+ * Converts editor entries to an object map of claim -> value. Both sides go in verbatim: the server
+ * compares the claim against the token exactly, so trimming here would quietly change what the
+ * operator asked for. `Object.fromEntries` rather than assignment into `{}`, because a claim named
+ * `__proto__` or `constructor` assigned into an object literal is swallowed by the prototype.
+ */
 export function claimRulesToRecord(entries: readonly ClaimRuleEntry[]): Record<string, string> {
-  const record: Record<string, string> = {};
-  for (const entry of entries) {
-    const claim = entry.claim.trim();
-    const value = entry.value.trim();
-    if (claim !== "" && value !== "") {
-      record[claim] = value;
-    }
-  }
-  return record;
+  return Object.fromEntries(
+    entries
+      .filter((entry) => entry.claim.trim() !== "" && entry.value.trim() !== "")
+      .map((entry) => [entry.claim, entry.value]),
+  );
 }
 
 /** Converts a claim -> value record into editor row entries. */
@@ -66,19 +67,21 @@ export function recordToClaimRules(record?: Record<string, string> | null): Clai
   }));
 }
 
-/** Validates that every row has both a non-empty claim and value, and no duplicate keys. */
+/**
+ * Validates that every row has both a non-empty claim and value, and no duplicate keys. A blank row
+ * is what an operator left behind, so emptiness is judged on the trimmed text; two claims are the
+ * same claim only when they are the same string, since that is how the server compares them.
+ */
 export function validateClaimRules(entries: readonly ClaimRuleEntry[]): string | undefined {
   const seen = new Set<string>();
   for (const entry of entries) {
-    const claim = entry.claim.trim();
-    const value = entry.value.trim();
-    if (claim === "" || value === "") {
+    if (entry.claim.trim() === "" || entry.value.trim() === "") {
       return "Both claim and value are required for each rule.";
     }
-    if (seen.has(claim)) {
-      return `Duplicate claim rule "${claim}".`;
+    if (seen.has(entry.claim)) {
+      return `Duplicate claim rule "${entry.claim}".`;
     }
-    seen.add(claim);
+    seen.add(entry.claim);
   }
   return undefined;
 }
@@ -160,13 +163,24 @@ function arraysEqual(first: readonly string[], second: readonly string[]): boole
   return sortedFirst.every((val, idx) => val === sortedSecond[idx]);
 }
 
+/**
+ * Compares two claim maps by their own entries rather than by key lookup: a rule named `__proto__`
+ * is an own property of both records, and reading it back with `record[key]` would answer with the
+ * prototype instead of the rule.
+ */
 function recordsEqual(first: Record<string, string>, second: Record<string, string>): boolean {
-  const keysFirst = Object.keys(first).toSorted();
-  const keysSecond = Object.keys(second).toSorted();
-  if (keysFirst.length !== keysSecond.length) {
+  const entriesFirst = sortedEntries(first);
+  const entriesSecond = sortedEntries(second);
+  if (entriesFirst.length !== entriesSecond.length) {
     return false;
   }
-  return keysFirst.every((key, idx) => key === keysSecond[idx] && first[key] === second[key]);
+  return entriesFirst.every(
+    ([claim, value], idx) => claim === entriesSecond[idx]?.[0] && value === entriesSecond[idx]?.[1],
+  );
+}
+
+function sortedEntries(record: Record<string, string>): [string, string][] {
+  return Object.entries(record).toSorted(([first], [second]) => first.localeCompare(second));
 }
 
 /** Computes the diff between the original client and the edited draft for PATCH. */
@@ -226,10 +240,57 @@ export function tokenExchangeCommand(serverUrl: string, clientId: string): strin
   return `curl -X POST ${base}/api/v2/oauth/token-exchange -d client_id=${clientId} -d jwt="$ID_TOKEN"`;
 }
 
-/** Builds the GitHub Actions configuration snippet to mint an OIDC token. */
-export function githubActionsSnippet(audience: string): string {
+/** EncodeURIComponent leaves these alone; the audience goes in whole, so they go with it. */
+const alsoEncoded: Record<string, string> = {
+  "!": "%21",
+  "'": "%27",
+  "(": "%28",
+  ")": "%29",
+  "*": "%2A",
+};
+
+/** A value safe to paste into a query string, whatever the operator typed in the audience field. */
+function encodeQueryValue(value: string): string {
+  return encodeURIComponent(value).replaceAll(
+    /[!'()*]/gu,
+    (character) => alsoEncoded[character] ?? character,
+  );
+}
+
+/** A value inside single quotes, where the only character the shell still reads is the quote. */
+function singleQuote(value: string): string {
+  return `'${value.replaceAll("'", String.raw`'\''`)}'`;
+}
+
+/**
+ * Builds the GitHub Actions snippet that mints an OIDC token and trades it for an API token: the
+ * `permissions` block the job needs, the step that asks the runner's token service for a JWT with
+ * this identity's audience, and the step that exchanges it. It is one workflow fragment rather than
+ * a shell line, because that is where it is pasted; the audience is percent-encoded into the
+ * request URL and everything else is single-quoted, so an audience or a client id with a `&`, a `#`
+ * or a quote in it still runs.
+ */
+export function githubActionsSnippet(
+  audience: string,
+  serverUrl: string,
+  clientId: string,
+): string {
+  const base = normalizeServerUrl(serverUrl);
+
   return `permissions:
   id-token: write
 
-curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=${audience}"`;
+steps:
+  - name: Request an OIDC token
+    run: |
+      ID_TOKEN=$(curl -sSf \\
+        -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \\
+        "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=${encodeQueryValue(audience)}" | jq -r .value)
+      echo "::add-mask::$ID_TOKEN"
+      echo "ID_TOKEN=$ID_TOKEN" >> "$GITHUB_ENV"
+  - name: Exchange it for an API token
+    run: |
+      curl -sSf -X POST ${singleQuote(`${base}/api/v2/oauth/token-exchange`)} \\
+        -d client_id=${singleQuote(clientId)} \\
+        --data-urlencode jwt="$ID_TOKEN"`;
 }
