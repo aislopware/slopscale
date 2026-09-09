@@ -482,7 +482,7 @@ func (m *mapSession) writeMap(msg *tailcfg.MapResponse) error {
 	data := out.Bytes()
 
 	body := len(data) - reservedResponseHeaderSize
-	if uint64(body) > math.MaxUint32 {
+	if int64(body) > math.MaxUint32 {
 		return fmt.Errorf("%w: %d bytes", errMapResponseTooLarge, body)
 	}
 
