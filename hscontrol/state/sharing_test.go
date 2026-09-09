@@ -71,3 +71,28 @@ func TestShareNode(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, fromDB.SharedWith)
 }
+
+// TestShareNodeRefusesWaitingUser covers a sharee still waiting for
+// approval: the share would come alive silently once they are admitted.
+func TestShareNodeRefusesWaitingUser(t *testing.T) {
+	t.Parallel()
+
+	s := newRoleTestState(t)
+	alice := createUserWithRole(t, s, "alice", "")
+
+	node := s.CreateRegisteredNodeForTest(alice, "alice-1")
+	s.PutNodeInStoreForTest(*node)
+
+	setSetting(t, s, types.SettingUsersApprovalOn, true)
+
+	pending, _, err := s.CreateUserFromLogin(types.User{Name: "waiting"})
+	require.NoError(t, err)
+	require.Nil(t, pending.ApprovedAt)
+
+	_, _, err = s.ShareNode(node.ID, types.UserID(pending.ID), nil)
+	require.ErrorIs(t, err, ErrUserNotApproved)
+
+	stored, ok := s.GetNodeByID(node.ID)
+	require.True(t, ok)
+	assert.Empty(t, stored.SharedWith().AsSlice())
+}

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/juanfont/headscale/hscontrol/db"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,4 +40,22 @@ func TestRenameNodeRejectsNameExceedingFQDNLimit(t *testing.T) {
 	// A short, valid name is still accepted.
 	_, _, err = s.RenameNode(node.ID, "short")
 	require.NoError(t, err)
+}
+
+// TestRenameNodeInvalidLabelMessage pins the message an operator sees: the
+// reason once, not the same sentence from every wrapping layer.
+func TestRenameNodeInvalidLabelMessage(t *testing.T) {
+	t.Parallel()
+
+	s := newRoleTestState(t)
+	user := s.CreateUserForTest("rename-msg-user")
+	node := s.CreateRegisteredNodeForTest(user, "rename-msg-node")
+	s.PutNodeInStoreForTest(*node)
+
+	_, _, err := s.RenameNode(node.ID, "trailing-")
+	require.ErrorIs(t, err, ErrGivenNameInvalid)
+	assert.Equal(t,
+		"given name is not a valid DNS label: must end with a letter or number",
+		err.Error(),
+	)
 }

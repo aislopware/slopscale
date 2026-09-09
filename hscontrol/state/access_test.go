@@ -2,6 +2,7 @@ package state
 
 import (
 	"testing"
+	"time"
 
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
@@ -213,4 +214,38 @@ func TestPreAuthKeyGroupsEnrolNode(t *testing.T) {
 	group, err := s.GetGroup(servers.ID)
 	require.NoError(t, err)
 	assert.Equal(t, []types.NodeID{node.ID()}, group.NodeIDs, "the missing group is skipped, the real one joined")
+}
+
+// TestExpireAccessSweepsOnFirstCall covers a membership that ran out
+// while the server was down: the caller starts the ticker at boot, so
+// only an unconditional first sweep can see it.
+func TestExpireAccessSweepsOnFirstCall(t *testing.T) {
+	t.Parallel()
+
+	s := newRoleTestState(t)
+	alice := createUserWithRole(t, s, "alice", "")
+
+	eng, _, err := s.CreateGroup("Engineering", "", false)
+	require.NoError(t, err)
+
+	// Straight to the database: the API refuses an expiry in the past,
+	// which is exactly what a restart leaves behind.
+	past := time.Now().Add(-time.Hour)
+	require.NoError(t, s.db.AddGroupUser(eng.ID, types.UserID(alice.ID), &past))
+
+	_, err = s.loadAccessModel()
+	require.NoError(t, err)
+
+	group, err := s.GetGroup(eng.ID)
+	require.NoError(t, err)
+	require.Contains(t, group.UserExpiries, types.UserID(alice.ID))
+
+	now := time.Now()
+	_, err = s.ExpireAccess(now, now)
+	require.NoError(t, err)
+
+	group, err = s.GetGroup(eng.ID)
+	require.NoError(t, err)
+	assert.Empty(t, group.UserIDs)
+	assert.Empty(t, group.UserExpiries)
 }

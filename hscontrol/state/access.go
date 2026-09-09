@@ -588,6 +588,13 @@ func sameExpiry(a, b *time.Time) bool {
 // without them and without the rules that expired. It runs from the
 // minute ticker, so a grant ends within a minute of its time.
 func (s *State) ExpireAccess(since, now time.Time) (change.Change, error) {
+	// The first sweep after boot ignores since: the caller starts it at
+	// the current time, and NextExpiry never looks behind it, so anything
+	// that ran out while the server was down would be skipped forever.
+	if s.accessSwept.CompareAndSwap(false, true) {
+		since = time.Time{}
+	}
+
 	next := s.AccessModel().NextExpiry(since)
 	if next.IsZero() || next.After(now) {
 		return change.Change{}, nil

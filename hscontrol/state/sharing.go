@@ -31,9 +31,16 @@ func (s *State) ShareNode(
 		return types.NodeView{}, change.Change{}, ErrShareWithOwner
 	}
 
-	_, err := s.db.GetUserByID(userID)
+	sharee, err := s.db.GetUserByID(userID)
 	if err != nil {
 		return types.NodeView{}, change.Change{}, fmt.Errorf("looking up sharee: %w", err)
+	}
+
+	// A user still waiting for approval has no devices to share with yet,
+	// and the share would silently come alive once they are approved.
+	err = requireApprovedUser(sharee)
+	if err != nil {
+		return types.NodeView{}, change.Change{}, err
 	}
 
 	err = s.db.ShareNode(nodeID, userID, createdBy)

@@ -138,6 +138,8 @@ type State struct {
 
 	// access holds the groups and access rules; see [State.AccessModel].
 	access atomic.Pointer[types.AccessModel]
+	// accessSwept marks that [State.ExpireAccess] has run once; see there.
+	accessSwept atomic.Bool
 	// polMan handles policy evaluation and management
 	polMan policy.PolicyManager
 
@@ -1094,7 +1096,8 @@ func (s *State) RenameNode(nodeID types.NodeID, newName string) (types.NodeView,
 	// an unmappable name would break this node and its peers (issue #3346).
 	err := types.ValidateGivenName(newName, s.cfg.BaseDomain)
 	if err != nil {
-		return types.NodeView{}, change.Change{}, fmt.Errorf("%w: %w", ErrGivenNameInvalid, err)
+		return types.NodeView{}, change.Change{},
+			fmt.Errorf("%w: %s", ErrGivenNameInvalid, dnsLabelReason(err))
 	}
 
 	view, err := s.nodeStore.SetGivenName(nodeID, newName)
@@ -1736,6 +1739,13 @@ func (s *State) TagOwnedByTags(tag string, ownerTags []string) bool {
 // matching SetNodeTags.
 func (s *State) TagExists(tag string) bool {
 	return s.polMan.TagExists(tag)
+}
+
+// HasTagOwners reports whether the policy defines any tag at all. Without
+// one no tag can be validated, so callers keep headscale's historical
+// behaviour of taking any well-formed tag.
+func (s *State) HasTagOwners() bool {
+	return s.polMan.HasTagOwners()
 }
 
 // DeleteExpiredAccessTokens hard-deletes OAuth access tokens that expired before
@@ -3673,19 +3683,30 @@ func assignNodeOwnership(nodeToRegister *types.Node, params newNodeParams) {
 
 // applyAdvertiseTags validates and applies client-requested advertise-tags
 // (tailscale up --advertise-tags). PreAuthKey nodes get their tags from the
-// key itself, not from client requests, so any advertise-tags on a PreAuthKey
-// registration are rejected early, before any resource allocation.
+// key itself, so a request is only accepted when it asks for tags the key
+// already carries; anything more is rejected early, before any resource
+// allocation.
 func (s *State) applyAdvertiseTags(nodeToRegister *types.Node, params newNodeParams) error {
 	if params.Hostinfo == nil || len(params.Hostinfo.RequestTags) == 0 {
 		return nil
 	}
 
 	if params.PreAuthKey != nil {
-		return fmt.Errorf(
-			"%w %v are invalid or not permitted",
-			ErrRequestedTagsInvalidOrNotPermitted,
-			params.Hostinfo.RequestTags,
-		)
+		// The key fixes the node's tags, so the client may name them again
+		// (tailscale up --authkey with --advertise-tags, which Tailscale
+		// accepts) but may not ask for anything the key does not carry.
+		for _, tag := range params.Hostinfo.RequestTags {
+			if !slices.Contains(params.PreAuthKey.Tags, tag) {
+				return fmt.Errorf(
+					"%w %v are not permitted: the pre-auth key allows %v",
+					ErrRequestedTagsInvalidOrNotPermitted,
+					params.Hostinfo.RequestTags,
+					params.PreAuthKey.Tags,
+				)
+			}
+		}
+
+		return nil
 	}
 
 	// Validate all tags before applying - reject if any tag is not permitted
@@ -3868,4 +3889,19 @@ func (s *State) createUser(user types.User) (*types.User, change.Change, error) 
 	s.emitUserCreated(&user)
 
 	return &user, c, nil
+}
+
+// dnsLabelReason reduces the validation error to its reason. Both dnsname
+// and [types.ValidateGivenName] prefix it with the label and the sentence
+// [ErrGivenNameInvalid] already says, so an operator read it three times
+// over; everything up to the last such prefix goes.
+func dnsLabelReason(err error) string {
+	const marker = "is not a valid DNS label: "
+
+	msg := err.Error()
+	if i := strings.LastIndex(msg, marker); i >= 0 {
+		return msg[i+len(marker):]
+	}
+
+	return msg
 }
