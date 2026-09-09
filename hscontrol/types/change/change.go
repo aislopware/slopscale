@@ -306,22 +306,32 @@ func (r Change) boolFieldNames() []string {
 
 // DedupePolicyChanges keeps the first broadcast policy change in a tick and
 // drops the rest: each rebuilds a node's whole netmap from the same snapshot, so
-// the repeats are wasted work. Order and all other changes are preserved.
+// the repeats are wasted work. What a dropped repeat asked for beyond the
+// recompute, the self node for a change that lives on it or a DNS or DERP
+// map refresh, is folded into the kept one, so a policy change followed in
+// the same tick by an approval or a service change still delivers the self
+// node. Order and all other changes are preserved.
 func DedupePolicyChanges(changes []Change) []Change {
 	if len(changes) < 2 {
 		return changes
 	}
 
 	out := make([]Change, 0, len(changes))
-	seen := false
+	kept := -1
 
 	for _, r := range changes {
 		if r.IsBroadcastPolicyChange() {
-			if seen {
+			if kept >= 0 {
+				out[kept].IncludeSelf = out[kept].IncludeSelf || r.IncludeSelf
+				out[kept].IncludeDERPMap = out[kept].IncludeDERPMap || r.IncludeDERPMap
+				out[kept].IncludeDNS = out[kept].IncludeDNS || r.IncludeDNS
+				out[kept].IncludeDomain = out[kept].IncludeDomain || r.IncludeDomain
+				out[kept].SendAllPeers = out[kept].SendAllPeers || r.SendAllPeers
+
 				continue
 			}
 
-			seen = true
+			kept = len(out)
 		}
 
 		out = append(out, r)

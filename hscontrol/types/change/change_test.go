@@ -335,6 +335,11 @@ func TestDedupePolicyChanges(t *testing.T) {
 	originRecompute := PolicyChange()
 	originRecompute.OriginNode = 7
 
+	// selfRecompute is what an approval or a service change dispatches:
+	// the recompute plus the self node, which carries the flipped flag.
+	selfRecompute := PolicyChange()
+	selfRecompute.IncludeSelf = true
+
 	tests := []struct {
 		name    string
 		changes []Change
@@ -382,6 +387,16 @@ func TestDedupePolicyChanges(t *testing.T) {
 			name:    "non-canonical recomputes are not collapsed",
 			changes: []Change{originRecompute, originRecompute},
 			want:    []Change{originRecompute, originRecompute},
+		},
+		{
+			name:    "a later self recompute lends its self node to the kept one",
+			changes: []Change{PolicyChange(), selfRecompute},
+			want:    []Change{selfRecompute},
+		},
+		{
+			name:    "the kept self recompute keeps its self node",
+			changes: []Change{selfRecompute, PolicyChange()},
+			want:    []Change{selfRecompute},
 		},
 		{
 			name:    "changes without any recompute are unchanged",
