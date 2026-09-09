@@ -1,0 +1,186 @@
+---
+title: "Device management"
+---
+
+The control server can ask a connected machine questions and, on a machine
+whose owner allowed it, change what the client does. Everything on this
+page rides the control connection the client already holds open, as a
+control-to-node request: the server sends the question down the machine's
+map stream and the client posts its answer back. No inbound port, no SSH
+and no agent is involved, and a machine that is not connected answers
+nothing, so every operation here reports `409` on an offline machine and
+`504` when the client never answers.
+
+What a client will answer depends on how it was built and what its owner
+turned on. The stock `tailscaled` answers everything below; a client built
+without its debug endpoints refuses the diagnostics with `501`, and one
+built without the update feature refuses the update with `500`. A refusal
+comes back as `502` with the client's own words, so the message an
+operator reads is the machine's, not the server's.
+
+## Updating a client
+
+A machine can be told to update its own Tailscale installation. The client
+decides whether to obey:
+
+- The owner must have allowed it, either with `tailscale set --auto-update`
+  or by running the daemon with `TS_ALLOW_REMOTE_UPDATE=1`. Without that
+  the client answers `not enabled`.
+- The platform must be able to update itself. It cannot on the Mac App
+  Store build, which the App Store updates, and the client answers `not
+  supported` there.
+- The client refuses while it is serving inbound Tailscale SSH sessions,
+  so an update does not cut someone's shell off mid-command. Forcing the
+  update overrides that.
+
+```console
+slopscale nodes update --identifier 7
+slopscale nodes update --identifier 7 --force
+```
+
+Through the API, `GET /api/v1/node/{id}/client-update` reports whether the
+machine would update and whether one is already running, and `POST` on the
+same path starts one, with `{"force": true}` to interrupt SSH sessions. The
+read needs `devices:core:read` and the start `devices:core`; the start is
+audited as `node.client_update.start`. `POST /api/v1/nodes/client-update`
+takes `{"nodeIds": [...], "force": false}` and starts several at once, a
+few at a time, answering with one result per machine so a fleet update
+reports each machine on its own.
+
+## Health and diagnostics
+
+A machine that is connected but not working usually knows why. The client
+keeps the warnings it would show its own user, and the server can read
+them:
+
+```console
+slopscale nodes health --identifier 7
+```
+
+Each warning carries a code, a severity, the title and text the client
+would display, when it broke and whether the client thinks traffic is
+affected. `GET /api/v1/node/{id}/health` returns the same, ordered by code,
+and needs `devices:core:read`.
+
+For anything the warnings do not explain, the client will hand over the
+dumps it keeps for support:
+
+| Kind         | What it is                                              |
+| ------------ | ------------------------------------------------------- |
+| `prefs`      | The preferences the client holds, as JSON                |
+| `netmap`     | The client's current network map, with its keys redacted |
+| `metrics`    | The client's counters in Prometheus text format          |
+| `goroutines` | A scrubbed goroutine dump                                |
+| `sockstats`  | The client's socket statistics                           |
+| `tka-log`    | The tailnet lock log the machine holds                   |
+
+```console
+slopscale nodes diagnostics --identifier 7 --kind netmap --out netmap.json
+slopscale nodes diagnostics --identifier 7 --kind goroutines
+```
+
+`GET /api/v1/node/{id}/diagnostics/{kind}` answers with the dump as the
+client wrote it, with the client's content type and a filename, so it is a
+download rather than a JSON body. It needs `devices:core`, not the read
+scope, because a netmap and a preferences dump describe the machine's whole
+view of the tailnet; every download is audited as `node.diagnostics.read`
+with the kind.
+
+## Managed preferences
+
+The preferences a machine's owner set are readable on any client with its
+debug endpoints:
+
+```console
+slopscale nodes prefs get --identifier 7
+```
+
+Changing them is a different matter, and needs the machine's consent.
+Tailscale's usual model is per-feature double opt-in: the tailnet admin can
+ask for something and the machine's owner still agrees to it, one setting
+at a time. Remote configuration replaces that with a single switch on the
+machine. The client's own documentation is blunt about what it means:
+
+:::warning[Remote configuration hands the machine over]
+"RemoteConfig is a different, more permissive posture: a single
+client-side 'I trust the tailnet admin' switch. Once `Prefs.RemoteConfig`
+is true, the control plane can invoke any of this node's LocalAPI
+endpoints (which includes read/write of every pref) with no further local
+consent. This is appropriate when the tailnet admin owns the machine (e.g.
+a corporate fleet device) or when the local user has explicitly delegated
+full control to the tailnet admin. It should NOT be used on personal or
+BYOD devices where the tailnet admin is not fully trusted."
+:::
+
+Someone with a shell on the machine turns it on:
+
+```console
+tailscale set --remote-config
+```
+
+The client then reports the opt-in in its Hostinfo, which the machine's
+record shows as `remoteConfig`, and the server will edit these
+preferences. It needs a client from Tailscale 1.102 or later, which is where
+the proxy the edit rides on appeared; an older client refuses whatever its
+preferences say. Without the opt-in the API answers `409` and tells the
+operator to run the command above.
+
+| Preference                   | What it does                                                 |
+| ---------------------------- | ------------------------------------------------------------ |
+| `advertiseRoutes`            | The subnets the machine offers to the tailnet                |
+| `advertiseExitNode`          | Whether it offers to be an exit node                         |
+| `acceptRoutes`               | Whether it uses the subnets other machines advertise         |
+| `acceptDns`                  | Whether it uses the tailnet's DNS configuration              |
+| `exitNode`                   | The exit node it uses, by stable ID or address; empty clears |
+| `exitNodeAllowLanAccess`     | Whether the local network stays reachable through an exit node |
+| `runSsh`                     | Whether it runs Tailscale SSH                                |
+| `shieldsUp`                  | Whether it blocks incoming connections                       |
+| `hostname`                   | The name it reports                                          |
+| `autoUpdateCheck`            | Whether it checks for client updates                         |
+| `autoUpdateApply`            | Whether it applies them                                      |
+| `advertiseConnector`         | Whether it offers to be an app connector                     |
+| `postureChecking`            | Whether it reports device posture                            |
+
+Only the preferences named in a request are changed; the rest keep
+whatever the machine's owner set. Offering to be an exit node is stored
+inside the advertised routes as the two default routes, so the server
+recomputes both together the way `tailscale set` does: turning it on leaves
+the other subnets alone.
+
+```console
+slopscale nodes prefs set --identifier 7 --accept-routes=true
+slopscale nodes prefs set --identifier 7 --advertise-routes 10.0.0.0/24,10.1.0.0/24
+slopscale nodes prefs set --identifier 7 --advertise-exit-node=true
+```
+
+`PATCH /api/v1/node/{id}/preferences` takes the same fields as JSON, needs
+`devices:core` and is audited as `node.preferences.update` with the names
+of the preferences the request changed. `GET` on the same path reads them
+and needs `devices:core:read`.
+
+## What else a machine will tell the server
+
+Three smaller questions round the set out.
+
+**SSH username hints.** A client will suggest the logins it would accept
+for a Tailscale SSH session, which is what the console's in-browser
+terminal offers in its username box. The hints are only that: the SSH
+policy still decides who may log in as whom, and a machine with many users
+truncates the list. `GET /api/v1/node/{id}/ssh-usernames` declares no
+scope, because it follows the same visibility rule as
+[browser SSH](/ref/console): whoever may open a session to the machine may
+read its hints, so a member sees their own machines and the ones their
+machines can already reach.
+
+**App connector routes.** An [app connector](/ref/apps) learns addresses as
+it resolves the domains it answers for. `GET
+/api/v1/node/{id}/app-connector-routes` reports what it has learned, domain
+by domain, which is how an operator checks a connector without reading its
+logs. A machine that is not a connector answers with none. It needs
+`devices:core:read`.
+
+**TLS certificate status.** A machine that serves HTTPS through
+[Serve or Funnel](/ref/funnel) caches a certificate for its MagicDNS name,
+and renewal fails quietly. `GET /api/v1/node/{id}/tls-cert` reports whether
+the certificate is valid, missing or expired and the error the client last
+saw. It needs `devices:core:read`.

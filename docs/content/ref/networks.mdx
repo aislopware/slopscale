@@ -107,3 +107,78 @@ and the ones it does not advertise.
 `slopscale networks` has `list`, `show`, `create`, `update` (which fetches the
 network and replaces only the flags given), `enable`, `disable` and `delete`.
 `create` and `update` take `--protocol` and `--ports`.
+
+## Peer relays
+
+A peer relay is a machine of your own tailnet that forwards UDP between two
+peers that cannot reach each other directly. It is an alternative to
+[DERP](/ref/derp) for that pair: the traffic stays inside the network the
+relay sits in and keeps its own WireGuard session, instead of going out to a
+relay server on the internet. A machine in the office that both sides can
+reach is the usual candidate.
+
+Run one with a Tailscale client 1.86 or later on Linux, Windows or macOS
+(iOS builds carry no relay server). On the machine that is to relay:
+
+```console
+$ sudo tailscale set --relay-server-port=41642
+```
+
+Any UDP port will do, `0` picks a free one and an empty value turns the relay
+server off again. Open that UDP port on the machine's firewall for the peers
+that will use it.
+
+The client only offers to relay for peers the control server lets it, which is
+a grant with the `tailscale.com/cap/relay` capability. It names the sources
+that may allocate a relay session and the machines that will carry it:
+
+```json title="policy.json"
+{
+  "grants": [
+    {
+      "src": ["autogroup:member"],
+      "dst": ["tag:relay"],
+      "app": {
+        "tailscale.com/cap/relay": [{}]
+      }
+    }
+  ]
+}
+```
+
+Slopscale compiles that into the packet filter both sides receive, and adds
+the companion `tailscale.com/cap/relay-target` rule in the opposite
+direction, so the relay learns which machines may allocate on it. It also
+treats a relay as a machine whose comings and goings matter: when one
+connects or disconnects, the peers that may allocate through it recompute
+their whole netmap rather than taking the cheap online/offline patch, so an
+allocation through a relay that has gone away is dropped instead of being
+used.
+
+The port is a client preference, so the control server cannot switch a relay
+server on. It can switch one off, with the `disable-relay-server`
+[node attribute](/ref/policy#node-attributes): while a machine carries it, its
+relay server stays down whatever its `--relay-server-port` says.
+
+```json title="policy.json"
+{
+  "nodeAttrs": [
+    {
+      "target": ["tag:laptop"],
+      "attr": ["disable-relay-server"]
+    }
+  ]
+}
+```
+
+To check the result, ask the relay what it is carrying:
+
+```console
+$ tailscale debug peer-relay-sessions
+```
+
+It prints the port it is bound to, or that none is configured, and one line
+per active session. On a client, `tailscale debug peer-relay-servers` lists
+the relays it knows it may use, `tailscale status` shows `peer-relay <addr>`
+for a peer it reaches that way, and `tailscale ping` reports
+`via peer-relay(<addr>)`.

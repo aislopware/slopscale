@@ -102,6 +102,152 @@ curl -H "Authorization: Bearer <API_KEY>" \
 </Tab>
 </Tabs>
 
+## Tailscale-compatible API
+
+Alongside `/api/v1`, Slopscale serves a second API at `/api/v2` that reuses
+**Tailscale's** wire shapes, so tooling written against Tailscale's control
+plane works against Slopscale unchanged: the
+[Terraform/OpenTofu provider](https://registry.terraform.io/providers/tailscale/tailscale/latest),
+[tscli](https://github.com/jaxxstorm/tscli), the official
+[Go client](https://pkg.go.dev/tailscale.com/client/tailscale/v2) and the
+[Kubernetes operator](https://tailscale.com/kb/1236/kubernetes-operator).
+
+- API endpoint: `/api/v2`, e.g. `https://slopscale.example.com/api/v2`
+- Documentation: `/api/v2/docs`
+- The tailnet in every path is `-`; Slopscale serves one tailnet, and any other
+  name is a `404`.
+- Authenticate with an [API key](#rest-api), which is all-access, or with
+  [OAuth 2.0 client credentials](#oauth-clients), which are limited to the
+  scopes and tags they were created with. Point the Terraform provider at
+  Slopscale with its `base_url`, and the operator with its
+  `LOGIN_SERVER`/`--login-server`.
+
+### OAuth clients
+
+Most of the ecosystem accepts an API key or OAuth client credentials; the
+Kubernetes operator accepts only the latter. An OAuth client is a key with
+`keyType: "client"`, created with `slopscale oauth-clients create`, on the
+console's _Keys_ page, or through the API. Its secret is shown once. The client
+exchanges it for a one-hour access token at `POST /api/v2/oauth/token`, and the
+token carries the client's scopes and tags:
+
+```console
+$ slopscale oauth-clients create --scope devices:core --scope auth_keys \
+    --tag tag:k8s-operator --description "Kubernetes operator"
+```
+
+The scopes bound which operations the token may perform, and the tags bound
+which machines it may create: an auth key minted with the token may only carry
+tags the token holds, or tags those own through the policy's `tagOwners`. A
+token cannot mint API keys, and it can never be given more than the caller that
+created the client could delegate.
+
+### Terraform provider support
+
+Every resource and data source the provider offers, and how far Slopscale
+carries it.
+
+| Resource                          | Support     | Notes                                                                                                                                                                         |
+| --------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tailscale_acl`                   | Supported   | Reads and writes the policy as HuJSON, comments and all, with an `ETag` for the conditional write. The plan-time validation call is supported, including running policy tests. |
+| `tailscale_aws_external_id`       | Unsupported | Slopscale has no AWS log integration, so there is no external ID to hand out. Returns `404`.                                                                                    |
+| `tailscale_contacts`              | Unsupported | Slopscale sends no account, support or security email of its own, so it stores no contact addresses. Returns `404`.                                                             |
+| `tailscale_device_authorization`  | Supported   | Maps onto [device approval](/ref/approval). Note that approval must be switched on for the resource to mean anything.                                                          |
+| `tailscale_device_key`            | Supported   | Sets whether a machine's key expires.                                                                                                                                          |
+| `tailscale_device_subnet_routes`  | Supported   | Approves the routes a machine advertises.                                                                                                                                      |
+| `tailscale_device_tags`           | Supported   | Tags and users are exclusive here, so tagging a user's machine hands it over to the tags.                                                                                       |
+| `tailscale_dns_configuration`     | Partial     | Every field is applied, including `useWithExitNode` and `overrideLocalDNS`. `magicDNS` comes from the configuration file, so a plan that changes it is refused with a `400`.    |
+| `tailscale_dns_nameservers`       | Supported   |                                                                                                                                                                                |
+| `tailscale_dns_preferences`       | Partial     | The only preference is `magicDNS`, which is set in the configuration file; a plan that repeats the value in force succeeds, one that changes it is refused.                     |
+| `tailscale_dns_search_paths`      | Supported   |                                                                                                                                                                                |
+| `tailscale_dns_split_nameservers` | Supported   |                                                                                                                                                                                |
+| `tailscale_federated_identity`    | Supported   | See [workload identity federation](#workload-identity-federation).                                                                                                             |
+| `tailscale_logstream_configuration` | Partial   | `configuration` streams the [audit log](/ref/audit). `network` is refused with `404`: network flow logs are produced by the client, not the control server, so Slopscale has none. Destinations are `http`, `splunk`, `elastic`, `datadog`, `axiom` and `loki`; S3 and Cloud Storage are refused by name. |
+| `tailscale_oauth_client`          | Supported   | Create, read, update in place and revoke.                                                                                                                                      |
+| `tailscale_posture_integration`   | Partial     | `falcon`, `sentinelone`, `intune`, `jamfpro`, `kandji` and `kolide` are wired to Slopscale's [posture integrations](/ref/device-trust). `fleet` and `huntress` are refused by name. |
+| `tailscale_service`               | Supported   | Maps onto [Tailscale Services](/ref/services).                                                                                                                                 |
+| `tailscale_tailnet_key`           | Supported   | Slopscale's pre-auth keys. `DELETE` revokes; the key stays readable as `invalid` until it is reaped.                                                                            |
+| `tailscale_tailnet_settings`      | Partial     | `devicesApprovalOn`, `usersApprovalOn`, `postureIdentityCollectionOn` and `devicesKeyDurationDays` can be changed. The rest are read-only here because they come from the configuration file or do not exist. |
+| `tailscale_webhook`               | Supported   | See [Webhooks](/ref/webhooks).                                                                                                                                                 |
+
+| Data source         | Support   | Notes                                                                                     |
+| ------------------- | --------- | ----------------------------------------------------------------------------------------- |
+| `tailscale_4via6`   | Supported | Computed by the provider itself with no server call, so it works against anything.        |
+| `tailscale_acl`     | Supported |                                                                                            |
+| `tailscale_device`  | Supported | Reading a device with all fields adds its distribution, connectivity, tailnet lock key and collected serial numbers. |
+| `tailscale_devices` | Supported |                                                                                            |
+| `tailscale_service` | Supported |                                                                                            |
+| `tailscale_user`    | Supported |                                                                                            |
+| `tailscale_users`   | Supported |                                                                                            |
+
+### Kubernetes operator
+
+The operator authenticates only with OAuth client credentials, so create a
+client with the `auth_keys`, `devices:core` and `services` scopes and the tag
+the operator runs as, and let that tag own the tag its proxies use:
+
+```json
+{
+  "tagOwners": {
+    "tag:k8s-operator": ["alice@"],
+    "tag:k8s": ["tag:k8s-operator"]
+  }
+}
+```
+
+The operator then mints its own auth keys for the proxies it creates, registers
+a Service per ingress and deletes a proxy's device when the workload goes away.
+All of it is covered by an end-to-end test in Slopscale's own suite.
+
+### Workload identity federation
+
+A CI job or cloud workload can trade the OIDC token its own platform signs for
+a Slopscale access token, so no long-lived secret has to live in a pipeline.
+Register the workload as a key with `keyType: "federated"`, naming the `issuer`,
+`audience` and `subject` its tokens carry, optionally with `customClaimRules`
+it must also satisfy, and the `scopes` and `tags` it should get:
+
+```console
+curl -H "Authorization: Bearer <API_KEY>" \
+    --json '{"keyType": "federated", "scopes": ["devices:core"], "tags": ["tag:ci"],
+             "issuer": "https://token.actions.githubusercontent.com",
+             "audience": "slopscale", "subject": "repo:acme/app:ref:refs/heads/main",
+             "customClaimRules": {"repository": "acme/app"}}' \
+    https://slopscale.example.com/api/v2/tailnet/-/keys
+```
+
+The workload exchanges its token for a one-hour access token with exactly that
+grant:
+
+```console
+curl --data-urlencode "client_id=<CLIENT_ID>" --data-urlencode "jwt=$ACTIONS_ID_TOKEN" \
+    https://slopscale.example.com/api/v2/oauth/token-exchange
+```
+
+The presented token is checked against the issuer's published keys and against
+every condition the identity carries, with a minute of clock leeway. Every
+exchange is recorded in the [audit log](/ref/audit) as `oauth.token.exchange`,
+refusals included, so a run of failures against one identity is visible.
+
+The console and the CLI manage identities next to OAuth clients, so neither
+needs the Tailscale-compatible API. The console's _OAuth clients_ page creates
+one and edits its trust conditions in place, and so does the CLI.
+
+```console
+$ slopscale oauth-clients create --federated --scope devices:core --tag tag:ci \
+    --issuer https://token.actions.githubusercontent.com --audience slopscale \
+    --subject "repo:acme/app:ref:refs/heads/main" --claim repository=acme/app
+
+$ slopscale oauth-clients update --id <CLIENT_ID> \
+    --subject "repo:acme/app:ref:refs/heads/release"
+```
+
+`slopscale oauth-clients list` shows both kinds with the subject each identity
+trusts. On `/api/v1` the same operations are `POST /api/v1/oauth-client` with
+`"keyType": "federated"`, `PATCH /api/v1/oauth-client/{clientId}`, where a
+field left out keeps its value and a trust condition sent for a plain client is
+refused, and `DELETE /api/v1/oauth-client/{clientId}` to revoke.
+
 ## Remote control
 
 The `slopscale` binary can control a Slopscale instance from a remote machine over the HTTP API.

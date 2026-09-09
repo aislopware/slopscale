@@ -21,7 +21,8 @@ MagicDNS and the base domain name the machines, so they stay in the configuratio
 
 The admin console edits the settings under _DNS_. The API has `GET`, `PUT` and `DELETE /api/v1/dns`, where `PUT`
 replaces every setting at once and `DELETE` returns to the configuration file, and the v2 API has Tailscale's
-`/api/v2/tailnet/-/dns/nameservers`, `/dns/preferences`, `/dns/searchpaths` and `/dns/split-dns` endpoints, so the
+`/api/v2/tailnet/-/dns/nameservers`, `/dns/preferences`, `/dns/searchpaths` and `/dns/split-dns` endpoints, plus
+`/dns/configuration`, which reads and replaces every setting in one call the way `PUT /api/v1/dns` does, so the
 Tailscale Terraform provider and other tooling written against them work unchanged. Both need the `dns` scope
 (`dns:read` to look); a network admin holds it, an IT admin can only read. The CLI mirrors the API:
 

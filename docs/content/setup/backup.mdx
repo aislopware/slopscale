@@ -1,0 +1,180 @@
+---
+title: "Backup and restore"
+---
+
+Slopscale keeps everything it knows in one database: users, machines and
+their keys, pre-auth keys, API keys, the policy and the settings. A backup
+of that database plus the configuration directory is a backup of the whole
+control server.
+
+## Why copying the file is not enough
+
+A SQLite database in write-ahead log mode is three files: `db.sqlite`,
+`db.sqlite-wal` and `db.sqlite-shm`. Recent writes live in the log until
+SQLite folds them back into the main file, so the main file on its own is
+missing them. `cp` reads the three at different moments while the server
+keeps writing, and the result can be a database that is inconsistent, or a
+main file paired with a log that no longer matches it. A copy taken from a
+stopped server is fine; a copy taken from a running one is a gamble.
+
+`slopscale db backup` asks SQLite for the copy instead, in one transaction,
+and writes a single file with no log beside it. It is safe to run while the
+server is serving.
+
+## Back up
+
+```shell
+sudo -u slopscale slopscale db backup
+```
+
+The backup lands next to the database as `<database>.backup-<timestamp>`.
+Write it somewhere else with `--out`:
+
+```shell
+sudo -u slopscale slopscale db backup --out /var/lib/slopscale/backups/db-2026-01-31.sqlite
+```
+
+The command refuses to overwrite an existing file, and the copy is read back
+before it takes its final name, so an interrupted backup leaves nothing
+behind.
+
+Back up the configuration directory too. It holds `config.yaml`, the private
+keys the server identifies itself with and, unless you keep the policy in
+the database, the policy file. None of them are in the database:
+
+```shell
+tar -czf /var/lib/slopscale/backups/etc-2026-01-31.tar.gz /etc/slopscale
+```
+
+:::warning[A backup is a copy of your tailnet's credentials]
+
+The database contains pre-auth keys, API keys and machine keys. Anyone who
+has the file can register machines on your tailnet. Keep backups readable by
+root or the slopscale user only, and encrypt them before they leave the
+machine.
+:::
+
+## Check a backup
+
+```shell
+slopscale db verify /var/lib/slopscale/backups/db-2026-01-31.sqlite
+```
+
+Verify runs SQLite's integrity check, confirms the file carries the
+slopscale migration history, and compares the version that last wrote it
+with the binary you run it with, so a backup from a newer server is
+reported before you try to restore it. Restore verifies the file the same
+way, so this is for checking that yesterday's backups are still good.
+
+## Restore
+
+Restoring replaces the live database. Stop the server first: it holds the
+database open and would carry on with the copy it started with.
+
+```shell
+sudo systemctl stop slopscale
+sudo -u slopscale slopscale db restore /var/lib/slopscale/backups/db-2026-01-31.sqlite
+sudo systemctl start slopscale
+```
+
+The current database is not deleted. It is moved to
+`<database>.pre-restore-<timestamp>`, together with its write-ahead log, so
+a restore of the wrong file can be undone by moving it back. The command
+asks for confirmation; `--yes` skips the question for scripts.
+
+Machines reconnect on their own after the restart. A machine that was
+registered after the backup was taken is unknown to the restored database
+and has to register again.
+
+## Take one every night
+
+The command writes the file, it does not create the directory it goes in:
+
+```shell
+sudo install -d -o slopscale -g slopscale -m 0700 /var/lib/slopscale/backups
+```
+
+<Tabs>
+<Tab title="cron">
+
+```shell title="/etc/cron.d/slopscale-backup"
+# The field after the schedule is the user to run as, and percent signs
+# must be escaped in a crontab.
+0 3 * * * slopscale slopscale db backup --out /var/lib/slopscale/backups/db-$(date +\%Y\%m\%d).sqlite
+15 3 * * * slopscale find /var/lib/slopscale/backups -name 'db-*.sqlite' -mtime +14 -delete
+```
+
+</Tab>
+<Tab title="systemd timer">
+
+```ini title="/etc/systemd/system/slopscale-backup.service"
+[Unit]
+Description=Back up the slopscale database
+
+[Service]
+Type=oneshot
+User=slopscale
+ExecStart=/bin/sh -c '/usr/bin/slopscale db backup --out /var/lib/slopscale/backups/db-$(date +%%Y%%m%%d).sqlite'
+```
+
+```ini title="/etc/systemd/system/slopscale-backup.timer"
+[Unit]
+Description=Back up the slopscale database nightly
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+```shell
+sudo systemctl enable --now slopscale-backup.timer
+```
+
+</Tab>
+</Tabs>
+
+## Containers
+
+Back up from the container that already has the configuration file and the
+data volume. The date is expanded by the shell on the host, so the image
+needs no shell of its own:
+
+```shell
+mkdir -p ./slopscale/lib/backups
+docker exec slopscale slopscale db backup \
+  --out /var/lib/slopscale/backups/db-$(date +%Y%m%d).sqlite
+```
+
+Restoring needs the server stopped, so run a second container over the same
+volumes with `db restore` in place of `serve`:
+
+```shell
+docker stop slopscale
+docker run --rm \
+  --volume "$(pwd)/config:/etc/slopscale:ro" \
+  --volume "$(pwd)/lib:/var/lib/slopscale" \
+  ghcr.io/aislopware/slopscale:<VERSION> \
+  db restore /var/lib/slopscale/backups/db-20260131.sqlite --yes
+docker start slopscale
+```
+
+## PostgreSQL
+
+`slopscale db` only handles SQLite. A PostgreSQL database is backed up with
+the tools that ship with the server:
+
+```shell
+pg_dump --format=custom --file=slopscale-2026-01-31.dump --host=localhost --username=slopscale slopscale
+```
+
+Restore it into an empty database with `pg_restore`:
+
+```shell
+pg_restore --dbname=slopscale --host=localhost --username=slopscale slopscale-2026-01-31.dump
+```
+
+See PostgreSQL's [Backup and Restore](https://www.postgresql.org/docs/current/backup.html) documentation for the
+options, and stop slopscale before restoring, as with SQLite.

@@ -68,7 +68,9 @@ switched off, so an open tailnet stays open until an operator turns it on.
 
 Rules and the policy file combine: the rules compile into grants that sit next
 to the file's own, and a connection is allowed when either admits it. The
-file's `tests` run against the combined result.
+file's `tests` run against the combined result. Capability grants have no
+equivalent among the rules and are written in the policy file; the grant that
+allows [peer relays](/ref/networks#peer-relays) is one.
 
 ## Temporary access
 

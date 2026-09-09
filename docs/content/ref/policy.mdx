@@ -255,6 +255,8 @@ configuration and attributes. At least the following node attributes are current
   port 41641.
 - `disable-captive-portal-detection`: [Disable automatic captive portal
   detection](https://tailscale.com/docs/integrations/captive-portals#disable-captive-portal-detection).
+- `disable-relay-server`: keep the node from acting as a [peer relay](/ref/networks#peer-relays), whatever its own
+  `--relay-server-port` setting says.
 
 ```json title="policy.json"
 {

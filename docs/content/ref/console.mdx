@@ -210,7 +210,9 @@ out*.
   with a switch), sharing and the global exit node switch, plus rename, tag,
   expire and remove. For an online machine running Tailscale SSH, an _SSH_
   button opens a terminal in the browser; see
-  [SSH from the console](#ssh-from-the-console).
+  [SSH from the console](#ssh-from-the-console). For client updates, health
+  diagnostics, live preferences and attestation, see
+  [Managing a machine's client](#managing-a-machines-client).
   A warning the client reports about itself, such as a subnet router whose
   kernel drops forwarded packets, shows at the top of the page until the client
   stops reporting it or goes offline.
@@ -226,7 +228,14 @@ out*.
   pre-authorized and tags; expire; delete), API keys and OAuth clients for
   the v2 API (create with scopes and tags; revoke; _Rotate secret_ mints a
   new secret for an API key that keeps its id and scopes). New keys and
-  client secrets are shown once, with a copy button.
+  client secrets are shown once, with a copy button. The OAuth clients page
+  also holds [federated identities](/ref/api#workload-identity-federation):
+  _New federated identity_ registers the issuer, audience and subject a
+  workload's own OpenID token carries, with optional claim rules, and the
+  scopes and tags it gets; the page then shows the token exchange call and
+  a GitHub Actions snippet to copy, since no secret exists. A _Kind_ column
+  and filter tell the two apart, and the row menu edits a client's scopes
+  and tags or an identity's trust conditions in place.
 - **Access controls**: a page each for the [rules, groups](/ref/access-control)
   and [postures](/ref/device-trust), the access [graph](/ref/access-control#access-graph)
   showing who can reach what, the queue of
@@ -292,12 +301,66 @@ when the tab closes. A user whose role does not read devices can only open a
 session to a machine of their own or one a machine of theirs already sees
 under the policy; any other machine is reported as not found.
 
+The SSH page offers the logins the machine suggests. They are a hint, not an
+authorisation, the SSH policy still decides, and when the machine names exactly
+one, it fills an empty field.
+
 Connecting from the browser needs the target machine's [DERP relays](/ref/derp)
 to be reachable over websockets (`wss:`). The
 [embedded relay](/ref/derp#embedded-derp) supports it; a relay that does not
 answers with a connection that never comes up.
 
 A console built without `make wasm` shows a notice on the terminal page.
+
+## Managing a machine's client
+
+The console can query a connected machine and change what its client does;
+see [device management](/ref/device-management). Every one of these questions
+goes to the machine over its control connection. A machine that is offline, or
+one with remote configuration off, answers 409; a client that refused answers
+502 with its message; a machine that did not answer in time gives 504. The
+console shows these in place rather than as a notification.
+
+A machine's Overview lists [hardware attestation](/ref/device-trust) as
+Attested, Lost or Not attested. Lost means the machine once proved itself with
+its hardware attestation key and its last map request did not; hovering the
+state shows when it was attested and when the key last changed. A machine whose
+client reported a TPM gets a TPM row with the manufacturer, vendor and firmware
+version. The Remote configuration row says whether the machine ran
+`tailscale set --remote-config`, which hands its local API to the tailnet admin.
+Actions → Reset hardware attestation clears what the key proved without
+touching the client. The next map request the machine signs starts the record
+again; until then `node:hardwareAttested` is false and any posture checking it
+fails. The machines list filters by attestation (Attested / Not attested). The
+filter appears once some machine reports an attestation key and rides in the URL
+as `?attested=`.
+
+The Client row offers Update now while the machine is connected, a newer stable
+client exists and the caller has the `devices:core` scope. The control plane
+cannot push an update: the client decides and refuses unless its owner allowed
+it with `tailscale set --auto-update=true`, and the console reports what it
+answered. The bulk bar's Update clients asks the ticked machines that are
+connected and behind, in one request, and reports "Started on N, M refused" with
+a dialog listing what each client said.
+
+The Client health section shows the warnings the client would show its own
+user, with the client's severity, how long it has been broken and whether
+traffic is affected. Refresh asks again. An offline machine is not asked. The
+Diagnostics block under Client health downloads the client's own dumps
+(preferences, network map, metrics, goroutines, socket stats and the tailnet
+lock log) as the client wrote them. It needs `devices:core`.
+
+The Preferences section reads the machine's own settings live: advertised
+routes, whether it accepts routes and DNS, the exit node it uses, Tailscale
+SSH, shields, posture reporting and auto-update. Editing them needs remote
+configuration on; without it the section shows the command that turns it on and
+has no Edit button. Only the fields changed are sent, so a setting the machine's
+owner changed meanwhile is left alone.
+
+Connectivity gains a TLS certificate row for a machine that runs Funnel or
+announces a service: Valid, Missing, Expired, or what the client said went
+wrong. An [app connector's](/ref/apps) page gains Learned routes: the addresses
+the machine has resolved for the domains it answers for, refreshable.
 
 ## Building from source
 

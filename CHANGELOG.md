@@ -613,11 +613,120 @@ node object carries `clientVersion` and `updateAvailable`, the server info
 machine page with an _Update available_ status and the latest release on
 the Server page.
 
+### Hardware attestation
+
+A client started with `tailscaled --hardware-attestation` signs every map
+request with a key generated inside the machine's TPM, which cannot be
+copied off it. The server verifies the signature against the machine's node
+key and offers the result to the policy as `node:hardwareAttested`, so a
+rule can insist that traffic comes from the machine itself rather than from
+a copied node key; `node:tpm` says whether the client found a TPM at all. A
+machine that stops signing loses the attribute on its next map request. The
+node object carries `hardwareAttestation` and `tpm`,
+`slopscale nodes attestation reset` and
+`DELETE /api/v1/node/{id}/hardware-attestation` forget the record after a
+TPM was cleared, and the audit log records every change of state. Linux and
+Windows machines with a TPM 2.0 can attest; the Apple and Android clients
+do not.
+
 ### Control dial plan
 
 `control_dial_plan` in the config file lists addresses clients try for the
 server before resolving its name, and keep between runs, so a tailnet
 survives a DNS outage; clients fall back to the name when none answers.
+
+### Database backup and restore
+
+`slopscale db backup` copies the SQLite database through SQLite itself, so a
+backup can be taken while the server runs; copying the file with `cp` cannot,
+because recent writes sit in the write-ahead log and the two files are read at
+different moments. `slopscale db verify` checks a backup, and
+`slopscale db restore` puts one back, keeping the database it replaces as
+`<database>.pre-restore-<timestamp>`. PostgreSQL is still backed up with
+`pg_dump`. See
+[Backup and restore](https://aislopware.github.io/slopscale/setup/backup/).
+
+### Peer relays
+
+The grant that lets machines relay traffic for each other, which slopscale
+has always compiled, is now documented, together with the
+`disable-relay-server` node attribute and how to check a relay. See
+[Peer relays](https://aislopware.github.io/slopscale/ref/networks/#peer-relays).
+
+### Managing machines over their control connection
+
+The server can now ask a connected machine to update its Tailscale
+installation, report the health warnings it would show its own user, hand
+over a support dump (its preferences, network map, metrics, goroutines,
+socket stats or tailnet lock log), list the logins it suggests for a
+Tailscale SSH session, report the routes it learned as an app connector and
+the state of the certificate it caches for Serve and Funnel. All of it
+rides the control connection the client already holds, so no inbound port
+or agent is involved, and a client that refuses is reported with its own
+words. `slopscale nodes update`, `nodes health` and `nodes diagnostics`
+drive it, and the API adds these under `/api/v1/node/{id}/`, with
+`POST /api/v1/nodes/client-update` for a fleet at once. The console's machine
+page shows the same: an _Update now_ button and a bulk _Update clients_
+action, a _Client health_ section with the diagnostics downloads, a
+_Preferences_ section, the certificate state under _Connectivity_, an app
+connector's learned routes, and the login hints on the SSH page.
+
+A machine whose owner ran `tailscale set --remote-config` also lets the
+server change a curated set of its preferences, from the routes it
+advertises to whether it runs Tailscale SSH, with `slopscale nodes prefs
+get` and `nodes prefs set` or `PATCH /api/v1/node/{id}/preferences`. That
+opt-in hands the tailnet admin the machine's whole local API, so it belongs
+on fleet machines rather than personal ones. See
+[Device management](https://aislopware.github.io/slopscale/ref/device-management/).
+
+### Terraform provider and Kubernetes operator
+
+The v2 API now covers what the Tailscale Terraform/OpenTofu provider and the
+Kubernetes operator ask of a control server, so both drive Slopscale
+unchanged. The provider can validate a policy before applying it
+(`tailscale_acl` checks every plan), read the stored policy back byte for byte
+with its comments intact, change an OAuth client in place, manage the whole
+DNS configuration in one resource, and manage posture integrations and the
+audit log stream as resources. A device read with `fields=all` now carries the
+detail the provider's device data source expects: whether the machine blocks
+incoming connections, whether it holds a control connection, its distribution,
+its tailnet lock key, whether it runs Tailscale SSH, its collected serial
+numbers and its connectivity, including per-relay latency. The default device
+fields are unchanged.
+
+The Kubernetes operator's whole startup and reconcile path is covered by a
+test: it authenticates as an OAuth client, probes devices, keys and services,
+mints an auth key for a proxy, registers the proxy's service and deletes the
+device when the proxy goes away. A service created before its ports are known
+(the operator sends `do-not-validate`) is now accepted rather than refused.
+
+Not everything the provider offers exists here: `tailscale_contacts`,
+`tailscale_aws_external_id` and network flow log streams have nothing behind
+them in Slopscale and are refused with an explanation. See
+[API](https://aislopware.github.io/slopscale/ref/api/) for the resource-by-resource
+table.
+
+### Workload identity federation
+
+A CI job or cloud workload can now get a Slopscale access token by presenting
+the OIDC token its own platform already signs for it, so no long-lived secret
+has to be stored in a pipeline. Register the workload as a key with
+`keyType: "federated"`, naming the issuer, audience and subject its tokens
+carry, optionally with extra claim rules it must satisfy, and give it the
+scopes and tags it needs. The workload exchanges its token at
+`POST /api/v2/oauth/token-exchange` for a one-hour access token with exactly
+that grant. The presented token is verified against the issuer's published
+keys, with a minute of clock leeway, and every exchange is recorded in the
+audit log as `oauth.token.exchange`, refusals included.
+
+The console and the CLI manage identities next to OAuth clients, so neither
+needs the Tailscale-compatible API. The console's OAuth clients page and
+`slopscale oauth-clients create --federated` make one, and the page and
+`slopscale oauth-clients update` change its scopes, tags and trust conditions
+in place, where a field left out keeps the value it has. An OAuth client on
+`/api/v1` now reports its `keyType` and, for an identity, its issuer, audience,
+subject and claim rules; `PATCH /api/v1/oauth-client/{clientId}` is the
+endpoint behind the edit.
 
 ### Protocol
 

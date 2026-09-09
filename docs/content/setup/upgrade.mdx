@@ -24,7 +24,9 @@ Update an existing Slopscale installation to a new version:
 ## Backup
 
 Slopscale applies database migrations during upgrades and we highly recommend to create a backup of your database before
-upgrading. A full backup of Slopscale depends on your individual setup, but below are some typical setup scenarios.
+upgrading. `slopscale db backup` copies the database through SQLite itself and reads the copy back before it keeps it.
+The configuration directory is copied separately, because the keys and the policy file are not in the database. See
+[Backup and restore](/setup/backup) for restoring one, for taking one on a schedule and for PostgreSQL.
 
 <Tabs>
 <Tab title="Standard installation">
@@ -36,10 +38,11 @@ An installation that follows our [official releases](/setup/install/official) se
 - SQLite as database: `/var/lib/slopscale/db.sqlite`
 
 ```console
-TIMESTAMP=$(date +%Y%m%d%H%M%S)
-cp -aR /etc/slopscale /etc/slopscale.backup-$TIMESTAMP
-cp -aR /var/lib/slopscale /var/lib/slopscale.backup-$TIMESTAMP
+sudo -u slopscale slopscale db backup
+sudo cp -aR /etc/slopscale /etc/slopscale.backup-$(date +%Y%m%d%H%M%S)
 ```
+
+The copy lands next to the database as `/var/lib/slopscale/db.sqlite.backup-<timestamp>`.
 
 </Tab>
 <Tab title="Container">
@@ -48,14 +51,20 @@ An installation that follows our [container](/setup/install/container) setup gui
 that contains the configuration file, data directory and the SQLite database.
 
 ```console
-cp -aR /path/to/slopscale /path/to/slopscale.backup-$(date +%Y%m%d%H%M%S)
+docker exec slopscale slopscale db backup
+cp -aR /path/to/slopscale/config /path/to/slopscale/config.backup-$(date +%Y%m%d%H%M%S)
 ```
 
 </Tab>
 <Tab title="PostgreSQL">
 
-Please follow PostgreSQL's [Backup and Restore](https://www.postgresql.org/docs/current/backup.html) documentation
+`slopscale db backup` is SQLite only. Use `pg_dump` and follow PostgreSQL's
+[Backup and Restore](https://www.postgresql.org/docs/current/backup.html) documentation
 to create a backup of your PostgreSQL database.
+
+```console
+pg_dump --format=custom --file=slopscale-$(date +%Y%m%d).dump --username=slopscale slopscale
+```
 
 </Tab>
 </Tabs>

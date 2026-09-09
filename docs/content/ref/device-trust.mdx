@@ -62,6 +62,8 @@ and `custom:` attributes are set by an operator.
 | `node:deviceModel`                  | The hardware model on macOS, iOS and Android                                                    |
 | `node:package`                      | How the client was installed                                                                    |
 | `node:tagged`                       | Whether the node is tagged                                                                      |
+| `node:hardwareAttested`             | Whether the machine proved its hardware attestation key on its last map request                 |
+| `node:tpm`                          | Whether the client found a TPM on the machine                                                   |
 | `node:serialNumber`                 | The serial numbers the client collected, once identity collection is on                         |
 | `custom:...`                        | Set through the API, the CLI or the console                                                     |
 | `ip:address`                        | The address the machine's control connection comes from, as seen by the server                  |
@@ -133,6 +135,91 @@ because whoever is root on a machine can then give it any attribute a
 policy trusts. An attribute the machine sets is a custom attribute like
 any other, with the comment _Set by the machine_, and the audit log
 records it as `node.attribute.set` with the machine as the actor.
+
+## Hardware attestation
+
+A posture attribute is only as good as the machine reporting it. Hardware
+attestation binds a machine's identity to hardware it cannot copy: the
+client generates an ECDSA P-256 key inside the machine's TPM, where the
+private half never becomes readable, and signs every map request with it.
+The server checks the signature and records what it proved, so the policy
+can insist that traffic comes from the physical machine that first
+presented the key rather than from a copied node key.
+
+The client only does this when it is started with the flag:
+
+```console
+tailscaled --hardware-attestation
+```
+
+It needs a build with TPM support (the stock Linux and Windows packages
+have it) and a TPM 2.0 device. The Apple and Android clients never send
+one, so their machines are never attested; `node:tpm` tells them apart
+from a Linux machine that has no TPM at all.
+
+### What the server verifies
+
+Every map request from such a client carries the public key, a timestamp
+and an ECDSA signature over the SHA-256 of `<unix seconds>|<node key>`,
+with the node key in its `nodekey:` form. The server verifies the
+signature against the node key it holds for the machine, and rejects a
+timestamp more than a day from its own clock: the client stamps its own
+time, so the window bounds a replay rather than checks a clock.
+
+The machine is attested for exactly as long as it keeps signing. A client
+that is restarted without the flag, or whose TPM stops answering, loses
+the attribute on its next map request, and every rule that requires it
+closes at once.
+
+A signature under a key other than the stored one replaces it, because a
+cleared TPM and a reinstall both produce a new key legitimately. The
+change is recorded on the machine as `keyChangedAt` and audited, since it
+also looks like a machine being impersonated.
+
+### Requiring it in a policy
+
+The two attributes are ordinary posture attributes:
+
+```text
+node:hardwareAttested == true
+node:tpm == true
+```
+
+`node:hardwareAttested` is always present, true or false, so a rule can
+require it with `== true` and nothing else. `node:tpm` is present as soon
+as the client has reported anything about itself.
+
+```console
+slopscale postures create --name "Attested hardware" \
+  --expr "node:hardwareAttested == true"
+slopscale access-rules create --name "SSH from attested machines" \
+  --src 2 --dst 3 --protocol tcp --ports 22 --posture 1
+```
+
+In the policy file the same expression goes into a `postures` entry and
+is named from `srcPosture`.
+
+### Console and API
+
+A machine's `hardwareAttestation` in the API holds `attested`, the key as
+`hwattestpub:<hex>`, `attestedAt` (when attestation was gained, not the
+last request) and `keyChangedAt`; it is absent for a machine that never
+sent a key. `tpm` holds what the client reported about the device:
+manufacturer, vendor, model, firmware version and specification revision.
+Both are on the node object of `GET /api/v1/node/{id}`, and the machine's
+page shows them under _Device posture_.
+
+`DELETE /api/v1/node/{id}/hardware-attestation` forgets the record, so
+the next map request that carries a valid signature starts it again. The
+client is not touched and keeps its key; this is what to do after a TPM
+was cleared, so that the change of key is not recorded as one. It needs
+the `devices:core` scope and is audited as `node.attestation.reset`, next
+to the `node.attestation.attested`, `node.attestation.lost` and
+`node.attestation.key_changed` entries the server writes on its own.
+
+```console
+slopscale nodes attestation reset --identifier 7
+```
 
 ## Posture integrations
 
