@@ -11,6 +11,7 @@ import (
 
 	"github.com/aislopware/slopscale/hscontrol/api/tagguard"
 	"github.com/aislopware/slopscale/hscontrol/audit"
+	"github.com/aislopware/slopscale/hscontrol/clientversion"
 	"github.com/aislopware/slopscale/hscontrol/scope"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/util"
@@ -69,6 +70,16 @@ type Node struct {
 	SharedWith []string `doc:"IDs of the users the node is shared with." json:"sharedWith" nullable:"false"`
 
 	GlobalExitNode bool `doc:"true when every client is told to prefer this exit node." json:"globalExitNode"`
+
+	// FunnelEnabled is what the client reports in its Hostinfo once a
+	// Funnel endpoint is on; the console marks such machines.
+	FunnelEnabled bool `doc:"true while the client has a Funnel endpoint on, exposing a service to the internet through the ingress." json:"funnelEnabled"` //nolint:lll // struct tag
+
+	// ClientVersion is the Tailscale client version the node reported,
+	// without the build suffix; UpdateAvailable says a newer stable
+	// release exists, once the server has looked it up.
+	ClientVersion   string `doc:"The Tailscale client version the node last reported, such as 1.86.2; empty until it connects."                            json:"clientVersion"`   //nolint:lll // struct tag
+	UpdateAvailable bool   `doc:"true when a newer stable Tailscale client exists than the one the node runs; see latestClientVersion on the server info." json:"updateAvailable"` //nolint:lll // struct tag
 
 	// Ephemeral covers both an ephemeral pre-auth key and a client that asked
 	// to be ephemeral when it registered.
@@ -217,7 +228,7 @@ func registerNodeReadOps(api huma.API, b Backend) {
 		}
 
 		out := &nodeOutput{}
-		out.Body.Node = nodeFromView(node)
+		out.Body.Node = b.nodeFromView(node)
 		out.Body.Node.SubnetRoutes = servedRoutes(b, node)
 
 		return out, nil
@@ -245,7 +256,7 @@ func registerNodeReadOps(api huma.API, b Backend) {
 		out.Body.Nodes = make([]Node, nodes.Len())
 
 		for i, node := range nodes.All() {
-			n := nodeFromView(node)
+			n := b.nodeFromView(node)
 
 			// Tags-as-identity: tagged nodes are presented as the special
 			// TaggedDevices user.
@@ -341,7 +352,7 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		b.Change(nodeChange)
 
 		out := &nodeOutput{}
-		out.Body.Node = nodeFromView(node)
+		out.Body.Node = b.nodeFromView(node)
 
 		return out, nil
 	})
@@ -396,7 +407,7 @@ func handleExpireNode(ctx context.Context, b Backend, in *expireNodeInput) (*nod
 		b.Change(nodeChange)
 
 		out := &nodeOutput{}
-		out.Body.Node = nodeFromView(node)
+		out.Body.Node = b.nodeFromView(node)
 
 		return out, nil
 	}
@@ -418,7 +429,7 @@ func handleExpireNode(ctx context.Context, b Backend, in *expireNodeInput) (*nod
 	b.Change(nodeChange)
 
 	out := &nodeOutput{}
-	out.Body.Node = nodeFromView(node)
+	out.Body.Node = b.nodeFromView(node)
 
 	return out, nil
 }
@@ -469,7 +480,7 @@ func handleSetTags(ctx context.Context, b Backend, in *setTagsInput) (*nodeOutpu
 	b.Change(nodeChange)
 
 	out := &nodeOutput{}
-	out.Body.Node = nodeFromView(node)
+	out.Body.Node = b.nodeFromView(node)
 
 	return out, nil
 }
@@ -540,7 +551,7 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 		b.Change(nodeChange, routeChange)
 
 		out := &nodeOutput{}
-		out.Body.Node = nodeFromView(node)
+		out.Body.Node = b.nodeFromView(node)
 
 		return out, nil
 	})
@@ -655,7 +666,7 @@ func handleSetApprovedRoutes(ctx context.Context, b Backend, in *setApprovedRout
 	b.Change(nodeChange)
 
 	out := &nodeOutput{}
-	out.Body.Node = nodeFromView(node)
+	out.Body.Node = b.nodeFromView(node)
 	out.Body.Node.SubnetRoutes = servedRoutes(b, node)
 
 	return out, nil
@@ -707,7 +718,7 @@ func handleDebugCreateNode(ctx context.Context, b Backend, in *debugCreateNodeIn
 	}
 
 	out := &nodeOutput{}
-	out.Body.Node = nodeFromView(echoNode.View())
+	out.Body.Node = b.nodeFromView(echoNode.View())
 
 	return out, nil
 }
@@ -723,6 +734,18 @@ func servedRoutes(b Backend, node types.NodeView) []string {
 // nodeFromView builds the Node response from a NodeView, reading through the
 // view accessors. SubnetRoutes is left empty; callers that serve routes set it
 // explicitly.
+func (b Backend) nodeFromView(view types.NodeView) Node {
+	n := nodeFromView(view)
+
+	if hi := view.Hostinfo(); hi.Valid() {
+		n.ClientVersion = clientversion.Short(hi.IPNVersion())
+		n.UpdateAvailable = clientversion.Outdated(hi.IPNVersion(), b.State.LatestClientVersion())
+	}
+
+	return n
+}
+
+// nodeFromView is [Backend.nodeFromView] without what needs the state.
 func nodeFromView(view types.NodeView) Node {
 	n := Node{
 		ID:              view.StringID(),
@@ -742,6 +765,7 @@ func nodeFromView(view types.NodeView) Node {
 		Approved:        view.IsApproved(),
 		SharedWith:      sharedWithIDs(view),
 		GlobalExitNode:  view.IsGlobalExitNode(),
+		FunnelEnabled:   view.FunnelEnabled(),
 		Ephemeral:       view.IsEphemeral(),
 	}
 

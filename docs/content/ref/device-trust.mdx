@@ -111,6 +111,29 @@ Through the API, `PUT /api/v1/node/{id}/attributes/{key}` with
 admins hold. The audit log records `node.attribute.set`,
 `node.attribute.delete` and `node.posture.collect`.
 
+### Attributes set by the machine
+
+A machine can set its own custom attributes over its control connection,
+the way Tailscale's experimental device attributes do: a management agent
+on the machine reports what it found, and the policy checks it. The
+client's local API takes a patch, `custom:` keys with a string, number or
+boolean value, or `null` to delete:
+
+```console
+curl --unix-socket /var/run/tailscale/tailscaled.sock -X PATCH \
+  -H 'Content-Type: application/json' \
+  -d '{"custom:disk-encrypted": true, "custom:agent": "1.4"}' \
+  http://local-tailscaled.sock/localapi/v0/alpha-set-device-attrs
+```
+
+The server accepts this only while the `deviceAttributesOn` setting is on,
+`slopscale settings set --device-attributes=true` or _Machines set their
+own attributes_ under the console's _Settings_; it is off by default,
+because whoever is root on a machine can then give it any attribute a
+policy trusts. An attribute the machine sets is a custom attribute like
+any other, with the comment _Set by the machine_, and the audit log
+records it as `node.attribute.set` with the machine as the actor.
+
 ## Postures
 
 A posture names conditions a machine must meet. It has a list of

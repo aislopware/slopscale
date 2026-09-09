@@ -157,12 +157,7 @@ var unmodelledTailnetStateCaps = []nodecap.Cap{
 // strippedCapPrefixes lists URL/string prefixes for parameterized or
 // pattern-named caps that should be stripped alongside
 // [unmodelledTailnetStateCaps].
-var strippedCapPrefixes = []string{
-	// "https://tailscale.com/cap/funnel-ports?…": parameterized cap
-	// (e.g. "?ports=80,443") issued when funnel is configured.
-	// Funnel is not supported.
-	"https://tailscale.com/cap/funnel-ports?",
-}
+var strippedCapPrefixes = []string{}
 
 // stripUnmodelledTailnetStateCaps returns a copy of cm with
 // [unmodelledTailnetStateCaps] and [strippedCapPrefixes] removed. Used

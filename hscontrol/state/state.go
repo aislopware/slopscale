@@ -23,6 +23,7 @@ import (
 	"time"
 
 	hsdb "github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/idtoken"
 	"github.com/aislopware/slopscale/hscontrol/logstream"
 	"github.com/aislopware/slopscale/hscontrol/policy"
 	"github.com/aislopware/slopscale/hscontrol/policy/matcher"
@@ -126,6 +127,13 @@ type State struct {
 	derp derpState
 	// settings holds the tailnet-wide switches; see [State.Settings].
 	settings atomic.Pointer[types.Settings]
+	// idTokenSigner signs identity tokens once a key is loaded or made;
+	// idTokenMu serialises that first use. See [State.IDTokenSigner].
+	idTokenSigner atomic.Pointer[idtoken.Signer]
+	idTokenMu     sync.Mutex
+	// latestClientVersion is the latest stable client release the server
+	// found, empty until the first lookup; see [State.LatestClientVersion].
+	latestClientVersion atomic.Pointer[string]
 	// webhooks delivers events to the registered endpoints.
 	webhooks *webhook.Dispatcher
 	// mailer sends the mail the server writes itself (an invite link);

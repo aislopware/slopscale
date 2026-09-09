@@ -1,0 +1,121 @@
+---
+title: "Funnel"
+---
+
+Funnel exposes a service on a machine to the internet, the way
+[Tailscale Funnel](https://tailscale.com/kb/1223/funnel) does: `tailscale
+funnel 3000` on the machine, and `https://laptop.ts.example.com` answers
+from anywhere. The machine terminates TLS with its own certificate; what
+sits in between is an _ingress_, a node that takes public TLS connections
+and hands the bytes to the machine over the tailnet. On Tailscale that is
+Tailscale's fleet of ingress servers; here it is a node you run, inside
+the server or on any machine with a public address.
+
+## How it works
+
+The client does not talk to the control server to serve a connection.
+The ingress reads the server name from the TLS client hello, finds the
+machine with that MagicDNS name among its peers, and opens the machine's
+peer API with the same request Tailscale's ingress sends. The machine
+checks three things before it takes the connection: the ingress holds the
+`ingress` peer capability (the policy grants it), the machine itself
+holds the `funnel` node attribute (the policy grants it too), and its own
+serve config allows Funnel for that host and port (`tailscale funnel`
+set it). Then it terminates TLS and serves as it would on the tailnet.
+
+The ingress sees encrypted bytes only. A machine that has not turned
+Funnel on refuses every connection, whatever the ingress sends.
+
+## Setting it up
+
+Funnel needs three things.
+
+**HTTPS certificates.** The machine needs a certificate for its MagicDNS
+name, so [certificate assistance](./https-certificates) must be on with
+a base domain that is a public zone. That also stamps the `https` node
+attribute, which `tailscale funnel` checks first.
+
+**The `funnel` node attribute**, granted by the policy file to the
+machines that may use Funnel, as on Tailscale:
+
+```json
+{
+  "nodeAttrs": [{ "target": ["tag:web", "alice@example.com"], "attr": ["funnel"] }]
+}
+```
+
+The server adds the ports Funnel may use (`443`, `8443` and `10000`
+unless the config says otherwise), and a grant that lets the ingress
+nodes reach those machines with the `ingress` capability. Nothing else
+in the policy needs to mention the ingress.
+
+**An ingress node** with a public address. The simplest is the one inside
+the server:
+
+```yaml
+funnel:
+  enabled: true
+  # The public addresses to accept TLS on; one per Funnel port.
+  listen_addrs: [":443", ":8443", ":10000"]
+  # The ingress node's keys.
+  state_dir: /var/lib/slopscale/ingress
+  # The ports Funnel may be turned on for.
+  ports: [443, 8443, 10000]
+```
+
+It joins the tailnet as `slopscale-ingress` with the tag
+`tag:slopscale-ingress`, approved and shown among the machines. If the
+server itself listens on port 443, give the ingress another address or
+put it on another machine.
+
+An ingress on another machine, such as a small VPS in front of a server
+behind NAT, runs with the same binary and a tagged pre-auth key:
+
+```console
+$ slopscale preauthkeys create --tags tag:slopscale-ingress --preauthorized
+$ slopscale ingress --control-url https://control.example.com \
+    --auth-key tskey-auth-… --state-dir /var/lib/slopscale-ingress
+```
+
+Several ingress nodes may run at once; public DNS decides which one a
+client reaches.
+
+**Public DNS.** The machines' MagicDNS names must resolve, on the public
+internet, to the ingress. A wildcard record under the base domain does
+it once:
+
+```
+*.ts.example.com.  A  203.0.113.7
+```
+
+The names carry no tailnet addresses; they only point clients at the
+ingress, which delivers by server name.
+
+## Using it
+
+On a machine the policy grants Funnel to:
+
+```console
+$ tailscale funnel 3000
+Available on the internet:
+
+https://laptop.ts.example.com/
+|-- proxy http://127.0.0.1:3000
+```
+
+`tailscale funnel` fails with its own message when the attribute is
+missing, when HTTPS is off, or when no ingress node has joined the
+tailnet. The machine reports Funnel in its Hostinfo, so the console marks
+it with a funnel icon on the machines list and the machine page says
+_Funnel: On_. The Server page shows how many ingress nodes have joined
+and whether the embedded one is running.
+
+## What is different from Tailscale
+
+- The ingress is yours: it is the machine the public reaches, and it
+  needs a public address and the Funnel ports open.
+- Only MagicDNS names are delivered. A name of your own on a Funnel port
+  (a client's _bring your own domain_) is not found by the ingress.
+- Funnel-based `tls-alpn-01` certificate renewal works through the
+  ingress like any other connection; first issuance still uses DNS-01
+  through certificate assistance.

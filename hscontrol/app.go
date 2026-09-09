@@ -27,6 +27,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/dns"
 	"github.com/aislopware/slopscale/hscontrol/dnsprovider"
 	"github.com/aislopware/slopscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/idtoken"
 	"github.com/aislopware/slopscale/hscontrol/mapper"
 	"github.com/aislopware/slopscale/hscontrol/recorder"
 	"github.com/aislopware/slopscale/hscontrol/state"
@@ -88,6 +89,10 @@ type Slopscale struct {
 	// dnsProvider publishes ACME challenge records for machines' HTTPS
 	// certificates; nil when cfg.HTTPSCerts is off.
 	dnsProvider dnsprovider.Provider
+
+	// funnelAddrs is where the embedded Funnel ingress listens while it
+	// runs; see [Slopscale.FunnelIngressAddrs].
+	funnelAddrs atomic.Pointer[[]string]
 
 	clientStreamsOpen sync.WaitGroup
 }
@@ -518,6 +523,14 @@ func (h *Slopscale) Serve() error {
 
 	if h.cfg.SSHRecording.Enabled {
 		errorGroup.Go(func() error { return h.runSSHRecorder(ctx) })
+	}
+
+	if h.cfg.Funnel.Enabled {
+		errorGroup.Go(func() error { return h.runFunnelIngress(ctx) })
+	}
+
+	if h.cfg.ClientUpdates.Check {
+		errorGroup.Go(func() error { return h.runClientVersionCheck(ctx) })
 	}
 
 	// Handle common process-killing signals so we can gracefully shut down:
@@ -1241,6 +1254,11 @@ func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 		r.Get(ConsoleLoginPath, provider.ConsoleLoginHandler)
 		r.Post("/register/confirm/{auth_id}", provider.RegisterConfirmHandler)
 	}
+
+	// Identity tokens (`tailscale id-token`) are verified through OpenID
+	// discovery at the server URL.
+	r.Get(idtoken.DiscoveryPath, h.OIDCDiscoveryHandler)
+	r.Get(idtoken.JWKSPath, h.JWKSHandler)
 
 	r.Get("/apple", h.AppleConfigMessage)
 	r.Get("/apple/{platform}", h.ApplePlatformConfig)

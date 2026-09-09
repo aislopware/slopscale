@@ -448,6 +448,75 @@ expiry is how a key is revoked, so a replacement must be created instead. A key
 that carries its own scopes may only rotate a key no wider than itself, and
 rotations are recorded in the audit log as `apikey.rotate`.
 
+### Funnel
+
+`tailscale funnel` works: a machine the policy grants the `funnel` node
+attribute can expose a service to the internet, and the server adds the
+Funnel ports and the grant that lets the ingress reach it. The ingress is a
+node you run, since Tailscale's ingress servers are not available to a
+self-hosted control plane: `funnel.enabled` runs one inside the server
+(joining as `slopscale-ingress`), and `slopscale ingress` runs one on any
+machine with a public address. It reads the server name from the TLS client
+hello and hands the bytes to the machine over the tailnet, so the machine
+terminates TLS with its own certificate and the ingress sees nothing in
+clear. Funnel needs HTTPS certificates on and public DNS pointing the
+machines' names at the ingress. `tailscale funnel` fails plainly while no
+ingress node has joined. Certificate assistance now also stamps the `https`
+node attribute, so `tailscale serve` no longer needs it granted in the
+policy. The console marks Funnel machines on the machines list and page,
+and the Server page shows the ingress nodes. See
+[Funnel](https://aislopware.github.io/slopscale/ref/funnel/).
+
+### Identity tokens
+
+`tailscale id-token <audience>` works: the server signs a JSON Web Token
+about the machine (its MagicDNS name, node key, addresses, tags or user,
+in the claims Tailscale documents) with an ES256 key it makes on first use
+and stores in the database, so every server on the same database signs
+alike. A verifier finds the key through OpenID discovery at the server
+URL, `/.well-known/openid-configuration` and `/.well-known/jwks.json`,
+which lets a secrets store or a cloud account's OpenID federation trust a
+machine without a password. A machine waiting for approval, suspended or
+expired gets no token. See
+[Identity tokens](https://aislopware.github.io/slopscale/ref/identity-tokens/).
+
+### Machines set their own attributes
+
+A machine can set its own `custom:` posture attributes over its control
+connection, Tailscale's experimental `set-device-attr`, once the new
+`deviceAttributesOn` setting is on (`slopscale settings set
+--device-attributes=true`, or _Machines set their own attributes_ under
+_Settings_ in the console). It is off by default, because root on a machine
+could otherwise give it any attribute a policy trusts. Attributes set this
+way carry the comment _Set by the machine_ and land in the audit log with
+the machine as the actor.
+
+### Client update notices
+
+The server reads the latest stable Tailscale release from
+pkgs.tailscale.com once a day and tells each client whether it runs it, so
+clients behind an older release show Tailscale's own "update available"
+health warning and, with auto-update on, update themselves. `client_updates`
+in the config file turns the lookup off or changes how often it runs. The
+node object carries `clientVersion` and `updateAvailable`, the server info
+`latestClientVersion`, and the console shows the client version on the
+machine page with an _Update available_ status and the latest release on
+the Server page.
+
+### Control dial plan
+
+`control_dial_plan` in the config file lists addresses clients try for the
+server before resolving its name, and keep between runs, so a tailnet
+survives a DNS outage; clients fall back to the name when none answers.
+
+### Protocol
+
+- A machine waiting for approval now gets a health message saying so, with
+  a link to the console's machines page, the way a suspended machine
+  already did.
+- `GET /machine/whoami`, which `tailscale debug ts2021` uses to check a
+  control connection, answers with the machine's nodes instead of `501`.
+
 ### BREAKING
 
 #### API

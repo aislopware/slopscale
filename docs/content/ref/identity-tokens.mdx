@@ -1,0 +1,57 @@
+---
+title: "Identity tokens"
+---
+
+A machine can ask the server for a signed token that says which machine
+it is, the way
+[Tailscale's workload identity](https://tailscale.com/kb/1276/workload-identity)
+does. A service that trusts the server's signing key can then let the
+machine in without a password: a secrets store, a cloud account's
+OpenID federation, an internal API.
+
+```console
+$ TAILSCALE_USE_WIP_CODE=1 tailscale id-token https://vault.example.com
+eyJhbGciOiJFUzI1NiIsImtpZCI6...
+```
+
+The command is behind the client's work-in-progress switch, as it is on
+Tailscale. Programs use the local API, `GET /localapi/v0/id-token?aud=…`,
+which the client forwards to the server over its control connection; the
+answer is `{"id_token": "…"}`.
+
+## What the token says
+
+The token is a JSON Web Token signed with an ES256 key the server holds.
+It carries the standard claims and Tailscale's:
+
+| Claim                                | Value                                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------- |
+| `iss`                                | The server URL                                                            |
+| `sub`                                | The machine's MagicDNS name, `laptop.ts.example.com`                      |
+| `aud`                                | The audience the machine asked for                                        |
+| `iat`, `nbf`, `exp`                  | Issued now, valid at once, for five minutes                               |
+| `jti`                                | A random token identifier                                                 |
+| `key`                                | The machine's node key                                                    |
+| `addresses`                          | Its tailnet addresses                                                     |
+| `nid`, `node`                        | Its machine ID and name                                                   |
+| `domain`                             | The tailnet's domain, the server's host name                              |
+| `tags`                               | `<domain>:tag:<name>` for each tag, on a tagged machine                   |
+| `user`, `uid`                        | `<domain>:<login>` and the user's ID, on a user-owned machine             |
+
+A verifier finds the key through OpenID discovery at the server URL:
+`/.well-known/openid-configuration` names the key set, served at
+`/.well-known/jwks.json`. Anything that verifies an OpenID Connect ID
+token can verify these, with the server URL as the issuer and the
+audience as the client ID.
+
+The signing key is made the first time a token is asked for and stored
+in the database, so every server on the same database signs with the
+same key and the key survives a restart. There is no key rotation; a
+verifier caches the key set for as long as it likes.
+
+## Checks
+
+The server signs only for the machine that asks: the node key in the
+request must be the one bound to the connection, and the machine must
+be approved and not suspended. An expired key, a machine waiting for
+approval or a suspended one gets a `403`.

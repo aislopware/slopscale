@@ -375,6 +375,7 @@ func (pol *Policy) compileGrants(
 
 	grants = append(grants, accessGrants(pol.access)...)
 	grants = append(grants, pol.recorderGrants()...)
+	grants = append(grants, pol.funnelGrants()...)
 
 	compiled := make([]compiledGrant, 0, len(grants))
 	ctx := pol.postureContext()

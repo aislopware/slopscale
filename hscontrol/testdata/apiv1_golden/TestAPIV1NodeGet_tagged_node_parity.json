@@ -6,11 +6,13 @@
       "approvedAt": "\u003ctimestamp\u003e",
       "approvedRoutes": [],
       "availableRoutes": [],
+      "clientVersion": "",
       "clientWarnings": [],
       "createdAt": "\u003ctimestamp\u003e",
       "discoKey": "\u003csecret\u003e",
       "ephemeral": false,
       "expiry": null,
+      "funnelEnabled": false,
       "givenName": "node-b",
       "globalExitNode": false,
       "id": "1",
@@ -54,6 +56,7 @@
       "tags": [
         "tag:initial"
       ],
+      "updateAvailable": false,
       "user": null
     }
   }

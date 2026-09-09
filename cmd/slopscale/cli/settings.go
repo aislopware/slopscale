@@ -22,6 +22,8 @@ func init() {
 		"Require an administrator to approve users created by OIDC login")
 	setSettingsCmd.Flags().Bool("posture-identity", false,
 		"Ask clients for their hardware serial numbers, for node:serialNumber posture checks")
+	setSettingsCmd.Flags().Bool("device-attributes", false,
+		"Let machines set their own custom posture attributes over the control connection")
 	setSettingsCmd.Flags().Int64("key-expiry-days", 0,
 		"Cap node key expiry at this many days after a login; 0 leaves the config file and the client in charge")
 	setSettingsCmd.Flags().StringSlice("ssh-recorders", nil,
@@ -31,8 +33,8 @@ func init() {
 }
 
 var errNoSettingGiven = errors.New(
-	"give at least one of --devices-approval, --users-approval, --posture-identity, --key-expiry-days, " +
-		"--ssh-recorders or --ssh-recording-enforce",
+	"give at least one of --devices-approval, --users-approval, --posture-identity, --device-attributes, " +
+		"--key-expiry-days, --ssh-recorders or --ssh-recording-enforce",
 )
 
 var settingsCmd = &cobra.Command{
@@ -84,6 +86,11 @@ users approval off approves every node or user that was waiting.`,
 				body.PostureIdentityOn = &on
 			}
 
+			if cmd.Flags().Changed("device-attributes") {
+				on, _ := cmd.Flags().GetBool("device-attributes")
+				body.DeviceAttributesOn = &on
+			}
+
 			if cmd.Flags().Changed("key-expiry-days") {
 				days, _ := cmd.Flags().GetInt64("key-expiry-days")
 				body.KeyExpiryDays = &days
@@ -101,7 +108,8 @@ users approval off approves every node or user that was waiting.`,
 			}
 
 			if body.DevicesApprovalOn == nil && body.UsersApprovalOn == nil && body.KeyExpiryDays == nil &&
-				body.PostureIdentityOn == nil && body.SshRecorders == nil && body.SshRecordingEnforce == nil {
+				body.PostureIdentityOn == nil && body.DeviceAttributesOn == nil && body.SshRecorders == nil &&
+				body.SshRecordingEnforce == nil {
 				return errNoSettingGiven
 			}
 
@@ -127,6 +135,7 @@ func printSettings(cmd *cobra.Command, settings *clientv1.Settings) error {
 				{"Device approval", onOff(settings.DevicesApprovalOn)},
 				{"Users approval", onOff(settings.UsersApprovalOn)},
 				{"Posture identity", onOff(settings.PostureIdentityOn)},
+				{"Device attributes", onOff(settings.DeviceAttributesOn)},
 				{"Key expiry", keyExpiryLabel(settings)},
 				{"SSH recorders", sshRecordersLabel(settings)},
 				{"SSH recording enforced", onOff(settings.SshRecordingEnforce)},

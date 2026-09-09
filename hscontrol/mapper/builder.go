@@ -6,8 +6,10 @@ import (
 	"net/netip"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/clientversion"
 	"github.com/aislopware/slopscale/hscontrol/policy"
 	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
 	"github.com/aislopware/slopscale/hscontrol/types"
@@ -98,13 +100,49 @@ func (b *MapResponseBuilder) WithSelfNode() *MapResponseBuilder {
 	}
 
 	b.resp.Node = tailnode
-	b.resp.DisplayMessages = suspensionMessages(nv)
+	b.resp.DisplayMessages = displayMessages(nv, b.mapper.cfg.ServerURL)
+	b.resp.ControlDialPlan = b.mapper.cfg.DialPlan()
+
+	if hi := nv.Hostinfo(); hi.Valid() {
+		b.resp.ClientVersion = clientversion.For(hi.IPNVersion(), b.mapper.state.LatestClientVersion())
+	}
 
 	return b
 }
 
-// suspendedMessageID keys the health message a suspended node shows.
-const suspendedMessageID tailcfg.DisplayMessageID = "slopscale-suspended"
+// The health messages the server shows on a node: keyed so a later
+// response clears one with a nil entry, as the client expects.
+const (
+	// suspendedMessageID keys the message a suspended node shows.
+	suspendedMessageID tailcfg.DisplayMessageID = "slopscale-suspended"
+	// approvalMessageID keys the message a node waiting for approval
+	// shows.
+	approvalMessageID tailcfg.DisplayMessageID = "slopscale-approval"
+)
+
+// displayMessages is what the node's user sees about its standing:
+// waiting for approval, suspended, or nothing, with the message keys
+// present and nil so a change clears the old message.
+func displayMessages(nv types.NodeView, serverURL string) map[tailcfg.DisplayMessageID]*tailcfg.DisplayMessage {
+	messages := suspensionMessages(nv)
+	messages[approvalMessageID] = nil
+
+	if !nv.IsApproved() {
+		messages[approvalMessageID] = &tailcfg.DisplayMessage{
+			Title: "This device is waiting for approval",
+			Text: "An administrator has to approve this device before it can reach the tailnet. " +
+				"It stays signed in and joins as soon as it is approved.",
+			Severity:            tailcfg.SeverityMedium,
+			ImpactsConnectivity: true,
+			PrimaryAction: &tailcfg.DisplayMessageAction{
+				URL:   strings.TrimSuffix(serverURL, "/") + "/admin/machines",
+				Label: "Open the admin console",
+			},
+		}
+	}
+
+	return messages
+}
 
 // suspensionMessages tells a suspended client why it lost its peers, and
 // clears the message again once the suspension is lifted. The client

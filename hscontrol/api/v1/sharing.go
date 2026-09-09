@@ -99,7 +99,7 @@ func registerSharing(api huma.API, b Backend) {
 		b.Change(nodeChange)
 
 		out := &nodeOutput{}
-		out.Body.Node = nodeFromView(node)
+		out.Body.Node = b.nodeFromView(node)
 
 		return out, nil
 	})
@@ -138,7 +138,7 @@ func registerSharing(api huma.API, b Backend) {
 		b.Change(nodeChange)
 
 		out := &nodeOutput{}
-		out.Body.Node = nodeFromView(node)
+		out.Body.Node = b.nodeFromView(node)
 
 		return out, nil
 	})

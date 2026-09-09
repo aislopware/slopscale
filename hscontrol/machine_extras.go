@@ -29,15 +29,13 @@ var ErrUnknownAuditAction = errors.New("unknown client audit action")
 
 // featureCaps lists, per feature the CLI can ask about, the self caps the
 // client needs before it stops asking (cmd/tailscale/cli enableFeatureInteractive).
-// Funnel is not here: it needs Tailscale's public ingress servers, which
-// this server does not run, so the policy refuses the attribute and the
-// answer says so.
 var featureCaps = map[string][]nodecap.Cap{
-	"serve": {nodecap.HTTPS},
+	"serve":  {nodecap.HTTPS},
+	"funnel": {nodecap.HTTPS, nodecap.Funnel},
 }
 
-const funnelUnavailable = "Funnel is not available on this server: it needs Tailscale's public ingress " +
-	"relays. tailscale serve still shares the service with the tailnet."
+const funnelNoIngress = "Funnel has no ingress on this server: run the embedded ingress (funnel.enabled in " +
+	"the config file) or `slopscale ingress` on a machine with a public address; see docs/ref/funnel."
 
 // sessionNode returns the node a machine request speaks for, refusing a
 // node key that is unknown or not bound to the session's machine key.
@@ -134,12 +132,12 @@ func (ns *noiseServer) FeatureQueryHandler(writer http.ResponseWriter, req *http
 		return
 	}
 
-	// Funnel needs Tailscale's public ingress, which this server has no
-	// stand-in for. An error, not a text answer, keeps `tailscale funnel`
+	// Funnel needs an ingress node; without one nothing could ever reach
+	// the machine. An error, not a text answer, keeps `tailscale funnel`
 	// on its own check, which fails loudly; a text answer makes the CLI
 	// print it and exit 0 with nothing set up.
-	if request.Feature == "funnel" {
-		httpError(writer, NewHTTPError(http.StatusNotFound, funnelUnavailable, ErrFeatureUnavailable))
+	if request.Feature == "funnel" && !ns.slopscale.state.HasFunnelIngress() {
+		httpError(writer, NewHTTPError(http.StatusNotFound, funnelNoIngress, ErrFeatureUnavailable))
 
 		return
 	}

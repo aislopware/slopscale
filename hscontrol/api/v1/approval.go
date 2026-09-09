@@ -28,6 +28,10 @@ type Settings struct {
 	// PostureIdentityOn lets the server ask clients for their hardware
 	// serial numbers, which the policy can then check as node:serialNumber.
 	PostureIdentityOn bool `json:"postureIdentityOn"`
+	// DeviceAttributesOn lets a machine set its own custom posture
+	// attributes over its control connection (the client's
+	// alpha-set-device-attrs local API).
+	DeviceAttributesOn bool `json:"deviceAttributesOn"`
 	// KeyExpiryDays caps how long a node key stays valid after a login;
 	// 0 leaves the config file's node.expiry and the client in charge.
 	KeyExpiryDays int `json:"keyExpiryDays"`
@@ -48,9 +52,10 @@ type Settings struct {
 // UpdateSettingsRequestBody carries the switches to change; absent ones
 // keep their value. Switching an approval off approves everything waiting.
 type UpdateSettingsRequestBody struct {
-	DevicesApprovalOn *bool `json:"devicesApprovalOn,omitempty"`
-	UsersApprovalOn   *bool `json:"usersApprovalOn,omitempty"`
-	PostureIdentityOn *bool `json:"postureIdentityOn,omitempty"`
+	DevicesApprovalOn  *bool `json:"devicesApprovalOn,omitempty"`
+	UsersApprovalOn    *bool `json:"usersApprovalOn,omitempty"`
+	PostureIdentityOn  *bool `json:"postureIdentityOn,omitempty"`
+	DeviceAttributesOn *bool `json:"deviceAttributesOn,omitempty"`
 	// KeyExpiryDays 0 switches the cap off.
 	KeyExpiryDays *int `json:"keyExpiryDays,omitempty" maximum:"365" minimum:"0"`
 	// SSHRecorders replaces the default recorders; an empty list clears
@@ -90,6 +95,7 @@ func settingsFrom(s types.Settings, cfg *types.Config) Settings {
 		DevicesApprovalOn:   s.DevicesApprovalOn,
 		UsersApprovalOn:     s.UsersApprovalOn,
 		PostureIdentityOn:   s.PostureIdentityOn,
+		DeviceAttributesOn:  s.DeviceAttributesOn,
 		KeyExpiryDays:       int(s.KeyExpiry / day),
 		SSHRecorders:        append([]string{}, s.SSHRecorders...),
 		SSHRecordingEnforce: s.SSHRecordingEnforce,
@@ -186,6 +192,7 @@ func registerApproval(api huma.API, b Backend) {
 			{types.SettingDevicesApprovalOn, in.Body.DevicesApprovalOn},
 			{types.SettingUsersApprovalOn, in.Body.UsersApprovalOn},
 			{types.SettingPostureIdentityOn, in.Body.PostureIdentityOn},
+			{types.SettingDeviceAttributesOn, in.Body.DeviceAttributesOn},
 		}
 
 		for _, u := range updates {

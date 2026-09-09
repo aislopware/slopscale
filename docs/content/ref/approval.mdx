@@ -65,8 +65,9 @@ build, addresses, DERP regions and config file values from
 A node waiting for approval is registered and keeps its address, but it gets
 no peers, no peer sees it and its packet filter is empty. The Tailscale client
 shows it as needing machine authorization (`tailscale status` reports
-"Machine is not yet approved") and picks up the approval live, without logging
-in again.
+"Machine is not yet approved"), a health message, "This device is waiting for
+approval", says why with a link to the console's machines page, and the node
+picks up the approval live, without logging in again.
 
 ```console
 slopscale nodes list           # the Approved column reads "pending"

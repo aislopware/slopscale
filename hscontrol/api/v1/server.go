@@ -49,6 +49,30 @@ type ServerInfo struct {
 	DERPRegions int `json:"derpRegions"`
 	// DERPServer reports whether the embedded DERP relay is serving.
 	DERPServer bool `json:"derpServer"`
+
+	// FunnelIngress reports whether the server runs the embedded Funnel
+	// ingress (funnel.enabled in the config file).
+	FunnelIngress bool `json:"funnelIngress"`
+	// FunnelListenAddrs are the public addresses the embedded ingress
+	// listens on.
+	FunnelListenAddrs []string `json:"funnelListenAddrs" nullable:"false"`
+	// FunnelPorts are the ports Funnel may be turned on for.
+	FunnelPorts []int `json:"funnelPorts" nullable:"false"`
+	// FunnelIngressNodes counts the ingress nodes that have joined the
+	// tailnet, the embedded one included; Funnel delivers nothing while
+	// it is zero.
+	FunnelIngressNodes int `json:"funnelIngressNodes"`
+	// LatestClientVersion is the latest stable Tailscale client release
+	// the server found at pkgs.tailscale.com; empty until the first
+	// lookup or while client_updates.check is off.
+	LatestClientVersion string `json:"latestClientVersion"`
+	// ClientUpdatesCheck reports whether the server looks the latest
+	// client release up (client_updates.check in the config file).
+	ClientUpdatesCheck bool `json:"clientUpdatesCheck"`
+	// ControlDialPlan lists the addresses clients are told to reach the
+	// server at before resolving its name (control_dial_plan in the
+	// config file).
+	ControlDialPlan []string `json:"controlDialPlan" nullable:"false"`
 	// EphemeralInactivityTimeout is how long an ephemeral node may stay
 	// offline before it is deleted.
 	EphemeralInactivityTimeout string `json:"ephemeralInactivityTimeout"`
@@ -72,25 +96,45 @@ func registerServer(api huma.API, b Backend) {
 		Tags:        []string{"Settings"},
 		Security:    bearerAuth,
 	}, scope.FeatureSettingsRead), func(_ context.Context, _ *struct{}) (*serverInfoOutput, error) {
-		return &serverInfoOutput{Body: serverInfoFrom(b.Cfg, b.State.DERP())}, nil
+		return &serverInfoOutput{Body: serverInfoFrom(
+			b.Cfg, b.State.DERP(), len(b.State.FunnelIngressNodes()), b.State.LatestClientVersion(),
+		)}, nil
 	})
 }
 
-func serverInfoFrom(cfg *types.Config, derp state.DERPStatus) ServerInfo {
+func serverInfoFrom(cfg *types.Config, derp state.DERPStatus, ingressNodes int, latestClient string) ServerInfo {
 	version := types.GetVersionInfo()
 	info := ServerInfo{
-		Version:     version.Version,
-		Commit:      version.Commit,
-		BuildTime:   version.BuildTime,
-		GoVersion:   version.Go.Version,
-		StartedAt:   startedAt,
-		OIDCScopes:  []string{},
-		DERPRegions: len(derp.Regions),
-		DERPServer:  derp.RelayRunning,
+		Version:             version.Version,
+		Commit:              version.Commit,
+		BuildTime:           version.BuildTime,
+		GoVersion:           version.Go.Version,
+		StartedAt:           startedAt,
+		OIDCScopes:          []string{},
+		DERPRegions:         len(derp.Regions),
+		DERPServer:          derp.RelayRunning,
+		FunnelListenAddrs:   []string{},
+		FunnelPorts:         []int{},
+		FunnelIngressNodes:  ingressNodes,
+		LatestClientVersion: latestClient,
+		ControlDialPlan:     []string{},
 	}
 
 	if cfg == nil {
 		return info
+	}
+
+	info.FunnelIngress = cfg.Funnel.Enabled
+	info.FunnelListenAddrs = append(info.FunnelListenAddrs, cfg.Funnel.ListenAddrs...)
+
+	for _, p := range cfg.Funnel.FunnelPorts() {
+		info.FunnelPorts = append(info.FunnelPorts, int(p))
+	}
+
+	info.ClientUpdatesCheck = cfg.ClientUpdates.Check
+
+	for _, addr := range cfg.ControlDialPlan {
+		info.ControlDialPlan = append(info.ControlDialPlan, addr.String())
 	}
 
 	info.ServerURL = cfg.ServerURL

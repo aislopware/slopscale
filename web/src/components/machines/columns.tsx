@@ -2,6 +2,7 @@ import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import {
+  FunnelIcon,
   GlobeIcon,
   HourglassIcon,
   PathIcon,
@@ -159,6 +160,17 @@ function Attributes({ node }: { readonly node: Node }): ReactElement | null {
     marks.push(
       <Mark key="subnets" hint={`Routes ${subnets.join(", ")}`}>
         <PathIcon size={markSize} />
+      </Mark>,
+    );
+  }
+
+  if (node.funnelEnabled) {
+    marks.push(
+      <Mark
+        key="funnel"
+        hint="Funnel is on: a service on this machine is reachable from the internet"
+      >
+        <FunnelIcon size={markSize} />
       </Mark>,
     );
   }

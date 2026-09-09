@@ -107,7 +107,6 @@ var (
 	ErrNodeAttrsIPPoolReserved      = errors.New("nodeAttrs ipPool must not overlap reserved Tailscale ranges")
 	ErrNodeAttrsIPPoolOutOfRange    = errors.New("nodeAttrs ipPool must be within 100.64.0.0/10")
 	ErrNodeAttrsAutogroupNotAllowed = errors.New("nodeAttrs target does not support this autogroup")
-	ErrNodeAttrUnsupported          = errors.New("nodeAttrs uses a feature slopscale does not yet support")
 	ErrNodeAttrIPPoolTarget         = errors.New(
 		"nodeAttrs ipPool target must be a user, group, tag or autogroup",
 	)
@@ -117,16 +116,6 @@ var (
 	)
 	ErrNodeAttrAppValueInvalid = errors.New("nodeAttrs app values must be JSON objects")
 )
-
-// nodeAttrUnsupportedCaps lists caps that slopscale parses but cannot act on
-// today. Each entry maps to the tracking issue an operator can follow. The
-// caps are accepted by Tailscale SaaS, but delivering them via slopscale
-// without the matching server-side machinery would be misleading — nodes
-// would advertise a feature that does not work. Reject at policy load and
-// point operators at the issue.
-var nodeAttrUnsupportedCaps = map[nodecap.Cap]string{
-	nodecap.Funnel: "https://github.com/juanfont/headscale/issues/2527",
-}
 
 // Policy validation errors.
 var (
@@ -3130,13 +3119,6 @@ func (pol *Policy) validate() error {
 				// source-side validation shape.
 			default:
 				errs = append(errs, fmt.Errorf("%w: %q (%T)", ErrNodeAttrTargetUnsupported, target, target))
-			}
-		}
-
-		for _, attr := range na.Attrs {
-			issue, ok := nodeAttrUnsupportedCaps[attr]
-			if ok {
-				errs = append(errs, fmt.Errorf("%w: %q tracked in %s", ErrNodeAttrUnsupported, attr, issue))
 			}
 		}
 

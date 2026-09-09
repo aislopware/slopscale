@@ -30,7 +30,8 @@ With `enabled`, every machine's map response lists its MagicDNS name,
 such as `laptop.ts.example.com`, as a cert domain, and the client picks
 DNS-01 when it needs a certificate. The names only need to exist in
 public DNS for the challenge record; they do not need to resolve to
-anything, and the machines stay reachable over the tailnet alone.
+anything, and the machines stay reachable over the tailnet alone, unless
+[Funnel](./funnel) opens one of them to the internet.
 
 Three providers publish the record:
 

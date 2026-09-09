@@ -57,6 +57,7 @@ type serverConfig struct {
 	smtp             *types.SMTPConfig
 	sshRecording     *types.SSHRecordingConfig
 	httpsCerts       *types.HTTPSCertsConfig
+	funnel           *types.FunnelConfig
 	embeddedDERP     bool
 	seededRule       bool
 }
@@ -163,6 +164,13 @@ func WithHTTPSCerts(cfg types.HTTPSCertsConfig) ServerOption {
 	return func(sc *serverConfig) { sc.httpsCerts = &cfg }
 }
 
+// WithFunnel configures the embedded Funnel ingress. Pair it with
+// [WithRealListener], [WithDNS] and [WithHTTPSCerts], and start it with
+// [hscontrol.Slopscale.StartFunnelIngressForTest].
+func WithFunnel(cfg types.FunnelConfig) ServerOption {
+	return func(sc *serverConfig) { sc.funnel = &cfg }
+}
+
 // WithSMTP gives the server a mail server, so email webhooks can be
 // created and delivered.
 func WithSMTP(cfg types.SMTPConfig) ServerOption {
@@ -257,6 +265,10 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 
 	if sc.httpsCerts != nil {
 		cfg.HTTPSCerts = *sc.httpsCerts
+	}
+
+	if sc.funnel != nil {
+		cfg.Funnel = *sc.funnel
 	}
 
 	if sc.sshRecording != nil {

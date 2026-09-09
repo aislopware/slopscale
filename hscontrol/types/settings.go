@@ -35,6 +35,16 @@ const (
 	// default recorders is reachable, instead of letting it go on
 	// unrecorded.
 	SettingSSHRecordingEnforce SettingKey = "ssh_recording_enforce"
+	// SettingDeviceAttributesOn lets a machine set its own custom posture
+	// attributes over its control connection, the client's
+	// alpha-set-device-attrs local API. Off, the request is refused:
+	// whoever is root on a machine could otherwise give it any attribute
+	// a policy trusts.
+	SettingDeviceAttributesOn SettingKey = "device_attributes_on"
+	// SettingIDTokenKey holds the identity token signing key as PKCS#8
+	// PEM; it is made on first use and shared by every server on the
+	// same database. See [State.IDTokenSigner].
+	SettingIDTokenKey SettingKey = "id_token_signing_key"
 )
 
 // Key expiry bounds: a cap shorter than an hour would log nodes out
@@ -71,4 +81,7 @@ type Settings struct {
 	// SSHRecordingEnforce refuses SSH sessions no default recorder can
 	// take.
 	SSHRecordingEnforce bool
+	// DeviceAttributesOn lets machines set their own custom posture
+	// attributes; see [SettingDeviceAttributesOn].
+	DeviceAttributesOn bool
 }

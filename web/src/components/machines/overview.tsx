@@ -7,6 +7,7 @@ import type { Node } from "~/api/queries.ts";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { Section } from "~/components/ui/section.tsx";
+import { Status } from "~/components/ui/status.tsx";
 import { isTagged, nodeName, userLabel } from "~/lib/node.ts";
 import { formatAbsolute, parseTime } from "~/lib/time.ts";
 
@@ -40,7 +41,32 @@ function overview(node: Node): Definition[] {
     },
     { key: "created", label: "Created", value: <Timestamp value={node.createdAt} /> },
     { key: "expiry", label: "Key expiry", value: <Expiry node={node} /> },
+    { key: "funnel", label: "Funnel", value: <Funnel node={node} /> },
+    { key: "client", label: "Client", value: <Client node={node} /> },
   ];
+}
+
+/** The Tailscale client version the machine reported, and whether a newer stable one exists. */
+function Client({ node }: { readonly node: Node }): ReactElement {
+  if (node.clientVersion === "") {
+    return <span className="text-kumo-subtle">Unknown until it connects</span>;
+  }
+
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <span>{node.clientVersion}</span>
+      {node.updateAvailable ? <Status tone="warning">Update available</Status> : null}
+    </span>
+  );
+}
+
+/** Whether the client reports a Funnel endpoint, which the ingress delivers public traffic to. */
+function Funnel({ node }: { readonly node: Node }): ReactElement {
+  return node.funnelEnabled ? (
+    <Status tone="success">On</Status>
+  ) : (
+    <span className="text-kumo-subtle">Off</span>
+  );
 }
 
 /**

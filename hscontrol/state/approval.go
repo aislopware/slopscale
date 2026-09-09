@@ -75,6 +75,10 @@ func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error)
 		settings.UsersApprovalOn = on
 	case types.SettingPostureIdentityOn:
 		settings.PostureIdentityOn = on
+	case types.SettingDeviceAttributesOn:
+		settings.DeviceAttributesOn = on
+	case types.SettingIDTokenKey:
+		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see IDTokenSigner", ErrUnknownSetting, key)
 	case types.SettingDNS:
 		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see SetDNS", ErrUnknownSetting, key)
 	case types.SettingDERP:
@@ -104,7 +108,8 @@ func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error)
 	case types.SettingUsersApprovalOn:
 		return s.approvePendingUsers()
 	case types.SettingDNS, types.SettingDERP, types.SettingKeyExpiry, types.SettingPostureIdentityOn,
-		types.SettingSSHRecorders, types.SettingSSHRecordingEnforce:
+		types.SettingSSHRecorders, types.SettingSSHRecordingEnforce, types.SettingDeviceAttributesOn,
+		types.SettingIDTokenKey:
 		return change.Change{}, nil
 	default:
 		return change.Change{}, nil

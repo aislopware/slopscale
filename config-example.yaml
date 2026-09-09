@@ -362,6 +362,48 @@ policy:
 #   # and marked incomplete. 0 uses the default of 512 MiB, not unlimited.
 #   max_session_bytes: 536870912
 
+## Funnel
+#
+# Run a Funnel ingress inside the server: it joins the tailnet as
+# `slopscale-ingress` (tag:slopscale-ingress) and delivers public TLS
+# connections to the machine named by the server name, for machines the
+# policy grants the `funnel` node attribute. Needs HTTPS certificates and
+# public DNS pointing the machines' names at this server; see
+# https://aislopware.github.io/slopscale/ref/funnel/.
+# funnel:
+#   enabled: false
+#   # The public addresses to accept TLS on, one per Funnel port. Change
+#   # them when the server itself listens on 443.
+#   listen_addrs: [":443", ":8443", ":10000"]
+#   # The ingress node's keys.
+#   state_dir: /var/lib/slopscale/ingress
+#   # The ports `tailscale funnel` may be turned on for.
+#   ports: [443, 8443, 10000]
+
+## Client updates
+#
+# Tell clients whether a newer Tailscale client exists, the way the hosted
+# control plane does: the server reads the latest stable release from
+# https://pkgs.tailscale.com once a day and each client behind it shows
+# the "update available" health warning (and updates itself when its
+# auto-update is on). The Server page of the console shows the release.
+# client_updates:
+#   # Set to false on a server without internet access, or to keep the
+#   # clients quiet.
+#   check: true
+#   # How often to look; at least 1h.
+#   interval: 24h
+
+## Control dial plan
+#
+# Addresses clients try for this server before resolving server_url's
+# host name, in order of preference. Clients keep the plan between runs,
+# so they reach the server when DNS is down, and fall back to the name
+# when none of the addresses answers. Leave empty to rely on DNS.
+# control_dial_plan:
+#   - 203.0.113.7
+#   - 2001:db8::7
+
 ## Outbound requests
 #
 # Where slopscale's own HTTP clients may go: webhook receivers, log stream

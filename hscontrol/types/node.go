@@ -1477,7 +1477,27 @@ func selfCapMap(cfg *Config, policyCaps tailcfg.NodeCapMap) tailcfg.NodeCapMap {
 
 	capMap[nodecap.DefaultAutoUpdate] = []tailcfg.RawMessage{autoUpdateVal}
 
+	// The hosted control plane stamps "https" once HTTPS certificates are
+	// on for the tailnet; here that is certificate assistance with a base
+	// domain to issue names under. `tailscale serve` and `tailscale
+	// funnel` refuse to set up HTTPS without it.
+	httpsOn := cfg.HTTPSCerts.Enabled && cfg.BaseDomain != ""
+	if httpsOn {
+		capMap[nodecap.HTTPS] = nil
+	}
+
 	maps.Copy(capMap, policyCaps)
+
+	// A node the policy grants Funnel learns which ports it may open, and
+	// is warned when HTTPS is off, since Funnel cannot work without a
+	// certificate; both as the hosted control plane emits them.
+	if _, ok := capMap[nodecap.Funnel]; ok {
+		capMap[cfg.Funnel.FunnelPortsCap()] = nil
+
+		if !httpsOn {
+			capMap[nodecap.WarnFunnelNoHTTPS] = nil
+		}
+	}
 
 	return capMap
 }

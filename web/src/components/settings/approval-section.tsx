@@ -50,6 +50,19 @@ const trust: readonly ApprovalSwitch[] = [
     read: (settings) => settings.postureIdentityOn,
     write: (on) => ({ postureIdentityOn: on }),
   },
+  {
+    id: "device-attributes",
+    title: "Machines set their own attributes",
+    description: (
+      <>
+        Let a machine set <Code>custom:</Code> posture attributes for itself over its control
+        connection (the client&apos;s <Code>alpha-set-device-attrs</Code> local API). Whoever is
+        root on the machine can then give it any attribute a policy trusts.
+      </>
+    ),
+    read: (settings) => settings.deviceAttributesOn,
+    write: (on) => ({ deviceAttributesOn: on }),
+  },
 ];
 
 export function ApprovalSection(props: {

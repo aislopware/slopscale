@@ -121,7 +121,51 @@ function policyItems(info: ServerInfo): readonly Definition[] {
       ),
     },
     { label: "Ephemeral timeout", value: info.ephemeralInactivityTimeout },
+    { label: "Latest client", value: <LatestClient info={info} /> },
+    {
+      label: "Control dial plan",
+      value:
+        info.controlDialPlan.length > 0 ? (
+          info.controlDialPlan.join(", ")
+        ) : (
+          <span className="text-kumo-subtle">Clients resolve the server URL</span>
+        ),
+    },
+    {
+      label: "Funnel",
+      value: (
+        <span className="flex flex-wrap items-center gap-2">
+          <span>
+            {info.funnelIngressNodes === 0
+              ? "No ingress node has joined"
+              : `${info.funnelIngressNodes} ingress ${info.funnelIngressNodes === 1 ? "node" : "nodes"}`}
+          </span>
+          <Status tone={info.funnelIngress ? "success" : "neutral"}>
+            {info.funnelIngress ? "Embedded ingress running" : "Embedded ingress off"}
+          </Status>
+          <span className="text-kumo-subtle">
+            {info.funnelIngress && info.funnelListenAddrs.length > 0
+              ? `Listening on ${info.funnelListenAddrs.join(", ")}. `
+              : ""}
+            Ports {info.funnelPorts.join(", ")}
+          </span>
+        </span>
+      ),
+    },
   ];
+}
+
+/** The latest stable Tailscale client the server found, or why it has none. */
+function LatestClient({ info }: { readonly info: ServerInfo }): ReactElement {
+  if (!info.clientUpdatesCheck) {
+    return <span className="text-kumo-subtle">Not checked (client_updates.check is off)</span>;
+  }
+
+  if (info.latestClientVersion === "") {
+    return <span className="text-kumo-subtle">Not looked up yet</span>;
+  }
+
+  return <span>{info.latestClientVersion}</span>;
 }
 
 /** The build, addresses and config file values of the running server. */

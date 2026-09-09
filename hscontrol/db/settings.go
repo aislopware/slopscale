@@ -59,6 +59,8 @@ func (hsdb *HSDatabase) LoadSettings() (types.Settings, error) {
 			continue
 		case types.SettingSSHRecordingEnforce:
 			target = &settings.SSHRecordingEnforce
+		case types.SettingDeviceAttributesOn:
+			target = &settings.DeviceAttributesOn
 		case types.SettingKeyExpiry:
 			d, err := time.ParseDuration(r.Setting.Value)
 			if err != nil {
@@ -70,8 +72,9 @@ func (hsdb *HSDatabase) LoadSettings() (types.Settings, error) {
 			settings.KeyExpiry = d
 
 			continue
-		case types.SettingDNS, types.SettingDERP:
-			// Hold JSON and are read by LoadDNSSettings and LoadDERPSettings.
+		case types.SettingDNS, types.SettingDERP, types.SettingIDTokenKey:
+			// Hold JSON or key material and are read by LoadDNSSettings,
+			// LoadDERPSettings and LoadIDTokenKey.
 			continue
 		default:
 			continue

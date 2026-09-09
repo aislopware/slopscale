@@ -178,36 +178,35 @@ func (h *Slopscale) NoiseUpgradeHandler(
 		// session recording could not start or broke off.
 		r.Post("/ssh/event", ns.SSHEventHandler)
 
-		// Not implemented yet
-		//
-		// /whoami is a debug endpoint to validate that the client can communicate over the connection,
-		// not clear if there is a specific response, it looks like it is just logged.
-		//
-		//nolint:lll // URL
-		// https://github.com/tailscale/tailscale/blob/dfba01ca9bd8c4df02c3c32f400d9aeb897c5fc7/cmd/tailscale/cli/debug.go#L1138
-		r.Get("/whoami", ns.NotImplementedHandler)
+		// `tailscale debug ts2021` checks the connection works by asking
+		// who it is; the answer is logged, so it names the machine's nodes.
+		r.Get("/whoami", ns.WhoAmIHandler)
 
 		// A [tailcfg.SetDNSRequest] publishes the TXT record of an ACME
 		// DNS-01 challenge for one of the node's cert domains.
 		r.Post("/set-dns", ns.SetDNSHandler)
 
-		// A patch of [tailcfg.SetDeviceAttributesRequest] to update device attributes.
-		// We currently do not support device attributes.
-		r.Patch("/set-device-attr", ns.NotImplementedHandler)
+		// A [tailcfg.SetDeviceAttributesRequest] patches the machine's own
+		// custom posture attributes, while the deviceAttributesOn setting
+		// allows it.
+		r.Patch("/set-device-attr", ns.SetDeviceAttrHandler)
 
 		// A [tailcfg.AuditLogRequest] carries an action the device's user
 		// took locally, such as leaving the tailnet; it lands in the
 		// audit log with the machine as actor.
 		r.Post("/audit-log", ns.AuditLogHandler)
 
-		// handles requests to get an OIDC ID token. Receives a [tailcfg.TokenRequest].
-		r.Post("/id-token", ns.NotImplementedHandler)
+		// A [tailcfg.TokenRequest] asks for a signed identity token about
+		// the node, for `tailscale id-token`.
+		r.Post("/id-token", ns.IDTokenHandler)
 
 		// `tailscale serve` and `tailscale funnel` ask whether the node may
 		// use the feature and how to turn it on; a [tailcfg.QueryFeatureRequest]
 		// gets a [tailcfg.QueryFeatureResponse].
 		r.Post("/feature/query", ns.FeatureQueryHandler)
 
+		// A [tailcfg.HealthChangeRequest]; clients stopped sending it in
+		// 2025 (tailcfg says it was never useful), so nothing stores it.
 		r.Post("/update-health", ns.NotImplementedHandler)
 
 		r.Route("/webclient", func(_ chi.Router) {})

@@ -251,15 +251,37 @@ func TestFeatureQueryTellsHowToEnable(t *testing.T) {
 
 	assert.True(t, query("serve").Complete)
 
-	// Funnel is an error, not an answer: a text answer would make
-	// `tailscale funnel` print it and exit 0 with nothing set up, while
-	// an error sends the CLI to its own check, which fails loudly.
+	// Without an ingress node Funnel is an error, not an answer: a text
+	// answer would make `tailscale funnel` print it and exit 0 with
+	// nothing set up, while an error sends the CLI to its own check,
+	// which fails loudly.
 	status, body := postMachine(t, srv, alice, "feature/query", tailcfg.QueryFeatureRequest{
 		Feature: "funnel",
 		NodeKey: alice.NodePrivateKey().Public(),
 	})
 	assert.Equal(t, http.StatusNotFound, status)
-	assert.Contains(t, string(body), "not available on this server")
+	assert.Contains(t, string(body), "no ingress")
+
+	// Once one has joined, the answer names the missing attribute, and
+	// the policy granting it completes the feature. HTTPS is off on this
+	// server, so the node is warned, as the hosted control plane does.
+	servertest.NewClient(t, srv, "ingress", servertest.WithUser(owner), servertest.WithTags(types.FunnelIngressTag))
+
+	funnelOff := query("funnel")
+	assert.False(t, funnelOff.Complete)
+	assert.Contains(t, funnelOff.Text, "granting the funnel node attribute")
+
+	reloadPolicy(t, srv, `{
+		"acls": [{"action": "accept", "src": ["*"], "dst": ["*:*"]}],
+		"nodeAttrs": [{"target": ["*"], "attr": ["https", "funnel"]}]
+	}`)
+
+	alice.WaitForCondition(t, "funnel caps granted", 5*time.Second, func(nm *netmap.NetworkMap) bool {
+		return hasCap(nm, nodecap.Funnel) && hasCap(nm, nodecap.WarnFunnelNoHTTPS) &&
+			hasCap(nm, types.FunnelConfig{}.FunnelPortsCap())
+	})
+
+	assert.True(t, query("funnel").Complete)
 
 	assert.Contains(t, query("teleport").Text, "not a feature this server knows")
 }

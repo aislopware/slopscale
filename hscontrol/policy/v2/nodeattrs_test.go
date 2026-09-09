@@ -257,11 +257,6 @@ func TestNodeAttrsValidate(t *testing.T) {
 			wantErr: ErrNodeAttrsAutogroupNotAllowed,
 		},
 		{
-			name:    "funnel attr rejected as unsupported",
-			extra:   `"nodeAttrs": [{"target": ["*"], "attr": ["funnel"]}]`,
-			wantErr: ErrNodeAttrUnsupported,
-		},
-		{
 			name:    "app capability without a domain rejected",
 			extra:   `"nodeAttrs": [{"target": ["*"], "app": {"app-connectors": [{}]}}]`,
 			wantErr: ErrNodeAttrAppCapInvalid,

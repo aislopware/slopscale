@@ -188,6 +188,17 @@ type Config struct {
 	// SSHRecording is the embedded session recorder.
 	SSHRecording SSHRecordingConfig
 
+	// Funnel is the embedded Funnel ingress.
+	Funnel FunnelConfig
+
+	// ClientUpdates looks up the latest client release for the clients;
+	// see [ClientUpdatesConfig].
+	ClientUpdates ClientUpdatesConfig
+
+	// ControlDialPlan lists the addresses clients try for the server
+	// before resolving its name; see [Config.DialPlan].
+	ControlDialPlan []netip.Addr
+
 	// Egress bounds where the server's own outbound requests may go.
 	Egress EgressConfig
 
@@ -541,6 +552,33 @@ func httpsCertsConfig() (HTTPSCertsConfig, error) {
 	return cfg, nil
 }
 
+func funnelConfig() (FunnelConfig, error) {
+	rawPorts := viper.GetIntSlice("funnel.ports")
+	ports := make([]uint16, 0, len(rawPorts))
+
+	for _, p := range rawPorts {
+		if p < 1 || p > 65535 {
+			return FunnelConfig{}, fmt.Errorf("%w: %d", ErrFunnelPortInvalid, p)
+		}
+
+		ports = append(ports, uint16(p))
+	}
+
+	cfg := FunnelConfig{
+		Enabled:     viper.GetBool("funnel.enabled"),
+		ListenAddrs: viper.GetStringSlice("funnel.listen_addrs"),
+		StateDir:    util.AbsolutePathFromConfigPath(viper.GetString("funnel.state_dir")),
+		Ports:       ports,
+	}
+
+	err := cfg.Validate()
+	if err != nil {
+		return FunnelConfig{}, err
+	}
+
+	return cfg, nil
+}
+
 func sshRecordingConfig() SSHRecordingConfig {
 	return SSHRecordingConfig{
 		Enabled:         viper.GetBool("ssh_recording.enabled"),
@@ -700,6 +738,29 @@ func (c *Config) Domain() string {
 	return u.Hostname()
 }
 
+// setNodeServiceDefaults sets the defaults for the services a node
+// reaches the server for: certificates, SSH recording, Funnel, egress and
+// the debug node API.
+func setNodeServiceDefaults() {
+	viper.SetDefault("https_certificates.enabled", false)
+	viper.SetDefault("https_certificates.ttl", time.Minute)
+	viper.SetDefault("https_certificates.rfc2136.tsig_algorithm", "hmac-sha256")
+	viper.SetDefault("ssh_recording.enabled", false)
+	viper.SetDefault("ssh_recording.dir", "/var/lib/slopscale/recordings")
+	viper.SetDefault("ssh_recording.state_dir", "/var/lib/slopscale/recorder")
+	viper.SetDefault("ssh_recording.max_session_bytes", 0)
+	viper.SetDefault("funnel.enabled", false)
+	viper.SetDefault("funnel.listen_addrs", []string{":443", ":8443", ":10000"})
+	viper.SetDefault("funnel.state_dir", "/var/lib/slopscale/ingress")
+	viper.SetDefault("funnel.ports", []int{443, 8443, 10000})
+	viper.SetDefault("client_updates.check", true)
+	viper.SetDefault("client_updates.interval", DefaultClientUpdatesInterval)
+	viper.SetDefault("egress.deny_private_targets", false)
+	viper.SetDefault("egress.allow_loopback_targets", false)
+	viper.SetDefault("debug.node_api_enabled", false)
+	viper.SetDefault("notifications.smtp.encryption", string(SMTPStartTLS))
+}
+
 // LoadConfig prepares and loads the Slopscale configuration into Viper.
 // This means it sets the default values, reads the configuration file and
 // environment variables, and handles deprecated configuration options.
@@ -731,17 +792,7 @@ func LoadConfig(path string, isFile bool) error {
 
 	viper.SetDefault("notifications.smtp.port", 587)
 
-	viper.SetDefault("https_certificates.enabled", false)
-	viper.SetDefault("https_certificates.ttl", time.Minute)
-	viper.SetDefault("https_certificates.rfc2136.tsig_algorithm", "hmac-sha256")
-	viper.SetDefault("ssh_recording.enabled", false)
-	viper.SetDefault("ssh_recording.dir", "/var/lib/slopscale/recordings")
-	viper.SetDefault("ssh_recording.state_dir", "/var/lib/slopscale/recorder")
-	viper.SetDefault("ssh_recording.max_session_bytes", 0)
-	viper.SetDefault("egress.deny_private_targets", false)
-	viper.SetDefault("egress.allow_loopback_targets", false)
-	viper.SetDefault("debug.node_api_enabled", false)
-	viper.SetDefault("notifications.smtp.encryption", string(SMTPStartTLS))
+	setNodeServiceDefaults()
 
 	viper.SetDefault("tls_letsencrypt_cache_dir", "/var/www/.cache")
 	viper.SetDefault("tls_letsencrypt_challenge_type", HTTP01ChallengeType)
@@ -1625,6 +1676,21 @@ func LoadServerConfig() (*Config, error) {
 		return nil, err
 	}
 
+	funnel, err := funnelConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	clientUpdates, err := clientUpdatesConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	dialPlan, err := controlDialPlanConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	serverURL := viper.GetString("server_url")
 
 	// BaseDomain cannot be the same as the server URL.
@@ -1708,6 +1774,12 @@ func LoadServerConfig() (*Config, error) {
 		SMTP: smtp,
 
 		SSHRecording: sshRecordingConfig(),
+
+		Funnel: funnel,
+
+		ClientUpdates: clientUpdates,
+
+		ControlDialPlan: dialPlan,
 
 		Egress: egressConfig(),
 

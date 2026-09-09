@@ -1831,6 +1831,12 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 	var filter []tailcfg.FilterRule
 	if !pm.pol.enforces() {
 		filter = tailcfg.FilterAllowAll
+
+		// An open tailnet still needs the ingress capability on the
+		// funnel nodes' filters; allow-all carries no capabilities.
+		if funnel := pm.pol.funnelFilterRules(pm.users, pm.nodes); len(funnel) > 0 {
+			filter = append(slices.Clone(tailcfg.FilterAllowAll), funnel...)
+		}
 	} else {
 		filter = globalFilterRules(pm.compiledGrants)
 	}
