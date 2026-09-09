@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"cmp"
 	"context"
+	"crypto/subtle"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -510,7 +512,8 @@ func (a *AuthProviderOIDC) RegisterConfirmHandler(
 		return
 	}
 
-	if cookie.Value != formCSRF {
+	// Constant time: the token is a secret the request must prove it has.
+	if subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(formCSRF)) != 1 {
 		httpUserError(writer, NewHTTPError(http.StatusForbidden, "csrf token mismatch", nil))
 
 		return
@@ -530,7 +533,7 @@ func (a *AuthProviderOIDC) RegisterConfirmHandler(
 		return
 	}
 
-	if pending.CSRF != cookie.Value {
+	if subtle.ConstantTimeCompare([]byte(pending.CSRF), []byte(cookie.Value)) != 1 {
 		httpUserError(writer, NewHTTPError(http.StatusForbidden, "csrf token does not match cached registration", nil))
 
 		return
@@ -834,6 +837,19 @@ func (a *AuthProviderOIDC) matchUserByEmail(claims *types.OIDCClaims) (*types.Us
 
 	matched := candidates[0]
 
+	// A candidate this issuer already knows is not migrating anywhere: the
+	// login is a second identity at the same provider, and letting it take
+	// the account over turns "set a user's email" into "become that user".
+	// Only an identifier left behind by another provider is taken over.
+	if identifierFromIssuer(matched.ProviderIdentifier, claims.Iss) {
+		log.Warn().
+			Str("user", matched.Name).
+			Str("identifier", claims.Identifier()).
+			Msg("login matched a user by email but that user already belongs to this provider; not matched")
+
+		return nil, nil //nolint:nilnil // no match is not an error
+	}
+
 	log.Info().
 		Str("user", matched.Name).
 		Str("previous", matched.ProviderIdentifier.String).
@@ -853,6 +869,23 @@ func (a *AuthProviderOIDC) matchUserByEmail(claims *types.OIDCClaims) (*types.Us
 	})
 
 	return &matched, nil
+}
+
+// identifierFromIssuer reports whether a stored provider identifier was
+// issued by iss. Identifiers read "<issuer>/<subject>" (see
+// [types.OIDCClaims.Identifier]), so the issuer is a prefix of the stored
+// value.
+func identifierFromIssuer(identifier sql.NullString, iss string) bool {
+	if !identifier.Valid || identifier.String == "" || iss == "" {
+		return false
+	}
+
+	prefix := types.CleanIdentifier(strings.TrimSuffix(iss, "/"))
+	if prefix == "" {
+		return false
+	}
+
+	return strings.HasPrefix(identifier.String, prefix+"/")
 }
 
 // renderRegistrationConfirmInterstitial captures the resolved OIDC

@@ -184,8 +184,8 @@ func renderConsoleRefused(writer http.ResponseWriter, code int, heading, message
 // oidc.admin_users an admin. It runs on every login so an address added to
 // the configuration takes effect the next time that person signs in, and
 // it never demotes: the owner and anyone already above member keep their
-// role. The email must be verified when the configuration demands it,
-// which doOIDCAuthorization checked before this point.
+// role. isConfiguredAdmin holds the email to the verification the
+// configuration demands.
 func (a *AuthProviderOIDC) promoteConfiguredAdmin(user *types.User, claims *types.OIDCClaims) (*types.User, error) {
 	if user.Role != types.RoleMember || !a.isConfiguredAdmin(claims) {
 		return user, nil
@@ -212,8 +212,15 @@ func (a *AuthProviderOIDC) promoteConfiguredAdmin(user *types.User, claims *type
 }
 
 // isConfiguredAdmin reports whether the login's email is in oidc.admin_users.
+// An unverified email grants nothing while oidc.email_verified_required is
+// on: the address alone is a claim anyone can make at a provider that does
+// not check it.
 func (a *AuthProviderOIDC) isConfiguredAdmin(claims *types.OIDCClaims) bool {
 	if claims.Email == "" {
+		return false
+	}
+
+	if !claims.EmailVerified && types.FlexibleBoolean(a.cfg.EmailVerifiedRequired) {
 		return false
 	}
 

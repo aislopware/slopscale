@@ -73,6 +73,40 @@ func TestOIDCMatchByEmail(t *testing.T) {
 		assert.True(t, switched, "the switch is audited")
 	})
 
+	t.Run("a second identity at the same provider does not take over", func(t *testing.T) {
+		t.Parallel()
+
+		// Both logins come from the configured provider, the second under
+		// another subject. Matching it to the first would turn "set a
+		// user's email" into "become that user".
+		srv, _ := newOIDCServer(t,
+			func(cfg *types.OIDCConfig) { cfg.MatchByEmail = true },
+			oidcUser("dana", "dana@example.com", true),
+			oidcUser("mallory", "dana@example.com", true),
+		)
+
+		first := servertest.NewPendingLogin(t, srv, "dana-laptop")
+		completeOIDCLogin(t, srv, srv.HTTPClient(t), first)
+		first.Wait(t, oidcLoginTimeout)
+
+		dana := soleUser(t, srv)
+
+		second := servertest.NewPendingLogin(t, srv, "mallory-laptop")
+		completeOIDCLogin(t, srv, srv.HTTPClient(t), second)
+		second.Wait(t, oidcLoginTimeout)
+
+		users, err := srv.State().ListAllUsers()
+		require.NoError(t, err)
+		require.Len(t, users, 2, "the second identity got its own user")
+
+		for _, u := range users {
+			if u.ID == dana.ID {
+				assert.Equal(t, dana.ProviderIdentifier.String, u.ProviderIdentifier.String,
+					"the first user keeps its identifier")
+			}
+		}
+	})
+
 	t.Run("off, the login is a new user", func(t *testing.T) {
 		t.Parallel()
 
