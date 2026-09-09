@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
 	clientv2 "github.com/aislopware/slopscale/gen/client/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -20,6 +21,31 @@ func oauthFlags(cmd *cobra.Command) {
 	cmd.Flags().StringArrayP("tag", "t", nil, "")
 	cmd.Flags().StringP("description", "d", "", "")
 	cmd.Flags().StringP("id", "i", "", "")
+	cmd.Flags().Bool("federated", false, "")
+	cmd.Flags().Bool("clear-tags", false, "")
+	cmd.Flags().Bool("clear-claims", false, "")
+	federatedFlags(cmd)
+}
+
+const (
+	testIssuer   = "https://token.actions.githubusercontent.com"
+	testAudience = "slopscale"
+	testSubject  = "repo:acme/app:ref:refs/heads/main"
+)
+
+func federatedKey() clientv2.Key {
+	return clientv2.Key{
+		Id:               "f1",
+		KeyType:          "federated",
+		Scopes:           &[]string{"auth_keys"},
+		Tags:             &[]string{"tag:ci"},
+		Issuer:           new(testIssuer),
+		Audience:         new(testAudience),
+		Subject:          new(testSubject),
+		CustomClaimRules: &map[string]string{"repository": "acme/app"},
+		Description:      new("github actions"),
+		Created:          time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+	}
 }
 
 func oauthClientKey() clientv2.Key {
@@ -30,6 +56,21 @@ func oauthClientKey() clientv2.Key {
 		Tags:        &[]string{"tag:k8s-operator"},
 		Description: new("kubernetes operator"),
 		Created:     time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC),
+	}
+}
+
+// updatedIdentity is what the v1 patch answers with; the CLI only reads the
+// client id from it.
+func updatedIdentity() clientv1.OAuthClient {
+	return clientv1.OAuthClient{
+		ClientId:         "f1",
+		KeyType:          clientv1.OAuthClientKeyTypeFederated,
+		Scopes:           []string{"auth_keys"},
+		Tags:             []string{"tag:ci"},
+		Issuer:           testIssuer,
+		Audience:         testAudience,
+		Subject:          testSubject,
+		CustomClaimRules: map[string]string{},
 	}
 }
 
@@ -46,11 +87,13 @@ func TestOAuthClientCommands(t *testing.T) {
 	created := client
 	created.Key = new("hskey-client-secret")
 
+	federated := federatedKey()
+
 	listBoth := func(t *testing.T, w http.ResponseWriter, r *http.Request) {
 		t.Helper()
 		assertBearer(t, r)
 		assert.Equal(t, "-", r.PathValue("tailnet"))
-		writeJSON(t, w, clientv2.ListKeysOutputBody{Keys: []clientv2.Key{client, authKey()}})
+		writeJSON(t, w, clientv2.ListKeysOutputBody{Keys: []clientv2.Key{client, federated, authKey()}})
 	}
 
 	cases := []commandCase{
@@ -114,11 +157,138 @@ func TestOAuthClientCommands(t *testing.T) {
 			wantErr: "api error (400): tags are required for devices:core",
 		},
 		{
-			name:   "list renders only oauth clients",
+			name: "create --federated sends the trust conditions and shows no secret",
+			src:  createOAuthClientCmd,
+			flags: map[string]string{
+				"scope": "auth_keys", "tag": "tag:ci", "federated": "true",
+				"issuer": testIssuer, "audience": testAudience, "subject": testSubject,
+				"claim": "repository=acme/app",
+			},
+			routes: map[string]apiHandler{
+				"POST /api/v2/tailnet/{tailnet}/keys": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+
+					var body clientv2.CreateKeyRequest
+
+					decodeBody(t, r, &body)
+					assert.Equal(t, "federated", ptrStr(body.KeyType))
+					assert.Equal(t, testIssuer, ptrStr(body.Issuer))
+					assert.Equal(t, testAudience, ptrStr(body.Audience))
+					assert.Equal(t, testSubject, ptrStr(body.Subject))
+					require.NotNil(t, body.CustomClaimRules)
+					assert.Equal(t, map[string]string{"repository": "acme/app"}, *body.CustomClaimRules)
+
+					writeJSON(t, w, federatedKey())
+				},
+			},
+			want: "Federated identity f1 created.\n",
+		},
+		{
+			name:    "a trust condition without --federated is refused",
+			src:     createOAuthClientCmd,
+			flags:   map[string]string{"scope": "auth_keys", "issuer": testIssuer},
+			wantErr: "need --federated",
+		},
+		{
+			name: "--federated needs every trust condition",
+			src:  createOAuthClientCmd,
+			flags: map[string]string{
+				"scope": "auth_keys", "federated": "true", "issuer": testIssuer, "audience": testAudience,
+			},
+			wantErr: "--federated needs --issuer, --audience and --subject",
+		},
+		{
+			name: "a malformed claim is refused",
+			src:  createOAuthClientCmd,
+			flags: map[string]string{
+				"scope": "auth_keys", "federated": "true", "issuer": testIssuer,
+				"audience": testAudience, "subject": testSubject, "claim": "repository",
+			},
+			wantErr: `--claim "repository" must be name=value`,
+		},
+		{
+			name:  "update sends only the flags that were set",
+			src:   updateOAuthClientCmd,
+			flags: map[string]string{"id": "f1", "subject": testSubject, "tag": "tag:ci"},
+			routes: map[string]apiHandler{
+				"PATCH /api/v1/oauth-client/{clientId}": func(
+					t *testing.T, w http.ResponseWriter, r *http.Request,
+				) {
+					t.Helper()
+					assertBearer(t, r)
+					assert.Equal(t, "f1", r.PathValue("clientId"))
+
+					var body clientv1.UpdateOAuthClientRequestBody
+
+					decodeBody(t, r, &body)
+					assert.Equal(t, testSubject, ptrStr(body.Subject))
+					assert.Equal(t, []string{"tag:ci"}, ptrStrs(body.Tags))
+					assert.Nil(t, body.Scopes, "an unset flag is not sent")
+					assert.Nil(t, body.Description)
+					assert.Nil(t, body.Issuer)
+
+					writeJSON(t, w, clientv1.UpdateOAuthClientOutputBody{OauthClient: updatedIdentity()})
+				},
+			},
+			want: "OAuth client f1 updated\n",
+		},
+		{
+			name:  "update clears the tags and the claim rules",
+			src:   updateOAuthClientCmd,
+			flags: map[string]string{"id": "f1", "clear-tags": "true", "clear-claims": "true"},
+			routes: map[string]apiHandler{
+				"PATCH /api/v1/oauth-client/{clientId}": func(
+					t *testing.T, w http.ResponseWriter, r *http.Request,
+				) {
+					t.Helper()
+
+					var body clientv1.UpdateOAuthClientRequestBody
+
+					decodeBody(t, r, &body)
+					assert.Equal(t, []string{}, ptrStrs(body.Tags))
+					require.NotNil(t, body.CustomClaimRules)
+					assert.Empty(t, *body.CustomClaimRules)
+
+					writeJSON(t, w, clientv1.UpdateOAuthClientOutputBody{OauthClient: updatedIdentity()})
+				},
+			},
+			want: "OAuth client f1 updated\n",
+		},
+		{
+			name:    "update requires an id",
+			src:     updateOAuthClientCmd,
+			flags:   map[string]string{"subject": testSubject},
+			wantErr: "--id is required",
+		},
+		{
+			name:    "update needs something to change",
+			src:     updateOAuthClientCmd,
+			flags:   map[string]string{"id": "f1"},
+			wantErr: "nothing to update",
+		},
+		{
+			name:  "update surfaces the v1 error",
+			src:   updateOAuthClientCmd,
+			flags: map[string]string{"id": "k1", "issuer": testIssuer},
+			routes: map[string]apiHandler{
+				"PATCH /api/v1/oauth-client/{clientId}": func(
+					t *testing.T, w http.ResponseWriter, _ *http.Request,
+				) {
+					t.Helper()
+					w.Header().Set("Content-Type", "application/problem+json")
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(`{"title":"Bad Request","detail":"issuer belongs to a federated identity"}`))
+				},
+			},
+			wantErr: "issuer belongs to a federated identity",
+		},
+		{
+			name:   "list renders both kinds and no auth keys",
 			src:    listOAuthClientsCmd,
 			routes: map[string]apiHandler{"GET /api/v2/tailnet/{tailnet}/keys": listBoth},
 			wantIn: []string{
-				"Scopes", "k1", "devices:core", "tag:k8s-operator", "kubernetes operator", "2026-03-01 12:00:00",
+				"Kind", "k1", "client", "devices:core", "tag:k8s-operator", "kubernetes operator",
+				"2026-03-01 12:00:00", "f1", "federated", testSubject,
 			},
 			wantNotIn: []string{"a1"},
 		},
@@ -127,7 +297,7 @@ func TestOAuthClientCommands(t *testing.T) {
 			src:    listOAuthClientsCmd,
 			flags:  map[string]string{"output": "json"},
 			routes: map[string]apiHandler{"GET /api/v2/tailnet/{tailnet}/keys": listBoth},
-			want:   indentJSON(t, []clientv2.Key{client}),
+			want:   indentJSON(t, []clientv2.Key{client, federated}),
 		},
 		{
 			name: "list surfaces a non-json error body",
