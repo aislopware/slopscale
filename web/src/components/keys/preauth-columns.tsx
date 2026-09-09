@@ -41,21 +41,15 @@ export const preAuthKeyColumns = helper.columns([
     id: "key",
     header: "Key",
     enableSorting: false,
-    cell: ({ row }) => (
-      <KeyPrefix
-        text={`${preview(row.original)}…`}
-        copy={row.original.key}
-        label="Copy pre-auth key"
-      />
-    ),
-    meta: { className: "min-w-64" },
+    cell: ({ row }) => <KeyCell authKey={row.original} />,
+    meta: { className: "min-w-56" },
   }),
   helper.accessor((authKey) => userLabel(authKey.user), {
     id: "user",
     header: "User",
     enableSorting: true,
     cell: ({ row }) => <UserCell name={userLabel(row.original.user)} />,
-    meta: { className: "min-w-36" },
+    meta: { className: "hidden min-w-36 sm:table-cell" },
   }),
   // A column of its own for tags was empty on most rows, so they ride along in this cell; the
   // accessor is what the global filter searches, which keeps "search by tag" working.
@@ -66,7 +60,7 @@ export const preAuthKeyColumns = helper.columns([
     cell: ({ row, table }) => (
       <TypeCell authKey={row.original} groups={table.options.meta?.groups ?? []} />
     ),
-    meta: { className: "min-w-36" },
+    meta: { className: "hidden min-w-36 sm:table-cell" },
   }),
   helper.accessor((authKey) => statusOrder[preAuthKeyStatus(authKey)], {
     id: "status",
@@ -108,6 +102,20 @@ export const preAuthKeyColumns = helper.columns([
     meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
+
+/** On a phone the User and Options columns are hidden, so the key carries their words below it. */
+function KeyCell({ authKey }: { readonly authKey: PreAuthKey }): ReactElement {
+  const words = [userLabel(authKey.user), ...traits(authKey), ...authKey.aclTags];
+
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <KeyPrefix text={`${preview(authKey)}…`} copy={authKey.key} label="Copy pre-auth key" />
+      <span className="truncate text-xs text-kumo-subtle sm:hidden" title={words.join(" · ")}>
+        {words.join(" · ")}
+      </span>
+    </div>
+  );
+}
 
 function UserCell({ name }: { readonly name: string }): ReactElement {
   return (

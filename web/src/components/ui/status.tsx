@@ -11,7 +11,8 @@ const dots: Record<Tone, string> = {
   warning: "bg-kumo-warning",
   danger: "bg-kumo-danger",
   info: "bg-kumo-info",
-  neutral: "bg-kumo-inactive",
+  // Kumo has no inactive fill token, only the text one, so the dot borrows it through currentColor.
+  neutral: "bg-current text-kumo-inactive",
 };
 
 const texts: Record<Tone, string> = {

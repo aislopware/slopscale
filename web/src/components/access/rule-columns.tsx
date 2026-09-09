@@ -127,11 +127,15 @@ function NameCell({ rule }: { readonly rule: AccessRule }): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="flex min-w-0 items-center gap-2">
-        <span className="truncate font-medium text-kumo-default">{rule.name}</span>
+        <span className="truncate font-medium text-kumo-default" title={rule.name}>
+          {rule.name}
+        </span>
         {isBuiltinRule(rule) ? <span className="text-xs text-kumo-subtle">Built-in</span> : null}
       </span>
       {rule.description === "" ? null : (
-        <span className="truncate text-xs text-kumo-subtle">{rule.description}</span>
+        <span className="truncate text-xs text-kumo-subtle" title={rule.description}>
+          {rule.description}
+        </span>
       )}
       {/* The protocol column is hidden on small screens, so the name carries it there. */}
       <span className="truncate text-xs text-kumo-subtle md:hidden">{protocolSummary(rule)}</span>

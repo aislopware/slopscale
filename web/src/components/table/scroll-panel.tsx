@@ -31,11 +31,20 @@ export function TableScroll({
   pinnedRight = false,
 }: TableScrollProps): ReactElement {
   const { ref, edges } = useOverflowEdges();
+  const overflowing = edges.left || edges.right;
 
   return (
     <div className="relative min-w-0">
-      <div ref={ref} className="overflow-x-auto">
-        {children(edges.left || edges.right)}
+      {/* A region that scrolls sideways must be reachable from the keyboard, or the arrow keys
+          never get to move it; it only joins the tab order while there is something to scroll to. */}
+      <div
+        ref={ref}
+        className="overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:ring-inset"
+        {...(overflowing
+          ? { tabIndex: 0, role: "region", "aria-label": "Table, scrolls sideways" }
+          : {})}
+      >
+        {children(overflowing)}
       </div>
       {below === null || below === undefined ? null : (
         // The header cells are positioned, so they would paint over the panel's top ring; the
