@@ -30,5 +30,10 @@ jobs:
       - uses: NixOS/nix-installer-action@62c1943b776c509394b550f3f983adc14e9212d6 # v1.0.0
       - uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
 
+      # The console sign-in cases need the embedded console; without a build the
+      # server answers 503 for /admin/.
+      - name: Build admin console
+        run: make web
+
       - name: go test ./hscontrol/servertest
         run: go test -timeout=20m ./hscontrol/servertest/...
