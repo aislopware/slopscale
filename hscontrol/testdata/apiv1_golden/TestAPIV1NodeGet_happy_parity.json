@@ -3,6 +3,7 @@
   "body": {
     "node": {
       "announcedServices": [],
+      "appConnector": false,
       "approved": true,
       "approvedAt": "\u003ctimestamp\u003e",
       "approvedRoutes": [],
@@ -50,6 +51,7 @@
       },
       "registerMethod": "REGISTER_METHOD_AUTH_KEY",
       "sharedWith": [],
+      "sshServer": false,
       "subnetRoutes": [],
       "suspended": false,
       "suspendedAt": null,

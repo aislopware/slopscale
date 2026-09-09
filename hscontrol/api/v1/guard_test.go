@@ -43,6 +43,10 @@ var selfEnforcedOps = map[string]bool{
 	// console sign-ins (sessionAudience).
 	"GET /api/v1/auth/sessions":         true,
 	"DELETE /api/v1/auth/sessions/{id}": true,
+
+	// A browser SSH session mints a key for the caller's own user; the
+	// SSH policy decides what that user may reach.
+	"POST /api/v1/ssh-session": true,
 }
 
 // TestEveryAuthenticatedOperationDeclaresScope guarantees no v1 operation
@@ -134,6 +138,8 @@ func TestDebugNodeOperationIsGatedByConfig(t *testing.T) {
 var unauditedOps = map[string]bool{
 	"POST /api/v1/policy/check":  true,
 	"POST /api/v1/posture/check": true,
+	// A credential check reaches the provider and stores nothing.
+	"POST /api/v1/posture-integrations/check": true,
 }
 
 // TestEveryWritingOperationIsAudited guarantees no v1 operation that changes

@@ -648,6 +648,18 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609180900-tailnet-lock",
 			run: migrateTailnetLock,
 		},
+		{
+			// App connectors: the app_connectors table holding the apps
+			// whose domains the connector nodes resolve and route.
+			id:  "202609181000-app-connectors",
+			run: migrateAppConnectors,
+		},
+		{
+			// Posture integrations: the posture_integrations table holding
+			// the device management services asked about each machine.
+			id:  "202609181100-posture-integrations",
+			run: migratePostureIntegrations,
+		},
 	}
 }
 
@@ -720,6 +732,75 @@ func migrateVIPServices(tx *Tx) error {
 )`,
 			indexes: []string{
 				`CREATE UNIQUE INDEX idx_vip_services_name ON vip_services(name)`,
+			},
+		},
+	})
+}
+
+// migrateAppConnectors (202609181000) creates the app_connectors table.
+func migrateAppConnectors(tx *Tx) error {
+	return createTables(tx, []tableDefinition{
+		{
+			name: "app_connectors",
+			sqlite: `CREATE TABLE app_connectors(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  description text,
+  domains text,
+  connectors text,
+  routes text,
+  created_at datetime,
+  updated_at datetime
+)`,
+			postgres: `CREATE TABLE app_connectors(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  domains text,
+  connectors text,
+  routes text,
+  created_at timestamptz,
+  updated_at timestamptz
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_app_connectors_name ON app_connectors(name)`,
+			},
+		},
+	})
+}
+
+// migratePostureIntegrations (202609181100) creates the
+// posture_integrations table.
+func migratePostureIntegrations(tx *Tx) error {
+	return createTables(tx, []tableDefinition{
+		{
+			name: "posture_integrations",
+			sqlite: `CREATE TABLE posture_integrations(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  provider text NOT NULL,
+  name text NOT NULL,
+  config text NOT NULL,
+  enabled numeric DEFAULT true,
+  last_sync_at datetime,
+  last_error text,
+  last_matched integer DEFAULT 0,
+  created_at datetime,
+  updated_at datetime
+)`,
+			postgres: `CREATE TABLE posture_integrations(
+  id bigserial PRIMARY KEY,
+  provider text NOT NULL,
+  name text NOT NULL,
+  config text NOT NULL,
+  enabled boolean DEFAULT true,
+  last_sync_at timestamptz,
+  last_error text,
+  last_matched bigint DEFAULT 0,
+  created_at timestamptz,
+  updated_at timestamptz
+)`,
+			indexes: []string{
+				`CREATE UNIQUE INDEX idx_posture_integrations_name ON posture_integrations(name)`,
 			},
 		},
 	})

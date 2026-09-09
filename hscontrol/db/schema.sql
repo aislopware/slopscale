@@ -610,3 +610,35 @@ CREATE TABLE tka_aums(
   committed_at datetime
 );
 CREATE INDEX idx_tka_aums_prev_hash ON tka_aums(prev_hash);
+
+-- app_connectors are the apps reached through app connectors: the
+-- domains, the connector tags and the static routes, JSON lists each.
+-- See docs/ref/apps.md.
+CREATE TABLE app_connectors(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  name text NOT NULL,
+  description text,
+  domains text,
+  connectors text,
+  routes text,
+  created_at datetime,
+  updated_at datetime
+);
+CREATE UNIQUE INDEX idx_app_connectors_name ON app_connectors(name);
+
+-- posture_integrations are the device management and endpoint security
+-- services asked about each machine by serial number; config is the
+-- provider's credentials as JSON. See docs/ref/device-trust.md.
+CREATE TABLE posture_integrations(
+  id integer PRIMARY KEY AUTOINCREMENT,
+  provider text NOT NULL,
+  name text NOT NULL,
+  config text NOT NULL,
+  enabled numeric DEFAULT true,
+  last_sync_at datetime,
+  last_error text,
+  last_matched integer DEFAULT 0,
+  created_at datetime,
+  updated_at datetime
+);
+CREATE UNIQUE INDEX idx_posture_integrations_name ON posture_integrations(name);

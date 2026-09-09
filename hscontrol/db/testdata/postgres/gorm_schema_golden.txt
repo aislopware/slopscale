@@ -37,6 +37,14 @@ COL api_keys.expiration timestamp with time zone null=YES
 COL api_keys.last_seen timestamp with time zone null=YES
 COL api_keys.scopes text null=YES
 COL api_keys.description text null=YES
+COL app_connectors.id bigint null=NO default=nextval('app_connectors_id_seq'::regclass)
+COL app_connectors.name text null=NO
+COL app_connectors.description text null=YES
+COL app_connectors.domains text null=YES
+COL app_connectors.connectors text null=YES
+COL app_connectors.routes text null=YES
+COL app_connectors.created_at timestamp with time zone null=YES
+COL app_connectors.updated_at timestamp with time zone null=YES
 COL audit_events.id bigint null=NO default=nextval('audit_events_id_seq'::regclass)
 COL audit_events.created_at timestamp with time zone null=NO
 COL audit_events.actor_kind text null=NO
@@ -179,6 +187,16 @@ COL policies.created_at timestamp with time zone null=YES
 COL policies.updated_at timestamp with time zone null=YES
 COL policies.deleted_at timestamp with time zone null=YES
 COL policies.data text null=YES
+COL posture_integrations.id bigint null=NO default=nextval('posture_integrations_id_seq'::regclass)
+COL posture_integrations.provider text null=NO
+COL posture_integrations.name text null=NO
+COL posture_integrations.config text null=NO
+COL posture_integrations.enabled boolean null=YES default=true
+COL posture_integrations.last_sync_at timestamp with time zone null=YES
+COL posture_integrations.last_error text null=YES
+COL posture_integrations.last_matched bigint null=YES default=0
+COL posture_integrations.created_at timestamp with time zone null=YES
+COL posture_integrations.updated_at timestamp with time zone null=YES
 COL postures.id bigint null=NO default=nextval('postures_id_seq'::regclass)
 COL postures.name text null=NO
 COL postures.description text null=YES
@@ -298,6 +316,7 @@ IDX CREATE UNIQUE INDEX access_rule_groups_pkey ON public.access_rule_groups USI
 IDX CREATE UNIQUE INDEX access_rule_postures_pkey ON public.access_rule_postures USING btree (id)
 IDX CREATE UNIQUE INDEX access_rules_pkey ON public.access_rules USING btree (id)
 IDX CREATE UNIQUE INDEX api_keys_pkey ON public.api_keys USING btree (id)
+IDX CREATE UNIQUE INDEX app_connectors_pkey ON public.app_connectors USING btree (id)
 IDX CREATE UNIQUE INDEX audit_events_pkey ON public.audit_events USING btree (id)
 IDX CREATE UNIQUE INDEX database_versions_pkey ON public.database_versions USING btree (id)
 IDX CREATE UNIQUE INDEX group_dns_rule_groups_pkey ON public.group_dns_rule_groups USING btree (id)
@@ -308,6 +327,7 @@ IDX CREATE UNIQUE INDEX groups_pkey ON public.groups USING btree (id)
 IDX CREATE UNIQUE INDEX idx_access_rule_groups_rule_group_side ON public.access_rule_groups USING btree (rule_id, group_id, side)
 IDX CREATE UNIQUE INDEX idx_access_rule_postures_rule_posture ON public.access_rule_postures USING btree (rule_id, posture_id)
 IDX CREATE UNIQUE INDEX idx_api_keys_prefix ON public.api_keys USING btree (prefix)
+IDX CREATE UNIQUE INDEX idx_app_connectors_name ON public.app_connectors USING btree (name)
 IDX CREATE UNIQUE INDEX idx_group_dns_rule_groups_rule_group ON public.group_dns_rule_groups USING btree (rule_id, group_id)
 IDX CREATE UNIQUE INDEX idx_group_dns_rules_name ON public.group_dns_rules USING btree (name)
 IDX CREATE UNIQUE INDEX idx_group_nodes_group_node ON public.group_nodes USING btree (group_id, node_id)
@@ -324,6 +344,7 @@ IDX CREATE UNIQUE INDEX idx_node_attributes_node_key ON public.node_attributes U
 IDX CREATE UNIQUE INDEX idx_node_shares_node_user ON public.node_shares USING btree (node_id, user_id)
 IDX CREATE UNIQUE INDEX idx_oauth_access_tokens_prefix ON public.oauth_access_tokens USING btree (prefix)
 IDX CREATE UNIQUE INDEX idx_oauth_clients_client_id ON public.oauth_clients USING btree (client_id)
+IDX CREATE UNIQUE INDEX idx_posture_integrations_name ON public.posture_integrations USING btree (name)
 IDX CREATE UNIQUE INDEX idx_postures_name ON public.postures USING btree (name)
 IDX CREATE UNIQUE INDEX idx_pre_auth_keys_prefix ON public.pre_auth_keys USING btree (prefix) WHERE ((prefix IS NOT NULL) AND (prefix <> ''::text))
 IDX CREATE UNIQUE INDEX idx_provider_identifier ON public.users USING btree (provider_identifier) WHERE (provider_identifier IS NOT NULL)
@@ -343,6 +364,7 @@ IDX CREATE UNIQUE INDEX nodes_pkey ON public.nodes USING btree (id)
 IDX CREATE UNIQUE INDEX oauth_access_tokens_pkey ON public.oauth_access_tokens USING btree (id)
 IDX CREATE UNIQUE INDEX oauth_clients_pkey ON public.oauth_clients USING btree (id)
 IDX CREATE UNIQUE INDEX policies_pkey ON public.policies USING btree (id)
+IDX CREATE UNIQUE INDEX posture_integrations_pkey ON public.posture_integrations USING btree (id)
 IDX CREATE UNIQUE INDEX postures_pkey ON public.postures USING btree (id)
 IDX CREATE UNIQUE INDEX pre_auth_keys_pkey ON public.pre_auth_keys USING btree (id)
 IDX CREATE UNIQUE INDEX sessions_pkey ON public.sessions USING btree (id)
@@ -382,6 +404,9 @@ CON access_rules access_rules_pkey PRIMARY KEY (id)
 CON access_rules access_rules_protocol_not_null NOT NULL protocol
 CON api_keys api_keys_id_not_null NOT NULL id
 CON api_keys api_keys_pkey PRIMARY KEY (id)
+CON app_connectors app_connectors_id_not_null NOT NULL id
+CON app_connectors app_connectors_name_not_null NOT NULL name
+CON app_connectors app_connectors_pkey PRIMARY KEY (id)
 CON audit_events audit_events_action_not_null NOT NULL action
 CON audit_events audit_events_actor_kind_not_null NOT NULL actor_kind
 CON audit_events audit_events_created_at_not_null NOT NULL created_at
@@ -474,6 +499,11 @@ CON oauth_clients oauth_clients_id_not_null NOT NULL id
 CON oauth_clients oauth_clients_pkey PRIMARY KEY (id)
 CON policies policies_id_not_null NOT NULL id
 CON policies policies_pkey PRIMARY KEY (id)
+CON posture_integrations posture_integrations_config_not_null NOT NULL config
+CON posture_integrations posture_integrations_id_not_null NOT NULL id
+CON posture_integrations posture_integrations_name_not_null NOT NULL name
+CON posture_integrations posture_integrations_pkey PRIMARY KEY (id)
+CON posture_integrations posture_integrations_provider_not_null NOT NULL provider
 CON postures postures_expressions_not_null NOT NULL expressions
 CON postures postures_id_not_null NOT NULL id
 CON postures postures_name_not_null NOT NULL name

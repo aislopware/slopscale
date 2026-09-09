@@ -149,6 +149,15 @@ type State struct {
 	access atomic.Pointer[types.AccessModel]
 	// vipServices holds the tailnet's services; see [State.VIPServices].
 	vipServices atomic.Pointer[[]types.VIPService]
+	// appConnectors holds the tailnet's apps; see [State.AppConnectors].
+	appConnectors atomic.Pointer[[]types.AppConnector]
+	// postureIntegrations holds the device management services asked
+	// about each machine; see [State.PostureIntegrations].
+	postureIntegrations atomic.Pointer[[]types.PostureIntegration]
+	// postureSyncMu serialises provider syncs: the scheduled one, the
+	// one after a save and a manual one must not interleave their
+	// attribute writes.
+	postureSyncMu sync.Mutex
 	// tailnetLock is the tailnet lock authority's log and settings; see
 	// [State.TailnetLock].
 	tailnetLock *tailnetLock
@@ -330,6 +339,16 @@ func NewState(cfg *types.Config) (*State, error) {
 	}
 
 	_, err = s.loadVIPServices()
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = s.loadAppConnectors()
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.loadPostureIntegrations()
 	if err != nil {
 		return nil, err
 	}

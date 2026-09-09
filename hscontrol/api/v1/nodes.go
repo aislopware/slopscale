@@ -90,6 +90,18 @@ type Node struct {
 	// to be ephemeral when it registered.
 	Ephemeral bool `doc:"true when the node is deleted on logout or after the ephemeral timeout." json:"ephemeral"`
 
+	// AppConnector is what the client reports once it runs the app
+	// connector service; see /api/v1/apps.
+	AppConnector bool `doc:"true while the client runs the app connector service (tailscale set --advertise-connector)." json:"appConnector"` //nolint:lll // struct tag
+
+	// SSHServer is what the client reports once it runs Tailscale SSH,
+	// which a browser session (POST /api/v1/ssh-session) needs.
+	SSHServer bool `doc:"true while the client runs Tailscale SSH (tailscale set --ssh)." json:"sshServer"`
+
+	// NetInfo is the client's last network report: its home relay
+	// region, the round trip to each region and what its NAT looks like.
+	NetInfo *NodeNetInfo `doc:"The client's last network report; absent until it connects." json:"netInfo,omitempty"`
+
 	// ClientWarnings are what the client itself reports as broken, taken
 	// from the warn-* flags of its last map request.
 	//nolint:lll // doc tag
@@ -752,6 +764,9 @@ func (b Backend) nodeFromView(view types.NodeView) Node {
 	if hi := view.Hostinfo(); hi.Valid() {
 		n.ClientVersion = clientversion.Short(hi.IPNVersion())
 		n.UpdateAvailable = clientversion.Outdated(hi.IPNVersion(), b.State.LatestClientVersion())
+		n.AppConnector = hi.AppConnector().EqualBool(true)
+		n.SSHServer = hi.SSH_HostKeys().Len() > 0
+		n.NetInfo = netInfoFrom(view, b.derpRegions())
 	}
 
 	return n

@@ -101,6 +101,11 @@ type PolicyManager interface {
 	// resolve against and the service caps are stamped from.
 	SetVIPServices(services []types.VIPService) (bool, error)
 
+	// SetAppConnectors replaces the tailnet's apps, which the connector
+	// nodes receive as the app-connectors capability and may approve
+	// learned routes for.
+	SetAppConnectors(apps []types.AppConnector) (bool, error)
+
 	// NodeNeedsPeerRecompute reports whether peers must recompute their
 	// netmap when the node's online state changes. True for subnet
 	// routers, relay targets (tailscale.com/cap/relay), and via targets;

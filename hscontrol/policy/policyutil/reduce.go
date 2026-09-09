@@ -6,6 +6,7 @@ import (
 
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/util"
+	"go4.org/netipx"
 	"tailscale.com/tailcfg"
 )
 
@@ -20,6 +21,7 @@ func ReduceFilterRules(node types.NodeView, rules []tailcfg.FilterRule) []tailcf
 	ret := []tailcfg.FilterRule{}
 	subnetRoutes := node.SubnetRoutes()
 	hasExitRoutes := node.IsExitNode()
+	runsConnector := node.Hostinfo().Valid() && node.Hostinfo().AppConnector().EqualBool(true)
 
 	for _, rule := range rules {
 		// Handle CapGrant rules separately — they use CapGrant[].Dsts
@@ -36,11 +38,22 @@ func ReduceFilterRules(node types.NodeView, rules []tailcfg.FilterRule) []tailcf
 		// record if the rule is actually relevant for the given node.
 		var dests []tailcfg.NetPortRange
 
+		// An app connector answers its peers' DNS for the app domains over
+		// PeerAPI, and the client only does so for a peer its filter lets
+		// reach 0.0.0.0:53 (see peerAPIHandler.replyToDNSQueries); the
+		// control plane is expected to synthesise that rule. A source the
+		// policy lets reach the internet through the connector gets it.
+		connectorDNS := false
+
 		for _, dest := range rule.DstPorts {
 			expanded, err := util.ParseIPSet(dest.IP, nil)
 			// Fail closed: unparseable dests are dropped.
 			if err != nil {
 				continue
+			}
+
+			if runsConnector && !connectorDNS && overlapsInternet(expanded) {
+				connectorDNS = true
 			}
 
 			if node.InIPSet(expanded) {
@@ -70,6 +83,10 @@ func ReduceFilterRules(node types.NodeView, rules []tailcfg.FilterRule) []tailcf
 			}
 		}
 
+		if connectorDNS {
+			dests = append(dests, connectorDNSDests...)
+		}
+
 		if len(dests) > 0 {
 			// Struct-copy preserves any unknown future FilterRule
 			// fields.
@@ -80,6 +97,20 @@ func ReduceFilterRules(node types.NodeView, rules []tailcfg.FilterRule) []tailcf
 	}
 
 	return ret
+}
+
+// connectorDNSDests are the destinations an app connector's client checks
+// before answering a peer's DNS query over PeerAPI.
+var connectorDNSDests = []tailcfg.NetPortRange{
+	{IP: "0.0.0.0/32", Ports: tailcfg.PortRange{First: dnsPort, Last: dnsPort}},
+	{IP: "::/128", Ports: tailcfg.PortRange{First: dnsPort, Last: dnsPort}},
+}
+
+const dnsPort = 53
+
+// overlapsInternet reports whether the set reaches any public address.
+func overlapsInternet(set *netipx.IPSet) bool {
+	return slices.ContainsFunc(util.TheInternet().Prefixes(), set.OverlapsPrefix)
 }
 
 // reduceCapGrantRule filters a [tailcfg.CapGrant] rule to only include

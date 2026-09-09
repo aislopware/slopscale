@@ -462,3 +462,29 @@ CREATE TABLE tka_aums(
   committed_at timestamptz
 );
 CREATE INDEX idx_tka_aums_prev_hash ON tka_aums(prev_hash);
+
+CREATE TABLE app_connectors(
+  id bigserial PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  domains text,
+  connectors text,
+  routes text,
+  created_at timestamptz,
+  updated_at timestamptz
+);
+CREATE UNIQUE INDEX idx_app_connectors_name ON app_connectors(name);
+
+CREATE TABLE posture_integrations(
+  id bigserial PRIMARY KEY,
+  provider text NOT NULL,
+  name text NOT NULL,
+  config text NOT NULL,
+  enabled boolean DEFAULT true,
+  last_sync_at timestamptz,
+  last_error text,
+  last_matched bigint DEFAULT 0,
+  created_at timestamptz,
+  updated_at timestamptz
+);
+CREATE UNIQUE INDEX idx_posture_integrations_name ON posture_integrations(name);

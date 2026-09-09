@@ -911,6 +911,14 @@ func (h *Slopscale) scheduledTasks(ctx context.Context) {
 	attributeTicker := time.NewTicker(time.Minute)
 	defer attributeTicker.Stop()
 
+	// Posture integrations ask each provider about every machine's
+	// serial; the first run happens as the worker starts so a restart
+	// does not leave stale attributes for a whole interval.
+	integrationTicker := time.NewTicker(state.PostureIntegrationSyncInterval)
+	defer integrationTicker.Stop()
+
+	go h.syncPostureIntegrations(ctx)
+
 	lastScheduleCheck := time.Now()
 
 	for {
@@ -961,6 +969,9 @@ func (h *Slopscale) scheduledTasks(ctx context.Context) {
 		case <-postureTicker.C:
 			h.state.CollectStalePostures(ctx, h.mapBatcher.IsConnected, h.Change)
 
+		case <-integrationTicker.C:
+			go h.syncPostureIntegrations(ctx)
+
 		case now := <-attributeTicker.C:
 			h.expireNodeAttributes()
 			h.expireAccess(lastScheduleCheck, now)
@@ -971,6 +982,16 @@ func (h *Slopscale) scheduledTasks(ctx context.Context) {
 
 			lastScheduleCheck = now
 		}
+	}
+}
+
+// syncPostureIntegrations asks every enabled posture provider and
+// publishes the attribute changes. It runs off the worker goroutine since
+// a provider may take a while.
+func (h *Slopscale) syncPostureIntegrations(ctx context.Context) {
+	c := h.state.SyncPostureIntegrations(ctx)
+	if !c.IsEmpty() {
+		h.Change(c)
 	}
 }
 

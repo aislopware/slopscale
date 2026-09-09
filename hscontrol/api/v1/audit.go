@@ -234,8 +234,8 @@ func registerAuditExport(api huma.API, b Backend) {
 			"200": {
 				Description: "The events as a file.",
 				Content: map[string]*huma.MediaType{
-					auditExportCSVMedia: {Schema: &huma.Schema{Type: "string", Format: "binary"}},
-					auditExportJSONType: {Schema: &huma.Schema{Type: "string", Format: "binary"}},
+					auditExportCSVMedia: {Schema: &huma.Schema{Type: attrString, Format: "binary"}},
+					auditExportJSONType: {Schema: &huma.Schema{Type: attrString, Format: "binary"}},
 				},
 			},
 		},

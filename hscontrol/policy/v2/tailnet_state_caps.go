@@ -112,12 +112,13 @@ var unmodelledTailnetStateCaps = []nodecap.Cap{
 	// services, so the replayed tailnet cannot reproduce the mapping.
 	nodecap.ServiceHost,
 
-	// --- 2. Feature not implemented ---
-
 	// [tailcfg.NodeAttrStoreAppCRoutes]: tells an app-connector node
 	// to persist learned routes across restarts. Client reads via
-	// controlknobs:148. Slopscale does not implement app connectors.
+	// controlknobs:148. Slopscale stamps it on every connector node of
+	// an app (see stampAppConnectorCaps); the captures carry no apps.
 	nodecap.StoreAppCRoutes,
+
+	// --- 2. Feature not implemented ---
 
 	// [tailcfg.CapabilityWarnFunnelNoHTTPS]: deprecated in Tailscale
 	// 2023-08-09. Should not appear in fresh captures — listed

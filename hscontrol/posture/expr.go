@@ -42,8 +42,17 @@ var (
 	ErrScalarWanted  = errors.New("this operator takes a single value, not a list")
 	ErrOrderedValue  = errors.New("<, <=, > and >= compare numbers or version strings")
 	ErrUnterminated  = errors.New("unterminated string in posture expression")
-	ErrUnknownPrefix = errors.New("attribute prefix must be one of node, custom or ip")
+	ErrUnknownPrefix = errors.New(
+		"attribute prefix must be one of node, custom, ip or an integration's: " +
+			"falcon, sentinelOne, intune, jamfPro, kandji, kolide",
+	)
 )
+
+// KnownPrefixes are the attribute namespaces an expression may read:
+// node: from what the client reports, custom: set by an operator, ip:
+// from where the node connects, and one per posture integration
+// (see types.PostureProvider).
+var KnownPrefixes = []string{"node", "custom", "ip", "falcon", "sentinelOne", "intune", "jamfPro", "kandji", "kolide"}
 
 // Value is a literal in an expression: a string, a number, a boolean,
 // or a list of those after IN.
@@ -194,9 +203,7 @@ func (p *parser) attribute() (string, error) {
 		return "", ErrAttribute
 	}
 
-	switch prefix {
-	case "node", "custom", "ip":
-	default:
+	if !slices.Contains(KnownPrefixes, prefix) {
 		return "", fmt.Errorf("%w, got %q", ErrUnknownPrefix, prefix)
 	}
 

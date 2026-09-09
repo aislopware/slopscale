@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/audit"
@@ -31,6 +32,10 @@ type NodePosture struct {
 	Identity *PostureIdentity `json:"identity,omitempty"`
 	// Custom lists the custom attributes with their expiry and comment.
 	Custom []CustomAttribute `json:"custom" nullable:"false"`
+	// Integration lists the attributes posture integrations wrote,
+	// falcon:ztaScore and the like; the provider owns them, so they have
+	// no expiry and cannot be edited here.
+	Integration []CustomAttribute `json:"integration" nullable:"false"`
 	// IdentityCollectionOn mirrors the tailnet setting.
 	IdentityCollectionOn bool `json:"identityCollectionOn"`
 }
@@ -85,6 +90,7 @@ func postureFromView(view types.NodeView, settings types.Settings) NodePosture {
 	out := NodePosture{
 		Attributes:           map[string]any(view.PostureAttributes(now)),
 		Custom:               []CustomAttribute{},
+		Integration:          []CustomAttribute{},
 		IdentityCollectionOn: settings.PostureIdentityOn,
 	}
 
@@ -105,7 +111,11 @@ func postureFromView(view types.NodeView, settings types.Settings) NodePosture {
 			c.ExpiresAt = &at
 		}
 
-		out.Custom = append(out.Custom, c)
+		if strings.HasPrefix(a.Key, types.CustomAttributePrefix) {
+			out.Custom = append(out.Custom, c)
+		} else {
+			out.Integration = append(out.Integration, c)
+		}
 	}
 
 	return out

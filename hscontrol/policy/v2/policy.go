@@ -68,6 +68,12 @@ type PolicyManager struct {
 	vipServices         []types.VIPService
 	autoApproveServices map[tailcfg.ServiceName]*netipx.IPSet
 
+	// appConnectors are the tailnet's apps; see
+	// [PolicyManager.SetAppConnectors]. They are stamped on the
+	// connector nodes as the app-connectors capability and let those
+	// nodes approve the routes they learn.
+	appConnectors []types.AppConnector
+
 	// relayTargetIPs holds the IPs of nodes that are destinations of a
 	// tailscale.com/cap/relay grant; viaTargetTags holds the tags used as
 	// via targets. A node matching either, or that is a subnet router,
@@ -128,6 +134,7 @@ type filterAndPolicy struct {
 	Policy   *Policy
 	Access   types.AccessModel
 	Services []types.VIPService
+	Apps     []types.AppConnector
 }
 
 // checkUsernameRef resolves a single user@ token and records an error in
@@ -1128,6 +1135,10 @@ func (pm *PolicyManager) NodeCanApproveRoute(node types.NodeView, route netip.Pr
 		return slices.ContainsFunc(node.IPs(), pm.exitSet.Contains)
 	}
 
+	if pm.connectorCanApproveRoute(node, route) {
+		return true
+	}
+
 	// The fast path is that a node requests to approve a prefix
 	// where there is an exact entry, e.g. 10.0.0.0/8, then
 	// check and return quickly
@@ -1916,6 +1927,7 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 		Policy:   pm.pol,
 		Access:   pm.access,
 		Services: pm.vipServices,
+		Apps:     pm.appConnectors,
 	})
 
 	filterChanged := filterHash != pm.filterHash
@@ -2351,7 +2363,8 @@ func (pm *PolicyManager) refreshNodeAttrsLocked() error {
 		len(pm.nodeAttrsHashes) == 0 &&
 		!usersHaveAdmin(pm.users) &&
 		!NodesHaveGlobalExitNode(pm.nodes) &&
-		len(pm.vipServices) == 0 {
+		len(pm.vipServices) == 0 &&
+		len(pm.appConnectors) == 0 {
 		return nil
 	}
 
@@ -2362,6 +2375,7 @@ func (pm *PolicyManager) refreshNodeAttrsLocked() error {
 
 	stampRoleCaps(pm.users, pm.nodes, newMap)
 	stampServiceCaps(pm.vipServices, pm.nodes, serviceReachable(pm.pol.enforces(), pm.matchers), newMap)
+	stampAppConnectorCaps(pm.appConnectors, pm.nodes, newMap)
 
 	newHashes := make(map[types.NodeID]deephash.Sum, len(newMap))
 	for id, capMap := range newMap {

@@ -203,7 +203,7 @@ func registerSSHRecordingFiles(api huma.API, b Backend) {
 			"200": {
 				Description: "The recording.",
 				Content: map[string]*huma.MediaType{
-					castContentType: {Schema: &huma.Schema{Type: "string", Format: "binary"}},
+					castContentType: {Schema: &huma.Schema{Type: attrString, Format: "binary"}},
 				},
 			},
 		},

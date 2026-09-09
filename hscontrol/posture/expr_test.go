@@ -38,6 +38,13 @@ func TestParse(t *testing.T) {
 		{expr: "custom:x > true", wantErr: ErrOrderedValue},
 		{expr: "custom:x == macos", wantErr: ErrValue},
 		{expr: "custom:x IS SET now", wantErr: ErrTrailing},
+		{expr: "falcon:ztaScore >= 80"},
+		{expr: "sentinelOne:operationalState == 'unlocked'"},
+		{expr: "intune:complianceState == 'compliant'"},
+		{expr: "jamfPro:SIPEnabled == 'ENABLED'"},
+		{expr: "kandji:mdmEnabled == true"},
+		{expr: "kolide:authState == 'Will Block'"},
+		{expr: "foo:bar == 1", wantErr: ErrUnknownPrefix},
 	}
 
 	for _, tt := range tests {
@@ -60,13 +67,19 @@ func TestEval(t *testing.T) {
 	t.Parallel()
 
 	attrs := map[string]any{
-		"node:os":           "macos",
-		"node:tsVersion":    "1.86.2",
-		"node:serialNumber": []string{"C02ABC", "C02DEF"},
-		"custom:oncall":     true,
-		"custom:tier":       float64(3),
-		"ip:address":        "203.0.113.7",
-		"ip:country":        "VN",
+		"node:os":                      "macos",
+		"node:tsVersion":               "1.86.2",
+		"node:serialNumber":            []string{"C02ABC", "C02DEF"},
+		"custom:oncall":                true,
+		"custom:tier":                  float64(3),
+		"ip:address":                   "203.0.113.7",
+		"ip:country":                   "VN",
+		"falcon:ztaScore":              float64(85),
+		"sentinelOne:operationalState": "unlocked",
+		"intune:complianceState":       "compliant",
+		"jamfPro:SIPEnabled":           "ENABLED",
+		"kandji:mdmEnabled":            true,
+		"kolide:authState":             "Will Block",
 	}
 
 	tests := []struct {
@@ -105,6 +118,13 @@ func TestEval(t *testing.T) {
 		{"ip:country == 'US'", false},
 		{"node:os > 'a'", true},
 		{"custom:tier == 'three'", false},
+		{"falcon:ztaScore >= 80", true},
+		{"falcon:ztaScore < 50", false},
+		{"sentinelOne:operationalState == 'unlocked'", true},
+		{"intune:complianceState == 'compliant'", true},
+		{"jamfPro:SIPEnabled == 'ENABLED'", true},
+		{"kandji:mdmEnabled == true", true},
+		{"kolide:authState == 'Will Block'", true},
 	}
 
 	for _, tt := range tests {

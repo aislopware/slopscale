@@ -17,6 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"
 	"tailscale.com/tailcfg/nodecap"
+	"tailscale.com/types/dnstype"
 	"tailscale.com/types/views"
 	"tailscale.com/util/multierr"
 )
@@ -243,8 +244,20 @@ func (b *MapResponseBuilder) WithDNSConfig() *MapResponseBuilder {
 		return b
 	}
 
+	// The node's groups' split DNS and the apps' come on top of the
+	// tailnet's, in that order.
+	routes := b.mapper.state.GroupDNSRoutes(node)
+
+	for domain, rs := range b.mapper.state.AppDNSRoutes(node) {
+		if routes == nil {
+			routes = make(map[string][]*dnstype.Resolver)
+		}
+
+		routes[domain] = append(routes[domain], rs...)
+	}
+
 	b.resp.DNSConfig = generateDNSConfig(
-		b.mapper.cfg, node, b.mapper.state.NodeCapMap(node.ID()), b.mapper.state.GroupDNSRoutes(node),
+		b.mapper.cfg, node, b.mapper.state.NodeCapMap(node.ID()), routes,
 		b.mapper.state.ServiceDNSRecords(b.mapper.cfg.BaseDomain),
 	)
 

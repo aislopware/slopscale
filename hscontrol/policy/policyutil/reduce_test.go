@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
+	"tailscale.com/types/opt"
 	"tailscale.com/util/must"
 )
 
@@ -1285,6 +1286,136 @@ func TestReduceFilterRulesCapGrant(t *testing.T) {
 					)
 				}
 			}
+		})
+	}
+}
+
+// TestReduceFilterRulesAppConnector verifies that ReduceFilterRules synthesises
+// DNS destination rules (0.0.0.0/32:53 and ::/128:53) for app connector nodes
+// when a filter rule's destination overlaps the public internet.
+func TestReduceFilterRulesAppConnector(t *testing.T) {
+	t.Parallel()
+
+	connectorNode := &types.Node{
+		IPv4: ap("100.64.0.1"),
+		IPv6: ap("fd7a:115c:a1e0::1"),
+		Hostinfo: &tailcfg.Hostinfo{
+			AppConnector: opt.NewBool(true),
+		},
+	}
+
+	nonConnectorNode := &types.Node{
+		IPv4: ap("100.64.0.2"),
+		IPv6: ap("fd7a:115c:a1e0::2"),
+		Hostinfo: &tailcfg.Hostinfo{
+			AppConnector: opt.NewBool(false),
+		},
+	}
+
+	wantConnectorDNSDests := []tailcfg.NetPortRange{
+		{IP: "0.0.0.0/32", Ports: tailcfg.PortRange{First: 53, Last: 53}},
+		{IP: "::/128", Ports: tailcfg.PortRange{First: 53, Last: 53}},
+	}
+
+	tests := []struct {
+		name  string
+		node  *types.Node
+		rules []tailcfg.FilterRule
+		want  []tailcfg.FilterRule
+	}{
+		{
+			name: "connector-with-internet-prefix-gets-extra-dns-dests",
+			node: connectorNode,
+			rules: []tailcfg.FilterRule{
+				{
+					SrcIPs: []string{"100.64.0.99/32"},
+					DstPorts: []tailcfg.NetPortRange{
+						{IP: "8.8.8.0/24", Ports: tailcfg.PortRangeAny},
+					},
+				},
+			},
+			want: []tailcfg.FilterRule{
+				{
+					SrcIPs:   []string{"100.64.0.99/32"},
+					DstPorts: wantConnectorDNSDests,
+				},
+			},
+		},
+		{
+			name: "connector-with-default-route-gets-extra-dns-dests",
+			node: connectorNode,
+			rules: []tailcfg.FilterRule{
+				{
+					SrcIPs: []string{"100.64.0.99/32"},
+					DstPorts: []tailcfg.NetPortRange{
+						{IP: "0.0.0.0/0", Ports: tailcfg.PortRangeAny},
+					},
+				},
+			},
+			want: []tailcfg.FilterRule{
+				{
+					SrcIPs: []string{"100.64.0.99/32"},
+					DstPorts: append(
+						[]tailcfg.NetPortRange{{IP: "0.0.0.0/0", Ports: tailcfg.PortRangeAny}},
+						wantConnectorDNSDests...,
+					),
+				},
+			},
+		},
+		{
+			name: "connector-with-private-range-gets-none",
+			node: connectorNode,
+			rules: []tailcfg.FilterRule{
+				{
+					SrcIPs: []string{"100.64.0.99/32"},
+					DstPorts: []tailcfg.NetPortRange{
+						{IP: "10.0.0.0/8", Ports: tailcfg.PortRangeAny},
+					},
+				},
+			},
+			want: []tailcfg.FilterRule{},
+		},
+		{
+			name: "connector-with-node-own-ip-gets-none",
+			node: connectorNode,
+			rules: []tailcfg.FilterRule{
+				{
+					SrcIPs: []string{"100.64.0.99/32"},
+					DstPorts: []tailcfg.NetPortRange{
+						{IP: "100.64.0.1/32", Ports: tailcfg.PortRangeAny},
+					},
+				},
+			},
+			want: []tailcfg.FilterRule{
+				{
+					SrcIPs: []string{"100.64.0.99/32"},
+					DstPorts: []tailcfg.NetPortRange{
+						{IP: "100.64.0.1/32", Ports: tailcfg.PortRangeAny},
+					},
+				},
+			},
+		},
+		{
+			name: "non-connector-with-internet-rule-gets-none",
+			node: nonConnectorNode,
+			rules: []tailcfg.FilterRule{
+				{
+					SrcIPs: []string{"100.64.0.99/32"},
+					DstPorts: []tailcfg.NetPortRange{
+						{IP: "8.8.8.0/24", Ports: tailcfg.PortRangeAny},
+					},
+				},
+			},
+			want: []tailcfg.FilterRule{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := policyutil.ReduceFilterRules(tt.node.View(), tt.rules)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
