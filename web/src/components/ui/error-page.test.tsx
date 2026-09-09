@@ -1,3 +1,4 @@
+import { LinkProvider } from "@cloudflare/kumo/utils";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -12,6 +13,7 @@ import { render } from "vitest-browser-react";
 
 import { ApiError } from "~/api/error.ts";
 import { RouteError, RouteNotFound } from "~/components/ui/error-page.tsx";
+import { AppLink } from "~/lib/link.tsx";
 
 /** A router whose routes throw what a real one would, with the pages under test as its defaults. */
 function app(path: string): ReactElement {
@@ -39,14 +41,25 @@ function app(path: string): ReactElement {
       throw new ApiError(502, undefined, "502 Bad Gateway");
     },
   });
+  const endedRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/machines/$id",
+    loader: () => {
+      throw new ApiError(401, undefined, "401");
+    },
+  });
   const router = createRouter({
-    routeTree: rootRoute.addChildren([indexRoute, forbiddenRoute, downRoute]),
+    routeTree: rootRoute.addChildren([indexRoute, forbiddenRoute, downRoute, endedRoute]),
     history: createMemoryHistory({ initialEntries: [path] }),
     defaultErrorComponent: RouteError,
     defaultNotFoundComponent: RouteNotFound,
   });
 
-  return <RouterProvider router={router} />;
+  return (
+    <LinkProvider component={AppLink}>
+      <RouterProvider router={router} />
+    </LinkProvider>
+  );
 }
 
 describe(RouteError, () => {
@@ -62,6 +75,18 @@ describe(RouteError, () => {
 
     await screen.getByRole("button", { name: "Technical details" }).click();
     await expect.element(screen.getByText("Request /api/x")).toBeVisible();
+  });
+
+  it("sends an ended session to sign in and back to the same page", async () => {
+    const screen = await render(app("/machines/7?tab=routes"));
+    const link = screen.getByRole("link", { name: "Sign in" });
+
+    await expect.element(link).toBeVisible();
+
+    const href = new URL(String(link.element().getAttribute("href")), globalThis.location.origin);
+
+    expect(href.pathname).toBe("/login");
+    expect(href.searchParams.get("redirect")).toBe("/machines/7?tab=routes");
   });
 
   it("offers a retry when the server did not answer", async () => {

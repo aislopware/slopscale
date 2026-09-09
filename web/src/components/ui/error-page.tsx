@@ -12,7 +12,7 @@ import {
   SignInIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
-import { useMatches, useRouter } from "@tanstack/react-router";
+import { useLocation, useMatches, useRouter } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { useMemo } from "react";
 import type { ReactElement, ReactNode } from "react";
@@ -193,6 +193,21 @@ function BackButton(): ReactElement {
   );
 }
 
+/** Sign in and come back here: the router's address, which is what the login page navigates to. */
+function SignInButton(): ReactElement {
+  const here = useLocation({ select: (location) => location.href });
+
+  return (
+    <LinkButton
+      href={`/login?redirect=${encodeURIComponent(here)}`}
+      variant="primary"
+      icon={SignInIcon}
+    >
+      Sign in
+    </LinkButton>
+  );
+}
+
 /** The actions a kind of trouble calls for, primary rightmost. */
 function Actions({
   trouble,
@@ -204,15 +219,7 @@ function Actions({
   readonly retry: () => void;
 }): ReactElement {
   if (trouble.kind === "session") {
-    return (
-      <LinkButton
-        href={`/login?redirect=${encodeURIComponent(globalThis.location.href)}`}
-        variant="primary"
-        icon={SignInIcon}
-      >
-        Sign in
-      </LinkButton>
-    );
+    return <SignInButton />;
   }
 
   if (trouble.kind === "forbidden" || trouble.kind === "missing") {

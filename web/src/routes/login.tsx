@@ -33,6 +33,14 @@ const signInProblems: Record<string, string> = {
 
 const genericProblem = "The sign-in could not be finished. Try again.";
 
+/**
+ * Where to go after signing in. The value comes from the URL, so only a path of the console's own
+ * is followed; a full address or a protocol-relative one would lead out of it.
+ */
+function safeTarget(target: string | undefined): string {
+  return target !== undefined && target.startsWith("/") && !target.startsWith("//") ? target : "/";
+}
+
 export const Route = createFileRoute("/login")({
   validateSearch: searchSchema,
   // Whether the operator is already signed in is the server's answer: the session cookie is
@@ -48,7 +56,7 @@ export const Route = createFileRoute("/login")({
       throw error;
     }
 
-    throw redirect({ to: search.redirect ?? "/" });
+    throw redirect({ to: safeTarget(search.redirect) });
   },
   loader: ({ context }) => context.queryClient.query(consoleAuthQuery),
   component: LoginPage,
@@ -134,7 +142,7 @@ function loginUrl(
   target: string | undefined,
   invite: string | undefined,
 ): string {
-  const query = new URLSearchParams({ redirect: consolePath(target ?? "/") });
+  const query = new URLSearchParams({ redirect: consolePath(safeTarget(target)) });
 
   if (invite !== undefined && invite !== "") {
     query.set("invite", invite);

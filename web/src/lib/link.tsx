@@ -3,6 +3,23 @@ import { Link } from "@tanstack/react-router";
 import { forwardRef } from "react";
 import type { ReactElement, Ref } from "react";
 
+/**
+ * The router's `to` is a path alone, so a query string in an href would become part of the path. A
+ * console address is split into the path and its parameters; anything else goes through as it is.
+ */
+function destination(href: string): {
+  readonly to: string;
+  readonly search?: Record<string, string>;
+} {
+  if (!href.startsWith("/") || !href.includes("?")) {
+    return { to: href };
+  }
+
+  const url = new URL(href, globalThis.location.origin);
+
+  return { to: url.pathname, search: Object.fromEntries(url.searchParams) };
+}
+
 function RouterLink(
   // oxlint-disable-next-line typescript/no-deprecated -- Breadcrumbs.Link still sends `to`
   { href, to, target, ...rest }: LinkComponentProps,
@@ -12,7 +29,7 @@ function RouterLink(
     <Link
       {...rest}
       ref={ref}
-      to={href ?? to ?? "/"}
+      {...destination(href ?? to ?? "/")}
       {...(target === undefined ? {} : { target })}
     />
   );
