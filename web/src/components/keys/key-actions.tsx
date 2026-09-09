@@ -1,6 +1,11 @@
 import { DeleteResource } from "@cloudflare/kumo";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
-import { ArrowsClockwiseIcon, ClockCounterClockwiseIcon, TrashIcon } from "@phosphor-icons/react";
+import {
+  ArrowsClockwiseIcon,
+  ClockCounterClockwiseIcon,
+  PencilSimpleIcon,
+  TrashIcon,
+} from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -28,6 +33,15 @@ export interface DeleteAction extends KeyAction {
   readonly resourceType: string;
   /** The prefix the operator has to type back to unlock the red button. */
   readonly resourceName: string;
+  /** Custom button text in the delete dialog, defaulting to "Delete <resourceType>". */
+  readonly buttonText?: string | undefined;
+  /** Custom label for the menu item, defaulting to "Delete…". */
+  readonly menuItemText?: string | undefined;
+}
+
+export interface EditEntry {
+  readonly onSelect: () => void;
+  readonly reason?: string | undefined;
 }
 
 /**
@@ -44,6 +58,7 @@ export interface KeyActionsProps {
   /** Accessible name of the trigger, such as "Actions for key tskey-abc". */
   readonly label: string;
   readonly disabled?: boolean;
+  readonly edit?: EditEntry | undefined;
   /** Present only for a credential whose secret can be replaced in place, such as an API key. */
   readonly rotate?: RotateEntry;
   /** Absent for a credential that cannot expire, such as an OAuth client. */
@@ -57,6 +72,7 @@ type Dialog = "expire" | "delete";
 export function KeyActions({
   label,
   disabled = false,
+  edit,
   rotate,
   expire,
   remove,
@@ -69,6 +85,22 @@ export function KeyActions({
   return (
     <>
       <RowMenu label={label}>
+        {edit === undefined ? null : (
+          <>
+            <DisabledReason reason={disabled ? readOnlyReason : edit.reason}>
+              <DropdownMenu.Item
+                icon={PencilSimpleIcon}
+                disabled={disabled || edit.reason !== undefined}
+                onClick={() => {
+                  edit.onSelect();
+                }}
+              >
+                Edit…
+              </DropdownMenu.Item>
+            </DisabledReason>
+            <DropdownMenu.Separator />
+          </>
+        )}
         {rotate === undefined ? null : (
           <>
             <DisabledReason reason={disabled ? readOnlyReason : rotate.reason}>
@@ -108,7 +140,7 @@ export function KeyActions({
             setDialog("delete");
           }}
         >
-          Delete…
+          {remove.menuItemText ?? "Delete…"}
         </DropdownMenu.Item>
       </RowMenu>
       {expire === undefined ? null : (
@@ -138,7 +170,7 @@ export function KeyActions({
         }}
         resourceType={remove.resourceType}
         resourceName={remove.resourceName}
-        deleteButtonText={`Delete ${remove.resourceType}`}
+        deleteButtonText={remove.buttonText ?? `Delete ${remove.resourceType}`}
         isDeleting={remove.pending}
         {...(remove.error === undefined ? {} : { errorMessage: remove.error })}
         onDelete={() => {

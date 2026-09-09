@@ -116,6 +116,13 @@ export function useSSHSession(nodeId: string, baseUrl?: string): UseSSHSessionRe
   const ipnRef = useRef<IPN | null>(null);
   const activeSshSessionRef = useRef<IPNSSHSession | null>(null);
   const restartRef = useRef<(() => void) | null>(null);
+  // The draft as it stands, readable from the async start: the session is fetched while the page is
+  // already on screen, so by the time the server's guess arrives the field may not be empty.
+  const draftRef = useRef("");
+
+  useEffect(() => {
+    draftRef.current = username;
+  }, [username]);
 
   const closeActiveSession = useCallback((): void => {
     if (activeSshSessionRef.current === null) {
@@ -155,7 +162,14 @@ export function useSSHSession(nodeId: string, baseUrl?: string): UseSSHSessionRe
       setSession(result.session);
       if (!usernameOffered) {
         usernameOffered = true;
-        const offered = result.session.target.username || fallbackUsername;
+
+        // Whatever is already in the field wins: the machine's own suggestion may have arrived
+        // first, or the operator may have typed while the client was still loading.
+        const offered =
+          draftRef.current === ""
+            ? result.session.target.username || fallbackUsername
+            : draftRef.current;
+
         setUsername(offered);
         setConnectionUsername(offered);
       }

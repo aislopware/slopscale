@@ -1,13 +1,17 @@
 import { Badge } from "@cloudflare/kumo/components/badge";
+import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { OAuthClient, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
+import type { Me } from "~/auth/me.ts";
 import { emptyUsers } from "~/components/keys/api-columns.tsx";
 import { KeyPrefix } from "~/components/keys/cells.tsx";
+import { issuerHost } from "~/components/keys/federated.ts";
 import { KeyActions } from "~/components/keys/key-actions.tsx";
 import { useOAuthClientMutations } from "~/components/keys/mutations.ts";
+import { EditOAuthClientDialog } from "~/components/keys/oauth-dialogs.tsx";
 import { scopeLabel } from "~/components/keys/scopes.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
@@ -19,19 +23,31 @@ import { parseTime } from "~/lib/time.ts";
 const helper = createAppColumnHelper<OAuthClient>();
 
 export const oauthClientColumns = helper.columns([
-  helper.accessor((client) => `${client.clientId} ${client.description}`, {
-    id: "client",
-    header: "Client",
+  helper.accessor(
+    (client) => `${client.clientId} ${client.description} ${client.subject} ${client.issuer}`,
+    {
+      id: "client",
+      header: "Client",
+      enableSorting: true,
+      cell: ({ row }) => <ClientCell client={row.original} />,
+      meta: { className: "min-w-56" },
+    },
+  ),
+  helper.accessor((client) => (client.keyType === "federated" ? "Federated identity" : "Client"), {
+    id: "kind",
+    header: "Kind",
     enableSorting: true,
-    cell: ({ row }) => <ClientCell client={row.original} />,
-    meta: { className: "min-w-36" },
+    cell: ({ getValue }) => <span className="text-kumo-default">{getValue()}</span>,
+    meta: { className: "min-w-32 whitespace-nowrap" },
   }),
+  // Scopes are the column that gives way first: they wrap onto as many lines as they need, so the
+  // tags beside them keep the width one pill asks for.
   helper.accessor((client) => client.scopes.join(" "), {
     id: "scopes",
     header: "Scopes",
     enableSorting: false,
     cell: ({ row }) => <Chips values={row.original.scopes} />,
-    meta: { className: "min-w-40" },
+    meta: { className: "min-w-32" },
   }),
   helper.accessor((client) => client.tags.join(" "), {
     id: "tags",
@@ -43,7 +59,7 @@ export const oauthClientColumns = helper.columns([
       ) : (
         <Chips values={row.original.tags} mono />
       ),
-    meta: { className: "hidden md:table-cell" },
+    meta: { className: "hidden min-w-28 md:table-cell" },
   }),
   helper.accessor((client) => client.userId ?? "", {
     id: "user",
@@ -53,7 +69,7 @@ export const oauthClientColumns = helper.columns([
     cell: ({ row, table }) => (
       <CreatorCell userId={row.original.userId} users={table.options.meta?.users ?? emptyUsers} />
     ),
-    meta: { className: "min-w-40" },
+    meta: { className: "hidden min-w-28 whitespace-nowrap 2xl:table-cell" },
   }),
   helper.accessor((client) => parseTime(client.createdAt)?.getTime() ?? 0, {
     id: "created",
@@ -66,7 +82,7 @@ export const oauthClientColumns = helper.columns([
         <RelativeTime value={row.original.createdAt} />
       </span>
     ),
-    meta: { className: "whitespace-nowrap" },
+    meta: { className: "hidden whitespace-nowrap 2xl:table-cell" },
   }),
   helper.display({
     id: "actions",
@@ -75,20 +91,44 @@ export const oauthClientColumns = helper.columns([
       <ClientMenu
         client={row.original}
         disabled={table.options.meta?.me === undefined || !can(table.options.meta.me, "oauth_keys")}
+        me={table.options.meta?.me}
       />
     ),
     meta: { className: "w-12 text-right", sticky: "right" },
   }),
 ]);
 
-/** The client id with the description under it. The secret is never shown again. */
+function ClientSubtext({ client }: { readonly client: OAuthClient }): ReactElement | null {
+  if (client.keyType === "federated") {
+    const host = issuerHost(client.issuer);
+    return (
+      <div className="flex min-w-0 items-baseline gap-1 text-xs">
+        <span className="truncate text-kumo-default">{client.subject}</span>
+        {host === "" ? null : <span className="shrink-0 text-kumo-subtle">{`(${host})`}</span>}
+      </div>
+    );
+  }
+  if (client.description === "") {
+    return null;
+  }
+  return <span className="truncate text-xs text-kumo-subtle">{client.description}</span>;
+}
+
+/**
+ * The client id with subject/issuer host for federated rows or description under it. The cell is
+ * capped rather than left to grow: a federated subject is a long line, and a column that widens to
+ * fit one pushes the tags beside it under the pinned actions.
+ */
 function ClientCell({ client }: { readonly client: OAuthClient }): ReactElement {
+  const isFederated = client.keyType === "federated";
+
   return (
-    <div className="flex min-w-0 flex-col gap-0.5">
+    <div className="flex max-w-72 min-w-0 flex-col gap-0.5">
       <KeyPrefix text={client.clientId} copy={client.clientId} label="Copy client id" />
-      {client.description === "" ? null : (
+      <ClientSubtext client={client} />
+      {isFederated && client.description !== "" ? (
         <span className="truncate text-xs text-kumo-subtle">{client.description}</span>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -143,33 +183,50 @@ function CreatorCell({
 function ClientMenu({
   client,
   disabled,
+  me,
 }: {
   readonly client: OAuthClient;
   readonly disabled: boolean;
+  readonly me?: Me | undefined;
 }): ReactElement {
+  const [editing, setEditing] = useState(false);
   const { revoke } = useOAuthClientMutations();
+  const isFederated = client.keyType === "federated";
+  const resourceType = isFederated ? "identity" : "OAuth client";
 
   return (
-    <KeyActions
-      label={`Actions for OAuth client ${client.clientId}`}
-      disabled={disabled}
-      remove={{
-        resourceType: "OAuth client",
-        resourceName: client.clientId,
-        pending: revoke.isPending,
-        error: revoke.isError ? errorMessage(revoke.error) : undefined,
-        run: (done) => {
-          revoke.mutate(
-            { params: { path: { clientId: client.clientId } } },
-            {
-              onSuccess: () => {
-                toast.success("OAuth client revoked");
-                done();
+    <>
+      <KeyActions
+        label={`Actions for ${resourceType} ${client.clientId}`}
+        disabled={disabled}
+        edit={{
+          onSelect: () => {
+            setEditing(true);
+          },
+        }}
+        remove={{
+          resourceType,
+          resourceName: client.clientId,
+          buttonText: isFederated ? "Delete identity" : undefined,
+          menuItemText: isFederated ? "Delete identity…" : undefined,
+          pending: revoke.isPending,
+          error: revoke.isError ? errorMessage(revoke.error) : undefined,
+          run: (done) => {
+            revoke.mutate(
+              { params: { path: { clientId: client.clientId } } },
+              {
+                onSuccess: () => {
+                  toast.success(
+                    isFederated ? "Federated identity deleted" : "OAuth client revoked",
+                  );
+                  done();
+                },
               },
-            },
-          );
-        },
-      }}
-    />
+            );
+          },
+        }}
+      />
+      <EditOAuthClientDialog client={client} me={me} open={editing} onOpenChange={setEditing} />
+    </>
   );
 }

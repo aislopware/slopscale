@@ -5,22 +5,39 @@ import { statusFilters } from "~/components/keys/status.ts";
 import type { StatusFilter } from "~/components/keys/status.ts";
 import { optionalText } from "~/lib/search-text.ts";
 
+export const kindFilters = ["all", "client", "federated"] as const;
+export type KindFilter = (typeof kindFilters)[number];
+
 function toStatus(value: unknown): StatusFilter | undefined {
   return statusFilters.find((known) => known === value);
 }
 
-const optionalStatus = optional(pipe(unknown(), transform(toStatus)));
+function toKind(value: unknown): KindFilter | undefined {
+  return kindFilters.find((known) => known === value);
+}
 
-/** The search of a keys page: its search box and the status filter, both absent when untouched. */
-export const keysSearchSchema = object({ q: optionalText, status: optionalStatus });
+const optionalStatus = optional(pipe(unknown(), transform(toStatus)));
+const optionalKind = optional(pipe(unknown(), transform(toKind)));
+
+/** The search of a keys page: its search box and the status/kind filters, absent when untouched. */
+export const keysSearchSchema = object({
+  q: optionalText,
+  status: optionalStatus,
+  kind: optionalKind,
+});
 
 export interface KeysSearch {
   readonly q?: string | undefined;
   readonly status?: StatusFilter | undefined;
+  readonly kind?: KindFilter | undefined;
 }
 
-function searchFor(query: string, status: StatusFilter): KeysSearch {
-  return { q: query === "" ? undefined : query, status: status === "all" ? undefined : status };
+function searchFor(query: string, status: StatusFilter, kind: KindFilter): KeysSearch {
+  return {
+    q: query === "" ? undefined : query,
+    status: status === "all" ? undefined : status,
+    kind: kind === "all" ? undefined : kind,
+  };
 }
 
 /**
@@ -33,17 +50,22 @@ export function keyControls(
 ): PanelControls {
   const query = search.q ?? "";
   const status = search.status ?? "all";
+  const kind = search.kind ?? "all";
   return {
     query,
     status,
+    kind,
     handleQueryChange: (value) => {
-      go(searchFor(value, status), true);
+      go(searchFor(value, status, kind), true);
     },
     handleStatusChange: (value) => {
-      go(searchFor(query, toStatus(value) ?? "all"), false);
+      go(searchFor(query, toStatus(value) ?? "all", kind), false);
+    },
+    handleKindChange: (value) => {
+      go(searchFor(query, status, toKind(value) ?? "all"), false);
     },
     handleClear: () => {
-      go(searchFor("", "all"), true);
+      go(searchFor("", "all", "all"), true);
     },
   };
 }

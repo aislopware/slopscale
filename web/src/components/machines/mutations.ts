@@ -4,7 +4,40 @@ import { useNavigate } from "@tanstack/react-router";
 import { api } from "~/api/client.ts";
 import type { Mutation } from "~/api/mutation.ts";
 import { invalidate } from "~/api/queries.ts";
+import type { NodeClientUpdate } from "~/api/schema.gen.ts";
 import { toast } from "~/components/ui/toast.ts";
+
+/**
+ * What the client answered when it was asked to update itself. It is a live question to the
+ * machine, so "the request worked" and "the update started" are different things: a client that has
+ * not opted in with `tailscale set --auto-update`, or one on a platform that cannot update itself,
+ * answers 200 with a refusal in it.
+ */
+export function reportClientUpdate(update: NodeClientUpdate): void {
+  if (update.started) {
+    toast.success("Update started");
+
+    return;
+  }
+
+  // The field carries the client's own words when it gave any; the server sends it empty rather
+  // than leaving it out when the client said nothing.
+  const said = update.error ?? "";
+
+  toast.error("The machine did not start the update", said === "" ? refusalReason(update) : said);
+}
+
+function refusalReason(update: NodeClientUpdate): string {
+  if (!update.supported) {
+    return "This platform cannot update its Tailscale client itself.";
+  }
+
+  if (!update.enabled) {
+    return "Run tailscale set --auto-update=true on the machine to let the tailnet update it.";
+  }
+
+  return "The client gave no reason.";
+}
 
 interface NodeMutations {
   readonly approve: Mutation<"post", "/api/v1/node/{nodeId}/approve">;
@@ -18,6 +51,8 @@ interface NodeMutations {
   readonly share: Mutation<"post", "/api/v1/node/{nodeId}/share">;
   readonly unshare: Mutation<"delete", "/api/v1/node/{nodeId}/share/{userId}">;
   readonly remove: Mutation<"delete", "/api/v1/node/{nodeId}">;
+  readonly updateClient: Mutation<"post", "/api/v1/node/{nodeId}/client-update">;
+  readonly resetAttestation: Mutation<"delete", "/api/v1/node/{nodeId}/hardware-attestation">;
 }
 
 /**
@@ -93,6 +128,22 @@ export function useNodeMutations(): NodeMutations {
           "/api/v1/network",
         );
         await navigate({ to: "/machines" });
+      },
+    }),
+    // The answer says whether the client took it on, so the caller reports it with
+    // `reportClientUpdate`; only a failed request is a toast of its own.
+    updateClient: api.useMutation("post", "/api/v1/node/{nodeId}/client-update", {
+      onError: (error) => {
+        toast.error("Could not reach the machine", error);
+      },
+    }),
+    resetAttestation: api.useMutation("delete", "/api/v1/node/{nodeId}/hardware-attestation", {
+      onSuccess: async () => {
+        toast.success("Hardware attestation reset");
+        await refresh();
+      },
+      onError: (error) => {
+        toast.error("Could not reset the hardware attestation", error);
       },
     }),
   };

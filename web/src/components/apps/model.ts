@@ -287,3 +287,20 @@ export function appsForNode<
 >(apps: readonly TApp[], nodeId: string): TApp[] {
   return apps.filter((app) => app.nodes.some((node) => node.nodeId === nodeId));
 }
+
+/** One domain the connector answers for, with every address it has resolved for it. */
+export interface LearnedRoute {
+  readonly domain: string;
+  readonly addresses: readonly string[];
+}
+
+/**
+ * What the connector has learned, a row per domain, alphabetically so the list holds still between
+ * refreshes. A domain the client has resolved nothing for is kept: that it answers for it and found
+ * nothing is the interesting case.
+ */
+export function learnedRoutes(domains: Readonly<Record<string, string[] | null>>): LearnedRoute[] {
+  return Object.entries(domains)
+    .map(([domain, addresses]) => ({ domain, addresses: addresses ?? [] }))
+    .toSorted((left, right) => left.domain.localeCompare(right.domain));
+}

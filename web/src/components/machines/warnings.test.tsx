@@ -20,6 +20,7 @@ const alice: User = {
 
 const router: Node = {
   appConnector: false,
+  remoteConfig: false,
   sshServer: false,
   approved: true,
   approvedAt: "2026-01-01T00:00:00Z",

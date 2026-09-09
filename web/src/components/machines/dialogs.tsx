@@ -254,6 +254,42 @@ export function SuspendDialog({
 }
 
 /**
+ * Resetting attestation forgets what the key proved without touching the client, so it asks once
+ * and says what happens next: the machine keeps its key and proves itself again on its next map
+ * request. Until it does, `node:hardwareAttested` is false and any posture that checks it fails.
+ */
+export function ResetAttestationDialog({
+  node,
+  open,
+  onOpenChange,
+  mutations,
+}: NodeDialogProps): ReactElement {
+  const { resetAttestation } = mutations;
+
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Reset hardware attestation?"
+      description={`${nodeName(node)} keeps its key. The record of what it proved is cleared, and the next map request it signs starts it again.`}
+      confirmLabel="Reset"
+      loading={resetAttestation.isPending}
+      error={resetAttestation.isError ? errorMessage(resetAttestation.error) : undefined}
+      onConfirm={() => {
+        resetAttestation.mutate(
+          { params: { path: { nodeId: node.id } } },
+          {
+            onSuccess: () => {
+              onOpenChange(false);
+            },
+          },
+        );
+      }}
+    />
+  );
+}
+
+/**
  * Removing a machine is not undoable and the tailnet keeps working without it, so it asks for the
  * name to be typed rather than for one more click.
  */

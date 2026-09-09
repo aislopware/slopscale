@@ -29,12 +29,18 @@ export const scopeOptions: readonly { readonly scope: Scope; readonly label: str
   { scope: "webhooks:read", label: "Webhooks (read)" },
   { scope: "logs:configuration", label: "Audit log and streaming" },
   { scope: "logs:configuration:read", label: "Audit log (read)" },
-  { scope: "services", label: "Services" },
-  { scope: "services:read", label: "Services (read)" },
 ];
 
 export function scopeLabel(scope: string): string {
   return scopeOptions.find((option) => option.scope === scope)?.label ?? scope;
+}
+
+/** Scopes that mint machine credentials, which the server only allows tagged. */
+const taggedScopes: ReadonlySet<string> = new Set(["devices:core", "auth_keys", "all"]);
+
+/** Whether the picked scopes oblige the credential to carry tags. */
+export function needsTags(scopes: readonly string[]): boolean {
+  return scopes.some((scope) => taggedScopes.has(scope));
 }
 
 /** The scopes the caller may hand to a key: only what it holds itself, since the server narrows. */
@@ -42,4 +48,20 @@ export function scopeItems(me: Me): PickerItem[] {
   return scopeOptions
     .filter((option) => me.permissions[option.scope] === true)
     .map((option) => ({ value: option.scope, label: option.label, hint: option.scope }));
+}
+
+/** Combines scopes the caller holds with scopes already assigned to an existing credential. */
+export function scopeItemsWithExisting(
+  me: Me | undefined,
+  existing: readonly string[],
+): PickerItem[] {
+  const base = me === undefined ? [] : scopeItems(me);
+  const baseValues = new Set(base.map((item) => item.value));
+  const extra: PickerItem[] = [];
+  for (const scope of existing) {
+    if (!baseValues.has(scope)) {
+      extra.push({ value: scope, label: scopeLabel(scope), hint: scope });
+    }
+  }
+  return [...base, ...extra];
 }

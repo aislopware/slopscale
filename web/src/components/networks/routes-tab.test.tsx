@@ -51,6 +51,7 @@ interface NodeSpec {
 function node(id: string, spec: NodeSpec = {}): Node {
   return {
     appConnector: false,
+    remoteConfig: false,
     sshServer: false,
     approved: true,
     approvedAt: stamp,

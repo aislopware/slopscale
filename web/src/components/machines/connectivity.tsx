@@ -1,7 +1,10 @@
+import { useQuery } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 
+import { errorMessage } from "~/api/error.ts";
+import { nodeTlsCertQuery } from "~/api/queries.ts";
 import type { Node } from "~/api/queries.ts";
-import type { NodeDerpLatency, NodeNetInfo } from "~/api/schema.gen.ts";
+import type { NodeDerpLatency, NodeNetInfo, NodeTlsCertStatus } from "~/api/schema.gen.ts";
 import {
   homeLatency,
   linkLabel,
@@ -23,25 +26,97 @@ import { Status } from "~/components/ui/status.tsx";
  * believes rather than something the server measured.
  */
 export function ConnectivitySection({ node }: { readonly node: Node }): ReactElement {
+  // Only a machine that serves something has a certificate to keep, and only a connected one can be
+  // asked, so nothing else is: the question is a live round trip to the client.
+  const serving = node.funnelEnabled || node.announcedServices.length > 0;
+  const cert = useQuery({ ...nodeTlsCertQuery(node.id), enabled: node.online && serving });
   const { netInfo } = node;
-
-  if (netInfo === undefined) {
-    return (
-      <Section title="Connectivity">
-        <p className="px-5 py-4 text-kumo-subtle">
-          No network report yet; the client sends one when it connects.
-        </p>
-      </Section>
-    );
-  }
-
-  const others = otherLatencies(netInfo);
+  const others = netInfo === undefined ? [] : otherLatencies(netInfo);
 
   return (
     <Section title="Connectivity">
-      <DefinitionList items={facts(netInfo)} />
+      {netInfo === undefined ? (
+        <p className="px-5 py-4 text-kumo-subtle">
+          No network report yet; the client sends one when it connects.
+        </p>
+      ) : (
+        <DefinitionList items={facts(netInfo)} />
+      )}
+      {node.online && serving ? (
+        <DefinitionList
+          className="border-t border-kumo-hairline"
+          items={[
+            {
+              key: "tls",
+              label: "TLS certificate",
+              value: (
+                <CertStatus
+                  status={cert.data}
+                  loading={cert.isPending}
+                  error={cert.isError ? errorMessage(cert.error) : undefined}
+                />
+              ),
+            },
+          ]}
+        />
+      ) : null}
       {others.length === 0 ? null : <OtherRegions regions={others} />}
     </Section>
+  );
+}
+
+/**
+ * The certificate the machine caches for its own MagicDNS name. Serve and Funnel need it and it
+ * fails quietly when it cannot be renewed, which is exactly the case worth showing.
+ */
+function CertStatus({
+  status,
+  loading,
+  error,
+}: {
+  readonly status: NodeTlsCertStatus | undefined;
+  readonly loading: boolean;
+  readonly error: string | undefined;
+}): ReactElement {
+  if (error !== undefined) {
+    return <CertProblem label="Unavailable" reason={error} />;
+  }
+
+  if (status === undefined) {
+    return <span className="text-kumo-subtle">{loading ? "Asking the machine…" : "Unknown"}</span>;
+  }
+
+  if (status.error !== undefined && status.error !== "") {
+    return <CertProblem label="Failed" reason={status.error} />;
+  }
+
+  if (status.expired) {
+    return <Status tone="danger">Expired</Status>;
+  }
+
+  if (status.valid) {
+    return <Status tone="success">Valid</Status>;
+  }
+
+  return <span className="text-kumo-subtle">Missing</span>;
+}
+
+/**
+ * The state as a word with the reason under it. A row of this list holds one line and truncates it,
+ * so a sentence put where "Valid" goes would be cut off and read as a state of its own.
+ */
+function CertProblem({
+  label,
+  reason,
+}: {
+  readonly label: string;
+  readonly reason: string;
+}): ReactElement {
+  return (
+    <span className="flex flex-col items-end gap-0.5 whitespace-normal">
+      <Status tone="danger">{label}</Status>
+      <span className="text-xs text-kumo-subtle">{reason}</span>
+    </span>
   );
 }
 

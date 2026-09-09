@@ -18,7 +18,7 @@ export function TableToolbar({
 }): ReactElement {
   return (
     <div className={cn("-mb-3 flex flex-wrap items-start gap-2", className)}>
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">{children}</div>
+      <div className="flex min-w-0 flex-1 basis-64 flex-wrap items-center gap-2">{children}</div>
       {actions === undefined ? null : (
         <div className="flex min-h-9 shrink-0 items-center gap-2">{actions}</div>
       )}

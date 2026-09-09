@@ -9,11 +9,15 @@ import { CopyText } from "~/components/ui/copy-text.tsx";
 import { DialogFooter } from "~/components/ui/dialog.tsx";
 
 /**
- * The secret a create dialog just minted, cleared as soon as the dialog opens again so a stale key
- * is never revealed twice. The dialog's title changes with it, so it cannot live inside the body.
+ * What a create dialog just minted — the secret, or the whole record when the panel after it needs
+ * more than that — cleared as soon as the dialog opens again so a stale key is never revealed
+ * twice. Clearing on open rather than on close is what keeps the dialog showing what it showed
+ * while it animates away. The dialog's title changes with it, so it cannot live inside the body.
  */
-export function useCreatedKey(open: boolean): [string | null, (key: string) => void] {
-  const [created, setCreated] = useState<string | null>(null);
+export function useCreatedKey<Value = string>(
+  open: boolean,
+): [Value | null, (value: Value) => void] {
+  const [created, setCreated] = useState<Value | null>(null);
   const [wasOpen, setWasOpen] = useState(open);
 
   if (wasOpen !== open) {

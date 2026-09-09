@@ -18,10 +18,15 @@ import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { apiKeyColumns, emptyUsers } from "~/components/keys/api-columns.tsx";
 import { CreateApiKeyDialog } from "~/components/keys/api-dialogs.tsx";
+import { matchesKind } from "~/components/keys/federated.ts";
 import { oauthClientColumns } from "~/components/keys/oauth-columns.tsx";
-import { CreateOAuthClientDialog } from "~/components/keys/oauth-dialogs.tsx";
+import {
+  CreateFederatedIdentityDialog,
+  CreateOAuthClientDialog,
+} from "~/components/keys/oauth-dialogs.tsx";
 import { preAuthKeyColumns } from "~/components/keys/preauth-columns.tsx";
 import { CreatePreAuthKeyDialog } from "~/components/keys/preauth-dialogs.tsx";
+import type { KindFilter } from "~/components/keys/search.ts";
 import { apiKeyStatus, preAuthKeyStatus } from "~/components/keys/status.ts";
 import type { StatusFilter } from "~/components/keys/status.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
@@ -44,8 +49,10 @@ const apiStatusTabs = preAuthStatusTabs.filter((tab) => tab.value !== "used");
 export interface PanelControls {
   readonly query: string;
   readonly status: StatusFilter;
+  readonly kind: KindFilter;
   readonly handleQueryChange: (value: string) => void;
   readonly handleStatusChange: (value: string) => void;
+  readonly handleKindChange: (value: string) => void;
   /** Clears search and status. */
   readonly handleClear: () => void;
 }
@@ -84,7 +91,7 @@ export function PreAuthPanel({
   return (
     <KeyPanel
       controls={controls}
-      statusTabs={countedTabs(preAuthStatusTabs, statusOf)}
+      tabs={countedTabs(preAuthStatusTabs, statusOf)}
       placeholder="Search by key, user or tag"
       action={
         <Button variant="primary" icon={PlusIcon} disabled={!can(me, "auth_keys")} onClick={create}>
@@ -151,7 +158,7 @@ export function ApiPanel({
   return (
     <KeyPanel
       controls={controls}
-      statusTabs={countedTabs(apiStatusTabs, statusOf)}
+      tabs={countedTabs(apiStatusTabs, statusOf)}
       placeholder="Search by prefix"
       action={
         <Button variant="primary" icon={PlusIcon} onClick={create}>
@@ -186,6 +193,12 @@ export function ApiPanel({
   );
 }
 
+const oauthKindTabs: readonly { value: KindFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "client", label: "Clients" },
+  { value: "federated", label: "Federated" },
+];
+
 export function OAuthPanel({
   me,
   controls,
@@ -195,10 +208,17 @@ export function OAuthPanel({
 }): ReactElement {
   const clients = useSuspenseQuery(oauthClientsQuery);
   const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
-  const [creating, setCreating] = useState(false);
+  const [creatingClient, setCreatingClient] = useState(false);
+  const [creatingFederated, setCreatingFederated] = useState(false);
   const filter = useDeferredValue(controls.query);
+
+  const kindOf = (kind: KindFilter): number =>
+    clients.data.oauthClients.filter((client) => matchesKind(client, kind)).length;
+
+  const rows = clients.data.oauthClients.filter((client) => matchesKind(client, controls.kind));
+
   const table = useAppTable({
-    data: clients.data.oauthClients,
+    data: rows,
     columns: oauthClientColumns,
     getRowId: (client) => client.clientId,
     state: { globalFilter: filter },
@@ -206,18 +226,37 @@ export function OAuthPanel({
     meta: { me, users: users.data?.users ?? emptyUsers },
   });
   const canCreate = can(me, "oauth_keys");
-  const create = (): void => {
-    setCreating(true);
-  };
 
   return (
     <KeyPanel
       controls={controls}
-      placeholder="Search by client id or description"
+      tabs={countedTabs(oauthKindTabs, kindOf)}
+      tabValue={controls.kind}
+      onTabChange={controls.handleKindChange}
+      placeholder="Search by client, subject or issuer"
       action={
-        <Button variant="primary" icon={PlusIcon} disabled={!canCreate} onClick={create}>
-          Create client
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            icon={PlusIcon}
+            disabled={!canCreate}
+            onClick={() => {
+              setCreatingFederated(true);
+            }}
+          >
+            New federated identity
+          </Button>
+          <Button
+            variant="primary"
+            icon={PlusIcon}
+            disabled={!canCreate}
+            onClick={() => {
+              setCreatingClient(true);
+            }}
+          >
+            New OAuth client
+          </Button>
+        </div>
       }
     >
       <table.AppTable>
@@ -232,17 +271,39 @@ export function OAuthPanel({
               size="sm"
               icon={<PlugsConnectedIcon size={emptyIconSize} />}
               title="No OAuth clients"
-              description="An OAuth client lets automation trade a secret for short-lived v2 API tokens."
+              description="An OAuth client or federated identity lets automation get short-lived v2 API tokens."
               contents={
-                <Button variant="secondary" disabled={!canCreate} onClick={create}>
-                  Create client
-                </Button>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <Button
+                    variant="secondary"
+                    disabled={!canCreate}
+                    onClick={() => {
+                      setCreatingFederated(true);
+                    }}
+                  >
+                    New federated identity
+                  </Button>
+                  <Button
+                    variant="primary"
+                    disabled={!canCreate}
+                    onClick={() => {
+                      setCreatingClient(true);
+                    }}
+                  >
+                    New OAuth client
+                  </Button>
+                </div>
               }
             />
           }
         />
       </table.AppTable>
-      <CreateOAuthClientDialog me={me} open={creating} onOpenChange={setCreating} />
+      <CreateOAuthClientDialog me={me} open={creatingClient} onOpenChange={setCreatingClient} />
+      <CreateFederatedIdentityDialog
+        me={me}
+        open={creatingFederated}
+        onOpenChange={setCreatingFederated}
+      />
     </KeyPanel>
   );
 }
@@ -250,18 +311,25 @@ export function OAuthPanel({
 /** Card, toolbar and the panel's own table: the shape the key tables share. */
 function KeyPanel({
   controls,
-  statusTabs,
+  tabs,
+  tabValue,
+  onTabChange,
   placeholder,
   action,
   children,
 }: {
   readonly controls: PanelControls;
-  /** Absent for a table whose rows have no status, such as OAuth clients. */
-  readonly statusTabs?: readonly TabsItem[];
+  /** Absent for a table whose rows have no category filters. */
+  readonly tabs?: readonly TabsItem[] | undefined;
+  readonly tabValue?: string | undefined;
+  readonly onTabChange?: ((value: string) => void) | undefined;
   readonly placeholder: string;
   readonly action: ReactNode;
   readonly children: ReactNode;
 }): ReactElement {
+  const currentTab = tabValue ?? controls.status;
+  const handleTab = onTabChange ?? controls.handleStatusChange;
+
   return (
     <>
       <TableToolbar actions={action}>
@@ -270,13 +338,8 @@ function KeyPanel({
           placeholder={placeholder}
           onValueChange={controls.handleQueryChange}
         />
-        {statusTabs === undefined ? null : (
-          <Tabs
-            variant="segmented"
-            tabs={[...statusTabs]}
-            value={controls.status}
-            onValueChange={controls.handleStatusChange}
-          />
+        {tabs === undefined ? null : (
+          <Tabs variant="segmented" tabs={[...tabs]} value={currentTab} onValueChange={handleTab} />
         )}
       </TableToolbar>
       <Frame>{children}</Frame>

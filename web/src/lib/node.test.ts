@@ -6,6 +6,7 @@ import { isExitRoute, pendingRouteCount } from "~/lib/node.ts";
 function fakeNode(availableRoutes: readonly string[], approvedRoutes: readonly string[]): Node {
   return {
     appConnector: false,
+    remoteConfig: false,
     sshServer: false,
     approved: true,
     approvedAt: "2099-01-01T00:00:00Z",

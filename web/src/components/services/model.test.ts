@@ -36,6 +36,7 @@ function node(
   return {
     announcedServices: [...announced],
     appConnector: false,
+    remoteConfig: false,
     sshServer: false,
     approved: true,
     approvedAt: stamp,

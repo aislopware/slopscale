@@ -7,6 +7,7 @@ import { appsQuery, groupsQuery, servicesQuery, usersQuery } from "~/api/queries
 import type { User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import { AppConnectorSection } from "~/components/apps/app-connector-section.tsx";
+import { ClientHealthSection } from "~/components/machines/client-health.tsx";
 import { ConnectivitySection } from "~/components/machines/connectivity.tsx";
 import { DangerZone } from "~/components/machines/danger-zone.tsx";
 import { GroupsSection } from "~/components/machines/groups.tsx";
@@ -14,6 +15,7 @@ import { MachineHeader } from "~/components/machines/header.tsx";
 import { AddressesSection, OverviewSection } from "~/components/machines/overview.tsx";
 import { machinePolling } from "~/components/machines/polling.ts";
 import { PostureSection } from "~/components/machines/posture.tsx";
+import { PreferencesSection } from "~/components/machines/preferences.tsx";
 import { GlobalExitSection, RoutesSection } from "~/components/machines/routes.tsx";
 import { ServicesSection } from "~/components/machines/services.tsx";
 import { SharingSection } from "~/components/machines/sharing.tsx";
@@ -69,7 +71,7 @@ function MachinePage(): ReactElement {
       <ClientWarnings node={node} />
       <div className="grid items-start gap-6 min-[1200px]:grid-cols-[minmax(0,2fr)_minmax(0,22rem)]">
         <div className="flex flex-col gap-6">
-          <OverviewSection node={node} />
+          <OverviewSection node={node} me={me} />
           <RoutesSection node={node} canEdit={routes} />
           {node.appConnector && apps.data !== undefined ? (
             <AppConnectorSection node={node} apps={apps.data.apps} />
@@ -81,6 +83,7 @@ function MachinePage(): ReactElement {
               canEdit={can(me, "services")}
             />
           )}
+          <PreferencesSection node={node} me={me} />
           <PostureSection node={node} me={me} />
           {groups.data === undefined ? null : (
             <GroupsSection node={node} groups={groups.data.groups} users={userList} me={me} />
@@ -90,6 +93,7 @@ function MachinePage(): ReactElement {
         <div className="flex flex-col gap-6">
           <AddressesSection node={node} />
           <ConnectivitySection node={node} />
+          <ClientHealthSection node={node} me={me} />
           <GlobalExitSection node={node} canEdit={routes} />
           {can(me, "devices:core") ? <DangerZone node={node} /> : null}
         </div>

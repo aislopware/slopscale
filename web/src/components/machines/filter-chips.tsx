@@ -3,7 +3,12 @@ import { XIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 import type { User } from "~/api/queries.ts";
-import { defaultStatus, statusFilterLabels } from "~/components/machines/filters.ts";
+import {
+  attestationFilterLabels,
+  defaultAttestation,
+  defaultStatus,
+  statusFilterLabels,
+} from "~/components/machines/filters.ts";
 import type { MachineFilterState } from "~/components/machines/filters.ts";
 import { FrameBand } from "~/components/ui/frame.tsx";
 import { userLabel } from "~/lib/node.ts";
@@ -111,6 +116,16 @@ export function machineChips(
       value: state.tag,
       onRemove: () => {
         onChange({ ...state, tag: "" });
+      },
+    });
+  }
+
+  if (state.attestation !== defaultAttestation) {
+    chips.push({
+      name: "Attestation",
+      value: attestationFilterLabels[state.attestation],
+      onRemove: () => {
+        onChange({ ...state, attestation: defaultAttestation });
       },
     });
   }

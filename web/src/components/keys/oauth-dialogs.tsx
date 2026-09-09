@@ -8,7 +8,7 @@ import type { Me } from "~/auth/me.ts";
 import { CreatedKey, useCreatedKey } from "~/components/keys/created-key.tsx";
 import { useOAuthClientMutations } from "~/components/keys/mutations.ts";
 import { parseTags } from "~/components/keys/preauth-dialogs.tsx";
-import { scopeItems } from "~/components/keys/scopes.ts";
+import { needsTags, scopeItems } from "~/components/keys/scopes.ts";
 import {
   DialogClose,
   DialogContent,
@@ -18,15 +18,11 @@ import {
 } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 
+export { CreateFederatedIdentityDialog } from "~/components/keys/federated-dialogs.tsx";
+export { EditOAuthClientDialog } from "~/components/keys/edit-oauth-dialog.tsx";
+
 const revealNote = "The secret is shown only once. Copy it now.";
 const tagRows = 2;
-
-/** Scopes that mint machine credentials, which the server only allows tagged. */
-const taggedScopes: ReadonlySet<string> = new Set(["devices:core", "auth_keys", "all"]);
-
-function needsTags(scopes: readonly string[]): boolean {
-  return scopes.some((scope) => taggedScopes.has(scope));
-}
 
 export function CreateOAuthClientDialog({
   me,
@@ -74,14 +70,21 @@ function CreateOAuthClientForm({
   const [description, setDescription] = useState("");
   const [scopes, setScopes] = useState<readonly string[]>([]);
   const [tags, setTags] = useState("");
+  const canSubmit = scopes.length > 0 && (!needsTags(scopes) || parseTags(tags).length > 0);
 
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
+
+    // Enter in a text input submits the form whatever the buttons say, so the guard is here too.
+    if (!canSubmit || create.isPending) {
+      return;
+    }
+
     create.mutate(
       { body: { description: description.trim(), scopes: [...scopes], tags: parseTags(tags) } },
       {
         onSuccess: (data) => {
-          onCreated(data.clientSecret);
+          onCreated(data.clientSecret ?? "");
         },
       },
     );
@@ -122,14 +125,9 @@ function CreateOAuthClientForm({
         onValueChange={setTags}
       />
       <DialogError message={create.isError ? errorMessage(create.error) : undefined} />
-      <DialogFooter>
+      <DialogFooter submitDisabled={!canSubmit || create.isPending}>
         <DialogClose render={<Button variant="secondary">Cancel</Button>} />
-        <Button
-          type="submit"
-          variant="primary"
-          disabled={scopes.length === 0}
-          loading={create.isPending}
-        >
+        <Button type="submit" variant="primary" disabled={!canSubmit} loading={create.isPending}>
           Create client
         </Button>
       </DialogFooter>

@@ -36,6 +36,7 @@ const bob = user("2");
 function node(id: string, owner: User, tags: string[] = []): Node {
   return {
     appConnector: false,
+    remoteConfig: false,
     sshServer: false,
     approved: true,
     approvedAt: stamp,

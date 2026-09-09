@@ -304,6 +304,126 @@ export function sshRecordingCastUrl(id: string): string {
   return `/api/v1/ssh-recording/${encodeURIComponent(id)}/cast`;
 }
 
+/**
+ * The queries below ask the machine itself rather than the server's records: each one is a round
+ * trip over the client's control connection, which only a connected machine answers. So they are
+ * keyed by node id, kept for the shared stale minute, only ever run from that machine's own page,
+ * and every caller gates them on `node.online`.
+ *
+ * Each is written as a factory over a prototype: `api.queryOptions` builds its option type out of
+ * the path, and naming that type any other way would mean spelling out the whole generic.
+ */
+const liveNodeOptions = { staleTime: sharedStaleTime };
+const anyNode = { params: { path: { nodeId: "" } } };
+
+const healthPrototype = api.queryOptions(
+  "get",
+  "/api/v1/node/{nodeId}/health",
+  anyNode,
+  liveNodeOptions,
+);
+
+/** The warnings the client would show its own user: where a connected but broken machine says so. */
+export function nodeHealthQuery(nodeId: string): typeof healthPrototype {
+  return api.queryOptions(
+    "get",
+    "/api/v1/node/{nodeId}/health",
+    { params: { path: { nodeId } } },
+    liveNodeOptions,
+  );
+}
+
+const preferencesPrototype = api.queryOptions(
+  "get",
+  "/api/v1/node/{nodeId}/preferences",
+  anyNode,
+  liveNodeOptions,
+);
+
+/** The curated preferences the machine's owner set; changing them needs remote configuration on. */
+export function nodePreferencesQuery(nodeId: string): typeof preferencesPrototype {
+  return api.queryOptions(
+    "get",
+    "/api/v1/node/{nodeId}/preferences",
+    { params: { path: { nodeId } } },
+    liveNodeOptions,
+  );
+}
+
+const tlsCertPrototype = api.queryOptions(
+  "get",
+  "/api/v1/node/{nodeId}/tls-cert",
+  anyNode,
+  liveNodeOptions,
+);
+
+/** The certificate the machine caches for its own name, which Serve and Funnel need. */
+export function nodeTlsCertQuery(nodeId: string): typeof tlsCertPrototype {
+  return api.queryOptions(
+    "get",
+    "/api/v1/node/{nodeId}/tls-cert",
+    { params: { path: { nodeId } } },
+    liveNodeOptions,
+  );
+}
+
+const appConnectorRoutesPrototype = api.queryOptions(
+  "get",
+  "/api/v1/node/{nodeId}/app-connector-routes",
+  anyNode,
+  liveNodeOptions,
+);
+
+/** The addresses an app connector has resolved for the domains it answers for. */
+export function nodeAppConnectorRoutesQuery(nodeId: string): typeof appConnectorRoutesPrototype {
+  return api.queryOptions(
+    "get",
+    "/api/v1/node/{nodeId}/app-connector-routes",
+    { params: { path: { nodeId } } },
+    liveNodeOptions,
+  );
+}
+
+const sshUsernamesPrototype = api.queryOptions(
+  "get",
+  "/api/v1/node/{nodeId}/ssh-usernames",
+  anyNode,
+  liveNodeOptions,
+);
+
+/**
+ * The logins the machine would suggest for a Tailscale SSH session. They are a hint, not an
+ * authorisation: the SSH policy still decides, so the terminal offers them and ignores a refusal.
+ */
+export function nodeSshUsernamesQuery(nodeId: string): typeof sshUsernamesPrototype {
+  return api.queryOptions(
+    "get",
+    "/api/v1/node/{nodeId}/ssh-usernames",
+    { params: { path: { nodeId } } },
+    liveNodeOptions,
+  );
+}
+
+/** The dumps a client hands over for support, in the order the console offers them. */
+export const nodeDiagnosticKinds = [
+  "prefs",
+  "netmap",
+  "metrics",
+  "goroutines",
+  "sockstats",
+  "tka-log",
+] as const;
+
+export type NodeDiagnosticKind = (typeof nodeDiagnosticKinds)[number];
+
+/**
+ * Where the browser fetches one diagnostic. It is a download rather than a query: the body is the
+ * client's own file, which the server passes through with the name it should be saved under.
+ */
+export function nodeDiagnosticUrl(nodeId: string, kind: NodeDiagnosticKind): string {
+  return `/api/v1/node/${encodeURIComponent(nodeId)}/diagnostics/${kind}`;
+}
+
 type Collection =
   | "/api/v1/node"
   | "/api/v1/user"

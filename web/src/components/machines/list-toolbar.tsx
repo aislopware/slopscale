@@ -8,15 +8,23 @@ import type { User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import {
+  attestationFilterLabels,
+  attestationFilters,
   statusFilterLabels,
   statusFilters,
+  toAttestationFilter,
   toStatusFilter,
 } from "~/components/machines/filters.ts";
-import type { StatusFilter } from "~/components/machines/filters.ts";
+import type { AttestationFilter, StatusFilter } from "~/components/machines/filters.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableToolbar } from "~/components/table/toolbar.tsx";
 import { userLabel } from "~/lib/node.ts";
+
+const attestationOptions = attestationFilters.map((value) => ({
+  value,
+  label: attestationFilterLabels[value],
+}));
 
 export interface MachinesToolbarProps {
   readonly me: Me;
@@ -30,6 +38,10 @@ export interface MachinesToolbarProps {
   readonly tags: readonly string[];
   /** The selected tag; "" for every machine. */
   readonly tag: string;
+  /** The selected attestation; the filter is absent while no machine reports one. */
+  readonly attestation: AttestationFilter;
+  /** Whether any machine has an attestation record at all. */
+  readonly attestable: boolean;
   readonly counts: Record<StatusFilter, number>;
   /** Opens the page's "Add machine" dialog, which the empty state shares. */
   readonly onAddMachine: () => void;
@@ -37,6 +49,7 @@ export interface MachinesToolbarProps {
   readonly onStatusChange: (value: StatusFilter) => void;
   readonly onUserChange: (value: string) => void;
   readonly onTagChange: (value: string) => void;
+  readonly onAttestationChange: (value: AttestationFilter) => void;
 }
 
 /** The first row of the machines card: search, the status segments, the owner filter, add. */
@@ -48,12 +61,15 @@ export function MachinesToolbar({
   users,
   tags,
   tag,
+  attestation,
+  attestable,
   counts,
   onAddMachine,
   onQueryChange,
   onStatusChange,
   onUserChange,
   onTagChange,
+  onAttestationChange,
 }: MachinesToolbarProps): ReactElement {
   return (
     <TableToolbar actions={<AddMachine me={me} onAdd={onAddMachine} />}>
@@ -97,6 +113,19 @@ export function MachinesToolbar({
           }}
         />
       )}
+      {attestable ? (
+        <Select
+          aria-label="Filter by hardware attestation"
+          className="w-36"
+          value={attestation}
+          items={attestationOptions}
+          onValueChange={(value) => {
+            handlePick(value, (picked) => {
+              onAttestationChange(toAttestationFilter(picked));
+            });
+          }}
+        />
+      ) : null}
     </TableToolbar>
   );
 }

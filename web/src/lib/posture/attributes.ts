@@ -58,6 +58,16 @@ export const nodeAttributes: readonly AttributeInfo[] = [
     doc: "Whether the node is tagged rather than owned by a user.",
     type: "bool",
   },
+  {
+    name: "node:hardwareAttested",
+    doc: "Whether the machine proved its hardware attestation key on its last map request.",
+    type: "bool",
+  },
+  {
+    name: "node:tpm",
+    doc: "Whether the client found a TPM on the machine.",
+    type: "bool",
+  },
 ];
 
 export const ipAttributes: readonly AttributeInfo[] = [

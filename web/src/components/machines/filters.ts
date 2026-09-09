@@ -34,12 +34,50 @@ function matchesStatus(node: Node, status: StatusFilter, now: Date): boolean {
   return status === "offline" ? current !== "online" && current !== "pending" : current === status;
 }
 
+/**
+ * Whether the machine's hardware attestation key currently proves it. "Not attested" covers both a
+ * machine that never signed a map request with one and a machine that no longer does, because
+ * either way a posture checking `node:hardwareAttested` fails.
+ */
+export const attestationFilters = ["any", "attested", "unattested"] as const;
+
+export type AttestationFilter = (typeof attestationFilters)[number];
+
+export const defaultAttestation: AttestationFilter = "any";
+
+export const attestationFilterLabels: Record<AttestationFilter, string> = {
+  any: "Any attestation",
+  attested: "Attested",
+  unattested: "Not attested",
+};
+
+/** Reads an attestation filter out of the URL, falling back to the default for anything unknown. */
+export function toAttestationFilter(value: string | undefined): AttestationFilter {
+  return attestationFilters.find((filter) => filter === value) ?? defaultAttestation;
+}
+
+/** Whether any machine has an attestation record, which is what makes the filter worth offering. */
+export function anyAttestation(nodes: readonly Node[]): boolean {
+  return nodes.some((node) => node.hardwareAttestation !== undefined);
+}
+
+function matchesAttestation(node: Node, attestation: AttestationFilter): boolean {
+  if (attestation === "any") {
+    return true;
+  }
+
+  const attested = node.hardwareAttestation?.attested ?? false;
+
+  return attestation === "attested" ? attested : !attested;
+}
+
 export interface MachineFilter {
   readonly status: StatusFilter;
   /** A user id; "" keeps every machine. Matches the owner and anyone it is shared with. */
   readonly user: string;
   /** One ACL tag, as the machine carries it (`tag:prod`); "" keeps every machine. */
   readonly tag: string;
+  readonly attestation: AttestationFilter;
 }
 
 /** Every tag any machine carries, in the order the tag filter offers them. */
@@ -64,6 +102,10 @@ export function filterNodes(
     }
 
     if (filter.tag !== "" && !node.tags.includes(filter.tag)) {
+      return false;
+    }
+
+    if (!matchesAttestation(node, filter.attestation)) {
       return false;
     }
 
@@ -106,11 +148,13 @@ export interface RawMachineSearch {
   readonly status?: string | undefined;
   readonly user?: string | undefined;
   readonly tag?: string | undefined;
+  readonly attested?: string | undefined;
 }
 
 /** The same parameters narrowed, which is what the page writes back. */
 export interface MachineSearch extends RawMachineSearch {
   readonly status?: StatusFilter | undefined;
+  readonly attested?: AttestationFilter | undefined;
 }
 
 /** What the URL asks for. An absent or unknown parameter reads as that filter's default. */
@@ -120,6 +164,7 @@ export function filtersFromSearch(search: RawMachineSearch): MachineFilterState 
     status: toStatusFilter(search.status),
     user: search.user ?? "",
     tag: search.tag ?? "",
+    attestation: toAttestationFilter(search.attested),
   };
 }
 
@@ -133,5 +178,6 @@ export function searchFromFilters(state: MachineFilterState): MachineSearch {
     ...(state.status === defaultStatus ? {} : { status: state.status }),
     ...(state.user === "" ? {} : { user: state.user }),
     ...(state.tag === "" ? {} : { tag: state.tag }),
+    ...(state.attestation === defaultAttestation ? {} : { attested: state.attestation }),
   };
 }

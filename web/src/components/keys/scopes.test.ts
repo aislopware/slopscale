@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Me } from "~/auth/me.ts";
-import { scopeItems, scopeLabel } from "~/components/keys/scopes.ts";
+import { scopeItems, scopeItemsWithExisting, scopeLabel } from "~/components/keys/scopes.ts";
 
 describe(scopeLabel, () => {
   it("names a known scope and echoes an unknown one", () => {
@@ -25,5 +25,20 @@ describe(scopeItems, () => {
       "dns",
       "dns:read",
     ]);
+  });
+});
+
+describe(scopeItemsWithExisting, () => {
+  it("includes both caller scopes and pre-existing assigned scopes", () => {
+    const me: Me = {
+      kind: "api_key",
+      role: "network-admin",
+      allAccess: false,
+      scopes: ["dns"],
+      permissions: { dns: true, users: false },
+    };
+
+    const items = scopeItemsWithExisting(me, ["dns", "users"]);
+    expect(items.map((item) => item.value)).toStrictEqual(["dns", "users"]);
   });
 });

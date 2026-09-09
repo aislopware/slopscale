@@ -14,6 +14,7 @@ import {
   domainsError,
   everyConnector,
   isAppDomain,
+  learnedRoutes,
   machinesLabel,
   normalizeConnectorTag,
   normalizeDomain,
@@ -234,5 +235,20 @@ describe(appsForNode, () => {
     expect(appsForNode(apps, "2").map((app) => app.name)).toStrictEqual(["crm", "wiki"]);
     expect(appsForNode(apps, "1").map((app) => app.name)).toStrictEqual(["crm"]);
     expect(appsForNode(apps, "9")).toStrictEqual([]);
+  });
+});
+
+describe(learnedRoutes, () => {
+  it("puts the domains in order and reads a null address list as none", () => {
+    const rows = learnedRoutes({ "wiki.example.com": null, "crm.example.com": ["1.2.3.4"] });
+
+    expect(rows).toStrictEqual([
+      { domain: "crm.example.com", addresses: ["1.2.3.4"] },
+      { domain: "wiki.example.com", addresses: [] },
+    ]);
+  });
+
+  it("has nothing to show before the connector resolved anything", () => {
+    expect(learnedRoutes({})).toStrictEqual([]);
   });
 });

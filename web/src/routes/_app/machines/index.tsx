@@ -13,6 +13,9 @@ import { columns, emptyUsers, selectableColumns } from "~/components/machines/co
 import { MachinesEmpty } from "~/components/machines/empty.tsx";
 import { FilterChips, machineChips } from "~/components/machines/filter-chips.tsx";
 import {
+  anyAttestation,
+  attestationFilters,
+  defaultAttestation,
   defaultStatus,
   filterNodes,
   filtersFromSearch,
@@ -51,12 +54,14 @@ function toText(value: unknown): string {
  */
 const optionalText = optional(pipe(unknown(), transform(toText)));
 const optionalStatus = optional(fallback(picklist(statusFilters), defaultStatus));
+const optionalAttestation = optional(fallback(picklist(attestationFilters), defaultAttestation));
 
 const searchSchema = object({
   q: optionalText,
   status: optionalStatus,
   user: optionalText,
   tag: optionalText,
+  attested: optionalAttestation,
 });
 
 export const Route = createFileRoute("/_app/machines/")({
@@ -122,6 +127,8 @@ function MachinesPage(): ReactElement {
         users={users.data?.users}
         tags={tagOptions(machines)}
         tag={view.tag}
+        attestation={view.attestation}
+        attestable={anyAttestation(machines)}
         counts={statusCounts(machines)}
         onQueryChange={(value) => {
           setFilters({ ...view, query: value }, true);
@@ -135,13 +142,16 @@ function MachinesPage(): ReactElement {
         onTagChange={(value) => {
           setFilters({ ...view, tag: value });
         }}
+        onAttestationChange={(value) => {
+          setFilters({ ...view, attestation: value });
+        }}
       />
       <Frame>
         <FilterChips
           chips={machineChips(view, users.data?.users, setFilters)}
           onClearAll={clearFilters}
         />
-        <MachineBulkBar selection={selection} />
+        <MachineBulkBar selection={selection} nodes={rows} />
         <SelectionProvider selection={selection}>
           <table.AppTable>
             <DataTable
@@ -152,7 +162,12 @@ function MachinesPage(): ReactElement {
                 <MachinesEmpty
                   total={machines.length}
                   status={view.status}
-                  narrowed={view.query !== "" || view.user !== "" || view.tag !== ""}
+                  narrowed={
+                    view.query !== "" ||
+                    view.user !== "" ||
+                    view.tag !== "" ||
+                    view.attestation !== defaultAttestation
+                  }
                   canCreateKeys={can(me, "auth_keys")}
                   onAddMachine={addMachine}
                   onClearFilters={clearFilters}

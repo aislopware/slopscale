@@ -1,14 +1,16 @@
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { Input } from "@cloudflare/kumo/components/input";
 import { ArrowLeftIcon, TerminalWindowIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 import type { ReactElement, SubmitEvent } from "react";
 
 import { api } from "~/api/client.ts";
+import { nodeSshUsernamesQuery } from "~/api/queries.ts";
 import type { Node } from "~/api/queries.ts";
 import { SSHTerminal } from "~/components/ssh/terminal.tsx";
+import { shouldPrefillUsername, UsernameField } from "~/components/ssh/username-field.tsx";
 import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
 import { Callout } from "~/components/ui/callout.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
@@ -31,6 +33,9 @@ export const Route = createFileRoute("/_app/machines/$nodeId_/ssh")({
   },
   component: SSHPage,
 });
+
+/** One array for "the machine has not answered", so the prefill does not re-run on every render. */
+const noUsernames: readonly string[] = [];
 
 const statuses: Record<SSHStatus, { readonly tone: Tone; readonly label: string }> = {
   "loading-client": { tone: "neutral", label: "Loading client" },
@@ -86,6 +91,14 @@ function SSHPage(): ReactElement {
     }),
   );
   const node = detail.data?.node;
+  // A hint from the machine itself, and only ever a hint: the SSH policy decides, so a refusal or
+  // an empty answer just leaves the field as it was.
+  const hints = useQuery({
+    ...nodeSshUsernamesQuery(nodeId),
+    enabled: node?.online ?? false,
+    retry: false,
+  });
+  const usernames = hints.data?.usernames ?? noUsernames;
 
   const {
     state,
@@ -108,6 +121,19 @@ function SSHPage(): ReactElement {
 
   const waiting = waitingMessage(state.status);
   const note = sessionDetail(state);
+
+  // The machine's own answer fills the field once, and only while it is still empty: the server's
+  // guess and the operator's own typing both land in the same field, and whichever got there first
+  // is the one that meant something. The ref is what keeps it from happening a second time when the
+  // field is cleared to type a different account.
+  const prefilled = useRef(false);
+
+  useEffect(() => {
+    if (shouldPrefillUsername(username, usernames, prefilled.current)) {
+      prefilled.current = true;
+      setUsername(usernames[0] ?? "");
+    }
+  }, [username, usernames, setUsername]);
 
   const handleSubmit = (event: SubmitEvent<HTMLFormElement>): void => {
     event.preventDefault();
@@ -144,15 +170,11 @@ function SSHPage(): ReactElement {
         }
         actions={
           <form className="flex items-center gap-2" onSubmit={handleSubmit}>
-            <Input
+            <UsernameField
               value={username}
-              onChange={(event) => {
-                setUsername(event.target.value);
-              }}
-              placeholder="Username"
-              aria-label="Username"
-              className="w-36"
+              suggestions={usernames}
               disabled={!usernameEditable(state.status)}
+              onValueChange={setUsername}
             />
             <ActionButton status={state.status} onDisconnect={disconnect} onReconnect={reconnect} />
           </form>

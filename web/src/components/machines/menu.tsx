@@ -1,9 +1,11 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import {
+  ArrowsClockwiseIcon,
   CaretDownIcon,
   CheckIcon,
   ClockIcon,
+  FingerprintIcon,
   GlobeIcon,
   PathIcon,
   PauseIcon,
@@ -23,10 +25,11 @@ import {
   DeleteDialog,
   ExpireDialog,
   RenameDialog,
+  ResetAttestationDialog,
   SuspendDialog,
   TagsDialog,
 } from "~/components/machines/dialogs.tsx";
-import { useNodeMutations } from "~/components/machines/mutations.ts";
+import { reportClientUpdate, useNodeMutations } from "~/components/machines/mutations.ts";
 import { ownerId } from "~/components/machines/owner.ts";
 import { RoutesDialog } from "~/components/machines/routes-dialog.tsx";
 import { ShareDialog } from "~/components/machines/share-dialog.tsx";
@@ -34,7 +37,15 @@ import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { advertisesExit, isTagged, nodeName } from "~/lib/node.ts";
 
-type Dialog = "rename" | "tags" | "routes" | "share" | "suspend" | "expire" | "delete";
+type Dialog =
+  | "rename"
+  | "tags"
+  | "routes"
+  | "share"
+  | "attestation"
+  | "suspend"
+  | "expire"
+  | "delete";
 
 export interface MachineMenuProps {
   readonly node: Node;
@@ -149,6 +160,75 @@ function SuspendItem({
   );
 }
 
+/**
+ * Asks the machine to update itself. Only while it is connected and behind: the request is a live
+ * round trip to the client, and the client is the one that decides, so the answer is reported.
+ */
+function UpdateClientItem({
+  node,
+  mutations,
+}: {
+  readonly node: Node;
+  readonly mutations: ReturnType<typeof useNodeMutations>;
+}): ReactElement {
+  return (
+    <DropdownMenu.Item
+      icon={ArrowsClockwiseIcon}
+      onClick={() => {
+        mutations.updateClient.mutate(
+          { params: { path: { nodeId: node.id } }, body: {} },
+          { onSuccess: reportClientUpdate },
+        );
+      }}
+    >
+      Update client
+    </DropdownMenu.Item>
+  );
+}
+
+/** What the machine offers to route, and whether every client should prefer it as the way out. */
+function RouteItems({
+  node,
+  routes,
+  mutations,
+  onOpen,
+}: {
+  readonly node: Node;
+  readonly routes: boolean;
+  readonly mutations: ReturnType<typeof useNodeMutations>;
+  readonly onOpen: (dialog: Dialog) => void;
+}): ReactElement {
+  return (
+    <>
+      {node.availableRoutes.length > 0 || node.approvedRoutes.length > 0 ? (
+        <DropdownMenu.Item
+          icon={PathIcon}
+          disabled={!routes}
+          onClick={() => {
+            onOpen("routes");
+          }}
+        >
+          Approve routes…
+        </DropdownMenu.Item>
+      ) : null}
+      {advertisesExit(node) ? (
+        <DropdownMenu.Item
+          icon={GlobeIcon}
+          disabled={!routes}
+          onClick={() => {
+            mutations.setGlobalExitNode.mutate({
+              params: { path: { nodeId: node.id } },
+              body: { enabled: !node.globalExitNode },
+            });
+          }}
+        >
+          {node.globalExitNode ? "Clear global exit node" : "Use as global exit node"}
+        </DropdownMenu.Item>
+      ) : null}
+    </>
+  );
+}
+
 function MachineMenuItems({
   node,
   me,
@@ -197,31 +277,7 @@ function MachineMenuItems({
       >
         Edit tags…
       </DropdownMenu.Item>
-      {node.availableRoutes.length > 0 || node.approvedRoutes.length > 0 ? (
-        <DropdownMenu.Item
-          icon={PathIcon}
-          disabled={!routes}
-          onClick={() => {
-            onOpen("routes");
-          }}
-        >
-          Approve routes…
-        </DropdownMenu.Item>
-      ) : null}
-      {advertisesExit(node) ? (
-        <DropdownMenu.Item
-          icon={GlobeIcon}
-          disabled={!routes}
-          onClick={() => {
-            mutations.setGlobalExitNode.mutate({
-              params: { path: { nodeId: node.id } },
-              body: { enabled: !node.globalExitNode },
-            });
-          }}
-        >
-          {node.globalExitNode ? "Clear global exit node" : "Use as global exit node"}
-        </DropdownMenu.Item>
-      ) : null}
+      <RouteItems node={node} routes={routes} mutations={mutations} onOpen={onOpen} />
       <DropdownMenu.Item
         icon={ShareNetworkIcon}
         disabled={!share || isTagged(node)}
@@ -231,6 +287,19 @@ function MachineMenuItems({
       >
         Share…
       </DropdownMenu.Item>
+      {core && node.updateAvailable && node.online ? (
+        <UpdateClientItem node={node} mutations={mutations} />
+      ) : null}
+      {core && node.hardwareAttestation !== undefined ? (
+        <DropdownMenu.Item
+          icon={FingerprintIcon}
+          onClick={() => {
+            onOpen("attestation");
+          }}
+        >
+          Reset hardware attestation…
+        </DropdownMenu.Item>
+      ) : null}
       {hideDestructive ? null : (
         <>
           <DropdownMenu.Separator />
@@ -261,8 +330,8 @@ function MachineMenuItems({
 }
 
 /**
- * All six dialogs stay mounted and are driven by `open` so their transitions play; each one keeps
- * its form state in a child of the popup, which Base UI unmounts on close.
+ * Every dialog stays mounted and is driven by `open` so its transition plays; each one keeps its
+ * form state in a child of the popup, which Base UI unmounts on close.
  */
 function MachineDialogs({
   dialog,
@@ -285,6 +354,7 @@ function MachineDialogs({
       <TagsDialog open={dialog === "tags"} {...props} />
       <RoutesDialog open={dialog === "routes"} {...props} />
       <ShareDialog open={dialog === "share"} users={users} {...props} />
+      <ResetAttestationDialog open={dialog === "attestation"} {...props} />
       <SuspendDialog open={dialog === "suspend"} {...props} />
       <ExpireDialog open={dialog === "expire"} {...props} />
       <DeleteDialog open={dialog === "delete"} {...props} />

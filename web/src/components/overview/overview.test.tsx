@@ -60,6 +60,7 @@ const newcomer: User = {
 
 const laptop: Node = {
   appConnector: false,
+  remoteConfig: false,
   sshServer: false,
   approved: true,
   approvedAt: "2026-01-01T00:00:00Z",
