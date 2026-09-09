@@ -200,18 +200,29 @@ func (node *Node) postureAttributes(now time.Time) PostureAttributes {
 		AttrTagged: node.IsTagged(),
 	}
 
+	// Only what the client actually reported: an attribute that is absent
+	// fails every check but NOT SET, while an empty string is present and
+	// would let "node:os NOT IN [...]" match a node that reported nothing.
 	if hi := node.Hostinfo; hi != nil {
-		attrs[AttrOS] = normalizeOS(hi.OS)
-		attrs[AttrOSVersion] = hi.OSVersion
-		attrs[AttrTSVersion] = clientVersion(hi.IPNVersion)
-		attrs[AttrTSReleaseTrack] = releaseTrack(attrs[AttrTSVersion].(string)) //nolint:forcetypeassert // set above
-		attrs[AttrTSAutoUpdate] = hi.AllowsUpdate
-		attrs[AttrHostname] = hi.Hostname
-		attrs[AttrMachine] = hi.Machine
-		attrs[AttrDistro] = hi.Distro
-		attrs[AttrDistroVersion] = hi.DistroVersion
-		attrs[AttrDeviceModel] = hi.DeviceModel
-		attrs[AttrPackage] = hi.Package
+		setReported(attrs, AttrOS, normalizeOS(hi.OS))
+		setReported(attrs, AttrOSVersion, hi.OSVersion)
+		setReported(attrs, AttrHostname, hi.Hostname)
+		setReported(attrs, AttrMachine, hi.Machine)
+		setReported(attrs, AttrDistro, hi.Distro)
+		setReported(attrs, AttrDistroVersion, hi.DistroVersion)
+		setReported(attrs, AttrDeviceModel, hi.DeviceModel)
+		setReported(attrs, AttrPackage, hi.Package)
+
+		if v := clientVersion(hi.IPNVersion); v != "" {
+			attrs[AttrTSVersion] = v
+			attrs[AttrTSReleaseTrack] = releaseTrack(v)
+		}
+
+		// AllowsUpdate is a bool with no unset value, so it only counts
+		// once the client has reported a version and is a real report.
+		if hi.IPNVersion != "" {
+			attrs[AttrTSAutoUpdate] = hi.AllowsUpdate
+		}
 	}
 
 	if node.Posture != nil && len(node.Posture.SerialNumbers) > 0 {
@@ -225,6 +236,14 @@ func (node *Node) postureAttributes(now time.Time) PostureAttributes {
 	}
 
 	return attrs
+}
+
+// setReported stores a reported string attribute, leaving it out when the
+// client reported nothing for it.
+func setReported(attrs PostureAttributes, key, value string) {
+	if value != "" {
+		attrs[key] = value
+	}
 }
 
 // postureInputsEqual reports whether two nodes feed [Node.postureAttributes]
