@@ -4,7 +4,6 @@ import {
   CaretDownIcon,
   CheckIcon,
   ClockIcon,
-  DotsThreeIcon,
   GlobeIcon,
   PathIcon,
   PauseIcon,
@@ -31,10 +30,9 @@ import { useNodeMutations } from "~/components/machines/mutations.ts";
 import { ownerId } from "~/components/machines/owner.ts";
 import { RoutesDialog } from "~/components/machines/routes-dialog.tsx";
 import { ShareDialog } from "~/components/machines/share-dialog.tsx";
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { advertisesExit, isTagged } from "~/lib/node.ts";
-
-const actionsIconSize = 18;
 
 type Dialog = "rename" | "tags" | "routes" | "share" | "suspend" | "expire" | "delete";
 
@@ -64,37 +62,33 @@ export function MachineMenu({
     }
   };
 
+  const items = (
+    <MachineMenuItems
+      node={node}
+      me={me}
+      mutations={mutations}
+      hideDestructive={hideDestructive}
+      onOpen={setDialog}
+    />
+  );
+
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenu.Trigger
-          render={
-            labelled ? (
+      {labelled ? (
+        <DropdownMenu>
+          <DropdownMenu.Trigger
+            render={
               <Button variant="secondary">
                 Actions
                 <CaretDownIcon />
               </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                shape="square"
-                size="sm"
-                icon={<DotsThreeIcon size={actionsIconSize} weight="bold" />}
-                aria-label="Actions"
-              />
-            )
-          }
-        />
-        <DropdownMenu.Content align="end">
-          <MachineMenuItems
-            node={node}
-            me={me}
-            mutations={mutations}
-            hideDestructive={hideDestructive}
-            onOpen={setDialog}
+            }
           />
-        </DropdownMenu.Content>
-      </DropdownMenu>
+          <DropdownMenu.Content align="end">{items}</DropdownMenu.Content>
+        </DropdownMenu>
+      ) : (
+        <RowMenu label="Actions">{items}</RowMenu>
+      )}
       <MachineDialogs
         dialog={dialog}
         node={node}

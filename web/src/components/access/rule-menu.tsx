@@ -1,6 +1,5 @@
-import { Button } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
-import { DotsThreeIcon, PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
+import { PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -9,8 +8,7 @@ import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
 import { DeleteRuleDialog, RuleDialog } from "~/components/access/rule-dialogs.tsx";
-
-const actionsIconSize = 18;
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 
 type Dialog = "edit" | "delete";
 
@@ -41,41 +39,28 @@ export function RuleMenu({
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenu.Trigger
-          render={
-            <Button
-              variant="ghost"
-              shape="square"
-              size="sm"
-              icon={<DotsThreeIcon size={actionsIconSize} weight="bold" />}
-              aria-label={`Actions for rule ${rule.name}`}
-            />
-          }
-        />
-        <DropdownMenu.Content align="end">
-          <DropdownMenu.Item
-            icon={PencilSimpleIcon}
-            disabled={!writable}
-            onClick={() => {
-              setDialog("edit");
-            }}
-          >
-            Edit…
-          </DropdownMenu.Item>
-          <DropdownMenu.Separator />
-          <DropdownMenu.Item
-            icon={TrashIcon}
-            variant="danger"
-            disabled={!writable}
-            onClick={() => {
-              setDialog("delete");
-            }}
-          >
-            Delete…
-          </DropdownMenu.Item>
-        </DropdownMenu.Content>
-      </DropdownMenu>
+      <RowMenu label={`Actions for rule ${rule.name}`}>
+        <DropdownMenu.Item
+          icon={PencilSimpleIcon}
+          disabled={!writable}
+          onClick={() => {
+            setDialog("edit");
+          }}
+        >
+          Edit…
+        </DropdownMenu.Item>
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item
+          icon={TrashIcon}
+          variant="danger"
+          disabled={!writable}
+          onClick={() => {
+            setDialog("delete");
+          }}
+        >
+          Delete…
+        </DropdownMenu.Item>
+      </RowMenu>
       <RuleDialog
         rule={rule}
         groups={groups}

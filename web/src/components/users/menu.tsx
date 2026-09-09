@@ -1,9 +1,7 @@
-import { Button } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import {
   CheckIcon,
   DevicesIcon,
-  DotsThreeIcon,
   IdentificationCardIcon,
   PencilSimpleIcon,
   ShieldCheckIcon,
@@ -24,6 +22,7 @@ import { MembershipDialog } from "~/components/access/membership-dialog.tsx";
 import { groupsOfUser } from "~/components/access/model.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import {
   DeleteUserDialog,
   EndSessionsDialog,
@@ -32,8 +31,6 @@ import {
 } from "~/components/users/dialogs.tsx";
 import { useUserMutations } from "~/components/users/mutations.ts";
 import { EditProfileDialog } from "~/components/users/profile-dialog.tsx";
-
-const actionsIconSize = 18;
 
 type Dialog = "rename" | "profile" | "role" | "groups" | "sessions" | "delete";
 
@@ -59,28 +56,15 @@ export function UserMenu({ user, me }: UserMenuProps): ReactElement {
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenu.Trigger
-          render={
-            <Button
-              variant="ghost"
-              shape="square"
-              size="sm"
-              icon={<DotsThreeIcon size={actionsIconSize} weight="bold" />}
-              aria-label={`Actions for ${user.name}`}
-            />
-          }
+      <RowMenu label={`Actions for ${user.name}`}>
+        <UserMenuItems
+          user={user}
+          me={me}
+          mutations={mutations}
+          canEditGroups={can(me, "policy_file") && groups.data !== undefined}
+          onOpen={setDialog}
         />
-        <DropdownMenu.Content align="end">
-          <UserMenuItems
-            user={user}
-            me={me}
-            mutations={mutations}
-            canEditGroups={can(me, "policy_file") && groups.data !== undefined}
-            onOpen={setDialog}
-          />
-        </DropdownMenu.Content>
-      </DropdownMenu>
+      </RowMenu>
       <RenameUserDialog
         user={user}
         open={dialog === "rename"}

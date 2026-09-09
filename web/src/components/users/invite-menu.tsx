@@ -1,6 +1,5 @@
-import { Button } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
-import { DotsThreeIcon, PaperPlaneTiltIcon, TrashIcon } from "@phosphor-icons/react";
+import { PaperPlaneTiltIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -11,13 +10,12 @@ import type { Me } from "~/auth/me.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DialogContent, DialogRoot } from "~/components/ui/dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { InviteResultView } from "~/components/users/invite-dialog.tsx";
 import type { InviteResult } from "~/components/users/invite-dialog.tsx";
 import { cannotChangeUsers } from "~/components/users/menu.tsx";
 import { useInviteMutations } from "~/components/users/mutations.ts";
-
-const actionsIconSize = 18;
 
 /** Re-send or revoke one invitation. A re-send mints a new link, so it is shown like a new one. */
 export function InviteMenu({
@@ -47,39 +45,26 @@ export function InviteMenu({
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenu.Trigger
-          render={
-            <Button
-              variant="ghost"
-              shape="square"
-              size="sm"
-              icon={<DotsThreeIcon size={actionsIconSize} weight="bold" />}
-              aria-label={`Actions for the invite to ${invite.email}`}
-            />
-          }
-        />
-        <DropdownMenu.Content align="end">
-          <DisabledReason reason={reason}>
-            <DropdownMenu.Item icon={PaperPlaneTiltIcon} disabled={!writable} onClick={resend}>
-              Resend
-            </DropdownMenu.Item>
-          </DisabledReason>
-          <DropdownMenu.Separator />
-          <DisabledReason reason={reason}>
-            <DropdownMenu.Item
-              icon={TrashIcon}
-              variant="danger"
-              disabled={!writable}
-              onClick={() => {
-                setConfirming(true);
-              }}
-            >
-              Revoke…
-            </DropdownMenu.Item>
-          </DisabledReason>
-        </DropdownMenu.Content>
-      </DropdownMenu>
+      <RowMenu label={`Actions for the invite to ${invite.email}`}>
+        <DisabledReason reason={reason}>
+          <DropdownMenu.Item icon={PaperPlaneTiltIcon} disabled={!writable} onClick={resend}>
+            Resend
+          </DropdownMenu.Item>
+        </DisabledReason>
+        <DropdownMenu.Separator />
+        <DisabledReason reason={reason}>
+          <DropdownMenu.Item
+            icon={TrashIcon}
+            variant="danger"
+            disabled={!writable}
+            onClick={() => {
+              setConfirming(true);
+            }}
+          >
+            Revoke…
+          </DropdownMenu.Item>
+        </DisabledReason>
+      </RowMenu>
       <DialogRoot
         open={result !== null}
         onOpenChange={(open) => {

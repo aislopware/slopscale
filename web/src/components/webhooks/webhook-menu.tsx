@@ -1,9 +1,7 @@
-import { Button } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import {
   ArrowsClockwiseIcon,
   ClockCounterClockwiseIcon,
-  DotsThreeIcon,
   PaperPlaneTiltIcon,
   PencilSimpleIcon,
   TrashIcon,
@@ -15,6 +13,7 @@ import { errorMessage } from "~/api/error.ts";
 import type { Webhook } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { DeliveriesDialog } from "~/components/webhooks/deliveries-dialog.tsx";
 import { useWebhookMutations } from "~/components/webhooks/mutations.ts";
@@ -23,8 +22,6 @@ import {
   RotateSecretDialog,
   WebhookDialog,
 } from "~/components/webhooks/webhook-dialogs.tsx";
-
-const actionsIconSize = 18;
 
 type Dialog = "deliveries" | "edit" | "rotate" | "delete";
 
@@ -66,66 +63,53 @@ export function WebhookMenu({
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenu.Trigger
-          render={
-            <Button
-              variant="ghost"
-              shape="square"
-              size="sm"
-              icon={<DotsThreeIcon size={actionsIconSize} weight="bold" />}
-              aria-label={`Actions for webhook ${webhook.url}`}
-            />
-          }
-        />
-        <DropdownMenu.Content align="end">
-          <DropdownMenu.Item
-            icon={PaperPlaneTiltIcon}
-            disabled={!writable || mutations.test.isPending}
-            onClick={sendTest}
-          >
-            Send test event
-          </DropdownMenu.Item>
-          <DropdownMenu.Item
-            icon={ClockCounterClockwiseIcon}
-            onClick={() => {
-              setDialog("deliveries");
-            }}
-          >
-            Deliveries…
-          </DropdownMenu.Item>
-          <DropdownMenu.Separator />
-          <DropdownMenu.Item
-            icon={PencilSimpleIcon}
-            disabled={!writable}
-            onClick={() => {
-              setDialog("edit");
-            }}
-          >
-            Edit…
-          </DropdownMenu.Item>
-          <DropdownMenu.Item
-            icon={ArrowsClockwiseIcon}
-            disabled={!writable}
-            onClick={() => {
-              setDialog("rotate");
-            }}
-          >
-            Rotate secret…
-          </DropdownMenu.Item>
-          <DropdownMenu.Separator />
-          <DropdownMenu.Item
-            icon={TrashIcon}
-            variant="danger"
-            disabled={!writable}
-            onClick={() => {
-              setDialog("delete");
-            }}
-          >
-            Delete…
-          </DropdownMenu.Item>
-        </DropdownMenu.Content>
-      </DropdownMenu>
+      <RowMenu label={`Actions for webhook ${webhook.url}`}>
+        <DropdownMenu.Item
+          icon={PaperPlaneTiltIcon}
+          disabled={!writable || mutations.test.isPending}
+          onClick={sendTest}
+        >
+          Send test event
+        </DropdownMenu.Item>
+        <DropdownMenu.Item
+          icon={ClockCounterClockwiseIcon}
+          onClick={() => {
+            setDialog("deliveries");
+          }}
+        >
+          Deliveries…
+        </DropdownMenu.Item>
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item
+          icon={PencilSimpleIcon}
+          disabled={!writable}
+          onClick={() => {
+            setDialog("edit");
+          }}
+        >
+          Edit…
+        </DropdownMenu.Item>
+        <DropdownMenu.Item
+          icon={ArrowsClockwiseIcon}
+          disabled={!writable}
+          onClick={() => {
+            setDialog("rotate");
+          }}
+        >
+          Rotate secret…
+        </DropdownMenu.Item>
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item
+          icon={TrashIcon}
+          variant="danger"
+          disabled={!writable}
+          onClick={() => {
+            setDialog("delete");
+          }}
+        >
+          Delete…
+        </DropdownMenu.Item>
+      </RowMenu>
       <DeliveriesDialog webhook={webhook} open={dialog === "deliveries"} onOpenChange={close} />
       <WebhookDialog
         webhook={webhook}

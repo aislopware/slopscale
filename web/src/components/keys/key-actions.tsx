@@ -1,19 +1,12 @@
 import { DeleteResource } from "@cloudflare/kumo";
-import { Button } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
-import {
-  ArrowsClockwiseIcon,
-  ClockCounterClockwiseIcon,
-  DotsThreeIcon,
-  TrashIcon,
-} from "@phosphor-icons/react";
+import { ArrowsClockwiseIcon, ClockCounterClockwiseIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
-
-const actionsIconSize = 18;
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 
 /** Why every item is unavailable when the whole menu is disabled by the caller's credentials. */
 const readOnlyReason = "Your credentials may not change keys";
@@ -75,62 +68,49 @@ export function KeyActions({
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenu.Trigger
-          render={
-            <Button
-              variant="ghost"
-              shape="square"
-              size="sm"
-              icon={<DotsThreeIcon size={actionsIconSize} weight="bold" />}
-              aria-label={label}
-            />
-          }
-        />
-        <DropdownMenu.Content align="end">
-          {rotate === undefined ? null : (
-            <>
-              <DisabledReason reason={disabled ? readOnlyReason : rotate.reason}>
-                <DropdownMenu.Item
-                  icon={ArrowsClockwiseIcon}
-                  disabled={disabled || rotate.reason !== undefined}
-                  onClick={() => {
-                    rotate.onSelect();
-                  }}
-                >
-                  Rotate secret…
-                </DropdownMenu.Item>
-              </DisabledReason>
-              <DropdownMenu.Separator />
-            </>
-          )}
-          {expire === undefined ? null : (
-            <>
+      <RowMenu label={label}>
+        {rotate === undefined ? null : (
+          <>
+            <DisabledReason reason={disabled ? readOnlyReason : rotate.reason}>
               <DropdownMenu.Item
-                icon={ClockCounterClockwiseIcon}
-                variant="danger"
-                disabled={disabled}
+                icon={ArrowsClockwiseIcon}
+                disabled={disabled || rotate.reason !== undefined}
                 onClick={() => {
-                  setDialog("expire");
+                  rotate.onSelect();
                 }}
               >
-                Expire…
+                Rotate secret…
               </DropdownMenu.Item>
-              <DropdownMenu.Separator />
-            </>
-          )}
-          <DropdownMenu.Item
-            icon={TrashIcon}
-            variant="danger"
-            disabled={disabled}
-            onClick={() => {
-              setDialog("delete");
-            }}
-          >
-            Delete…
-          </DropdownMenu.Item>
-        </DropdownMenu.Content>
-      </DropdownMenu>
+            </DisabledReason>
+            <DropdownMenu.Separator />
+          </>
+        )}
+        {expire === undefined ? null : (
+          <>
+            <DropdownMenu.Item
+              icon={ClockCounterClockwiseIcon}
+              variant="danger"
+              disabled={disabled}
+              onClick={() => {
+                setDialog("expire");
+              }}
+            >
+              Expire…
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+          </>
+        )}
+        <DropdownMenu.Item
+          icon={TrashIcon}
+          variant="danger"
+          disabled={disabled}
+          onClick={() => {
+            setDialog("delete");
+          }}
+        >
+          Delete…
+        </DropdownMenu.Item>
+      </RowMenu>
       {expire === undefined ? null : (
         <ConfirmDialog
           open={dialog === "expire"}

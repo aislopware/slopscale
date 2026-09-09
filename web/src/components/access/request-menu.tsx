@@ -1,6 +1,5 @@
-import { Button } from "@cloudflare/kumo/components/button";
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
-import { CheckIcon, DotsThreeIcon, ProhibitIcon, TrashIcon } from "@phosphor-icons/react";
+import { CheckIcon, ProhibitIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -11,8 +10,7 @@ import {
   DenyRequestDialog,
 } from "~/components/access/request-dialogs.tsx";
 import type { RequestRow } from "~/components/access/request-model.ts";
-
-const actionsIconSize = 18;
+import { RowMenu } from "~/components/ui/row-menu.tsx";
 
 type Dialog = "approve" | "deny" | "cancel";
 
@@ -44,51 +42,38 @@ export function RequestMenu({
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenu.Trigger
-          render={
-            <Button
-              variant="ghost"
-              shape="square"
-              size="sm"
-              icon={<DotsThreeIcon size={actionsIconSize} weight="bold" />}
-              aria-label={`Actions for request ${request.id}`}
-            />
-          }
-        />
-        <DropdownMenu.Content align="end">
-          {canDecide && pending ? (
-            <>
-              <DropdownMenu.Item
-                icon={CheckIcon}
-                onClick={() => {
-                  setDialog("approve");
-                }}
-              >
-                Approve…
-              </DropdownMenu.Item>
-              <DropdownMenu.Item
-                icon={ProhibitIcon}
-                onClick={() => {
-                  setDialog("deny");
-                }}
-              >
-                Deny…
-              </DropdownMenu.Item>
-              <DropdownMenu.Separator />
-            </>
-          ) : null}
-          <DropdownMenu.Item
-            icon={TrashIcon}
-            variant="danger"
-            onClick={() => {
-              setDialog("cancel");
-            }}
-          >
-            {pending ? "Withdraw…" : "Delete…"}
-          </DropdownMenu.Item>
-        </DropdownMenu.Content>
-      </DropdownMenu>
+      <RowMenu label={`Actions for request ${request.id}`}>
+        {canDecide && pending ? (
+          <>
+            <DropdownMenu.Item
+              icon={CheckIcon}
+              onClick={() => {
+                setDialog("approve");
+              }}
+            >
+              Approve…
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              icon={ProhibitIcon}
+              onClick={() => {
+                setDialog("deny");
+              }}
+            >
+              Deny…
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+          </>
+        ) : null}
+        <DropdownMenu.Item
+          icon={TrashIcon}
+          variant="danger"
+          onClick={() => {
+            setDialog("cancel");
+          }}
+        >
+          {pending ? "Withdraw…" : "Delete…"}
+        </DropdownMenu.Item>
+      </RowMenu>
       <ApproveRequestDialog
         request={request}
         open={dialog === "approve"}
