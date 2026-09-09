@@ -29,10 +29,10 @@ export const dialogHeaderClass =
 
 /**
  * The actions, on the band under the panel, the way a Frame's band carries what belongs to the
- * panel but is not its content. px-5 plus the band's 4px puts the last button's edge under the edge
- * of the panel's text.
+ * panel but is not its content. px-6 plus the band's 4px puts the last button's edge under the edge
+ * of the panel's text, which sits 24px inside the panel.
  */
-export const dialogActionsClass = "flex justify-end gap-3 px-5 pt-3 pb-2";
+export const dialogActionsClass = "flex justify-end gap-3 px-6 pt-3 pb-2";
 
 export interface DialogContentProps {
   readonly title: string;
