@@ -439,6 +439,18 @@ type CreatePreAuthKeyRequestBody struct {
 	User          *string `json:"user,omitempty"`
 }
 
+// CreateServiceRequestBody defines model for CreateServiceRequestBody.
+type CreateServiceRequestBody struct {
+	Comment     *string `json:"comment,omitempty"`
+	DisplayName *string `json:"displayName,omitempty"`
+
+	// Name svc:<label> or the label alone; a DNS label.
+	Name string `json:"name"`
+
+	// Ports tcp:443, udp:53-60 or tcp:*.
+	Ports *[]string `json:"ports,omitempty"`
+}
+
 // CreateUserRequestBody defines model for CreateUserRequestBody.
 type CreateUserRequestBody struct {
 	DisplayName *string `json:"displayName,omitempty"`
@@ -777,6 +789,28 @@ type HealthResponseBody struct {
 	DatabaseConnectivity bool `json:"databaseConnectivity"`
 }
 
+// Host defines model for Host.
+type Host struct {
+	// Active true when the node advertises the service.
+	Active bool `json:"active"`
+
+	// Announced true when the node's serve config announces it.
+	Announced bool `json:"announced"`
+
+	// Approved true when the node may host the service.
+	Approved bool `json:"approved"`
+
+	// Name The node's given name.
+	Name   string `json:"name"`
+	NodeId string `json:"nodeId"`
+
+	// Ports The protocol and ports the node serves it on.
+	Ports []string `json:"ports"`
+
+	// Primary true when clients route to this node for it now.
+	Primary bool `json:"primary"`
+}
+
 // Invite defines model for Invite.
 type Invite struct {
 	Accepted   bool       `json:"accepted"`
@@ -888,6 +922,11 @@ type ListRulesOutputBody struct {
 type ListSSHRecordingsOutputBody struct {
 	NextBefore string         `json:"nextBefore"`
 	Recordings []SSHRecording `json:"recordings"`
+}
+
+// ListServicesOutputBody defines model for ListServicesOutputBody.
+type ListServicesOutputBody struct {
+	Services []Service `json:"services"`
 }
 
 // ListSessionsOutputBody defines model for ListSessionsOutputBody.
@@ -1019,11 +1058,17 @@ type NetworkRouter struct {
 
 // Node defines model for Node.
 type Node struct {
+	// AnnouncedServices The services in the node's serve configuration, as it last reported them.
+	AnnouncedServices []NodeService `json:"announcedServices"`
+
 	// Approved false while the node waits for an administrator.
-	Approved        bool       `json:"approved"`
-	ApprovedAt      *time.Time `json:"approvedAt"`
-	ApprovedRoutes  []string   `json:"approvedRoutes"`
-	AvailableRoutes []string   `json:"availableRoutes"`
+	Approved       bool       `json:"approved"`
+	ApprovedAt     *time.Time `json:"approvedAt"`
+	ApprovedRoutes []string   `json:"approvedRoutes"`
+
+	// ApprovedServices The services the node may host; it hosts the ones it also announces.
+	ApprovedServices []string `json:"approvedServices"`
+	AvailableRoutes  []string `json:"availableRoutes"`
 
 	// ClientVersion The Tailscale client version the node last reported, such as 1.86.2; empty until it connects.
 	ClientVersion string `json:"clientVersion"`
@@ -1100,6 +1145,18 @@ type NodePreAuthKey struct {
 	Reusable      bool       `json:"reusable"`
 	Used          bool       `json:"used"`
 	User          User       `json:"user"`
+}
+
+// NodeService defines model for NodeService.
+type NodeService struct {
+	// Active true when the node advertises the service.
+	Active bool `json:"active"`
+
+	// Name The service name, svc:<label>.
+	Name string `json:"name"`
+
+	// Ports The protocol and ports the node serves it on.
+	Ports []string `json:"ports"`
 }
 
 // OAuthClient defines model for OAuthClient.
@@ -1300,6 +1357,38 @@ type ServerInfo struct {
 	Version                    string    `json:"version"`
 }
 
+// Service defines model for Service.
+type Service struct {
+	// Addresses The service's own tailnet addresses.
+	Addresses []string `json:"addresses"`
+
+	// Comment The operator's note.
+	Comment   string    `json:"comment"`
+	CreatedAt time.Time `json:"createdAt"`
+
+	// DisplayName The shown label; empty falls back to the name.
+	DisplayName string `json:"displayName"`
+
+	// DnsName The service's MagicDNS name.
+	DnsName string `json:"dnsName"`
+
+	// Hosts The nodes that announce or are approved.
+	Hosts []Host `json:"hosts"`
+	Id    string `json:"id"`
+
+	// Name The service's name, svc:<label>.
+	Name string `json:"name"`
+
+	// Ports The ports clients are told about.
+	Ports     []string  `json:"ports"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// ServiceOutputBody defines model for ServiceOutputBody.
+type ServiceOutputBody struct {
+	Service Service `json:"service"`
+}
+
 // SetApprovalRequestBody defines model for SetApprovalRequestBody.
 type SetApprovalRequestBody struct {
 	// Approved false withdraws the approval.
@@ -1309,6 +1398,12 @@ type SetApprovalRequestBody struct {
 // SetApprovedRoutesRequestBody defines model for SetApprovedRoutesRequestBody.
 type SetApprovedRoutesRequestBody struct {
 	Routes *[]string `json:"routes,omitempty"`
+}
+
+// SetApprovedServicesRequestBody defines model for SetApprovedServicesRequestBody.
+type SetApprovedServicesRequestBody struct {
+	// Services Service names; an empty list withdraws every approval.
+	Services []string `json:"services"`
 }
 
 // SetAttributeRequestBody defines model for SetAttributeRequestBody.
@@ -1387,6 +1482,13 @@ type ShareNodeRequestBody struct {
 // SshRecordingOutputBody defines model for SshRecordingOutputBody.
 type SshRecordingOutputBody struct {
 	Recording SSHRecording `json:"recording"`
+}
+
+// UpdateServiceRequestBody defines model for UpdateServiceRequestBody.
+type UpdateServiceRequestBody struct {
+	Comment     *string   `json:"comment,omitempty"`
+	DisplayName *string   `json:"displayName,omitempty"`
+	Ports       *[]string `json:"ports,omitempty"`
 }
 
 // UpdateSettingsRequestBody defines model for UpdateSettingsRequestBody.
@@ -1697,6 +1799,9 @@ type ApproveNodeJSONRequestBody = SetApprovalRequestBody
 // SetApprovedRoutesJSONRequestBody defines body for SetApprovedRoutes for application/json ContentType.
 type SetApprovedRoutesJSONRequestBody = SetApprovedRoutesRequestBody
 
+// SetApprovedServicesJSONRequestBody defines body for SetApprovedServices for application/json ContentType.
+type SetApprovedServicesJSONRequestBody = SetApprovedServicesRequestBody
+
 // SetNodeAttributeJSONRequestBody defines body for SetNodeAttribute for application/json ContentType.
 type SetNodeAttributeJSONRequestBody = SetAttributeRequestBody
 
@@ -1738,6 +1843,12 @@ type CreatePreAuthKeyJSONRequestBody = CreatePreAuthKeyRequestBody
 
 // ExpirePreAuthKeyJSONRequestBody defines body for ExpirePreAuthKey for application/json ContentType.
 type ExpirePreAuthKeyJSONRequestBody = ExpirePreAuthKeyRequestBody
+
+// UpdateServiceJSONRequestBody defines body for UpdateService for application/json ContentType.
+type UpdateServiceJSONRequestBody = UpdateServiceRequestBody
+
+// CreateServiceJSONRequestBody defines body for CreateService for application/json ContentType.
+type CreateServiceJSONRequestBody = CreateServiceRequestBody
 
 // UpdateSettingsJSONRequestBody defines body for UpdateSettings for application/json ContentType.
 type UpdateSettingsJSONRequestBody = UpdateSettingsRequestBody
@@ -2739,6 +2850,28 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/node/{nodeId}/approve_routes (the `SetApprovedRoutes` operationId).
 	SetApprovedRoutes(ctx context.Context, nodeId string, body SetApprovedRoutesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// SetApprovedServicesWithBody Set approved services
+	//
+	// Replaces the services the node may host. Only a tagged node can host a service.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/approve_services (the `SetApprovedServices` operationId).
+	SetApprovedServicesWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetApprovedServices Set approved services
+	//
+	// Replaces the services the node may host. Only a tagged node can host a service.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/approve_services (the `SetApprovedServices` operationId).
+	SetApprovedServices(ctx context.Context, nodeId string, body SetApprovedServicesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteNodeAttribute Delete a custom posture attribute
 	//
 	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -3133,6 +3266,71 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/server (the `GetServerInfo` operationId).
 	GetServerInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteService Delete service
+	//
+	// Removes the service, frees its addresses and withdraws every host's approval.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v1/service/{name} (the `DeleteService` operationId).
+	DeleteService(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetService Get service
+	//
+	// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/service/{name} (the `GetService` operationId).
+	GetService(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateServiceWithBody Update service
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/service/{name} (the `UpdateService` operationId).
+	UpdateServiceWithBody(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateService Update service
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/service/{name} (the `UpdateService` operationId).
+	UpdateService(ctx context.Context, name string, body UpdateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListServices List services
+	//
+	// The tailnet's services with the nodes that announce or may host each.
+	//
+	// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v1/services (the `ListServices` operationId).
+	ListServices(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateServiceWithBody Create service
+	//
+	// Creates a service and gives it a pair of tailnet addresses. Nodes host it once they announce it and are approved.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/services (the `CreateService` operationId).
+	CreateServiceWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateService Create service
+	//
+	// Creates a service and gives it a pair of tailnet addresses. Nodes host it once they announce it and are approved.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/services (the `CreateService` operationId).
+	CreateService(ctx context.Context, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSettings Get settings
 	//
@@ -5335,6 +5533,48 @@ func (c *Client) SetApprovedRoutes(ctx context.Context, nodeId string, body SetA
 	return c.Client.Do(req)
 }
 
+// SetApprovedServicesWithBody Set approved services
+//
+// Replaces the services the node may host. Only a tagged node can host a service.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/node/{nodeId}/approve_services (the `SetApprovedServices` operationId).
+func (c *Client) SetApprovedServicesWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetApprovedServicesRequestWithBody(c.Server, nodeId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetApprovedServices Set approved services
+//
+// Replaces the services the node may host. Only a tagged node can host a service.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/node/{nodeId}/approve_services (the `SetApprovedServices` operationId).
+func (c *Client) SetApprovedServices(ctx context.Context, nodeId string, body SetApprovedServicesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetApprovedServicesRequest(c.Server, nodeId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // DeleteNodeAttribute Delete a custom posture attribute
 //
 // Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -6150,6 +6390,141 @@ func (c *Client) ExpirePreAuthKey(ctx context.Context, body ExpirePreAuthKeyJSON
 // Corresponds with GET /api/v1/server (the `GetServerInfo` operationId).
 func (c *Client) GetServerInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetServerInfoRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteService Delete service
+//
+// Removes the service, frees its addresses and withdraws every host's approval.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v1/service/{name} (the `DeleteService` operationId).
+func (c *Client) DeleteService(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteServiceRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetService Get service
+//
+// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/service/{name} (the `GetService` operationId).
+func (c *Client) GetService(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetServiceRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateServiceWithBody Update service
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/service/{name} (the `UpdateService` operationId).
+func (c *Client) UpdateServiceWithBody(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateServiceRequestWithBody(c.Server, name, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateService Update service
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/service/{name} (the `UpdateService` operationId).
+func (c *Client) UpdateService(ctx context.Context, name string, body UpdateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateServiceRequest(c.Server, name, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListServices List services
+//
+// The tailnet's services with the nodes that announce or may host each.
+//
+// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v1/services (the `ListServices` operationId).
+func (c *Client) ListServices(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListServicesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateServiceWithBody Create service
+//
+// Creates a service and gives it a pair of tailnet addresses. Nodes host it once they announce it and are approved.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/services (the `CreateService` operationId).
+func (c *Client) CreateServiceWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateServiceRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateService Create service
+//
+// Creates a service and gives it a pair of tailnet addresses. Nodes host it once they announce it and are approved.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/services (the `CreateService` operationId).
+func (c *Client) CreateService(ctx context.Context, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateServiceRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -9724,6 +10099,53 @@ func NewSetApprovedRoutesRequestWithBody(server string, nodeId string, contentTy
 	return req, nil
 }
 
+// NewSetApprovedServicesRequest calls the generic SetApprovedServices builder with application/json body
+func NewSetApprovedServicesRequest(server string, nodeId string, body SetApprovedServicesJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetApprovedServicesRequestWithBody(server, nodeId, "application/json", bodyReader)
+}
+
+// NewSetApprovedServicesRequestWithBody constructs an http.Request for the SetApprovedServices method, with any body, and a specified content type
+func NewSetApprovedServicesRequestWithBody(server string, nodeId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/node/%s/approve_services", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewDeleteNodeAttributeRequest constructs an http.Request for the DeleteNodeAttribute method
 func NewDeleteNodeAttributeRequest(server string, nodeId string, key string) (*http.Request, error) {
 	var err error
@@ -10852,6 +11274,188 @@ func NewGetServerInfoRequest(server string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewDeleteServiceRequest constructs an http.Request for the DeleteService method
+func NewDeleteServiceRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/service/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetServiceRequest constructs an http.Request for the GetService method
+func NewGetServiceRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/service/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateServiceRequest calls the generic UpdateService builder with application/json body
+func NewUpdateServiceRequest(server string, name string, body UpdateServiceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateServiceRequestWithBody(server, name, "application/json", bodyReader)
+}
+
+// NewUpdateServiceRequestWithBody constructs an http.Request for the UpdateService method, with any body, and a specified content type
+func NewUpdateServiceRequestWithBody(server string, name string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/service/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListServicesRequest constructs an http.Request for the ListServices method
+func NewListServicesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/services")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateServiceRequest calls the generic CreateService builder with application/json body
+func NewCreateServiceRequest(server string, body CreateServiceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateServiceRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateServiceRequestWithBody constructs an http.Request for the CreateService method, with any body, and a specified content type
+func NewCreateServiceRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/services")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -12832,6 +13436,28 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/node/{nodeId}/approve_routes (the `SetApprovedRoutes` operationId).
 	SetApprovedRoutesWithResponse(ctx context.Context, nodeId string, body SetApprovedRoutesJSONRequestBody, reqEditors ...RequestEditorFn) (*SetApprovedRoutesResponse, error)
 
+	// SetApprovedServicesWithBodyWithResponse Set approved services
+	//
+	// Replaces the services the node may host. Only a tagged node can host a service.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/approve_services (the `SetApprovedServices` operationId).
+	SetApprovedServicesWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetApprovedServicesResponse, error)
+
+	// SetApprovedServicesWithResponse Set approved services
+	//
+	// Replaces the services the node may host. Only a tagged node can host a service.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/node/{nodeId}/approve_services (the `SetApprovedServices` operationId).
+	SetApprovedServicesWithResponse(ctx context.Context, nodeId string, body SetApprovedServicesJSONRequestBody, reqEditors ...RequestEditorFn) (*SetApprovedServicesResponse, error)
+
 	// DeleteNodeAttributeWithResponse Delete a custom posture attribute
 	//
 	// Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -13256,6 +13882,77 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/server (the `GetServerInfo` operationId).
 	GetServerInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetServerInfoResponse, error)
+
+	// DeleteServiceWithResponse Delete service
+	//
+	// Removes the service, frees its addresses and withdraws every host's approval.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/service/{name} (the `DeleteService` operationId).
+	DeleteServiceWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*DeleteServiceResponse, error)
+
+	// GetServiceWithResponse Get service
+	//
+	// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/service/{name} (the `GetService` operationId).
+	GetServiceWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetServiceResponse, error)
+
+	// UpdateServiceWithBodyWithResponse Update service
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/service/{name} (the `UpdateService` operationId).
+	UpdateServiceWithBodyWithResponse(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateServiceResponse, error)
+
+	// UpdateServiceWithResponse Update service
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/service/{name} (the `UpdateService` operationId).
+	UpdateServiceWithResponse(ctx context.Context, name string, body UpdateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateServiceResponse, error)
+
+	// ListServicesWithResponse List services
+	//
+	// The tailnet's services with the nodes that announce or may host each.
+	//
+	// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/services (the `ListServices` operationId).
+	ListServicesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListServicesResponse, error)
+
+	// CreateServiceWithBodyWithResponse Create service
+	//
+	// Creates a service and gives it a pair of tailnet addresses. Nodes host it once they announce it and are approved.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/services (the `CreateService` operationId).
+	CreateServiceWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateServiceResponse, error)
+
+	// CreateServiceWithResponse Create service
+	//
+	// Creates a service and gives it a pair of tailnet addresses. Nodes host it once they announce it and are approved.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/services (the `CreateService` operationId).
+	CreateServiceWithResponse(ctx context.Context, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateServiceResponse, error)
 
 	// GetSettingsWithResponse Get settings
 	//
@@ -17054,6 +17751,54 @@ func (r SetApprovedRoutesResponse) ContentType() string {
 	return ""
 }
 
+type SetApprovedServicesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NodeOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetApprovedServicesResponse) GetJSON200() *NodeOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r SetApprovedServicesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetApprovedServicesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetApprovedServicesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetApprovedServicesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetApprovedServicesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type DeleteNodeAttributeResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -18440,6 +19185,239 @@ func (r GetServerInfoResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetServerInfoResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteServiceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r DeleteServiceResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteServiceResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteServiceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteServiceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteServiceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetServiceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ServiceOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetServiceResponse) GetJSON200() *ServiceOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r GetServiceResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetServiceResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetServiceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetServiceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetServiceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateServiceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ServiceOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateServiceResponse) GetJSON200() *ServiceOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateServiceResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateServiceResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateServiceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateServiceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateServiceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListServicesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListServicesOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListServicesResponse) GetJSON200() *ListServicesOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r ListServicesResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListServicesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListServicesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListServicesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListServicesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateServiceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *ServiceOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateServiceResponse) GetJSON201() *ServiceOutputBody {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r CreateServiceResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateServiceResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateServiceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateServiceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateServiceResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -21188,6 +22166,40 @@ func (c *ClientWithResponses) SetApprovedRoutesWithResponse(ctx context.Context,
 	return ParseSetApprovedRoutesResponse(rsp)
 }
 
+// SetApprovedServicesWithBodyWithResponse Set approved services
+//
+// Replaces the services the node may host. Only a tagged node can host a service.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/approve_services (the `SetApprovedServices` operationId).
+func (c *ClientWithResponses) SetApprovedServicesWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetApprovedServicesResponse, error) {
+	rsp, err := c.SetApprovedServicesWithBody(ctx, nodeId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetApprovedServicesResponse(rsp)
+}
+
+// SetApprovedServicesWithResponse Set approved services
+//
+// Replaces the services the node may host. Only a tagged node can host a service.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/node/{nodeId}/approve_services (the `SetApprovedServices` operationId).
+func (c *ClientWithResponses) SetApprovedServicesWithResponse(ctx context.Context, nodeId string, body SetApprovedServicesJSONRequestBody, reqEditors ...RequestEditorFn) (*SetApprovedServicesResponse, error) {
+	rsp, err := c.SetApprovedServices(ctx, nodeId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetApprovedServicesResponse(rsp)
+}
+
 // DeleteNodeAttributeWithResponse Delete a custom posture attribute
 //
 // Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -21869,6 +22881,119 @@ func (c *ClientWithResponses) GetServerInfoWithResponse(ctx context.Context, req
 		return nil, err
 	}
 	return ParseGetServerInfoResponse(rsp)
+}
+
+// DeleteServiceWithResponse Delete service
+//
+// Removes the service, frees its addresses and withdraws every host's approval.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/service/{name} (the `DeleteService` operationId).
+func (c *ClientWithResponses) DeleteServiceWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*DeleteServiceResponse, error) {
+	rsp, err := c.DeleteService(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteServiceResponse(rsp)
+}
+
+// GetServiceWithResponse Get service
+//
+// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/service/{name} (the `GetService` operationId).
+func (c *ClientWithResponses) GetServiceWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetServiceResponse, error) {
+	rsp, err := c.GetService(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetServiceResponse(rsp)
+}
+
+// UpdateServiceWithBodyWithResponse Update service
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/service/{name} (the `UpdateService` operationId).
+func (c *ClientWithResponses) UpdateServiceWithBodyWithResponse(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateServiceResponse, error) {
+	rsp, err := c.UpdateServiceWithBody(ctx, name, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateServiceResponse(rsp)
+}
+
+// UpdateServiceWithResponse Update service
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/service/{name} (the `UpdateService` operationId).
+func (c *ClientWithResponses) UpdateServiceWithResponse(ctx context.Context, name string, body UpdateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateServiceResponse, error) {
+	rsp, err := c.UpdateService(ctx, name, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateServiceResponse(rsp)
+}
+
+// ListServicesWithResponse List services
+//
+// The tailnet's services with the nodes that announce or may host each.
+//
+// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/services (the `ListServices` operationId).
+func (c *ClientWithResponses) ListServicesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListServicesResponse, error) {
+	rsp, err := c.ListServices(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListServicesResponse(rsp)
+}
+
+// CreateServiceWithBodyWithResponse Create service
+//
+// Creates a service and gives it a pair of tailnet addresses. Nodes host it once they announce it and are approved.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/services (the `CreateService` operationId).
+func (c *ClientWithResponses) CreateServiceWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateServiceResponse, error) {
+	rsp, err := c.CreateServiceWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateServiceResponse(rsp)
+}
+
+// CreateServiceWithResponse Create service
+//
+// Creates a service and gives it a pair of tailnet addresses. Nodes host it once they announce it and are approved.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/services (the `CreateService` operationId).
+func (c *ClientWithResponses) CreateServiceWithResponse(ctx context.Context, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateServiceResponse, error) {
+	rsp, err := c.CreateService(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateServiceResponse(rsp)
 }
 
 // GetSettingsWithResponse Get settings
@@ -24812,6 +25937,39 @@ func ParseSetApprovedRoutesResponse(rsp *http.Response) (*SetApprovedRoutesRespo
 	return response, nil
 }
 
+// ParseSetApprovedServicesResponse parses an HTTP response from a SetApprovedServicesWithResponse call
+func ParseSetApprovedServicesResponse(rsp *http.Response) (*SetApprovedServicesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetApprovedServicesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NodeOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseDeleteNodeAttributeResponse parses an HTTP response from a DeleteNodeAttributeWithResponse call
 func ParseDeleteNodeAttributeResponse(rsp *http.Response) (*DeleteNodeAttributeResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -25756,6 +26914,167 @@ func ParseGetServerInfoResponse(rsp *http.Response) (*GetServerInfoResponse, err
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteServiceResponse parses an HTTP response from a DeleteServiceWithResponse call
+func ParseDeleteServiceResponse(rsp *http.Response) (*DeleteServiceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteServiceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetServiceResponse parses an HTTP response from a GetServiceWithResponse call
+func ParseGetServiceResponse(rsp *http.Response) (*GetServiceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetServiceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ServiceOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateServiceResponse parses an HTTP response from a UpdateServiceWithResponse call
+func ParseUpdateServiceResponse(rsp *http.Response) (*UpdateServiceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateServiceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ServiceOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListServicesResponse parses an HTTP response from a ListServicesWithResponse call
+func ParseListServicesResponse(rsp *http.Response) (*ListServicesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListServicesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListServicesOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateServiceResponse parses an HTTP response from a CreateServiceWithResponse call
+func ParseCreateServiceResponse(rsp *http.Response) (*CreateServiceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateServiceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest ServiceOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest ErrorModel

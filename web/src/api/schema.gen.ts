@@ -1038,6 +1038,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/node/{nodeId}/approve_services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set approved services
+         * @description Replaces the services the node may host. Only a tagged node can host a service.
+         *
+         *     Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["setApprovedServices"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/node/{nodeId}/attributes/{key}": {
         parameters: {
             query?: never;
@@ -1547,6 +1569,64 @@ export interface paths {
         get: operations["getServerInfo"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/service/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get service
+         * @description Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["getService"];
+        /**
+         * Update service
+         * @description Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        put: operations["updateService"];
+        post?: never;
+        /**
+         * Delete service
+         * @description Removes the service, frees its addresses and withdraws every host's approval.
+         *
+         *     Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        delete: operations["deleteService"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List services
+         * @description The tailnet's services with the nodes that announce or may host each.
+         *
+         *     Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        get: operations["listServices"];
+        put?: never;
+        /**
+         * Create service
+         * @description Creates a service and gives it a pair of tailnet addresses. Nodes host it once they announce it and are approved.
+         *
+         *     Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["createService"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2181,6 +2261,14 @@ export interface components {
             /** Format: uint64 */
             user?: string;
         };
+        CreateServiceRequestBody: {
+            comment?: string;
+            displayName?: string;
+            /** @description svc:<label> or the label alone; a DNS label. */
+            name: string;
+            /** @description tcp:443, udp:53-60 or tcp:*. */
+            ports?: string[] | null;
+        };
         CreateUserRequestBody: {
             displayName?: string;
             email?: string;
@@ -2459,6 +2547,22 @@ export interface components {
         HealthResponseBody: {
             databaseConnectivity: boolean;
         };
+        Host: {
+            /** @description true when the node advertises the service. */
+            active: boolean;
+            /** @description true when the node's serve config announces it. */
+            announced: boolean;
+            /** @description true when the node may host the service. */
+            approved: boolean;
+            /** @description The node's given name. */
+            name: string;
+            /** Format: uint64 */
+            nodeId: string;
+            /** @description The protocol and ports the node serves it on. */
+            ports: string[];
+            /** @description true when clients route to this node for it now. */
+            primary: boolean;
+        };
         Invite: {
             accepted: boolean;
             /** Format: date-time */
@@ -2539,6 +2643,9 @@ export interface components {
         ListRulesOutputBody: {
             policyFileEnforces: boolean;
             rules: components["schemas"]["AccessRule"][];
+        };
+        ListServicesOutputBody: {
+            services: components["schemas"]["Service"][];
         };
         ListSessionsOutputBody: {
             sessions: components["schemas"]["ConsoleSession"][];
@@ -2645,11 +2752,15 @@ export interface components {
             primaryPrefixes: string[];
         };
         Node: {
+            /** @description The services in the node's serve configuration, as it last reported them. */
+            announcedServices: components["schemas"]["NodeService"][];
             /** @description false while the node waits for an administrator. */
             approved: boolean;
             /** Format: date-time */
             approvedAt: string | null;
             approvedRoutes: string[];
+            /** @description The services the node may host; it hosts the ones it also announces. */
+            approvedServices: string[];
             availableRoutes: string[];
             /** @description The Tailscale client version the node last reported, such as 1.86.2; empty until it connects. */
             clientVersion: string;
@@ -2719,6 +2830,14 @@ export interface components {
             reusable: boolean;
             used: boolean;
             user: components["schemas"]["User"];
+        };
+        NodeService: {
+            /** @description true when the node advertises the service. */
+            active: boolean;
+            /** @description The service name, svc:<label>. */
+            name: string;
+            /** @description The protocol and ports the node serves it on. */
+            ports: string[];
         };
         OAuthClient: {
             clientId: string;
@@ -2869,12 +2988,41 @@ export interface components {
             tls: string;
             version: string;
         };
+        Service: {
+            /** @description The service's own tailnet addresses. */
+            addresses: string[];
+            /** @description The operator's note. */
+            comment: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description The shown label; empty falls back to the name. */
+            displayName: string;
+            /** @description The service's MagicDNS name. */
+            dnsName: string;
+            /** @description The nodes that announce or are approved. */
+            hosts: components["schemas"]["Host"][];
+            /** Format: uint64 */
+            id: string;
+            /** @description The service's name, svc:<label>. */
+            name: string;
+            /** @description The ports clients are told about. */
+            ports: string[];
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ServiceOutputBody: {
+            service: components["schemas"]["Service"];
+        };
         SetApprovalRequestBody: {
             /** @description false withdraws the approval. */
             approved?: boolean;
         };
         SetApprovedRoutesRequestBody: {
             routes?: string[] | null;
+        };
+        SetApprovedServicesRequestBody: {
+            /** @description Service names; an empty list withdraws every approval. */
+            services: string[];
         };
         SetAttributeRequestBody: {
             comment?: string;
@@ -2961,6 +3109,11 @@ export interface components {
         };
         SshRecordingOutputBody: {
             recording: components["schemas"]["SSHRecording"];
+        };
+        UpdateServiceRequestBody: {
+            comment?: string;
+            displayName?: string;
+            ports?: string[];
         };
         UpdateSettingsRequestBody: {
             deviceAttributesOn?: boolean;
@@ -3095,6 +3248,7 @@ export type CreateInviteRequestBody = components['schemas']['CreateInviteRequest
 export type CreateOAuthClientOutputBody = components['schemas']['CreateOAuthClientOutputBody'];
 export type CreateOAuthClientRequestBody = components['schemas']['CreateOAuthClientRequestBody'];
 export type CreatePreAuthKeyRequestBody = components['schemas']['CreatePreAuthKeyRequestBody'];
+export type CreateServiceRequestBody = components['schemas']['CreateServiceRequestBody'];
 export type CreateUserRequestBody = components['schemas']['CreateUserRequestBody'];
 export type CustomAttribute = components['schemas']['CustomAttribute'];
 export type DebugCreateNodeRequestBody = components['schemas']['DebugCreateNodeRequestBody'];
@@ -3130,6 +3284,7 @@ export type GroupMemberRequestBody = components['schemas']['GroupMemberRequestBo
 export type GroupOutputBody = components['schemas']['GroupOutputBody'];
 export type GroupRequestBody = components['schemas']['GroupRequestBody'];
 export type HealthResponseBody = components['schemas']['HealthResponseBody'];
+export type Host = components['schemas']['Host'];
 export type Invite = components['schemas']['Invite'];
 export type InviteOutputBody = components['schemas']['InviteOutputBody'];
 export type ListApiKeysOutputBody = components['schemas']['ListAPIKeysOutputBody'];
@@ -3145,6 +3300,7 @@ export type ListPosturesOutputBody = components['schemas']['ListPosturesOutputBo
 export type ListPreAuthKeysOutputBody = components['schemas']['ListPreAuthKeysOutputBody'];
 export type ListRequestsOutputBody = components['schemas']['ListRequestsOutputBody'];
 export type ListRulesOutputBody = components['schemas']['ListRulesOutputBody'];
+export type ListServicesOutputBody = components['schemas']['ListServicesOutputBody'];
 export type ListSessionsOutputBody = components['schemas']['ListSessionsOutputBody'];
 export type ListSshRecordingsOutputBody = components['schemas']['ListSSHRecordingsOutputBody'];
 export type ListUsersOutputBody = components['schemas']['ListUsersOutputBody'];
@@ -3163,6 +3319,7 @@ export type NodeOutputBody = components['schemas']['NodeOutputBody'];
 export type NodePosture = components['schemas']['NodePosture'];
 export type NodePosturesOutputBody = components['schemas']['NodePosturesOutputBody'];
 export type NodePreAuthKey = components['schemas']['NodePreAuthKey'];
+export type NodeService = components['schemas']['NodeService'];
 export type OAuthClient = components['schemas']['OAuthClient'];
 export type PolicyRequestBody = components['schemas']['PolicyRequestBody'];
 export type PolicyResponseBody = components['schemas']['PolicyResponseBody'];
@@ -3184,8 +3341,11 @@ export type RotateApiKeyRequestBody = components['schemas']['RotateApiKeyRequest
 export type RuleEnabledInputBody = components['schemas']['RuleEnabledInputBody'];
 export type RuleOutputBody = components['schemas']['RuleOutputBody'];
 export type ServerInfo = components['schemas']['ServerInfo'];
+export type Service = components['schemas']['Service'];
+export type ServiceOutputBody = components['schemas']['ServiceOutputBody'];
 export type SetApprovalRequestBody = components['schemas']['SetApprovalRequestBody'];
 export type SetApprovedRoutesRequestBody = components['schemas']['SetApprovedRoutesRequestBody'];
+export type SetApprovedServicesRequestBody = components['schemas']['SetApprovedServicesRequestBody'];
 export type SetAttributeRequestBody = components['schemas']['SetAttributeRequestBody'];
 export type SetDerpRequestBody = components['schemas']['SetDERPRequestBody'];
 export type SetDnsRequestBody = components['schemas']['SetDNSRequestBody'];
@@ -3197,6 +3357,7 @@ export type SetUserRoleRequestBody = components['schemas']['SetUserRoleRequestBo
 export type ShareNodeRequestBody = components['schemas']['ShareNodeRequestBody'];
 export type SshRecording = components['schemas']['SSHRecording'];
 export type SshRecordingOutputBody = components['schemas']['SshRecordingOutputBody'];
+export type UpdateServiceRequestBody = components['schemas']['UpdateServiceRequestBody'];
 export type UpdateSettingsRequestBody = components['schemas']['UpdateSettingsRequestBody'];
 export type UpdateUserRequestBody = components['schemas']['UpdateUserRequestBody'];
 export type User = components['schemas']['User'];
@@ -5470,6 +5631,41 @@ export interface operations {
             };
         };
     };
+    setApprovedServices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetApprovedServicesRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodeOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     setNodeAttribute: {
         parameters: {
             query?: never;
@@ -6455,6 +6651,165 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ServerInfo"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description svc:<label> or the label alone. */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updateService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateServiceRequestBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description svc:<label> or the label alone. */
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    listServices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListServicesOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    createService: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateServiceRequestBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceOutputBody"];
                 };
             };
             /** @description Error */

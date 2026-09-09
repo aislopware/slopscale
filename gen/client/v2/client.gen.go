@@ -251,9 +251,23 @@ type ListUsersOutputBody struct {
 	Users []User `json:"users"`
 }
 
+// ListVIPServicesOutputBody defines model for ListVIPServicesOutputBody.
+type ListVIPServicesOutputBody struct {
+	VipServices []VIPService `json:"vipServices"`
+}
+
 // ListWebhooksOutputBody defines model for ListWebhooksOutputBody.
 type ListWebhooksOutputBody struct {
 	Webhooks []WebhookEndpoint `json:"webhooks"`
+}
+
+// PutVIPServiceRequest defines model for PutVIPServiceRequest.
+type PutVIPServiceRequest struct {
+	Annotations *map[string]string `json:"annotations,omitempty"`
+	Comment     *string            `json:"comment,omitempty"`
+	Name        *string            `json:"name,omitempty"`
+	Ports       *[]string          `json:"ports,omitempty"`
+	Tags        *[]string          `json:"tags,omitempty"`
 }
 
 // SetAuthorizedRequest defines model for SetAuthorizedRequest.
@@ -343,6 +357,16 @@ type User struct {
 	Status             string    `json:"status"`
 	TailnetId          string    `json:"tailnetId"`
 	Type               string    `json:"type"`
+}
+
+// VIPService defines model for VIPService.
+type VIPService struct {
+	Addrs       []string           `json:"addrs"`
+	Annotations *map[string]string `json:"annotations,omitempty"`
+	Comment     *string            `json:"comment,omitempty"`
+	Name        string             `json:"name"`
+	Ports       []string           `json:"ports"`
+	Tags        []string           `json:"tags"`
 }
 
 // WebhookEndpoint defines model for WebhookEndpoint.
@@ -466,6 +490,9 @@ type CreateKeyJSONRequestBody = CreateKeyRequest
 
 // UpdateTailnetSettingsJSONRequestBody defines body for UpdateTailnetSettings for application/json ContentType.
 type UpdateTailnetSettingsJSONRequestBody = UpdateTailnetSettings
+
+// PutVIPServiceJSONRequestBody defines body for PutVIPService for application/json ContentType.
+type PutVIPServiceJSONRequestBody = PutVIPServiceRequest
 
 // CreateWebhookJSONRequestBody defines body for CreateWebhook for application/json ContentType.
 type CreateWebhookJSONRequestBody = CreateWebhookRequest
@@ -940,6 +967,49 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v2/tailnet/{tailnet}/users (the `ListUsers` operationId).
 	ListUsers(ctx context.Context, tailnet string, params *ListUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListVIPServices List services
+	//
+	// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v2/tailnet/{tailnet}/vip-services (the `ListVIPServices` operationId).
+	ListVIPServices(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteVIPService Delete service
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with DELETE /api/v2/tailnet/{tailnet}/vip-services/{name} (the `DeleteVIPService` operationId).
+	DeleteVIPService(ctx context.Context, tailnet string, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetVIPService Get service
+	//
+	// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Corresponds with GET /api/v2/tailnet/{tailnet}/vip-services/{name} (the `GetVIPService` operationId).
+	GetVIPService(ctx context.Context, tailnet string, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutVIPServiceWithBody Create or update service
+	//
+	// Creates the service when it does not exist, giving it a pair of tailnet addresses, and replaces its comment, ports and display name otherwise.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v2/tailnet/{tailnet}/vip-services/{name} (the `PutVIPService` operationId).
+	PutVIPServiceWithBody(ctx context.Context, tailnet string, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutVIPService Create or update service
+	//
+	// Creates the service when it does not exist, giving it a pair of tailnet addresses, and replaces its comment, ports and display name otherwise.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v2/tailnet/{tailnet}/vip-services/{name} (the `PutVIPService` operationId).
+	PutVIPService(ctx context.Context, tailnet string, name string, body PutVIPServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListWebhooks List webhooks
 	//
@@ -1871,6 +1941,99 @@ func (c *Client) UpdateTailnetSettings(ctx context.Context, tailnet string, body
 // Corresponds with GET /api/v2/tailnet/{tailnet}/users (the `ListUsers` operationId).
 func (c *Client) ListUsers(ctx context.Context, tailnet string, params *ListUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListUsersRequest(c.Server, tailnet, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListVIPServices List services
+//
+// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v2/tailnet/{tailnet}/vip-services (the `ListVIPServices` operationId).
+func (c *Client) ListVIPServices(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListVIPServicesRequest(c.Server, tailnet)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteVIPService Delete service
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with DELETE /api/v2/tailnet/{tailnet}/vip-services/{name} (the `DeleteVIPService` operationId).
+func (c *Client) DeleteVIPService(ctx context.Context, tailnet string, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteVIPServiceRequest(c.Server, tailnet, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetVIPService Get service
+//
+// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Corresponds with GET /api/v2/tailnet/{tailnet}/vip-services/{name} (the `GetVIPService` operationId).
+func (c *Client) GetVIPService(ctx context.Context, tailnet string, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetVIPServiceRequest(c.Server, tailnet, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutVIPServiceWithBody Create or update service
+//
+// Creates the service when it does not exist, giving it a pair of tailnet addresses, and replaces its comment, ports and display name otherwise.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v2/tailnet/{tailnet}/vip-services/{name} (the `PutVIPService` operationId).
+func (c *Client) PutVIPServiceWithBody(ctx context.Context, tailnet string, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutVIPServiceRequestWithBody(c.Server, tailnet, name, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutVIPService Create or update service
+//
+// Creates the service when it does not exist, giving it a pair of tailnet addresses, and replaces its comment, ports and display name otherwise.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v2/tailnet/{tailnet}/vip-services/{name} (the `PutVIPService` operationId).
+func (c *Client) PutVIPService(ctx context.Context, tailnet string, name string, body PutVIPServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutVIPServiceRequest(c.Server, tailnet, name, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3615,6 +3778,176 @@ func NewListUsersRequest(server string, tailnet string, params *ListUsersParams)
 	return req, nil
 }
 
+// NewListVIPServicesRequest constructs an http.Request for the ListVIPServices method
+func NewListVIPServicesRequest(server string, tailnet string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/vip-services", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteVIPServiceRequest constructs an http.Request for the DeleteVIPService method
+func NewDeleteVIPServiceRequest(server string, tailnet string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/vip-services/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetVIPServiceRequest constructs an http.Request for the GetVIPService method
+func NewGetVIPServiceRequest(server string, tailnet string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/vip-services/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutVIPServiceRequest calls the generic PutVIPService builder with application/json body
+func NewPutVIPServiceRequest(server string, tailnet string, name string, body PutVIPServiceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutVIPServiceRequestWithBody(server, tailnet, name, "application/json", bodyReader)
+}
+
+// NewPutVIPServiceRequestWithBody constructs an http.Request for the PutVIPService method, with any body, and a specified content type
+func NewPutVIPServiceRequestWithBody(server string, tailnet string, name string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "tailnet", tailnet, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/tailnet/%s/vip-services/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewListWebhooksRequest constructs an http.Request for the ListWebhooks method
 func NewListWebhooksRequest(server string, tailnet string) (*http.Request, error) {
 	var err error
@@ -4484,6 +4817,55 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v2/tailnet/{tailnet}/users (the `ListUsers` operationId).
 	ListUsersWithResponse(ctx context.Context, tailnet string, params *ListUsersParams, reqEditors ...RequestEditorFn) (*ListUsersResponse, error)
+
+	// ListVIPServicesWithResponse List services
+	//
+	// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v2/tailnet/{tailnet}/vip-services (the `ListVIPServices` operationId).
+	ListVIPServicesWithResponse(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*ListVIPServicesResponse, error)
+
+	// DeleteVIPServiceWithResponse Delete service
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v2/tailnet/{tailnet}/vip-services/{name} (the `DeleteVIPService` operationId).
+	DeleteVIPServiceWithResponse(ctx context.Context, tailnet string, name string, reqEditors ...RequestEditorFn) (*DeleteVIPServiceResponse, error)
+
+	// GetVIPServiceWithResponse Get service
+	//
+	// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v2/tailnet/{tailnet}/vip-services/{name} (the `GetVIPService` operationId).
+	GetVIPServiceWithResponse(ctx context.Context, tailnet string, name string, reqEditors ...RequestEditorFn) (*GetVIPServiceResponse, error)
+
+	// PutVIPServiceWithBodyWithResponse Create or update service
+	//
+	// Creates the service when it does not exist, giving it a pair of tailnet addresses, and replaces its comment, ports and display name otherwise.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v2/tailnet/{tailnet}/vip-services/{name} (the `PutVIPService` operationId).
+	PutVIPServiceWithBodyWithResponse(ctx context.Context, tailnet string, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutVIPServiceResponse, error)
+
+	// PutVIPServiceWithResponse Create or update service
+	//
+	// Creates the service when it does not exist, giving it a pair of tailnet addresses, and replaces its comment, ports and display name otherwise.
+	//
+	// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v2/tailnet/{tailnet}/vip-services/{name} (the `PutVIPService` operationId).
+	PutVIPServiceWithResponse(ctx context.Context, tailnet string, name string, body PutVIPServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*PutVIPServiceResponse, error)
 
 	// ListWebhooksWithResponse List webhooks
 	//
@@ -6980,6 +7362,310 @@ func (r ListUsersResponse) ContentType() string {
 	return ""
 }
 
+type ListVIPServicesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListVIPServicesOutputBody
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListVIPServicesResponse) GetJSON200() *ListVIPServicesOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r ListVIPServicesResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r ListVIPServicesResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListVIPServicesResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ListVIPServicesResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r ListVIPServicesResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ListVIPServicesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListVIPServicesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListVIPServicesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListVIPServicesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteVIPServiceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r DeleteVIPServiceResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r DeleteVIPServiceResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r DeleteVIPServiceResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r DeleteVIPServiceResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r DeleteVIPServiceResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteVIPServiceResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteVIPServiceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteVIPServiceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteVIPServiceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetVIPServiceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *VIPService
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetVIPServiceResponse) GetJSON200() *VIPService {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r GetVIPServiceResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r GetVIPServiceResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetVIPServiceResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r GetVIPServiceResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r GetVIPServiceResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetVIPServiceResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetVIPServiceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetVIPServiceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetVIPServiceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutVIPServiceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *VIPService
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *ErrorModel
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *ErrorModel
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *ErrorModel
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *ErrorModel
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *ErrorModel
+	// ApplicationproblemJSON500 the response for an HTTP 500 `application/problem+json` response
+	ApplicationproblemJSON500 *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutVIPServiceResponse) GetJSON200() *VIPService {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r PutVIPServiceResponse) GetApplicationproblemJSON400() *ErrorModel {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r PutVIPServiceResponse) GetApplicationproblemJSON401() *ErrorModel {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r PutVIPServiceResponse) GetApplicationproblemJSON403() *ErrorModel {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r PutVIPServiceResponse) GetApplicationproblemJSON404() *ErrorModel {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r PutVIPServiceResponse) GetApplicationproblemJSON422() *ErrorModel {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON500 returns the response for an HTTP 500 `application/problem+json` response
+func (r PutVIPServiceResponse) GetApplicationproblemJSON500() *ErrorModel {
+	return r.ApplicationproblemJSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PutVIPServiceResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutVIPServiceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutVIPServiceResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutVIPServiceResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListWebhooksResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -8525,6 +9211,85 @@ func (c *ClientWithResponses) ListUsersWithResponse(ctx context.Context, tailnet
 		return nil, err
 	}
 	return ParseListUsersResponse(rsp)
+}
+
+// ListVIPServicesWithResponse List services
+//
+// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v2/tailnet/{tailnet}/vip-services (the `ListVIPServices` operationId).
+func (c *ClientWithResponses) ListVIPServicesWithResponse(ctx context.Context, tailnet string, reqEditors ...RequestEditorFn) (*ListVIPServicesResponse, error) {
+	rsp, err := c.ListVIPServices(ctx, tailnet, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListVIPServicesResponse(rsp)
+}
+
+// DeleteVIPServiceWithResponse Delete service
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v2/tailnet/{tailnet}/vip-services/{name} (the `DeleteVIPService` operationId).
+func (c *ClientWithResponses) DeleteVIPServiceWithResponse(ctx context.Context, tailnet string, name string, reqEditors ...RequestEditorFn) (*DeleteVIPServiceResponse, error) {
+	rsp, err := c.DeleteVIPService(ctx, tailnet, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteVIPServiceResponse(rsp)
+}
+
+// GetVIPServiceWithResponse Get service
+//
+// Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v2/tailnet/{tailnet}/vip-services/{name} (the `GetVIPService` operationId).
+func (c *ClientWithResponses) GetVIPServiceWithResponse(ctx context.Context, tailnet string, name string, reqEditors ...RequestEditorFn) (*GetVIPServiceResponse, error) {
+	rsp, err := c.GetVIPService(ctx, tailnet, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetVIPServiceResponse(rsp)
+}
+
+// PutVIPServiceWithBodyWithResponse Create or update service
+//
+// Creates the service when it does not exist, giving it a pair of tailnet addresses, and replaces its comment, ports and display name otherwise.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v2/tailnet/{tailnet}/vip-services/{name} (the `PutVIPService` operationId).
+func (c *ClientWithResponses) PutVIPServiceWithBodyWithResponse(ctx context.Context, tailnet string, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutVIPServiceResponse, error) {
+	rsp, err := c.PutVIPServiceWithBody(ctx, tailnet, name, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutVIPServiceResponse(rsp)
+}
+
+// PutVIPServiceWithResponse Create or update service
+//
+// Creates the service when it does not exist, giving it a pair of tailnet addresses, and replaces its comment, ports and display name otherwise.
+//
+// Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v2/tailnet/{tailnet}/vip-services/{name} (the `PutVIPService` operationId).
+func (c *ClientWithResponses) PutVIPServiceWithResponse(ctx context.Context, tailnet string, name string, body PutVIPServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*PutVIPServiceResponse, error) {
+	rsp, err := c.PutVIPService(ctx, tailnet, name, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutVIPServiceResponse(rsp)
 }
 
 // ListWebhooksWithResponse List webhooks
@@ -10614,6 +11379,253 @@ func ParseListUsersResponse(rsp *http.Response) (*ListUsersResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListVIPServicesResponse parses an HTTP response from a ListVIPServicesWithResponse call
+func ParseListVIPServicesResponse(rsp *http.Response) (*ListVIPServicesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListVIPServicesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListVIPServicesOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteVIPServiceResponse parses an HTTP response from a DeleteVIPServiceWithResponse call
+func ParseDeleteVIPServiceResponse(rsp *http.Response) (*DeleteVIPServiceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteVIPServiceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetVIPServiceResponse parses an HTTP response from a GetVIPServiceWithResponse call
+func ParseGetVIPServiceResponse(rsp *http.Response) (*GetVIPServiceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetVIPServiceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest VIPService
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutVIPServiceResponse parses an HTTP response from a PutVIPServiceWithResponse call
+func ParsePutVIPServiceResponse(rsp *http.Response) (*PutVIPServiceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutVIPServiceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest VIPService
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorModel

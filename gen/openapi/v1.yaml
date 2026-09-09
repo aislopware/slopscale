@@ -512,6 +512,27 @@ components:
           format: uint64
           type: string
       type: object
+    CreateServiceRequestBody:
+      additionalProperties: false
+      properties:
+        comment:
+          type: string
+        displayName:
+          type: string
+        name:
+          description: svc:<label> or the label alone; a DNS label.
+          minLength: 1
+          type: string
+        ports:
+          description: tcp:443, udp:53-60 or tcp:*.
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - name
+      type: object
     CreateUserRequestBody:
       additionalProperties: false
       properties:
@@ -1136,6 +1157,41 @@ components:
       required:
         - databaseConnectivity
       type: object
+    Host:
+      additionalProperties: false
+      properties:
+        active:
+          description: true when the node advertises the service.
+          type: boolean
+        announced:
+          description: true when the node's serve config announces it.
+          type: boolean
+        approved:
+          description: true when the node may host the service.
+          type: boolean
+        name:
+          description: The node's given name.
+          type: string
+        nodeId:
+          format: uint64
+          type: string
+        ports:
+          description: The protocol and ports the node serves it on.
+          items:
+            type: string
+          type: array
+        primary:
+          description: true when clients route to this node for it now.
+          type: boolean
+      required:
+        - nodeId
+        - name
+        - announced
+        - ports
+        - active
+        - approved
+        - primary
+      type: object
     Invite:
       additionalProperties: false
       properties:
@@ -1363,6 +1419,16 @@ components:
       required:
         - recordings
         - nextBefore
+      type: object
+    ListServicesOutputBody:
+      additionalProperties: false
+      properties:
+        services:
+          items:
+            $ref: "#/components/schemas/Service"
+          type: array
+      required:
+        - services
       type: object
     ListSessionsOutputBody:
       additionalProperties: false
@@ -1643,6 +1709,11 @@ components:
     Node:
       additionalProperties: false
       properties:
+        announcedServices:
+          description: The services in the node's serve configuration, as it last reported them.
+          items:
+            $ref: "#/components/schemas/NodeService"
+          type: array
         approved:
           description: false while the node waits for an administrator.
           type: boolean
@@ -1652,6 +1723,11 @@ components:
             - string
             - "null"
         approvedRoutes:
+          items:
+            type: string
+          type: array
+        approvedServices:
+          description: The services the node may host; it hosts the ones it also announces.
           items:
             type: string
           type: array
@@ -1768,6 +1844,8 @@ components:
         - tags
         - sharedWith
         - globalExitNode
+        - announcedServices
+        - approvedServices
         - funnelEnabled
         - clientVersion
         - updateAvailable
@@ -1854,6 +1932,25 @@ components:
         - createdAt
         - aclTags
         - preauthorized
+      type: object
+    NodeService:
+      additionalProperties: false
+      properties:
+        active:
+          description: true when the node advertises the service.
+          type: boolean
+        name:
+          description: The service name, svc:<label>.
+          type: string
+        ports:
+          description: The protocol and ports the node serves it on.
+          items:
+            type: string
+          type: array
+      required:
+        - name
+        - ports
+        - active
       type: object
     OAuthClient:
       additionalProperties: false
@@ -2301,6 +2398,65 @@ components:
         - ephemeralInactivityTimeout
         - nodeExpiry
       type: object
+    Service:
+      additionalProperties: false
+      properties:
+        addresses:
+          description: The service's own tailnet addresses.
+          items:
+            type: string
+          type: array
+        comment:
+          description: The operator's note.
+          type: string
+        createdAt:
+          format: date-time
+          type: string
+        displayName:
+          description: The shown label; empty falls back to the name.
+          type: string
+        dnsName:
+          description: The service's MagicDNS name.
+          type: string
+        hosts:
+          description: The nodes that announce or are approved.
+          items:
+            $ref: "#/components/schemas/Host"
+          type: array
+        id:
+          format: uint64
+          type: string
+        name:
+          description: The service's name, svc:<label>.
+          type: string
+        ports:
+          description: The ports clients are told about.
+          items:
+            type: string
+          type: array
+        updatedAt:
+          format: date-time
+          type: string
+      required:
+        - id
+        - name
+        - displayName
+        - comment
+        - ports
+        - addresses
+        - dnsName
+        - hosts
+        - createdAt
+        - updatedAt
+      type: object
+    ServiceOutputBody:
+      additionalProperties: false
+      properties:
+        service:
+          $ref: "#/components/schemas/Service"
+      required:
+        - service
+      type: object
     SetApprovalRequestBody:
       additionalProperties: false
       properties:
@@ -2317,6 +2473,17 @@ components:
           type:
             - array
             - "null"
+      type: object
+    SetApprovedServicesRequestBody:
+      additionalProperties: false
+      properties:
+        services:
+          description: Service names; an empty list withdraws every approval.
+          items:
+            type: string
+          type: array
+      required:
+        - services
       type: object
     SetAttributeRequestBody:
       additionalProperties: false
@@ -2489,6 +2656,18 @@ components:
           $ref: "#/components/schemas/SSHRecording"
       required:
         - recording
+      type: object
+    UpdateServiceRequestBody:
+      additionalProperties: false
+      properties:
+        comment:
+          type: string
+        displayName:
+          type: string
+        ports:
+          items:
+            type: string
+          type: array
       type: object
     UpdateSettingsRequestBody:
       additionalProperties: false
@@ -5116,6 +5295,46 @@ paths:
         - Nodes
       x-audit-action: node.routes.set
       x-required-scope: devices:routes
+  /api/v1/node/{nodeId}/approve_services:
+    post:
+      description: |-
+        Replaces the services the node may host. Only a tagged node can host a service.
+
+        Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: setApprovedServices
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetApprovedServicesRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Set approved services
+      tags:
+        - Nodes
+      x-audit-action: node.services.set
+      x-required-scope: services
   /api/v1/node/{nodeId}/attributes/{key}:
     delete:
       description: Requires the `devices:posture_attributes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -6050,6 +6269,160 @@ paths:
       tags:
         - Settings
       x-required-scope: feature_settings:read
+  /api/v1/service/{name}:
+    delete:
+      description: |-
+        Removes the service, frees its addresses and withdraws every host's approval.
+
+        Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: deleteService
+      parameters:
+        - description: svc:<label> or the label alone.
+          in: path
+          name: name
+          required: true
+          schema:
+            description: svc:<label> or the label alone.
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Delete service
+      tags:
+        - Services
+      x-audit-action: service.delete
+      x-required-scope: services
+    get:
+      description: Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: getService
+      parameters:
+        - description: svc:<label> or the label alone.
+          in: path
+          name: name
+          required: true
+          schema:
+            description: svc:<label> or the label alone.
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Get service
+      tags:
+        - Services
+      x-required-scope: services:read
+    put:
+      description: Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateService
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServiceRequestBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Update service
+      tags:
+        - Services
+      x-audit-action: service.update
+      x-required-scope: services
+  /api/v1/services:
+    get:
+      description: |-
+        The tailnet's services with the nodes that announce or may host each.
+
+        Requires the `services:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: listServices
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListServicesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: List services
+      tags:
+        - Services
+      x-required-scope: services:read
+    post:
+      description: |-
+        Creates a service and gives it a pair of tailnet addresses. Nodes host it once they announce it and are approved.
+
+        Requires the `services` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: createService
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceRequestBody"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceOutputBody"
+          description: Created
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Create service
+      tags:
+        - Services
+      x-audit-action: service.create
+      x-required-scope: services
   /api/v1/settings:
     get:
       description: Requires the `feature_settings:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).

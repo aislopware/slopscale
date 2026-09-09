@@ -42,6 +42,7 @@ func UseSchema(schema string) {
 	SSHRecordings = SSHRecordings.FromSchema(schema)
 	UserInvites = UserInvites.FromSchema(schema)
 	Users = Users.FromSchema(schema)
+	VipServices = VipServices.FromSchema(schema)
 	WebhookDeliveries = WebhookDeliveries.FromSchema(schema)
 	Webhooks = Webhooks.FromSchema(schema)
 }
