@@ -71,6 +71,7 @@ const onePage = {
   fetching: false,
   failed: false,
   setPage: noop,
+  setPageSize: noop,
 };
 
 const base: Omit<EventsTableProps, "events"> = {

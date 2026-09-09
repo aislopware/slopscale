@@ -14,6 +14,8 @@ export interface CursorPaging {
   /** The last ask for the next page failed; asking again tries again. */
   readonly failed: boolean;
   readonly setPage: (page: number) => void;
+  /** Cuts the rows loaded into pages of another size and goes back to the first. */
+  readonly setPageSize: (size: number) => void;
 }
 
 export interface PageWindow<Row> extends CursorPaging {
@@ -24,6 +26,7 @@ export interface PageWindow<Row> extends CursorPaging {
 export interface PageWindowOptions<Row> {
   /** Every row the server has sent, in order, across the pages fetched so far. */
   readonly rows: readonly Row[];
+  /** The rows on a page to begin with; the reader may pick another size. */
   readonly pageSize: number;
   readonly hasMore: boolean;
   readonly fetching: boolean;
@@ -43,7 +46,7 @@ export interface PageWindowOptions<Row> {
  */
 export function usePageWindow<Row>({
   rows,
-  pageSize,
+  pageSize: initialPageSize,
   hasMore,
   fetching,
   failed,
@@ -53,6 +56,7 @@ export function usePageWindow<Row>({
   // The page asked for, with the key it was asked for under: a page asked for under other filters
   // is not this list's page, so the list starts over at one without a reset of its own.
   const [asked, setAsked] = useState({ key: resetKey, page: 1 });
+  const [pageSize, setPageSize] = useState(initialPageSize);
   const wanted = asked.key === resetKey ? asked.page : 1;
   const loadedPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const page = Math.min(wanted, loadedPages);
@@ -73,6 +77,10 @@ export function usePageWindow<Row>({
       if (next > loadedPages && hasMore && !fetching) {
         fetchMore();
       }
+    },
+    setPageSize: (size) => {
+      setPageSize(size);
+      setAsked({ key: resetKey, page: 1 });
     },
   };
 }

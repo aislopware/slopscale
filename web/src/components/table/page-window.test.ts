@@ -70,6 +70,20 @@ describe(usePageWindow, () => {
     expect(fetchMore).toHaveBeenCalledTimes(2);
   });
 
+  it("cuts the rows loaded into pages of the size picked, from the first", async () => {
+    const { result, act } = await renderHook(useWindow, {
+      initialProps: options({ rows: rowsUpTo(pageSize * 3), hasMore: false }),
+    });
+
+    await act(() => {
+      result.current.setPage(3);
+    });
+    await act(() => {
+      result.current.setPageSize(pageSize * 3);
+    });
+    expect(result.current).toMatchObject({ page: 1, pageSize: pageSize * 3, rows: rowsUpTo(6) });
+  });
+
   it("starts over at the first page when the key changes", async () => {
     const { result, rerender, act } = await renderHook(useWindow, {
       initialProps: options({ rows: rowsUpTo(pageSize * 2), resetKey: "a" }),

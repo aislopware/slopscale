@@ -84,16 +84,17 @@ function moreText(fetching: boolean, failed: boolean): string {
 
 /**
  * Paging over rows the server hands out a page at a time. Until the server says there are no more,
- * the total is unknown, so the band offers Previous and Next and names the range so far.
+ * the total is unknown, so the band offers Previous and Next and names the range so far. The rows
+ * per page are the reader's to pick, as on a table the browser holds whole.
  */
 export function CursorBand({ paging, noun }: CursorBandProps): ReactElement | null {
-  const { page, pageSize, loaded, hasMore, fetching, failed, setPage } = paging;
+  const { page, pageSize, loaded, hasMore, fetching, failed, setPage, setPageSize } = paging;
 
   if (loaded === 0) {
     return null;
   }
 
-  if (!hasMore && loaded <= pageSize) {
+  if (!hasMore && loaded <= smallestPageSize) {
     return (
       <Band>
         <Pagination page={1} perPage={pageSize} totalCount={loaded} setPage={setPage}>
@@ -106,6 +107,7 @@ export function CursorBand({ paging, noun }: CursorBandProps): ReactElement | nu
   const info = hasMore
     ? `Showing ${rangeText(page, pageSize, loaded)}${moreText(fetching, failed)}`
     : `Showing ${rangeText(page, pageSize, loaded)} of ${loaded}`;
+  const pages = Math.ceil(loaded / pageSize);
 
   return (
     <Band>
@@ -116,11 +118,19 @@ export function CursorBand({ paging, noun }: CursorBandProps): ReactElement | nu
         setPage={setPage}
       >
         <Pagination.Info>{() => info}</Pagination.Info>
-        <Pagination.Controls
-          controls={hasMore ? "simple" : "full"}
-          pageSelector="input"
-          className="grow"
+        <Pagination.PageSize
+          className="ml-auto"
+          label="Rows per page"
+          value={pageSize}
+          onChange={setPageSize}
         />
+        {hasMore || pages > 1 ? (
+          <Pagination.Controls
+            controls={hasMore ? "simple" : "full"}
+            pageSelector="input"
+            className="grow-0"
+          />
+        ) : null}
       </Pagination>
     </Band>
   );
