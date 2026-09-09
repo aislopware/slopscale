@@ -7,6 +7,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/juanfont/headscale/hscontrol/api/principal"
 	"github.com/juanfont/headscale/hscontrol/audit"
+	"github.com/juanfont/headscale/hscontrol/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // selfEnforcedOps are the authenticated operations that intentionally declare
@@ -81,6 +84,51 @@ func humaOperations(item *huma.PathItem) map[string]*huma.Operation {
 	}
 }
 
+// TestDebugNodeOperationIsGatedByConfig proves POST /api/v1/debug/node, which
+// mints a node from key material the caller hands it, is registered only when
+// the config asks for it: a production server neither serves it nor describes
+// it. The spec generator builds the API with no config and keeps every
+// operation. With the endpoint off the guards above still hold, so the
+// operation is absent rather than unguarded.
+func TestDebugNodeOperationIsGatedByConfig(t *testing.T) {
+	t.Parallel()
+
+	const debugNode = "/api/v1/debug/node"
+
+	off := NewAPI(chi.NewMux(), Backend{Cfg: &types.Config{}})
+	assert.Nil(t, off.OpenAPI().Paths[debugNode], "off unless the config asks for it")
+
+	on := NewAPI(chi.NewMux(), Backend{
+		Cfg: &types.Config{Debug: types.DebugConfig{NodeAPIEnabled: true}},
+	})
+	require.NotNil(t, on.OpenAPI().Paths[debugNode])
+	require.NotNil(t, on.OpenAPI().Paths[debugNode].Post)
+	assert.NotEmpty(t, on.OpenAPI().Paths[debugNode].Post.Security, "and still authenticated")
+
+	spec := NewAPI(chi.NewMux(), Backend{})
+	assert.NotNil(t, spec.OpenAPI().Paths[debugNode], "the spec describes every operation")
+
+	for path, item := range off.OpenAPI().Paths {
+		for method, op := range humaOperations(item) {
+			if op == nil {
+				continue
+			}
+
+			key := method + " " + path
+
+			if len(op.Security) > 0 && !selfEnforcedOps[key] {
+				_, ok := principal.RequiredScope(op)
+				assert.True(t, ok, "operation %q is authenticated but declares no scope", key)
+			}
+
+			if method != "GET" && !unauditedOps[key] {
+				_, ok := audit.Action(op)
+				assert.True(t, ok, "operation %q writes but declares no audit action", key)
+			}
+		}
+	}
+}
+
 // unauditedOps are the writing operations that change nothing: they
 // validate input and answer.
 var unauditedOps = map[string]bool{
@@ -112,5 +160,36 @@ func TestEveryWritingOperationIsAudited(t *testing.T) {
 					"or add it to unauditedOps if it changes nothing", key)
 			}
 		}
+	}
+}
+
+// TestSelfEnforcingOperationsAreAuthenticated pins the other half of the
+// scope guard: an operation on the self-enforcing list is excused from
+// declaring a scope, not from authentication. Without Security the
+// middleware attaches no principal, and the handler's own check would then
+// run against [principal.None], which holds nothing.
+func TestSelfEnforcingOperationsAreAuthenticated(t *testing.T) {
+	t.Parallel()
+
+	api := NewAPI(chi.NewMux(), Backend{})
+
+	seen := map[string]bool{}
+
+	for path, item := range api.OpenAPI().Paths {
+		for method, op := range humaOperations(item) {
+			key := method + " " + path
+			if op == nil || !selfEnforcedOps[key] {
+				continue
+			}
+
+			seen[key] = true
+
+			assert.NotEmpty(t, op.Security,
+				"self-enforcing operation %q must still require authentication", key)
+		}
+	}
+
+	for key := range selfEnforcedOps {
+		assert.True(t, seen[key], "selfEnforcedOps names %q, which no operation registers", key)
 	}
 }

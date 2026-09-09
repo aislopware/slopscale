@@ -2,6 +2,7 @@ package db
 
 import (
 	"testing"
+	"time"
 
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/juanfont/headscale/hscontrol/util"
@@ -27,6 +28,44 @@ func TestCreateAndDestroyUser(t *testing.T) {
 
 	_, err = db.GetUserByID(types.UserID(user.ID))
 	assert.Error(t, err)
+}
+
+// TestDestroyUserRevokesOAuthClients pins that a deleted user takes the
+// OAuth clients they created, and the tokens those clients issued, with
+// them: a client is its creator's authority in credential form and must not
+// outlive the account.
+func TestDestroyUserRevokesOAuthClients(t *testing.T) {
+	t.Parallel()
+
+	db, err := newSQLiteTestDB()
+	require.NoError(t, err)
+
+	keeper := db.CreateUserForTest("keeper")
+	leaver := db.CreateUserForTest("leaver")
+
+	_, keeperClient, err := db.CreateOAuthClient([]string{"users"}, nil, "keeper's", &keeper.ID)
+	require.NoError(t, err)
+
+	_, leaverClient, err := db.CreateOAuthClient([]string{"users"}, nil, "leaver's", &leaver.ID)
+	require.NoError(t, err)
+
+	expiry := time.Now().Add(time.Hour)
+
+	token, _, err := db.MintAccessToken(leaverClient.ClientID, []string{"users"}, nil, &expiry)
+	require.NoError(t, err)
+
+	_, err = db.AuthenticateAccessToken(token)
+	require.NoError(t, err)
+
+	require.NoError(t, db.DestroyUser(types.UserID(leaver.ID)))
+
+	clients, err := db.ListOAuthClients()
+	require.NoError(t, err)
+	require.Len(t, clients, 1)
+	assert.Equal(t, keeperClient.ClientID, clients[0].ClientID)
+
+	_, err = db.AuthenticateAccessToken(token)
+	require.Error(t, err, "a token issued by a deleted user's client must not authenticate")
 }
 
 func TestDestroyUserErrors(t *testing.T) {

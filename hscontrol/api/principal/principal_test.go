@@ -76,6 +76,21 @@ func newFakeAuth() fakeAuth {
 		},
 		tokens: map[string]*types.OAuthAccessToken{
 			types.AccessTokenPrefix + "routes": {Scopes: []string{"devices:routes"}, Tags: []string{"tag:web"}},
+			// Client-owned tokens: the owner's keeps its grant, the member's
+			// keeps nothing, the network admin's loses the write scope its
+			// role lacks, and the deleted user's grants nothing.
+			types.AccessTokenPrefix + "owner-users": {
+				Scopes: []string{"users"}, ClientUserID: new(uint(1)),
+			},
+			types.AccessTokenPrefix + "member-users": {
+				Scopes: []string{"users"}, ClientUserID: new(uint(3)),
+			},
+			types.AccessTokenPrefix + "netadm-users": {
+				Scopes: []string{"users", "devices:routes"}, ClientUserID: new(uint(2)),
+			},
+			types.AccessTokenPrefix + "orphan-all": {
+				Scopes: []string{"all"}, ClientUserID: new(uint(99)),
+			},
 		},
 		sessions: map[string]*types.Session{
 			"owner-session":  {ID: 7, UserID: 1},
@@ -157,6 +172,23 @@ func TestAuthenticate(t *testing.T) {
 			allows:   []scope.Scope{scope.DevicesRoutes, scope.DevicesRoutesRead},
 			denies:   []scope.Scope{scope.DevicesCore, scope.UsersRead},
 			wantTags: []string{"tag:web"},
+		},
+		{
+			token: types.AccessTokenPrefix + "owner-users", wantKind: AccessToken, bounded: true, wantOAuth: true,
+			allows: []scope.Scope{scope.Users, scope.UsersRead},
+		},
+		{
+			token: types.AccessTokenPrefix + "member-users", wantKind: AccessToken, bounded: true, wantOAuth: true,
+			denies: []scope.Scope{scope.Users, scope.UsersRead, scope.AllRead},
+		},
+		{
+			token: types.AccessTokenPrefix + "netadm-users", wantKind: AccessToken, bounded: true, wantOAuth: true,
+			allows: []scope.Scope{scope.DevicesRoutes, scope.DevicesRoutesRead},
+			denies: []scope.Scope{scope.Users, scope.UsersRead},
+		},
+		{
+			token: types.AccessTokenPrefix + "orphan-all", wantKind: AccessToken, bounded: true, wantOAuth: true,
+			denies: []scope.Scope{scope.All, scope.AllRead, scope.Users, scope.UsersRead},
 		},
 	}
 

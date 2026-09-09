@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/juanfont/headscale/hscontrol/audit"
@@ -361,6 +362,23 @@ func handleUpdateUser(ctx context.Context, b Backend, in *updateUserInput) (*use
 		}
 	}
 
+	target, err := b.State.GetUserByID(id)
+	if err != nil {
+		return nil, mapError("updating user", err)
+	}
+
+	err = requireProfileAuthority(ctx, target)
+	if err != nil {
+		return nil, err
+	}
+
+	if in.Body.Email != nil {
+		err = requireEmailFree(b, id, *in.Body.Email)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	user, c, err := b.State.UpdateUser(id, func(user *types.User) error {
 		if in.Body.DisplayName != nil {
 			user.DisplayName = *in.Body.DisplayName
@@ -388,6 +406,49 @@ func handleUpdateUser(ctx context.Context, b Backend, in *updateUserInput) (*use
 	out.Body.User = userFromView(user.View())
 
 	return out, nil
+}
+
+// requireProfileAuthority refuses a caller who is not an admin editing a
+// user who outranks them. A profile carries the email an OIDC login is
+// matched by, so editing an admin's profile is a step towards holding the
+// admin's account; the users scope alone must not buy it.
+func requireProfileAuthority(ctx context.Context, target *types.User) error {
+	p := caller(ctx)
+	if !p.Bounded || p.Role.IsAdmin() {
+		return nil
+	}
+
+	if target.Role.IsAdmin() {
+		return huma.Error403Forbidden("only an admin can edit an admin's profile")
+	}
+
+	return nil
+}
+
+// requireEmailFree refuses an address another user already holds. Two users
+// with one email are ambiguous to every path that resolves a person by
+// address, and with oidc.match_by_email one of them would be taken over.
+func requireEmailFree(b Backend, id types.UserID, email string) error {
+	if email == "" {
+		return nil
+	}
+
+	users, err := b.State.ListAllUsers()
+	if err != nil {
+		return huma.Error500InternalServerError("updating user", err)
+	}
+
+	for i := range users {
+		if types.UserID(users[i].ID) == id {
+			continue
+		}
+
+		if strings.EqualFold(strings.TrimSpace(users[i].Email), strings.TrimSpace(email)) {
+			return huma.Error409Conflict("another user already has the email " + email)
+		}
+	}
+
+	return nil
 }
 
 var errPictureURLNotHTTPS = errors.New("the picture URL must be an https URL with a host")

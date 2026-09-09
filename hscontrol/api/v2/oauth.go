@@ -8,9 +8,15 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
 )
+
+// grantAuditAction is the audit action of a client-credentials exchange.
+// The endpoint is a plain route, outside the middleware that audits every
+// huma operation, so it records its own entry for both outcomes.
+const grantAuditAction = "oauth.token.create"
 
 // accessTokenTTL is the fixed lifetime of a minted access token, matching
 // Tailscale's non-configurable one hour.
@@ -38,9 +44,17 @@ type tokenResponse struct {
 // short-lived bearer token.
 func oauthTokenHandler(b Backend) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// deny answers a refused request and records it, with whatever
+		// client the presented secret named.
+		deny := func(secret string, status int, code, desc string) {
+			writeOAuthError(w, status, code, desc)
+			recordTokenEvent(b, r, clientIDFromSecret(secret), status,
+				map[string]any{"error": code})
+		}
+
 		err := r.ParseForm()
 		if err != nil {
-			writeOAuthError(w, http.StatusBadRequest, "invalid_request", "could not parse request body")
+			deny("", http.StatusBadRequest, "invalid_request", "could not parse request body")
 
 			return
 		}
@@ -48,7 +62,7 @@ func oauthTokenHandler(b Backend) http.HandlerFunc {
 		// grant_type defaults to client_credentials: Tailscale's documented curl
 		// omits it, and the x/oauth2 client always sends it.
 		if gt := r.PostForm.Get("grant_type"); gt != "" && gt != "client_credentials" {
-			writeOAuthError(w, http.StatusBadRequest, "unsupported_grant_type",
+			deny("", http.StatusBadRequest, "unsupported_grant_type",
 				"only the client_credentials grant is supported")
 
 			return
@@ -65,14 +79,14 @@ func oauthTokenHandler(b Backend) http.HandlerFunc {
 		}
 
 		if secret == "" {
-			writeOAuthError(w, http.StatusUnauthorized, "invalid_client", "missing client credentials")
+			deny("", http.StatusUnauthorized, "invalid_client", "missing client credentials")
 
 			return
 		}
 
 		client, err := b.State.AuthenticateOAuthClient(secret)
 		if err != nil {
-			writeOAuthError(w, http.StatusUnauthorized, "invalid_client", "invalid client credentials")
+			deny(secret, http.StatusUnauthorized, "invalid_client", "invalid client credentials")
 
 			return
 		}
@@ -81,7 +95,7 @@ func oauthTokenHandler(b Backend) http.HandlerFunc {
 		// client's grant.
 		scopes, badScope, ok := narrowScopes(client.Scopes, strings.Fields(r.PostForm.Get("scope")))
 		if !ok {
-			writeOAuthError(w, http.StatusBadRequest, "invalid_scope",
+			deny(secret, http.StatusBadRequest, "invalid_scope",
 				"scope "+badScope+" is not granted to this client")
 
 			return
@@ -89,7 +103,7 @@ func oauthTokenHandler(b Backend) http.HandlerFunc {
 
 		tags, badTag, ok := narrowTags(client, strings.Fields(r.PostForm.Get("tags")))
 		if !ok {
-			writeOAuthError(w, http.StatusBadRequest, "invalid_target",
+			deny(secret, http.StatusBadRequest, "invalid_target",
 				"tag "+badTag+" is not granted to this client")
 
 			return
@@ -99,10 +113,13 @@ func oauthTokenHandler(b Backend) http.HandlerFunc {
 
 		tokenStr, _, err := b.State.MintAccessToken(client.ClientID, scopes, tags, &expiry)
 		if err != nil {
-			writeOAuthError(w, http.StatusInternalServerError, "server_error", "could not mint access token")
+			deny(secret, http.StatusInternalServerError, "server_error", "could not mint access token")
 
 			return
 		}
+
+		recordTokenEvent(b, r, client.ClientID, http.StatusOK,
+			map[string]any{"scopes": scopes, "tags": tags})
 
 		writeJSON(w, http.StatusOK, tokenResponse{
 			AccessToken: tokenStr,
@@ -111,6 +128,41 @@ func oauthTokenHandler(b Backend) http.HandlerFunc {
 			Scope:       strings.Join(scopes, " "),
 		})
 	}
+}
+
+// recordTokenEvent writes the audit entry for one token exchange. A refused
+// attempt is recorded too: the endpoint is unauthenticated, so a run of
+// failures against one client id is what a credential hunt looks like.
+func recordTokenEvent(b Backend, r *http.Request, clientID string, outcome int, detail map[string]any) {
+	audit.Record(b.State, &types.AuditEvent{
+		Action:     grantAuditAction,
+		ActorKind:  types.ActorOAuth,
+		ActorName:  clientID,
+		TargetKind: "oauth_client",
+		TargetID:   clientID,
+		Outcome:    outcome,
+		Detail:     detail,
+		RemoteAddr: r.RemoteAddr,
+	})
+}
+
+// clientIDFromSecret recovers the public client id a secret carries
+// (hskey-client-<id>-<secret>), so a refused attempt names the client it
+// aimed at. It returns "" for anything not shaped like a client secret.
+func clientIDFromSecret(secret string) string {
+	secret, _, _ = strings.Cut(secret, "?")
+
+	rest, found := strings.CutPrefix(secret, types.OAuthClientPrefix)
+	if !found {
+		return ""
+	}
+
+	id, _, found := strings.Cut(rest, "-")
+	if !found {
+		return ""
+	}
+
+	return id
 }
 
 // narrowScopes returns the requested scopes if each is granted by the client (an

@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	jet "github.com/go-jet/jet/v2/sqlite"
@@ -61,6 +62,18 @@ const (
 // flood could exhaust memory. ponytail: a global semaphore sized to GOMAXPROCS;
 // revisit only if credential hashing ever becomes a throughput bottleneck.
 var argon2Limiter = make(chan struct{}, max(2, runtime.GOMAXPROCS(0)))
+
+// dummySecretHash is the hash of a secret nobody holds, verified against on
+// the unknown-client path so that path does the same Argon2 work as a hit.
+// It is computed once, on first use, because it costs a full hash.
+var dummySecretHash = sync.OnceValue(func() []byte {
+	hash, err := hashSecret(rands.HexString(oauthClientSecretLength))
+	if err != nil {
+		return nil
+	}
+
+	return hash
+})
 
 // hashSecret hashes a credential secret with Argon2id, encoded in PHC string
 // form so the parameters travel with the hash. Argon2id is the current OWASP
@@ -125,10 +138,11 @@ func verifySecret(encoded []byte, secret string) error {
 	}
 
 	argon2Limiter <- struct{}{}
+	// Deferred: a panic in the hash must not leak the slot for good.
+	defer func() { <-argon2Limiter }()
+
 	//nolint:gosec // G115: want is checked above to be exactly sha256.Size (32) bytes, well within uint32
 	got := argon2.IDKey([]byte(secret), salt, timeCost, memory, threads, uint32(len(want)))
-
-	<-argon2Limiter
 
 	if subtle.ConstantTimeCompare(got, want) != 1 {
 		return errSecretMismatch
@@ -250,6 +264,10 @@ func (hsdb *HSDatabase) AuthenticateOAuthClient(secretStr string) (*types.OAuthC
 
 	client, err := getOAuthClient(hsdb, clientID)
 	if err != nil {
+		// Hash against a dummy so an unknown client id costs the same as a
+		// known one; otherwise the response time enumerates client ids.
+		_ = verifySecret(dummySecretHash(), secret)
+
 		return nil, ErrOAuthClientNotFound
 	}
 
@@ -322,6 +340,48 @@ func (hsdb *HSDatabase) RevokeOAuthClient(clientID string) error {
 
 		return nil
 	})
+}
+
+// DestroyUserOAuthClients deletes the OAuth clients a user created and every
+// access token those clients issued. A client is its creator's authority in
+// credential form, so it must not outlive the account; the caller runs this
+// in the same transaction that deletes the user.
+func DestroyUserOAuthClients(q Querier, uid types.UserID) error {
+	var records []oauthClientRecord
+
+	err := q.executor().query(
+		jet.SELECT(table.OAuthClients.ClientID).FROM(table.OAuthClients).
+			WHERE(table.OAuthClients.UserID.EQ(jet.Uint64(uint64(uid)))),
+		&records,
+	)
+	if err != nil {
+		return fmt.Errorf("listing the user's oauth clients: %w", err)
+	}
+
+	if len(records) == 0 {
+		return nil
+	}
+
+	ids := make([]jet.Expression, 0, len(records))
+	for i := range records {
+		ids = append(ids, jet.String(records[i].Client.ClientID))
+	}
+
+	_, err = q.executor().exec(
+		table.OAuthAccessTokens.DELETE().WHERE(table.OAuthAccessTokens.ClientID.IN(ids...)),
+	)
+	if err != nil {
+		return fmt.Errorf("deleting the user's oauth access tokens: %w", err)
+	}
+
+	_, err = q.executor().exec(
+		table.OAuthClients.DELETE().WHERE(table.OAuthClients.UserID.EQ(jet.Uint64(uint64(uid)))),
+	)
+	if err != nil {
+		return fmt.Errorf("deleting the user's oauth clients: %w", err)
+	}
+
+	return nil
 }
 
 // MintAccessToken stores a new [types.OAuthAccessToken] for clientID with the
@@ -451,6 +511,10 @@ func (hsdb *HSDatabase) AuthenticateAccessToken(tokenStr string) (*types.OAuthAc
 	if client.Revoked != nil {
 		return nil, ErrAccessTokenClientRevoked
 	}
+
+	// The owner travels with the token so the caller can bound it by that
+	// user's current role without loading the client again.
+	token.ClientUserID = client.UserID
 
 	return token, nil
 }

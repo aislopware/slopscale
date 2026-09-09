@@ -242,6 +242,11 @@ func DestroyUser(q Querier, uid types.UserID) error {
 		}
 	}
 
+	err = DestroyUserOAuthClients(q, uid)
+	if err != nil {
+		return err
+	}
+
 	_, err = q.executor().exec(table.Users.DELETE().WHERE(table.Users.ID.EQ(jet.Uint64(uint64(user.ID)))))
 
 	return err

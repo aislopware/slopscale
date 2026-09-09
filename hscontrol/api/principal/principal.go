@@ -4,8 +4,9 @@
 // may do anything; an API key without a user is the historical all-access
 // admin key; an API key owned by a user is bounded by the user's role, and
 // by its own scopes when it was minted with some; an OAuth access token is
-// bounded by its scopes; a console session cookie is bounded by the
-// signed-in user's role.
+// bounded by its scopes and by the current role of the user its client
+// belongs to; a console session cookie is bounded by the signed-in user's
+// role.
 package principal
 
 import (
@@ -89,6 +90,13 @@ func Local() Principal {
 	return Principal{Kind: LocalTrust}
 }
 
+// None is the principal of a request that reached a handler without one. It
+// holds no scope and belongs to nobody, so a missing principal fails closed
+// instead of passing as the socket.
+func None() Principal {
+	return Principal{Bounded: true, Scoped: true}
+}
+
 // HasUser reports whether the credential belongs to a user.
 func (p Principal) HasUser() bool {
 	return p.UserID != 0
@@ -134,14 +142,7 @@ func Authenticate(auth Authenticator, token string) (Principal, error) {
 			return Principal{}, ErrUnauthenticated
 		}
 
-		return Principal{
-			Kind:       AccessToken,
-			Bounded:    true,
-			Scoped:     true,
-			Scopes:     scope.Parse(at.Scopes),
-			Tags:       at.Tags,
-			Credential: at.ClientID,
-		}, nil
+		return accessTokenPrincipal(auth, at), nil
 	}
 
 	key, err := auth.AuthenticateAPIKey(token)
@@ -157,6 +158,37 @@ func Authenticate(auth Authenticator, token string) (Principal, error) {
 	}
 
 	return applyKeyScopes(p, key), nil
+}
+
+// accessTokenPrincipal bounds an OAuth token by its own scopes and, when the
+// issuing client belongs to a user, by that user's current role: without
+// that the client outlives the authority its creator had, and keeps it
+// after a demotion. A client whose owner is gone grants nothing. A client
+// without an owner is the tailnet's own, bounded by its scopes alone.
+func accessTokenPrincipal(auth Authenticator, at *types.OAuthAccessToken) Principal {
+	p := Principal{
+		Kind:       AccessToken,
+		Bounded:    true,
+		Scoped:     true,
+		Scopes:     scope.Parse(at.Scopes),
+		Tags:       at.Tags,
+		Credential: at.ClientID,
+	}
+
+	if at.ClientUserID == nil {
+		return p
+	}
+
+	role, ok := userRole(auth, types.UserID(*at.ClientUserID))
+	if !ok {
+		p.Scopes = nil
+
+		return p
+	}
+
+	p.Scopes = scope.Narrow(scope.ForRole(role), p.Scopes)
+
+	return p
 }
 
 // applyKeyScopes narrows p to the scopes minted on the key, within what
@@ -277,6 +309,14 @@ func WithLocalTrust(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		next.ServeHTTP(w, req.WithContext(With(req.Context(), Local())))
 	})
+}
+
+// LocalTrustMiddleware marks every request through a huma API as locally
+// trusted. [WithLocalTrust] does the same one layer down, at the http
+// handler, which is what the unix socket mounts; this one is for a huma API
+// driven in process, with no server under it.
+func LocalTrustMiddleware(ctx huma.Context, next func(huma.Context)) {
+	next(huma.WithValue(ctx, contextKey{}, Local()))
 }
 
 // scopeMetaKey keys the per-operation required scope in huma.Operation.Metadata.

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	apiv2 "github.com/juanfont/headscale/hscontrol/api/v2"
+	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -210,7 +211,7 @@ func TestAPIv2OAuth_TokenEndpoint(t *testing.T) {
 	assert.NotEmpty(t, mBasic["access_token"])
 
 	// Bad credentials → RFC 6749 invalid_client.
-	statusBad, mBad := mintToken(t, baseURL, clientID, "hskey-client-deadbeefdead-"+stringOf("0", 64), "", false)
+	statusBad, mBad := mintToken(t, baseURL, clientID, "hskey-client-deadbeefdead-"+wrongSecret, "", false)
 	assert.Equal(t, http.StatusUnauthorized, statusBad)
 	assert.Equal(t, "invalid_client", mBad["error"])
 
@@ -225,6 +226,40 @@ func TestAPIv2OAuth_TokenEndpoint(t *testing.T) {
 	require.NoError(t, err)
 	resp.Body.Close()
 	assert.Equal(t, "no-store", resp.Header.Get("Cache-Control"))
+}
+
+// TestAPIv2OAuth_TokenEndpointIsAudited pins that the token endpoint, which
+// is mounted outside the huma middleware that audits every other writing
+// operation, records both outcomes itself: credentials are handed out here.
+func TestAPIv2OAuth_TokenEndpointIsAudited(t *testing.T) {
+	t.Parallel()
+
+	app, baseURL, admin := newOAuthTestServer(t)
+
+	clientID, secret := createClient(t, baseURL, admin, []string{"auth_keys"}, []string{"tag:ci"})
+
+	status, m := mintToken(t, baseURL, clientID, secret, "", false)
+	require.Equalf(t, http.StatusOK, status, "%v", m)
+
+	status, _ = mintToken(t, baseURL, clientID, "hskey-client-deadbeefdead-"+wrongSecret, "", false)
+	require.Equal(t, http.StatusUnauthorized, status)
+
+	events, err := app.state.ListAuditEvents(types.AuditQuery{Action: "oauth.token."})
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+
+	failed, issued := events[0], events[1]
+
+	assert.Equal(t, "oauth.token.create", issued.Action)
+	assert.Equal(t, clientID, issued.TargetID)
+	assert.True(t, issued.Succeeded())
+	assert.Equal(t, []any{"auth_keys"}, issued.Detail["scopes"])
+	assert.Equal(t, []any{"tag:ci"}, issued.Detail["tags"])
+
+	assert.Equal(t, "deadbeefdead", failed.TargetID, "the client the attempt named")
+	assert.Equal(t, http.StatusUnauthorized, failed.Outcome)
+	assert.Equal(t, "invalid_client", failed.Detail["error"])
+	assert.NotEmpty(t, failed.RemoteAddr)
 }
 
 func TestAPIv2OAuth_ScopeEnforcement(t *testing.T) {
@@ -417,7 +452,7 @@ func TestAPIv2OAuth_UndefinedTagRejected(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, st, "token may not create a client with an undefined tag")
 
 	// An admin key keeps the historical behaviour: a syntactically valid but
-	// undefined tag is accepted (consistent with the v1/CLI pre-auth-key path).
+	// undefined tag is accepted.
 	assert.Equal(t, http.StatusOK, createTaggedKey(t, baseURL, admin, []string{"tag:adminhistorical"}),
 		"admin retains syntax-only tag validation")
 }
@@ -467,9 +502,9 @@ func TestAPIv2OAuth_DenialBranches(t *testing.T) {
 
 	// Bearer dispatch: every malformed/unknown bearer is unauthorized.
 	for _, bearer := range []string{
-		"hskey-oauthtok-deadbeefdead-" + stringOf("0", 64), // well-formed prefix, unknown token
-		"hskey-oauthtok-garbage",                           // malformed OAuth token
-		"hskey-client-deadbeefdead-" + stringOf("0", 64),   // client secret presented as API bearer
+		"hskey-oauthtok-deadbeefdead-" + wrongSecret, // well-formed prefix, unknown token
+		"hskey-oauthtok-garbage",                     // malformed OAuth token
+		"hskey-client-deadbeefdead-" + wrongSecret,   // client secret presented as API bearer
 		"totally-bogus",
 	} {
 		assert.Equalf(t, http.StatusUnauthorized, apiGet(t, keysURL, bearer),
@@ -533,6 +568,6 @@ func TestAPIv2OAuth_KeysMultiplexIsolation(t *testing.T) {
 	assert.Equalf(t, http.StatusOK, stDel2, "oauth_keys deletes the client: %s", body2)
 }
 
-func stringOf(s string, n int) string {
-	return strings.Repeat(s, n)
-}
+// wrongSecret is the 64-character body of a well-formed credential whose
+// secret is not any client's.
+var wrongSecret = strings.Repeat("0", 64)

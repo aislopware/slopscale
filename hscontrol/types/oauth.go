@@ -60,6 +60,11 @@ type OAuthAccessToken struct {
 
 	// ClientID links back to the issuing [OAuthClient].
 	ClientID string
+	// ClientUserID is the user the issuing client belongs to, filled at
+	// authentication from that client and never stored on the token: the
+	// token is bounded by its owner's current role, not the role held when
+	// the client was made.
+	ClientUserID *uint
 
 	Scopes []string
 	Tags   []string

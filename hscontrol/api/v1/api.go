@@ -158,12 +158,14 @@ func authMiddleware(api huma.API, b Backend) func(huma.Context, func(huma.Contex
 	return principal.Middleware(api, b.State)
 }
 
-// caller returns the request's principal; a locally trusted request carries
-// [principal.Local].
+// caller returns the request's principal. The middleware attaches one to
+// every authenticated request, and [WithLocalTrust] to a request over the
+// socket; a request that carries none reaches here only through a coding
+// mistake and gets [principal.None], which may do nothing.
 func caller(ctx context.Context) principal.Principal {
 	p, ok := principal.From(ctx)
 	if !ok {
-		return principal.Local()
+		return principal.None()
 	}
 
 	return p
