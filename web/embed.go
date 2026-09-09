@@ -131,25 +131,11 @@ func serveIndex(w http.ResponseWriter, r *http.Request, sub fs.FS) {
 	http.ServeContent(w, r, indexFile, time.Time{}, strings.NewReader(string(index)))
 }
 
-const unbuiltPage = `<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>headscale admin console</title>
-<style>
-body{font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1.5rem;line-height:1.5;color:#1f2430}
-code{background:#eef0f4;padding:.1rem .35rem;border-radius:.25rem}
-</style>
-</head>
-<body>
-<h1>Admin console not built</h1>
-<p>This headscale binary was compiled without the web console. Build it with
-<code>make web</code> before <code>make build</code>, or use a release binary, and it will be served here.</p>
-<p>The API is still available under <code>/api/v1</code>.</p>
-</body>
-</html>
-`
+// The page served in place of the console when the binary was built without it. It is its own
+// file so the HTML stays readable and out of Go's line length.
+//
+//go:embed unbuilt.html
+var unbuiltPage string
 
 func serveUnbuilt(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-cache")

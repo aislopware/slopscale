@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>headscale admin console</title>
+<style>
+:root{color-scheme:light dark;--bg:#fafafa;--card:#fff;--line:rgba(0,0,0,.1);--text:#1f2430;--muted:#5b6370;--tint:#f2f3f5;--mark:#c2410c;--mark-bg:rgba(194,65,12,.1)}
+@media(prefers-color-scheme:dark){:root{--bg:#0b0c0e;--card:#16181c;--line:rgba(255,255,255,.12);--text:#e7e9ee;--muted:#9aa2ae;--tint:#22252b;--mark:#fb923c;--mark-bg:rgba(251,146,60,.14)}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:1.5rem;font:14px/1.5 system-ui,sans-serif;color:var(--text);background:var(--bg)}
+main{width:100%;max-width:28rem;padding:1.5rem;border-radius:.75rem;background:var(--card);box-shadow:0 0 0 1px var(--line),0 12px 32px rgba(0,0,0,.08)}
+.mark{display:flex;width:2.5rem;height:2.5rem;align-items:center;justify-content:center;border-radius:.5rem;background:var(--mark-bg);color:var(--mark);margin-bottom:1rem}
+.eyebrow{margin:0 0 .25rem;font-family:ui-monospace,monospace;font-size:12px;color:var(--muted)}
+h1{margin:0 0 .25rem;font-size:20px;font-weight:600}
+p{margin:0 0 1rem;color:var(--muted)}
+p:last-child{margin-bottom:0}
+code{font-family:ui-monospace,monospace;font-size:.9em;padding:.1rem .35rem;border-radius:.25rem;background:var(--tint);color:var(--text)}
+</style>
+</head>
+<body>
+<main>
+<span class="mark" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 256 256" fill="currentColor"><path d="M240,128a15.79,15.79,0,0,1-10.5,15l-63.44,23.07L143,229.5a16,16,0,0,1-30,0L89.94,166.06,26.5,143a16,16,0,0,1,0-30l63.44-23.07L113,26.5a16,16,0,0,1,30,0l23.07,63.44L229.5,113A15.79,15.79,0,0,1,240,128Z" opacity=".2"/><path d="M235.5,105.5,172,82.42,148.94,19A24,24,0,0,0,107.06,19L84,82.42,20.5,105.5a24,24,0,0,0,0,45L84,173.58,107.06,237a24,24,0,0,0,41.88,0L172,173.58l63.47-23.08a24,24,0,0,0,0-45Zm-5.47,30L164,159.06a8,8,0,0,0-4.93,4.93L136.5,227.5a8,8,0,0,1-17,0L96.93,164a8,8,0,0,0-4.93-4.93L28.5,136.5a8,8,0,0,1,0-17L92,96.93A8,8,0,0,0,96.93,92L119.5,28.5a8,8,0,0,1,17,0L159.06,92A8,8,0,0,0,164,96.93l63.47,22.57a8,8,0,0,1,0,17Z"/></svg></span>
+<p class="eyebrow">HTTP 503</p>
+<h1>Admin console not built</h1>
+<p>This headscale binary was compiled without the web console. Build it with
+<code>make web</code> before <code>make build</code>, or use a release binary, and it will be served here.</p>
+<p>The API is still available under <code>/api/v1</code>.</p>
+</main>
+</body>
+</html>

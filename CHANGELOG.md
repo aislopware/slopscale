@@ -355,6 +355,18 @@ Long tables page at fifty rows, with the page size and the page controls
 on the band under the rows, scroll sideways on a phone with the row menu
 kept in reach, and figures line up on the right; the page is the only thing
 that scrolls.
+When something goes wrong, one page says what it means and what to do,
+whether the server did not answer, the session ended, the account lacks
+access or the address names nothing, with the server's own words folded
+under it and a copy of them for a bug report; inside the console it keeps
+the sidebar. A binary built without the console answers with a page in the
+same style.
+When something goes wrong, one page says what it means and what to do,
+whether the server did not answer, the session ended, the account lacks
+access or the address names nothing, with the server's own words folded
+under it and a copy of them for a bug report; inside the console it keeps
+the sidebar. A binary built without the console answers with a page in the
+same style.
 _Machines_ keeps its filters in the URL, so a filtered list can be shared,
 selects rows for approving, expiring or deleting in one go, and refreshes
 on its own every fifteen seconds while the tab is open. A disabled control
