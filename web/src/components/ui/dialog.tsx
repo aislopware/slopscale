@@ -3,7 +3,7 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { Dialog } from "@cloudflare/kumo/components/dialog";
 import { cn } from "@cloudflare/kumo/utils";
 import { XIcon } from "@phosphor-icons/react";
-import { createContext, use, useEffect, useState } from "react";
+import { createContext, use, useEffect, useId, useMemo, useState } from "react";
 import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { createPortal } from "react-dom";
 
@@ -57,7 +57,15 @@ export function DialogContent({
   className,
   children,
 }: DialogContentProps): ReactElement {
-  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+  // The slot exists before the first render, so the footer is in the first committed tree rather
+  // than one render later; the band adopts it on mount.
+  const slot = useMemo(() => {
+    const node = document.createElement("div");
+
+    node.className = "empty:hidden";
+
+    return node;
+  }, []);
 
   return (
     <Dialog size={size} className={cn(dialogFrameClass, className)}>
@@ -82,7 +90,11 @@ export function DialogContent({
         </DialogBody>
       </div>
       {/* The footer is written inside the body and lands here through a portal. */}
-      <div ref={setSlot} className="empty:hidden" />
+      <div
+        ref={(band) => {
+          band?.append(slot);
+        }}
+      />
     </Dialog>
   );
 }
@@ -177,30 +189,52 @@ function useScrollEdges(): ScrollEdges {
 }
 
 /**
- * Submits the form the anchor belongs to when a submit button on the band is clicked. The button
- * left its form when it moved to the band, so the browser would not submit for it.
+ * Gives every submit button on the band the form the anchor belongs to. A button that left its form
+ * when it moved to the band has no form owner, so the browser would not submit for it; with the
+ * `form` attribute it is the form's own button again, submitter, validation and all. The click
+ * listener catches a button that appeared after the effect ran, before its activation.
  */
-function useSubmitFromBand(actions: HTMLDivElement | null, anchor: HTMLButtonElement | null): void {
+function useFormOwner(
+  actions: HTMLDivElement | null,
+  anchor: HTMLButtonElement | null,
+  fallbackId: string,
+): void {
   useEffect((): (() => void) | undefined => {
-    if (actions === null) {
+    const form = anchor?.form ?? null;
+
+    if (actions === null || form === null) {
       return undefined;
+    }
+
+    if (form.id === "") {
+      form.setAttribute("id", fallbackId);
+    }
+
+    const adopt = (button: Element): void => {
+      if (!button.hasAttribute("form")) {
+        button.setAttribute("form", form.id);
+      }
+    };
+
+    for (const button of actions.querySelectorAll("button[type=submit]")) {
+      adopt(button);
     }
 
     const onClick = (event: MouseEvent): void => {
       const button =
         event.target instanceof Element ? event.target.closest("button[type=submit]") : null;
 
-      if (button !== null && anchor?.form) {
-        anchor.form.requestSubmit();
+      if (button !== null) {
+        adopt(button);
       }
     };
 
-    actions.addEventListener("click", onClick);
+    actions.addEventListener("click", onClick, { capture: true });
 
     return () => {
-      actions.removeEventListener("click", onClick);
+      actions.removeEventListener("click", onClick, { capture: true });
     };
-  }, [actions, anchor]);
+  }, [actions, anchor, fallbackId]);
 }
 
 /**
@@ -217,8 +251,9 @@ export function DialogFooter({
   const slot = use(FooterSlotContext);
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null);
   const [actions, setActions] = useState<HTMLDivElement | null>(null);
+  const formId = useId();
 
-  useSubmitFromBand(actions, anchor);
+  useFormOwner(actions, anchor, formId);
 
   return (
     <>

@@ -26,14 +26,19 @@ function TallDialog(): React.ReactElement {
   );
 }
 
-function FormDialog({ onSubmit }: { readonly onSubmit: () => void }): React.ReactElement {
+function FormDialog({
+  onSubmit,
+}: {
+  /** Called with the text of the button that submitted, or "" for an implicit submission. */
+  readonly onSubmit: (submitter: string) => void;
+}): React.ReactElement {
   return (
     <DialogRoot open onOpenChange={vi.fn<(open: boolean) => void>()}>
       <DialogContent title="Rename">
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            onSubmit();
+            onSubmit(event.nativeEvent.submitter?.textContent ?? "");
           }}
         >
           <Input label="Name" defaultValue="laptop" />
@@ -69,11 +74,12 @@ describe(DialogContent, () => {
   });
 
   it("submits the form from the band, by button and by Enter", async () => {
-    const onSubmit = vi.fn<() => void>();
+    const onSubmit = vi.fn<(submitter: string) => void>();
     const screen = await render(<FormDialog onSubmit={onSubmit} />);
 
+    // The band button is the form's own submitter, so a handler can tell which button it was.
     await screen.getByRole("button", { name: "Save" }).click();
-    expect(onSubmit).toHaveBeenCalledOnce();
+    expect(onSubmit).toHaveBeenCalledExactlyOnceWith("Save");
 
     await screen.getByRole("button", { name: "Cancel" }).click();
     expect(onSubmit).toHaveBeenCalledOnce();
