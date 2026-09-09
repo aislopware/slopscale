@@ -24,29 +24,49 @@ func TestCreateUserInviteRules(t *testing.T) {
 	t.Run("an invitation cannot hand out ownership", func(t *testing.T) {
 		t.Parallel()
 
-		_, _, err := s.CreateUserInvite(InviteSpec{Email: "owner@example.com", Role: types.RoleOwner})
+		_, _, err := s.CreateUserInvite(nil, InviteSpec{Email: "owner@example.com", Role: types.RoleOwner})
 		require.ErrorIs(t, err, types.ErrInviteOwnerRole)
 	})
 
 	t.Run("the role must exist", func(t *testing.T) {
 		t.Parallel()
 
-		_, _, err := s.CreateUserInvite(InviteSpec{Email: "root@example.com", Role: types.Role("root")})
+		_, _, err := s.CreateUserInvite(nil, InviteSpec{Email: "root@example.com", Role: types.Role("root")})
 		require.ErrorIs(t, err, types.ErrInvalidRole)
 	})
 
 	t.Run("an address is needed", func(t *testing.T) {
 		t.Parallel()
 
-		_, _, err := s.CreateUserInvite(InviteSpec{Email: "   ", Role: types.RoleMember})
+		_, _, err := s.CreateUserInvite(nil, InviteSpec{Email: "   ", Role: types.RoleMember})
 		require.ErrorIs(t, err, types.ErrInviteEmailEmpty)
+	})
+
+	t.Run("the address must be a plain mailbox", func(t *testing.T) {
+		t.Parallel()
+
+		// The address is mailed a link and becomes the user's login, so a
+		// display name, a list or a header is not an address here.
+		for _, email := range []string{
+			"not-an-address",
+			"ops <ops@example.com>",
+			"a@example.com, b@example.com",
+			"a@@example.com",
+			"ops@example.com\nbcc: attacker@example.com",
+		} {
+			_, _, err := s.CreateUserInvite(nil, InviteSpec{Email: email, Role: types.RoleMember})
+			require.ErrorIs(t, err, types.ErrInviteEmailInvalid, "email %q", email)
+		}
+
+		_, _, err := s.CreateUserInvite(nil, InviteSpec{Email: "plain@example.com", Role: types.RoleMember})
+		require.NoError(t, err)
 	})
 
 	t.Run("the lifetime is bounded", func(t *testing.T) {
 		t.Parallel()
 
 		for _, expiry := range []time.Duration{-time.Hour, types.InviteMaxExpiry + time.Hour} {
-			_, _, err := s.CreateUserInvite(InviteSpec{
+			_, _, err := s.CreateUserInvite(nil, InviteSpec{
 				Email: "long@example.com", Role: types.RoleMember, Expiry: expiry,
 			})
 			require.ErrorIs(t, err, types.ErrInviteExpiryRange, "expiry %s", expiry)
@@ -56,7 +76,7 @@ func TestCreateUserInviteRules(t *testing.T) {
 	t.Run("the groups must exist", func(t *testing.T) {
 		t.Parallel()
 
-		_, _, err := s.CreateUserInvite(InviteSpec{
+		_, _, err := s.CreateUserInvite(nil, InviteSpec{
 			Email: "ghost@example.com", Role: types.RoleMember, GroupIDs: []types.GroupID{999_999},
 		})
 		require.ErrorIs(t, err, types.ErrGroupNotFound)
@@ -65,7 +85,7 @@ func TestCreateUserInviteRules(t *testing.T) {
 	t.Run("the default lifetime is a week", func(t *testing.T) {
 		t.Parallel()
 
-		invite, token, err := s.CreateUserInvite(InviteSpec{
+		invite, token, err := s.CreateUserInvite(nil, InviteSpec{
 			Email: "ada@example.com", Role: types.RoleAdmin, GroupIDs: []types.GroupID{group.ID},
 		})
 		require.NoError(t, err)
@@ -74,7 +94,7 @@ func TestCreateUserInviteRules(t *testing.T) {
 		assert.WithinDuration(t, time.Now().Add(types.InviteDefaultExpiry), invite.ExpiresAt, time.Minute)
 		assert.Equal(t, []types.GroupID{group.ID}, invite.GroupIDs)
 
-		_, _, err = s.CreateUserInvite(InviteSpec{Email: "Ada@Example.com", Role: types.RoleMember})
+		_, _, err = s.CreateUserInvite(nil, InviteSpec{Email: "Ada@Example.com", Role: types.RoleMember})
 		require.ErrorIs(t, err, types.ErrInviteEmailTaken, "a pending invitation holds the address")
 
 		resolved, err := s.PendingUserInviteByToken(token)
@@ -88,8 +108,60 @@ func TestCreateUserInviteRules(t *testing.T) {
 		_, _, err := s.CreateUser(types.User{Name: "bea", Email: "Bea@Example.com"})
 		require.NoError(t, err)
 
-		_, _, err = s.CreateUserInvite(InviteSpec{Email: "bea@example.com", Role: types.RoleMember})
+		_, _, err = s.CreateUserInvite(nil, InviteSpec{Email: "bea@example.com", Role: types.RoleMember})
 		require.ErrorIs(t, err, types.ErrInviteEmailTaken)
+	})
+}
+
+// TestCreateUserInviteRoleActor pins that an invitation cannot hand out a
+// role its sender could not assign directly: an it-admin holds the users
+// scope, so without the check it could invite an admin and accept the
+// invitation with a second identity of its own.
+func TestCreateUserInviteRoleActor(t *testing.T) {
+	t.Parallel()
+
+	s := newRoleTestState(t)
+
+	// The first user of an empty tailnet becomes its owner, so make one
+	// before the actors under test.
+	createUserWithRole(t, s, "owner", types.RoleOwner)
+	itAdmin := createUserWithRole(t, s, "it", types.RoleITAdmin)
+	admin := createUserWithRole(t, s, "boss", types.RoleAdmin)
+
+	t.Run("an it-admin cannot invite an admin", func(t *testing.T) {
+		t.Parallel()
+
+		_, _, err := s.CreateUserInvite(actor(itAdmin), InviteSpec{
+			Email: "climb@example.com", Role: types.RoleAdmin,
+		})
+		require.ErrorIs(t, err, ErrRoleChangeForbidden)
+	})
+
+	t.Run("an it-admin may still invite a member", func(t *testing.T) {
+		t.Parallel()
+
+		_, _, err := s.CreateUserInvite(actor(itAdmin), InviteSpec{
+			Email: "member@example.com", Role: types.RoleMember,
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("an admin may invite an admin", func(t *testing.T) {
+		t.Parallel()
+
+		_, _, err := s.CreateUserInvite(actor(admin), InviteSpec{
+			Email: "peer@example.com", Role: types.RoleAdmin,
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("the socket may invite an admin", func(t *testing.T) {
+		t.Parallel()
+
+		_, _, err := s.CreateUserInvite(nil, InviteSpec{
+			Email: "cli@example.com", Role: types.RoleAdmin,
+		})
+		require.NoError(t, err)
 	})
 }
 
@@ -112,7 +184,7 @@ func TestAcceptUserInvite(t *testing.T) {
 	group, _, err := s.CreateGroup("engineering", "", false)
 	require.NoError(t, err)
 
-	invite, _, err := s.CreateUserInvite(InviteSpec{
+	invite, _, err := s.CreateUserInvite(nil, InviteSpec{
 		Email:    "cleo@example.com",
 		Role:     types.RoleITAdmin,
 		GroupIDs: []types.GroupID{group.ID},
@@ -146,7 +218,7 @@ func TestResendUserInvite(t *testing.T) {
 
 	s := newRoleTestState(t)
 
-	invite, first, err := s.CreateUserInvite(InviteSpec{Email: "dora@example.com", Role: types.RoleMember})
+	invite, first, err := s.CreateUserInvite(nil, InviteSpec{Email: "dora@example.com", Role: types.RoleMember})
 	require.NoError(t, err)
 
 	rotated, second, err := s.ResendUserInvite(invite.ID, time.Hour)

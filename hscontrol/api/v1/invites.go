@@ -113,7 +113,9 @@ func registerInvites(api huma.API, b Backend) {
 			return nil, err
 		}
 
-		invite, token, err := b.State.CreateUserInvite(spec)
+		// The invited role is a role grant, so the caller is held to the
+		// same matrix as a direct role change.
+		invite, token, err := b.State.CreateUserInvite(roleActor(ctx), spec)
 		if err != nil {
 			return nil, mapInviteError("creating invite", err)
 		}
@@ -308,6 +310,7 @@ func mapInviteError(msg string, err error) error {
 	case errors.Is(err, types.ErrInviteAccepted):
 		return huma.Error409Conflict(msg, err)
 	case errors.Is(err, types.ErrInviteEmailEmpty),
+		errors.Is(err, types.ErrInviteEmailInvalid),
 		errors.Is(err, types.ErrInviteOwnerRole),
 		errors.Is(err, types.ErrInviteExpiryRange),
 		errors.Is(err, types.ErrInviteExpired):

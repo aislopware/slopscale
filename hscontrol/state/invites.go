@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/mail"
 	"strings"
 	"time"
 
@@ -39,11 +40,12 @@ func (s *State) GetUserInvite(id types.UserInviteID) (types.UserInvite, error) {
 }
 
 // CreateUserInvite stores an invitation and returns it with the token its
-// link carries. The token is returned once; only its hash is stored.
-func (s *State) CreateUserInvite(spec InviteSpec) (types.UserInvite, string, error) {
+// link carries. The token is returned once; only its hash is stored. actor
+// is the administrator asking for it, nil for the local trust boundary.
+func (s *State) CreateUserInvite(actor *RoleActor, spec InviteSpec) (types.UserInvite, string, error) {
 	email := hsdb.NormaliseInviteEmail(spec.Email)
 
-	expiry, err := s.validateInvite(email, spec)
+	expiry, err := s.validateInvite(actor, email, spec)
 	if err != nil {
 		return types.UserInvite{}, "", err
 	}
@@ -70,11 +72,19 @@ func (s *State) CreateUserInvite(spec InviteSpec) (types.UserInvite, string, err
 }
 
 // validateInvite checks the request and settles the expiry: the role must
-// exist and must not be owner, the groups must exist, and the address must
-// be free of both a user and a pending invite.
-func (s *State) validateInvite(email string, spec InviteSpec) (time.Duration, error) {
+// exist, must not be owner and must be one the sender could assign, the
+// groups must exist, and the address must be free of both a user and a
+// pending invite.
+func (s *State) validateInvite(actor *RoleActor, email string, spec InviteSpec) (time.Duration, error) {
 	if email == "" {
 		return 0, types.ErrInviteEmailEmpty
+	}
+
+	// The address is mailed a link and becomes the invited user's login, so
+	// it must be one bare mailbox: no display name, no list, no header.
+	addr, err := mail.ParseAddress(email)
+	if err != nil || addr.Name != "" || addr.Address != email {
+		return 0, fmt.Errorf("%w: %q", types.ErrInviteEmailInvalid, email)
 	}
 
 	if !spec.Role.Valid() {
@@ -83,6 +93,11 @@ func (s *State) validateInvite(email string, spec InviteSpec) (time.Duration, er
 
 	if spec.Role == types.RoleOwner {
 		return 0, types.ErrInviteOwnerRole
+	}
+
+	err = authorizeInviteRole(actor, spec.Role)
+	if err != nil {
+		return 0, err
 	}
 
 	expiry := spec.Expiry
@@ -95,18 +110,31 @@ func (s *State) validateInvite(email string, spec InviteSpec) (time.Duration, er
 	}
 
 	for _, gid := range spec.GroupIDs {
-		_, err := s.GetGroup(gid)
+		_, err = s.GetGroup(gid)
 		if err != nil {
 			return 0, err
 		}
 	}
 
-	err := s.requireInviteEmailFree(email)
+	err = s.requireInviteEmailFree(email)
 	if err != nil {
 		return 0, err
 	}
 
 	return expiry, nil
+}
+
+// authorizeInviteRole holds an invitation to a role its sender could assign
+// directly: an invite is a role grant that arrives later, and the invited
+// person may sign in with an identity of their own choosing, so a caller who
+// cannot promote anybody must not be able to invite an admin. A nil actor is
+// the local trust boundary.
+func authorizeInviteRole(actor *RoleActor, role types.Role) error {
+	if actor == nil || role == "" || role == types.RoleMember || actor.Role.IsAdmin() {
+		return nil
+	}
+
+	return ErrRoleChangeForbidden
 }
 
 // requireInviteEmailFree refuses an address that already belongs to a user

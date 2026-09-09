@@ -25,6 +25,10 @@ var (
 	ErrInviteEmailTaken = errors.New("the email already belongs to a user or a pending invite")
 	// ErrInviteEmailEmpty is returned for an invite without an address.
 	ErrInviteEmailEmpty = errors.New("an invite needs an email address")
+	// ErrInviteEmailInvalid is returned for an address that is not a bare
+	// mailbox: the invite link is mailed to it and the address becomes the
+	// user's login, so a display name or a list is not an address here.
+	ErrInviteEmailInvalid = errors.New("an invite needs a plain email address")
 	// ErrInviteOwnerRole is returned when an invite would create an owner:
 	// ownership moves by transfer, never by invitation.
 	ErrInviteOwnerRole = errors.New("an invite cannot create an owner; transfer ownership instead")
