@@ -83,7 +83,7 @@ func registerAuth(api huma.API, b Backend) {
 			return nil, huma.Error400BadRequest("registering node", err)
 		}
 
-		audit.Detail(ctx, "authId", in.Body.AuthID)
+		audit.Detail(ctx, "authId", auditRegistrationID(in.Body.AuthID))
 		audit.Detail(ctx, "user", in.Body.User)
 
 		user, err := b.State.GetUserByName(in.Body.User)
@@ -131,7 +131,7 @@ func registerAuth(api huma.API, b Backend) {
 			return nil, err
 		}
 
-		audit.Detail(ctx, "authId", in.Body.AuthID)
+		audit.Detail(ctx, "authId", auditRegistrationID(in.Body.AuthID))
 
 		authReq.FinishAuth(types.AuthVerdict{})
 
@@ -153,7 +153,7 @@ func registerAuth(api huma.API, b Backend) {
 			return nil, err
 		}
 
-		audit.Detail(ctx, "authId", in.Body.AuthID)
+		audit.Detail(ctx, "authId", auditRegistrationID(in.Body.AuthID))
 
 		authReq.FinishAuth(types.AuthVerdict{
 			Err: errAuthRejected,

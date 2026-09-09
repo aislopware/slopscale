@@ -3,7 +3,9 @@ package hscontrol
 import (
 	"encoding/json"
 	"net/http"
+	"net/netip"
 	"testing"
+	"time"
 
 	"github.com/juanfont/headscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
@@ -68,6 +70,31 @@ func seedNodes(seeds ...nodeSeed) func(t *testing.T, app *Headscale) {
 	}
 }
 
+// registerNodeAdvertising registers a node announcing routes, so the route
+// handlers have something to approve.
+func registerNodeAdvertising(
+	t *testing.T,
+	app *Headscale,
+	user, hostname string,
+	routes []netip.Prefix,
+) {
+	t.Helper()
+
+	u := app.state.CreateUserForTest(user)
+
+	pak, err := app.state.CreatePreAuthKey(u.TypedID(), false, false, nil, nil)
+	require.NoError(t, err)
+
+	nodeKey := key.NewNode()
+
+	_, err = app.handleRegisterWithAuthKey(tailcfg.RegisterRequest{
+		Auth:     &tailcfg.RegisterResponseAuth{AuthKey: pak.Key},
+		NodeKey:  nodeKey.Public(),
+		Hostinfo: &tailcfg.Hostinfo{Hostname: hostname, RoutableIPs: routes},
+	}, key.NewMachine().Public())
+	require.NoError(t, err)
+}
+
 func TestAPIV1NodeGet(t *testing.T) {
 	t.Parallel()
 
@@ -87,6 +114,65 @@ func TestAPIV1NodeGet(t *testing.T) {
 		// pre-auth key path, which forces tags regardless of policy.
 		seedNodes(newNodeSeed("bob", "node-b", "tag:initial"))(t, h.app)
 		h.assertParity(t, http.MethodGet, "/api/v1/node/1", nil)
+	})
+
+	// A pointer to the zero time is not an expiry; the schema says null.
+	t.Run("zero expiry is null", func(t *testing.T) {
+		t.Parallel()
+
+		h := newAPIV1Harness(t)
+		seedNodes(newNodeSeed("alice", "node-a"))(t, h.app)
+
+		node, ok := h.app.state.GetNodeByID(1)
+		require.True(t, ok)
+
+		stored := *node.AsStruct()
+		stored.Expiry = &time.Time{}
+		h.app.state.PutNodeInStoreForTest(stored)
+
+		res := h.callHuma(http.MethodGet, "/api/v1/node/1", nil)
+		require.Equal(t, http.StatusOK, res.status)
+
+		var got struct {
+			Node map[string]any `json:"node"`
+		}
+		require.NoError(t, json.Unmarshal(res.body, &got))
+		assert.Nil(t, got.Node["expiry"])
+	})
+
+	// The single GET reports what the list does: primary plus exit routes.
+	t.Run("subnet routes include exit routes", func(t *testing.T) {
+		t.Parallel()
+
+		h := newAPIV1Harness(t)
+		registerNodeAdvertising(t, h.app, "alice", "node-a", []netip.Prefix{
+			netip.MustParsePrefix("10.0.0.0/24"),
+			netip.MustParsePrefix("0.0.0.0/0"),
+			netip.MustParsePrefix("::/0"),
+		})
+
+		approve := h.callHuma(http.MethodPost, "/api/v1/node/1/approve_routes",
+			[]byte(`{"routes":["10.0.0.0/24","0.0.0.0/0","::/0"]}`))
+		require.Equal(t, http.StatusOK, approve.status)
+
+		var approved struct {
+			Node map[string]any `json:"node"`
+		}
+		require.NoError(t, json.Unmarshal(approve.body, &approved))
+
+		// The primary-route ledger only names an online node, so an offline
+		// one serves its approved exit routes and nothing else.
+		want := []any{"0.0.0.0/0", "::/0"}
+		assert.ElementsMatch(t, want, approved.Node["subnetRoutes"])
+
+		res := h.callHuma(http.MethodGet, "/api/v1/node/1", nil)
+		require.Equal(t, http.StatusOK, res.status)
+
+		var got struct {
+			Node map[string]any `json:"node"`
+		}
+		require.NoError(t, json.Unmarshal(res.body, &got))
+		assert.ElementsMatch(t, want, got.Node["subnetRoutes"])
 	})
 
 	t.Run("not found parity", func(t *testing.T) {
@@ -499,8 +585,8 @@ func TestAPIV1NodeDebugCreate(t *testing.T) {
 		assert.Equal(t, []any{"10.0.0.0/24"}, got.Node["availableRoutes"])
 		// The synthetic echo node has no pre-auth key: emitted as null.
 		assert.Nil(t, got.Node["preAuthKey"])
-		// Zero-time expiry/lastSeen are emitted as the zero instant, not null.
-		assert.Equal(t, "0001-01-01T00:00:00Z", got.Node["expiry"])
-		assert.Equal(t, "0001-01-01T00:00:00Z", got.Node["lastSeen"])
+		// A pointer to the zero time is not a timestamp: both are null.
+		assert.Nil(t, got.Node["expiry"])
+		assert.Nil(t, got.Node["lastSeen"])
 	})
 }

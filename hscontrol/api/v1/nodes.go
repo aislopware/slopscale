@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/juanfont/headscale/hscontrol/api/tagguard"
 	"github.com/juanfont/headscale/hscontrol/audit"
 	"github.com/juanfont/headscale/hscontrol/scope"
 	"github.com/juanfont/headscale/hscontrol/types"
@@ -217,6 +218,7 @@ func registerNodeReadOps(api huma.API, b Backend) {
 
 		out := &nodeOutput{}
 		out.Body.Node = nodeFromView(node)
+		out.Body.Node.SubnetRoutes = servedRoutes(b, node)
 
 		return out, nil
 	})
@@ -252,10 +254,7 @@ func registerNodeReadOps(api huma.API, b Backend) {
 				n.User = &user
 			}
 
-			// SubnetRoutes is the routes actively served, exit routes included.
-			n.SubnetRoutes = util.PrefixesToString(
-				append(b.State.GetNodePrimaryRoutes(node.ID()), node.ExitRoutes()...),
-			)
+			n.SubnetRoutes = servedRoutes(b, node)
 
 			out.Body.Nodes[i] = n
 		}
@@ -450,6 +449,14 @@ func handleSetTags(ctx context.Context, b Backend, in *setTagsInput) (*nodeOutpu
 		return nil, huma.Error404NotFound("node not found")
 	}
 
+	// An OAuth token may only assign tags its own tags own; SetNodeTags still
+	// enforces that each tag exists in the policy. v2 gates the same way
+	// (handleSetDeviceTags).
+	err = tagguard.AssignOwned(ctx, b.State, in.Body.Tags)
+	if err != nil {
+		return nil, err
+	}
+
 	audit.Detail(ctx, "tags", in.Body.Tags)
 
 	node, nodeChange, err := b.State.SetNodeTags(nodeID, in.Body.Tags)
@@ -491,12 +498,20 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 	}, scope.DevicesCore), "node.register", "", ""), func(
 		ctx context.Context, in *registerNodeInput,
 	) (*nodeOutput, error) {
+		// Registering a node into a user's account is acting for that user,
+		// which an OAuth token may not do: its nodes are tagged. Checked
+		// before the input, so a token learns nothing from the answer.
+		err := tagguard.ActForUser(ctx, "register a node")
+		if err != nil {
+			return nil, err
+		}
+
 		registrationID, err := types.AuthIDFromString(in.Key)
 		if err != nil {
 			return nil, huma.Error400BadRequest("registering node", err)
 		}
 
-		audit.Detail(ctx, "key", in.Key)
+		audit.Detail(ctx, "key", auditRegistrationID(in.Key))
 		audit.Detail(ctx, "user", in.User)
 
 		user, err := b.State.GetUserByName(in.User)
@@ -561,6 +576,10 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 		return out, nil
 	})
 
+	if !b.debugNodeAPIEnabled() {
+		return
+	}
+
 	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "debugCreateNode",
 		Method:      http.MethodPost,
@@ -573,6 +592,29 @@ func registerNodeAdminOps(api huma.API, b Backend) {
 	) (*nodeOutput, error) {
 		return handleDebugCreateNode(ctx, b, in)
 	})
+}
+
+// debugNodeAPIEnabled reports whether POST /api/v1/debug/node is served. It
+// mints a node from key material the caller hands it, which is a development
+// tool and not something a production server should offer, so it is
+// registered only when the config asks for it and is absent from the
+// document that server serves otherwise. A backend with no config is the
+// spec generator, which describes every operation.
+func (b Backend) debugNodeAPIEnabled() bool {
+	return b.Cfg == nil || b.Cfg.Debug.NodeAPIEnabled
+}
+
+// auditRegistrationID is what the audit log keeps of a registration id: it
+// is the secret a node registers with, so the log keeps only enough of it to
+// match one entry against another.
+func auditRegistrationID(id string) string {
+	const keep = 8
+
+	if len(id) <= keep {
+		return id
+	}
+
+	return id[:keep]
 }
 
 func handleSetApprovedRoutes(ctx context.Context, b Backend, in *setApprovedRoutesInput) (*nodeOutput, error) {
@@ -614,10 +656,7 @@ func handleSetApprovedRoutes(ctx context.Context, b Backend, in *setApprovedRout
 
 	out := &nodeOutput{}
 	out.Body.Node = nodeFromView(node)
-	// SubnetRoutes here excludes exit routes, unlike the list handler.
-	out.Body.Node.SubnetRoutes = util.PrefixesToString(
-		b.State.GetNodePrimaryRoutes(node.ID()),
-	)
+	out.Body.Node.SubnetRoutes = servedRoutes(b, node)
 
 	return out, nil
 }
@@ -673,6 +712,14 @@ func handleDebugCreateNode(ctx context.Context, b Backend, in *debugCreateNodeIn
 	return out, nil
 }
 
+// servedRoutes is what the node actively serves, exit routes included:
+// the one shape every handler that fills SubnetRoutes reports.
+func servedRoutes(b Backend, node types.NodeView) []string {
+	return util.PrefixesToString(
+		append(b.State.GetNodePrimaryRoutes(node.ID()), node.ExitRoutes()...),
+	)
+}
+
 // nodeFromView builds the Node response from a NodeView, reading through the
 // view accessors. SubnetRoutes is left empty; callers that serve routes set it
 // explicitly.
@@ -720,14 +767,15 @@ func nodeFromView(view types.NodeView) Node {
 		n.PreAuthKey = nodePreAuthKeyFromView(view.AuthKey())
 	}
 
-	if view.LastSeen().Valid() {
-		ls := view.LastSeen().Get()
-		n.LastSeen = &ls
+	// A pointer to the zero time is not a timestamp; the schema says null.
+	if ls := view.LastSeen(); ls.Valid() && !ls.Get().IsZero() {
+		at := ls.Get()
+		n.LastSeen = &at
 	}
 
-	if view.Expiry().Valid() {
-		exp := view.Expiry().Get()
-		n.Expiry = &exp
+	if exp := view.Expiry(); exp.Valid() && !exp.Get().IsZero() {
+		at := exp.Get()
+		n.Expiry = &at
 	}
 
 	return n
