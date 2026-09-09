@@ -362,8 +362,11 @@ func (v NodeView) CapVer() tailcfg.CapabilityVersion { return v.ж.CapVer }
 // ClientWarnings are the warn-* flags the client last sent in
 // [tailcfg.MapRequest.DebugFlags], without the prefix and sorted:
 // "ip-forwarding-off" for a subnet router whose kernel drops
-// forwarded packets, "router-unhealthy" for a broken route setup.
-// Runtime-only, written by [State.UpdateNodeFromMapRequest].
+// forwarded packets, "router-unhealthy" for a broken route setup,
+// "etc-apt-source-disabled" for a commented-out Tailscale apt source,
+// and whatever a newer client adds. Runtime-only, written by
+// [State.UpdateNodeFromMapRequest] and cleared by [State.Disconnect]
+// when the node goes offline.
 func (v NodeView) ClientWarnings() views.Slice[string] { return views.SliceOf(v.ж.ClientWarnings) }
 func (v NodeView) String() string                      { return v.ж.String() }
 
