@@ -30,7 +30,7 @@ const (
 )
 
 // Typography System
-// EXTRACTED FROM: https://aislopware.github.io/slopscale/stable/assets/stylesheets/main.342714a4.min.css
+// EXTRACTED FROM: https://aislopware.github.io/slopscale/assets/stylesheets/main.342714a4.min.css
 // Material for MkDocs typography - exact values from .md-typeset CSS.
 const (
 	// Font sizes - from .md-typeset CSS rules.

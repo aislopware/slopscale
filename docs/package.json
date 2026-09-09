@@ -1,0 +1,14 @@
+{
+  "name": "slopscale-docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "blume dev",
+    "build": "blume build",
+    "preview": "blume preview",
+    "validate": "blume validate"
+  },
+  "dependencies": {
+    "blume": "1.6.3"
+  }
+}

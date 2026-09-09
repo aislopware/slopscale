@@ -27,12 +27,14 @@ go run ./cmd/hi doctor
 go run ./cmd/hi run "TestName" [--postgres]
 ```
 
-Needs go, golangci-lint, mdformat and bun on PATH; `nix develop` pins the
-CI versions but isn't required. Markup and config files outside `docs/`
-are formatted by the console's oxfmt (`make fmt-markup`, root
-`.oxfmtrc.json`); `docs/` stays on mdformat because python-markdown needs
-four-space list indents. `prek install` once; `--no-verify` is for
-WIP commits on feature branches only.
+Needs go, golangci-lint and bun on PATH; `nix develop` pins the CI
+versions but isn't required. Markup and config files outside `docs/` and
+`web/` are formatted by the console's oxfmt (`make fmt-markup`, root
+`.oxfmtrc.json`). The docs are a Blume site in `docs/` (MDX under
+`docs/content/`, sidebar order in `meta.ts` files, `make docs` builds it,
+`make docs-dev` serves it); GitHub Pages deploys `docs/dist` from `main`.
+`prek install` once; `--no-verify` is for WIP commits on feature branches
+only.
 
 ## Orientation
 

@@ -131,7 +131,7 @@ derp:
   #
   # This option is mostly interesting for people hosting their own DERP servers:
   # https://tailscale.com/docs/reference/derp-servers/custom-derp-servers
-  # https://aislopware.github.io/slopscale/stable/ref/derp/
+  # https://aislopware.github.io/slopscale/ref/derp/
   #
   # Relays you run can also be added at runtime from the console, so a
   # file is only needed for what the console cannot express (region
@@ -245,7 +245,7 @@ database:
   #   ssl: false
 
 ### TLS configuration
-# See: https://aislopware.github.io/slopscale/stable/ref/tls/
+# See: https://aislopware.github.io/slopscale/ref/tls/
 
 ## Let's Encrypt / ACME
 # Slopscale supports automatically requesting and setting up
@@ -304,7 +304,7 @@ policy:
 ## Notifications
 #
 # Email webhooks (provider "email", URL "mailto:...") send through this
-# server; see https://aislopware.github.io/slopscale/development/ref/webhooks/#notifications.
+# server; see https://aislopware.github.io/slopscale/ref/webhooks/#notifications.
 # Leave host unset to refuse email endpoints.
 # notifications:
 #   smtp:
@@ -322,7 +322,7 @@ policy:
 # Let machines get Let's Encrypt certificates for their MagicDNS names
 # with `tailscale cert`. The base domain must be a real zone the server
 # can publish TXT records in; see
-# https://aislopware.github.io/slopscale/development/ref/https-certificates/.
+# https://aislopware.github.io/slopscale/ref/https-certificates/.
 # https_certificates:
 #   enabled: false
 #   # cloudflare, rfc2136 or command.
@@ -349,7 +349,7 @@ policy:
 # Run a session recorder inside the server. It joins the tailnet as
 # `slopscale-recorder` (tag:slopscale-recorder) and records every session
 # that Tailscale SSH admits, unless a rule names another recorder; see
-# https://aislopware.github.io/slopscale/development/ref/ssh-recording/.
+# https://aislopware.github.io/slopscale/ref/ssh-recording/.
 # ssh_recording:
 #   enabled: false
 #   # One asciinema file per session.
@@ -466,7 +466,7 @@ dns:
 
   # Extra DNS records
   # so far only A and AAAA records are supported (on the tailscale side)
-  # See: https://aislopware.github.io/slopscale/stable/ref/dns/
+  # See: https://aislopware.github.io/slopscale/ref/dns/
   extra_records: []
   #   - name: "grafana.myvpn.example.com"
   #     type: "A"
@@ -485,7 +485,7 @@ unix_socket: /var/run/slopscale/slopscale.sock
 unix_socket_permission: "0770"
 
 # OpenID Connect
-# https://aislopware.github.io/slopscale/stable/ref/oidc/
+# https://aislopware.github.io/slopscale/ref/oidc/
 # oidc:
 #   # Block startup until the identity provider is available and healthy.
 #   only_start_if_oidc_is_available: true
@@ -578,7 +578,7 @@ unix_socket_permission: "0770"
 #     method: S256
 
 # Audit log
-# https://aislopware.github.io/slopscale/stable/ref/audit/
+# https://aislopware.github.io/slopscale/ref/audit/
 # Every writing API request is recorded with its caller and outcome.
 audit:
   # How long events are kept; the collector runs hourly. "0" keeps them

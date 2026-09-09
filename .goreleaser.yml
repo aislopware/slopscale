@@ -13,7 +13,7 @@ release:
   header: |
     ## Upgrade
 
-    Please follow the steps outlined in the [upgrade guide](https://aislopware.github.io/slopscale/stable/setup/upgrade/) to update your existing Slopscale installation.
+    Please follow the steps outlined in the [upgrade guide](https://aislopware.github.io/slopscale/setup/upgrade/) to update your existing Slopscale installation.
 
 # The SQLite driver is C compiled by cgo, so every target needs a C
 # compiler: zigcc (from the Nix devShell, which also exports CGO_CFLAGS from

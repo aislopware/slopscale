@@ -61,7 +61,7 @@ passes its own on, and an OAuth token cannot mint API keys. The policy
 gains `autogroup:owner`, `autogroup:admin`, `autogroup:network-admin`,
 `autogroup:it-admin` and `autogroup:auditor`, and the devices of the owner and
 admins carry Tailscale's `is-admin` capability. See
-[User roles](https://aislopware.github.io/slopscale/development/ref/roles/).
+[User roles](https://aislopware.github.io/slopscale/ref/roles/).
 
 ### Device and user approval
 
@@ -79,7 +79,7 @@ approves everything that was waiting. `slopscale settings` manages the
 switches, and the v2 API's `authorized` device flag, `needs-approval` user
 status, `preauthorized` key capability and tailnet settings `PATCH` now carry
 real meaning, so Tailscale tooling can drive approval. See
-[Device and user approval](https://aislopware.github.io/slopscale/development/ref/approval/).
+[Device and user approval](https://aislopware.github.io/slopscale/ref/approval/).
 
 ### Node sharing
 
@@ -92,7 +92,7 @@ users that node is shared with; the destination is always narrowed to the
 shared node, so a share never opens anything else. The sharee's devices see the
 node as a peer marked with the owner as sharer, the shared node gets no access
 back, and a policy that never names `autogroup:shared` ignores shares. See
-[Node sharing](https://aislopware.github.io/slopscale/development/ref/sharing/).
+[Node sharing](https://aislopware.github.io/slopscale/ref/sharing/).
 
 ### DNS settings at runtime
 
@@ -112,7 +112,7 @@ NextDNS and the like), and extra records are A or AAAA. An extra-records file
 Split DNS can also be handed to some groups only: a group DNS rule names
 domains, nameservers and the groups whose machines receive them, from the
 console's _DNS_ page, `slopscale dns rules` or `/api/v1/dns/rule`. See
-[DNS](https://aislopware.github.io/slopscale/development/ref/dns/).
+[DNS](https://aislopware.github.io/slopscale/ref/dns/).
 
 ### DERP relays at runtime, embedded relay on by default
 
@@ -143,7 +143,7 @@ verification on drops the machines connected to it, so they reconnect
 under the new rule; a request that leaves `verifyClients` out gets
 verification on; and a fetched map with a broken relay entry is served
 without it rather than failing the refresh. See
-[DERP](https://aislopware.github.io/slopscale/development/ref/derp/).
+[DERP](https://aislopware.github.io/slopscale/ref/derp/).
 
 - `GET /api/v1/derp` returns an `ETag` for the settings in force and
   `PUT /api/v1/derp` accepts it back as `If-Match`: when someone else changed
@@ -165,7 +165,7 @@ there is one. Pre-auth keys can carry groups so the machines they register
 join them. Manage it all from the console's _Access controls_ page, with
 `slopscale groups` and `slopscale access-rules`, or through `/api/v1/group`
 and `/api/v1/access-rule`. See
-[Groups and access rules](https://aislopware.github.io/slopscale/development/ref/access-control/).
+[Groups and access rules](https://aislopware.github.io/slopscale/ref/access-control/).
 
 A new server no longer starts open. The builtin group _Own machines_ is
 Tailscale's `autogroup:self`, a rule destination meaning the machines owned
@@ -185,7 +185,7 @@ caps how long a login stays valid, the way Tailscale's key expiry setting
 does, without a config change or restart. `GET /api/v1/server` reports the
 build, addresses, DERP regions and config file values of the running server,
 and the console's _Settings_ page shows both. See
-[Device and user approval](https://aislopware.github.io/slopscale/development/ref/approval/#key-expiry).
+[Device and user approval](https://aislopware.github.io/slopscale/ref/approval/#key-expiry).
 
 ### Webhooks
 
@@ -205,7 +205,7 @@ bounded queue, and logs and audit entries carry the endpoint's host rather
 than the URL, which for chat providers is a credential. Manage them from the
 console's _Webhooks_ page, with `slopscale webhooks`, or through
 `/api/v1/webhook`. See
-[Webhooks](https://aislopware.github.io/slopscale/development/ref/webhooks/).
+[Webhooks](https://aislopware.github.io/slopscale/ref/webhooks/).
 
 ### Device trust
 
@@ -243,7 +243,7 @@ address or a schedule boundary changes. The policy file takes Tailscale's
 `slopscale postures`, the `--posture` flag of `slopscale access-rules`, a
 _Postures_ page and a _Required postures_ picker in the console's access
 controls cover it. See
-[Device trust](https://aislopware.github.io/slopscale/development/ref/device-trust/).
+[Device trust](https://aislopware.github.io/slopscale/ref/device-trust/).
 
 ### Temporary access
 
@@ -263,7 +263,7 @@ rebuilds the policy. `--expires` on `slopscale access-rules` and
 `accessRequestApproved` and `accessRequestDenied` webhook events, the
 `access_request.*` audit actions, a _My access_ page for every signed-in
 user and a _Requests_ page under the console's access controls cover it.
-See [Temporary access](https://aislopware.github.io/slopscale/development/ref/temporary-access/).
+See [Temporary access](https://aislopware.github.io/slopscale/ref/temporary-access/).
 
 ### Notifications and log streaming
 
@@ -282,8 +282,8 @@ entries and a test entry on demand. The `logs:configuration` scope, held by
 every admin role, manages streams; `logs:configuration:read` lists them
 without their tokens. `slopscale log-streams`, `/api/v1/log-stream` and a
 _Log streams_ tab on the console's _Integrations_ page (formerly _Webhooks_)
-cover it. See [Log streaming](https://aislopware.github.io/slopscale/development/ref/log-streaming/)
-and [Webhooks](https://aislopware.github.io/slopscale/development/ref/webhooks/#notifications).
+cover it. See [Log streaming](https://aislopware.github.io/slopscale/ref/log-streaming/)
+and [Webhooks](https://aislopware.github.io/slopscale/ref/webhooks/#notifications).
 
 ### SSH session recording
 
@@ -304,7 +304,7 @@ audit log as `ssh.recording.*` and fires the `sshRecordingFailed` webhook
 event. Recordings are listed, downloaded and deleted from the console's _SSH
 sessions_ page, `slopscale ssh-recordings` and `/api/v1/ssh-recording`
 under the `logs:configuration` scopes. See [SSH session
-recording](https://aislopware.github.io/slopscale/development/ref/ssh-recording/).
+recording](https://aislopware.github.io/slopscale/ref/ssh-recording/).
 
 ### HTTPS certificates
 
@@ -317,7 +317,7 @@ token), `rfc2136` (dynamic update, TSIG-signed) or `command` (a program
 given the record name and value). A machine may publish only its own
 name's challenge record, and each one lands in the audit log as
 `node.cert_challenge`. The base domain must be a public zone. See [HTTPS
-certificates](https://aislopware.github.io/slopscale/development/ref/https-certificates/).
+certificates](https://aislopware.github.io/slopscale/ref/https-certificates/).
 
 ### Networks
 
@@ -332,7 +332,7 @@ what its groups reach behind the routers to a protocol and ports, the way an
 access rule does, so a printer subnet can be handed out on TCP 631 alone.
 Manage networks from the console's _Networks_ page, with every route any
 machine advertises on the _Routes_ page next to it, with `slopscale networks`, or through
-`/api/v1/network`. See [Networks](https://aislopware.github.io/slopscale/development/ref/networks/).
+`/api/v1/network`. See [Networks](https://aislopware.github.io/slopscale/ref/networks/).
 
 ### Global exit node
 
@@ -342,7 +342,7 @@ told to prefer, with no policy involved: its exit routes are approved, the
 marked nodes alone carry `suggest-exit-node` on every other client's view of
 them and every node carries `auto-exit-node`, so `tailscale exit-node suggest`
 names one and clients set to `--exit-node=auto:any` pick it. See
-[Global exit node](https://aislopware.github.io/slopscale/development/ref/routes/#global-exit-node).
+[Global exit node](https://aislopware.github.io/slopscale/ref/routes/#global-exit-node).
 
 ### Admin console
 
@@ -391,7 +391,7 @@ says why on hover, the theme is a Light, Dark, System menu, and dates are
 picked with a calendar rather than the browser's own field.
 Release binaries and container images include it. When building from source,
 run `make web` before `make build`.
-See [Admin console](https://aislopware.github.io/slopscale/development/ref/console/).
+See [Admin console](https://aislopware.github.io/slopscale/ref/console/).
 
 ### Audit log
 
@@ -399,7 +399,7 @@ Every writing API request, whether from the CLI, the console or a script, is
 recorded with who made it, what it touched and how it ended, alongside console
 sign-ins. Read it with `slopscale audit list`, `GET /api/v1/audit` or the
 console's _Audit log_ page; bound it with `audit.retention`. See
-[Audit log](https://aislopware.github.io/slopscale/development/ref/audit/).
+[Audit log](https://aislopware.github.io/slopscale/ref/audit/).
 
 The log can be downloaded as a file: `GET /api/v1/audit/export` takes the same
 filters as the list plus `format=csv|json` and streams every matching event,
@@ -432,7 +432,7 @@ role and groups. Invitations expire (seven days by default, thirty at most),
 can be revoked with `DELETE /api/v1/invite/{id}` and re-sent with a fresh link
 with `POST /api/v1/invite/{id}/resend`. An invitation cannot hand out
 ownership; transfer it instead. See
-[Console](https://aislopware.github.io/slopscale/development/ref/console/).
+[Console](https://aislopware.github.io/slopscale/ref/console/).
 
 ### API key rotation
 
@@ -492,7 +492,7 @@ rotations are recorded in the audit log as `apikey.rotate`.
 - Warnings a client reports in its map requests (`warn-ip-forwarding-off` on a subnet router whose kernel drops forwarded packets, `warn-router-unhealthy`, `warn-etc-apt-source-disabled`) are kept on the node as `clientWarnings` in `GET /api/v1/node` and shown on the console's machine page, where before they were dropped
 - A nameserver can be kept in use while a machine routes through an exit node, like Tailscale's per-nameserver "Use with exit node" setting: `dns.nameservers.use_with_exit_node` in the configuration file, the switch next to each nameserver and split DNS domain on the console's _DNS_ page, `slopscale dns set --use-with-exit-node` and `--split-use-with-exit-node`, and `useWithExitNode`/`splitUseWithExitNode` in `PUT /api/v1/dns`. The rest of the machine's DNS goes through the exit node then, as before. Global nameservers need override local DNS, as the client only honours the flag on the resolvers it uses for every query, and a split DNS domain survives only when every one of its nameservers is kept; the API enforces the first and the console marks the whole domain. Needs Tailscale 1.88.1 or later on the client [#2816](https://github.com/juanfont/headscale/issues/2816), [#3376](https://github.com/juanfont/headscale/issues/3376), [#2234](https://github.com/juanfont/headscale/issues/2234)
 - A client that asks to be ephemeral in its register request is now ephemeral: a `tailscaled` with `--state=mem:`, a `tsnet` program with `Ephemeral` set or the browser client is deleted on logout and after the ephemeral inactivity timeout offline, with a regular pre-auth key or an interactive login alike, where before only an ephemeral pre-auth key counted and such nodes piled up. `slopscale nodes list`, the console and the `ephemeral` field of the v1 node report either kind
-- A DERP map file can carry `homeparams.regionscore` to prefer or avoid regions when a client picks its home DERP, as the hosted control plane's map does. The scores are merged across the loaded maps, later files winning, where before they were dropped in the merge. See [DERP](https://aislopware.github.io/slopscale/development/ref/derp/#customize-derp-map)
+- A DERP map file can carry `homeparams.regionscore` to prefer or avoid regions when a client picks its home DERP, as the hosted control plane's map does. The scores are merged across the loaded maps, later files winning, where before they were dropped in the merge. See [DERP](https://aislopware.github.io/slopscale/ref/derp/#customize-derp-map)
 - Groups can be synced from the identity provider: with `oidc.groups.sync` on, a user's `groups` claim is mirrored into slopscale groups of the same name at every sign-in (optionally only the claims with `oidc.groups.prefix`, stripped), and the user leaves the synced groups the claim drops, like Tailscale's user and group provisioning. Synced groups show as such in the console and the API (`source: oidc`); their users and name cannot be edited by hand, machines and description can, and an operator-made group is never taken over by name. Each sync that moved a membership is logged as `group.sync`
 - `oidc.match_by_email`: a login whose provider identifier is unknown is matched to the existing OIDC user with the same verified email, the user moves to the new identifier and keeps its machines, so an identity provider can be switched without editing the database. The switch is logged as `user.provider.switch`; a login is refused when several users share the email [#2438](https://github.com/juanfont/headscale/issues/2438)
 - `nodeAttrs` accepts the `app` field, application capabilities with data such as Tailscale's app connector definitions (`tailscale.com/app-connectors`): the values reach the targets' node capability map verbatim, values from several entries for the same capability add up, and the policy is refused when a capability is not domain-qualified or a value is not a JSON object. A policy with `app` was rejected as unknown before [#3021](https://github.com/juanfont/headscale/issues/3021)
@@ -979,7 +979,7 @@ sequentially through each stable release, selecting the latest patch version ava
 - Database migration support removed for pre-0.25.0 databases [#2883](https://github.com/juanfont/headscale/pull/2883)
 
   - If you are running a version older than 0.25.0, you must upgrade to 0.25.1 first, then upgrade to this release
-  - See the [upgrade path documentation](https://aislopware.github.io/slopscale/stable/about/faq/#what-is-the-recommended-update-path-can-i-skip-multiple-versions-while-updating) for detailed guidance
+  - See the [upgrade path documentation](https://aislopware.github.io/slopscale/about/faq/#what-is-the-recommended-update-path-can-i-skip-multiple-versions-while-updating) for detailed guidance
   - In version 0.29, all migrations before 0.28.0 will also be removed
 
 - Remove ability to move nodes between users [#2922](https://github.com/juanfont/headscale/pull/2922)

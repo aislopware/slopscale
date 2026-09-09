@@ -1,0 +1,127 @@
+---
+title: "Groups and access rules"
+---
+
+Slopscale can enforce access without a policy file. Machines and users go
+into named groups, and access rules say which groups may reach which on what
+protocol and ports. The admin console edits both under _Access controls_,
+and the same operations are on the API and the CLI. The model follows
+[NetBird's groups and policies](https://docs.netbird.io/manage/access-control):
+allow rules only, no ordering, and a tailnet that turns default-deny as soon as
+one rule is enabled.
+
+## Groups
+
+A group is a named set of machines. A machine belongs to it in one of two
+ways:
+
+- directly, when an operator adds the machine to the group, and
+- through its owner, when the operator adds the user to the group. Every
+  machine the user owns is then a member, including machines the user
+  registers later.
+
+Tagged machines have no owner, so they join groups directly. A machine can be
+in any number of groups. Two builtin groups cannot be renamed, edited or
+deleted: _All_ holds every machine and lists no members, and _Own machines_
+is a rule destination only. It is Tailscale's `autogroup:self`: in a rule it
+means the machines owned by the same user as the source, so it has no
+members of its own, cannot be a source, cannot be in a bidirectional rule
+and cannot be given to a network, a DNS rule or a pre-auth key. Tagged
+machines have no user and are never reached through it.
+
+Groups can also come from the identity provider: with `oidc.groups.sync`
+on, a user's `groups` claim is mirrored into groups of the same name at every
+sign-in, and those groups show _Synced_ in the console. Their users follow
+the claim and cannot be edited by hand; see [OIDC](/ref/oidc#authorize-users-with-filters).
+
+Pre-auth keys carry groups too. A key created with `groupIds` enrols every
+machine it registers into those groups, the way a NetBird setup key does with
+its auto-groups. A group that has been deleted since is skipped.
+
+Deleting a user or a machine drops its memberships. A group an access rule
+names cannot be deleted; take it out of the rule first.
+
+## Access rules
+
+A rule has a name, a description, an enabled switch, a protocol (`all`,
+`tcp`, `udp` or `icmp`), ports for `tcp` and `udp` (`22,80,8000-8100`, empty
+for every port), source groups and destination groups. It lets the members of
+the source groups open connections to the members of the destination groups.
+The destination cannot open connections back unless the rule is
+_bidirectional_, which allows both directions.
+
+Rules only allow. While no rule is enabled and the policy file has no acls
+or grants, every machine sees every other. The first enabled rule makes
+everything not allowed by a rule (or by the policy file) unreachable, so
+create the rules a tailnet needs before turning them on, or start with one
+rule from _All_ to _All_ and narrow it down. The console asks before the
+last enabled rule is disabled or deleted when that would open the tailnet.
+
+A new server does not start open. The first time it runs it seeds one
+builtin rule, _Own machines_, from _All_ to _Own machines_ on every
+protocol: each machine reaches the other machines of its own user and
+nothing else, and machines of different users do not see each other. A
+builtin rule has only its enabled switch: it cannot be renamed, narrowed or
+deleted. Switch it off to open the tailnet, or add rules next to it. On a
+database that already has machines when it is upgraded the rule is seeded
+switched off, so an open tailnet stays open until an operator turns it on.
+
+Rules and the policy file combine: the rules compile into grants that sit next
+to the file's own, and a connection is allowed when either admits it. The
+file's `tests` run against the combined result.
+
+## Temporary access
+
+A rule and a membership can carry an expiry, and a group can be marked
+requestable so users ask to join it for a while and an approver decides.
+See [Temporary access](/ref/temporary-access).
+
+## Structuring groups
+
+Groups work best when each one answers one question. Groups of users describe
+who: `engineering`, `support`, `contractors`. Groups of machines describe what:
+`production-servers`, `office-printers`, `ci-runners`. A rule then reads as a
+sentence, "engineering may reach production-servers on tcp 22 and 443", and
+a new engineer or a new server needs a group change, not a rule change.
+
+## API and CLI
+
+Groups live at `/api/v1/group` and rules at `/api/v1/access-rule`; both need
+the `policy_file` scope (`policy_file:read` for listing). A group is created
+with `POST /api/v1/group` and `{"name": "Engineering", "userIds": ["3"]}`,
+changed with `PATCH /api/v1/group/{id}`, which replaces the members it names
+and keeps the ones it omits, and deleted with `DELETE`. Single members are
+added with `POST /api/v1/group/{id}/member` and `{"nodeId": "7"}` or
+`{"userId": "3"}`, and removed with `DELETE /api/v1/group/{id}/node/{nodeId}`
+or `DELETE /api/v1/group/{id}/user/{userId}`.
+
+A rule is created with `POST /api/v1/access-rule`:
+
+```json
+{
+  "name": "SSH to servers",
+  "protocol": "tcp",
+  "ports": "22",
+  "sourceGroupIds": ["2"],
+  "destinationGroupIds": ["3"]
+}
+```
+
+`PUT /api/v1/access-rule/{id}` replaces every field,
+`PATCH /api/v1/access-rule/{id}` with `{"enabled": false}` flips only the
+switch (the rest of the rule is read on the server, so a stale copy cannot
+overwrite someone else's edit), and `DELETE` removes the rule. The list
+carries `policyFileEnforces`, which is false when no policy file restricts
+traffic: then the rules are all that keeps the tailnet from allow-all, and
+disabling the last one opens it. Every change is audited as `group.*` or
+`access_rule.*` and reaches connected clients at once.
+
+The CLI mirrors the API:
+
+```console
+$ slopscale groups create --name Engineering
+$ slopscale groups add-user --identifier 2 --user 3
+$ slopscale groups add-node --identifier 3 --node 7
+$ slopscale access-rules create --name "SSH to servers" --src 2 --dst 3 --protocol tcp --ports 22
+$ slopscale access-rules disable --identifier 1
+```

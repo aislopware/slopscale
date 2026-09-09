@@ -61,14 +61,6 @@ repos:
         files: ^web/
         pass_filenames: false
 
-      # mdformat for docs
-      - id: mdformat
-        name: mdformat
-        entry: mdformat
-        language: system
-        types_or: [markdown]
-        files: ^docs/
-
       # go fix applies the Go release modernizers (any, min/max, range-int,
       # slices/maps, strings.SplitSeq, wg.Go, ...) so new code never lands
       # in an old idiom.

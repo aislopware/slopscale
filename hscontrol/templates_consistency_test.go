@@ -186,7 +186,7 @@ func TestTemplateExternalLinkSecurity(t *testing.T) {
 				Message: "You can now close this window.",
 			}).Render(),
 			externalURLs: []string{
-				"https://aislopware.github.io/slopscale/stable/",
+				"https://aislopware.github.io/slopscale/",
 				"https://tailscale.com/docs",
 			},
 		},

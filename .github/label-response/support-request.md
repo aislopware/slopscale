@@ -7,8 +7,8 @@ For help with setup, configuration, or general questions, please visit our [GitH
 **Before posting a discussion, please check:**
 
 - [Documentation](https://aislopware.github.io/slopscale/)
-- [FAQ](https://aislopware.github.io/slopscale/stable/faq/)
-- [Debugging and Troubleshooting Guide](https://aislopware.github.io/slopscale/stable/ref/debug/)
+- [FAQ](https://aislopware.github.io/slopscale/faq/)
+- [Debugging and Troubleshooting Guide](https://aislopware.github.io/slopscale/ref/debug/)
 
 If after troubleshooting you determine this is actually a bug, please open a new issue with the required debug information from the troubleshooting guide.
 

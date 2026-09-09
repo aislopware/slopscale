@@ -81,7 +81,7 @@ body:
       label: Debug information
       description: |
         Please have a look at our [Debugging and troubleshooting
-        guide](https://aislopware.github.io/slopscale/development/ref/debug/) to learn about
+        guide](https://aislopware.github.io/slopscale/ref/debug/) to learn about
         common debugging techniques.
 
         Links? References? Anything that will give us more context about the issue you are encountering.

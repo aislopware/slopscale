@@ -1,0 +1,45 @@
+---
+title: "Build from source"
+---
+
+:::warning[Community documentation]
+
+This page is not actively maintained by the slopscale authors and is
+written by community members. It is _not_ verified by slopscale developers.
+
+**It might be outdated and it might miss necessary steps**.
+:::
+
+Slopscale can be built from source using the latest version of [Go](https://golang.org) and [Buf](https://buf.build)
+(Protobuf generator). See the [Contributing section in the GitHub
+README](https://github.com/aislopware/slopscale#contributing) for more information.
+
+## OpenBSD
+
+### Install from source
+
+```shell
+# Install prerequisites: Go, git, GNU make and a C compiler (clang ships
+# with the base system; the SQLite driver is C compiled through cgo)
+pkg_add go git gmake
+
+git clone https://github.com/aislopware/slopscale.git
+
+cd slopscale
+
+# optionally checkout a release
+# option a. you can find official release at https://github.com/aislopware/slopscale/releases/latest
+# option b. get latest tag, this may be a beta release
+latestTag=$(git describe --tags `git rev-list --tags --max-count=1`)
+
+git checkout $latestTag
+
+# gmake build passes the compiler flags from sqlite.cflags that the server expects
+gmake build
+
+# make it executable
+chmod a+x slopscale
+
+# copy it to /usr/local/sbin
+cp slopscale /usr/local/sbin
+```

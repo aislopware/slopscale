@@ -1,5 +1,0 @@
-# Getting help
-
-Ask questions in [GitHub discussions](https://github.com/aislopware/slopscale/discussions).
-
-Please report bugs via [GitHub issues](https://github.com/aislopware/slopscale/issues)

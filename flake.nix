@@ -170,10 +170,6 @@
             # roundtrip tests (TestAPIv2). Binaries: tofu, tscli.
             opentofu
             tscli
-            python3Packages.mdformat
-            python3Packages.mdformat-footnote
-            python3Packages.mdformat-frontmatter
-            python3Packages.mdformat-mkdocs
             prek
 
             # 'dot' is needed for pprof graphs

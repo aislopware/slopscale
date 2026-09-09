@@ -1,10 +1,18 @@
 name: Test documentation build
 
-on: [pull_request]
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs-test.yml"
 
 concurrency:
-  group: ${{ github.workflow }}-$${{ github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
+
+defaults:
+  run:
+    shell: nix develop --fallback --command bash -e {0}
 
 jobs:
   test:
@@ -12,16 +20,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: 3.x
-      - name: Setup cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          key: ${{ github.ref }}
-          path: .cache
-      - name: Setup dependencies
-        run: pip install -r docs/requirements.txt
+      - uses: NixOS/nix-installer-action@62c1943b776c509394b550f3f983adc14e9212d6 # v1.0.0
+      - uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
       - name: Build docs
-        run: mkdocs build --strict
+        run: make docs

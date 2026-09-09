@@ -1,0 +1,320 @@
+---
+title: "Admin console"
+---
+
+Slopscale ships a web console at `/admin/` on the server's own address. It
+lists machines, users and keys, edits the policy, approves devices and users,
+shares nodes and marks the global exit node from a browser, the same things
+the CLI and the API do.
+
+The console is a static, client-rendered application embedded in the
+`slopscale` binary. It keeps no state on the server and needs no extra process:
+open `https://<your server>/admin/` and it loads.
+
+## Signing in
+
+The console signs in only through the [identity provider](/ref/oidc): the
+sign-in page has one button, *Continue with Google* (or the provider's name),
+and nothing else. The browser is sent through the provider and comes back
+signed in as the matching slopscale user, holding a session cookie that lasts
+seven days; *Sign out* in the account menu ends it. The provider's redirect
+URI is the same `/oidc/callback` as for device logins, so nothing more has to
+be registered.
+
+The client ID and secret go either in the configuration file or in the
+environment, whichever suits the deployment:
+
+```yaml
+oidc:
+  issuer: https://accounts.google.com
+  client_id: 1234567890-abc.apps.googleusercontent.com
+  client_secret: GOCSPX-...
+```
+
+```console
+$ export SLOPSCALE_OIDC_CLIENT_ID=1234567890-abc.apps.googleusercontent.com
+$ export SLOPSCALE_OIDC_CLIENT_SECRET=GOCSPX-...
+```
+
+Every key of the configuration can be set this way: `SLOPSCALE_` followed by
+the key path with dots replaced by underscores.
+
+A user who signs in for the first time is created the same way as on a device
+login, including [user approval](/ref/approval) when it is on: until an
+administrator approves them, the sign-in page says so and opens no session.
+The first user of an empty server becomes its owner. Anyone else who should
+administer the server from day one is named in `oidc.admin_users`: an
+address on that list is made an admin the moment it signs in, so nobody has
+to hand out roles over the CLI first.
+
+```yaml
+oidc:
+  admin_users:
+    - alice@example.com
+```
+
+```console
+$ export SLOPSCALE_OIDC_ADMIN_USERS="alice@example.com bob@example.com"
+```
+
+The list is checked on every sign-in and only ever promotes a member; the
+owner and users who already hold a role keep it, and removing an address
+does not demote anyone (use `slopscale users set-role` for that). The
+promotion is written to the audit log as a system `user.role.set`.
+
+Without an identity provider the console cannot sign anyone in and says so;
+the CLI and the API keep working with API keys.
+
+What the console can show and change is decided by the signed-in user's
+current [role](/ref/roles), read on every request:
+
+- A role change takes effect at once, and deleting the user ends their
+  sessions. So does _Sign out everywhere_.
+- An auditor sees everything and can change nothing, an `it-admin` cannot
+  approve routes, and so on. Pages the user cannot read are hidden; actions
+  they cannot take are disabled.
+- A member sees only the overview, their own machines and their own API keys.
+
+Everything the console changes is written to the [audit log](/ref/audit) with
+the signed-in user as the actor.
+
+## Sessions
+
+A sign-in opens a session that lasts seven days. There is no sliding renewal,
+so a stolen cookie is bounded the same way as a fresh one, and _Sign out_ in
+the account menu ends the session it was made from.
+
+Every session is listed under _Settings → Sessions_ with the user it belongs to,
+when it was opened, when it last made a request, and the address and browser it
+came from. An administrator sees every session and can end any of them; a
+member sees and ends only their own. Ending a session takes effect on that
+browser's next request: it is asked to sign in again.
+
+```console
+$ curl -H "Authorization: Bearer $KEY" https://<your server>/api/v1/auth/sessions
+$ curl -X DELETE -H "Authorization: Bearer $KEY" \
+    https://<your server>/api/v1/auth/sessions/7
+```
+
+`slopscale sessions list` prints the same table, `--user <id>` narrows it to one
+user, and `slopscale sessions end <id>` ends a single session:
+
+```console
+$ slopscale sessions list --user 3
+$ slopscale sessions end 7
+```
+
+`DELETE /api/v1/user/{id}/sessions`, _Sign out everywhere_ on the user's page,
+or `slopscale users sign-out --identifier <id>` signs one user out of every
+browser, which is what to reach for when a laptop goes missing; it changes
+nothing else about the account. All three are recorded in the
+[audit log](/ref/audit) as `console.logout`, `session.end` and
+`user.sessions.end`.
+
+The address a session records is the one the request came from after
+`trusted_proxies` was applied, so a deployment behind a reverse proxy shows the
+browser's address rather than the proxy's. A session opened before this version
+shows neither an address nor a browser.
+
+## Inviting users
+
+An administrator can invite someone by email instead of waiting for them to
+find the sign-in page. _Users → Invite_ asks for the address, the
+[role](/ref/roles) and any [groups](/ref/access-control) the person should join,
+and hands back a link; `slopscale invites create` does the same from the CLI:
+
+```console
+$ slopscale invites create --email ada@example.com --role admin --group 3 --expiry 72h
+$ curl -X POST -H "Authorization: Bearer $KEY" \
+    -d '{"email":"ada@example.com","role":"admin","groupIds":["3"],"expiry":"72h"}' \
+    https://<your server>/api/v1/invite
+```
+
+`--group` is repeatable and `--expiry` defaults to `168h`, a week, with `720h`
+the longest the server accepts. `slopscale invites list` shows which
+invitations are still pending, `slopscale invites resend <id>` mints a fresh
+link for one, and `slopscale invites delete <id>` withdraws it.
+
+The link is `https://<your server>/admin/login?invite=<token>` and is shown
+once: the server keeps only a hash of the token, as it does for a session
+cookie or a pre-auth key. When [`notifications.smtp`](/ref/webhooks) is
+configured the link is also mailed to the address, and the response says
+whether that worked (`emailSent`, with `emailError` when it did not). A mail
+that cannot be sent does not fail the invitation. The link works either way
+and can be passed on by hand.
+
+An invitation is consumed by the first login it fits, in either of two ways:
+
+- the person opens the link, which carries the token through the identity
+  provider and back, or
+- the person signs in by themselves and the identity provider vouches for an
+  email that matches a pending invitation.
+
+Either way the user is created **approved**, even while
+[user approval](/ref/approval) is on, because an administrator already vouched
+for the address, with the invited role and groups. An account that already
+exists keeps the role and groups it has and the invitation stays pending; an
+invitation cannot promote someone who is already signed up.
+
+Invitations expire: seven days by default, thirty at most. An expired,
+revoked or already-used link says so on the sign-in page rather than signing
+the person in without the role they were promised.
+
+```console
+$ curl -H "Authorization: Bearer $KEY" https://<your server>/api/v1/invite
+$ curl -X POST -H "Authorization: Bearer $KEY" -d '{}' \
+    https://<your server>/api/v1/invite/4/resend
+$ curl -X DELETE -H "Authorization: Bearer $KEY" https://<your server>/api/v1/invite/4
+```
+
+Re-sending mints a new token and a new expiry, so the link in the previous
+mail stops working. Revoking deletes the invitation.
+
+An invitation cannot hand out ownership: the tailnet has exactly one owner and
+that role moves only by [transfer](/ref/roles). The invited address must be free
+of both an existing user and another pending invitation, otherwise the request
+is refused.
+
+Creating, re-sending and revoking are recorded in the
+[audit log](/ref/audit) as `user.invite.create`, `user.invite.resend` and
+`user.invite.delete`; accepting is recorded as `user.invite.accept` against
+the user it created.
+
+## Getting around
+
+The sidebar starts with the overview and is then grouped by what you are
+doing. *Tailnet* holds machines and users. *Access* holds the access controls
+and, for everyone, the page to ask for temporary access. *Connectivity* holds
+networks, routes, DNS and relays. *Logs* holds the audit log and the SSH
+session recordings. *Administration* holds the settings, the keys and the
+integrations. An item with several parts, such as _Access controls_, _DNS_,
+_Relays_, _Settings_, _Keys_ or _Integrations_, opens into a page per part,
+each with its own address.
+A count next to _Machines_, _Users_, _Routes_ and _Requests_ says how many
+are waiting for approval. The arrow in the sidebar footer
+collapses it to an icon rail. *Quick search*, or ++cmd+k++ / ++ctrl+k++,
+jumps to any page, machine or user by name. The top bar shows breadcrumbs
+for where you are, the light/dark switch and the account menu with *Sign
+out*.
+
+## Pages
+
+- **Overview**: counts, machines and users waiting for approval (approve them
+  in place), the machines seen most recently, and a getting-started
+  checklist while the tailnet is empty.
+- **Machines**: every node with its owner or tags, addresses, status and
+  routes. Search by name, address, user or tag and filter by status, user or
+  tag; the filters live in the URL, so a filtered list can be shared. Tick
+  rows to approve, expire or delete them in one go. The list refreshes on
+  its own every fifteen seconds while the tab is open.
+  Each machine has a detail page with its keys, routes (approve with a switch),
+  sharing and the global exit node switch, plus rename, tag, expire and remove.
+  A warning the client reports about itself, such as a subnet router whose
+  kernel drops forwarded packets, shows at the top of the page until the client
+  stops reporting it or goes offline.
+  _Add machine_ mints a pre-auth key and hands over the join command for
+  Linux, macOS, Windows and Docker, next to a QR code carrying the same line
+  so a phone or a machine without a shared clipboard can pick it up; the
+  iOS and Android tab gives the server address and where the app takes it.
+- **Users**: create, invite, rename, approve, change the [role](/ref/roles) and
+  delete users. Each user has _Sign out everywhere_, which ends every console
+  session of theirs. _Invite_ mints a link for an address, with the role and
+  groups the person gets on their first login.
+- **Keys**: a page each for pre-auth keys (create with reusable, ephemeral,
+  pre-authorized and tags; expire; delete), API keys and OAuth clients for
+  the v2 API (create with scopes and tags; revoke; _Rotate secret_ mints a
+  new secret for an API key that keeps its id and scopes). New keys and
+  client secrets are shown once, with a copy button.
+- **Access controls**: a page each for the [rules, groups](/ref/access-control)
+  and [postures](/ref/device-trust), the queue of
+  [access requests](/ref/temporary-access), and the [policy](/ref/policy) file
+  in an editor that colours HuJSON, underlines what the server would refuse
+  as you type (an unknown key, a group no section defines, an autogroup on
+  the wrong side, a bad port), completes section names, rule keys and the
+  names the file defines, explains a key or an autogroup on hover, and sends
+  the draft to the server for the checks only it can do once typing pauses.
+  The band above the file counts what is wrong. *Check* validates the draft
+  against the server without saving; *Save* applies it. Leaving the page
+  with unsaved changes asks first. The posture editor colours each
+  expression the same way and underlines a parse error on the line it is
+  on.
+- **Networks**: [networks](/ref/networks) that hand subnets and exit nodes to
+  groups.
+- **Routes**: every route any machine advertises, with approval for the ones
+  no network owns.
+- **DNS**: a page each for nameservers with MagicDNS and search domains, split
+  DNS for every machine or for some groups, and extra records, all changed at
+  runtime; see [DNS](/ref/dns).
+- **Relays**: a page each for the DERP map machines receive, the map sources
+  and refetch schedule, the relays you run yourself, and the embedded relay.
+- **Integrations**: a page for webhooks, endpoints that receive signed event
+  notifications, with their subscriptions and last delivery (create, edit,
+  test, rotate the secret and delete; see [Webhooks](/ref/webhooks)), and one
+  for log streams, which ship the audit log to a SIEM in batches.
+- **Audit log**: who changed what, newest first, with filters by action, user
+  and time, and _Export_ as CSV or JSON with the same filters; see
+  [Audit log](/ref/audit).
+- **Settings**: a page each for the tailnet switches
+  ([device and user approval](/ref/approval), device trust, the key expiry cap,
+  SSH recording), the console [sessions](#sessions) with _End_ and _Sign out
+  everywhere_ next to the signed-in credential's role and scopes, and the
+  server's build, addresses, DERP regions and config file values with a
+  _Maintenance_ section holding the IP address backfill
+  (`slopscale nodes backfillips`).
+
+## Building from source
+
+Release binaries and container images include the console. When building from
+source, build it first so the binary embeds it:
+
+```console
+$ make web
+$ make build
+```
+
+`make web` needs [bun](https://bun.sh) (the Nix development shell provides it).
+A binary built without it still serves `/admin/`, with a page saying the
+console is missing, and the API works as usual.
+
+The console lives in `web/`: React with the TanStack router, query and table
+libraries and Cloudflare's [Kumo](https://kumo-ui.com) design system (Base UI
+components and Tailwind CSS), checked
+by TypeScript, oxlint and oxfmt. Its API types are generated from the server's
+OpenAPI document by `make web-generate` and committed. `bun run dev` in `web/`
+starts a development server that proxies `/api` and `/oidc` to a slopscale on
+`http://127.0.0.1:8080` (set `SLOPSCALE_URL` to point elsewhere).
+
+### Signing in without Google
+
+The console only signs in through an identity provider, so development and
+tests need one that asks no questions. `go run ./cmd/dev` starts a slopscale
+with a mock OpenID Connect provider running inside the same process: every
+sign-in comes back as `jane.doe@example.com`, who is listed in that server's
+`oidc.admin_users` and therefore opens the console as an admin.
+
+```console
+$ go run ./cmd/dev                       # server on :8080, provider on :9100
+$ open http://127.0.0.1:8080/admin/      # Continue with single sign-on
+```
+
+To sign in from the Vite development server instead, start slopscale with
+its public URL set to Vite's origin, so the provider sends the browser back
+there: `go run ./cmd/dev -server-url http://localhost:5173`, then
+`bun run dev` in `web/` and open `http://localhost:5173/admin/`.
+
+`make test-e2e` runs the same flow in a browser: it builds the console,
+starts `cmd/dev`, signs in through the mock provider, checks the audit log
+and signs out (Playwright, `web/e2e/`). The Go side is covered by the
+`TestConsoleLogin*` tests in `hscontrol/servertest`, which drive a mock
+provider without a browser.
+
+## Serving behind a reverse proxy
+
+The console lives under `/admin/` on the same origin as the API, so a
+[reverse proxy](/ref/integration/reverse-proxy) that forwards the whole host
+needs no extra rules. It sends a `Content-Security-Policy` that only allows its
+own origin; do not embed it in another site's frame.
+
+If you prefer the console not to be reachable, block `/admin/` at the proxy.
+Everything it does is also available through the API with the same key, so
+this only removes the page, not the capability.

@@ -17,7 +17,7 @@ To help us investigate and resolve this, we need more information. Please provid
 
 ### Debug Information
 
-Please follow our [Debugging and Troubleshooting Guide](https://aislopware.github.io/slopscale/stable/ref/debug/) and provide:
+Please follow our [Debugging and Troubleshooting Guide](https://aislopware.github.io/slopscale/ref/debug/) and provide:
 
 1. **Client netmap dump** (from affected Tailscale client):
 

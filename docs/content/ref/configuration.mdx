@@ -1,0 +1,51 @@
+---
+title: "Configuration"
+---
+
+- Slopscale loads its configuration from a YAML file
+- It searches for `config.yaml` in the following paths:
+    - `/etc/slopscale`
+    - `$HOME/.slopscale`
+    - the current working directory
+- To load the configuration from a different path, use:
+    - the command line flag `-c`, `--config`
+    - the environment variable `SLOPSCALE_CONFIG`
+- Validate the configuration file with: `slopscale configtest`
+
+:::note[Get the example configuration from the GitHub repository]
+
+Always select the [same GitHub tag](https://github.com/aislopware/slopscale/tags) as the released version you use to
+ensure you have the correct example configuration. The `main` branch might contain unreleased changes.
+
+<Tabs>
+<Tab title="View on GitHub">
+
+- Development version: https://github.com/aislopware/slopscale/blob/main/config-example.yaml
+- Version 0.29.3: https://github.com/aislopware/slopscale/blob/v0.29.3/config-example.yaml
+
+</Tab>
+<Tab title="Download with wget">
+
+```shell
+# Development version
+wget -O config.yaml https://raw.githubusercontent.com/aislopware/slopscale/main/config-example.yaml
+
+# Version 0.29.3
+wget -O config.yaml https://raw.githubusercontent.com/aislopware/slopscale/v0.29.3/config-example.yaml
+```
+
+</Tab>
+<Tab title="Download with curl">
+
+```shell
+# Development version
+curl -o config.yaml https://raw.githubusercontent.com/aislopware/slopscale/main/config-example.yaml
+
+# Version 0.29.3
+curl -o config.yaml https://raw.githubusercontent.com/aislopware/slopscale/v0.29.3/config-example.yaml
+```
+
+</Tab>
+</Tabs>
+
+:::

@@ -41,7 +41,6 @@ all: lint test build
 check-deps:
 	$(call check_tool,go)
 	$(call check_tool,golangci-lint)
-	$(call check_tool,mdformat)
 
 .PHONY: check-web-deps
 check-web-deps:
@@ -91,6 +90,19 @@ test-web: web-deps
 	@echo "Running console tests..."
 	cd web && bun run test
 
+.PHONY: docs-deps
+docs-deps:
+	cd docs && bun install --frozen-lockfile --silent
+
+.PHONY: docs
+docs: docs-deps
+	@echo "Building documentation..."
+	cd docs && bun run build && bun run validate
+
+.PHONY: docs-dev
+docs-dev: docs-deps
+	cd docs && bun run dev
+
 # End-to-end: builds the console, starts a real server through cmd/dev
 # with its mock identity provider, and signs in through a browser.
 .PHONY: test-e2e
@@ -107,7 +119,7 @@ test: check-deps $(GO_SOURCES) go.mod go.sum
 
 # Formatting targets
 .PHONY: fmt
-fmt: fmt-go fmt-mdformat fmt-markup fmt-web
+fmt: fmt-go fmt-markup fmt-web
 
 .PHONY: fmt-go
 fmt-go: check-deps $(GO_SOURCES)
@@ -115,11 +127,6 @@ fmt-go: check-deps $(GO_SOURCES)
 	go fix ./...
 	golangci-lint fmt
 	golangci-lint run --fix
-
-.PHONY: fmt-mdformat
-fmt-mdformat: check-deps
-	@echo "Formatting documentation..."
-	mdformat docs/
 
 .PHONY: fmt-markup
 fmt-markup: web-deps $(MARKUP_SOURCES)
@@ -215,12 +222,13 @@ help:
 	@echo ""
 	@echo "Specific targets:"
 	@echo "  fmt-go       - Format Go code only"
-	@echo "  fmt-mdformat - Format documentation only"
 	@echo "  fmt-markup   - Format markup and config files only (oxfmt)"
 	@echo "  lint-go      - Lint Go code only"
 	@echo "  web          - Build the admin console into web/dist (embedded by build)"
 	@echo "  web-generate - Regenerate the console's API types from the OpenAPI spec"
 	@echo "  lint-web     - Typecheck, lint and format-check the admin console"
+	@echo "  docs         - Build the documentation site and validate its links"
+	@echo "  docs-dev     - Serve the documentation with hot reload"
 	@echo "  test-web     - Run the admin console's browser tests"
 	@echo "  test-e2e     - Sign in to a real server through the browser (mock identity provider)"
 	@echo ""

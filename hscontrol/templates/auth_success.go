@@ -49,7 +49,7 @@ func AuthSuccess(result AuthSuccessResult) *elem.Element {
 		Ul(
 			elem.Li(
 				nil,
-				externalLink("https://aislopware.github.io/slopscale/stable/", "Slopscale documentation"),
+				externalLink("https://aislopware.github.io/slopscale/", "Slopscale documentation"),
 			),
 			elem.Li(
 				nil,
