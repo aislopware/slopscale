@@ -42,7 +42,8 @@ func TestHandlerSetsPolicy(t *testing.T) {
 
 	rec := serve(t, http.MethodGet, "/admin/")
 
-	assert.Contains(t, rec.Header().Get("Content-Security-Policy"), "script-src 'self'")
+	assert.Contains(t, rec.Header().Get("Content-Security-Policy"), "script-src 'self' 'wasm-unsafe-eval'")
+	assert.Contains(t, rec.Header().Get("Content-Security-Policy"), "connect-src 'self' wss:")
 	assert.Contains(t, rec.Header().Get("Content-Type"), "text/html")
 }
 

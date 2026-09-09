@@ -9,3 +9,5 @@ dist/*
 test-results/
 playwright-report/
 .tanstack/
+# Tailscale's in-browser client, built by make wasm (cmd/tsconnect-build).
+public/tsconnect/

@@ -8,6 +8,7 @@
 package web
 
 import (
+	"bytes"
 	"embed"
 	"errors"
 	"io/fs"
@@ -38,11 +39,20 @@ const cacheForever = "public, max-age=31536000, immutable"
 
 // contentSecurityPolicy locks the console down to its own origin. Inline
 // styles are needed for Base UI's positioning and CodeMirror's injected
-// stylesheets; scripts stay strictly self-hosted. Images may come from any
-// https origin so a user's profile picture can be previewed.
-const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-	"img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; " +
-	"base-uri 'self'; form-action 'self'"
+// stylesheets; scripts stay strictly self-hosted, and wasm-unsafe-eval
+// lets the SSH terminal instantiate Tailscale's in-browser client, which
+// is served from this origin too. Images may come from any https origin
+// so a user's profile picture can be previewed. Connections stay on this
+// origin except for wss:, which the in-browser client needs to reach the
+// tailnet's relays; which relays is the DERP map's call, so the policy
+// admits any secure websocket rather than a list that would go stale.
+const contentSecurityPolicy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; " +
+	"style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; " +
+	"connect-src 'self' wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+// tsconnectDir holds the in-browser client; its hashed files may be
+// cached forever like Vite's assets, and the wasm is stored gzipped.
+const tsconnectDir = "tsconnect/"
 
 // Built reports whether the embedded bundle contains a console.
 func Built() bool {
@@ -94,6 +104,11 @@ func Handler() http.Handler {
 		}
 
 		_, statErr := fs.Stat(sub, rel)
+		if errors.Is(statErr, fs.ErrNotExist) && strings.HasSuffix(rel, ".wasm") {
+			// make web keeps only the gzipped client.
+			_, statErr = fs.Stat(sub, rel+".gz")
+		}
+
 		if errors.Is(statErr, fs.ErrNotExist) {
 			serveIndex(w, r, sub)
 
@@ -106,14 +121,56 @@ func Handler() http.Handler {
 			return
 		}
 
-		if strings.HasPrefix(rel, assetsDir) {
+		if strings.HasPrefix(rel, assetsDir) || isHashedTsconnect(rel) {
 			w.Header().Set("Cache-Control", cacheForever)
+		}
+
+		if strings.HasSuffix(rel, ".wasm") {
+			serveGzipped(w, r, sub, rel)
+
+			return
 		}
 
 		r2 := r.Clone(r.Context())
 		r2.URL.Path = "/" + rel
 		files.ServeHTTP(w, r2)
 	})
+}
+
+// isHashedTsconnect reports whether the path is a hashed file of the
+// in-browser client (main-<hash>.wasm); its manifest and loader are not
+// hashed and stay revalidated.
+func isHashedTsconnect(rel string) bool {
+	name, ok := strings.CutPrefix(rel, tsconnectDir)
+
+	return ok && strings.HasPrefix(name, "main-") && strings.Contains(name, ".wasm")
+}
+
+// serveGzipped serves the client's wasm, which dist holds gzipped. Every
+// browser accepts gzip, so the compressed bytes go out as they are with
+// the encoding declared, and the browser's streaming instantiation gets
+// the wasm content type it insists on. The raw file, when present (a
+// dist that make web did not prune), is served as is.
+func serveGzipped(w http.ResponseWriter, r *http.Request, sub fs.FS, rel string) {
+	w.Header().Set("Content-Type", "application/wasm")
+
+	packed, err := fs.ReadFile(sub, rel+".gz")
+	if err != nil {
+		raw, rawErr := fs.ReadFile(sub, rel)
+		if rawErr != nil {
+			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+
+			return
+		}
+
+		http.ServeContent(w, r, rel, time.Time{}, bytes.NewReader(raw))
+
+		return
+	}
+
+	w.Header().Set("Content-Encoding", "gzip")
+	w.Header().Set("Vary", "Accept-Encoding")
+	http.ServeContent(w, r, rel, time.Time{}, bytes.NewReader(packed))
 }
 
 // serveIndex writes index.html uncached so a new release is picked up on the

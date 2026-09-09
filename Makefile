@@ -30,7 +30,7 @@ MARKUP_SOURCES := $(shell find . \( -name '*.md' -o -name '*.yaml' -o -name '*.y
 # oxfmt is pinned in web/bun.lock and formats the repo's markup and config
 # files as well as the console (see .oxfmtrc.json for the root scope).
 OXFMT := web/node_modules/.bin/oxfmt
-WEB_SOURCES := $(shell find web -type f -not -path 'web/node_modules/*' -not -path 'web/codegen/node_modules/*' -not -path 'web/dist/*')
+WEB_SOURCES := $(shell find web -type f -not -path 'web/node_modules/*' -not -path 'web/codegen/node_modules/*' -not -path 'web/dist/*' -not -path 'web/public/tsconnect/*')
 
 # Default target
 .PHONY: all
@@ -61,10 +61,22 @@ web-deps: check-web-deps web/package.json web/bun.lock
 	@echo "Installing console dependencies..."
 	cd web && bun install --frozen-lockfile
 
+# The console's SSH terminal runs Tailscale's in-browser client, compiled
+# from tailscale.com/cmd/tsconnect/wasm by cmd/tsconnect-build into
+# web/public/tsconnect (gitignored): the raw wasm for the Vite dev
+# server, the gzipped one for the embedded server, wasm_exec.js and a
+# manifest. Only the gzipped file ships in the binary, so make web
+# removes the raw one from dist; web/embed.go serves .wasm from .wasm.gz.
+.PHONY: wasm
+wasm: check-deps
+	@echo "Building the in-browser Tailscale client..."
+	go run ./cmd/tsconnect-build
+
 .PHONY: web
-web: web-deps $(WEB_SOURCES)
+web: web-deps wasm $(WEB_SOURCES)
 	@echo "Building admin console..."
 	cd web && bun run build
+	rm -f web/dist/tsconnect/*.wasm
 
 # Regenerate the console's API types from the served OpenAPI document. The
 # spec is committed under gen/openapi so the TypeScript output is
@@ -225,6 +237,7 @@ help:
 	@echo "  fmt-markup   - Format markup and config files only (oxfmt)"
 	@echo "  lint-go      - Lint Go code only"
 	@echo "  web          - Build the admin console into web/dist (embedded by build)"
+	@echo "  wasm         - Build the in-browser Tailscale client for the console's SSH terminal"
 	@echo "  web-generate - Regenerate the console's API types from the OpenAPI spec"
 	@echo "  lint-web     - Typecheck, lint and format-check the admin console"
 	@echo "  docs         - Build the documentation site and validate its links"
