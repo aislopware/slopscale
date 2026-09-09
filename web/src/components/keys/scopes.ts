@@ -21,12 +21,16 @@ export const scopeOptions: readonly { readonly scope: Scope; readonly label: str
   { scope: "policy_file:read", label: "Policy and access (read)" },
   { scope: "dns", label: "DNS" },
   { scope: "dns:read", label: "DNS (read)" },
+  { scope: "services", label: "Services" },
+  { scope: "services:read", label: "Services (read)" },
   { scope: "feature_settings", label: "Settings" },
   { scope: "feature_settings:read", label: "Settings (read)" },
   { scope: "webhooks", label: "Webhooks" },
   { scope: "webhooks:read", label: "Webhooks (read)" },
   { scope: "logs:configuration", label: "Audit log and streaming" },
   { scope: "logs:configuration:read", label: "Audit log (read)" },
+  { scope: "services", label: "Services" },
+  { scope: "services:read", label: "Services (read)" },
 ];
 
 export function scopeLabel(scope: string): string {

@@ -31,7 +31,9 @@ function node(id: string, overrides: Partial<Node> = {}): Node {
   return {
     approved: true,
     approvedAt: stamp,
+    announcedServices: [],
     approvedRoutes: [],
+    approvedServices: [],
     availableRoutes: [],
     clientWarnings: [],
     createdAt: stamp,

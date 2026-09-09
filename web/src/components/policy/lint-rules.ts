@@ -8,7 +8,7 @@ import {
   splitPorts,
 } from "~/components/policy/aliases.ts";
 import type { AliasKind } from "~/components/policy/aliases.ts";
-import { anyAlias } from "~/components/policy/lint-context.ts";
+import { anyAlias, anyDestination } from "~/components/policy/lint-context.ts";
 import type { Lint } from "~/components/policy/lint-context.ts";
 import { aclKeys, grantKeys, sshKeys } from "~/components/policy/schema.ts";
 import type { JsonNode, JsonString } from "~/lib/hujson/ast.ts";
@@ -78,7 +78,7 @@ function aclDestination(lint: Lint, item: JsonString): JsonString | null {
     lint.error({ from: alias.to + 1, to: item.to - 1 }, ports);
   }
 
-  lint.alias(alias, { side: "dst", allowed: anyAlias });
+  lint.alias(alias, { side: "dst", allowed: anyDestination });
 
   return alias;
 }
@@ -168,7 +168,7 @@ function lintIp(lint: Lint, node: JsonNode): boolean {
 }
 
 function lintGrantDestinations(lint: Lint, node: JsonNode): JsonString[] {
-  const destinations = lint.aliases(node, { side: "dst", allowed: anyAlias, what: "dst" });
+  const destinations = lint.aliases(node, { side: "dst", allowed: anyDestination, what: "dst" });
 
   for (const destination of destinations) {
     if (isDefaultRoute(destination.value)) {

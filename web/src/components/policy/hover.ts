@@ -76,6 +76,13 @@ function stringDoc(root: JsonNode, path: readonly PathStep[], value: string): Do
     };
   }
 
+  if (value.startsWith("svc:")) {
+    return {
+      name: value,
+      text: "A service: its own addresses, served by the machines approved for it. Destination only.",
+    };
+  }
+
   if (value.startsWith("posture:") && names.postures.has(value)) {
     return {
       name: value,

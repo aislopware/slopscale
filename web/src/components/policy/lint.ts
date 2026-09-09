@@ -1,4 +1,4 @@
-import { isPrefix } from "~/components/policy/aliases.ts";
+import { isPrefix, isServiceName } from "~/components/policy/aliases.ts";
 import type { AliasKind } from "~/components/policy/aliases.ts";
 import { Lint, anyAlias } from "~/components/policy/lint-context.ts";
 import type { Names, Problem } from "~/components/policy/lint-context.ts";
@@ -151,6 +151,20 @@ function lintAutoApprovers(lint: Lint, node: JsonNode): void {
           side: "src",
           allowed: approvers,
           what: `approvers of ${route.key.name}`,
+        });
+      }
+    } else if (key.name === "services") {
+      const services = lint.object(value, "services");
+
+      for (const service of services?.entries ?? []) {
+        if (!isServiceName(service.key.name)) {
+          lint.error(service.key, `"${service.key.name}" is not a service name such as "svc:web"`);
+        }
+
+        lint.aliases(service.value, {
+          side: "src",
+          allowed: approvers,
+          what: `hosts of ${service.key.name}`,
         });
       }
     }

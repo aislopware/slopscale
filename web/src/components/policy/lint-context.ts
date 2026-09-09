@@ -1,4 +1,4 @@
-import { aliasKind, autogroupIssue } from "~/components/policy/aliases.ts";
+import { aliasKind, autogroupIssue, isServiceName } from "~/components/policy/aliases.ts";
 import type { AliasKind, Side } from "~/components/policy/aliases.ts";
 import type { KeyInfo } from "~/components/policy/schema.ts";
 import type { JsonArray, JsonNode, JsonObject, JsonString, Span } from "~/lib/hujson/ast.ts";
@@ -23,6 +23,7 @@ const kindLabels: Readonly<Record<AliasKind, string>> = {
   group: "a group",
   tag: "a tag",
   autogroup: "an autogroup",
+  service: "a service",
   host: "a host",
 };
 
@@ -46,6 +47,7 @@ function aliasHint(text: string): string {
   return `"${text}" is not a user, group, tag, autogroup, host, address or *`;
 }
 
+/** What may be a source: everything but a service, which only receives traffic. */
 export const anyAlias: readonly AliasKind[] = [
   "prefix",
   "wildcard",
@@ -55,6 +57,9 @@ export const anyAlias: readonly AliasKind[] = [
   "autogroup",
   "host",
 ];
+
+/** What may be a destination: a source alias or a service, "svc:web". */
+export const anyDestination: readonly AliasKind[] = [...anyAlias, "service"];
 
 /** Where a list of aliases stands and which kinds may stand there. */
 export interface AliasPlace {
@@ -168,7 +173,12 @@ export class Lint {
     }
 
     if (!place.allowed.includes(kind)) {
-      this.error(node, `${sideLabels[place.side]} cannot be ${kindLabels[kind]}`);
+      this.error(
+        node,
+        kind === "service"
+          ? "A service can only be a destination"
+          : `${sideLabels[place.side]} cannot be ${kindLabels[kind]}`,
+      );
 
       return kind;
     }
@@ -187,6 +197,8 @@ export class Lint {
       this.error(node, `"${text}" has no owners in tagOwners`);
     } else if (kind === "host" && !this.names.hosts.has(text)) {
       this.error(node, `"${text}" is not defined in hosts`);
+    } else if (kind === "service" && !isServiceName(text)) {
+      this.error(node, `"${text}" is not a service name such as "svc:web"`);
     } else if (kind === "autogroup") {
       const issue = autogroupIssue(text, side);
 

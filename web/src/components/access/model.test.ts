@@ -37,7 +37,9 @@ function node(id: string, owner: User, tags: string[] = []): Node {
   return {
     approved: true,
     approvedAt: stamp,
+    announcedServices: [],
     approvedRoutes: [],
+    approvedServices: [],
     availableRoutes: [],
     clientWarnings: [],
     createdAt: stamp,

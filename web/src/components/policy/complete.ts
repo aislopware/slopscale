@@ -163,7 +163,8 @@ function stringValues(path: readonly PathStep[], ask: Ask): Completion[] {
 
   if (
     section === "tagOwners" ||
-    (section === "autoApprovers" && (second === "exitNode" || second === "routes"))
+    (section === "autoApprovers" &&
+      (second === "exitNode" || second === "routes" || second === "services"))
   ) {
     return approvers(names, users);
   }

@@ -43,6 +43,8 @@ import { Route as AppRelaysEmbeddedRouteImport } from './routes/_app/relays/embe
 import { Route as AppRelaysMapRouteImport } from './routes/_app/relays/map'
 import { Route as AppRelaysOwnRouteImport } from './routes/_app/relays/own'
 import { Route as AppRelaysSourcesRouteImport } from './routes/_app/relays/sources'
+import { Route as AppServicesIndexRouteImport } from './routes/_app/services/index'
+import { Route as AppServicesLabelRouteImport } from './routes/_app/services/$label'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppSettingsServerRouteImport } from './routes/_app/settings/server'
 import { Route as AppSettingsSessionsRouteImport } from './routes/_app/settings/sessions'
@@ -218,6 +220,16 @@ const AppRelaysSourcesRoute = AppRelaysSourcesRouteImport.update({
   path: '/relays/sources',
   getParentRoute: () => AppRoute,
 } as any)
+const AppServicesIndexRoute = AppServicesIndexRouteImport.update({
+  id: '/services/',
+  path: '/services/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppServicesLabelRoute = AppServicesLabelRouteImport.update({
+  id: '/services/$label',
+  path: '/services/$label',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
@@ -267,6 +279,7 @@ export interface FileRoutesByFullPath {
   '/relays/map': typeof AppRelaysMapRoute
   '/relays/own': typeof AppRelaysOwnRoute
   '/relays/sources': typeof AppRelaysSourcesRoute
+  '/services/$label': typeof AppServicesLabelRoute
   '/settings/server': typeof AppSettingsServerRoute
   '/settings/sessions': typeof AppSettingsSessionsRoute
   '/settings/tailnet': typeof AppSettingsTailnetRoute
@@ -276,6 +289,7 @@ export interface FileRoutesByFullPath {
   '/machines/': typeof AppMachinesIndexRoute
   '/policy/': typeof AppPolicyIndexRoute
   '/relays/': typeof AppRelaysIndexRoute
+  '/services/': typeof AppServicesIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -306,6 +320,7 @@ export interface FileRoutesByTo {
   '/relays/map': typeof AppRelaysMapRoute
   '/relays/own': typeof AppRelaysOwnRoute
   '/relays/sources': typeof AppRelaysSourcesRoute
+  '/services/$label': typeof AppServicesLabelRoute
   '/settings/server': typeof AppSettingsServerRoute
   '/settings/sessions': typeof AppSettingsSessionsRoute
   '/settings/tailnet': typeof AppSettingsTailnetRoute
@@ -315,6 +330,7 @@ export interface FileRoutesByTo {
   '/machines': typeof AppMachinesIndexRoute
   '/policy': typeof AppPolicyIndexRoute
   '/relays': typeof AppRelaysIndexRoute
+  '/services': typeof AppServicesIndexRoute
   '/settings': typeof AppSettingsIndexRoute
 }
 export interface FileRoutesById {
@@ -347,6 +363,7 @@ export interface FileRoutesById {
   '/_app/relays/map': typeof AppRelaysMapRoute
   '/_app/relays/own': typeof AppRelaysOwnRoute
   '/_app/relays/sources': typeof AppRelaysSourcesRoute
+  '/_app/services/$label': typeof AppServicesLabelRoute
   '/_app/settings/server': typeof AppSettingsServerRoute
   '/_app/settings/sessions': typeof AppSettingsSessionsRoute
   '/_app/settings/tailnet': typeof AppSettingsTailnetRoute
@@ -356,6 +373,7 @@ export interface FileRoutesById {
   '/_app/machines/': typeof AppMachinesIndexRoute
   '/_app/policy/': typeof AppPolicyIndexRoute
   '/_app/relays/': typeof AppRelaysIndexRoute
+  '/_app/services/': typeof AppServicesIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
 }
 export interface FileRouteTypes {
@@ -388,6 +406,7 @@ export interface FileRouteTypes {
     | '/relays/map'
     | '/relays/own'
     | '/relays/sources'
+    | '/services/$label'
     | '/settings/server'
     | '/settings/sessions'
     | '/settings/tailnet'
@@ -397,6 +416,7 @@ export interface FileRouteTypes {
     | '/machines/'
     | '/policy/'
     | '/relays/'
+    | '/services/'
     | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -427,6 +447,7 @@ export interface FileRouteTypes {
     | '/relays/map'
     | '/relays/own'
     | '/relays/sources'
+    | '/services/$label'
     | '/settings/server'
     | '/settings/sessions'
     | '/settings/tailnet'
@@ -436,6 +457,7 @@ export interface FileRouteTypes {
     | '/machines'
     | '/policy'
     | '/relays'
+    | '/services'
     | '/settings'
   id:
     | '__root__'
@@ -467,6 +489,7 @@ export interface FileRouteTypes {
     | '/_app/relays/map'
     | '/_app/relays/own'
     | '/_app/relays/sources'
+    | '/_app/services/$label'
     | '/_app/settings/server'
     | '/_app/settings/sessions'
     | '/_app/settings/tailnet'
@@ -476,6 +499,7 @@ export interface FileRouteTypes {
     | '/_app/machines/'
     | '/_app/policy/'
     | '/_app/relays/'
+    | '/_app/services/'
     | '/_app/settings/'
   fileRoutesById: FileRoutesById
 }
@@ -724,6 +748,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRelaysSourcesRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/services/': {
+      id: '/_app/services/'
+      path: '/services'
+      fullPath: '/services/'
+      preLoaderRoute: typeof AppServicesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/services/$label': {
+      id: '/_app/services/$label'
+      path: '/services/$label'
+      fullPath: '/services/$label'
+      preLoaderRoute: typeof AppServicesLabelRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings/': {
       id: '/_app/settings/'
       path: '/settings'
@@ -782,6 +820,7 @@ interface AppRouteChildren {
   AppRelaysMapRoute: typeof AppRelaysMapRoute
   AppRelaysOwnRoute: typeof AppRelaysOwnRoute
   AppRelaysSourcesRoute: typeof AppRelaysSourcesRoute
+  AppServicesLabelRoute: typeof AppServicesLabelRoute
   AppSettingsServerRoute: typeof AppSettingsServerRoute
   AppSettingsSessionsRoute: typeof AppSettingsSessionsRoute
   AppSettingsTailnetRoute: typeof AppSettingsTailnetRoute
@@ -791,6 +830,7 @@ interface AppRouteChildren {
   AppMachinesIndexRoute: typeof AppMachinesIndexRoute
   AppPolicyIndexRoute: typeof AppPolicyIndexRoute
   AppRelaysIndexRoute: typeof AppRelaysIndexRoute
+  AppServicesIndexRoute: typeof AppServicesIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
 }
 
@@ -821,6 +861,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppRelaysMapRoute: AppRelaysMapRoute,
   AppRelaysOwnRoute: AppRelaysOwnRoute,
   AppRelaysSourcesRoute: AppRelaysSourcesRoute,
+  AppServicesLabelRoute: AppServicesLabelRoute,
   AppSettingsServerRoute: AppSettingsServerRoute,
   AppSettingsSessionsRoute: AppSettingsSessionsRoute,
   AppSettingsTailnetRoute: AppSettingsTailnetRoute,
@@ -830,6 +871,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppMachinesIndexRoute: AppMachinesIndexRoute,
   AppPolicyIndexRoute: AppPolicyIndexRoute,
   AppRelaysIndexRoute: AppRelaysIndexRoute,
+  AppServicesIndexRoute: AppServicesIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
 }
 

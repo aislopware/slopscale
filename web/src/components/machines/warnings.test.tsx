@@ -21,7 +21,9 @@ const alice: User = {
 const router: Node = {
   approved: true,
   approvedAt: "2026-01-01T00:00:00Z",
+  announcedServices: [],
   approvedRoutes: ["10.0.0.0/24"],
+  approvedServices: [],
   availableRoutes: ["10.0.0.0/24"],
   createdAt: "2026-01-01T00:00:00Z",
   discoKey: "",

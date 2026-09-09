@@ -4,6 +4,7 @@ import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import {
   FunnelIcon,
   GlobeIcon,
+  HardDrivesIcon,
   HourglassIcon,
   PathIcon,
   ShareNetworkIcon,
@@ -18,6 +19,7 @@ import { expiryWorthShowing } from "~/components/machines/filters.ts";
 import { MachineMenu } from "~/components/machines/menu.tsx";
 import { SelectAllCheckbox, SelectRowCheckbox } from "~/components/machines/selection.tsx";
 import { StatusBadge } from "~/components/machines/status-badge.tsx";
+import { hostedServices } from "~/components/services/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { Code } from "~/components/ui/code.tsx";
@@ -171,6 +173,16 @@ function Attributes({ node }: { readonly node: Node }): ReactElement | null {
         hint="Funnel is on: a service on this machine is reachable from the internet"
       >
         <FunnelIcon size={markSize} />
+      </Mark>,
+    );
+  }
+
+  const hosted = hostedServices(node);
+
+  if (hosted.length > 0) {
+    marks.push(
+      <Mark key="services" hint={`Hosts ${hosted.join(", ")}`}>
+        <HardDrivesIcon size={markSize} />
       </Mark>,
     );
   }

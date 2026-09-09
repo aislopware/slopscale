@@ -139,6 +139,11 @@ export const autoApproverKeys: readonly KeyInfo[] = [
     doc: "The users, groups or tags whose machines may become exit nodes without approval.",
     shape: "aliases",
   },
+  {
+    name: "services",
+    doc: "Each service, svc:web, to the users, groups or tags whose machines may host it without approval.",
+    shape: "object",
+  },
 ];
 
 export const testKeys: readonly KeyInfo[] = [
@@ -204,7 +209,7 @@ export const sections: readonly KeyInfo[] = [
   },
   {
     name: "autoApprovers",
-    doc: "Routes and exit nodes approved without an administrator.",
+    doc: "Routes, exit nodes and service hosts approved without an administrator.",
     shape: "object",
     keys: autoApproverKeys,
   },

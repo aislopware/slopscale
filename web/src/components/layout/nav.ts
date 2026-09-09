@@ -5,6 +5,7 @@ import {
   GearSixIcon,
   GlobeIcon,
   HandWavingIcon,
+  HardDrivesIcon,
   BroadcastIcon,
   KeyIcon,
   WebhooksLogoIcon,
@@ -45,6 +46,7 @@ export type NavPath =
   | "/relays/embedded"
   | "/networks"
   | "/routes"
+  | "/services"
   | "/integrations"
   | "/integrations/webhooks"
   | "/integrations/log-streams"
@@ -140,6 +142,7 @@ export const navGroups: readonly NavGroup[] = [
         scope: "devices:routes:read",
         badge: "pendingRoutes",
       },
+      { to: "/services", label: "Services", icon: HardDrivesIcon, scope: "services:read" },
       {
         to: "/dns",
         label: "DNS",

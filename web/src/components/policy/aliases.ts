@@ -2,9 +2,18 @@ import { isIp, isIpv4, isIpv6 } from "~/lib/ip.ts";
 
 /**
  * What a string in a policy may name, as `hscontrol/policy/v2` classifies it: an address or a
- * range, the wildcard, a user, a group, a tag, an autogroup or a host from the hosts section.
+ * range, the wildcard, a user, a group, a tag, an autogroup, a service or a host from the hosts
+ * section.
  */
-export type AliasKind = "prefix" | "wildcard" | "user" | "group" | "tag" | "autogroup" | "host";
+export type AliasKind =
+  | "prefix"
+  | "wildcard"
+  | "user"
+  | "group"
+  | "tag"
+  | "autogroup"
+  | "service"
+  | "host";
 
 const ipv4Bits = 32;
 const ipv6Bits = 128;
@@ -47,6 +56,14 @@ export function isPrefix(text: string): boolean {
   return isIpv6(address) && Number(bits) <= ipv6Bits;
 }
 
+/** A service name as the server takes it: "svc:" and a DNS label. */
+const serviceName = /^svc:(?!-)[a-z0-9\-]{1,63}(?<!-)$/v;
+
+/** Whether the text names a service the way a destination or autoApprovers.services key does. */
+export function isServiceName(text: string): boolean {
+  return serviceName.test(text);
+}
+
 /** Whether the range is 0.0.0.0/0 or ::/0, which a grant must write as "*" or autogroup:internet. */
 export function isDefaultRoute(text: string): boolean {
   return text.endsWith("/0") && isPrefix(text);
@@ -75,6 +92,10 @@ export function aliasKind(text: string): AliasKind | null {
 
   if (text.startsWith("autogroup:")) {
     return "autogroup";
+  }
+
+  if (text.startsWith("svc:")) {
+    return "service";
   }
 
   return text.includes(":") ? null : "host";

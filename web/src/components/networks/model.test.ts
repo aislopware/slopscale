@@ -28,7 +28,9 @@ function node(id: string, available: string[], approved: string[]): Node {
   return {
     approved: true,
     approvedAt: stamp,
+    announcedServices: [],
     approvedRoutes: approved,
+    approvedServices: [],
     availableRoutes: available,
     clientWarnings: [],
     createdAt: stamp,

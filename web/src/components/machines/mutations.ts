@@ -11,6 +11,7 @@ interface NodeMutations {
   readonly rename: Mutation<"post", "/api/v1/node/{nodeId}/rename/{newName}">;
   readonly setTags: Mutation<"post", "/api/v1/node/{nodeId}/tags">;
   readonly setRoutes: Mutation<"post", "/api/v1/node/{nodeId}/approve_routes">;
+  readonly setServices: Mutation<"post", "/api/v1/node/{nodeId}/approve_services">;
   readonly setGlobalExitNode: Mutation<"post", "/api/v1/node/{nodeId}/global-exit-node">;
   readonly expire: Mutation<"post", "/api/v1/node/{nodeId}/expire">;
   readonly suspend: Mutation<"post", "/api/v1/node/{nodeId}/suspend">;
@@ -48,6 +49,12 @@ export function useNodeMutations(): NodeMutations {
     setTags: api.useMutation("post", "/api/v1/node/{nodeId}/tags", { onSuccess: refresh }),
     setRoutes: api.useMutation("post", "/api/v1/node/{nodeId}/approve_routes", {
       onSuccess: refresh,
+    }),
+    // An approval is stored on the node and read back on the service, so both lists go stale.
+    setServices: api.useMutation("post", "/api/v1/node/{nodeId}/approve_services", {
+      onSuccess: async () => {
+        await invalidate(queryClient, "/api/v1/node", "/api/v1/services");
+      },
     }),
     setGlobalExitNode: api.useMutation("post", "/api/v1/node/{nodeId}/global-exit-node", {
       onSuccess: async (node) => {

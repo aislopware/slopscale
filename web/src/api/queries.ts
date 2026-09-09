@@ -41,6 +41,9 @@ export type Derp = MethodResponse<typeof api, "get", "/api/v1/derp">;
 export type Network = MethodResponse<typeof api, "get", "/api/v1/network">["networks"][number];
 export type DnsRule = MethodResponse<typeof api, "get", "/api/v1/dns/rule">["rules"][number];
 export type Webhook = MethodResponse<typeof api, "get", "/api/v1/webhook">["webhooks"][number];
+export type Service = MethodResponse<typeof api, "get", "/api/v1/services">["services"][number];
+/** One machine's standing towards a service: what it announces and whether it may host it. */
+export type ServiceHost = Service["hosts"][number];
 
 /**
  * How long the collections every page reads stay fresh. The sidebar badges and the command palette
@@ -79,6 +82,7 @@ export type AccessRequestOptions = MethodResponse<
 export const dnsQuery = api.queryOptions("get", "/api/v1/dns");
 export const dnsRulesQuery = api.queryOptions("get", "/api/v1/dns/rule");
 export const networksQuery = api.queryOptions("get", "/api/v1/network");
+export const servicesQuery = api.queryOptions("get", "/api/v1/services");
 export const webhooksQuery = api.queryOptions("get", "/api/v1/webhook");
 
 export type LogStream = MethodResponse<
@@ -263,6 +267,7 @@ type Collection =
   | "/api/v1/derp"
   | "/api/v1/server"
   | "/api/v1/network"
+  | "/api/v1/services"
   | "/api/v1/webhook"
   | "/api/v1/log-stream"
   | "/api/v1/ssh-recording"

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { aliasKind, isDefaultRoute, isPrefix, splitPorts } from "~/components/policy/aliases.ts";
+import {
+  aliasKind,
+  isDefaultRoute,
+  isPrefix,
+  isServiceName,
+  splitPorts,
+} from "~/components/policy/aliases.ts";
 
 describe(isPrefix, () => {
   it.each([
@@ -36,6 +42,17 @@ describe(aliasKind, () => {
     expect(aliasKind("::ffff:192.0.2.1")).toBe("prefix");
     expect(aliasKind("group:eng")).toBe("group");
     expect(aliasKind("tag:web")).toBe("tag");
+    expect(aliasKind("svc:web")).toBe("service");
+  });
+});
+
+describe(isServiceName, () => {
+  it.each(["svc:web", "svc:web-1"])("takes %s", (text) => {
+    expect(isServiceName(text)).toBe(true);
+  });
+
+  it.each(["svc:Web", "svc:-web", "svc:", "web"])("rejects %s", (text) => {
+    expect(isServiceName(text)).toBe(false);
   });
 });
 

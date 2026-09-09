@@ -7,7 +7,9 @@ function fakeNode(availableRoutes: readonly string[], approvedRoutes: readonly s
   return {
     approved: true,
     approvedAt: "2099-01-01T00:00:00Z",
+    announcedServices: [],
     approvedRoutes: [...approvedRoutes],
+    approvedServices: [],
     availableRoutes: [...availableRoutes],
     clientWarnings: [],
     createdAt: "2099-01-01T00:00:00Z",
