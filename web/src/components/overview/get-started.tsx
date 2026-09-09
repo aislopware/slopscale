@@ -1,11 +1,12 @@
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
-import { ClipboardText } from "@cloudflare/kumo/components/clipboard-text";
 import { DownloadSimpleIcon, KeyIcon } from "@phosphor-icons/react";
 import type { ReactElement, ReactNode } from "react";
 
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { connectCommand } from "~/components/machines/connect.ts";
+import { Code } from "~/components/ui/code.tsx";
+import { CommandBox } from "~/components/ui/command-text.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 
 const downloadUrl = "https://tailscale.com/download";
@@ -92,15 +93,9 @@ export function GetStarted({ me, onAddMachine }: GetStartedProps): ReactElement 
       <Step index={3} title="Point the machine at this server">
         <p className="text-kumo-subtle">
           Run this on the machine, with the key from step 2 in place of{" "}
-          <span className="font-mono text-[0.9em]">{keyPlaceholder}</span>.
+          <Code className="text-kumo-warning">{keyPlaceholder}</Code>.
         </p>
-        <ClipboardText
-          size="sm"
-          className="max-w-full"
-          text={connectCommand(keyPlaceholder)}
-          tooltip={{ text: "Copy command", copiedText: "Copied" }}
-          labels={{ copyAction: "Copy command" }}
-        />
+        <CommandBox size="sm" command={connectCommand(keyPlaceholder)} />
       </Step>
     </Section>
   );

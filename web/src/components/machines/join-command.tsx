@@ -1,4 +1,3 @@
-import { ClipboardText } from "@cloudflare/kumo/components/clipboard-text";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import { useState } from "react";
 import type { ReactElement } from "react";
@@ -10,6 +9,7 @@ import {
   platforms,
 } from "~/components/machines/connect.ts";
 import type { Platform } from "~/components/machines/connect.ts";
+import { CommandBox } from "~/components/ui/command-text.tsx";
 import { QrCode } from "~/components/ui/qr-code.tsx";
 
 const tabs = platforms.map((platform) => ({ value: platform, label: platformLabels[platform] }));
@@ -35,13 +35,7 @@ export function JoinCommand({ authKey }: { readonly authKey: string }): ReactEle
       <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
         <div className="flex min-w-0 flex-col gap-1.5">
           {instructions.command === null ? null : (
-            <ClipboardText
-              size="base"
-              className="max-w-full"
-              text={instructions.command}
-              tooltip={{ text: "Copy command", copiedText: "Copied" }}
-              labels={{ copyAction: "Copy command" }}
-            />
+            <CommandBox command={instructions.command} wrap />
           )}
           <p className="text-kumo-subtle">{instructions.note}</p>
           {instructions.command === null ? null : (
