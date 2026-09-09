@@ -69,10 +69,11 @@ jobs:
         with:
           go-key: test
       # ./integration needs Docker (its own workflow) and hscontrol/servertest
-      # is slow and timing-sensitive, so it gets a job of its own.
+      # is slow and timing-sensitive, so it gets a job of its own. No -race:
+      # it doubles the run and is what `make test` is for on a workstation.
       - name: go test
         run: |
-          go test -race -short -timeout 30m \
+          go test -short -timeout 30m \
             $(go list ./... | grep -v -e '/integration$' -e '/hscontrol/servertest')
 
   servertest:
