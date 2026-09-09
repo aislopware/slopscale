@@ -95,7 +95,7 @@ export const preAuthKeyColumns = helper.columns([
         <RelativeTime value={row.original.createdAt} />
       </span>
     ),
-    meta: { className: "hidden lg:table-cell whitespace-nowrap" },
+    meta: { className: "hidden 2xl:table-cell whitespace-nowrap" },
   }),
   helper.display({
     id: "actions",
@@ -111,7 +111,7 @@ export const preAuthKeyColumns = helper.columns([
 
 function UserCell({ name }: { readonly name: string }): ReactElement {
   return (
-    <span className="flex min-w-0 items-center gap-2">
+    <span className="flex max-w-44 min-w-0 items-center gap-2" title={name}>
       <Avatar name={name} size="sm" />
       <span className="truncate text-kumo-default">{name}</span>
     </span>
@@ -127,7 +127,7 @@ function TypeCell({
 }): ReactElement {
   return (
     <div className="flex min-w-0 flex-col items-start gap-1">
-      <span className="whitespace-nowrap text-kumo-default">{traits(authKey).join(" · ")}</span>
+      <span className="text-kumo-default">{traits(authKey).join(" · ")}</span>
       {authKey.aclTags.length === 0 && authKey.groupIds.length === 0 ? null : (
         <span className="flex flex-wrap gap-1">
           {authKey.aclTags.map((tag) => (

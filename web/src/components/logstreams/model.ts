@@ -119,7 +119,10 @@ export function statusLabel(stream: Pick<LogStream, "lastDeliveryStatus">): stri
     return `HTTP ${status}`;
   }
 
-  return status.length > maxLength ? `${status.slice(0, maxLength)}…` : status;
+  // The server reports a word (unreachable, rejected) or a short error; the cell starts a phrase.
+  const sentence = status.charAt(0).toUpperCase() + status.slice(1);
+
+  return sentence.length > maxLength ? `${sentence.slice(0, maxLength)}…` : sentence;
 }
 
 /** "1,204 delivered · 3 dropped", with dropped shown only when there are any. */

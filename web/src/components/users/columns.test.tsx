@@ -56,17 +56,17 @@ describe("the users table", () => {
     await expect.element(screen.getByText("Provider")).not.toBeInTheDocument();
   });
 
-  it("names an external provider under the email", async () => {
+  it("puts the username and email under the name, the provider in the title", async () => {
     const screen = await render(<UsersTable users={[alice]} />);
 
-    await expect.element(screen.getByText("alice@example.com")).toBeVisible();
-    await expect.element(screen.getByText("OpenID Connect")).toBeVisible();
+    await expect.element(screen.getByText("alice · alice@example.com")).toBeVisible();
+    await expect.element(screen.getByTitle(/OpenID Connect/u)).toBeInTheDocument();
   });
 
   it("leaves a local user's email alone", async () => {
     const screen = await render(<UsersTable users={[bob]} />);
 
-    await expect.element(screen.getByText("bob@example.com")).toBeVisible();
+    await expect.element(screen.getByText(/bob@example.com/u)).toBeVisible();
     await expect.element(screen.getByText("Local")).not.toBeInTheDocument();
   });
 });
@@ -81,9 +81,9 @@ describe("a user without a display name", () => {
     expect(screen.getByText("dev", { exact: true }).elements()).toHaveLength(1);
   });
 
-  it("leaves a dash where there is no email", async () => {
+  it("shows no second line when there is nothing to add", async () => {
     const screen = await render(<UsersTable users={[dev]} />);
 
-    await expect.element(screen.getByText("—")).toBeVisible();
+    await expect.element(screen.getByText("—")).not.toBeInTheDocument();
   });
 });

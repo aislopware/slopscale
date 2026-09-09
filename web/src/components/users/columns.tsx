@@ -26,19 +26,16 @@ function externalProvider(user: User): string | null {
 }
 
 export const columns = helper.columns([
-  helper.accessor((user) => `${userLabel(user)} ${user.name}`, {
-    id: "name",
-    header: "User",
-    enableSorting: true,
-    cell: ({ row }) => <NameCell user={row.original} />,
-    meta: { className: "w-[26%] min-w-52" },
-  }),
-  helper.accessor((user) => `${user.email} ${providerLabel(user)}`, {
-    id: "email",
-    header: "Email",
-    enableSorting: true,
-    cell: ({ row }) => <EmailCell user={row.original} />,
-  }),
+  helper.accessor(
+    (user) => `${userLabel(user)} ${user.name} ${user.email} ${providerLabel(user)}`,
+    {
+      id: "name",
+      header: "User",
+      enableSorting: true,
+      cell: ({ row }) => <NameCell user={row.original} />,
+      meta: { className: "w-[32%] min-w-56" },
+    },
+  ),
   helper.accessor((user) => user.role, {
     id: "role",
     header: "Role",
@@ -98,39 +95,26 @@ export const columns = helper.columns([
   }),
 ]);
 
+/**
+ * The name, and under it the username and email on one line: the username is what the policy refers
+ * to, the email is how the operator knows who that is. A separate Email column pushed the role and
+ * status off the right edge at 1280px.
+ */
 function NameCell({ user }: { readonly user: User }): ReactElement {
   const label = userLabel(user);
+  const provider = externalProvider(user);
+  const parts = [label === user.name ? "" : user.name, user.email].filter((part) => part !== "");
+  const title = [label, user.email, provider ?? ""].filter((part) => part !== "").join(", ");
 
   return (
-    <div className="flex max-w-72 items-center gap-2.5" title={label}>
+    <div className="flex max-w-80 items-center gap-2.5" title={title}>
       <Avatar name={label} size="lg" />
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate font-medium text-kumo-default">{label}</span>
-        {label === user.name ? null : (
-          <span className="truncate text-xs text-kumo-subtle">{user.name}</span>
+        {parts.length === 0 ? null : (
+          <span className="truncate text-xs text-kumo-subtle">{parts.join(" · ")}</span>
         )}
       </div>
-    </div>
-  );
-}
-
-function EmailCell({ user }: { readonly user: User }): ReactElement {
-  const provider = externalProvider(user);
-
-  if (user.email === "" && provider === null) {
-    return <span className="text-kumo-subtle">—</span>;
-  }
-
-  return (
-    <div className="flex max-w-72 min-w-0 flex-col gap-0.5" title={user.email}>
-      {user.email === "" ? (
-        <span className="text-kumo-subtle">—</span>
-      ) : (
-        <span className="truncate text-kumo-subtle">{user.email}</span>
-      )}
-      {provider === null ? null : (
-        <span className="truncate text-xs text-kumo-subtle">{provider}</span>
-      )}
     </div>
   );
 }

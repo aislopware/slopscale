@@ -35,7 +35,8 @@ describe(deliveryLabel, () => {
   it("shortens long error text", () => {
     const long = "x".repeat(60);
 
-    expect(deliveryLabel({ lastDeliveryStatus: long })).toBe(`${"x".repeat(40)}…`);
+    expect(deliveryLabel({ lastDeliveryStatus: long })).toBe(`X${"x".repeat(39)}…`);
+    expect(deliveryLabel({ lastDeliveryStatus: "rejected" })).toBe("Rejected");
   });
 
   it("says never", () => {

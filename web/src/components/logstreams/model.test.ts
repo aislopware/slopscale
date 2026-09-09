@@ -29,7 +29,8 @@ describe(statusLabel, () => {
   it("shows a code or a short error", () => {
     expect(statusLabel({ lastDeliveryStatus: "" })).toBe("Never");
     expect(statusLabel({ lastDeliveryStatus: "200" })).toBe("HTTP 200");
-    expect(statusLabel({ lastDeliveryStatus: "x".repeat(50) })).toBe(`${"x".repeat(40)}…`);
+    expect(statusLabel({ lastDeliveryStatus: "unreachable" })).toBe("Unreachable");
+    expect(statusLabel({ lastDeliveryStatus: "x".repeat(50) })).toBe(`X${"x".repeat(39)}…`);
   });
 });
 
