@@ -6,6 +6,7 @@
  */
 
 import { ExpressionFailureError } from "~/lib/posture/failure.ts";
+import { parseGoFloat } from "~/lib/posture/number.ts";
 import { hasOperator, isAttributeChar, isSpace, operators } from "~/lib/posture/tokens.ts";
 import type { Operator } from "~/lib/posture/tokens.ts";
 
@@ -223,9 +224,9 @@ class Parser {
       return { kind: "bool", value: lower === "true", from, to: this.at };
     }
 
-    const number = Number(word);
+    const number = parseGoFloat(word);
 
-    if (word.trim() === "" || Number.isNaN(number)) {
+    if (number === null) {
       fail(
         `${errors.value}: "${word}" is not a number, true, false or a quoted string`,
         from,

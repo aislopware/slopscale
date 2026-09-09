@@ -1,3 +1,5 @@
+import { isGoFloat } from "~/lib/posture/number.ts";
+
 /** The operators, longest first so `<=` wins over `<` and `NOT IN` over `IN`. */
 export const operators = [
   "NOT IN",
@@ -166,5 +168,5 @@ function bareToken(text: string, from: number): [TokenKind, number] {
     return ["bool", to];
   }
 
-  return [Number.isNaN(Number(word)) ? "invalid" : "number", to];
+  return [isGoFloat(word) ? "number" : "invalid", to];
 }

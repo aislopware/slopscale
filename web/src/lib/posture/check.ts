@@ -44,14 +44,14 @@ function checkValueType(info: AttributeInfo, value: Value, into: ExpressionProbl
     if (info.type === "bool" && item.kind !== "bool") {
       into.push({
         severity: "warning",
-        message: `${info.name} is true or false, so this never matches`,
+        message: `${info.name} is true or false, not a string or number`,
         from: item.from,
         to: item.to,
       });
     } else if (info.type !== "bool" && item.kind === "bool") {
       into.push({
         severity: "warning",
-        message: `${info.name} is not a boolean, so this never matches`,
+        message: `${info.name} is not true or false`,
         from: item.from,
         to: item.to,
       });
