@@ -380,3 +380,88 @@ func TestGitHubIssue3129_TransientlyBlockedWriteDoesNotLeaveLiveStaleSession(t *
 		}
 	}, time.Second, 20*time.Millisecond, "after stale-send cleanup, the stale session should exit")
 }
+
+// deadlineRecordingResponseWriter records the write deadline the handler sets
+// on it, standing in for the HTTP/2 stream a blocked response is written to.
+type deadlineRecordingResponseWriter struct {
+	header   http.Header
+	mu       sync.Mutex
+	deadline time.Time
+}
+
+func (w *deadlineRecordingResponseWriter) Header() http.Header { return w.header }
+func (w *deadlineRecordingResponseWriter) WriteHeader(int)     {}
+func (w *deadlineRecordingResponseWriter) Write(b []byte) (int, error) {
+	return len(b), nil
+}
+
+func (w *deadlineRecordingResponseWriter) SetWriteDeadline(deadline time.Time) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.deadline = deadline
+
+	return nil
+}
+
+func (w *deadlineRecordingResponseWriter) writeDeadline() time.Time {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	return w.deadline
+}
+
+// TestStopFromBatcherExpiresWriteDeadline pins the second half of stopping a
+// map session. Closing the cancel channel is a signal the session only reads
+// between writes, so a response already blocked on HTTP/2 flow control — a
+// client that stopped reading — never sees it, and the session, and with it
+// server shutdown, stays alive indefinitely. Expiring the stream's write
+// deadline is what unblocks the write itself.
+func TestStopFromBatcherExpiresWriteDeadline(t *testing.T) {
+	t.Parallel()
+
+	writer := &deadlineRecordingResponseWriter{header: make(http.Header)}
+	session := &mapSession{
+		w:        writer,
+		cancelCh: make(chan struct{}),
+	}
+
+	before := time.Now()
+
+	session.stopFromBatcher()
+
+	select {
+	case <-session.cancelCh:
+	default:
+		t.Fatal("stopFromBatcher must close the cancel channel")
+	}
+
+	deadline := writer.writeDeadline()
+	require.False(t, deadline.IsZero(), "stopFromBatcher must expire the stream's write deadline")
+	assert.False(t, deadline.After(before.Add(time.Second)),
+		"the deadline must be in the past so a blocked write fails at once")
+
+	// Idempotent: a second stop is a no-op, not a second deadline.
+	session.stopFromBatcher()
+	assert.Equal(t, deadline, writer.writeDeadline())
+}
+
+// TestStopFromBatcherWithoutDeadlineSupport asserts a response writer that
+// cannot carry a deadline is not an error path: the cancel channel still
+// closes and the session still stops.
+func TestStopFromBatcherWithoutDeadlineSupport(t *testing.T) {
+	t.Parallel()
+
+	session := &mapSession{
+		w:        &recordingResponseWriter{header: make(http.Header)},
+		cancelCh: make(chan struct{}),
+	}
+
+	session.stopFromBatcher()
+
+	select {
+	case <-session.cancelCh:
+	default:
+		t.Fatal("stopFromBatcher must close the cancel channel without deadline support")
+	}
+}
