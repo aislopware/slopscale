@@ -125,7 +125,7 @@ jobs:
           # Extract Go cache to host directories for bind mounting
           mkdir -p /tmp/go-cache
           tar -xzf /tmp/artifacts/go-cache.tar.gz -C /tmp/go-cache
-          ls -la /tmp/go-cache/ /tmp/go-cache/.cache/
+          ls -la /tmp/go-cache/
       - name: Run Integration Test
         env:
           SLOPSCALE_INTEGRATION_SLOPSCALE_IMAGE: slopscale:${{ github.sha }}
@@ -133,7 +133,7 @@ jobs:
           SLOPSCALE_INTEGRATION_POSTGRES_IMAGE: ${{ inputs.postgres_flag == '--postgres=1' && format('postgres:{0}', github.sha) || '' }}
           SLOPSCALE_INTEGRATION_SOAK_DURATION: ${{ inputs.soak_duration }}
           SLOPSCALE_INTEGRATION_GO_CACHE: /tmp/go-cache/go
-          SLOPSCALE_INTEGRATION_GO_BUILD_CACHE: /tmp/go-cache/.cache/go-build
+          SLOPSCALE_INTEGRATION_GO_BUILD_CACHE: /tmp/go-cache/go-build
           # Mirror the docker/login-action secrets into env so the
           # dockertestutil.Credentials resolver picks them up directly
           # (otherwise it falls back to parsing ~/.docker/config.json,
