@@ -271,11 +271,13 @@ func (h *Slopscale) handleLogout(
 				Msg("Deleting ephemeral node during logout")
 
 			c, deleteErr := h.state.DeleteNode(node)
+			if !c.IsEmpty() {
+				h.Change(c)
+			}
+
 			if deleteErr != nil {
 				return nil, fmt.Errorf("deleting ephemeral node: %w", deleteErr)
 			}
-
-			h.Change(c)
 
 			return &tailcfg.RegisterResponse{
 				NodeKeyExpired:    true,

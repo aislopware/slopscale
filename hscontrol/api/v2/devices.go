@@ -302,11 +302,13 @@ func handleDeleteDevice(ctx context.Context, b Backend, in *deviceByIDInput) (*e
 	audit.Target(ctx, "", "", node.GivenName())
 
 	nodeChange, err := b.State.DeleteNode(node)
+	if !nodeChange.IsEmpty() {
+		b.Change(nodeChange)
+	}
+
 	if err != nil {
 		return nil, mapError("deleting device", err)
 	}
-
-	b.Change(nodeChange)
 
 	return &emptyOutput{}, nil
 }
