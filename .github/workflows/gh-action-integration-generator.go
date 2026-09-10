@@ -30,6 +30,20 @@ const (
 	sqliteShards       = concurrentJobLimit - postgresShards
 )
 
+// streamsPerShard is how many `hi run` invocations a shard starts side by
+// side. A test spends nearly all of its time waiting: sampled in CI, a
+// control server averages under 5% of one CPU and 25 MB against a 1500 MB
+// budget, so a shard's wall clock is set by how many tests it will run at
+// once rather than by the runner's cores. Each stream is its own process
+// with its own run id, which is what keeps the logs attributable and lets
+// `hi` clean up only what it started.
+const streamsPerShard = 3
+
+// streamSeparator divides a shard's streams from each other. Patterns
+// inside a stream are separated by spaces and run in order; the shard runs
+// the streams concurrently and waits for all of them.
+const streamSeparator = ";"
+
 // durationsFile holds the measured runtime in seconds of every top-level
 // test, which is what the shards are packed by. Refresh it from a real run
 // when the balance drifts: the per-job times are in the run's job list, and a
@@ -90,8 +104,8 @@ type item struct {
 	seconds int
 }
 
-// shard is one matrix entry: a name for its logs and the go test patterns it
-// runs, in order.
+// shard is one matrix entry: a name for its logs and the streams of go test
+// patterns it runs, separated by [streamSeparator].
 type shard struct {
 	Name  string `json:"name"`
 	Tests string `json:"tests"`
@@ -246,8 +260,34 @@ func shards(tests []string, durations map[string]int, n int) []shard {
 			total += it.seconds
 		}
 
-		out = append(out, shard{Name: fmt.Sprintf("%02d", i+1), Tests: patterns(bin)})
-		log.Printf("shard %02d: %2d tests, %4.1f min", i+1, len(bin), float64(total)/60)
+		var (
+			streams []string
+			longest int
+		)
+
+		for _, stream := range pack(bin, streamsPerShard) {
+			if len(stream) == 0 {
+				continue
+			}
+
+			load := 0
+			for _, it := range stream {
+				load += it.seconds
+			}
+
+			longest = max(longest, load)
+
+			streams = append(streams, patterns(stream))
+		}
+
+		out = append(out, shard{
+			Name:  fmt.Sprintf("%02d", i+1),
+			Tests: strings.Join(streams, streamSeparator),
+		})
+		log.Printf(
+			"shard %02d: %2d tests, %4.1f min in %d streams (%4.1f min serial)",
+			i+1, len(bin), float64(longest)/60, len(streams), float64(total)/60,
+		)
 	}
 
 	return out

@@ -9,9 +9,11 @@ on:
         type: string
       tests:
         description: >
-          Space separated go test -run patterns, run in order. One shard holds
-          many tests; a split test needs a pattern of its own because go test
-          applies the part after "/" to everything the part before it selected.
+          The shard's streams, separated by ";". A stream is space separated
+          go test -run patterns that run in order; the streams themselves run
+          at once. A split test needs a pattern of its own because go test
+          applies the part after "/" to everything the part before it
+          selected.
         required: true
         type: string
       postgres_flag:
@@ -139,23 +141,76 @@ jobs:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_CI_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_CI_TOKEN }}
           PATTERNS: ${{ inputs.tests }}
+        # A shard is a set of streams separated by ";". The streams run at
+        # once and the patterns inside one run in order. A test is idle
+        # almost throughout (a control server averages under 5% of a CPU and
+        # 25 MB), so running them one at a time left the runner doing
+        # nothing for most of the shard.
+        #
         # --failfast=false: a shard holds many unrelated tests, and one
         # failure must not hide the verdict of the rest. Every pattern runs
-        # even after an earlier one fails, and the step reports the first
-        # failing exit code at the end.
+        # even after an earlier one fails, and the step exits non-zero if any
+        # of them did.
+        #
+        # --clean-before=false: that sweep removes stale containers and
+        # networks daemon-wide, which would reach into the streams running
+        # beside it. A CI runner is fresh, so there is nothing stale to
+        # remove.
         run: |
-          # The patterns are regexes holding "*" and "?", and the loop needs
+          # The patterns are regexes holding "*" and "?", and the loops need
           # word splitting, so turn pathname expansion off rather than quote.
           set -f
+
+          pids=()
+          logs=()
+          stream=0
+
+          # read returns non-zero on an unterminated last field, which -e
+          # would take as a reason to stop before running anything.
+          IFS=';' read -ra STREAMS <<<"$PATTERNS" || true
+
+          for patterns in "${STREAMS[@]}"; do
+            stream=$((stream + 1))
+            log="$RUNNER_TEMP/stream-$stream.log"
+            logs+=("$log")
+            (
+              set -f
+              rc=0
+              for pattern in $patterns; do
+                echo "--- $pattern"
+                /tmp/artifacts/hi run --stats --failfast=false \
+                  --clean-before=false \
+                  --ts-memory-limit=300 --hs-memory-limit=1500 \
+                  --timeout=90m "$pattern" ${{ inputs.postgres_flag }} || rc=$?
+              done
+              exit $rc
+            ) >"$log" 2>&1 &
+            pids+=($!)
+          done
+
+          # Wait for every stream before reporting, so one failure does not
+          # leave the others half-run.
           status=0
-          for pattern in $PATTERNS; do
-            echo "::group::$pattern"
-            /tmp/artifacts/hi run --stats --failfast=false \
-              --ts-memory-limit=300 --hs-memory-limit=1500 \
-              --timeout=90m "$pattern" ${{ inputs.postgres_flag }} || status=$?
+          for pid in "${pids[@]}"; do
+            wait "$pid" || status=$?
+          done
+
+          # The streams wrote to their own files, so replay them one at a
+          # time; interleaved output from three scenarios is unreadable.
+          for i in "${!logs[@]}"; do
+            echo "::group::stream $((i + 1))"
+            cat "${logs[$i]}"
             echo "::endgroup::"
           done
+
           exit $status
+      # The containers run as root and so do the files they leave behind,
+      # which the upload cannot read: it fails the whole artifact with
+      # "EACCES ... _status.json" and takes the map response captures with
+      # it, exactly when a failing shard needs them.
+      - name: Make the artefacts readable
+        if: always()
+        run: sudo chmod -R a+rX control_logs || true
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
