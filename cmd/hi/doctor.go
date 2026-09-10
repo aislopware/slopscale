@@ -248,8 +248,14 @@ func checkGolangImage(ctx context.Context) DoctorResult {
 	return pass(nameGolangImage, fmt.Sprintf("Golang image %s is now available", imageName))
 }
 
-// checkK3sImage verifies the ghcr k3s image used by TestK8sOperator is available
-// locally or can be pulled. The image is pinned (see [k3sic.K3sImage]).
+// checkK3sImage reports whether the ghcr k3s image used by TestK8sOperator is
+// already on the daemon. The image is pinned (see [k3sic.K3sImage]).
+//
+// It deliberately does not pull. [k3sic.New] pulls the image itself when the
+// one test that wants it runs, and pulling here cost every other invocation a
+// round trip to ghcr.io that ends in "denied" on a CI runner with no
+// credentials for it: measured at roughly fifty seconds, paid once per `hi
+// run`, on every shard.
 func checkK3sImage(ctx context.Context) DoctorResult {
 	cli, err := createDockerClient(ctx)
 	if err != nil {
@@ -273,17 +279,12 @@ func checkK3sImage(ctx context.Context) DoctorResult {
 		return pass(nameK3sImage, fmt.Sprintf("K3s image %s is available locally", imageName))
 	}
 
-	err = ensureImageAvailable(ctx, cli, imageName, false)
-	if err != nil {
-		return warn(
-			nameK3sImage,
-			fmt.Sprintf("K3s image %s not available locally and could not pull: %v", imageName, err),
-			"Only TestK8sOperator needs this image; other tests are unaffected",
-			"Try: docker pull "+imageName,
-		)
-	}
-
-	return pass(nameK3sImage, fmt.Sprintf("K3s image %s is now available", imageName))
+	return warn(
+		nameK3sImage,
+		fmt.Sprintf("K3s image %s is not on this daemon", imageName),
+		"Only TestK8sOperator needs it, and that test pulls it when it runs",
+		"To have it ready beforehand: docker pull "+imageName,
+	)
 }
 
 // checkGoInstallation verifies Go is installed and working.
