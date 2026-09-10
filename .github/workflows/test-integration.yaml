@@ -23,7 +23,11 @@ jobs:
   # limits at test time.
   # sqlite: Runs all integration tests with SQLite backend.
   # postgres: Runs a subset of tests with PostgreSQL to verify database compatibility.
-  build:
+  # Deciding whether the matrix has anything to do is a checkout and a filter,
+  # so it is its own job. The image jobs below need the answer but none of
+  # build's artifacts, and hanging them off build made them wait out its five
+  # minutes for a value that was ready in twenty seconds.
+  changes:
     runs-on: ubuntu-24.04-arm
     outputs:
       files-changed: ${{ steps.changed-files.outputs.files }}
@@ -45,14 +49,19 @@ jobs:
               - '.github/workflows/test-integration.yaml'
               - '.github/workflows/integration-test-template.yml'
               - 'Dockerfile.*'
+  build:
+    runs-on: ubuntu-24.04-arm
+    needs: changes
+    if: needs.changes.outputs.files-changed == 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
       - uses: NixOS/nix-installer-action@62c1943b776c509394b550f3f983adc14e9212d6 # v1.0.0
-        if: steps.changed-files.outputs.files == 'true'
       - uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
-        if: steps.changed-files.outputs.files == 'true'
       # The matrix waits on this job, so its length is added to every run's
       # wall clock. Compiling from cold was the bulk of it.
       - name: Restore Go cache
-        if: steps.changed-files.outputs.files == 'true'
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
@@ -63,7 +72,6 @@ jobs:
             go-integration-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum') }}-
             go-integration-${{ runner.os }}-${{ runner.arch }}-
       - name: Build binaries and warm Go cache
-        if: steps.changed-files.outputs.files == 'true'
         run: |
           # Build all Go binaries in one nix shell to maximize cache reuse.
           # hi runs on a runner that has no nix store, so it must not be the
@@ -75,14 +83,12 @@ jobs:
           # Build integration test binary to warm the cache with all dependencies
           go test -c ./integration -o /dev/null 2>/dev/null || true
       - name: Upload hi binary
-        if: steps.changed-files.outputs.files == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hi-binary
           path: hi
           retention-days: 10
       - name: Package Go cache
-        if: steps.changed-files.outputs.files == 'true'
         run: |
           # Package Go module cache and build cache. gzip -1 rather than the
           # default -6: this runs on the critical path before the matrix can
@@ -90,7 +96,6 @@ jobs:
           # test jobs in parallel.
           tar -I 'gzip -1' -cf go-cache.tar.gz -C ~ go .cache/go-build
       - name: Upload Go cache
-        if: steps.changed-files.outputs.files == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: go-cache
@@ -99,7 +104,6 @@ jobs:
           compression-level: 0
           retention-days: 10
       - name: Force overlay2 storage driver
-        if: steps.changed-files.outputs.files == 'true'
         run: |
           # Docker 29 runner images default to overlayfs, which breaks
           # docker build via Go SDK libraries and docker save/load
@@ -119,23 +123,13 @@ jobs:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ env.DOCKERHUB_TOKEN }}
       - name: Build slopscale image
-        if: steps.changed-files.outputs.files == 'true'
         run: |
           docker build \
             --file Dockerfile.integration-ci \
             --tag slopscale:${{ github.sha }} \
             .
           docker save slopscale:${{ github.sha }} | gzip > slopscale-image.tar.gz
-      - name: Build tailscale HEAD image
-        if: steps.changed-files.outputs.files == 'true'
-        run: |
-          docker build \
-            --file Dockerfile.tailscale-HEAD \
-            --tag tailscale-head:${{ github.sha }} \
-            .
-          docker save tailscale-head:${{ github.sha }} | gzip > tailscale-head-image.tar.gz
       - name: Upload slopscale image
-        if: steps.changed-files.outputs.files == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: slopscale-image
@@ -143,8 +137,40 @@ jobs:
           # Already gzipped; the default level 6 re-compresses it for nothing.
           compression-level: 0
           retention-days: 10
+  # Two minutes of docker build that needs nothing from `build`. Its steps run
+  # as plain bash rather than through the dev shell, so it skips installing nix
+  # for a job that only talks to the docker daemon.
+  build-tailscale-head:
+    runs-on: ubuntu-24.04-arm
+    needs: changes
+    if: needs.changes.outputs.files-changed == 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Force overlay2 storage driver
+        shell: bash
+        run: |
+          sudo mkdir -p /etc/docker
+          echo '{"storage-driver":"overlay2"}' | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker version
+      - name: Login to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_CI_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_CI_TOKEN }}
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ env.DOCKERHUB_USERNAME }}
+          password: ${{ env.DOCKERHUB_TOKEN }}
+      - name: Build tailscale HEAD image
+        shell: bash
+        run: |
+          docker build \
+            --file Dockerfile.tailscale-HEAD \
+            --tag tailscale-head:${{ github.sha }} \
+            .
+          docker save tailscale-head:${{ github.sha }} | gzip > tailscale-head-image.tar.gz
       - name: Upload tailscale HEAD image
-        if: steps.changed-files.outputs.files == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: tailscale-head-image
@@ -154,8 +180,8 @@ jobs:
           retention-days: 10
   build-postgres:
     runs-on: ubuntu-24.04-arm
-    needs: build
-    if: needs.build.outputs.files-changed == 'true'
+    needs: changes
+    if: needs.changes.outputs.files-changed == 'true'
     steps:
       - name: Force overlay2 storage driver
         shell: bash
@@ -189,8 +215,8 @@ jobs:
           retention-days: 10
   build-tailscale-released:
     runs-on: ubuntu-24.04-arm
-    needs: build
-    if: needs.build.outputs.files-changed == 'true'
+    needs: changes
+    if: needs.changes.outputs.files-changed == 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: NixOS/nix-installer-action@62c1943b776c509394b550f3f983adc14e9212d6 # v1.0.0
@@ -249,8 +275,8 @@ jobs:
           compression-level: 0
           retention-days: 10
   sqlite:
-    needs: [build, build-tailscale-released]
-    if: needs.build.outputs.files-changed == 'true'
+    needs: [changes, build, build-tailscale-head, build-tailscale-released]
+    if: needs.changes.outputs.files-changed == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -302,8 +328,15 @@ jobs:
       # A pull request shortens the soak window; the nightly run keeps it.
       soak_duration: ${{ github.event_name == 'pull_request' && '4m' || '' }}
   postgres:
-    needs: [build, build-postgres, build-tailscale-released]
-    if: needs.build.outputs.files-changed == 'true'
+    needs:
+      [
+        changes,
+        build,
+        build-tailscale-head,
+        build-postgres,
+        build-tailscale-released,
+      ]
+    if: needs.changes.outputs.files-changed == 'true'
     strategy:
       fail-fast: false
       matrix:
