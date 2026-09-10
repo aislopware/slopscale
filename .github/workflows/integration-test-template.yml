@@ -3,7 +3,15 @@ name: Integration Test Template
 on:
   workflow_call:
     inputs:
-      test:
+      shard:
+        description: "Shard number, used to name this job's log artifacts."
+        required: true
+        type: string
+      tests:
+        description: >
+          Space separated go test -run patterns, run in order. One shard holds
+          many tests; a split test needs a pattern of its own because go test
+          applies the part after "/" to everything the part before it selected.
         required: true
         type: string
       postgres_flag:
@@ -86,11 +94,12 @@ jobs:
           sudo systemctl restart docker
           docker version
       - name: Load br_netfilter for in-cluster service routing
-        if: inputs.test == 'TestK8sOperator'
         # TestK8sOperator runs k3s in a container; without br_netfilter on the
         # host, bridged pod-to-pod traffic skips kube-proxy's ClusterIP DNAT and
         # in-cluster DNS (kube-dns) is unreachable. The module cannot be loaded
         # from inside the unprivileged-module rancher/k3s image, so load it here.
+        # Which shard holds that test moves as the tests are repacked, so every
+        # shard loads it; on the rest it is a no-op.
         run: sudo modprobe br_netfilter
       - name: Login to Docker Hub
         env:
@@ -129,26 +138,33 @@ jobs:
           # which works but is one step further from the source).
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_CI_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_CI_TOKEN }}
-        run:
-          /tmp/artifacts/hi run --stats --ts-memory-limit=300 --hs-memory-limit=1500 "^${{ inputs.test }}$" \
-          --timeout=120m \
-          ${{ inputs.postgres_flag }}
-      # Sanitize test name for artifact upload (replace invalid characters: " : < > | * ? \ / with -)
-      - name: Sanitize test name for artifacts
-        if: always()
-        id: sanitize
-        run: echo "name=${TEST_NAME//[\":<>|*?\\\/]/-}" >> $GITHUB_OUTPUT
-        env:
-          TEST_NAME: ${{ inputs.test }}
+          PATTERNS: ${{ inputs.tests }}
+        # --failfast=false: a shard holds many unrelated tests, and one
+        # failure must not hide the verdict of the rest. Every pattern runs
+        # even after an earlier one fails, and the step reports the first
+        # failing exit code at the end.
+        run: |
+          # The patterns are regexes holding "*" and "?", and the loop needs
+          # word splitting, so turn pathname expansion off rather than quote.
+          set -f
+          status=0
+          for pattern in $PATTERNS; do
+            echo "::group::$pattern"
+            /tmp/artifacts/hi run --stats --failfast=false \
+              --ts-memory-limit=300 --hs-memory-limit=1500 \
+              --timeout=90m "$pattern" ${{ inputs.postgres_flag }} || status=$?
+            echo "::endgroup::"
+          done
+          exit $status
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: ${{ inputs.database_name }}-${{ steps.sanitize.outputs.name }}-logs
+          name: ${{ inputs.database_name }}-shard-${{ inputs.shard }}-logs
           path: "control_logs/*/*.log"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: ${{ inputs.database_name }}-${{ steps.sanitize.outputs.name }}-artifacts
+          name: ${{ inputs.database_name }}-shard-${{ inputs.shard }}-artifacts
           path: control_logs/
       - name: Setup a blocking tmux session
         if: ${{ env.HAS_TAILSCALE_SECRET }}

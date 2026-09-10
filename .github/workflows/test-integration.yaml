@@ -254,205 +254,50 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test:
-          - TestACLHostsInNetMapTable
-          - TestACLAllowUser80Dst
-          - TestACLDenyAllPort80
-          - TestACLAllowUserDst
-          - TestACLAllowStarDst
-          - TestACLNamedHostsCanReachBySubnet
-          - TestACLNamedHostsCanReach
-          - TestACLDevice1CanAccessDevice2
-          - TestPolicyUpdateWhileRunningWithCLIInDatabase
-          - TestACLAutogroupMember
-          - TestACLAutogroupTagged
-          - TestACLAutogroupSelf
-          - TestACLPolicyPropagationOverTime
-          - TestACLTagPropagation
-          - TestACLTagPropagationPortSpecific
-          - TestACLGroupWithUnknownUser
-          - TestACLGroupAfterUserDeletion
-          - TestACLGroupDeletionExactReproduction
-          - TestACLDynamicUnknownUserAddition
-          - TestACLDynamicUnknownUserRemoval
-          - TestAPIAuthenticationBypass
-          - TestAPIAuthenticationBypassCurl
-          - TestRemoteCLIAuthenticationBypass
-          - TestCLIWithConfigAuthenticationBypass
-          - TestAuthKeyLogoutAndReloginSameUser$/^with-https-true.*
-          - TestAuthKeyLogoutAndReloginSameUser$/^with-https-false.*
-          - TestAuthKeyLogoutAndReloginNewUser
-          - TestAuthKeyLogoutAndReloginSameUserExpiredKey$/^with-https-true.*
-          - TestAuthKeyLogoutAndReloginSameUserExpiredKey$/^with-https-false.*
-          - TestAuthKeyDeleteKey
-          - TestAuthKeyLogoutAndReloginRoutesPreserved
-          - TestOIDCAuthenticationPingAll
-          - TestOIDCExpireNodesBasedOnTokenExpiry
-          - TestOIDC024UserCreation$/^no-migration-verified-email.*
-          - TestOIDC024UserCreation$/^no-migration-not-verified-email.*
-          - TestOIDC024UserCreation$/^migration-no-strip-domains-not-verified-email.*
-          - TestOIDCAuthenticationWithPKCE
-          - TestOIDCReloginSameNodeNewUser
-          - TestOIDCFollowUpUrl
-          - TestOIDCMultipleOpenedLoginUrls
-          - TestOIDCReloginSameNodeSameUser
-          - TestOIDCExpiryAfterRestart
-          - TestOIDCACLPolicyOnJoin
-          - TestOIDCReloginSameUserRoutesPreserved
-          - TestAuthWebFlowAuthenticationPingAll
-          - TestAuthWebFlowLogoutAndReloginSameUser
-          - TestAuthWebFlowLogoutAndReloginNewUser
-          - TestApiKeyCommand
-          - TestApiKeyCommandValidation
-          - TestAuthCommandValidation
-          - TestNodeCommand
-          - TestNodeExpireCommand
-          - TestNodeRenameCommand
-          - TestPreAuthKeyCorrectUserLoggedInCommand
-          - TestTaggedNodesCLIOutput
-          - TestNodeExpireFlagsCommand
-          - TestNodeCommandValidation
-          - TestNodeTagCommand
-          - TestNodeRouteCommands
-          - TestNodeBackfillIPsCommand
-          - TestOAuthClientCommand
-          - TestOAuthClientCommandValidation
-          - TestPolicyCheckCommand
-          - TestSSHTestsRejectFailingPolicy
-          - TestPolicyCommand
-          - TestPolicyBrokenConfigCommand
-          - TestPreAuthKeyCommand
-          - TestPreAuthKeyCommandWithoutExpiry
-          - TestPreAuthKeyCommandReusableEphemeral
-          - TestPreAuthKeyDeleteCommand
-          - TestPreAuthKeyCommandValidation
-          - TestServerInfoCommands
-          - TestUserCommand
-          - TestUserCreateCommand
-          - TestUserCommandValidation
-          - TestDERPVerifyEndpoint
-          - TestResolveMagicDNS
-          - TestResolveMagicDNSExtraRecordsPath
-          - TestDERPServerScenario
-          - TestDERPServerWebsocketScenario
-          - TestPingAllByIP
-          - TestPingAllByIPPublicDERP
-          - TestEphemeral
-          - TestEphemeralInAlternateTimezone
-          - TestEphemeral2006DeletedTooQuickly
-          - TestPingAllByHostname
-          - TestTaildrop
-          - TestUpdateHostnameFromClient
-          - TestExpireNode
-          - TestSetNodeExpiryInFuture
-          - TestDisableNodeExpiry
-          - TestNodeOnlineStatus
-          - TestPingAllByIPManyUpDown
-          - Test2118DeletingOnlineNodePanics
-          - TestGrantCapRelay
-          - TestGrantCapDrive
-          - TestK8sOperator
-          - TestEnablingRoutes
-          - TestHASubnetRouterFailover
-          - TestSubnetRouteACL
-          - TestEnablingExitRoutes
-          - TestExitRoutesWithAutogroupInternetACL
-          - TestSubnetRouterMultiNetwork
-          - TestSubnetRouterMultiNetworkExitNode
-          - TestAutoApproveMultiNetwork$/^authkey-tag-advertiseduringup-false-pol-database.*
-          - TestAutoApproveMultiNetwork$/^authkey-tag-advertiseduringup-false-pol-file.*
-          - TestAutoApproveMultiNetwork$/^authkey-tag-advertiseduringup-true-pol-database.*
-          - TestAutoApproveMultiNetwork$/^authkey-tag-advertiseduringup-true-pol-file.*
-          - TestAutoApproveMultiNetwork$/^authkey-user-advertiseduringup-false-pol-database.*
-          - TestAutoApproveMultiNetwork$/^authkey-user-advertiseduringup-false-pol-file.*
-          - TestAutoApproveMultiNetwork$/^authkey-user-advertiseduringup-true-pol-database.*
-          - TestAutoApproveMultiNetwork$/^authkey-user-advertiseduringup-true-pol-file.*
-          - TestAutoApproveMultiNetwork$/^authkey-group-advertiseduringup-false-pol-database.*
-          - TestAutoApproveMultiNetwork$/^authkey-group-advertiseduringup-false-pol-file.*
-          - TestAutoApproveMultiNetwork$/^authkey-group-advertiseduringup-true-pol-database.*
-          - TestAutoApproveMultiNetwork$/^authkey-group-advertiseduringup-true-pol-file.*
-          - TestAutoApproveMultiNetwork$/^webauth-tag-advertiseduringup-false-pol-database.*
-          - TestAutoApproveMultiNetwork$/^webauth-tag-advertiseduringup-false-pol-file.*
-          - TestAutoApproveMultiNetwork$/^webauth-tag-advertiseduringup-true-pol-database.*
-          - TestAutoApproveMultiNetwork$/^webauth-tag-advertiseduringup-true-pol-file.*
-          - TestAutoApproveMultiNetwork$/^webauth-user-advertiseduringup-false-pol-database.*
-          - TestAutoApproveMultiNetwork$/^webauth-user-advertiseduringup-false-pol-file.*
-          - TestAutoApproveMultiNetwork$/^webauth-user-advertiseduringup-true-pol-database.*
-          - TestAutoApproveMultiNetwork$/^webauth-user-advertiseduringup-true-pol-file.*
-          - TestAutoApproveMultiNetwork$/^webauth-group-advertiseduringup-false-pol-database.*
-          - TestAutoApproveMultiNetwork$/^webauth-group-advertiseduringup-false-pol-file.*
-          - TestAutoApproveMultiNetwork$/^webauth-group-advertiseduringup-true-pol-database.*
-          - TestAutoApproveMultiNetwork$/^webauth-group-advertiseduringup-true-pol-file.*
-          - TestSubnetRouteACLFiltering
-          - TestGrantViaSubnetSteering
-          - TestHASubnetRouterPingFailover
-          - TestHASubnetRouterFailoverBothOffline
-          - TestHASubnetRouterFailoverBothOfflineCablePull
-          - TestHASubnetRouterFailoverDockerDisconnect
-          - TestSlopscale
-          - TestTailscaleNodesJoiningHeadcale
-          - TestSSHOneUserToAll
-          - TestSSHMultipleUsersAllToAll
-          - TestSSHNoSSHConfigured
-          - TestSSHIsBlockedInACL
-          - TestSSHUserOnlyIsolation
-          - TestSSHAutogroupSelf
-          - TestSSHOneUserToOneCheckModeCLI
-          - TestSSHOneUserToOneCheckModeOIDC
-          - TestSSHCheckModeUnapprovedTimeout
-          - TestSSHCheckModeCheckPeriodCLI
-          - TestSSHCheckModeAutoApprove
-          - TestSSHCheckModeSessionLossReDelegates
-          - TestSSHCheckModeNegativeCLI
-          - TestSSHLocalpart$/^MemberAndTagged.*
-          - TestSSHLocalpart$/^AutogroupSelf.*
-          - TestSSHLocalpart$/^LocalpartPlusRoot.*
-          - TestTagsAuthKeyWithTagRequestDifferentTag
-          - TestTagsAuthKeyWithTagNoAdvertiseFlag
-          - TestTagsAuthKeyWithTagCannotAddViaCLI
-          - TestTagsAuthKeyWithTagCannotChangeViaCLI
-          - TestTagsAuthKeyWithTagAdminOverrideReauthPreserves
-          - TestTagsReauthDifferentKeyRetagsNode
-          - TestTagsReauthDifferentKeyRemovesTag
-          - TestTagsAuthKeyWithTagCLICannotModifyAdminTags
-          - TestTagsAuthKeyWithoutTagCannotRequestTags
-          - TestTagsAuthKeyWithoutTagRegisterNoTags
-          - TestTagsAuthKeyWithoutTagCannotAddViaCLI
-          - TestTagsAuthKeyWithoutTagCLINoOpAfterAdminWithReset
-          - TestTagsAuthKeyWithoutTagCLINoOpAfterAdminWithEmptyAdvertise
-          - TestTagsAuthKeyWithoutTagCLICannotReduceAdminMultiTag
-          - TestTagsUserLoginOwnedTagAtRegistration
-          - TestTagsUserLoginNonExistentTagAtRegistration
-          - TestTagsUserLoginUnownedTagAtRegistration
-          - TestTagsUserLoginAddTagViaCLIReauth
-          - TestTagsUserLoginRemoveTagViaCLIReauth
-          - TestTagsUserLoginCLINoOpAfterAdminAssignment
-          - TestTagsUserLoginCLICannotRemoveAdminTags
-          - TestTagsAuthKeyWithTagRequestNonExistentTag
-          - TestTagsAuthKeyWithTagRequestUnownedTag
-          - TestTagsAuthKeyWithoutTagRequestNonExistentTag
-          - TestTagsAuthKeyWithoutTagRequestUnownedTag
-          - TestTagsAdminAPICannotSetNonExistentTag
-          - TestTagsAdminAPICanSetUnownedTag
-          - TestTagsAdminAPICannotRemoveAllTags
-          - TestTagsIssue2978ReproTagReplacement
-          - TestTagsAdminAPICannotSetInvalidFormat
-          - TestTagsUserLoginReauthWithEmptyTagsRemovesAllTags
-          - TestTagsAuthKeyWithoutUserInheritsTags
-          - TestTagsAuthKeyWithoutUserRejectsAdvertisedTags
-          - TestTagsAuthKeyConvertToUserViaCLIRegister
-          - TestTaggedNodeLogoutReloginSingleUseKeyOnline
-          - TestTaggedNodeLogoutReloginReusableKeyOnline
-          - TestTagsOIDCReauthAddOwnedTag
-          - TestTagsReauthEmptyTagsReturnsToUserSurvives
-          - TestTS2021WebSocketGET
-          - TestTS2021WASMClientUnderNode
-          - TestTailscaleRustAxum
+        shard:
+          - name: "01"
+            tests: "^(TestAPIAuthenticationBypass|TestDisableNodeExpiry|TestNodeOnlineStatus|TestPingAllByIPManyUpDown|TestRemoteCLIAuthenticationBypass|TestSSHOneUserToOneCheckModeCLI|TestSSHUserOnlyIsolation|TestTagsUserLoginUnownedTagAtRegistration)$ ^TestAutoApproveMultiNetwork$/^(webauth-group-advertiseduringup-false-pol-file).*$"
+          - name: "02"
+            tests: "^(TestExitRoutesWithAutogroupInternetACL|TestNodeTagCommand|TestOIDCExpireNodesBasedOnTokenExpiry|TestPolicyCheckCommand|TestServerInfoCommands|TestTagsAuthKeyWithTagCLICannotModifyAdminTags|TestTagsReauthDifferentKeyRetagsNode|TestTagsUserLoginNonExistentTagAtRegistration)$ ^TestAutoApproveMultiNetwork$/^(webauth-group-advertiseduringup-true-pol-database).*$ ^TestOIDC024UserCreation$/^(migration-no-strip-domains-not-verified-email).*$"
+          - name: "03"
+            tests: "^(TestACLDynamicUnknownUserRemoval|TestACLTagPropagation|TestPreAuthKeyCommandValidation|TestSSHNoSSHConfigured|TestTS2021WASMClientUnderNode|TestTS2021WebSocketGET|TestTagsAdminAPICannotSetNonExistentTag|TestUserCreateCommand)$ ^TestAuthKeyLogoutAndReloginSameUser$/^(with-https-true).*$ ^TestAutoApproveMultiNetwork$/^(authkey-user-advertiseduringup-true-pol-file).*$"
+          - name: "04"
+            tests: "^(TestACLAllowUser80Dst|TestACLDynamicUnknownUserAddition|TestAuthCommandValidation|TestAuthKeyDeleteKey|TestHASubnetRouterFailoverDockerDisconnect|TestPolicyUpdateWhileRunningWithCLIInDatabase|TestTagsAuthKeyWithoutTagRegisterNoTags|TestTagsUserLoginRemoveTagViaCLIReauth)$ ^TestAuthKeyLogoutAndReloginSameUser$/^(with-https-false).*$ ^TestAutoApproveMultiNetwork$/^(webauth-group-advertiseduringup-false-pol-database).*$"
+          - name: "05"
+            tests: "^(TestACLAllowUserDst|TestACLAutogroupTagged|TestApiKeyCommandValidation|TestAuthWebFlowLogoutAndReloginNewUser|TestAuthWebFlowLogoutAndReloginSameUser|TestResolveMagicDNS|TestSSHAutogroupSelf|TestTagsAdminAPICanSetUnownedTag|TestTagsUserLoginReauthWithEmptyTagsRemovesAllTags)$ ^TestAutoApproveMultiNetwork$/^(authkey-user-advertiseduringup-false-pol-database).*$"
+          - name: "06"
+            tests: "^(TestACLPolicyPropagationOverTime|TestDERPVerifyEndpoint|TestEnablingExitRoutes|TestPolicyBrokenConfigCommand|TestSSHTestsRejectFailingPolicy|TestSubnetRouteACLFiltering|TestTagsAuthKeyWithoutTagCLINoOpAfterAdminWithEmptyAdvertise|TestTagsAuthKeyWithoutTagCannotRequestTags|TestTagsReauthDifferentKeyRemovesTag)$ ^TestAutoApproveMultiNetwork$/^(authkey-user-advertiseduringup-false-pol-file).*$"
+          - name: "07"
+            tests: "^(TestCLIWithConfigAuthenticationBypass|TestDERPServerWebsocketScenario|TestEphemeral2006DeletedTooQuickly|TestNodeBackfillIPsCommand|TestSSHCheckModeCheckPeriodCLI|TestTaggedNodeLogoutReloginSingleUseKeyOnline|TestTagsAdminAPICannotSetInvalidFormat|TestTagsAuthKeyWithTagNoAdvertiseFlag|TestTagsAuthKeyWithTagRequestNonExistentTag)$ ^TestAutoApproveMultiNetwork$/^(authkey-user-advertiseduringup-true-pol-database).*$"
+          - name: "08"
+            tests: "^(TestACLHostsInNetMapTable|TestACLNamedHostsCanReach|TestOIDCFollowUpUrl|TestPingAllByHostname|TestPingAllByIP|TestSSHIsBlockedInACL|TestSlopscale|TestTagsAdminAPICannotRemoveAllTags|TestTagsAuthKeyWithoutUserRejectsAdvertisedTags|TestUserCommand)$ ^TestAutoApproveMultiNetwork$/^(authkey-tag-advertiseduringup-true-pol-database).*$"
+          - name: "09"
+            tests: "^(TestAPIAuthenticationBypassCurl|TestApiKeyCommand|TestAuthKeyLogoutAndReloginRoutesPreserved|TestDERPServerScenario|TestOIDCReloginSameNodeNewUser|TestPolicyCommand|TestPreAuthKeyCorrectUserLoggedInCommand|TestTagsReauthEmptyTagsReturnsToUserSurvives|TestTagsUserLoginAddTagViaCLIReauth)$ ^TestAutoApproveMultiNetwork$/^(authkey-tag-advertiseduringup-true-pol-file).*$"
+          - name: "10"
+            tests: "^(TestACLGroupDeletionExactReproduction|TestACLGroupWithUnknownUser|TestAuthWebFlowAuthenticationPingAll|TestNodeCommand|TestResolveMagicDNSExtraRecordsPath|TestSSHCheckModeUnapprovedTimeout|TestSubnetRouterMultiNetworkExitNode|TestTagsOIDCReauthAddOwnedTag|TestTagsUserLoginCLICannotRemoveAdminTags)$ ^TestAutoApproveMultiNetwork$/^(authkey-tag-advertiseduringup-false-pol-file).*$"
+          - name: "11"
+            tests: "^(TestACLDevice1CanAccessDevice2|TestGrantViaSubnetSteering|TestNodeCommandValidation|TestNodeRouteCommands|TestOAuthClientCommandValidation|TestTagsAuthKeyWithoutUserInheritsTags|TestTagsUserLoginCLINoOpAfterAdminAssignment|TestTailscaleRustAxum)$ ^TestAutoApproveMultiNetwork$/^(authkey-tag-advertiseduringup-false-pol-database|webauth-user-advertiseduringup-true-pol-file).*$"
+          - name: "12"
+            tests: "^(TestExpireNode|TestHASubnetRouterPingFailover|TestPreAuthKeyCommandReusableEphemeral|TestPreAuthKeyCommandWithoutExpiry|TestPreAuthKeyDeleteCommand|TestSSHOneUserToOneCheckModeOIDC|TestSetNodeExpiryInFuture|TestTaildrop)$ ^TestAutoApproveMultiNetwork$/^(authkey-group-advertiseduringup-true-pol-file|webauth-user-advertiseduringup-true-pol-database).*$"
+          - name: "13"
+            tests: "^(Test2118DeletingOnlineNodePanics|TestHASubnetRouterFailoverBothOfflineCablePull|TestOIDCACLPolicyOnJoin|TestSSHCheckModeAutoApprove|TestTaggedNodeLogoutReloginReusableKeyOnline|TestTagsAuthKeyWithoutTagCLICannotReduceAdminMultiTag|TestTailscaleNodesJoiningHeadcale|TestUpdateHostnameFromClient)$ ^TestAutoApproveMultiNetwork$/^(webauth-group-advertiseduringup-true-pol-file).*$ ^TestOIDC024UserCreation$/^(no-migration-not-verified-email).*$ ^TestSSHLocalpart$/^(AutogroupSelf).*$"
+          - name: "14"
+            tests: "^(TestACLTagPropagationPortSpecific|TestOIDCMultipleOpenedLoginUrls|TestSubnetRouterMultiNetwork|TestTagsAuthKeyConvertToUserViaCLIRegister|TestTagsAuthKeyWithTagAdminOverrideReauthPreserves|TestTagsAuthKeyWithTagCannotAddViaCLI|TestTagsIssue2978ReproTagReplacement|TestTagsUserLoginOwnedTagAtRegistration)$ ^TestAutoApproveMultiNetwork$/^(webauth-tag-advertiseduringup-false-pol-file).*$ ^TestSSHLocalpart$/^(MemberAndTagged).*$"
+          - name: "15"
+            tests: "^(TestACLDenyAllPort80|TestEphemeral|TestNodeExpireFlagsCommand|TestOIDCAuthenticationPingAll|TestSSHCheckModeNegativeCLI|TestSSHOneUserToAll|TestTagsAuthKeyWithTagRequestDifferentTag|TestTagsAuthKeyWithoutTagCannotAddViaCLI)$ ^TestAutoApproveMultiNetwork$/^(authkey-group-advertiseduringup-true-pol-database|webauth-user-advertiseduringup-false-pol-file).*$"
+          - name: "16"
+            tests: "^(TestACLAllowStarDst|TestACLNamedHostsCanReachBySubnet|TestEphemeralInAlternateTimezone|TestOIDCAuthenticationWithPKCE|TestOIDCReloginSameUserRoutesPreserved|TestSSHMultipleUsersAllToAll|TestTagsAuthKeyWithoutTagRequestNonExistentTag)$ ^TestAutoApproveMultiNetwork$/^(webauth-user-advertiseduringup-false-pol-database).*$ ^TestOIDC024UserCreation$/^(no-migration-verified-email).*$ ^TestSSHLocalpart$/^(LocalpartPlusRoot).*$"
+          - name: "17"
+            tests: "^(TestACLAutogroupMember|TestACLAutogroupSelf|TestHASubnetRouterFailoverBothOffline|TestK8sOperator|TestOAuthClientCommand|TestPingAllByIPPublicDERP|TestTaggedNodesCLIOutput|TestTagsAuthKeyWithoutTagRequestUnownedTag)$ ^TestAutoApproveMultiNetwork$/^(authkey-group-advertiseduringup-false-pol-database|webauth-tag-advertiseduringup-true-pol-database).*$"
+          - name: "18"
+            tests: "^(TestACLGroupAfterUserDeletion|TestAuthKeyLogoutAndReloginNewUser|TestOIDCExpiryAfterRestart|TestOIDCReloginSameNodeSameUser|TestPreAuthKeyCommand|TestSSHCheckModeSessionLossReDelegates|TestSubnetRouteACL|TestTagsAuthKeyWithTagRequestUnownedTag|TestUserCommandValidation)$ ^TestAuthKeyLogoutAndReloginSameUserExpiredKey$/^(with-https-false).*$ ^TestAutoApproveMultiNetwork$/^(webauth-tag-advertiseduringup-false-pol-database).*$"
+          - name: "19"
+            tests: "^(TestEnablingRoutes|TestGrantCapDrive|TestGrantCapRelay|TestHASubnetRouterFailover|TestNodeExpireCommand|TestNodeRenameCommand|TestTagsAuthKeyWithTagCannotChangeViaCLI|TestTagsAuthKeyWithoutTagCLINoOpAfterAdminWithReset)$ ^TestAuthKeyLogoutAndReloginSameUserExpiredKey$/^(with-https-true).*$ ^TestAutoApproveMultiNetwork$/^(authkey-group-advertiseduringup-false-pol-file|webauth-tag-advertiseduringup-true-pol-file).*$"
     uses: ./.github/workflows/integration-test-template.yml
     secrets: inherit
     with:
-      test: ${{ matrix.test }}
-      postgres_flag: "--postgres=0"
+      shard: ${{ matrix.shard.name }}
+      tests: ${{ matrix.shard.tests }}
       database_name: "sqlite"
       # A pull request shortens the soak window; the nightly run keeps it.
       soak_duration: ${{ github.event_name == 'pull_request' && '4m' || '' }}
@@ -462,17 +307,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test:
-          - TestACLAllowUserDst
-          - TestPingAllByIP
-          - TestEphemeral2006DeletedTooQuickly
-          - TestPingAllByIPManyUpDown
-          - TestSubnetRouterMultiNetwork
+        shard:
+          - name: "01"
+            tests: "^(TestACLAllowUserDst|TestEphemeral2006DeletedTooQuickly|TestPingAllByIP|TestPingAllByIPManyUpDown|TestSubnetRouterMultiNetwork)$"
     uses: ./.github/workflows/integration-test-template.yml
     secrets: inherit
     with:
-      test: ${{ matrix.test }}
+      shard: ${{ matrix.shard.name }}
+      tests: ${{ matrix.shard.tests }}
       postgres_flag: "--postgres=1"
       database_name: "postgres"
       # A pull request shortens the soak window; the nightly run keeps it.
       soak_duration: ${{ github.event_name == 'pull_request' && '4m' || '' }}
+tests: null
