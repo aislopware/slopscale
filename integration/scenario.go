@@ -204,11 +204,14 @@ func NewScenario(spec ScenarioSpec) (*Scenario, error) {
 		pool.Client = client
 	}
 
-	// Opportunity to clean up unreferenced networks.
-	// This might be a no op, but it is worth a try as we sometime
-	// dont clean up nicely after ourselves.
-	_ = dockertestutil.CleanUnreferencedNetworks(pool)
-	_ = dockertestutil.CleanImagesInCI(pool)
+	// Nothing sweeps the daemon here on purpose. Both sweeps this used to
+	// run were global: one removed every "hs-" network that had no
+	// containers yet, which is exactly what a scenario looks like between
+	// creating its network and attaching to it, and the other removed every
+	// untagged image, which is where the classic builder keeps the layer
+	// cache. Either one would reach into a scenario running beside this
+	// one. A scenario closes its own networks in [Scenario.Shutdown], and
+	// `hi clean` sweeps what a crashed run left behind.
 
 	if spec.MaxWait == 0 {
 		pool.MaxWait = dockertestMaxWait()
@@ -367,9 +370,6 @@ func (s *Scenario) Services(name string) ([]*dockertest.Resource, error) {
 
 func (s *Scenario) ShutdownAssertNoPanics(t *testing.T) {
 	t.Helper()
-
-	defer func() { _ = dockertestutil.CleanUnreferencedNetworks(s.pool) }()
-	defer func() { _ = dockertestutil.CleanImagesInCI(s.pool) }()
 
 	s.controlServers.Range(func(_ string, control ControlServer) bool {
 		stdoutPath, stderrPath, err := control.Shutdown()

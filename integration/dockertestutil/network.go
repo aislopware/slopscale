@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/cenkalti/backoff/v5"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
@@ -413,67 +412,6 @@ func RandomFreeHostPort() (int, error) {
 	}
 
 	return tcpAddr.Port, nil
-}
-
-// CleanUnreferencedNetworks removes networks that are not referenced by any containers.
-func CleanUnreferencedNetworks(pool *dockertest.Pool) error {
-	filter := "name=hs-"
-
-	networks, err := pool.NetworksByName(filter)
-	if err != nil {
-		return fmt.Errorf("getting networks by filter %q: %w", filter, err)
-	}
-
-	for _, network := range networks {
-		if len(network.Network.Containers) == 0 {
-			err := pool.RemoveNetwork(&network)
-			if err != nil {
-				log.Printf("removing network %s: %s", network.Network.Name, err)
-			}
-		}
-	}
-
-	return nil
-}
-
-// CleanImagesInCI removes images if running in CI.
-// It only removes dangling (untagged) images to avoid forcing rebuilds.
-// Tagged images (golang:*, tailscale/tailscale:*, etc.) are automatically preserved.
-func CleanImagesInCI(pool *dockertest.Pool) error {
-	if !util.IsCI() {
-		log.Println("Skipping image cleanup outside of CI")
-		return nil
-	}
-
-	images, err := pool.Client.ListImages(docker.ListImagesOptions{})
-	if err != nil {
-		return fmt.Errorf("getting images: %w", err)
-	}
-
-	removedCount := 0
-
-	for _, image := range images {
-		// Only remove dangling (untagged) images to avoid forcing rebuilds
-		// Dangling images have no RepoTags or only have "<none>:<none>"
-		if len(image.RepoTags) == 0 || (len(image.RepoTags) == 1 && image.RepoTags[0] == "<none>:<none>") {
-			log.Printf("Removing dangling image: %s", image.ID[:12])
-
-			err := pool.Client.RemoveImage(image.ID)
-			if err != nil {
-				log.Printf("Warning: failed to remove image %s: %v", image.ID[:12], err)
-			} else {
-				removedCount++
-			}
-		}
-	}
-
-	if removedCount > 0 {
-		log.Printf("Removed %d dangling images in CI", removedCount)
-	} else {
-		log.Println("No dangling images to remove in CI")
-	}
-
-	return nil
 }
 
 // DockerRestartPolicy sets the restart policy for containers.
