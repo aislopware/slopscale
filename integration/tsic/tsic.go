@@ -893,6 +893,12 @@ func (t *TailscaleInContainer) MustIPv6() netip.Addr {
 }
 
 // Status returns the [ipnstate.Status] of the Tailscale instance.
+// Status reports what `tailscale status --json` says. On failure it returns
+// an empty status next to the error rather than nil, because almost every
+// caller reads it inside an [assert.EventuallyWithT] closure after an
+// assert.NoError, which records the error and carries on. A nil there
+// panics, and a panic in one of those goroutines takes down the whole test
+// binary along with every other test sharing it.
 func (t *TailscaleInContainer) Status(_ ...bool) (*ipnstate.Status, error) {
 	command := []string{
 		tailscaleBin,
@@ -900,13 +906,15 @@ func (t *TailscaleInContainer) Status(_ ...bool) (*ipnstate.Status, error) {
 		"--json",
 	}
 
+	empty := &ipnstate.Status{Self: &ipnstate.PeerStatus{}}
+
 	status, raw, err := t.execJSON[ipnstate.Status](
 		command,
 		"executing tailscale status command",
 		"unmarshalling tailscale status",
 	)
 	if err != nil {
-		return nil, err
+		return empty, err
 	}
 
 	err = os.WriteFile(
@@ -915,7 +923,7 @@ func (t *TailscaleInContainer) Status(_ ...bool) (*ipnstate.Status, error) {
 		0o600,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("status netmap to /tmp/control: %w", err)
+		return empty, fmt.Errorf("status netmap to /tmp/control: %w", err)
 	}
 
 	return status, nil
