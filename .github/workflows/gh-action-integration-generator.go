@@ -3,23 +3,50 @@ package main
 //go:generate go run ./gh-action-integration-generator.go
 
 import (
-	"bytes"
+	"encoding/json"
 	"fmt"
 	"log"
+	"maps"
+	"os"
 	"os/exec"
+	"slices"
+	"sort"
 	"strings"
 )
 
-// testsToSplit defines tests that should be split into multiple CI jobs.
-// Key is the test function name, value is a list of subtest prefixes.
-// Each prefix becomes a separate CI job as "TestName$/^prefix".
+// GitHub runs a limited number of this repository's jobs at once, so the
+// matrix's wall clock is bounded by the total test time divided by that
+// limit, not by the longest single test. One job per test spent that budget
+// on setup: each job downloads four image tarballs and a Go cache before it
+// runs anything, about a minute that 190-odd jobs paid 190 times.
 //
-// Wall clock across the matrix is bounded by the longest single job, not by
-// the total, so the tests worth splitting are the slowest ones. Measured
-// against a full run: [TestAutoApproveMultiNetwork] took 13-18 minutes per
-// approver while every other job averaged four, because CI split it by
-// approver (4 subtests each) rather than by subtest. Splitting to the leaf
-// costs nothing in coverage: the same subtests run, in more jobs.
+// The tests are therefore packed into a fixed number of shards, sized so the
+// two matrices together stay inside the limit. Raise these together with the
+// limit; leaving lanes idle costs wall clock, and asking for more lanes than
+// exist only queues the surplus behind a full shard.
+const (
+	concurrentJobLimit = 20
+	postgresShards     = 1
+	sqliteShards       = concurrentJobLimit - postgresShards
+)
+
+// durationsFile holds the measured runtime in seconds of every top-level
+// test, which is what the shards are packed by. Refresh it from a real run
+// when the balance drifts: the per-job times are in the run's job list, and a
+// test missing from the file is packed as [defaultSeconds].
+const durationsFile = "integration-test-durations.json"
+
+// defaultSeconds is what a test not in [durationsFile] is assumed to cost,
+// close to the median test. A new test lands in some shard either way; the
+// only cost of a wrong guess is a less even split.
+const defaultSeconds = 185
+
+// testsToSplit defines tests that are split across shards by subtest.
+// Key is the test function name, value is a list of subtest prefixes.
+//
+// A whole test cannot straddle two shards, so any test longer than a shard
+// sets the wall clock on its own. [TestAutoApproveMultiNetwork] takes about
+// 88 minutes, several times a shard, and splits into 24 independent leaves.
 //
 // A prefix must name a real subtest. [TestAutoApproveMultiNetwork] composes
 // its names as "<approver>-advertiseduringup-<bool>-pol-<mode>", the auth-key
@@ -46,6 +73,30 @@ var testsToSplit = map[string][]string{
 	},
 }
 
+// postgresTests is the subset of tests that also runs against PostgreSQL.
+var postgresTests = []string{
+	"TestACLAllowUserDst",
+	"TestPingAllByIP",
+	"TestEphemeral2006DeletedTooQuickly",
+	"TestPingAllByIPManyUpDown",
+	"TestSubnetRouterMultiNetwork",
+}
+
+// item is one unit of work a shard can be given: a whole test, or a single
+// subtest prefix of a test that is split.
+type item struct {
+	top     string
+	sub     string
+	seconds int
+}
+
+// shard is one matrix entry: a name for its logs and the go test patterns it
+// runs, in order.
+type shard struct {
+	Name  string `json:"name"`
+	Tests string `json:"tests"`
+}
+
 // autoApproveSubtests enumerates the leaf subtests [TestAutoApproveMultiNetwork]
 // generates: one per approver, policy mode and advertise-during-up combination.
 func autoApproveSubtests() []string {
@@ -70,30 +121,136 @@ func autoApproveSubtests() []string {
 	return out
 }
 
-// expandTests takes a list of test names and expands any that need splitting
-// into multiple subtest patterns.
-func expandTests(tests []string) []string {
-	var expanded []string
+func readDurations() map[string]int {
+	raw, err := os.ReadFile(durationsFile)
+	if err != nil {
+		log.Fatalf("reading %s: %s", durationsFile, err)
+	}
+
+	var durations map[string]int
+
+	err = json.Unmarshal(raw, &durations)
+	if err != nil {
+		log.Fatalf("parsing %s: %s", durationsFile, err)
+	}
+
+	return durations
+}
+
+// toItems turns test names into the units the shards are packed from. A split
+// test contributes one item per subtest prefix, each carrying an even share of
+// the whole test's measured time.
+func toItems(tests []string, durations map[string]int) []item {
+	var items []item
 
 	for _, test := range tests {
-		prefixes, ok := testsToSplit[test]
+		seconds, ok := durations[test]
 		if !ok {
-			expanded = append(expanded, test)
+			seconds = defaultSeconds
+		}
+
+		prefixes, split := testsToSplit[test]
+		if !split {
+			items = append(items, item{top: test, seconds: seconds})
 
 			continue
 		}
 
-		// The runner wraps the pattern in ^...$ and go test splits it on "/",
-		// matching each part unanchored. Anchor both ends of the test name
-		// ourselves, or "^TestAuthKeyLogoutAndReloginSameUser" also selects
-		// TestAuthKeyLogoutAndReloginSameUserExpiredKey and runs it twice.
-		// ".*" on the prefix lets it match the rest of the subtest name.
 		for _, prefix := range prefixes {
-			expanded = append(expanded, fmt.Sprintf("%s$/^%s.*", test, prefix))
+			items = append(items, item{top: test, sub: prefix, seconds: seconds / len(prefixes)})
 		}
 	}
 
-	return expanded
+	return items
+}
+
+// pack distributes items over n shards longest-first, each going to the shard
+// with the least work so far. Ties are broken by name so the output is stable
+// and the workflow only changes when the tests or their timings do.
+func pack(items []item, n int) [][]item {
+	sorted := slices.Clone(items)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if sorted[i].seconds != sorted[j].seconds {
+			return sorted[i].seconds > sorted[j].seconds
+		}
+
+		return sorted[i].top+sorted[i].sub < sorted[j].top+sorted[j].sub
+	})
+
+	bins := make([][]item, n)
+	load := make([]int, n)
+
+	for _, it := range sorted {
+		best := 0
+		for i := 1; i < n; i++ {
+			if load[i] < load[best] {
+				best = i
+			}
+		}
+
+		bins[best] = append(bins[best], it)
+		load[best] += it.seconds
+	}
+
+	return bins
+}
+
+// patterns renders one shard's items as go test -run patterns. Whole tests
+// collapse into a single alternation; each split test needs its own pattern,
+// because go test applies the part after "/" to every test the part before it
+// selected.
+func patterns(items []item) string {
+	var whole []string
+
+	subs := map[string][]string{}
+
+	for _, it := range items {
+		if it.sub == "" {
+			whole = append(whole, it.top)
+
+			continue
+		}
+
+		subs[it.top] = append(subs[it.top], it.sub)
+	}
+
+	var out []string
+
+	if len(whole) > 0 {
+		sort.Strings(whole)
+		out = append(out, "^("+strings.Join(whole, "|")+")$")
+	}
+
+	for _, top := range slices.Sorted(maps.Keys(subs)) {
+		sort.Strings(subs[top])
+		// ".*" lets a prefix match the rest of the subtest name; the test
+		// name is anchored so "…SameUser" does not also select
+		// "…SameUserExpiredKey" and run it in two shards.
+		out = append(out, "^"+top+"$/^("+strings.Join(subs[top], "|")+").*$")
+	}
+
+	return strings.Join(out, " ")
+}
+
+func shards(tests []string, durations map[string]int, n int) []shard {
+	bins := pack(toItems(tests, durations), n)
+	out := make([]shard, 0, len(bins))
+
+	for i, bin := range bins {
+		if len(bin) == 0 {
+			continue
+		}
+
+		total := 0
+		for _, it := range bin {
+			total += it.seconds
+		}
+
+		out = append(out, shard{Name: fmt.Sprintf("%02d", i+1), Tests: patterns(bin)})
+		log.Printf("shard %02d: %2d tests, %4.1f min", i+1, len(bin), float64(total)/60)
+	}
+
+	return out
 }
 
 func findTests() []string {
@@ -114,69 +271,51 @@ func findTests() []string {
 		"--no-heading",
 	}
 
-	cmd := exec.Command(rgBin, args...)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err = cmd.Run()
+	out, err := exec.Command(rgBin, args...).Output()
 	if err != nil {
 		log.Fatalf("failed to run command: %s", err)
 	}
 
-	tests := strings.Split(strings.TrimSpace(out.String()), "\n")
-	return tests
+	return strings.Split(strings.TrimSpace(string(out)), "\n")
 }
 
-func updateYAML(tests []string, jobName string, testPath string) {
-	testsForYq := fmt.Sprintf("[%s]", strings.Join(tests, ", "))
-
-	yqCommand := fmt.Sprintf(
-		"yq eval '.jobs.%s.strategy.matrix.test = %s' %s -i",
-		jobName,
-		testsForYq,
-		testPath,
-	)
-	cmd := exec.Command("bash", "-c", yqCommand)
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
+// updateYAML writes a job's shard matrix. The value goes through the
+// environment rather than the expression, so a pattern's regex characters
+// never reach a shell or yq's parser as syntax.
+func updateYAML(entries []shard, jobName string, testPath string) {
+	encoded, err := json.Marshal(entries)
 	if err != nil {
-		log.Printf("stdout: %s", stdout.String())
-		log.Printf("stderr: %s", stderr.String())
-		log.Fatalf("failed to run yq command: %s", err)
+		log.Fatalf("encoding shards: %s", err)
 	}
 
-	fmt.Printf("YAML file (%s) job %s updated successfully\n", testPath, jobName)
+	// The shards are handed over as JSON, which yq keeps in flow style with
+	// every scalar double quoted. Collections become block style so oxfmt
+	// leaves the file alone, and the scalars stay quoted so a pattern's
+	// leading "^" is never read as YAML syntax. Without this the workflow
+	// that regenerates and diffs could not agree with the formatted tree.
+	const restyle = `(.jobs.%[1]s.strategy.matrix.shard | .. | ` +
+		`select(tag == "!!map" or tag == "!!seq")) style="" | ` +
+		`(.jobs.%[1]s.strategy.matrix.shard | .. | select(tag == "!!str")) style="double" | ` +
+		`(.jobs.%[1]s.strategy.matrix.shard[][] | key) style=""`
+
+	expr := fmt.Sprintf(".jobs.%[1]s.strategy.matrix.shard = env(SHARDS) | "+restyle, jobName)
+
+	cmd := exec.Command("yq", "eval", expr, testPath, "-i")
+	cmd.Env = append(os.Environ(), "SHARDS="+string(encoded))
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Printf("yq: %s", output)
+		log.Fatalf("failed to run yq: %s", err)
+	}
+
+	fmt.Printf("YAML file (%s) job %s updated with %d shards\n", testPath, jobName, len(entries))
 }
 
 func main() {
+	durations := readDurations()
 	tests := findTests()
 
-	// Expand tests that should be split into multiple jobs
-	expandedTests := expandTests(tests)
-
-	quotedTests := make([]string, len(expandedTests))
-	for i, test := range expandedTests {
-		quotedTests[i] = fmt.Sprintf("\"%s\"", test)
-	}
-
-	// Define selected tests for PostgreSQL
-	postgresTestNames := []string{
-		"TestACLAllowUserDst",
-		"TestPingAllByIP",
-		"TestEphemeral2006DeletedTooQuickly",
-		"TestPingAllByIPManyUpDown",
-		"TestSubnetRouterMultiNetwork",
-	}
-
-	quotedPostgresTests := make([]string, len(postgresTestNames))
-	for i, test := range postgresTestNames {
-		quotedPostgresTests[i] = fmt.Sprintf("\"%s\"", test)
-	}
-
-	// Update both SQLite and PostgreSQL job matrices
-	updateYAML(quotedTests, "sqlite", "./test-integration.yaml")
-	updateYAML(quotedPostgresTests, "postgres", "./test-integration.yaml")
+	updateYAML(shards(tests, durations, sqliteShards), "sqlite", "./test-integration.yaml")
+	updateYAML(shards(postgresTests, durations, postgresShards), "postgres", "./test-integration.yaml")
 }
