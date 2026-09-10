@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -136,7 +137,7 @@ func NewAuthProviderOIDC(
 		ClientID:     cfg.ClientID,
 		ClientSecret: cfg.ClientSecret,
 		Endpoint:     oidcProvider.Endpoint(),
-		RedirectURL:  strings.TrimSuffix(serverURL, "/") + "/oidc/callback",
+		RedirectURL:  oidcCallbackURL(serverURL),
 		Scopes:       cfg.Scope,
 	}
 
@@ -223,8 +224,8 @@ func (a *AuthProviderOIDC) OIDCCallbackHandler(
 
 	// The state/nonce cookies have served their CSRF purpose; clear them so a
 	// single-use pair does not linger in the browser until MaxAge.
-	clearOIDCCallbackCookie(writer, stateCookieName)
-	clearOIDCCallbackCookie(writer, nonceCookieName)
+	a.clearOIDCCallbackCookie(writer, stateCookieName)
+	a.clearOIDCCallbackCookie(writer, nonceCookieName)
 
 	nodeExpiry := a.determineNodeExpiry(idToken.Expiry)
 
@@ -295,13 +296,13 @@ func (a *AuthProviderOIDC) OIDCCallbackHandler(
 		return
 	}
 
-	// If this is a registration flow, render the confirmation
+	// If this is a registration flow, send the browser to the confirmation
 	// interstitial instead of finalising the registration immediately.
 	// Without an explicit user click, a single GET to
 	// /register/{auth_id} could silently complete a registration when
 	// the IdP allows silent SSO.
 	if authInfo.Registration {
-		a.renderRegistrationConfirmInterstitial(writer, req, authInfo.AuthID, user, nodeExpiry)
+		a.beginRegistrationConfirmation(writer, req, authInfo.AuthID, user, nodeExpiry)
 
 		return
 	}
@@ -442,27 +443,106 @@ func doOIDCAuthorization(
 // browser do not collide.
 const registerConfirmCSRFCookie = "slopscale_register_confirm"
 
-// setRegisterConfirmCookie writes the per-session register-confirm CSRF
-// cookie. Pass the CSRF token and authCacheExpiration seconds to set it;
-// pass ("", -1) to clear it after the registration is finalised.
-func setRegisterConfirmCookie(
+// registrationLinkSpentMsg is logged when a user returns to a registration
+// link whose session is gone, which is usually a reload or a back button
+// after they already confirmed.
+const registrationLinkSpentMsg = "registration link already used or expired"
+
+// registrationLinkSpentUserMsg is what the browser shows for it: the generic
+// 410 page reads as a failure, and this one almost never is.
+const registrationLinkSpentUserMsg = "This link has already been used or has expired. " +
+	"If your device is connected you are done; otherwise start the login again."
+
+var errRegistrationLinkSpent = newHTTPUserError(
+	http.StatusGone,
+	registrationLinkSpentMsg,
+	registrationLinkSpentUserMsg,
+	nil,
+)
+
+// RegisterConfirmGetHandler renders the OIDC registration confirmation
+// interstitial. It is reached via the redirect that
+// [AuthProviderOIDC.beginRegistrationConfirmation] issues from the OIDC
+// callback, and it is safe to reload: it only reads the pending confirmation
+// captured on the cached [types.AuthRequest] and never touches the one-time
+// code exchange.
+//
+// Listens in GET /register/confirm/:auth_id.
+func (a *AuthProviderOIDC) RegisterConfirmGetHandler(
 	writer http.ResponseWriter,
 	req *http.Request,
-	authID types.AuthID,
-	value string,
-	maxAge int,
-	secure bool,
 ) {
-	//nolint:gosec // G124: Secure from server_url scheme or req.TLS; HttpOnly + SameSite already set
-	http.SetCookie(writer, &http.Cookie{
-		Name:     registerConfirmCSRFCookie,
-		Value:    value,
-		Path:     "/register/confirm/" + authID.String(),
-		MaxAge:   maxAge,
-		Secure:   secure || req.TLS != nil,
-		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
-	})
+	authID, err := authIDFromRequest(req)
+	if err != nil {
+		httpUserError(writer, err)
+
+		return
+	}
+
+	authReq, ok := a.h.state.GetAuthCacheEntry(authID)
+	if !ok {
+		httpUserError(writer, errRegistrationLinkSpent)
+
+		return
+	}
+
+	pending := authReq.PendingConfirmation()
+	if pending == nil {
+		httpUserError(writer, NewHTTPError(http.StatusForbidden, "registration not OIDC-authorized", nil))
+
+		return
+	}
+
+	// Only the browser that completed the OIDC flow holds this cookie, and
+	// holding it is what authorises the confirm POST. Requiring it here too
+	// keeps the device details, and the token that finalises the
+	// registration, away from anyone who merely knows the auth ID — which
+	// the node being registered does.
+	cookie, err := req.Cookie(registerConfirmCSRFCookie)
+	if err != nil {
+		httpUserError(writer, NewHTTPError(http.StatusForbidden, "missing csrf cookie", err))
+
+		return
+	}
+
+	// Constant time: the token is a secret the request must prove it has.
+	if subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(pending.CSRF)) != 1 {
+		httpUserError(writer, NewHTTPError(http.StatusForbidden, "csrf token mismatch", nil))
+
+		return
+	}
+
+	user, err := a.h.state.GetUserByID(types.UserID(pending.UserID))
+	if err != nil {
+		httpUserError(writer, fmt.Errorf("looking up user: %w", err))
+
+		return
+	}
+
+	regData := authReq.RegistrationData()
+
+	info := templates.RegisterConfirmInfo{
+		FormAction:    a.registerConfirmURL(authID),
+		CSRFTokenName: registerConfirmCSRFCookie,
+		CSRFToken:     pending.CSRF,
+		User:          user.Display(),
+		Hostname:      regData.Hostname,
+		MachineKey:    regData.MachineKey.ShortString(),
+	}
+	if regData.Hostinfo != nil {
+		info.OS = regData.Hostinfo.OS
+	}
+
+	// The page carries the token that finalises the registration, so no
+	// shared cache or history restore may serve it back.
+	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+	writer.WriteHeader(http.StatusOK)
+
+	_, err = writer.Write([]byte(templates.RegisterConfirm(info).Render()))
+	if err != nil {
+		util.LogErr(err, "Failed to write HTTP response")
+	}
 }
 
 // RegisterConfirmHandler is the POST endpoint behind the OIDC
@@ -521,7 +601,7 @@ func (a *AuthProviderOIDC) RegisterConfirmHandler(
 
 	authReq, ok := a.h.state.GetAuthCacheEntry(authID)
 	if !ok {
-		httpUserError(writer, NewHTTPError(http.StatusGone, "registration session expired", nil))
+		httpUserError(writer, errRegistrationLinkSpent)
 
 		return
 	}
@@ -549,7 +629,12 @@ func (a *AuthProviderOIDC) RegisterConfirmHandler(
 	newNode, err := a.handleRegistration(user, authID, pending.NodeExpiry)
 	if err != nil {
 		if errors.Is(err, db.ErrNodeNotFoundRegistrationCache) {
-			httpUserError(writer, NewHTTPError(http.StatusGone, "registration session expired", err))
+			httpUserError(writer, newHTTPUserError(
+				http.StatusGone,
+				registrationLinkSpentMsg,
+				registrationLinkSpentUserMsg,
+				err,
+			))
 
 			return
 		}
@@ -570,7 +655,7 @@ func (a *AuthProviderOIDC) RegisterConfirmHandler(
 	}
 
 	// Clear the CSRF cookie now that the registration is final.
-	setRegisterConfirmCookie(writer, req, authID, "", -1, a.cookiesSecure())
+	a.setRegisterConfirmCookie(writer, req, authID, "", -1)
 
 	content := renderRegistrationSuccessTemplate(user, newNode)
 
@@ -587,6 +672,51 @@ func (a *AuthProviderOIDC) RegisterConfirmHandler(
 	}
 }
 
+// registerConfirmURL is the browser-facing URL of the confirmation page. It
+// is built from server_url, like [AuthProviderOIDC.RegisterURL] and the OIDC
+// redirect URI, so a Slopscale that a reverse proxy serves under a path
+// prefix hands the browser a URL that resolves.
+func (a *AuthProviderOIDC) registerConfirmURL(authID types.AuthID) string {
+	return authPathURL(a.serverURL, "register/confirm", authID)
+}
+
+// setRegisterConfirmCookie writes the per-session register-confirm CSRF
+// cookie. Pass the CSRF token and authCacheExpiration seconds to set it;
+// pass ("", -1) to clear it after the registration is finalised.
+func (a *AuthProviderOIDC) setRegisterConfirmCookie(
+	writer http.ResponseWriter,
+	req *http.Request,
+	authID types.AuthID,
+	value string,
+	maxAge int,
+) {
+	// Scope the cookie to the browser-facing path, which carries the
+	// reverse proxy's prefix; the routed path does not.
+	path := "/register/confirm/" + authID.String()
+
+	u, err := url.Parse(a.registerConfirmURL(authID))
+	if err == nil {
+		path = u.Path
+	}
+
+	//nolint:gosec // G124: Secure from server_url scheme or req.TLS; HttpOnly + SameSite already set
+	http.SetCookie(writer, &http.Cookie{
+		Name:     registerConfirmCSRFCookie,
+		Value:    value,
+		Path:     path,
+		MaxAge:   maxAge,
+		Secure:   a.cookiesSecure() || req.TLS != nil,
+		HttpOnly: true,
+		// Lax, not Strict: the callback sets this cookie and immediately
+		// redirects to the confirmation page. That hop ends a redirect
+		// chain which began cross-site at the IdP, and Firefox evaluates
+		// the whole chain, so a Strict cookie is withheld and the
+		// confirmation page 403s. Lax still never rides a cross-site
+		// POST, so the confirm submission stays protected.
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
 // cookiesSecure reports whether the OIDC cookies should carry the Secure flag.
 // It keys off the configured server_url scheme, not req.TLS, so cookies stay
 // Secure behind a TLS-terminating reverse proxy (where the proxy→Slopscale hop
@@ -594,6 +724,25 @@ func (a *AuthProviderOIDC) RegisterConfirmHandler(
 // spoofable X-Forwarded-Proto header.
 func (a *AuthProviderOIDC) cookiesSecure() bool {
 	return strings.HasPrefix(a.serverURL, "https://")
+}
+
+// oidcCallbackURL is the browser-facing URL the identity provider redirects
+// back to. It is built from server_url so a Slopscale behind a reverse proxy
+// that serves it under a path prefix hands the IdP a URL that resolves.
+func oidcCallbackURL(serverURL string) string {
+	return strings.TrimSuffix(serverURL, "/") + "/oidc/callback"
+}
+
+// oidcCallbackPath is the path the callback cookies are scoped to: the
+// browser-facing path, which carries the reverse proxy's prefix, not the
+// routed path.
+func (a *AuthProviderOIDC) oidcCallbackPath() string {
+	u, err := url.Parse(oidcCallbackURL(a.serverURL))
+	if err != nil {
+		return "/oidc/callback"
+	}
+
+	return u.Path
 }
 
 // authHandler takes an incoming request that needs to be authenticated and
@@ -616,10 +765,10 @@ func (a *AuthProviderOIDC) authHandler(
 // under a fresh state, so the callback can pick the flow up again.
 func (a *AuthProviderOIDC) startAuth(writer http.ResponseWriter, req *http.Request, registrationInfo AuthInfo) {
 	// Set the state and nonce cookies to protect against CSRF attacks
-	state := setCSRFCookie(writer, req, "state", a.cookiesSecure())
+	state := a.setCSRFCookie(writer, req, "state")
 
 	// Set the state and nonce cookies to protect against CSRF attacks
-	nonce := setCSRFCookie(writer, req, "nonce", a.cookiesSecure())
+	nonce := a.setCSRFCookie(writer, req, "nonce")
 
 	extras := make([]oauth2.AuthCodeOption, 0, len(a.cfg.ExtraParams)+defaultOAuthOptionsCount)
 	// Add PKCE verification if enabled
@@ -888,11 +1037,19 @@ func identifierFromIssuer(identifier sql.NullString, iss string) bool {
 	return strings.HasPrefix(identifier.String, prefix+"/")
 }
 
-// renderRegistrationConfirmInterstitial captures the resolved OIDC
-// identity and node expiry into the cached [types.AuthRequest], sets the CSRF
-// cookie, and renders the confirmation page that the user must
-// explicitly submit before the registration is finalised.
-func (a *AuthProviderOIDC) renderRegistrationConfirmInterstitial(
+// beginRegistrationConfirmation captures the resolved OIDC identity and node
+// expiry into the cached [types.AuthRequest], sets the CSRF cookie, and
+// redirects the browser to the confirmation page.
+//
+// The interstitial is served from its own URL rather than written inline
+// here, because this request carries the single-use OAuth authorization code.
+// A page rendered on this response leaves the browser parked on the
+// code-bearing URL, and anything that reloads it — an extension calling
+// window.location.reload(), the back button, pull-to-refresh, a prerender —
+// re-enters the callback with a spent code and paints an error over the
+// interstitial. Redirecting keeps the code exchange one-shot and makes the
+// page the user waits on safe to reload.
+func (a *AuthProviderOIDC) beginRegistrationConfirmation(
 	writer http.ResponseWriter,
 	req *http.Request,
 	authID types.AuthID,
@@ -927,29 +1084,12 @@ func (a *AuthProviderOIDC) renderRegistrationConfirmInterstitial(
 		CSRF:       csrf,
 	})
 
-	setRegisterConfirmCookie(writer, req, authID, csrf, int(authCacheExpiration.Seconds()), a.cookiesSecure())
+	a.setRegisterConfirmCookie(writer, req, authID, csrf, int(authCacheExpiration.Seconds()))
 
-	regData := authReq.RegistrationData()
-
-	info := templates.RegisterConfirmInfo{
-		FormAction:    "/register/confirm/" + authID.String(),
-		CSRFTokenName: registerConfirmCSRFCookie,
-		CSRFToken:     csrf,
-		User:          user.Display(),
-		Hostname:      regData.Hostname,
-		MachineKey:    regData.MachineKey.ShortString(),
-	}
-	if regData.Hostinfo != nil {
-		info.OS = regData.Hostinfo.OS
-	}
-
-	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-	writer.WriteHeader(http.StatusOK)
-
-	_, err := writer.Write([]byte(templates.RegisterConfirm(info).Render()))
-	if err != nil {
-		util.LogErr(err, "Failed to write HTTP response")
-	}
+	// 303 See Other so the browser issues a fresh GET for the confirmation
+	// page and leaves the code-bearing URL behind as a transient hop rather
+	// than a history entry it can return to.
+	http.Redirect(writer, req, a.registerConfirmURL(authID), http.StatusSeeOther)
 }
 
 func (a *AuthProviderOIDC) handleRegistration(
@@ -1222,25 +1362,25 @@ func getCookieName(baseName, value string) string {
 
 // clearOIDCCallbackCookie expires a /oidc/callback cookie by name. Matching the
 // path the cookie was set with is required for the browser to drop it.
-func clearOIDCCallbackCookie(w http.ResponseWriter, name string) {
+func (a *AuthProviderOIDC) clearOIDCCallbackCookie(w http.ResponseWriter, name string) {
 	//nolint:gosec // G124: a deletion cookie (empty value, MaxAge<0); security attributes are moot
 	http.SetCookie(w, &http.Cookie{
 		Name:   name,
-		Path:   "/oidc/callback",
+		Path:   a.oidcCallbackPath(),
 		MaxAge: -1,
 	})
 }
 
-func setCSRFCookie(w http.ResponseWriter, r *http.Request, name string, secure bool) string {
+func (a *AuthProviderOIDC) setCSRFCookie(w http.ResponseWriter, r *http.Request, name string) string {
 	val := rands.HexString(oidcCookieValueLength)
 
 	//nolint:gosec // G124: Secure from server_url scheme or req.TLS; HttpOnly + SameSite set below
 	c := &http.Cookie{
-		Path:     "/oidc/callback",
+		Path:     a.oidcCallbackPath(),
 		Name:     getCookieName(name, val),
 		Value:    val,
 		MaxAge:   int(time.Hour.Seconds()),
-		Secure:   secure || r.TLS != nil,
+		Secure:   a.cookiesSecure() || r.TLS != nil,
 		HttpOnly: true,
 		// Lax, not Strict: the OIDC callback is a cross-site top-level GET
 		// redirect from the IdP that must still carry this cookie. Strict
