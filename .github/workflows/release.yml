@@ -98,9 +98,13 @@ jobs:
           BASE: ${{ steps.version.outputs.base }}
         run: |
           notes="$RUNNER_TEMP/notes.md"
+          # Every heading moves up one level on the way out. In CHANGELOG.md
+          # the sections sit under the version's own "##" heading, which this
+          # drops; left at "###" in a release body they render as children of
+          # goreleaser's footer, the only other heading on the page.
           awk -v base="$BASE" '
             /^## / { if (found) exit; if ($2 == base) { found = 1; next } }
-            found { print }
+            found { sub(/^###/, "##"); print }
           ' CHANGELOG.md > "$notes"
           if ! grep -q '[^[:space:]]' "$notes"; then
             echo "::error::CHANGELOG.md has no '## $BASE (...)' section; write one for the operators first"

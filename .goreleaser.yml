@@ -10,7 +10,10 @@ before:
 release:
   prerelease: auto
   draft: true
-  header: |
+  # A footer, not a header: a release page leads with what changed. As a
+  # header this paragraph pushed all forty-odd sections of the release below
+  # a heading about upgrading, which is not what they are.
+  footer: |
     ## Upgrade
 
     Please follow the steps outlined in the [upgrade guide](https://aislopware.github.io/slopscale/setup/upgrade/) to update your existing Slopscale installation.
