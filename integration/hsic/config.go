@@ -30,6 +30,12 @@ func DefaultConfigEnv() map[string]string {
 		"SLOPSCALE_METRICS_LISTEN_ADDR":               "0.0.0.0:9090",
 		"SLOPSCALE_DEBUG_PORT":                        "40000",
 
+		// POST /api/v1/debug/node mints a node from key material the
+		// caller hands it, so a server only registers it when asked.
+		// `slopscale debug create-node` is how the CLI node tests get a
+		// node without a client, and without this they get a 404.
+		"SLOPSCALE_DEBUG_NODE_API_ENABLED": "true",
+
 		// Embedded DERP is the default for test isolation.
 		// Tests should not depend on external DERP infrastructure.
 		// Use [WithPublicDERP] to opt out for tests that explicitly
