@@ -8,16 +8,29 @@
 @import "@cloudflare/kumo/styles";
 @import "tailwindcss";
 
+/*
+ * The type is Kumo's own stack, the platform's UI face. Inter was never loaded here, so it only
+ * showed up on machines that had it installed, and it is the face every generated UI reaches for.
+ */
 @theme {
-  --font-sans:
-    "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
-    "Segoe UI Symbol", "Noto Color Emoji";
   --font-mono:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
     monospace;
 }
 
 @layer base {
+  /*
+   * A primary button carries `!text-white`, which is right on ink but not on the near-white ink of
+   * dark mode. The primary variant is the one whose inline emphasis colour is mixed from the brand
+   * token (the destructive variant mixes from the danger token), which is what the style attribute
+   * selector picks out; `primary-button.test.tsx` pins that Kumo still writes it that way. It
+   * lives in the base layer because important declarations cascade in reverse layer order, and
+   * base is the one layer whose `!important` outranks the utility's.
+   */
+  [data-mode="dark"] :is(button, a)[data-kumo-component][style*="--color-kumo-brand"] {
+    color: var(--color-kumo-canvas) !important;
+  }
+
   * {
     box-sizing: border-box;
     -webkit-font-smoothing: antialiased;
@@ -26,7 +39,6 @@
 
   html {
     font-family: var(--font-sans);
-    font-feature-settings: "cv02", "cv03", "cv04", "calt";
     line-height: 1.5;
   }
 
@@ -41,6 +53,15 @@
 
 @layer components {
   /*
+   * Kumo's focus ring on an emphasised button is the button's own colour a shade darker, invisible
+   * on ink; an offset outline in the focus colour shows on either theme.
+   */
+  :is(button, a)[data-kumo-component][style*="--color-kumo-brand"]:focus-visible {
+    outline: 2px solid var(--color-kumo-focus);
+    outline-offset: 2px;
+  }
+
+  /*
    * Kumo halves the opacity of a disabled button and leaves its colour alone, so a disabled primary
    * or destructive action keeps the accent gradient and still reads as the thing to press. Drain the
    * colour instead: the label stays where it was, and the button reads as unavailable in both
@@ -50,4 +71,34 @@
   button[data-kumo-component="Button"]:disabled {
     filter: grayscale(1);
   }
+}
+
+/*
+ * The accent is ink, not blue. Kumo paints its primary button, focus rings, the underline tab
+ * indicator and the sidebar's drag handle from `--color-kumo-brand`; here the one coloured thing on
+ * a page should be the thing that is wrong, so the token is the contrast colour (near-black in light
+ * mode, near-white in dark) and blue is left to links, which have their own token. These rules sit
+ * outside the cascade layers because a Tailwind utility on the element would otherwise win.
+ */
+:root {
+  --color-kumo-brand: var(--color-kumo-contrast);
+  --color-kumo-brand-hover: color-mix(
+    in oklch,
+    var(--color-kumo-contrast),
+    var(--color-kumo-canvas) 20%
+  );
+}
+
+/*
+ * The switch does not read the token: Kumo paints a checked track blue-500 and, in dark mode, its
+ * thumb blue-300. Ink for the track and the canvas colour for the thumb keeps the knob visible on
+ * either theme.
+ */
+[data-kumo-component="Switch"][data-checked] {
+  background-color: var(--color-kumo-contrast);
+  --tw-ring-color: var(--color-kumo-contrast);
+}
+
+[data-kumo-component="Switch"][data-checked] > div {
+  background-color: var(--color-kumo-canvas);
 }
