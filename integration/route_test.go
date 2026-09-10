@@ -4643,21 +4643,72 @@ func TestHASubnetRouterFailoverDockerDisconnect(t *testing.T) {
 		}, propagationTime, 1*time.Second, msg)
 	}
 
-	// requirePrimaryStable asserts primary == want for the entire
-	// window. Catches transient flaps and verifies anti-flap on
-	// prev-primary return.
+	// wantOnline reports whether slopscale still believes the node
+	// holding want is connected.
+	wantOnline := func(want types.NodeID) bool {
+		nodes, err := slopscale.ListNodes()
+		if err != nil {
+			// Say yes on a read error so the caller keeps asserting;
+			// ending the window on a transport hiccup would hide a flap.
+			return true
+		}
+
+		for _, n := range nodes {
+			if types.NodeID(mustParseID(n.Id)) == want {
+				return n.Online
+			}
+		}
+
+		return false
+	}
+
+	// requirePrimaryStable asserts primary == want until the window
+	// runs out or slopscale reaps the node holding want. Catches
+	// transient flaps and verifies anti-flap on prev-primary return.
+	//
+	// The early exit is what keeps this honest. A cable-pulled router
+	// lingers as IsOnline=true until its half-open map poll times out,
+	// and both of them lingering is the state issue #3203 is about:
+	// every advertiser online, every advertiser unhealthy, and the
+	// election handing the prefix to the lowest NodeID rather than
+	// keeping the one it had. Once want's poll times out the question
+	// is a different one. Slopscale now knows that router is gone, and
+	// electing the one it still believes in, or unmapping the prefix
+	// when the prober has caught up with that one too, is the right
+	// answer either way. Each poll times out on its own clock, set by
+	// whenever that client last reconnected, so where they land depends
+	// on the phases before: on run 34460377686 r2's fired twelve
+	// seconds into phase 5a and the test called the correct answer a
+	// regression.
 	requirePrimaryStable := func(want types.NodeID, window time.Duration, msg string) {
 		t.Helper()
-		require.Never(t, func() bool {
-			pr, err := slopscale.PrimaryRoutes()
-			if err != nil {
-				return false
+
+		deadline := time.NewTimer(window)
+		defer deadline.Stop()
+
+		tick := time.NewTicker(1 * time.Second)
+		defer tick.Stop()
+
+		for {
+			if !wantOnline(want) {
+				t.Logf("%s: slopscale reaped node %d, ending the window here", msg, want)
+
+				return
 			}
 
-			owner, ok := pr.PrimaryRoutes[pref.String()]
+			pr, err := slopscale.PrimaryRoutes()
+			if err == nil {
+				owner, ok := pr.PrimaryRoutes[pref.String()]
+				require.Truef(t, ok, "%s: the prefix lost its primary", msg)
+				require.Equalf(t, want, owner, "%s", msg)
+			}
 
-			return !ok || owner != want
-		}, window, 1*time.Second, msg)
+			select {
+			case <-deadline.C:
+				return
+			case <-tick.C:
+			}
+		}
 	}
 
 	// ============================================================
