@@ -830,6 +830,7 @@ endpoint behind the edit.
 - `POST /api/v1/debug/node` (`slopscale debug create-node`) is off unless `debug.node_api_enabled` is set, and while it is off the operation is not registered and is absent from the OpenAPI document the server serves
 - On the v1 API an OAuth access token is now bounded by its tags the way it already was on v2: it may create a pre-auth key or tag a node only with tags it holds or that those tags own, it cannot create an untagged (user-owned) key, and it cannot create a key for a user or register a node into a user's account. Admin API keys are unaffected
 - A registration id is recorded in the audit log by its first eight characters only, because the whole id is the secret a node registers with
+- Deleting a node now removes the database row before the in-memory copy, and publishes the removal even when the policy refresh that follows it fails, so a committed deletion always tears down the deleted node's live map session [#3410](https://github.com/juanfont/headscale/issues/3410)
 
 ## 0.29.4 (unreleased)
 

@@ -166,12 +166,15 @@ func NewSlopscale(cfg *types.Config) (*Slopscale, error) {
 		}
 
 		policyChanged, deleteErr := app.state.DeleteNode(node)
+		if !policyChanged.IsEmpty() {
+			app.Change(policyChanged)
+		}
+
 		if deleteErr != nil {
 			log.Error().Err(deleteErr).EmbedObject(node).Msg("ephemeral node deletion failed")
 			return
 		}
 
-		app.Change(policyChanged)
 		log.Debug().Caller().EmbedObject(node).Msg("ephemeral node deleted because garbage collection timeout reached")
 	})
 	app.ephemeralGC = ephemeralGC
