@@ -12,50 +12,87 @@ import (
 
 // testsToSplit defines tests that should be split into multiple CI jobs.
 // Key is the test function name, value is a list of subtest prefixes.
-// Each prefix becomes a separate CI job as "TestName/prefix".
+// Each prefix becomes a separate CI job as "TestName$/^prefix".
 //
-// Example: [TestAutoApproveMultiNetwork] has subtests like:
-//   - TestAutoApproveMultiNetwork/authkey-tag-advertiseduringup-false-pol-database
-//   - TestAutoApproveMultiNetwork/webauth-user-advertiseduringup-true-pol-file
+// Wall clock across the matrix is bounded by the longest single job, not by
+// the total, so the tests worth splitting are the slowest ones. Measured
+// against a full run: [TestAutoApproveMultiNetwork] took 13-18 minutes per
+// approver while every other job averaged four, because CI split it by
+// approver (4 subtests each) rather than by subtest. Splitting to the leaf
+// costs nothing in coverage: the same subtests run, in more jobs.
 //
-// Splitting by approver type (tag, user, group) creates 6 CI jobs with 4 tests each:
-//   - TestAutoApproveMultiNetwork/authkey-tag.* (4 tests)
-//   - TestAutoApproveMultiNetwork/authkey-user.* (4 tests)
-//   - TestAutoApproveMultiNetwork/authkey-group.* (4 tests)
-//   - TestAutoApproveMultiNetwork/webauth-tag.* (4 tests)
-//   - TestAutoApproveMultiNetwork/webauth-user.* (4 tests)
-//   - TestAutoApproveMultiNetwork/webauth-group.* (4 tests)
-//
-// This reduces load per CI job (4 tests instead of 12) to avoid infrastructure
-// flakiness when running many sequential Docker-based integration tests.
+// A prefix must name a real subtest. [TestAutoApproveMultiNetwork] composes
+// its names as "<approver>-advertiseduringup-<bool>-pol-<mode>", the auth-key
+// relogin tests as "with-https-<bool>", and the rest take theirs from a table.
 var testsToSplit = map[string][]string{
-	"TestAutoApproveMultiNetwork": {
-		"authkey-tag",
-		"authkey-user",
-		"authkey-group",
-		"webauth-tag",
-		"webauth-user",
-		"webauth-group",
+	"TestAutoApproveMultiNetwork": autoApproveSubtests(),
+	"TestAuthKeyLogoutAndReloginSameUser": {
+		"with-https-true",
+		"with-https-false",
 	},
+	"TestAuthKeyLogoutAndReloginSameUserExpiredKey": {
+		"with-https-true",
+		"with-https-false",
+	},
+	"TestSSHLocalpart": {
+		"MemberAndTagged",
+		"AutogroupSelf",
+		"LocalpartPlusRoot",
+	},
+	"TestOIDC024UserCreation": {
+		"no-migration-verified-email",
+		"no-migration-not-verified-email",
+		"migration-no-strip-domains-not-verified-email",
+	},
+}
+
+// autoApproveSubtests enumerates the leaf subtests [TestAutoApproveMultiNetwork]
+// generates: one per approver, policy mode and advertise-during-up combination.
+func autoApproveSubtests() []string {
+	approvers := []string{
+		"authkey-tag", "authkey-user", "authkey-group",
+		"webauth-tag", "webauth-user", "webauth-group",
+	}
+
+	var out []string
+
+	for _, approver := range approvers {
+		for _, advertiseDuringUp := range []string{"false", "true"} {
+			for _, polMode := range []string{"database", "file"} {
+				out = append(out, fmt.Sprintf(
+					"%s-advertiseduringup-%s-pol-%s",
+					approver, advertiseDuringUp, polMode,
+				))
+			}
+		}
+	}
+
+	return out
 }
 
 // expandTests takes a list of test names and expands any that need splitting
 // into multiple subtest patterns.
 func expandTests(tests []string) []string {
 	var expanded []string
+
 	for _, test := range tests {
-		if prefixes, ok := testsToSplit[test]; ok {
-			// This test should be split into multiple jobs.
-			// We append ".*" to each prefix because the CI runner wraps patterns
-			// with ^...$ anchors. Without ".*", a pattern like "authkey$" wouldn't
-			// match "authkey-tag-advertiseduringup-false-pol-database".
-			for _, prefix := range prefixes {
-				expanded = append(expanded, fmt.Sprintf("%s/%s.*", test, prefix))
-			}
-		} else {
+		prefixes, ok := testsToSplit[test]
+		if !ok {
 			expanded = append(expanded, test)
+
+			continue
+		}
+
+		// The runner wraps the pattern in ^...$ and go test splits it on "/",
+		// matching each part unanchored. Anchor both ends of the test name
+		// ourselves, or "^TestAuthKeyLogoutAndReloginSameUser" also selects
+		// TestAuthKeyLogoutAndReloginSameUserExpiredKey and runs it twice.
+		// ".*" on the prefix lets it match the rest of the subtest name.
+		for _, prefix := range prefixes {
+			expanded = append(expanded, fmt.Sprintf("%s$/^%s.*", test, prefix))
 		}
 	}
+
 	return expanded
 }
 

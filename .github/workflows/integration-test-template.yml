@@ -13,6 +13,13 @@ on:
       database_name:
         required: true
         type: string
+      soak_duration:
+        description: >
+          How long a soak test watches for a steady state to break. Empty
+          keeps each test's full window.
+        required: false
+        type: string
+        default: ""
 
 jobs:
   test:
@@ -113,6 +120,7 @@ jobs:
           SLOPSCALE_INTEGRATION_SLOPSCALE_IMAGE: slopscale:${{ github.sha }}
           SLOPSCALE_INTEGRATION_TAILSCALE_IMAGE: tailscale-head:${{ github.sha }}
           SLOPSCALE_INTEGRATION_POSTGRES_IMAGE: ${{ inputs.postgres_flag == '--postgres=1' && format('postgres:{0}', github.sha) || '' }}
+          SLOPSCALE_INTEGRATION_SOAK_DURATION: ${{ inputs.soak_duration }}
           SLOPSCALE_INTEGRATION_GO_CACHE: /tmp/go-cache/go
           SLOPSCALE_INTEGRATION_GO_BUILD_CACHE: /tmp/go-cache/.cache/go-build
           # Mirror the docker/login-action secrets into env so the

@@ -1309,8 +1309,11 @@ func TestNodeOnlineStatus(t *testing.T) {
 	slopscale, err := scenario.Slopscale()
 	require.NoError(t, err)
 
-	// Duration is chosen arbitrarily, 10m is reported in #1561
-	testDuration := 12 * time.Minute
+	// Duration is chosen arbitrarily, 10m is reported in #1561. This loop is
+	// the longest job in the integration matrix, so a pull request shortens it
+	// and the nightly run keeps the full window; see
+	// [integrationutil.SoakDuration].
+	testDuration := integrationutil.SoakDuration(12 * time.Minute)
 	start := time.Now()
 	end := start.Add(testDuration)
 

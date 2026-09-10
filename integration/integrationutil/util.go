@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -35,6 +36,30 @@ func PeerSyncTimeout() time.Duration {
 // PeerSyncRetryInterval returns the retry interval for peer synchronization checks.
 func PeerSyncRetryInterval() time.Duration {
 	return 100 * time.Millisecond
+}
+
+// soakDurationEnv overrides how long a soak test observes its steady state.
+const soakDurationEnv = "SLOPSCALE_INTEGRATION_SOAK_DURATION"
+
+// SoakDuration returns how long a soak test should watch for a steady state to
+// break. It is the full window by default and on a nightly run; a pull request
+// sets [soakDurationEnv] to something shorter, because the longest single job
+// is what bounds the integration matrix's wall clock and this is that job.
+//
+// A value that does not parse is a typo in CI configuration, not a reason to
+// silently soak for the default window, so it panics.
+func SoakDuration(full time.Duration) time.Duration {
+	raw := os.Getenv(soakDurationEnv)
+	if raw == "" {
+		return full
+	}
+
+	d, err := time.ParseDuration(raw)
+	if err != nil {
+		panic(fmt.Sprintf("%s=%q: %s", soakDurationEnv, raw, err))
+	}
+
+	return d
 }
 
 // ScaledTimeout returns the given timeout, scaled for CI environments
