@@ -1657,7 +1657,12 @@ func (s *Scenario) runMockOIDC(accessTTL time.Duration, users []mockoidc.MockUse
 	// Add integration test labels if running under hi tool
 	dockertestutil.DockerAddIntegrationLabels(mockOidcOptions, "oidc")
 
-	pmockoidc, err := s.pool.BuildAndRunWithBuildOptions(
+	// The mock provider is `slopscale mockoidc`, the same binary the control
+	// server runs, so it reuses the control server's image instead of
+	// building one per scenario.
+	pmockoidc, err := dockertestutil.RunPrebuiltOrBuild(
+		s.pool,
+		hsic.SlopscaleImageEnv,
 		slopscaleBuildOptions,
 		mockOidcOptions,
 		dockertestutil.DockerRestartPolicy,
@@ -1744,7 +1749,11 @@ func Webservice(s *Scenario, networkName string) (*dockertest.Resource, error) {
 		ContextDir: dockerContextPath,
 	}
 
-	web, err := s.pool.BuildAndRunWithBuildOptions(
+	// The web service is python3 out of the control server's runtime image,
+	// so it reuses that image rather than building one per scenario.
+	web, err := dockertestutil.RunPrebuiltOrBuild(
+		s.pool,
+		hsic.SlopscaleImageEnv,
 		webBOpts,
 		webOpts,
 		dockertestutil.DockerRestartPolicy,

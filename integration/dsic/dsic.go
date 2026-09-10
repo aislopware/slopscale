@@ -214,6 +214,10 @@ func New(
 	// Add integration test labels if running under hi tool
 	dockertestutil.DockerAddIntegrationLabels(runOptions, "derp")
 
+	// This one builds even in CI, unlike every other container helper. Only
+	// [TestDERPVerifyEndpoint] needs a DERPer, so pre-building it would
+	// make all twenty shards download the image to save that one shard a
+	// single build.
 	container, err = pool.BuildAndRunWithBuildOptions(
 		buildOptions,
 		runOptions,
