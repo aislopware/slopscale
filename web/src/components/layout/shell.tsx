@@ -56,7 +56,14 @@ export function Shell({
   return (
     <BreadcrumbProvider>
       <Sidebar.Provider defaultOpen collapsible="icon" peekable>
-        <Sidebar className="md:sticky md:top-0 md:h-svh">
+        {/*
+         * A sticky element may not pass the bottom of its parent, and the page's height is
+         * fractional while its scroll height is rounded up, so at the very bottom of a long page
+         * the sidebar was dragged up by that fraction and every row in it shifted. A rail one
+         * pixel short of the viewport always has the slack to stay put; its own panel keeps the
+         * full height, so nothing shows through under it.
+         */}
+        <Sidebar className="md:sticky md:top-0 md:h-[calc(100svh-1px)] md:[&>div]:h-svh">
           <Sidebar.Header className="h-12">
             <Brand />
             {/* The drawer has no chrome of its own, so it carries the way out. */}
