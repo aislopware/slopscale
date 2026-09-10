@@ -2020,7 +2020,12 @@ func (c *Config) SetExtraRecords(records []tailcfg.DNSRecord) {
 	tailcfgDNSMu.Lock()
 	defer tailcfgDNSMu.Unlock()
 
-	c.dnsFileRecords = records
+	// Normalize as dns.extra_records from the config file is normalized.
+	// DNS names are case-insensitive, but a client matches an extra record
+	// against the lowercased query name, so "Printer.fritz.box" in the
+	// records file never resolves and the query falls through to the global
+	// nameserver.
+	c.dnsFileRecords = NormalizeExtraRecords(records)
 	c.dnsFileRecordsSet = true
 
 	c.rebuildTailcfgDNSLocked()

@@ -783,3 +783,27 @@ func TestTrustedProxies(t *testing.T) {
 		})
 	}
 }
+
+// TestSetExtraRecordsNormalizesNames proves the records read from
+// dns.extra_records_path are normalized the way the ones written inline in the
+// config file already are. DNS names are case-insensitive, but a client
+// matches an extra record against the lowercased query name, so a
+// mixed-case "Printer.fritz.box" in the records file never resolved and the
+// query fell through to the global nameserver.
+func TestSetExtraRecordsNormalizesNames(t *testing.T) {
+	cfg := &Config{
+		DNSConfig:        DNSConfig{MagicDNS: false},
+		TailcfgDNSConfig: &tailcfg.DNSConfig{},
+	}
+
+	cfg.SetExtraRecords([]tailcfg.DNSRecord{
+		{Name: "Printer.Fritz.Box.", Type: "a", Value: " 192.168.0.2 "},
+	})
+
+	got := cfg.CloneTailcfgDNSConfig()
+	require.NotNil(t, got)
+	require.Len(t, got.ExtraRecords, 1)
+	assert.Equal(t, "printer.fritz.box", got.ExtraRecords[0].Name)
+	assert.Equal(t, "A", got.ExtraRecords[0].Type)
+	assert.Equal(t, "192.168.0.2", got.ExtraRecords[0].Value)
+}
