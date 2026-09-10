@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/netip"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -2360,30 +2359,13 @@ func TestACLPolicyPropagationOverTime(t *testing.T) {
 		err = slopscale.DeleteNode(nodeToDeleteID)
 		require.NoError(t, err, "iteration %d: failed to delete node %d", iteration, nodeToDeleteID)
 
-		// Remove the deleted client from the scenario's user.Clients map
-		// This is necessary for WaitForTailscaleSyncPerUser to calculate correct peer counts
-		t.Logf("Iteration %d: Phase 2b - Removing deleted client from scenario", iteration)
-
-		for clientName, client := range scenario.users["user1"].Clients {
-			status := client.MustStatus()
-
-			nodeID, parseUintErr := strconv.ParseUint(string(status.Self.ID), 10, 64)
-			if parseUintErr != nil {
-				continue
-			}
-
-			if nodeID == nodeToDeleteID {
-				delete(scenario.users["user1"].Clients, clientName)
-				t.Logf(
-					"Iteration %d: Phase 2b - Removed client %s (node ID %d) from scenario",
-					iteration,
-					clientName,
-					nodeToDeleteID,
-				)
-
-				break
-			}
-		}
+		// Drop the deleted client from the scenario's user.Clients map, or
+		// WaitForTailscaleSyncPerUser below still waits on it and it has no
+		// peers left to count. The client is the one this phase added, so
+		// remove it by name: asking the node for its own ID here would mean
+		// querying a node the control server has just forgotten.
+		t.Logf("Iteration %d: Phase 2b - Removing deleted client %s from scenario", iteration, newClient.Hostname())
+		delete(scenario.users["user1"].Clients, newClient.Hostname())
 
 		// Verify the node has been deleted
 		t.Logf("Iteration %d: Phase 2b - Verifying node deletion (expecting 2 user1 nodes)", iteration)
