@@ -45,9 +45,12 @@ const streamsPerShard = 3
 const streamSeparator = ";"
 
 // durationsFile holds the measured runtime in seconds of every top-level
-// test, which is what the shards are packed by. Refresh it from a real run
-// when the balance drifts: the per-job times are in the run's job list, and a
-// test missing from the file is packed as [defaultSeconds].
+// test, which is what the shards are packed by. A split test may also carry
+// a "Test/subtest-prefix" entry per leaf, which is what that leaf is packed
+// by; without one the leaves share the whole test's time evenly. Refresh it
+// from a real run when the balance drifts: the per-job times are in the
+// run's job list, and a test missing from the file is packed as
+// [defaultSeconds].
 const durationsFile = "integration-test-durations.json"
 
 // defaultSeconds is what a test not in [durationsFile] is assumed to cost,
@@ -171,7 +174,17 @@ func toItems(tests []string, durations map[string]int) []item {
 		}
 
 		for _, prefix := range prefixes {
-			items = append(items, item{top: test, sub: prefix, seconds: seconds / len(prefixes)})
+			// An even share is only a guess, and a bad one where the leaves
+			// differ: TestAuthKeyLogoutAndReloginSameUser splits into 352
+			// seconds of with-https-false and about 50 of with-https-true, so
+			// halving its total put a six minute item in a shard budgeted
+			// three. Use the measured leaf when the file carries one.
+			share, ok := durations[test+"/"+prefix]
+			if !ok {
+				share = seconds / len(prefixes)
+			}
+
+			items = append(items, item{top: test, sub: prefix, seconds: share})
 		}
 	}
 
