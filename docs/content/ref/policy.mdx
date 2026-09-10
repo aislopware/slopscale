@@ -244,6 +244,9 @@ standard Tailscale IP ranges. This autogroup can only be used as source.
 configuration and attributes. At least the following node attributes are currently supported by Slopscale[^2]:
 
 - `drive:access`, `drive:share`: [Taildrive support](https://tailscale.com/docs/features/taildrive).
+- `suggest-exit-node`, `suggest-exit-node-ui`: [Automatic exit node selection](/ref/routes#suggested-exit-nodes).
+  Slopscale stamps `suggest-exit-node` on approved exit nodes on its own, so the policy only needs these to narrow or
+  widen what the client is offered.
 - `nextdns:<profile>`, `nextdns:no-device-info`: [NextDNS integration](https://tailscale.com/docs/integrations/nextdns).
   Be sure to set NextDNS as global resolver in the [configuration](/ref/configuration).
 - `magicdns-aaaa`: Respond to AAAA queries on the local [MagicDNS](https://tailscale.com/docs/features/magicdns)
