@@ -173,6 +173,12 @@ type ScenarioSpec struct {
 	OIDCUsers     []mockoidc.MockUser
 	OIDCAccessTTL time.Duration
 
+	// KeepSeededRule leaves the rule a fresh database is seeded with
+	// enabled, so a machine reaches only the other machines of its own
+	// user. Scenarios expect an open tailnet by default; set this to test
+	// what a new tailnet actually does.
+	KeepSeededRule bool
+
 	MaxWait time.Duration
 }
 
@@ -494,6 +500,17 @@ func (s *Scenario) Slopscale(opts ...hsic.Option) (ControlServer, error) {
 	err = slopscale.WaitForRunning()
 	if err != nil {
 		return nil, fmt.Errorf("reaching slopscale container: %w", err)
+	}
+
+	// A fresh database is seeded with a rule that lets a machine reach only
+	// the other machines of its own user. Scenarios here predate it and
+	// expect an open tailnet unless they install a policy, so it comes off
+	// unless the spec asks to keep it.
+	if !s.spec.KeepSeededRule {
+		err = slopscale.DisableSeededRule()
+		if err != nil {
+			return nil, fmt.Errorf("disabling the seeded access rule: %w", err)
+		}
 	}
 
 	s.controlServers.Store("slopscale", slopscale)
