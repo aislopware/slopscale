@@ -11,7 +11,6 @@ import (
 	"github.com/aislopware/slopscale/integration/integrationutil"
 	"github.com/aislopware/slopscale/integration/tsic"
 	tcmp "github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -131,8 +130,7 @@ func TestUserCommand(t *testing.T) {
 	if diff := tcmp.Diff(
 		want,
 		listByUsername,
-		cmpopts.IgnoreUnexported(clientv1.User{}),
-		cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+		userCmpOptions()...,
 	); diff != "" {
 		t.Errorf("unexpected users (-want +got):\n%s", diff)
 	}
@@ -167,8 +165,7 @@ func TestUserCommand(t *testing.T) {
 	if diff := tcmp.Diff(
 		want,
 		listByID,
-		cmpopts.IgnoreUnexported(clientv1.User{}),
-		cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+		userCmpOptions()...,
 	); diff != "" {
 		t.Errorf("unexpected users (-want +got):\n%s", diff)
 	}
@@ -214,8 +211,7 @@ func TestUserCommand(t *testing.T) {
 		if diff := tcmp.Diff(
 			want,
 			listAfterIDDelete,
-			cmpopts.IgnoreUnexported(clientv1.User{}),
-			cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+			userCmpOptions()...,
 		); diff != "" {
 			assert.Fail(ct, "unexpected users", "diff (-want +got):\n%s", diff)
 		}
