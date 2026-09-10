@@ -58,6 +58,7 @@ const (
 	defaultDirPerm    = 0o755
 	binSlopscale      = "slopscale"
 	flagOutput        = "--output"
+	flagIdentifier    = "--identifier"
 	acceptJSON        = "Accept: application/json"
 )
 
@@ -1145,6 +1146,49 @@ func (t *SlopscaleInContainer) WaitForRunning() error {
 	})
 }
 
+// DisableSeededRule switches off the rule a fresh database is seeded with,
+// which lets every machine reach the other machines of its own user and
+// nothing else. The integration suite predates that rule and its scenarios
+// expect an open tailnet unless they install a policy, the same assumption
+// servertest makes when it disables the rule on every server it builds.
+//
+// A scenario that wants a fresh tailnet's real behaviour keeps the rule by
+// setting KeepSeededRule on its spec.
+func (t *SlopscaleInContainer) DisableSeededRule() error {
+	result, _, err := dockertestutil.ExecuteCommand(
+		t.container,
+		[]string{binSlopscale, "access-rules", "list", flagOutput, "json"},
+		[]string{},
+	)
+	if err != nil {
+		return fmt.Errorf("listing access rules: %w", err)
+	}
+
+	var rules []clientv1.AccessRule
+
+	err = json.Unmarshal([]byte(result), &rules)
+	if err != nil {
+		return fmt.Errorf("unmarshalling access rules: %w", err)
+	}
+
+	for _, rule := range rules {
+		if rule.Builtin == "" || !rule.Enabled {
+			continue
+		}
+
+		_, _, err = dockertestutil.ExecuteCommand(
+			t.container,
+			[]string{binSlopscale, "access-rules", "disable", flagIdentifier, rule.Id},
+			[]string{},
+		)
+		if err != nil {
+			return fmt.Errorf("disabling builtin access rule %s: %w", rule.Id, err)
+		}
+	}
+
+	return nil
+}
+
 // CreateUser adds a new user to the Slopscale instance.
 func (t *SlopscaleInContainer) CreateUser(
 	user string,
@@ -1361,7 +1405,7 @@ func (t *SlopscaleInContainer) DeleteNode(nodeID uint64) error {
 		binSlopscale,
 		"nodes",
 		"delete",
-		"--identifier",
+		flagIdentifier,
 		strconv.FormatUint(nodeID, 10),
 		flagOutput,
 		"json",
@@ -1455,7 +1499,7 @@ func (t *SlopscaleInContainer) DeleteUser(userID uint64) error {
 		binSlopscale,
 		"users",
 		"delete",
-		"--identifier",
+		flagIdentifier,
 		strconv.FormatUint(userID, 10),
 		"--force",
 		flagOutput,
@@ -1575,7 +1619,7 @@ func (t *SlopscaleInContainer) ApproveRoutes(id uint64, routes []netip.Prefix) (
 	command := []string{
 		binSlopscale, "nodes", "approve-routes",
 		flagOutput, "json",
-		"--identifier", strconv.FormatUint(id, 10),
+		flagIdentifier, strconv.FormatUint(id, 10),
 		"--routes=" + strings.Join(util.PrefixesToString(routes), ","),
 	}
 
@@ -1609,7 +1653,7 @@ func (t *SlopscaleInContainer) ApproveRoutes(id uint64, routes []netip.Prefix) (
 func (t *SlopscaleInContainer) SetNodeTags(nodeID uint64, tags []string) error {
 	command := []string{
 		binSlopscale, "nodes", "tag",
-		"--identifier", strconv.FormatUint(nodeID, 10),
+		flagIdentifier, strconv.FormatUint(nodeID, 10),
 		flagOutput, "json",
 	}
 
