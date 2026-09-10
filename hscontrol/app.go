@@ -1319,6 +1319,7 @@ func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	if provider, ok := h.authProvider.(*AuthProviderOIDC); ok {
 		r.Get("/oidc/callback", provider.OIDCCallbackHandler)
 		r.Get(ConsoleLoginPath, provider.ConsoleLoginHandler)
+		r.Get("/register/confirm/{auth_id}", provider.RegisterConfirmGetHandler)
 		r.Post("/register/confirm/{auth_id}", provider.RegisterConfirmHandler)
 	}
 

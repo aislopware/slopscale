@@ -100,3 +100,147 @@ func TestRegisterConfirmHandler_RejectsWithoutPending(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, rec.Code,
 		"confirm without prior OIDC pending state must be rejected with 403")
 }
+
+func newConfirmGetRequest(t *testing.T, authID types.AuthID, cookieCSRF string) *http.Request {
+	t.Helper()
+
+	req := httptest.NewRequestWithContext(
+		t.Context(),
+		http.MethodGet,
+		"/register/confirm/"+authID.String(),
+		nil,
+	)
+
+	if cookieCSRF != "" {
+		req.AddCookie(&http.Cookie{
+			Name:  registerConfirmCSRFCookie,
+			Value: cookieCSRF,
+		})
+	}
+
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("auth_id", authID.String())
+
+	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+}
+
+// TestBeginRegistrationConfirmationRedirects proves the OIDC callback no
+// longer renders the interstitial on the URL that carries the single-use
+// authorization code. Anything that reloads that URL — the back button,
+// pull-to-refresh, an extension — would re-enter the spent code exchange and
+// paint an error over the page the user was told to click.
+func TestBeginRegistrationConfirmationRedirects(t *testing.T) {
+	t.Parallel()
+
+	app := createTestApp(t)
+	provider := &AuthProviderOIDC{h: app, serverURL: "http://localhost:8080"}
+
+	authID := types.MustAuthID()
+	app.state.SetAuthCacheEntry(authID, types.NewRegisterAuthRequest(
+		&types.RegistrationData{Hostname: "redirect-me"},
+	))
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/oidc/callback?code=c&state=s", nil)
+
+	provider.beginRegistrationConfirmation(rec, req, authID, &types.User{ID: 1}, nil)
+
+	require.Equal(t, http.StatusSeeOther, rec.Code,
+		"the code-bearing callback URL must be left behind with a 303, not rendered on")
+	assert.Equal(t, "http://localhost:8080/register/confirm/"+authID.String(), rec.Header().Get("Location"))
+
+	cookies := rec.Result().Cookies()
+	require.Len(t, cookies, 1)
+	assert.Equal(t, registerConfirmCSRFCookie, cookies[0].Name)
+	assert.NotEmpty(t, cookies[0].Value)
+	assert.Equal(t, http.SameSiteLaxMode, cookies[0].SameSite,
+		"Strict is withheld on the hop out of the IdP redirect chain, so the page would 403")
+
+	cached, ok := app.state.GetAuthCacheEntry(authID)
+	require.True(t, ok)
+	require.NotNil(t, cached.PendingConfirmation())
+	assert.Equal(t, cookies[0].Value, cached.PendingConfirmation().CSRF,
+		"the cookie must carry the token cached for the confirmation page")
+}
+
+// TestRegisterConfirmGetHandlerIsReloadable proves the confirmation page can
+// be fetched, and re-fetched, from its own URL: it only reads the pending
+// confirmation and never touches the one-time code exchange.
+func TestRegisterConfirmGetHandlerIsReloadable(t *testing.T) {
+	t.Parallel()
+
+	app := createTestApp(t)
+	provider := &AuthProviderOIDC{h: app, serverURL: "http://localhost:8080"}
+
+	user, _, err := app.state.CreateUser(types.User{Name: "confirm-user"})
+	require.NoError(t, err)
+
+	authID := types.MustAuthID()
+	regReq := types.NewRegisterAuthRequest(&types.RegistrationData{Hostname: "reload-me"})
+	regReq.SetPendingConfirmation(&types.PendingRegistrationConfirmation{
+		UserID: user.ID,
+		CSRF:   "expected-csrf",
+	})
+	app.state.SetAuthCacheEntry(authID, regReq)
+
+	for range 2 {
+		rec := httptest.NewRecorder()
+		provider.RegisterConfirmGetHandler(rec, newConfirmGetRequest(t, authID, "expected-csrf"))
+
+		require.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"),
+			"the page carries the token that finalises the registration")
+		assert.Contains(t, rec.Body.String(), "reload-me")
+		assert.Contains(t, rec.Body.String(),
+			"http://localhost:8080/register/confirm/"+authID.String(),
+			"the form must post to the browser-facing URL, which carries any proxy prefix")
+	}
+
+	cached, ok := app.state.GetAuthCacheEntry(authID)
+	require.True(t, ok, "rendering the page must not consume the registration")
+	require.NotNil(t, cached.PendingConfirmation())
+}
+
+// TestRegisterConfirmGetHandlerRequiresCSRFCookie asserts the device details,
+// and the token that finalises the registration, stay away from anyone who
+// merely knows the auth ID — which the node being registered does.
+func TestRegisterConfirmGetHandlerRequiresCSRFCookie(t *testing.T) {
+	t.Parallel()
+
+	app := createTestApp(t)
+	provider := &AuthProviderOIDC{h: app, serverURL: "http://localhost:8080"}
+
+	authID := types.MustAuthID()
+	regReq := types.NewRegisterAuthRequest(&types.RegistrationData{Hostname: "secret-host"})
+	regReq.SetPendingConfirmation(&types.PendingRegistrationConfirmation{
+		UserID: 1,
+		CSRF:   "expected-csrf",
+	})
+	app.state.SetAuthCacheEntry(authID, regReq)
+
+	missing := httptest.NewRecorder()
+	provider.RegisterConfirmGetHandler(missing, newConfirmGetRequest(t, authID, ""))
+	assert.Equal(t, http.StatusForbidden, missing.Code, "no cookie must not render the page")
+	assert.NotContains(t, missing.Body.String(), "secret-host")
+
+	wrong := httptest.NewRecorder()
+	provider.RegisterConfirmGetHandler(wrong, newConfirmGetRequest(t, authID, "other-csrf"))
+	assert.Equal(t, http.StatusForbidden, wrong.Code, "a foreign cookie must not render the page")
+	assert.NotContains(t, wrong.Body.String(), "secret-host")
+}
+
+// TestRegisterConfirmGetHandlerSpentLink covers the common case: the user
+// already confirmed and came back to the link. That is not a failure, so the
+// page says so rather than showing the generic expired-session error.
+func TestRegisterConfirmGetHandlerSpentLink(t *testing.T) {
+	t.Parallel()
+
+	app := createTestApp(t)
+	provider := &AuthProviderOIDC{h: app, serverURL: "http://localhost:8080"}
+
+	rec := httptest.NewRecorder()
+	provider.RegisterConfirmGetHandler(rec, newConfirmGetRequest(t, types.MustAuthID(), "any"))
+
+	assert.Equal(t, http.StatusGone, rec.Code)
+	assert.Contains(t, rec.Body.String(), "already been used")
+}

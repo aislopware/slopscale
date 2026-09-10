@@ -195,7 +195,8 @@ func TestSetCSRFCookieSameSite(t *testing.T) {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/auth/abcdef0123456789", nil)
 
-	setCSRFCookie(w, r, "state", false)
+	a := &AuthProviderOIDC{serverURL: "http://slopscale.example.com"}
+	a.setCSRFCookie(w, r, "state")
 
 	cookies := w.Result().Cookies()
 	require.Len(t, cookies, 1)
@@ -247,7 +248,8 @@ func TestClearOIDCCallbackCookie(t *testing.T) {
 	t.Parallel()
 
 	w := httptest.NewRecorder()
-	clearOIDCCallbackCookie(w, "state_abcdef")
+	a := &AuthProviderOIDC{serverURL: "http://slopscale.example.com"}
+	a.clearOIDCCallbackCookie(w, "state_abcdef")
 
 	cookies := w.Result().Cookies()
 	require.Len(t, cookies, 1)
@@ -255,26 +257,56 @@ func TestClearOIDCCallbackCookie(t *testing.T) {
 	assert.Negative(t, cookies[0].MaxAge, "deletion cookie must have negative MaxAge")
 }
 
-// TestSetCSRFCookieSecure verifies the Secure flag is driven by the secure
-// argument (derived from the configured https server_url), not only req.TLS, so
-// cookies stay Secure behind a TLS-terminating reverse proxy where req.TLS is
-// nil.
+// TestSetCSRFCookieSecure verifies the Secure flag is driven by the configured
+// server_url scheme, not only req.TLS, so cookies stay Secure behind a
+// TLS-terminating reverse proxy where req.TLS is nil.
 func TestSetCSRFCookieSecure(t *testing.T) {
 	t.Parallel()
 
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/auth/abcdef0123456789", nil)
 
 	secureRec := httptest.NewRecorder()
-	setCSRFCookie(secureRec, r, "state", true)
+	secureProvider := &AuthProviderOIDC{serverURL: "https://slopscale.example.com"}
+	secureProvider.setCSRFCookie(secureRec, r, "state")
 	require.Len(t, secureRec.Result().Cookies(), 1)
 	assert.True(t, secureRec.Result().Cookies()[0].Secure,
 		"https server_url must set Secure even when req.TLS is nil (proxy case)")
 
 	plainRec := httptest.NewRecorder()
-	setCSRFCookie(plainRec, r, "state", false)
+	plainProvider := &AuthProviderOIDC{serverURL: "http://slopscale.example.com"}
+	plainProvider.setCSRFCookie(plainRec, r, "state")
 	require.Len(t, plainRec.Result().Cookies(), 1)
 	assert.False(t, plainRec.Result().Cookies()[0].Secure,
 		"plain-http server_url without req.TLS must not set Secure")
+}
+
+// TestOIDCCookiePathsCarryProxyPrefix asserts the OIDC callback and
+// register-confirm cookies are scoped to the browser-facing paths derived from
+// server_url. A Slopscale served under a reverse proxy path prefix sets its
+// cookies on the prefixed path the browser actually requests; scoping them to
+// the routed path would have the browser withhold them.
+func TestOIDCCookiePathsCarryProxyPrefix(t *testing.T) {
+	t.Parallel()
+
+	a := &AuthProviderOIDC{serverURL: "https://example.com/slopscale"}
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/auth/abcdef0123456789", nil)
+
+	assert.Equal(t, "/slopscale/oidc/callback", a.oidcCallbackPath())
+
+	rec := httptest.NewRecorder()
+	a.setCSRFCookie(rec, r, "state")
+	require.Len(t, rec.Result().Cookies(), 1)
+	assert.Equal(t, "/slopscale/oidc/callback", rec.Result().Cookies()[0].Path)
+
+	authID, err := types.NewAuthID()
+	require.NoError(t, err)
+
+	confirmRec := httptest.NewRecorder()
+	a.setRegisterConfirmCookie(confirmRec, r, authID, "csrf", 60)
+	require.Len(t, confirmRec.Result().Cookies(), 1)
+	assert.Equal(t, "/slopscale/register/confirm/"+authID.String(), confirmRec.Result().Cookies()[0].Path)
+	assert.Equal(t, http.SameSiteLaxMode, confirmRec.Result().Cookies()[0].SameSite,
+		"Strict is withheld on the hop out of the IdP redirect chain, so the confirm page 403s")
 }
 
 func TestNewAuthProviderOIDCIssuerMismatch(t *testing.T) {
