@@ -281,7 +281,7 @@ func TestAddToBatch_FullUpdateOverrides(t *testing.T) {
 	})
 }
 
-// TestAddToBatch_NodeRemovalCleanup verifies that PeersRemoved in a change
+// TestAddToBatch_NodeRemovalCleanup verifies that a permanent node deletion
 // cleans up the node from the batcher's internal state.
 func TestAddToBatch_NodeRemovalCleanup(t *testing.T) {
 	t.Parallel()
@@ -295,11 +295,7 @@ func TestAddToBatch_NodeRemovalCleanup(t *testing.T) {
 	_, exists := lb.b.nodes.Load(removedNode)
 	require.True(t, exists, "node 3 should exist before removal")
 
-	// Send a change that includes node 3 in PeersRemoved
-	lb.b.addToBatch(change.Change{
-		Reason:       "node deleted",
-		PeersRemoved: []types.NodeID{removedNode},
-	})
+	lb.b.addToBatch(change.NodeRemoved(removedNode))
 
 	// Node should be removed from the nodes map
 	_, exists = lb.b.nodes.Load(removedNode)
