@@ -42,10 +42,12 @@ export const inviteColumns = helper.columns([
     id: "email",
     header: "Email",
     enableSorting: true,
+    // An address has no spaces to break at, and `truncate` would set the column to the width of the
+    // longest one, pushing the last columns out of the panel. It wraps inside the word instead.
     cell: ({ row }) => (
-      <span className="truncate font-medium text-kumo-default">{row.original.email}</span>
+      <span className="font-medium wrap-anywhere text-kumo-default">{row.original.email}</span>
     ),
-    meta: { className: "w-[28%] min-w-52" },
+    meta: { className: "w-[28%] min-w-52 align-top" },
   }),
   helper.accessor((invite) => invite.role, {
     id: "role",
