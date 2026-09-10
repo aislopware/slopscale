@@ -389,6 +389,12 @@ selects rows for approving, expiring or deleting in one go, and refreshes
 on its own every fifteen seconds while the tab is open. A disabled control
 says why on hover, the theme is a Light, Dark, System menu, and dates are
 picked with a calendar rather than the browser's own field.
+A state is a word in the row ("Connected", "Expired", "HTTP 500"), coloured
+only when it needs attention, with no dot or pill in front of it; a page's
+state sits on the line under its title rather than above it. Empty lists say
+what is missing and offer the one action, without an icon over the heading.
+The primary button is ink on the page rather than blue, as are the switches,
+so blue is left to links. The console uses the platform's own type face.
 Release binaries and container images include it. When building from source,
 run `make web` before `make build`.
 See [Admin console](https://aislopware.github.io/slopscale/ref/console/).
