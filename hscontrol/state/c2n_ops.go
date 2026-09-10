@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -237,14 +238,33 @@ func (s *State) AppConnectorRoutes(
 }
 
 // TLSCertStatus asks a connected node about the certificate it caches for
-// its own name, which Serve and Funnel need and which fails quietly.
+// its own name, which Serve and Funnel need and which fails quietly. The
+// client keeps certificates per domain and refuses the question without
+// one, so it is asked about the node's MagicDNS name; a tailnet with no
+// base domain gives the node no such name and so no certificate to hold.
 func (s *State) TLSCertStatus(
 	ctx context.Context, nodeID types.NodeID, connected bool, dispatch func(...change.Change),
 ) (types.TLSCertStatus, error) {
+	if !connected {
+		return types.TLSCertStatus{}, ErrNodeNotConnected
+	}
+
+	node, ok := s.GetNodeByID(nodeID)
+	if !ok {
+		return types.TLSCertStatus{}, fmt.Errorf("%w: %d", ErrNodeNotFound, nodeID)
+	}
+
+	domain := node.MagicDNSName(s.cfg)
+	if domain == "" {
+		return types.TLSCertStatus{Missing: true}, nil
+	}
+
 	var resp tailcfg.C2NTLSCertInfo
 
-	err := s.c2nJSON(ctx, nodeID, connected,
-		c2nCall{method: http.MethodGet, path: "/tls-cert-status"}, dispatch, &resp)
+	err := s.c2nJSON(ctx, nodeID, connected, c2nCall{
+		method: http.MethodGet,
+		path:   "/tls-cert-status?domain=" + url.QueryEscape(domain),
+	}, dispatch, &resp)
 	if err != nil {
 		return types.TLSCertStatus{}, err
 	}

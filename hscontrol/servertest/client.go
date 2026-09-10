@@ -108,9 +108,10 @@ type clientConfig struct {
 	// appConnectorRoutes are the domains the client answers for as an app
 	// connector, with the addresses it resolved for each.
 	appConnectorRoutes map[string][]netip.Addr
-	// tlsCert is what the client answers to /tls-cert-status; nil makes it
-	// report a certificate it never fetched.
-	tlsCert *tailcfg.C2NTLSCertInfo
+	// tlsCert is what the client answers to /tls-cert-status for
+	// tlsCertDomain; nil makes it report a certificate it never fetched.
+	tlsCert       *tailcfg.C2NTLSCertInfo
+	tlsCertDomain string
 	// prefs are the preferences the client serves and, while remoteConfig
 	// is on, lets the server edit through its local API.
 	prefs        ipn.Prefs
@@ -171,9 +172,13 @@ func WithAppConnectorRoutes(domains map[string][]netip.Addr) ClientOption {
 }
 
 // WithTLSCert makes the client report info about the certificate it
-// caches for its own name.
-func WithTLSCert(info tailcfg.C2NTLSCertInfo) ClientOption {
-	return func(c *clientConfig) { c.tlsCert = &info }
+// caches for domain. It answers for that name only, the way a client
+// holding one certificate does.
+func WithTLSCert(domain string, info tailcfg.C2NTLSCertInfo) ClientOption {
+	return func(c *clientConfig) {
+		c.tlsCert = &info
+		c.tlsCertDomain = domain
+	}
 }
 
 // WithClientPrefs gives the client the preferences it serves. With
@@ -977,9 +982,18 @@ func c2nHandler(cc *clientConfig) http.Handler {
 	mux.HandleFunc("GET /appconnector/routes", func(w http.ResponseWriter, _ *http.Request) {
 		writeC2NJSON(w, tailcfg.C2NAppConnectorDomainRoutesResponse{Domains: cc.appConnectorRoutes})
 	})
-	mux.HandleFunc("GET /tls-cert-status", func(w http.ResponseWriter, _ *http.Request) {
-		info := tailcfg.C2NTLSCertInfo{Missing: true}
-		if cc.tlsCert != nil {
+	mux.HandleFunc("GET /tls-cert-status", func(w http.ResponseWriter, r *http.Request) {
+		// The client keeps certificates per name, so it refuses the
+		// question without one and answers about that name alone.
+		domain := r.FormValue("domain")
+		if domain == "" {
+			http.Error(w, "no 'domain'", http.StatusBadRequest)
+
+			return
+		}
+
+		info := tailcfg.C2NTLSCertInfo{Missing: true, Error: "no certificate"}
+		if cc.tlsCert != nil && domain == cc.tlsCertDomain {
 			info = *cc.tlsCert
 		}
 

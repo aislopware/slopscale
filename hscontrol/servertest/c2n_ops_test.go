@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/servertest"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/health"
@@ -28,7 +29,10 @@ const c2nOpsWait = 10 * time.Second
 func TestNodeClientOperations(t *testing.T) {
 	t.Parallel()
 
-	srv := servertest.NewServer(t)
+	// A base domain gives every node a MagicDNS name, which is the name
+	// the certificate question is asked about.
+	srv := servertest.NewServer(t,
+		servertest.WithDNS(types.DNSConfig{MagicDNS: true, BaseDomain: "ops.test"}))
 	client := srv.HTTPClient(t)
 	v1 := srv.URL + "/api/v1"
 
@@ -58,7 +62,7 @@ func TestNodeClientOperations(t *testing.T) {
 		servertest.WithAppConnectorRoutes(map[string][]netip.Addr{
 			"example.com": {netip.MustParseAddr("93.184.216.34"), netip.MustParseAddr("1.1.1.1")},
 		}),
-		servertest.WithTLSCert(tailcfg.C2NTLSCertInfo{Valid: true}),
+		servertest.WithTLSCert("ops-laptop.ops.test", tailcfg.C2NTLSCertInfo{Valid: true}),
 		servertest.WithClientPrefs(ipn.Prefs{
 			CorpDNS:         true,
 			Hostname:        "ops-laptop",
@@ -159,11 +163,21 @@ func TestNodeClientOperations(t *testing.T) {
 		assert.Equal(t, []any{"1.1.1.1", "93.184.216.34"},
 			field(t, body, "domains", "example.com"))
 
+		// The client answers for its MagicDNS name and no other, so a
+		// valid answer proves the server asked about the right name.
 		status, body = apiCall(t, client, ownerKey, http.MethodGet,
 			v1+"/node/"+laptop.NodeIDString()+"/tls-cert", nil)
 		require.Equal(t, http.StatusOK, status, body)
 		assert.Equal(t, true, body["valid"])
 		assert.Equal(t, false, body["missing"])
+
+		// A machine that fetched no certificate reports it as missing
+		// rather than as a failure.
+		status, body = apiCall(t, client, ownerKey, http.MethodGet,
+			v1+"/node/"+desktop.NodeIDString()+"/tls-cert", nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, false, body["valid"])
+		assert.Equal(t, true, body["missing"])
 	})
 
 	t.Run("ssh username hints follow the session visibility rule", func(t *testing.T) {
@@ -260,4 +274,28 @@ func rawCall(t *testing.T, client *http.Client, key, url string) (int, http.Head
 	require.NoError(t, err)
 
 	return resp.StatusCode, resp.Header, raw
+}
+
+// TestTLSCertStatusWithoutBaseDomain proves a tailnet with no base domain
+// reports the certificate as missing without asking: the node has no
+// MagicDNS name to hold one for, and the client refuses the question
+// without a name.
+func TestTLSCertStatusWithoutBaseDomain(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	client := srv.HTTPClient(t)
+
+	owner := srv.CreateUser(t, "nocert-owner")
+	ownerKey := srv.CreateAPIKey(t, owner)
+
+	laptop := servertest.NewClient(t, srv, "nocert-laptop", servertest.WithUser(owner),
+		servertest.WithTLSCert("nocert-laptop", tailcfg.C2NTLSCertInfo{Valid: true}))
+	laptop.WaitForPeerCount(t, 0, c2nOpsWait)
+
+	status, body := apiCall(t, client, ownerKey, http.MethodGet,
+		srv.URL+"/api/v1/node/"+laptop.NodeIDString()+"/tls-cert", nil)
+	require.Equal(t, http.StatusOK, status, body)
+	assert.Equal(t, false, body["valid"])
+	assert.Equal(t, true, body["missing"])
 }
