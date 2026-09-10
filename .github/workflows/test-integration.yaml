@@ -319,4 +319,3 @@ jobs:
       database_name: "postgres"
       # A pull request shortens the soak window; the nightly run keeps it.
       soak_duration: ${{ github.event_name == 'pull_request' && '4m' || '' }}
-tests: null
