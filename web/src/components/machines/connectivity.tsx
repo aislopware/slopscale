@@ -87,12 +87,19 @@ function CertStatus({
     return <span className="text-kumo-subtle">{loading ? "Asking the machine…" : "Unknown"}</span>;
   }
 
-  if (status.error !== undefined && status.error !== "") {
-    return <CertProblem label="Failed" reason={status.error} />;
+  // A client sends its reason with every state, "no certificate"
+  // included, so the states come before the reason: a machine that never
+  // fetched one has nothing wrong with it.
+  if (status.missing) {
+    return <span className="text-kumo-subtle">Missing</span>;
   }
 
   if (status.expired) {
     return <Status tone="danger">Expired</Status>;
+  }
+
+  if (status.error !== undefined && status.error !== "") {
+    return <CertProblem label="Failed" reason={status.error} />;
   }
 
   if (status.valid) {

@@ -160,6 +160,9 @@ function facts(preferences: NodePreferences): Definition[] {
         </Label>
       ),
       value: <Routes routes={preferences.advertiseRoutes} />,
+      // Half a row is narrower than one prefix, which would cut the
+      // start off every chip.
+      wide: preferences.advertiseRoutes.length > 0,
     },
     ...preferenceSwitches.map(({ key, label, hint }) => ({
       key,

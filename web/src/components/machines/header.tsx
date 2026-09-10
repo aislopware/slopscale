@@ -103,17 +103,16 @@ function MachineFacts({ node }: { readonly node: Node }): ReactElement {
           <span>ephemeral, deleted when it logs out or goes offline</span>
         </>
       ) : null}
-      <span aria-hidden>·</span>
-      <span>
-        {node.online ? (
-          "connected"
-        ) : (
-          <>
+      {/* The badge above already says a connected machine is connected. */}
+      {node.online ? null : (
+        <>
+          <span aria-hidden>·</span>
+          <span>
             {"last seen "}
             <RelativeTime value={node.lastSeen} />
-          </>
-        )}
-      </span>
+          </span>
+        </>
+      )}
       {node.tags.map((tag) => (
         <Badge key={tag} variant="secondary">
           <span className="font-mono">{tag}</span>

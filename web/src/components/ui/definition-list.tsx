@@ -8,6 +8,8 @@ export interface Definition {
   readonly value: ReactNode;
   /** Renders the value as a click-to-copy monospace run putting this text on the clipboard. */
   readonly copy?: string;
+  /** Gives the row both columns of a two-column list, for a value a half row would cut off. */
+  readonly wide?: boolean;
   readonly key?: string;
 }
 
@@ -37,6 +39,7 @@ export function DefinitionList({
           className={cn(
             "flex min-w-0 items-baseline justify-between gap-4 border-t border-kumo-hairline px-5 py-2.5 first:border-t-0",
             columns === 2 && "xl:nth-[2]:border-t-0",
+            columns === 2 && item.wide === true && "xl:col-span-2",
           )}
         >
           <dt className="shrink-0 text-kumo-subtle">{item.label}</dt>
