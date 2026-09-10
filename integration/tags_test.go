@@ -550,10 +550,20 @@ func TestTagsAuthKeyWithTagAdminOverrideReauthPreserves(t *testing.T) {
 
 	t.Logf("Step 2 complete: Admin assigned tag:second (verified on both server and node self)")
 
-	// Step 3: Force reauthentication
+	// Step 3: Force reauthentication.
+	//
+	// `tailscale up` refuses to change settings without mentioning every
+	// non-default flag already in the client's prefs, and by now those hold
+	// the hostname from the initial login plus the tags, because the client
+	// folded the admin's tag:second into its own advertised set. Naming the
+	// key's tag rather than the current pair is what the scenario is about:
+	// the client asks for tag:valid-owned again and the admin's tag:second
+	// is still what the server reports.
 	command := []string{
 		"tailscale", "up",
 		"--login-server=" + slopscale.GetEndpoint(),
+		"--hostname=" + client.Hostname(),
+		"--advertise-tags=tag:valid-owned",
 		"--authkey=" + authKey.Key,
 		"--force-reauth",
 	}
