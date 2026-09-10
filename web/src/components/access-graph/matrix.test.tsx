@@ -36,6 +36,26 @@ describe(AccessMatrix, () => {
     expect(screen.container.querySelectorAll("tbody tr")).toHaveLength(2);
   });
 
+  it("leaves room above and below a sideways column name, not either side of it", async () => {
+    const screen = await render(
+      <AccessMatrix
+        matrix={buildMatrix(nodes, [edge])}
+        onPick={vi.fn<(nodeId: string) => void>()}
+      />,
+    );
+    // The column headers come before the body, so the first button named for a machine is the
+    // sideways one; the row header below it carries the same name the ordinary way up.
+    const header = screen.getByRole("button", { name: "alpha" }).first().element();
+    const padding = globalThis.getComputedStyle(header);
+
+    // `px` and `py` are logical, so a sideways name gets its padding from the axis that reads as
+    // the other one. Written the wrong way round the names run into the line under the header.
+    expect(padding.paddingTop).not.toBe("0px");
+    expect(padding.paddingBottom).not.toBe("0px");
+    expect(padding.paddingLeft).toBe("0px");
+    expect(padding.paddingRight).toBe("0px");
+  });
+
   it("keeps one tab stop and walks the grid with the arrow keys", async () => {
     const screen = await render(
       <AccessMatrix

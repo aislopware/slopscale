@@ -127,7 +127,10 @@ function ColumnHeader({
         node={node}
         onPick={onPick}
         // Turned on its side so 60 machines fit across a column each, with the name reading up.
-        className="h-40 w-6 rotate-180 justify-start truncate px-0 py-2 text-base [writing-mode:vertical-rl]"
+        // `px` and `py` are logical, so sideways they swap: `px` is the padding above and below the
+        // name here, and `py` the padding either side of it. Written the other way round the names
+        // ran into the line under the header.
+        className="h-40 w-6 rotate-180 justify-start truncate px-2 py-0 text-base [writing-mode:vertical-rl]"
       />
     </th>
   );
