@@ -2,7 +2,13 @@ name: integration
 # To debug locally on a branch, and when needing secrets
 # change this to include `push` so the build is ran on
 # the main repository.
-on: [pull_request]
+on:
+  pull_request:
+  # The soak test's full window only runs here: a pull request shortens it,
+  # because that one job is what bounds the matrix's wall clock.
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
@@ -43,6 +49,19 @@ jobs:
         if: steps.changed-files.outputs.files == 'true'
       - uses: Mic92/hestia@f1f4df2801140a36398ed423533c8460618539df # v3.0.1
         if: steps.changed-files.outputs.files == 'true'
+      # The matrix waits on this job, so its length is added to every run's
+      # wall clock. Compiling from cold was the bulk of it.
+      - name: Restore Go cache
+        if: steps.changed-files.outputs.files == 'true'
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-integration-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            go-integration-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum') }}-
+            go-integration-${{ runner.os }}-${{ runner.arch }}-
       - name: Build binaries and warm Go cache
         if: steps.changed-files.outputs.files == 'true'
         run: |
@@ -65,14 +84,19 @@ jobs:
       - name: Package Go cache
         if: steps.changed-files.outputs.files == 'true'
         run: |
-          # Package Go module cache and build cache
-          tar -czf go-cache.tar.gz -C ~ go .cache/go-build
+          # Package Go module cache and build cache. gzip -1 rather than the
+          # default -6: this runs on the critical path before the matrix can
+          # start, while the slightly larger artifact is downloaded by the
+          # test jobs in parallel.
+          tar -I 'gzip -1' -cf go-cache.tar.gz -C ~ go .cache/go-build
       - name: Upload Go cache
         if: steps.changed-files.outputs.files == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: go-cache
           path: go-cache.tar.gz
+          # Already gzipped; the default level 6 re-compresses it for nothing.
+          compression-level: 0
           retention-days: 10
       - name: Force overlay2 storage driver
         if: steps.changed-files.outputs.files == 'true'
@@ -116,6 +140,8 @@ jobs:
         with:
           name: slopscale-image
           path: slopscale-image.tar.gz
+          # Already gzipped; the default level 6 re-compresses it for nothing.
+          compression-level: 0
           retention-days: 10
       - name: Upload tailscale HEAD image
         if: steps.changed-files.outputs.files == 'true'
@@ -123,6 +149,8 @@ jobs:
         with:
           name: tailscale-head-image
           path: tailscale-head-image.tar.gz
+          # Already gzipped; the default level 6 re-compresses it for nothing.
+          compression-level: 0
           retention-days: 10
   build-postgres:
     runs-on: ubuntu-24.04-arm
@@ -156,6 +184,8 @@ jobs:
         with:
           name: postgres-image
           path: postgres-image.tar.gz
+          # Already gzipped; the default level 6 re-compresses it for nothing.
+          compression-level: 0
           retention-days: 10
   build-tailscale-released:
     runs-on: ubuntu-24.04-arm
@@ -215,6 +245,8 @@ jobs:
         with:
           name: tailscale-released-images
           path: tailscale-released-images.tar.gz
+          # Already gzipped; the default level 6 re-compresses it for nothing.
+          compression-level: 0
           retention-days: 10
   sqlite:
     needs: [build, build-tailscale-released]
@@ -247,14 +279,18 @@ jobs:
           - TestAPIAuthenticationBypassCurl
           - TestRemoteCLIAuthenticationBypass
           - TestCLIWithConfigAuthenticationBypass
-          - TestAuthKeyLogoutAndReloginSameUser
+          - TestAuthKeyLogoutAndReloginSameUser$/^with-https-true.*
+          - TestAuthKeyLogoutAndReloginSameUser$/^with-https-false.*
           - TestAuthKeyLogoutAndReloginNewUser
-          - TestAuthKeyLogoutAndReloginSameUserExpiredKey
+          - TestAuthKeyLogoutAndReloginSameUserExpiredKey$/^with-https-true.*
+          - TestAuthKeyLogoutAndReloginSameUserExpiredKey$/^with-https-false.*
           - TestAuthKeyDeleteKey
           - TestAuthKeyLogoutAndReloginRoutesPreserved
           - TestOIDCAuthenticationPingAll
           - TestOIDCExpireNodesBasedOnTokenExpiry
-          - TestOIDC024UserCreation
+          - TestOIDC024UserCreation$/^no-migration-verified-email.*
+          - TestOIDC024UserCreation$/^no-migration-not-verified-email.*
+          - TestOIDC024UserCreation$/^migration-no-strip-domains-not-verified-email.*
           - TestOIDCAuthenticationWithPKCE
           - TestOIDCReloginSameNodeNewUser
           - TestOIDCFollowUpUrl
@@ -323,12 +359,30 @@ jobs:
           - TestExitRoutesWithAutogroupInternetACL
           - TestSubnetRouterMultiNetwork
           - TestSubnetRouterMultiNetworkExitNode
-          - TestAutoApproveMultiNetwork/authkey-tag.*
-          - TestAutoApproveMultiNetwork/authkey-user.*
-          - TestAutoApproveMultiNetwork/authkey-group.*
-          - TestAutoApproveMultiNetwork/webauth-tag.*
-          - TestAutoApproveMultiNetwork/webauth-user.*
-          - TestAutoApproveMultiNetwork/webauth-group.*
+          - TestAutoApproveMultiNetwork$/^authkey-tag-advertiseduringup-false-pol-database.*
+          - TestAutoApproveMultiNetwork$/^authkey-tag-advertiseduringup-false-pol-file.*
+          - TestAutoApproveMultiNetwork$/^authkey-tag-advertiseduringup-true-pol-database.*
+          - TestAutoApproveMultiNetwork$/^authkey-tag-advertiseduringup-true-pol-file.*
+          - TestAutoApproveMultiNetwork$/^authkey-user-advertiseduringup-false-pol-database.*
+          - TestAutoApproveMultiNetwork$/^authkey-user-advertiseduringup-false-pol-file.*
+          - TestAutoApproveMultiNetwork$/^authkey-user-advertiseduringup-true-pol-database.*
+          - TestAutoApproveMultiNetwork$/^authkey-user-advertiseduringup-true-pol-file.*
+          - TestAutoApproveMultiNetwork$/^authkey-group-advertiseduringup-false-pol-database.*
+          - TestAutoApproveMultiNetwork$/^authkey-group-advertiseduringup-false-pol-file.*
+          - TestAutoApproveMultiNetwork$/^authkey-group-advertiseduringup-true-pol-database.*
+          - TestAutoApproveMultiNetwork$/^authkey-group-advertiseduringup-true-pol-file.*
+          - TestAutoApproveMultiNetwork$/^webauth-tag-advertiseduringup-false-pol-database.*
+          - TestAutoApproveMultiNetwork$/^webauth-tag-advertiseduringup-false-pol-file.*
+          - TestAutoApproveMultiNetwork$/^webauth-tag-advertiseduringup-true-pol-database.*
+          - TestAutoApproveMultiNetwork$/^webauth-tag-advertiseduringup-true-pol-file.*
+          - TestAutoApproveMultiNetwork$/^webauth-user-advertiseduringup-false-pol-database.*
+          - TestAutoApproveMultiNetwork$/^webauth-user-advertiseduringup-false-pol-file.*
+          - TestAutoApproveMultiNetwork$/^webauth-user-advertiseduringup-true-pol-database.*
+          - TestAutoApproveMultiNetwork$/^webauth-user-advertiseduringup-true-pol-file.*
+          - TestAutoApproveMultiNetwork$/^webauth-group-advertiseduringup-false-pol-database.*
+          - TestAutoApproveMultiNetwork$/^webauth-group-advertiseduringup-false-pol-file.*
+          - TestAutoApproveMultiNetwork$/^webauth-group-advertiseduringup-true-pol-database.*
+          - TestAutoApproveMultiNetwork$/^webauth-group-advertiseduringup-true-pol-file.*
           - TestSubnetRouteACLFiltering
           - TestGrantViaSubnetSteering
           - TestHASubnetRouterPingFailover
@@ -350,7 +404,9 @@ jobs:
           - TestSSHCheckModeAutoApprove
           - TestSSHCheckModeSessionLossReDelegates
           - TestSSHCheckModeNegativeCLI
-          - TestSSHLocalpart
+          - TestSSHLocalpart$/^MemberAndTagged.*
+          - TestSSHLocalpart$/^AutogroupSelf.*
+          - TestSSHLocalpart$/^LocalpartPlusRoot.*
           - TestTagsAuthKeyWithTagRequestDifferentTag
           - TestTagsAuthKeyWithTagNoAdvertiseFlag
           - TestTagsAuthKeyWithTagCannotAddViaCLI
@@ -398,6 +454,8 @@ jobs:
       test: ${{ matrix.test }}
       postgres_flag: "--postgres=0"
       database_name: "sqlite"
+      # A pull request shortens the soak window; the nightly run keeps it.
+      soak_duration: ${{ github.event_name == 'pull_request' && '4m' || '' }}
   postgres:
     needs: [build, build-postgres, build-tailscale-released]
     if: needs.build.outputs.files-changed == 'true'
@@ -416,3 +474,5 @@ jobs:
       test: ${{ matrix.test }}
       postgres_flag: "--postgres=1"
       database_name: "postgres"
+      # A pull request shortens the soak window; the nightly run keeps it.
+      soak_duration: ${{ github.event_name == 'pull_request' && '4m' || '' }}
