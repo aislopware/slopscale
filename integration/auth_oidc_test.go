@@ -116,8 +116,7 @@ func TestOIDCAuthenticationPingAll(t *testing.T) {
 	if diff := cmp.Diff(
 		want,
 		listUsers,
-		cmpopts.IgnoreUnexported(clientv1.User{}),
-		cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+		userCmpOptions()...,
 	); diff != "" {
 		t.Fatalf("unexpected users: %s", diff)
 	}
@@ -396,8 +395,7 @@ func TestOIDC024UserCreation(t *testing.T) {
 			if diff := cmp.Diff(
 				want,
 				listUsers,
-				cmpopts.IgnoreUnexported(clientv1.User{}),
-				cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+				userCmpOptions()...,
 			); diff != "" {
 				t.Errorf("unexpected users: %s", diff)
 			}
@@ -529,8 +527,7 @@ func TestOIDCReloginSameNodeNewUser(t *testing.T) {
 		if diff := cmp.Diff(
 			wantUsers,
 			listUsers,
-			cmpopts.IgnoreUnexported(clientv1.User{}),
-			cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+			userCmpOptions()...,
 		); diff != "" {
 			ct.Errorf("User validation failed after first login - unexpected users: %s", diff)
 		}
@@ -633,8 +630,7 @@ func TestOIDCReloginSameNodeNewUser(t *testing.T) {
 		if diff := cmp.Diff(
 			wantUsers,
 			listUsers,
-			cmpopts.IgnoreUnexported(clientv1.User{}),
-			cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+			userCmpOptions()...,
 		); diff != "" {
 			ct.Errorf("User validation failed after user2 login - expected both user1 and user2: %s", diff)
 		}
@@ -871,8 +867,7 @@ func TestOIDCReloginSameNodeNewUser(t *testing.T) {
 		if diff := cmp.Diff(
 			wantUsers,
 			listUsers,
-			cmpopts.IgnoreUnexported(clientv1.User{}),
-			cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+			userCmpOptions()...,
 		); diff != "" {
 			ct.Errorf("Final user validation failed - both users should persist after relogin cycle: %s", diff)
 		}
@@ -1131,8 +1126,7 @@ func TestOIDCFollowUpUrl(t *testing.T) {
 	if diff := cmp.Diff(
 		wantUsers,
 		listUsers,
-		cmpopts.IgnoreUnexported(clientv1.User{}),
-		cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+		userCmpOptions()...,
 	); diff != "" {
 		t.Fatalf("unexpected users: %s", diff)
 	}
@@ -1240,8 +1234,7 @@ func TestOIDCMultipleOpenedLoginUrls(t *testing.T) {
 	if diff := cmp.Diff(
 		wantUsers,
 		listUsers,
-		cmpopts.IgnoreUnexported(clientv1.User{}),
-		cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+		userCmpOptions()...,
 	); diff != "" {
 		t.Fatalf("unexpected users: %s", diff)
 	}
@@ -1350,8 +1343,7 @@ func TestOIDCReloginSameNodeSameUser(t *testing.T) {
 		if diff := cmp.Diff(
 			wantUsers,
 			listUsers,
-			cmpopts.IgnoreUnexported(clientv1.User{}),
-			cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+			userCmpOptions()...,
 		); diff != "" {
 			ct.Errorf("User validation failed after first login - unexpected users: %s", diff)
 		}
@@ -1489,8 +1481,7 @@ func TestOIDCReloginSameNodeSameUser(t *testing.T) {
 		if diff := cmp.Diff(
 			wantUsers,
 			listUsers,
-			cmpopts.IgnoreUnexported(clientv1.User{}),
-			cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt"),
+			userCmpOptions()...,
 		); diff != "" {
 			ct.Errorf("Final user validation failed - user1 should persist after same-user relogin: %s", diff)
 		}
@@ -2221,6 +2212,19 @@ func TestOIDCReloginSameUserRoutesPreserved(t *testing.T) {
 
 // compareUsersByID orders users by numeric ID for stable comparison
 // against expected fixtures.
+// userCmpOptions is what every comparison of a listed user against a literal
+// uses. It drops the fields the server fills in that a literal cannot state:
+// CreatedAt and ApprovedAt are wall clock, and Approved and Role follow from
+// creation order rather than from anything these tests set up. What they mean
+// is covered where it is the subject, in state.TestUsersApproval and
+// servertest.TestRBACRolesEndToEnd.
+func userCmpOptions() []cmp.Option {
+	return []cmp.Option{
+		cmpopts.IgnoreUnexported(clientv1.User{}),
+		cmpopts.IgnoreFields(clientv1.User{}, "CreatedAt", "ApprovedAt", "Approved", "Role"),
+	}
+}
+
 func compareUsersByID(a, b *clientv1.User) int {
 	ai, bi := mustParseID(a.Id), mustParseID(b.Id)
 
