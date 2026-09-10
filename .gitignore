@@ -30,6 +30,8 @@ dist/
 /web/dist/*
 !/web/dist/.gitkeep
 /slopscale
+# `go build ./cmd/hi` and the CI build step both drop this at the root.
+/hi
 config.yaml
 config*.yaml
 !config-example.yaml

@@ -23,7 +23,7 @@ func cleanupBeforeTest(ctx context.Context) error {
 		return fmt.Errorf("cleaning stale test containers: %w", err)
 	}
 
-	err = pruneDockerNetworks(ctx)
+	err = pruneDockerNetworks(ctx, stalePruneAge)
 	if err != nil {
 		return fmt.Errorf("pruning networks: %w", err)
 	}
@@ -160,6 +160,11 @@ func cleanupStaleTestContainers(ctx context.Context) error {
 const (
 	containerRemoveInitialInterval = 100 * time.Millisecond
 	containerRemoveMaxElapsedTime  = 2 * time.Second
+
+	// stalePruneAge is how old an unused resource must be before
+	// `--clean-before` will remove it. Anything younger may belong to a run
+	// that started moments ago beside this one.
+	stalePruneAge = 2 * time.Hour
 )
 
 // removeContainerWithRetry attempts to remove a container with exponential backoff retry logic.
@@ -221,15 +226,26 @@ func killAndRemove(ctx context.Context, cli *client.Client, cont container.Summa
 	return removeContainerWithRetry(ctx, cli, cont.ID)
 }
 
-// pruneDockerNetworks removes unused Docker networks.
-func pruneDockerNetworks(ctx context.Context) error {
+// pruneDockerNetworks removes unused Docker networks. A non-zero olderThan
+// spares networks younger than it.
+func pruneDockerNetworks(ctx context.Context, olderThan time.Duration) error {
 	cli, err := createDockerClient(ctx)
 	if err != nil {
 		return fmt.Errorf("creating Docker client: %w", err)
 	}
 	defer cli.Close()
 
-	pruneResult, err := cli.NetworkPrune(ctx, client.NetworkPruneOptions{})
+	// An unfiltered prune removes every unused network on the daemon, and a
+	// scenario that has created its network but not yet attached a
+	// container to it looks exactly like one. Runs share a daemon, so the
+	// automatic sweep passes an age that no live run can be older than;
+	// `hi clean networks` passes zero and prunes the lot.
+	filters := make(client.Filters)
+	if olderThan > 0 {
+		filters.Add("until", olderThan.String())
+	}
+
+	pruneResult, err := cli.NetworkPrune(ctx, client.NetworkPruneOptions{Filters: filters})
 	if err != nil {
 		return fmt.Errorf("pruning networks: %w", err)
 	}

@@ -44,7 +44,7 @@ func main() {
 						Name: "networks",
 						Help: "Prune unused Docker networks",
 						Run: func(env *command.Env) error {
-							return pruneDockerNetworks(env.Context())
+							return pruneDockerNetworks(env.Context(), 0)
 						},
 					},
 					{
@@ -88,7 +88,7 @@ func main() {
 func cleanAll(ctx context.Context) error {
 	for _, step := range []func(context.Context) error{
 		killTestContainers,
-		pruneDockerNetworks,
+		func(ctx context.Context) error { return pruneDockerNetworks(ctx, 0) },
 		cleanOldImages,
 		cleanCacheVolume,
 	} {
