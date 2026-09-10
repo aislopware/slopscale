@@ -18,8 +18,10 @@ import (
 func TestUserCommand(t *testing.T) {
 	IntegrationSkip(t)
 
+	// user1 is created first and so holds the owner role, which no delete
+	// can take away. The other two are what the destroy paths work on.
 	spec := ScenarioSpec{
-		Users: []string{"user1", "user2"},
+		Users: []string{"user1", "user2", "user3"},
 	}
 
 	scenario, err := NewScenario(spec)
@@ -176,8 +178,8 @@ func TestUserCommand(t *testing.T) {
 			"users",
 			"destroy",
 			"--force",
-			// Delete "user1"
-			"--identifier=1",
+			// Delete "user3"
+			"--identifier=3",
 		},
 	)
 	require.NoError(t, err)
@@ -201,6 +203,11 @@ func TestUserCommand(t *testing.T) {
 		slices.SortFunc(listAfterIDDelete, sortWithID)
 
 		want := []*clientv1.User{
+			{
+				Id:    "1",
+				Name:  "user1",
+				Email: "user1@test.no",
+			},
 			{
 				Id:    "2",
 				Name:  "newname",
@@ -243,12 +250,25 @@ func TestUserCommand(t *testing.T) {
 			&listAfterNameDelete,
 		)
 		assert.NoError(c, err)
-		assert.Empty(c, listAfterNameDelete)
+		assert.Len(c, listAfterNameDelete, 1)
 	},
 		integrationutil.ScaledTimeout(10*time.Second),
 		integrationutil.FastPoll,
 		"Waiting for user list after name delete",
 	)
+
+	// The tailnet always keeps its owner, so the last user standing cannot
+	// be destroyed at all. This is why the list above is not empty.
+	_, err = slopscale.Execute(
+		[]string{
+			"slopscale",
+			"users",
+			"destroy",
+			"--force",
+			"--name=user1",
+		},
+	)
+	require.ErrorContains(t, err, "the owner cannot be deleted")
 }
 
 // TestUserCreateCommand exercises `slopscale users create` with all of its
