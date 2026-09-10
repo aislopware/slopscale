@@ -46,8 +46,11 @@ jobs:
       - name: Build binaries and warm Go cache
         if: steps.changed-files.outputs.files == 'true'
         run: |
-          # Build all Go binaries in one nix shell to maximize cache reuse
-          go build -o hi ./cmd/hi
+          # Build all Go binaries in one nix shell to maximize cache reuse.
+          # hi runs on a runner that has no nix store, so it must not be the
+          # dynamically linked binary the dev shell's C compiler produces by
+          # default: its interpreter would be missing and exec fails with 127.
+          CGO_ENABLED=0 go build -o hi ./cmd/hi
           # The container runs the binary on Debian; zigcc links it statically against musl.
           CC=zigcc GOOS=linux go build -trimpath -tags netgo,osusergo -ldflags '-linkmode=external -extldflags=-static' -o slopscale ./cmd/slopscale
           # Build integration test binary to warm the cache with all dependencies
