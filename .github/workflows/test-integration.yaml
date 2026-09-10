@@ -87,9 +87,18 @@ jobs:
             ~/.cache/go-build
             ~/int-cache/go-build
             ~/go/pkg/mod
-          key: go-integration-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          # No ${{ github.sha }} in the key. With one the primary key never
+          # repeats, so every run wrote another 665 MB entry, and the repo's
+          # ten gigabyte cache budget then evicted them faster than the next
+          # run could read one: measured "Cache not found for input keys" on
+          # three consecutive runs, each paying four minutes to compile from
+          # cold. Keyed on go.sum alone the primary key hits and actions/cache
+          # skips the save entirely. What ages out of it is the handful of
+          # first-party packages that changed, which cost seconds; the
+          # dependency tree is what takes the four minutes and go.sum already
+          # covers it.
+          key: go-integration-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum') }}
           restore-keys: |
-            go-integration-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum') }}-
             go-integration-${{ runner.os }}-${{ runner.arch }}-
       - name: Build binaries and warm Go cache
         run: |
@@ -352,8 +361,12 @@ jobs:
       shard: ${{ matrix.shard.name }}
       tests: ${{ matrix.shard.tests }}
       database_name: "sqlite"
-      # A pull request shortens the soak window; the nightly run keeps it.
-      soak_duration: ${{ github.event_name == 'pull_request' && '4m' || '' }}
+      # Only the nightly run keeps the full soak window. Everything else,
+      # a pull request or a hand-started run, shortens it: that one test is
+      # what bounds the matrix's wall clock, at 735 seconds against 253 for
+      # the short window, and a dispatch that does not match its own pull
+      # request cannot be compared against one.
+      soak_duration: ${{ github.event_name == 'schedule' && '' || '4m' }}
   postgres:
     needs:
       - changes
@@ -375,5 +388,9 @@ jobs:
       tests: ${{ matrix.shard.tests }}
       postgres_flag: "--postgres=1"
       database_name: "postgres"
-      # A pull request shortens the soak window; the nightly run keeps it.
-      soak_duration: ${{ github.event_name == 'pull_request' && '4m' || '' }}
+      # Only the nightly run keeps the full soak window. Everything else,
+      # a pull request or a hand-started run, shortens it: that one test is
+      # what bounds the matrix's wall clock, at 735 seconds against 253 for
+      # the short window, and a dispatch that does not match its own pull
+      # request cannot be compared against one.
+      soak_duration: ${{ github.event_name == 'schedule' && '' || '4m' }}
