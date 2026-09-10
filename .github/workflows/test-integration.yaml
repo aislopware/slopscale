@@ -85,6 +85,7 @@ jobs:
         with:
           path: |
             ~/.cache/go-build
+            ~/int-cache/go-build
             ~/go/pkg/mod
           key: go-integration-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
           restore-keys: |
@@ -106,6 +107,10 @@ jobs:
           # image's, so every shard missed and spent four minutes compiling
           # from cold on the first pattern of each of its streams.
           go_version=$(sed -n 's/^go \([0-9.]*\).*/\1/p' go.mod | head -1)
+          # Its own directory rather than the dev shell's: the two toolchains
+          # cannot read each other's entries anyway, and putting both in one
+          # tarball tripled what every shard downloads.
+          mkdir -p "$HOME/int-cache/go-build"
           # As the runner rather than root, so the tar below can still read
           # what it writes. GOPATH is /go in the image, which is where the
           # module cache is mounted; HOME only has to exist and be writable.
@@ -113,7 +118,7 @@ jobs:
             --user "$(id -u):$(id -g)" \
             --volume "$PWD:$PWD" \
             --volume "$HOME/go:/go" \
-            --volume "$HOME/.cache/go-build:/cache/go-build" \
+            --volume "$HOME/int-cache/go-build:/cache/go-build" \
             --env GOCACHE=/cache/go-build \
             --env HOME=/tmp \
             --workdir "$PWD/integration" \
@@ -131,7 +136,7 @@ jobs:
           # default -6: this runs on the critical path before the matrix can
           # start, while the slightly larger artifact is downloaded by the
           # test jobs in parallel.
-          tar -I 'gzip -1' -cf go-cache.tar.gz -C ~ go .cache/go-build
+          tar -I 'gzip -1' -cf go-cache.tar.gz -C ~ go -C ~/int-cache go-build
       - name: Upload Go cache
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
