@@ -1242,3 +1242,68 @@ func TestRemoveConnectionAtIndex_NilsTrailingSlot(t *testing.T) {
 
 	mc.mutex.Unlock()
 }
+
+// TestAddToBatch_NodeRemovedStopsSession proves a permanent deletion tears
+// down the deleted node's own map session, so a deleted client is told to log
+// in again instead of receiving keep-alives until the TCP session breaks.
+func TestAddToBatch_NodeRemovedStopsSession(t *testing.T) {
+	t.Parallel()
+
+	lb := setupLightweightBatcher(t, 1, 1)
+	defer lb.cleanup()
+
+	mc, ok := lb.b.nodes.Load(1)
+	require.True(t, ok)
+
+	stopped := make(chan struct{})
+
+	mc.mutex.Lock()
+	mc.connections[0].stop = func() { close(stopped) }
+	mc.mutex.Unlock()
+
+	lb.b.AddWork(change.NodeRemoved(1))
+
+	select {
+	case <-stopped:
+	default:
+		t.Fatal("a node deletion must stop the deleted node's map session")
+	}
+
+	_, stillTracked := lb.b.nodes.Load(1)
+	assert.False(t, stillTracked, "a deleted node must not remain tracked by the batcher")
+	assert.Equal(t, int64(0), lb.b.totalNodes.Load())
+}
+
+// TestAddToBatch_PeersRemovedKeepsSession is the other half: a peer
+// visibility delta is a protocol message about someone else's netmap, not a
+// lifecycle signal, so it must never kill the peer's own long poll. Before
+// [change.Change.DeletedNodes] existed, the batcher keyed this cleanup off
+// [change.Change.PeersRemoved] and any future producer of that field would
+// have disconnected a live node.
+func TestAddToBatch_PeersRemovedKeepsSession(t *testing.T) {
+	t.Parallel()
+
+	lb := setupLightweightBatcher(t, 1, 1)
+	defer lb.cleanup()
+
+	mc, ok := lb.b.nodes.Load(1)
+	require.True(t, ok)
+
+	stopped := make(chan struct{})
+
+	mc.mutex.Lock()
+	mc.connections[0].stop = func() { close(stopped) }
+	mc.mutex.Unlock()
+
+	lb.b.AddWork(change.PeersRemoved(1))
+
+	select {
+	case <-stopped:
+		t.Fatal("a peer visibility delta must not stop the peer's own map session")
+	default:
+	}
+
+	_, stillTracked := lb.b.nodes.Load(1)
+	assert.True(t, stillTracked, "a visible peer removal must remain tracked by the batcher")
+	assert.Equal(t, int64(1), lb.b.totalNodes.Load())
+}
