@@ -50,20 +50,20 @@ there is enough space and that the required Docker images are available.
 Defaults are tuned for single-test development runs. Review before
 changing.
 
-| Flag                | Default        | Purpose                                                                     |
-| ------------------- | -------------- | --------------------------------------------------------------------------- |
-| `--timeout`         | `120m`         | Total test timeout. Use the built-in flag — never wrap with bash `timeout`. |
-| `--postgres`        | `false`        | Use PostgreSQL instead of SQLite                                            |
-| `--failfast`        | `true`         | Stop on first test failure                                                  |
-| `--go-version`      | auto           | Detected from `go.mod` (currently 1.27.1)                                   |
-| `--clean-before`    | `true`         | Clean stale (stopped/exited) containers before starting                     |
-| `--clean-after`     | `true`         | Clean this run's containers after completion                                |
-| `--keep-on-failure` | `false`        | Preserve containers for manual inspection on failure                        |
-| `--logs-dir`        | `control_logs` | Where to save run artefacts                                                 |
-| `--verbose`         | `false`        | Verbose output                                                              |
-| `--stats`           | `false`        | Collect container resource-usage stats                                      |
-| `--hs-memory-limit` | `0`            | Fail if any slopscale container exceeds N MB (0 = disabled)                 |
-| `--ts-memory-limit` | `0`            | Fail if any tailscale container exceeds N MB                                |
+| Flag                | Default        | Purpose                                                                         |
+| ------------------- | -------------- | ------------------------------------------------------------------------------- |
+| `--timeout`         | `120m`         | Total test timeout. Use the built-in flag — never wrap with bash `timeout`.     |
+| `--postgres`        | `false`        | Use PostgreSQL instead of SQLite                                                |
+| `--failfast`        | `true`         | Stop on first test failure                                                      |
+| `--go-version`      | auto           | Detected from `go.mod` (currently 1.27.1)                                       |
+| `--clean-before`    | `true`         | Clean stale (stopped/exited) containers and old unused networks before starting |
+| `--clean-after`     | `true`         | Clean this run's containers after completion                                    |
+| `--keep-on-failure` | `false`        | Preserve containers for manual inspection on failure                            |
+| `--logs-dir`        | `control_logs` | Where to save run artefacts                                                     |
+| `--verbose`         | `false`        | Verbose output                                                                  |
+| `--stats`           | `false`        | Collect container resource-usage stats                                          |
+| `--hs-memory-limit` | `0`            | Fail if any slopscale container exceeds N MB (0 = disabled)                     |
+| `--ts-memory-limit` | `0`            | Fail if any tailscale container exceeds N MB                                    |
 
 ### Timeout guidance
 
@@ -105,10 +105,21 @@ go run ./cmd/hi run "TestACLAllowUserDst" &
 go run ./cmd/hi run "TestOIDCAuthenticationPingAll" &
 ```
 
+CI relies on this. A shard's tests are split into streams that run as
+concurrent `hi run` invocations, so a job uses the runner it is paying for
+instead of leaving it idle. Each stream writes to its own log and the shard
+replays them one at a time, because interleaved output from three scenarios
+is unreadable. CI passes `--clean-before=false`: a fresh runner has nothing
+stale, and the sweep is the one part of a run that reaches outside itself.
+
 ### Safety rules for concurrent runs
 
 - ✅ Your run cleans only containers labelled with its own `hi.run-id`
-- ✅ `--clean-before` removes only stopped/exited containers
+- ✅ `--clean-before` removes only stopped/exited containers, and only
+  networks unused for two hours, which no live run can be
+- ⚠️ `--clean-before` still removes another live run's _exited_ containers.
+  Harmless in practice, but pass `--clean-before=false` when running
+  streams side by side, as CI does
 - ❌ **Never** run `docker rm -f $(docker ps -q --filter name=hs-)` —
   this destroys other agents' live test sessions
 - ❌ **Never** run `docker system prune -f` while any tests are running

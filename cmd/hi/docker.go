@@ -239,7 +239,11 @@ func startStatsCollector(ctx context.Context, config *RunConfig, runID string) *
 
 // buildGoTestCommand constructs the go test command arguments.
 func buildGoTestCommand(config *RunConfig) []string {
-	cmd := []string{"go", "test", "./..."}
+	// Only the integration package holds tests this runner can drive. The
+	// subpackages hold helpers plus a couple of unit tests that `make test`
+	// already runs, and building them here costs a compile and a link per
+	// invocation for a "no tests to run" line.
+	cmd := []string{"go", "test", "."}
 
 	if config.TestPattern != "" {
 		cmd = append(cmd, "-run", config.TestPattern)
