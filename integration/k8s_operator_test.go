@@ -77,9 +77,11 @@ func TestK8sOperator(t *testing.T) {
 	defer scenario.ShutdownAssertNoPanics(t)
 
 	err = scenario.CreateSlopscaleEnv(
-		// The tsic client reaches the in-cluster proxy only via DERP (no direct
-		// path to the k3s pod network), and hsic's embedded DERP is non-TLS, so the
-		// client must reach DERP over plain-HTTP websockets — as the proxy pods do.
+		// The tsic client reaches the in-cluster proxy only via DERP (no
+		// direct path to the k3s pod network), and hsic's embedded DERP is
+		// non-TLS, so the client has to dial DERP over plain HTTP. The raw
+		// upgrade works there; websockets are for clients that cannot do
+		// one, and asking for them here would cost a client build.
 		[]tsic.Option{tsic.WithDERPOverHTTP()},
 		hsic.WithTestName("k8soperator"),
 		hsic.WithoutTLS(),

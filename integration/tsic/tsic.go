@@ -164,14 +164,16 @@ func WithWebsocketDERP(enabled bool) Option {
 	}
 }
 
-// WithDERPOverHTTP makes the client reach the DERP server over plain-HTTP
-// websockets (TS_DEBUG_DERP_WS_CLIENT + TS_DEBUG_USE_DERP_HTTP). It is the
-// counterpart to [hsic.WithoutTLS]: a Slopscale serving its embedded DERP without
-// TLS is otherwise unreachable, because the client defaults to dialing DERP over
-// HTTPS.
+// WithDERPOverHTTP makes the client dial the DERP server over plain HTTP
+// (TS_DEBUG_USE_DERP_HTTP). It is the counterpart to [hsic.WithoutTLS]: a
+// Slopscale serving its embedded DERP without TLS is otherwise unreachable,
+// because the client defaults to dialing DERP over HTTPS.
+//
+// This is a plain envknob, so it works on the pre-built client image.
+// Websocket DERP is a separate transport behind a build tag; a test that
+// wants both asks for [WithWebsocketDERP] as well.
 func WithDERPOverHTTP() Option {
 	return func(tsic *TailscaleInContainer) {
-		tsic.withWebsocketDERP = true
 		tsic.withDERPOverHTTP = true
 	}
 }
@@ -331,6 +333,13 @@ func New(
 		Env:        []string{},
 	}
 
+	// Only the websocket transport lives behind a build tag, and building the
+	// client costs over four minutes, so keep the two knobs apart: a test
+	// that just needs DERP without TLS still runs on the pre-built image.
+	if tsic.withDERPOverHTTP {
+		tailscaleOptions.Env = append(tailscaleOptions.Env, "TS_DEBUG_USE_DERP_HTTP=true")
+	}
+
 	if tsic.withWebsocketDERP {
 		if version != VersionHead {
 			return tsic, errInvalidClientConfig
@@ -342,12 +351,6 @@ func New(
 			tailscaleOptions.Env,
 			fmt.Sprintf("TS_DEBUG_DERP_WS_CLIENT=%t", tsic.withWebsocketDERP),
 		)
-
-		// Plain-HTTP DERP additionally needs the client to dial http:// instead of
-		// the default https://; see [WithDERPOverHTTP].
-		if tsic.withDERPOverHTTP {
-			tailscaleOptions.Env = append(tailscaleOptions.Env, "TS_DEBUG_USE_DERP_HTTP=true")
-		}
 	}
 
 	tailscaleOptions.ExtraHosts = append(tailscaleOptions.ExtraHosts,
