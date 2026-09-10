@@ -20,14 +20,33 @@ import (
 // on setup: each job downloads four image tarballs and a Go cache before it
 // runs anything, about a minute that 190-odd jobs paid 190 times.
 //
-// The tests are therefore packed into a fixed number of shards, sized so the
-// two matrices together stay inside the limit. Raise these together with the
-// limit; leaving lanes idle costs wall clock, and asking for more lanes than
-// exist only queues the surplus behind a full shard.
+// The tests are therefore packed into a fixed number of shards, sized to the
+// lanes this matrix can actually have. Raise these together with the limit;
+// leaving lanes idle costs wall clock, and asking for more lanes than exist
+// only queues the surplus behind a full shard.
 const (
+	// concurrentJobLimit is how many jobs the account runs on
+	// ubuntu-24.04-arm at once. Measured rather than assumed: sampling
+	// every job of every workflow one push started, the peak was exactly
+	// twenty.
 	concurrentJobLimit = 20
-	postgresShards     = 1
-	sqliteShards       = concurrentJobLimit - postgresShards
+	// siblingJobs is what the other workflows the same push starts hold
+	// while this matrix wants to begin. The limit is shared, and the Go
+	// workflow's lint, test, servertest and cross jobs run through the
+	// first five minutes, which is exactly when the matrix starts. Sized
+	// to the whole limit its last three shards queued behind them, the
+	// last by two minutes, and that shard then finished last and set the
+	// run's wall clock.
+	//
+	// Giving the lanes back costs nothing here. A shard's wall clock is
+	// set by its longest indivisible leaf, 352 seconds of
+	// TestAuthKeyLogoutAndReloginSameUser/with-https-false, and the
+	// packer reports the same 5.9 minute maximum anywhere from fifteen
+	// shards to nineteen. Fewer shards only fill the slack around that
+	// leaf.
+	siblingJobs    = 4
+	postgresShards = 1
+	sqliteShards   = concurrentJobLimit - siblingJobs - postgresShards
 )
 
 // streamsPerShard is how many `hi run` invocations a shard starts side by
