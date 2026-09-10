@@ -70,9 +70,20 @@ describe(LatencySection, () => {
     await expect.element(screen.getByText("Singapore").first()).toBeVisible();
     await expect.element(screen.getByText("Showing 1 region")).toBeVisible();
     await expect
-      .element(screen.getByRole("link", { name: "Connected laptop" }))
+      .element(screen.getByRole("link", { name: "laptop" }))
       .toHaveAttribute("href", "/machines/1");
+    await expect.element(screen.getByText("offline")).not.toBeInTheDocument();
     await expect.element(screen.getByText("Showing 1 machine")).toBeVisible();
+  });
+
+  it("marks a machine that is no longer connected", async () => {
+    const machines = report.machines.map((machine) => ({ ...machine, online: false }));
+    const screen = await render(page({ ...report, machines }));
+
+    await expect.element(screen.getByText("offline")).toBeVisible();
+    await expect
+      .element(screen.getByRole("link", { name: "laptop" }))
+      .toHaveAttribute("href", "/machines/1");
   });
 
   it("says so while nothing has been measured", async () => {

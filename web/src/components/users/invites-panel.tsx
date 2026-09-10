@@ -1,5 +1,4 @@
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { EnvelopeSimpleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 
@@ -9,7 +8,7 @@ import type { Me } from "~/auth/me.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { Frame, FrameBand } from "~/components/ui/frame.tsx";
 import { inviteColumns } from "~/components/users/invite-columns.tsx";
@@ -58,7 +57,6 @@ export function PendingInvites({ me }: { readonly me: Me }): ReactElement | null
             <Empty
               className={tableEmptyClass}
               size="sm"
-              icon={<EnvelopeSimpleIcon size={emptyIconSize} />}
               title="No invitations waiting"
               description="An invitation stays here until it is used, revoked or expired."
             />

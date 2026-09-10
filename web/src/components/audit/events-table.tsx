@@ -2,7 +2,7 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { Table } from "@cloudflare/kumo/components/table";
 import { cn } from "@cloudflare/kumo/utils";
-import { CaretDownIcon, CaretRightIcon, ClockCounterClockwiseIcon } from "@phosphor-icons/react";
+import { CaretDownIcon, CaretRightIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { MouseEvent, ReactElement } from "react";
 
@@ -15,7 +15,7 @@ import {
   ResultCell,
   TargetCell,
 } from "~/components/audit/cells.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
@@ -208,7 +208,6 @@ function EmptyEvents({
     <Empty
       className={tableEmptyClass}
       size="sm"
-      icon={<ClockCounterClockwiseIcon size={emptyIconSize} />}
       title="No events yet"
       description="Every change made through the API or this console is recorded here."
     />

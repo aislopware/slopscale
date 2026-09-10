@@ -1,6 +1,6 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { HandWavingIcon, PlusIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -13,7 +13,7 @@ import { requestColumns } from "~/components/access/request-columns.tsx";
 import { toRequestRows } from "~/components/access/request-model.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
@@ -107,7 +107,6 @@ function MyAccessPage(): ReactElement {
               <Empty
                 className={tableEmptyClass}
                 size="sm"
-                icon={<HandWavingIcon size={emptyIconSize} />}
                 title="No requests"
                 description={emptyText(me.user !== undefined, options.groups.length > 0)}
                 contents={

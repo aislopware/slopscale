@@ -57,7 +57,8 @@ export function FramePanel({
  */
 export const frameTableClass = cn(
   "border-separate border-spacing-0",
-  "[&_th]:border-b-0 [&_th]:bg-kumo-elevated",
+  // A header never wraps: a two-line "Machines matched" beside one-line headers reads as misaligned.
+  "[&_th]:border-b-0 [&_th]:bg-kumo-elevated [&_th]:whitespace-nowrap",
   "[&_td]:border-b [&_td]:border-kumo-hairline",
   "[&_td:first-child]:border-l [&_td:first-child]:border-l-kumo-line",
   "[&_td:last-child]:border-r [&_td:last-child]:border-r-kumo-line",

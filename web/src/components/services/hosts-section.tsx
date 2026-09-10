@@ -12,10 +12,9 @@ import { Code } from "~/components/ui/code.tsx";
 import { CommandBox } from "~/components/ui/command-text.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
-import { StatusDot } from "~/components/ui/status-dot.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
-import { isTagged, nodeStatus } from "~/lib/node.ts";
+import { isTagged } from "~/lib/node.ts";
 
 /** Why a machine cannot be approved to host a service; the server refuses it as well. */
 export const untaggedReason = "Only tagged machines can host a service";
@@ -71,12 +70,19 @@ export function HostsSection({
           title="No machine announces it"
           description="Run these on a tagged machine, then approve it here."
           contents={
-            <div className="flex w-full max-w-md flex-col gap-2 text-left">
+            <div className="flex w-full max-w-md flex-col items-center gap-2">
               <CommandBox
                 size="sm"
+                wrap
+                className="w-full"
                 command={`tailscale serve --service=${service.name} --https=443 localhost:8080`}
               />
-              <CommandBox size="sm" command={`tailscale serve advertise ${service.name}`} />
+              <CommandBox
+                size="sm"
+                wrap
+                className="w-full"
+                command={`tailscale serve advertise ${service.name}`}
+              />
             </div>
           }
         />
@@ -116,7 +122,6 @@ function HostRow({
           params={{ nodeId: host.nodeId }}
           className="flex min-w-0 items-center gap-2 font-medium text-kumo-default hover:text-kumo-link hover:underline"
         >
-          {node === undefined ? null : <StatusDot status={nodeStatus(node)} />}
           <span className="truncate">{host.name}</span>
         </Link>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-kumo-subtle">

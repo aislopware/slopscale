@@ -2,7 +2,7 @@ import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import type { TabsItem } from "@cloudflare/kumo/components/tabs";
-import { KeyIcon, PlugsConnectedIcon, PlusIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useDeferredValue, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
@@ -31,7 +31,7 @@ import { apiKeyStatus, preAuthKeyStatus } from "~/components/keys/status.ts";
 import type { StatusFilter } from "~/components/keys/status.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
@@ -109,7 +109,6 @@ export function PreAuthPanel({
             <Empty
               className={tableEmptyClass}
               size="sm"
-              icon={<KeyIcon size={emptyIconSize} />}
               title="No pre-auth keys"
               description="A pre-auth key lets a machine register without anyone signing in on it."
               contents={
@@ -176,7 +175,6 @@ export function ApiPanel({
             <Empty
               className={tableEmptyClass}
               size="sm"
-              icon={<KeyIcon size={emptyIconSize} />}
               title="No API keys"
               description="An API key authenticates scripts and other tools against the v1 API."
               contents={
@@ -269,7 +267,6 @@ export function OAuthPanel({
             <Empty
               className={tableEmptyClass}
               size="sm"
-              icon={<PlugsConnectedIcon size={emptyIconSize} />}
               title="No OAuth clients"
               description="An OAuth client or federated identity lets automation get short-lived v2 API tokens."
               contents={

@@ -1,6 +1,6 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { PlusIcon, ShippingContainerIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useState } from "react";
 import type { ReactElement } from "react";
 
@@ -12,7 +12,7 @@ import { LogStreamDialog } from "~/components/logstreams/dialogs.tsx";
 import { useLogStreamMutations } from "~/components/logstreams/mutations.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
@@ -75,7 +75,6 @@ export function LogStreamsTab({
                 <Empty
                   className={tableEmptyClass}
                   size="sm"
-                  icon={<ShippingContainerIcon size={emptyIconSize} />}
                   title="No log streams yet"
                   description="Ship the audit log to Splunk, Elasticsearch, Datadog, Axiom, Loki or any HTTP collector."
                   contents={

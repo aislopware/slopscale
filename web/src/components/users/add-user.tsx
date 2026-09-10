@@ -1,12 +1,12 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { PlusIcon, UsersIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { CreateUserDialog } from "~/components/users/dialogs.tsx";
 import { useUserMutations } from "~/components/users/mutations.ts";
 
@@ -45,7 +45,6 @@ export function FirstUserEmpty({ me }: { readonly me: Me }): ReactElement {
       <Empty
         className={tableEmptyClass}
         size="sm"
-        icon={<UsersIcon size={emptyIconSize} />}
         title="No users yet"
         description="Users appear here after their first sign-in. Add one now to hand out a pre-auth key."
         contents={

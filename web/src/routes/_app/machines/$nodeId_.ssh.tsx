@@ -1,6 +1,6 @@
 import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { ArrowLeftIcon, TerminalWindowIcon } from "@phosphor-icons/react";
+import { ArrowLeftIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
@@ -11,7 +11,7 @@ import { nodeSshUsernamesQuery } from "~/api/queries.ts";
 import type { Node } from "~/api/queries.ts";
 import { SSHTerminal } from "~/components/ssh/terminal.tsx";
 import { UsernameField, usernamePrefillStep } from "~/components/ssh/username-field.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { Callout } from "~/components/ui/callout.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { Status } from "~/components/ui/status.tsx";
@@ -147,11 +147,6 @@ function SSHPage(): ReactElement {
   return (
     <div className="flex h-[calc(100svh-9rem)] flex-col gap-4">
       <PageHeader
-        eyebrow={
-          <LinkButton href={`/machines/${nodeId}`} variant="ghost" size="sm" icon={ArrowLeftIcon}>
-            Machine details
-          </LinkButton>
-        }
         title={title}
         meta={
           <>
@@ -171,7 +166,10 @@ function SSHPage(): ReactElement {
           </>
         }
         actions={
-          <form className="flex items-center gap-2" onSubmit={handleSubmit}>
+          <form className="flex flex-wrap items-center justify-end gap-2" onSubmit={handleSubmit}>
+            <LinkButton href={`/machines/${nodeId}`} variant="ghost" icon={ArrowLeftIcon}>
+              Machine details
+            </LinkButton>
             <UsernameField
               value={username}
               suggestions={usernames}
@@ -266,7 +264,6 @@ function SessionError({
         <Empty
           size="sm"
           className={tableEmptyClass}
-          icon={<TerminalWindowIcon size={emptyIconSize} />}
           title="The in-browser client was not built"
           description="Run make wasm from the repository root, then reload this page."
         />

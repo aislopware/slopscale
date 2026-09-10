@@ -1,10 +1,10 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { DevicesIcon, PlusIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 import type { StatusFilter } from "~/components/machines/filters.ts";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 
 export interface MachinesEmptyProps {
   /** How many machines exist at all, before any filter. */
@@ -34,7 +34,6 @@ export function MachinesEmpty({
       <Empty
         size="sm"
         className={tableEmptyClass}
-        icon={<DevicesIcon size={emptyIconSize} />}
         title="No machines yet"
         description="Register a machine with a pre-auth key or by signing in. New machines appear here on their own."
         contents={

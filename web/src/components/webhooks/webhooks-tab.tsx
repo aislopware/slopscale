@@ -1,6 +1,6 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { PlusIcon, WebhooksLogoIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useState } from "react";
 import type { ReactElement } from "react";
 
@@ -9,7 +9,7 @@ import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
@@ -77,7 +77,6 @@ export function WebhooksTab({
                 <Empty
                   className={tableEmptyClass}
                   size="sm"
-                  icon={<WebhooksLogoIcon size={emptyIconSize} />}
                   title="No webhooks yet"
                   description="Post events to your own endpoint, a chat channel, Telegram, ntfy or email."
                   contents={

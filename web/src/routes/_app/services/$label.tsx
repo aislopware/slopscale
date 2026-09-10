@@ -83,10 +83,11 @@ function ServiceHeader({
 
   return (
     <PageHeader
-      eyebrow={<Status tone={tone}>{label}</Status>}
       title={serviceTitle(service)}
       meta={
         <>
+          <Status tone={tone}>{label}</Status>
+          <span aria-hidden>·</span>
           <span className="font-mono">{service.name}</span>
           {service.comment === "" ? null : (
             <>

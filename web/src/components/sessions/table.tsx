@@ -3,7 +3,7 @@ import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { Table } from "@cloudflare/kumo/components/table";
 import { cn } from "@cloudflare/kumo/utils";
-import { DownloadSimpleIcon, TerminalWindowIcon, TrashIcon } from "@phosphor-icons/react";
+import { DownloadSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -19,7 +19,7 @@ import {
 } from "~/components/sessions/model.ts";
 import type { RecordingState } from "~/components/sessions/model.ts";
 import { useDeleteRecording } from "~/components/sessions/mutations.ts";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
@@ -184,7 +184,6 @@ function EmptySessions({ embeddedRecorder }: { readonly embeddedRecorder: boolea
     <Empty
       className={tableEmptyClass}
       size="sm"
-      icon={<TerminalWindowIcon size={emptyIconSize} />}
       title="No recorded sessions"
       contents={
         <p className="max-w-140 text-center text-kumo-subtle">

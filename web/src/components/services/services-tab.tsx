@@ -1,6 +1,6 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { HardDrivesIcon, PlusIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useNavigate } from "@tanstack/react-router";
 import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
@@ -14,7 +14,7 @@ import { serviceColumns } from "~/components/services/service-columns.tsx";
 import { ServiceDialog } from "~/components/services/service-dialogs.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 import { CommandBox } from "~/components/ui/command-text.tsx";
@@ -139,27 +139,27 @@ function ServicesEmpty({
     <Empty
       className={tableEmptyClass}
       size="sm"
-      icon={<HardDrivesIcon size={emptyIconSize} />}
       title="No services"
       description="A service is a name and a pair of addresses of its own that tagged machines host, so clients reach it by name however it moves."
       contents={
-        <div className="flex w-full max-w-md flex-col gap-3 text-left">
+        <div className="flex w-full max-w-md flex-col items-center gap-3">
           <CommandBox
             size="sm"
+            wrap
+            className="w-full"
             command="tailscale serve --service=svc:web --https=443 localhost:8080"
           />
-          <CommandBox size="sm" command="tailscale serve advertise svc:web" />
-          <p className="text-kumo-subtle">
+          <CommandBox
+            size="sm"
+            wrap
+            className="w-full"
+            command="tailscale serve advertise svc:web"
+          />
+          <p className="text-center text-kumo-subtle">
             Create the service here, run those on a tagged machine, then approve the machine to host
             it.
           </p>
-          <Button
-            variant="secondary"
-            icon={PlusIcon}
-            disabled={!canEdit}
-            className="self-start"
-            onClick={onCreate}
-          >
+          <Button variant="secondary" icon={PlusIcon} disabled={!canEdit} onClick={onCreate}>
             New service
           </Button>
         </div>

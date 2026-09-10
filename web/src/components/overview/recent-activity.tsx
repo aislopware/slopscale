@@ -4,8 +4,7 @@ import type { ReactElement } from "react";
 import type { Node } from "~/api/queries.ts";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section } from "~/components/ui/section.tsx";
-import { StatusDot } from "~/components/ui/status-dot.tsx";
-import { nodeName, nodeStatus, ownerLabel } from "~/lib/node.ts";
+import { nodeName, ownerLabel } from "~/lib/node.ts";
 import { parseTime } from "~/lib/time.ts";
 
 /** Enough rows to show what is happening without repeating the machines page. */
@@ -32,7 +31,6 @@ function ActivityRow({ node }: { readonly node: Node }): ReactElement {
       params={{ nodeId: node.id }}
       className="group flex items-center gap-3 px-5 py-2.5 text-kumo-default no-underline not-first:border-t not-first:border-kumo-hairline hover:bg-kumo-tint"
     >
-      <StatusDot status={nodeStatus(node)} />
       <span className="min-w-0 truncate font-medium text-kumo-default group-hover:text-kumo-link group-hover:underline group-focus-visible:underline">
         {nodeName(node)}
       </span>

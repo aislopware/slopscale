@@ -1,6 +1,6 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { PlusIcon, ShieldCheckIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useState } from "react";
 import type { ReactElement } from "react";
 
@@ -12,7 +12,7 @@ import { postureColumns } from "~/components/access/posture-columns.tsx";
 import { PostureDialog } from "~/components/access/posture-dialogs.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
@@ -82,7 +82,6 @@ export function PosturesTab({
                 <Empty
                   className={tableEmptyClass}
                   size="sm"
-                  icon={<ShieldCheckIcon size={emptyIconSize} />}
                   title="No postures yet"
                   description="A posture names conditions a machine must meet. Attach it to a rule to require it of the sources."
                   contents={
@@ -101,7 +100,6 @@ export function PosturesTab({
                 <Empty
                   className={tableEmptyClass}
                   size="sm"
-                  icon={<ShieldCheckIcon size={emptyIconSize} />}
                   title="No postures match"
                   contents={
                     <Button

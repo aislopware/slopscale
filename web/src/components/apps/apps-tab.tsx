@@ -1,6 +1,6 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { AppWindowIcon, PlusIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useState } from "react";
 import type { ReactElement } from "react";
 
@@ -13,7 +13,7 @@ import { countApps } from "~/components/apps/model.ts";
 import { useAppMutations } from "~/components/apps/mutations.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Code } from "~/components/ui/code.tsx";
@@ -124,7 +124,6 @@ function EmptyApps({
     <Empty
       className={tableEmptyClass}
       size="sm"
-      icon={<AppWindowIcon size={emptyIconSize} />}
       title="No apps yet"
       description="An app names the domains it covers and the tags of the machines that reach them. Two things make one work:"
       contents={

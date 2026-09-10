@@ -1,6 +1,6 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { PathIcon, PlusIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
@@ -12,7 +12,7 @@ import { networkColumns, toNetworkRows } from "~/components/networks/network-col
 import { NetworkDialog } from "~/components/networks/network-dialogs.tsx";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
@@ -87,7 +87,6 @@ export function NetworksTab({
                 <Empty
                   className={tableEmptyClass}
                   size="sm"
-                  icon={<PathIcon size={emptyIconSize} />}
                   title="No networks"
                   description="A network approves a subnet or exit node on its routers and hands the routes only to the groups you pick."
                   contents={

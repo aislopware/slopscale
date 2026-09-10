@@ -14,8 +14,8 @@ export type TroubleKind =
 
 export interface Trouble {
   readonly kind: TroubleKind;
-  /** A word or two over the title: the HTTP status, or where the error came from. */
-  readonly eyebrow: string;
+  /** A word or two under the sentence: the HTTP status, or where the error came from. */
+  readonly code: string;
   readonly title: string;
   /** What it means and what to do, in a sentence or two. */
   readonly description: string;
@@ -44,7 +44,7 @@ const unreachable = {
 
 const console = {
   kind: "console",
-  eyebrow: "Console error",
+  code: "Console error",
   title: "The console hit an error",
   description:
     "The console failed, not your tailnet. Try again, or report it with the details below.",
@@ -53,7 +53,7 @@ const console = {
 /** The page the address names does not exist; the router says so, not the server. */
 export const pageNotFound: Trouble = {
   kind: "missing",
-  eyebrow: "Not found",
+  code: "Not found",
   title: "Page not found",
   description: "There is no page at this address. It may have moved when the console was updated.",
   message: "",
@@ -74,14 +74,14 @@ export function sentence(text: string): string {
 }
 
 function byStatus(error: ApiError): Omit<Trouble, "message" | "instance"> {
-  const eyebrow = `HTTP ${error.status}`;
+  const code = `HTTP ${error.status}`;
   const raw = error.problem?.detail;
   const detail = raw === undefined ? undefined : sentence(raw);
 
   if (error.status === statusUnauthorized) {
     return {
       kind: "session",
-      eyebrow,
+      code,
       title: "Your session has ended",
       description: "Sign in again to continue.",
     };
@@ -90,7 +90,7 @@ function byStatus(error: ApiError): Omit<Trouble, "message" | "instance"> {
   if (error.status === statusForbidden) {
     return {
       kind: "forbidden",
-      eyebrow,
+      code,
       title: "You do not have access",
       description:
         detail ??
@@ -101,20 +101,20 @@ function byStatus(error: ApiError): Omit<Trouble, "message" | "instance"> {
   if (error.status === statusNotFound) {
     return {
       kind: "missing",
-      eyebrow,
+      code,
       title: "Not found",
       description: detail ?? "This address no longer points to anything.",
     };
   }
 
   if (gatewayStatuses.has(error.status)) {
-    return { ...unreachable, eyebrow };
+    return { ...unreachable, code };
   }
 
   if (error.status >= statusServerError) {
     return {
       kind: "server",
-      eyebrow,
+      code,
       title: "The server hit an error",
       description: detail ?? "slopscale could not finish the request. The server log has more.",
     };
@@ -122,7 +122,7 @@ function byStatus(error: ApiError): Omit<Trouble, "message" | "instance"> {
 
   return {
     kind: "server",
-    eyebrow,
+    code,
     title: "The server refused the request",
     description: detail ?? sentence(errorMessage(error)),
   };
@@ -142,7 +142,7 @@ export function describeTrouble(error: unknown): Trouble {
   }
 
   if (isNetworkFailure(error)) {
-    return { ...unreachable, eyebrow: "No connection", message, instance: undefined };
+    return { ...unreachable, code: "No connection", message, instance: undefined };
   }
 
   return { ...console, message, instance: undefined };

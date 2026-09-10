@@ -88,7 +88,9 @@ export const ruleColumns = helper.columns([
     header: "Protocol and ports",
     enableSorting: true,
     cell: ({ row }) => <ProtocolCell rule={row.original} />,
-    meta: { className: "hidden whitespace-nowrap align-top md:table-cell" },
+    // The ports wrap after their commas; a nowrap list of them was what pushed the table past its
+    // panel at 1280px.
+    meta: { className: "hidden align-top md:table-cell" },
   }),
   helper.accessor((rule) => (rule.enabled ? 1 : 0), {
     id: "enabled",
@@ -127,18 +129,20 @@ function NameCell({ rule }: { readonly rule: AccessRule }): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
       <span className="flex min-w-0 items-center gap-2">
-        <span className="truncate font-medium text-kumo-default" title={rule.name}>
+        <span className="font-medium whitespace-normal text-kumo-default" title={rule.name}>
           {rule.name}
         </span>
         {isBuiltinRule(rule) ? <span className="text-xs text-kumo-subtle">Built-in</span> : null}
       </span>
       {rule.description === "" ? null : (
-        <span className="truncate text-xs text-kumo-subtle" title={rule.description}>
+        <span className="line-clamp-2 text-xs text-kumo-subtle" title={rule.description}>
           {rule.description}
         </span>
       )}
       {/* The protocol column is hidden on small screens, so the name carries it there. */}
-      <span className="truncate text-xs text-kumo-subtle md:hidden">{protocolSummary(rule)}</span>
+      <span className="text-xs whitespace-normal text-kumo-subtle md:hidden">
+        {protocolSummary(rule)}
+      </span>
       <ExpiryLine rule={rule} />
     </div>
   );
@@ -152,7 +156,7 @@ function SourcesCell({ rule }: { readonly rule: RuleRow }): ReactElement {
     <div className="flex min-w-0 flex-col gap-1">
       <GroupChips ids={rule.sourceGroupIds} groups={groups ?? []} />
       {rule.postureIds.length === 0 ? null : (
-        <span className="truncate text-xs text-kumo-subtle" title={rule.postureNames}>
+        <span className="text-xs whitespace-normal text-kumo-subtle" title={rule.postureNames}>
           Requires {rule.postureNames}
         </span>
       )}
@@ -173,7 +177,7 @@ function ExpiryLine({ rule }: { readonly rule: AccessRule }): ReactElement | nul
       Expired <RelativeTime value={rule.expiresAt} />
     </Status>
   ) : (
-    <span className="truncate text-xs text-kumo-subtle">
+    <span className="text-xs whitespace-normal text-kumo-subtle">
       Expires <RelativeTime value={rule.expiresAt} />
     </span>
   );

@@ -8,44 +8,25 @@ import { HoverPopover } from "~/components/ui/hover-popover.tsx";
 /** What a state means to the operator, coloured the same way everywhere. */
 export type Tone = "success" | "warning" | "danger" | "info" | "neutral";
 
-const dots: Record<Tone, string> = {
-  success: "bg-kumo-success",
-  warning: "bg-kumo-warning",
-  danger: "bg-kumo-danger",
-  info: "bg-kumo-info",
-  // Kumo has no inactive fill token, only the text one, so the dot borrows it through currentColor.
-  neutral: "bg-current text-kumo-inactive",
-};
-
+/**
+ * Only bad news gets a colour. A good or ordinary state reads in the default text, an inactive one
+ * steps back to subtle, so a column of states is a column of words and the coloured ones are the
+ * rows to look at.
+ */
 const texts: Record<Tone, string> = {
-  success: "text-kumo-success",
+  success: "text-kumo-default",
   warning: "text-kumo-warning",
   danger: "text-kumo-danger",
-  info: "text-kumo-info",
+  info: "text-kumo-default",
   neutral: "text-kumo-subtle",
 };
 
 const noteIconSize = 14;
 
-export function Dot({
-  tone,
-  className,
-}: {
-  readonly tone: Tone;
-  readonly className?: string;
-}): ReactElement {
-  return (
-    <span
-      aria-hidden
-      className={cn("inline-block size-2 shrink-0 rounded-full", dots[tone], className)}
-    />
-  );
-}
-
 /**
- * A state as words with a coloured dot in front: "Connected", "Pending", "Failed". Plain text, not
- * a pill, so a column of states reads as a column and the colour alone carries the meaning. A pill
- * is for a thing the operator can pick out, such as a tag; a state is a fact about the row.
+ * A state as words: "Connected", "Pending", "Failed". Plain text, not a pill and not a dot, so a
+ * column of states reads as a column and the word alone carries the meaning. A pill is for a thing
+ * the operator can pick out, such as a tag; a state is a fact about the row.
  */
 export function Status({
   tone,
@@ -56,19 +37,14 @@ export function Status({
   readonly children: ReactNode;
   readonly className?: string;
 }): ReactElement {
-  return (
-    <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap", className)}>
-      <Dot tone={tone} />
-      {children}
-    </span>
-  );
+  return <span className={cn("whitespace-nowrap", texts[tone], className)}>{children}</span>;
 }
 
 /**
- * A state whose reason does not fit on the line: the word with a dot, and the reason, the client's
- * own text and any timestamp one hover, tap or focus away. A sentence rendered where "Valid" goes
- * is cut off by the row it sits in and reads as a state of its own, so the words stay short and the
- * rest goes in the popover.
+ * A state whose reason does not fit on the line: the word, and the reason, the client's own text
+ * and any timestamp one hover, tap or focus away. A sentence rendered where "Valid" goes is cut off
+ * by the row it sits in and reads as a state of its own, so the words stay short and the rest goes
+ * in the popover.
  */
 export function StatusDetail({
   tone,

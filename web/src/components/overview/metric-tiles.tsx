@@ -1,12 +1,5 @@
 import { SkeletonLine } from "@cloudflare/kumo/components/loader";
 import { cn } from "@cloudflare/kumo/utils";
-import {
-  DevicesIcon,
-  GlobeHemisphereWestIcon,
-  ShieldCheckIcon,
-  ShieldWarningIcon,
-  UsersThreeIcon,
-} from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement, ReactNode } from "react";
 
@@ -33,34 +26,21 @@ const tileClass = cn(
 
 type Tone = "neutral" | "warning";
 
+/** A label, the number and one line of context; no icon, the words say what the number counts. */
 function TileBody({
-  icon,
   label,
   value,
   context,
   tone = "neutral",
 }: {
-  readonly icon: ReactNode;
   readonly label: string;
   readonly value: number;
   readonly context: ReactNode;
   readonly tone?: Tone;
 }): ReactElement {
-  const accent = tone === "warning" ? "text-kumo-warning" : "text-kumo-subtle";
-
   return (
     <>
-      <span className="flex items-center gap-2">
-        <span
-          className={cn(
-            "flex size-6 shrink-0 items-center justify-center rounded-md bg-kumo-tint ring ring-kumo-hairline",
-            accent,
-          )}
-        >
-          {icon}
-        </span>
-        <span className="truncate text-kumo-subtle">{label}</span>
-      </span>
+      <span className="truncate text-kumo-subtle">{label}</span>
       <span
         className={cn(
           "text-2xl font-semibold tabular-nums",
@@ -80,7 +60,6 @@ function MachinesTile({ nodes }: { readonly nodes: readonly Node[] }): ReactElem
   return (
     <Link to="/machines" className={tileClass}>
       <TileBody
-        icon={<DevicesIcon weight="duotone" />}
         label="Machines"
         value={nodes.length}
         context={online === 0 ? "None connected" : `${online} connected`}
@@ -102,13 +81,6 @@ function ApprovalTile({
   return (
     <Link to="/machines" search={{ status: "pending" }} className={tileClass}>
       <TileBody
-        icon={
-          pending === 0 ? (
-            <ShieldCheckIcon weight="duotone" />
-          ) : (
-            <ShieldWarningIcon weight="duotone" />
-          )
-        }
         label="Needs approval"
         value={pending}
         context={pending === 0 ? "Nothing waiting" : waitingContext(pendingNodes, pendingUsers)}
@@ -138,7 +110,6 @@ function UsersTile({
   return (
     <Link to="/users" search={allUsers} className={tileClass}>
       <TileBody
-        icon={<UsersThreeIcon weight="duotone" />}
         label="Users"
         value={users.length}
         context={pending === 0 ? "All approved" : `${pending} waiting`}
@@ -154,7 +125,6 @@ function ExitTile({ nodes }: { readonly nodes: readonly Node[] }): ReactElement 
   return (
     <Link to="/machines" className={tileClass}>
       <TileBody
-        icon={<GlobeHemisphereWestIcon weight="duotone" />}
         label="Exit nodes"
         value={count}
         context={global === undefined ? "No global exit node" : `${nodeName(global)} is global`}

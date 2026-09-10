@@ -22,7 +22,7 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { Frame, framePanelClass } from "~/components/ui/frame.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
-import { Dot, Status } from "~/components/ui/status.tsx";
+import { Status } from "~/components/ui/status.tsx";
 
 const infoSize = 14;
 
@@ -281,15 +281,18 @@ function MachineCell({
   readonly machine: LatencyMachineRow["machine"];
 }): ReactElement {
   return (
-    <Link
-      to="/machines/$nodeId"
-      params={{ nodeId: machine.nodeId }}
-      className="flex items-center gap-2 hover:underline"
-    >
-      <Dot tone={machine.online ? "success" : "neutral"} />
-      <span className="sr-only">{machine.online ? "Connected" : "Disconnected"}</span>
-      <span className="truncate">{machine.name}</span>
-    </Link>
+    <span className="flex items-center gap-2">
+      <Link
+        to="/machines/$nodeId"
+        params={{ nodeId: machine.nodeId }}
+        className="truncate hover:underline"
+      >
+        {machine.name}
+      </Link>
+      {/* A disconnected machine keeps its last reading, which is the one thing about the row a
+          reader has to know; a connected one is the normal case and says nothing. */}
+      {machine.online ? null : <span className="text-xs text-kumo-subtle">offline</span>}
+    </span>
   );
 }
 

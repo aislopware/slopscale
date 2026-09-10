@@ -1,7 +1,6 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
-import { HandWavingIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
@@ -11,7 +10,7 @@ import { requestColumns } from "~/components/access/request-columns.tsx";
 import { requestNames, toRequestRows } from "~/components/access/request-model.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
@@ -95,7 +94,6 @@ export function RequestsTab({
               <Empty
                 className={tableEmptyClass}
                 size="sm"
-                icon={<HandWavingIcon size={emptyIconSize} />}
                 title={filter === "pending" ? "Nothing to decide" : "No requests"}
                 description={
                   filter === "pending"

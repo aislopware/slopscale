@@ -1,6 +1,6 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { PlusIcon, UsersThreeIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
@@ -14,7 +14,7 @@ import { useAccessMutations } from "~/components/access/mutations.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
@@ -92,7 +92,6 @@ export function GroupsTab({
               <Empty
                 className={tableEmptyClass}
                 size="sm"
-                icon={<UsersThreeIcon size={emptyIconSize} />}
                 title="No groups match"
                 contents={
                   <Button

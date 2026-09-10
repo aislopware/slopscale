@@ -14,7 +14,6 @@ import { NetworkMenu } from "~/components/networks/network-menu.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { Flagged } from "~/components/ui/flagged.tsx";
-import { StatusDot } from "~/components/ui/status-dot.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 /** A network with its group names spelled out, so the global filter can match them. */
@@ -158,8 +157,8 @@ function RoutersCell({ network }: { readonly network: Network }): ReactElement {
       {network.routers.map((router) =>
         router.missingPrefixes.length === 0 ? (
           <span key={router.nodeId} className="flex max-w-full items-center gap-2">
-            <StatusDot status={router.online ? "online" : "offline"} />
             <span className="truncate">{router.name}</span>
+            {router.online ? null : <span className="text-xs text-kumo-subtle">offline</span>}
           </span>
         ) : (
           <Flagged

@@ -1,5 +1,4 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { CheckCircleIcon, DevicesIcon, UserIcon } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
@@ -94,16 +93,6 @@ export function pendingRows(nodes: readonly Node[], users: readonly User[]): Pen
   return rows.toSorted((left, right) => at(left.createdAt) - at(right.createdAt));
 }
 
-function KindMark({ kind }: { readonly kind: PendingRow["kind"] }): ReactElement {
-  return (
-    <span className="flex h-lh items-center">
-      <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-kumo-tint text-kumo-subtle ring ring-kumo-hairline">
-        {kind === "node" ? <DevicesIcon /> : <UserIcon />}
-      </span>
-    </span>
-  );
-}
-
 function RowTitle({ row }: { readonly row: PendingRow }): ReactElement {
   if (row.kind === "user") {
     return (
@@ -143,14 +132,13 @@ function PendingItem({
 
   return (
     <SectionRow className="flex items-center justify-between gap-4 py-3">
-      <div className="flex min-w-0 items-start gap-3">
-        <KindMark kind={row.kind} />
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <RowTitle row={row} />
-          <p className="truncate text-xs text-kumo-subtle">
-            {row.subtitle} · added <RelativeTime value={row.createdAt} />
-          </p>
-        </div>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <RowTitle row={row} />
+        {/* The kind is said, not drawn: a boxed icon beside every row is the generated-UI template. */}
+        <p className="truncate text-xs text-kumo-subtle">
+          {row.kind === "node" ? "Machine" : "User"} · {row.subtitle} · added{" "}
+          <RelativeTime value={row.createdAt} />
+        </p>
       </div>
       {allowed ? (
         <Button
@@ -186,12 +174,7 @@ function AllApproved({ me }: { readonly me: Me }): ReactElement {
   return (
     <Frame>
       <FramePanel className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-3 text-kumo-subtle">
-        <span className="flex items-start gap-2">
-          <span className="flex h-lh items-center">
-            <CheckCircleIcon weight="fill" className="text-kumo-success" />
-          </span>
-          All machines and users are approved
-        </span>
+        <span>All machines and users are approved</span>
         <ApprovalSettingsLink me={me} />
       </FramePanel>
     </Frame>

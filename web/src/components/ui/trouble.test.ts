@@ -9,7 +9,7 @@ describe(describeTrouble, () => {
 
     expect(trouble).toMatchObject({
       kind: "unreachable",
-      eyebrow: "HTTP 502",
+      code: "HTTP 502",
       title: "The server did not answer",
       message: "502 Bad Gateway",
     });
@@ -18,7 +18,7 @@ describe(describeTrouble, () => {
   it("reads a failed fetch the same way", () => {
     expect(describeTrouble(new TypeError("Failed to fetch"))).toMatchObject({
       kind: "unreachable",
-      eyebrow: "No connection",
+      code: "No connection",
     });
   });
 
@@ -59,7 +59,7 @@ describe(describeTrouble, () => {
     expect(describeTrouble(new ApiError(401, undefined, "401")).kind).toBe("session");
     expect(describeTrouble(new Error("x is not a function"))).toMatchObject({
       kind: "console",
-      eyebrow: "Console error",
+      code: "Console error",
       message: "x is not a function",
     });
   });

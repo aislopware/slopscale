@@ -32,16 +32,6 @@ export function MachineHeader({
 }): ReactElement {
   return (
     <PageHeader
-      eyebrow={
-        <>
-          <StatusBadge status={nodeStatus(node)} />
-          {node.tags.map((tag) => (
-            <Badge key={tag} variant="secondary">
-              <span className="font-mono">{tag}</span>
-            </Badge>
-          ))}
-        </>
-      }
       title={nodeName(node)}
       meta={<MachineFacts node={node} />}
       actions={
@@ -95,9 +85,15 @@ function SSHButton({ node, me }: { readonly node: Node; readonly me: Me }): Reac
   );
 }
 
+/**
+ * The line under the name: the state first, since it is the fact the operator came for, then who
+ * owns it, how it joined, when it was last seen, and its tags.
+ */
 function MachineFacts({ node }: { readonly node: Node }): ReactElement {
   return (
     <>
+      <StatusBadge status={nodeStatus(node)} />
+      <span aria-hidden>·</span>
       <span>{isTagged(node) ? "Tagged machine" : ownerLabel(node)}</span>
       <span aria-hidden>·</span>
       <span>{registerMethods[node.registerMethod] ?? "registered"}</span>
@@ -118,6 +114,11 @@ function MachineFacts({ node }: { readonly node: Node }): ReactElement {
           </>
         )}
       </span>
+      {node.tags.map((tag) => (
+        <Badge key={tag} variant="secondary">
+          <span className="font-mono">{tag}</span>
+        </Badge>
+      ))}
     </>
   );
 }

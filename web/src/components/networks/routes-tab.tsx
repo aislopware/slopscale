@@ -1,6 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
-import { SignpostIcon } from "@phosphor-icons/react";
 import type { ExpandedState } from "@tanstack/react-table";
 import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
@@ -19,7 +18,7 @@ import {
 import type { RouteFilterState, RoutesRow } from "~/components/networks/routes-model.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
-import { emptyIconSize, tableEmptyClass } from "~/components/table/empty.ts";
+import { tableEmptyClass } from "~/components/table/empty.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Code } from "~/components/ui/code.tsx";
@@ -97,7 +96,6 @@ export function RoutesTab({
                 <Empty
                   className={tableEmptyClass}
                   size="sm"
-                  icon={<SignpostIcon size={emptyIconSize} />}
                   title="Nothing advertised"
                   contents={
                     <p className="max-w-140 text-center text-kumo-subtle">

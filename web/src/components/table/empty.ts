@@ -3,4 +3,3 @@
  * and the title steps down to body size so an empty tab reads like the rows it replaces.
  */
 export const tableEmptyClass = "border-none bg-kumo-base [&>h2]:text-base";
-export const emptyIconSize = 32;

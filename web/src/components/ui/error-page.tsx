@@ -29,14 +29,14 @@ import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
 const iconSize = 22;
 const caretSize = 12;
 
-/** The mark at the top of the card: what kind of trouble, at a glance, in the tone it deserves. */
+/** The mark beside the title: what kind of trouble, at a glance, in the tone it deserves. */
 const tones: Record<TroubleKind, { readonly icon: Icon; readonly className: string }> = {
-  unreachable: { icon: PlugsIcon, className: "bg-kumo-warning/10 text-kumo-warning" },
-  session: { icon: SignInIcon, className: "bg-kumo-info/10 text-kumo-info" },
-  forbidden: { icon: LockKeyIcon, className: "bg-kumo-warning/10 text-kumo-warning" },
-  missing: { icon: CompassIcon, className: "bg-kumo-tint text-kumo-subtle" },
-  server: { icon: WarningCircleIcon, className: "bg-kumo-danger/10 text-kumo-danger" },
-  console: { icon: BugIcon, className: "bg-kumo-danger/10 text-kumo-danger" },
+  unreachable: { icon: PlugsIcon, className: "text-kumo-warning" },
+  session: { icon: SignInIcon, className: "text-kumo-info" },
+  forbidden: { icon: LockKeyIcon, className: "text-kumo-warning" },
+  missing: { icon: CompassIcon, className: "text-kumo-subtle" },
+  server: { icon: WarningCircleIcon, className: "text-kumo-danger" },
+  console: { icon: BugIcon, className: "text-kumo-danger" },
 };
 
 /** Whether the app layout is up around the page, so the error can sit in it with the sidebar. */
@@ -97,7 +97,11 @@ function Details({ trouble }: { readonly trouble: Trouble }): ReactElement | nul
   );
 }
 
-/** The card: a mark, an eyebrow, the title, the sentence, the actions and the fold. */
+/**
+ * The card: the title with its mark on the line, the sentence, the code under it, the actions and
+ * the fold. Nothing sits above the title, and the mark is an icon on the title line rather than a
+ * tile of its own over it.
+ */
 function TroubleCard({
   trouble,
   actions,
@@ -110,18 +114,15 @@ function TroubleCard({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4">
-        <span
-          className={cn("flex size-10 items-center justify-center rounded-lg", tone.className)}
-          aria-hidden
-        >
-          <Mark size={iconSize} weight="duotone" />
-        </span>
-        <div className="flex flex-col gap-1">
-          <p className="font-mono text-xs text-kumo-subtle">{trouble.eyebrow}</p>
-          <h1 className="text-xl font-semibold text-kumo-strong">{trouble.title}</h1>
-          <p className="text-kumo-subtle">{trouble.description}</p>
-        </div>
+      <div className="flex flex-col gap-1">
+        <h1 className="flex items-start gap-2 text-xl font-semibold text-kumo-strong">
+          <span className={cn("flex h-lh shrink-0 items-center", tone.className)} aria-hidden>
+            <Mark size={iconSize} weight="duotone" />
+          </span>
+          {trouble.title}
+        </h1>
+        <p className="text-kumo-subtle">{trouble.description}</p>
+        <p className="font-mono text-xs text-kumo-subtle">{trouble.code}</p>
       </div>
       <div className="flex flex-wrap items-center justify-end gap-2">{actions}</div>
       <Details trouble={trouble} />
