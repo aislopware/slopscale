@@ -1136,10 +1136,12 @@ func doLoginURLWithClient(hostname string, loginURL *url.URL, hc *http.Client, f
 		}
 	}
 
-	// The OIDC registration flow now renders a confirmation interstitial
-	// (POST form) instead of completing immediately. Detect the form and
-	// auto-submit it so integration tests behave like a real browser.
-	if followRedirects && strings.Contains(body, `action="/register/confirm/`) {
+	// The OIDC registration flow renders a confirmation interstitial (POST
+	// form) instead of completing immediately. Detect the form and
+	// auto-submit it so integration tests behave like a real browser. The
+	// CSRF field is the marker rather than the form action, which the
+	// server builds from server_url and so is absolute.
+	if followRedirects && strings.Contains(body, `name="slopscale_register_confirm"`) {
 		confirmBody, confirmURL, confirmErr := submitConfirmForm(hostname, body, resp, hc)
 		if confirmErr != nil {
 			return body, redirectURL, confirmErr
@@ -1204,12 +1206,12 @@ func submitConfirmForm(
 	valEnd := strings.Index(inputTag[valStart:], `"`)
 	csrfToken := inputTag[valStart : valStart+valEnd]
 
-	// Build the absolute POST URL from the response's request URL.
-	base := prevResp.Request.URL
-	confirmURL := &url.URL{
-		Scheme: base.Scheme,
-		Host:   base.Host,
-		Path:   formAction,
+	// The server builds the action from server_url, so it arrives absolute,
+	// but a Slopscale behind a reverse proxy could hand back a relative one.
+	// Resolving against the page's own URL covers both.
+	confirmURL, err := prevResp.Request.URL.Parse(formAction)
+	if err != nil {
+		return "", nil, fmt.Errorf("%s confirm form: resolving action %q: %w", hostname, formAction, err)
 	}
 
 	log.Printf("%s auto-submitting confirm form: %s", hostname, confirmURL)
