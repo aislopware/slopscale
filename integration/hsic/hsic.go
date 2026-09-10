@@ -50,10 +50,15 @@ const (
 	tlsKeyPath                    = "/etc/slopscale/tls.key"
 	slopscaleDefaultPort          = 8080
 	IntegrationTestDockerFileName = "Dockerfile.integration"
-	defaultDirPerm                = 0o755
-	binSlopscale                  = "slopscale"
-	flagOutput                    = "--output"
-	acceptJSON                    = "Accept: application/json"
+
+	// SlopscaleImageEnv names the pre-built control server image. The mock
+	// OIDC provider and the test web service run out of the same image, so
+	// they read this too rather than building their own.
+	SlopscaleImageEnv = "SLOPSCALE_INTEGRATION_SLOPSCALE_IMAGE"
+	defaultDirPerm    = 0o755
+	binSlopscale      = "slopscale"
+	flagOutput        = "--output"
+	acceptJSON        = "Accept: application/json"
 )
 
 var (
@@ -476,7 +481,7 @@ func New(
 	var container *dockertest.Resource
 
 	// Check if a pre-built image is available via environment variable
-	prebuiltImage := os.Getenv("SLOPSCALE_INTEGRATION_SLOPSCALE_IMAGE")
+	prebuiltImage := os.Getenv(SlopscaleImageEnv)
 
 	switch {
 	case prebuiltImage != "":
