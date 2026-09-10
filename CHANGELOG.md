@@ -831,6 +831,7 @@ endpoint behind the edit.
 - On the v1 API an OAuth access token is now bounded by its tags the way it already was on v2: it may create a pre-auth key or tag a node only with tags it holds or that those tags own, it cannot create an untagged (user-owned) key, and it cannot create a key for a user or register a node into a user's account. Admin API keys are unaffected
 - A registration id is recorded in the audit log by its first eight characters only, because the whole id is the secret a node registers with
 - Deleting a node now removes the database row before the in-memory copy, and publishes the removal even when the policy refresh that follows it fails, so a committed deletion always tears down the deleted node's live map session [#3410](https://github.com/juanfont/headscale/issues/3410)
+- Extra records read from `dns.extra_records_path` are normalized the way records written inline in the config file already are. Names are matched by clients against the lowercased query name, so a record such as `Printer.fritz.box` in the file never resolved and the query fell through to the global nameserver [#2782](https://github.com/juanfont/headscale/issues/2782)
 
 ## 0.29.4 (unreleased)
 
