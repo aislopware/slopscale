@@ -31,6 +31,8 @@ jobs:
     runs-on: ubuntu-24.04-arm
     outputs:
       files-changed: ${{ steps.changed-files.outputs.files }}
+      fingerprint: ${{ steps.fingerprint.outputs.hash }}
+      already-green: ${{ steps.green.outputs.cache-hit }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,10 +51,50 @@ jobs:
               - '.github/workflows/test-integration.yaml'
               - '.github/workflows/integration-test-template.yml'
               - 'Dockerfile.*'
+      # The filter above answers "does this pull request touch anything the
+      # matrix tests", which on a pull_request event is asked of the whole
+      # branch: GitHub gives paths-filter the base branch to diff against,
+      # not the commit that was just pushed, and paths/paths-ignore on the
+      # trigger behave the same way. So a pull request that changed one Go
+      # file runs the matrix again for a later commit that only touched the
+      # changelog. There is no filter setting that fixes this.
+      #
+      # What does fix it is asking a different question: has this exact tree
+      # already passed. Every fully green run writes a marker under the
+      # fingerprint of the files the matrix reads, and finding one here
+      # skips the matrix. Rewriting a commit, or merging a main that moves
+      # under the branch, changes the fingerprint and tests again.
+      #
+      # The trade is that a tree is tested once. A rerun of an unchanged
+      # tree can only catch a flake, and catching flakes by lottery is not
+      # what this gate is for.
+      - name: Fingerprint what the matrix reads
+        id: fingerprint
+        shell: bash
+        run: |
+          echo "hash=${{ hashFiles(
+            '*.nix',
+            'go.*',
+            '**/*.go',
+            'integration/**',
+            'config-example.yaml',
+            '.github/workflows/test-integration.yaml',
+            '.github/workflows/integration-test-template.yml',
+            'Dockerfile.*'
+          ) }}" >> "$GITHUB_OUTPUT"
+      - name: Has this tree already passed
+        id: green
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          # lookup-only, so this reads the marker's existence without
+          # downloading it. The marker is a timestamp; only its key matters.
+          lookup-only: true
+          path: .integration-green
+          key: integration-green-${{ steps.fingerprint.outputs.hash }}
   build:
     runs-on: ubuntu-24.04-arm
     needs: changes
-    if: needs.changes.outputs.files-changed == 'true'
+    if: needs.changes.outputs.files-changed == 'true' && needs.changes.outputs.already-green != 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -175,7 +217,7 @@ jobs:
   build-tailscale-head:
     runs-on: ubuntu-24.04-arm
     needs: changes
-    if: needs.changes.outputs.files-changed == 'true'
+    if: needs.changes.outputs.files-changed == 'true' && needs.changes.outputs.already-green != 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Force overlay2 storage driver
@@ -213,7 +255,7 @@ jobs:
   build-postgres:
     runs-on: ubuntu-24.04-arm
     needs: changes
-    if: needs.changes.outputs.files-changed == 'true'
+    if: needs.changes.outputs.files-changed == 'true' && needs.changes.outputs.already-green != 'true'
     steps:
       - name: Force overlay2 storage driver
         shell: bash
@@ -248,7 +290,7 @@ jobs:
   build-tailscale-released:
     runs-on: ubuntu-24.04-arm
     needs: changes
-    if: needs.changes.outputs.files-changed == 'true'
+    if: needs.changes.outputs.files-changed == 'true' && needs.changes.outputs.already-green != 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: NixOS/nix-installer-action@62c1943b776c509394b550f3f983adc14e9212d6 # v1.0.0
@@ -312,7 +354,7 @@ jobs:
       - build
       - build-tailscale-head
       - build-tailscale-released
-    if: needs.changes.outputs.files-changed == 'true'
+    if: needs.changes.outputs.files-changed == 'true' && needs.changes.outputs.already-green != 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -366,7 +408,7 @@ jobs:
       - build-tailscale-head
       - build-postgres
       - build-tailscale-released
-    if: needs.changes.outputs.files-changed == 'true'
+    if: needs.changes.outputs.files-changed == 'true' && needs.changes.outputs.already-green != 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -386,3 +428,23 @@ jobs:
       # the short window, and a dispatch that does not match its own pull
       # request cannot be compared against one.
       soak_duration: ${{ github.event_name == 'schedule' && '' || '4m' }}
+  # Records that this tree passed, so a later commit that leaves every file
+  # the matrix reads untouched skips it. Both matrices have to be green:
+  # needs alone does that, because a skipped or failed dependency skips this
+  # job and no marker is written.
+  record-green:
+    runs-on: ubuntu-24.04-arm
+    needs:
+      - changes
+      - sqlite
+      - postgres
+    steps:
+      - name: Write the marker
+        shell: bash
+        run: |
+          mkdir -p .integration-green
+          date --utc --iso-8601=seconds > .integration-green/passed-at
+      - uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .integration-green
+          key: integration-green-${{ needs.changes.outputs.fingerprint }}
