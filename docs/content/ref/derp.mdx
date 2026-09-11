@@ -140,6 +140,10 @@ derp:
     - /etc/slopscale/derp.yaml
 ```
 
+A map URL is fetched from the server, so it follows the [outbound request
+rules](/ref/configuration#settings-that-live-only-in-the-file): no loopback or link-local address, no redirects,
+at most 4 MiB, and a source that cannot be reached leaves the previous map in place.
+
 </Tab>
 <Tab title="Provide custom DERP servers">
 

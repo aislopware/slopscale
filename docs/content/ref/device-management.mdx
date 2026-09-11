@@ -47,6 +47,19 @@ takes `{"nodeIds": [...], "force": false}` and starts several at once, a
 few at a time, answering with one result per machine so a fleet update
 reports each machine on its own.
 
+### Client update notices
+
+Separately from a push, the server tells every client whether a newer
+Tailscale exists, the way the hosted control plane does: it reads the
+latest stable release from pkgs.tailscale.com once a day, and a client
+behind it shows Tailscale's own _update available_ health warning and,
+with auto-update on, updates itself. The node object carries
+`clientVersion` and `updateAvailable`, the server info
+`latestClientVersion`, and the console shows the version on the machine
+page with an _Update available_ status and the latest release on the
+_Server_ page. `client_updates` in the [configuration file](/ref/configuration#settings-that-live-only-in-the-file)
+turns the lookup off or changes how often it runs.
+
 ## Health and diagnostics
 
 A machine that is connected but not working usually knows why. The client

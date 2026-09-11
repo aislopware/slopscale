@@ -21,7 +21,7 @@ ensure you have the correct example configuration. The `main` branch might conta
 <Tab title="View on GitHub">
 
 - Development version: https://github.com/aislopware/slopscale/blob/main/config-example.yaml
-- Version 0.29.3: https://github.com/aislopware/slopscale/blob/v0.29.3/config-example.yaml
+- Version 0.36.0: https://github.com/aislopware/slopscale/blob/v0.36.0/config-example.yaml
 
 </Tab>
 <Tab title="Download with wget">
@@ -30,8 +30,8 @@ ensure you have the correct example configuration. The `main` branch might conta
 # Development version
 wget -O config.yaml https://raw.githubusercontent.com/aislopware/slopscale/main/config-example.yaml
 
-# Version 0.29.3
-wget -O config.yaml https://raw.githubusercontent.com/aislopware/slopscale/v0.29.3/config-example.yaml
+# Version 0.36.0
+wget -O config.yaml https://raw.githubusercontent.com/aislopware/slopscale/v0.36.0/config-example.yaml
 ```
 
 </Tab>
@@ -41,11 +41,44 @@ wget -O config.yaml https://raw.githubusercontent.com/aislopware/slopscale/v0.29
 # Development version
 curl -o config.yaml https://raw.githubusercontent.com/aislopware/slopscale/main/config-example.yaml
 
-# Version 0.29.3
-curl -o config.yaml https://raw.githubusercontent.com/aislopware/slopscale/v0.29.3/config-example.yaml
+# Version 0.36.0
+curl -o config.yaml https://raw.githubusercontent.com/aislopware/slopscale/v0.36.0/config-example.yaml
 ```
 
 </Tab>
 </Tabs>
 
 :::
+
+## Settings that live only in the file
+
+Most of what an operator changes day to day (DNS, DERP relays, key expiry, approval, the tailnet switches) is
+stored in the database and edited from the [console](/ref/console), the CLI or the API without a restart. A few
+things stay in the file, because the server needs them before it has a database or because they are about the
+machine it runs on:
+
+- `server_url`, the listen addresses, TLS and the [database](/setup/backup).
+- `oidc`, the [identity provider](/ref/oidc), and `policy.geoip_database` for [postures](/ref/device-trust#postures).
+- `derp.paths`, the relay's key and `automatically_add_embedded_derp_region`; see [DERP](/ref/derp).
+- `ssh_recording`, `https_certificates`, `funnel` and `notifications.smtp`, which run something inside the server.
+- `client_updates`: the server reads the latest stable Tailscale release from pkgs.tailscale.com once a day and
+  tells each client whether it runs it, so an older client shows Tailscale's own _update available_ warning and,
+  with auto-update on, updates itself. `check: false` turns the lookup off on a server without internet access;
+  `interval` is how often to look, at least one hour. See [Device management](/ref/device-management#client-update-notices).
+- `control_dial_plan`: addresses clients try for the server before resolving its name, in order of preference.
+  Clients keep the plan between runs, so they reach the server through a DNS outage and fall back to the name when
+  none of the addresses answers. Leave it empty to rely on DNS.
+
+  ```yaml
+  control_dial_plan:
+    - 203.0.113.7
+    - 2001:db8::7
+  ```
+
+- `egress`: where the server's own HTTP clients may go. Webhook receivers, log stream sinks and DERP map URLs
+  may never point at a loopback, link-local or unspecified address, so an operator-supplied URL cannot reach the
+  server's own services or a cloud metadata endpoint; the URL is checked when it is stored and again against the
+  address it resolves to when it is dialed, so DNS rebinding does not get past it. Private ranges stay reachable,
+  because a receiver on the LAN is a normal self-hosted setup. `deny_private_targets: true` refuses them too, and
+  `allow_loopback_targets: true` re-allows loopback for a development server whose receivers run alongside it.
+- `debug.node_api_enabled`, a [development endpoint](/ref/debug#development-endpoints).

@@ -44,16 +44,11 @@ See [Running slopscale in a container](/setup/install/container) for full contai
 
 ## Binaries
 
-Pre-built binaries from the latest successful build on `main` are available
-via [nightly.link](https://nightly.link/aislopware/slopscale/workflows/container-main/main):
+Binaries are published with each [release](https://github.com/aislopware/slopscale/releases) for Linux amd64, arm64
+and armv7, statically linked so they run on any distribution. There are no macOS or FreeBSD binaries: [build from
+source](/setup/install/source) or use the Nix flake there. The `main` branch is not built into binaries, only into
+the container image above.
 
-| OS    | Arch  | Download                                                                                                                     |
-| ----- | ----- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Linux | amd64 | [slopscale-linux-amd64](https://nightly.link/aislopware/slopscale/workflows/container-main/main/slopscale-linux-amd64.zip)   |
-| Linux | arm64 | [slopscale-linux-arm64](https://nightly.link/aislopware/slopscale/workflows/container-main/main/slopscale-linux-arm64.zip)   |
-| macOS | amd64 | [slopscale-darwin-amd64](https://nightly.link/aislopware/slopscale/workflows/container-main/main/slopscale-darwin-amd64.zip) |
-| macOS | arm64 | [slopscale-darwin-arm64](https://nightly.link/aislopware/slopscale/workflows/container-main/main/slopscale-darwin-arm64.zip) |
-
-After downloading and extracting the archive, make the binary executable and follow the
+After downloading, make the binary executable and follow the
 [standalone binary installation](/setup/install/official#using-standalone-binaries-advanced)
 instructions for setting up the service.

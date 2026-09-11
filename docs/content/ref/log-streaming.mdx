@@ -20,7 +20,8 @@ $ slopscale log-streams create --name siem --destination splunk \
     --token 11111111-2222-3333-4444-555555555555
 ```
 
-The token is stored and never listed again; an update that leaves it empty
+The URL is subject to the same [outbound request rules](/ref/configuration#settings-that-live-only-in-the-file)
+as a webhook: no loopback or link-local sink. The token is stored and never listed again; an update that leaves it empty
 keeps the stored one. `slopscale log-streams test` ships one synthetic entry
 (`logstream.test`) and reports the sink's answer, and the list shows the
 newest batch's status with how many entries the sink has accepted and how

@@ -19,7 +19,9 @@ $ slopscale webhooks create --url https://ops.example.com/slopscale \
     --event nodeCreated --event nodeDeleted --event userCreated
 ```
 
-The response carries the secret once. Store it on the receiver; a later read
+The URL may not point at a loopback, link-local or unspecified address, and the server checks the address it
+resolves to when it delivers; see [outbound requests](/ref/configuration#settings-that-live-only-in-the-file) for
+the `egress` switches that widen or narrow this. The response carries the secret once. Store it on the receiver; a later read
 never shows it again. `slopscale webhooks rotate` issues a new one, and
 `slopscale webhooks test` sends a `test` event so you can check the receiver
 before anything real happens.

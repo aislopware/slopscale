@@ -39,17 +39,31 @@ log:
 ### Database logging
 
 The database debug mode logs all database queries. Enable it to see how Slopscale interacts with its database. This also
-requires the application log level to be set to either `debug` or `trace`.
+requires the application log level to be set to either `debug` or `trace`. `database.query_log` shapes what is
+written: `parameterized` logs placeholders instead of the bound arguments, `log_not_found` logs a query that returned
+no rows as an error, and `slow_threshold` (milliseconds) marks slow queries. The former `database.gorm` block is
+still read with a deprecation warning.
 
 ```yaml hl_lines="3 7"
 database:
   # Enable debug mode. This setting requires the log.level to be set to "debug" or "trace".
   debug: false
+  query_log:
+    parameterized: true
+    log_not_found: false
+    slow_threshold: 1000
 
 log:
   # Valid log levels: panic, fatal, error, warn, info, debug, trace
   level: debug
 ```
+
+### Development endpoints
+
+`POST /api/v1/debug/node` (`slopscale debug create-node`) mints a node from key material the caller supplies, which
+tests and seed scripts use. It is off unless `debug.node_api_enabled` is set in the configuration file; while it is
+off the operation is not registered and is absent from the OpenAPI document the server serves. It is not part of the
+supported API.
 
 ### Metrics and debug endpoint
 

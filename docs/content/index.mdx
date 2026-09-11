@@ -1,5 +1,7 @@
 ---
 title: "Welcome to slopscale"
+seo:
+  image: /og-card.png
 ---
 
 Slopscale is a fork of [headscale](https://github.com/juanfont/headscale), the open source, self-hosted
@@ -7,6 +9,25 @@ implementation of the Tailscale control server. It keeps headscale's core and ad
 and fixes.
 
 This page contains the documentation for the latest version of slopscale. Please also check our [FAQ](/about/faq).
+
+## What it does
+
+- Runs a tailnet for the stock Tailscale clients: registration, MagicDNS, [DNS](/ref/dns), [routes](/ref/routes),
+  [DERP relays](/ref/derp), [Tailscale SSH](/ref/ssh-recording), [Serve](/ref/https-certificates),
+  [Funnel](/ref/funnel), [Services](/ref/services), [app connectors](/ref/apps), [tailnet lock](/ref/tailnet-lock)
+  and [identity tokens](/ref/identity-tokens).
+- Signs users in through [OpenID Connect](/ref/oidc), gives each a [role](/ref/roles), and puts an administrator
+  between a new machine or user and the tailnet with [approval](/ref/approval).
+- Controls access with a [policy file](/ref/policy), or without one through [groups and access rules](/ref/access-control),
+  [networks](/ref/networks), [temporary access](/ref/temporary-access) and [node sharing](/ref/sharing), narrowed by
+  [device posture](/ref/device-trust).
+- Tells you what happened: an [audit log](/ref/audit), [webhooks](/ref/webhooks) and notifications,
+  [log streaming](/ref/log-streaming) to a SIEM and [SSH session recording](/ref/ssh-recording).
+- Manages machines over the connection they already hold: [updates, health, diagnostics and preferences](/ref/device-management).
+- Speaks the [Tailscale API](/ref/api#tailscale-compatible-api), so the Terraform provider and the Kubernetes
+  operator work unchanged, next to its own [REST API](/ref/api#rest-api) and CLI.
+
+The full list is on the [Features](/about/features) page.
 
 ## Design goal
 

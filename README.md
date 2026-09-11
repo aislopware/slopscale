@@ -3,7 +3,7 @@
   <img alt="The slopscale admin console, open on one machine" src="docs/assets/readme/console-light.png">
 </picture>
 
-# slopscale
+# <img src="docs/assets/logo/slopscale-mark.svg" alt="" width="28" align="top"> slopscale
 
 An open source, self-hosted implementation of the Tailscale control server.
 Point the stock Tailscale clients at slopscale instead of the hosted control
@@ -14,13 +14,20 @@ slopscale is a fork of [headscale](https://github.com/juanfont/headscale)
 with these improvements:
 
 - Faster map responses, lower memory use, a smaller database footprint
-- Built-in admin console at `/console/`
-- User roles, device and user approval, machine sharing, groups and access
-  rules, temporary access, device trust
-- OAuth clients with scopes, so the Tailscale Terraform provider and Kubernetes
-  operator work unchanged
-- DNS, DERP relays, key expiry and certificates configurable at runtime
-- Webhooks, log streaming, audit log, SSH session recording
+- Built-in admin console at `/console/`, signed in through your identity
+  provider, with a terminal to any machine running Tailscale SSH
+- User roles, device and user approval, invitations, machine sharing, groups
+  and access rules, networks, temporary access, device posture and postures,
+  hardware attestation, suspension
+- Tailscale features the hosted control plane has: Services, app connectors,
+  Funnel, HTTPS certificates for Serve, tailnet lock, identity tokens, SSH
+  session recording, key expiry, client update notices
+- OAuth clients with scopes and workload identity federation, so the Tailscale
+  Terraform provider and Kubernetes operator work unchanged
+- DNS, DERP relays, key expiry and certificates configurable at runtime, with
+  an embedded relay on by default
+- Webhooks and chat or email notifications, log streaming to a SIEM, audit
+  log, client updates and diagnostics over the control connection
 - Bug fixes to the control protocol: exit node suggestions, ephemeral
   registration, DNS records, deleted machines, and more
 

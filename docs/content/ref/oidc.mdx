@@ -316,7 +316,9 @@ endpoint.
 
 - Support for OpenID Connect aims to be generic and vendor independent. It offers only limited support for quirks of
   specific identity providers.
-- OIDC groups cannot be used in policy rules.
+- OIDC groups are not visible to the policy file: `groups` in the file are defined in the file. With
+  [`groups.sync`](#authorize-users-with-filters) on, a provider's groups become slopscale groups that
+  [access rules](/ref/access-control) can name.
 - The username provided by the identity provider needs to adhere to this pattern:
     - The username must be at least two characters long.
     - It must only contain letters, digits, hyphens, dots, underscores, and up to a single `@`.

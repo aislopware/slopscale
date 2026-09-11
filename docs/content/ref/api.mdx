@@ -70,6 +70,11 @@ naming the prefix the key had and the one it now answers to.
 - Documentation: `/api/v1/docs`, e.g. `https://slopscale.example.com/api/v1/docs`
 - Slopscale Version: `/version`, e.g. `https://slopscale.example.com/version`
 - Authenticate using HTTP Bearer authentication by sending the [API key](/ref/api) with the HTTP `Authorization: Bearer <API_KEY>` header.
+- The OpenAPI 3.1 document is at `/api/v1/openapi.yaml`.
+- Errors are [RFC 7807](https://www.rfc-editor.org/rfc/rfc7807) problem details, `application/problem+json`, with
+  `status`, `title` and `detail`, and the usual meaning of the status: `400` for malformed input, `401` and `403`
+  for a missing or insufficient credential, `404` for an unknown user or node, `409` for a duplicate name, `412`
+  for a stale `If-Match`. An unexpected failure answers `500` with an id that finds it in the server log.
 
 Start by [creating an API key](/ref/api) and test it with the examples below. Read the API documentation provided by your
 Slopscale server at `/api/v1/docs` for details.

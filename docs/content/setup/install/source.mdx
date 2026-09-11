@@ -10,9 +10,14 @@ written by community members. It is _not_ verified by slopscale developers.
 **It might be outdated and it might miss necessary steps**.
 :::
 
-Slopscale can be built from source using the latest version of [Go](https://golang.org) and [Buf](https://buf.build)
-(Protobuf generator). See the [Contributing section in the GitHub
-README](https://github.com/aislopware/slopscale#contributing) for more information.
+Slopscale is built with a current [Go](https://golang.org), a C compiler (the SQLite driver is C compiled through
+cgo) and [Bun](https://bun.sh) for the admin console. `make build` builds the server; run `make web` first so the
+binary embeds the [console](/ref/console#building-from-source) and its SSH terminal, or the binary serves a page
+saying the console is missing. The Nix flake (`nix develop`) provides the whole toolchain at the versions CI uses.
+See [Contributing](/about/contributing) for more information.
+
+Release binaries are published for Linux only (amd64, arm64 and armv7, statically linked); macOS and FreeBSD are
+built from source this way or through the Nix flake.
 
 ## OpenBSD
 
