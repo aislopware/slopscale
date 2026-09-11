@@ -3,7 +3,7 @@
   <img alt="The slopscale admin console, open on one machine" src="docs/assets/readme/console-light.png">
 </picture>
 
-# <img src="docs/assets/logo/slopscale-mark.svg" alt="" width="28" align="top"> slopscale
+# <img src="docs/assets/logo/slopscale-mark.svg" alt="" width="32" align="middle"> slopscale
 
 An open source, self-hosted implementation of the Tailscale control server.
 Point the stock Tailscale clients at slopscale instead of the hosted control
