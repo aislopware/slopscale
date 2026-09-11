@@ -106,7 +106,8 @@ describe("the pre-auth key table", () => {
     await expect
       .element(screen.getByRole("columnheader", { name: "Tags" }))
       .not.toBeInTheDocument();
-    await expect.element(screen.getByText("tag:ci, tag:prod")).toBeVisible();
+    await expect.element(screen.getByText("tag:ci")).toBeVisible();
+    await expect.element(screen.getByText("tag:prod")).toBeVisible();
     await expect.element(screen.getByText("Reusable")).toBeVisible();
   });
 

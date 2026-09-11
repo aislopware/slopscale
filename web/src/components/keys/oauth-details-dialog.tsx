@@ -5,6 +5,7 @@ import { issuerHost } from "~/components/keys/federated.ts";
 import { scopeLabel } from "~/components/keys/scopes.ts";
 import { CopyText } from "~/components/ui/copy-text.tsx";
 import { DialogContent, DialogRoot } from "~/components/ui/dialog.tsx";
+import { TagList } from "~/components/ui/tag.tsx";
 import { formatAbsolute, parseTime } from "~/lib/time.ts";
 
 /**
@@ -43,7 +44,10 @@ export function OAuthClientDetailsDialog({
           )}
           {federated ? <TrustConditions client={client} /> : null}
           <Values label="Scopes" values={client.scopes.map(scopeLabel)} empty="None" />
-          <Values label="Tags" values={client.tags} empty="None" mono />
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-kumo-default">Tags</span>
+            <TagList tags={client.tags} size="sm" />
+          </div>
           <Field label="Created" value={createdLabel(client.createdAt)} copyable={false} />
         </div>
       </DialogContent>
@@ -119,17 +123,15 @@ function labelClass(mono: boolean): string {
   return mono ? "font-mono text-[0.9em] text-kumo-subtle" : "text-sm font-medium text-kumo-default";
 }
 
-/** A list read as words: scopes by their console names, tags as the policy spells them. */
+/** A list read as words: scopes by their console names. */
 function Values({
   label,
   values,
   empty,
-  mono = false,
 }: {
   readonly label: string;
   readonly values: readonly string[];
   readonly empty: string;
-  readonly mono?: boolean;
 }): ReactElement {
   return (
     <div className="flex flex-col gap-1">
@@ -137,14 +139,10 @@ function Values({
       {values.length === 0 ? (
         <span className="text-sm text-kumo-subtle">{empty}</span>
       ) : (
-        <span className={valueClass(mono)}>{values.join(", ")}</span>
+        <span className="text-sm text-kumo-default">{values.join(", ")}</span>
       )}
     </div>
   );
-}
-
-function valueClass(mono: boolean): string {
-  return mono ? "font-mono text-[0.9em] text-kumo-default" : "text-sm text-kumo-default";
 }
 
 function createdLabel(createdAt: string | null): string {

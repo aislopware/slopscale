@@ -15,6 +15,7 @@ import { Avatar } from "~/components/ui/avatar.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
+import { TagList } from "~/components/ui/tag.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { userLabel } from "~/lib/node.ts";
 import { parseTime } from "~/lib/time.ts";
@@ -135,11 +136,7 @@ function TypeCell({
   return (
     <div className="flex min-w-0 flex-col items-start gap-1">
       <span className="text-kumo-default">{traits(authKey).join(" · ")}</span>
-      {authKey.aclTags.length === 0 ? null : (
-        <Labelled label="Tags">
-          <span className="font-mono text-[0.9em]">{authKey.aclTags.join(", ")}</span>
-        </Labelled>
-      )}
+      {authKey.aclTags.length === 0 ? null : <TagList tags={authKey.aclTags} size="sm" />}
       {authKey.groupIds.length === 0 ? null : (
         <Labelled label="Groups">
           {authKey.groupIds.map((id) => groupName(groups, id)).join(", ")}

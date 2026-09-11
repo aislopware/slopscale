@@ -1,9 +1,11 @@
 import { Collapsible } from "@cloudflare/kumo/components/collapsible";
+import { cn } from "@cloudflare/kumo/utils";
 import { CaretDownIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 import type { PolicyBlocks } from "~/components/policy/blocks.ts";
 import { Frame, FramePanel } from "~/components/ui/frame.tsx";
+import { Tag } from "~/components/ui/tag.tsx";
 
 const caretSize = 14;
 
@@ -11,11 +13,14 @@ function BlockRow({
   label,
   names,
   empty,
+  tags = false,
   onSelect,
 }: {
   readonly label: string;
   readonly names: readonly string[];
   readonly empty: string;
+  /** Draws the names as tag chips, the way the rest of the console shows a tag. */
+  readonly tags?: boolean;
   readonly onSelect: (name: string) => void;
 }): ReactElement {
   return (
@@ -24,18 +29,23 @@ function BlockRow({
       {names.length === 0 ? (
         <span className="text-kumo-subtle">{empty}</span>
       ) : (
-        <div className="flex flex-col items-start gap-0.5">
+        <div className={cn("flex items-start", tags ? "flex-wrap gap-1" : "flex-col gap-0.5")}>
           {names.map((name) => (
             <button
               key={name}
               type="button"
               title={`Find ${name} in the policy`}
-              className="rounded-sm text-left font-mono text-[0.9em] [overflow-wrap:anywhere] text-kumo-default hover:underline focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none"
+              className={cn(
+                "rounded-sm text-left focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none",
+                tags
+                  ? "rounded-md hover:opacity-80"
+                  : "font-mono text-[0.9em] [overflow-wrap:anywhere] text-kumo-default hover:underline",
+              )}
               onClick={() => {
                 onSelect(name);
               }}
             >
-              {name}
+              {tags ? <Tag tag={name} size="sm" /> : name}
             </button>
           ))}
         </div>
@@ -95,7 +105,13 @@ export function BuildingBlocks({
               empty="No groups yet"
               onSelect={onSelect}
             />
-            <BlockRow label="Tags" names={blocks.tags} empty="No tags yet" onSelect={onSelect} />
+            <BlockRow
+              label="Tags"
+              names={blocks.tags}
+              empty="No tags yet"
+              tags
+              onSelect={onSelect}
+            />
             <BlockRow
               label="Autogroups"
               names={blocks.autogroups}

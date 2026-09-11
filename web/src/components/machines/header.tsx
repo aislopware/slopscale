@@ -11,6 +11,7 @@ import { StatusBadge } from "~/components/machines/status-badge.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { TagList } from "~/components/ui/tag.tsx";
 import { isTagged, nodeName, nodeStatus, ownerLabel } from "~/lib/node.ts";
 
 const registerMethods: Record<string, string> = {
@@ -93,11 +94,7 @@ function MachineFacts({ node }: { readonly node: Node }): ReactElement {
     <>
       <StatusBadge status={nodeStatus(node)} />
       <span aria-hidden>·</span>
-      {isTagged(node) ? (
-        <span className="font-mono">{node.tags.join(", ")}</span>
-      ) : (
-        <span>{ownerLabel(node)}</span>
-      )}
+      {isTagged(node) ? <TagList tags={node.tags} size="sm" /> : <span>{ownerLabel(node)}</span>}
       <span aria-hidden>·</span>
       <span>{registerMethods[node.registerMethod] ?? "registered"}</span>
       {node.ephemeral ? (

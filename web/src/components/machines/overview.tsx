@@ -9,7 +9,7 @@ import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { Status, StatusDetail } from "~/components/ui/status.tsx";
-import { ValueList } from "~/components/ui/value-list.tsx";
+import { TagList } from "~/components/ui/tag.tsx";
 import { isTagged, nodeName, userLabel } from "~/lib/node.ts";
 import { formatAbsolute, formatRelative, parseTime } from "~/lib/time.ts";
 
@@ -191,7 +191,7 @@ export function AddressesSection({ node }: { readonly node: Node }): ReactElemen
 
 function Owner({ node }: { readonly node: Node }): ReactElement {
   if (isTagged(node)) {
-    return <ValueList items={node.tags} mono className="items-end" />;
+    return <TagList tags={node.tags} size="sm" className="justify-end" />;
   }
 
   return <span>{userLabel(node.user)}</span>;

@@ -7,7 +7,7 @@ export type ValueItem =
   | string
   | {
       readonly value: string;
-      /** Shown as code: a tag, a route, a scope as the API spells it. */
+      /** Shown as code: a route, a scope as the API spells it. */
       readonly mono?: boolean;
       /** Stepped back to subtle, such as a network that is switched off. */
       readonly muted?: boolean;
@@ -38,9 +38,11 @@ export interface ValueListProps {
 }
 
 /**
- * Identifiers as text, one per line: tags, groups, scopes, domains, routes. A row of pills said the
- * same thing louder and had to truncate to fit, which hid the part that told two values apart. A
- * long value wraps within the line rather than widening the column it sits in.
+ * Identifiers as text, one per line: groups, scopes, routes, ports. A row of pills said the same
+ * thing louder and had to truncate to fit, which hid the part that told two values apart. A long
+ * value wraps within the line rather than widening the column it sits in. A tag is `Tag` from
+ * `ui/tag.tsx` and a domain is `Domain` from `ui/domain.tsx`: the one identifier that is a label by
+ * nature, and the one that is a name.
  */
 export function ValueList({
   items,

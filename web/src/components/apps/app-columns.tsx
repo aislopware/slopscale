@@ -13,8 +13,9 @@ import {
   totalPendingRoutes,
 } from "~/components/apps/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { DomainList } from "~/components/ui/domain.tsx";
 import { Status } from "~/components/ui/status.tsx";
-import { ValueList } from "~/components/ui/value-list.tsx";
+import { TagList } from "~/components/ui/tag.tsx";
 
 const helper = createAppColumnHelper<App>();
 
@@ -35,7 +36,7 @@ export const appColumns = helper.columns([
     header: "Domains",
     enableSorting: false,
     cell: ({ row }) => (
-      <ValueList items={row.original.domains} max={maxValues} mono empty="No domain" />
+      <DomainList domains={row.original.domains} max={maxValues} empty="No domain" />
     ),
     meta: { className: "min-w-44 align-top" },
   }),
@@ -102,7 +103,7 @@ function ConnectorsCell({ app }: { readonly app: App }): ReactElement {
     return <span className="text-kumo-subtle">Every connector</span>;
   }
 
-  return <ValueList items={app.connectors} max={maxValues} mono empty="Every connector" />;
+  return <TagList tags={app.connectors} size="sm" max={maxValues} empty="Every connector" />;
 }
 
 /**

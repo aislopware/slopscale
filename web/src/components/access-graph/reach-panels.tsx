@@ -8,6 +8,7 @@ import { edgeListView, edgeRows, portLines, sshLogins } from "~/components/acces
 import type { Peer } from "~/components/access-graph/model.ts";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 import { Note, Status } from "~/components/ui/status.tsx";
+import { TagList } from "~/components/ui/tag.tsx";
 import { ValueList } from "~/components/ui/value-list.tsx";
 
 /** One side of a machine's access: the edges it is the source of, or the ones it is the target of. */
@@ -125,15 +126,7 @@ function Owner({ node }: { readonly node: AccessGraphNode | undefined }): ReactE
   }
 
   if (node.tags.length > 0) {
-    return (
-      <span className="flex flex-wrap gap-x-2 text-xs text-kumo-subtle">
-        {node.tags.map((tag) => (
-          <span key={tag} className="font-mono">
-            {tag}
-          </span>
-        ))}
-      </span>
-    );
+    return <TagList tags={node.tags} size="sm" />;
   }
 
   return (

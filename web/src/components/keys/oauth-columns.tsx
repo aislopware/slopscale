@@ -15,6 +15,7 @@ import { scopeLabel } from "~/components/keys/scopes.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { TagList } from "~/components/ui/tag.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { ValueList } from "~/components/ui/value-list.tsx";
 import { userLabel } from "~/lib/node.ts";
@@ -53,7 +54,7 @@ export const oauthClientColumns = helper.columns([
     id: "tags",
     header: "Tags",
     enableSorting: false,
-    cell: ({ row }) => <ValueList items={row.original.tags} mono />,
+    cell: ({ row }) => <TagList tags={row.original.tags} size="sm" />,
     meta: { className: "hidden min-w-28 align-top md:table-cell" },
   }),
   helper.accessor((client) => client.userId ?? "", {

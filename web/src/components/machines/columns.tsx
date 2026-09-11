@@ -25,6 +25,7 @@ import { Code } from "~/components/ui/code.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
 import { Flagged } from "~/components/ui/flagged.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { TagList } from "~/components/ui/tag.tsx";
 import {
   approvedSubnets,
   isExitNode,
@@ -126,11 +127,7 @@ function NameCell({ node }: { readonly node: Node }): ReactElement {
         {node.name === name ? null : (
           <span className="truncate font-mono text-xs">{node.name}</span>
         )}
-        {node.tags.map((tag) => (
-          <span key={tag} className="font-mono">
-            {tag}
-          </span>
-        ))}
+        {node.tags.length === 0 ? null : <TagList tags={node.tags} size="sm" />}
         <Attributes node={node} />
       </div>
     </div>

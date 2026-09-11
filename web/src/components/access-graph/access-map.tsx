@@ -18,6 +18,7 @@ import type {
   Openness,
 } from "~/components/access-graph/model.ts";
 import { Section } from "~/components/ui/section.tsx";
+import { TagList } from "~/components/ui/tag.tsx";
 
 const openDelay = 150;
 
@@ -190,6 +191,9 @@ function ClassHeader({
   readonly group: AccessClass;
   readonly onPick: (nodeId: string) => void;
 }): ReactElement {
+  // A class of one is named by its machine, and a tagged machine's tags are its owner line.
+  const only = group.members.length === 1 ? group.members[0] : undefined;
+
   return (
     <Popover>
       <Popover.Trigger
@@ -197,15 +201,16 @@ function ClassHeader({
         delay={openDelay}
         className="flex h-10 w-44 cursor-pointer flex-col justify-center gap-0.5 px-3 text-left outline-none hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:ring-inset"
       >
-        <span
-          className={cn(
-            "block truncate text-kumo-default",
-            group.tagged && "font-mono text-[0.9em]",
-          )}
-        >
-          {group.label}
-        </span>
-        <span className="block truncate text-xs text-kumo-subtle">{group.detail}</span>
+        {group.tagged ? (
+          <TagList tags={group.members[0]?.tags ?? []} size="sm" className="flex-nowrap" />
+        ) : (
+          <span className="block truncate text-kumo-default">{group.label}</span>
+        )}
+        {only !== undefined && only.tags.length > 0 ? (
+          <TagList tags={only.tags} size="sm" className="flex-nowrap" />
+        ) : (
+          <span className="block truncate text-xs text-kumo-subtle">{group.detail}</span>
+        )}
       </Popover.Trigger>
       <Popover.Content side="bottom" align="start" className="max-w-72 gap-1 p-3">
         <Popover.Title className="text-sm leading-5 font-medium">
