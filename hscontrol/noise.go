@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/capver"
@@ -19,7 +21,6 @@ import (
 	"github.com/go-chi/metrics"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/net/http2"
 	"tailscale.com/control/controlbase"
 	"tailscale.com/control/controlhttp/controlhttpserver"
 	"tailscale.com/tailcfg"
@@ -78,10 +79,9 @@ const (
 type noiseServer struct {
 	slopscale *Slopscale
 
-	httpBaseConfig *http.Server
-	http2Server    *http2.Server
-	conn           *controlbase.Conn
-	machineKey     key.MachinePublic
+	httpServer *http.Server
+	conn       *controlbase.Conn
+	machineKey key.MachinePublic
 
 	// [tailcfg.EarlyNoise]-related stuff
 	challenge       key.ChallengePrivate
@@ -222,18 +222,73 @@ func (h *Slopscale) NoiseUpgradeHandler(
 		r.Post("/c2n-response", ns.slopscale.C2NResponseHandler)
 	})
 
-	ns.httpBaseConfig = &http.Server{
+	// The client speaks HTTP/2 with prior knowledge over the Noise
+	// connection, which is encrypted by Noise rather than TLS, so the
+	// server takes it as unencrypted HTTP/2. Serve returns once the
+	// connection is closed, when the HTTP/2 session on it ends.
+	ns.httpServer = &http.Server{
 		Handler:           r,
 		ReadHeaderTimeout: types.HTTPTimeout,
 	}
-	ns.http2Server = &http2.Server{}
+	ns.httpServer.Protocols = new(http.Protocols)
+	ns.httpServer.Protocols.SetUnencryptedHTTP2(true)
 
-	ns.http2Server.ServeConn(
-		noiseConn,
-		&http2.ServeConnOpts{
-			BaseConfig: ns.httpBaseConfig,
-		},
-	)
+	err = ns.httpServer.Serve(newSingleConnListener(noiseConn))
+	if err != nil && !errors.Is(err, net.ErrClosed) {
+		log.Debug().Caller().Err(err).Msg("serving noise connection")
+	}
+}
+
+// singleConnListener hands one established connection to
+// [http.Server.Serve] and reports itself closed once that connection
+// is, so Serve returns when the session on it ends.
+type singleConnListener struct {
+	conn *closeSignallingConn
+	once sync.Once
+}
+
+func newSingleConnListener(conn net.Conn) *singleConnListener {
+	return &singleConnListener{
+		conn: &closeSignallingConn{Conn: conn, closed: make(chan struct{})},
+	}
+}
+
+func (l *singleConnListener) Accept() (net.Conn, error) {
+	var conn net.Conn
+
+	l.once.Do(func() { conn = l.conn })
+
+	if conn != nil {
+		return conn, nil
+	}
+
+	<-l.conn.closed
+
+	return nil, net.ErrClosed
+}
+
+func (l *singleConnListener) Close() error { return nil }
+
+func (l *singleConnListener) Addr() net.Addr { return l.conn.LocalAddr() }
+
+// closeSignallingConn closes a channel the first time it is closed, so
+// the listener that handed it out knows when to stop.
+type closeSignallingConn struct {
+	net.Conn
+
+	once   sync.Once
+	closed chan struct{}
+}
+
+func (c *closeSignallingConn) Close() error {
+	c.once.Do(func() { close(c.closed) })
+
+	err := c.Conn.Close()
+	if err != nil {
+		return fmt.Errorf("closing noise connection: %w", err)
+	}
+
+	return nil
 }
 
 func unsupportedClientError(version tailcfg.CapabilityVersion) error {

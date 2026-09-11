@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
 	"net/netip"
 	"strconv"
 	"strings"
@@ -1496,6 +1499,313 @@ func TestPingAllByIPManyUpDown(t *testing.T) {
 
 		// Clean up context for this run
 		cancel()
+	}
+}
+
+// peersMapResponseType is the [change.Change.Type] label that
+// slopscale_mapresponse_generated_total carries for a whole-peer resend,
+// which is what [change.NodeAdded] produces.
+const peersMapResponseType = "peers"
+
+// mapResponseCountsByType reads slopscale_mapresponse_generated_total keyed
+// by its response_type label, from the metrics listener the test process
+// reaches on the container's own network, as SaveMetrics in hsic does.
+func mapResponseCountsByType(slopscale ControlServer) (map[string]float64, error) {
+	const (
+		metricName  = "slopscale_mapresponse_generated_total"
+		labelPrefix = `response_type="`
+	)
+
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		"http://"+net.JoinHostPort(slopscale.GetHostname(), "9090")+"/metrics",
+		http.NoBody,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating metrics request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetching metrics: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading metrics: %w", err)
+	}
+
+	out := string(body)
+
+	counts := make(map[string]float64)
+
+	for line := range strings.SplitSeq(out, "\n") {
+		if !strings.HasPrefix(line, metricName+"{") {
+			continue
+		}
+
+		_, after, ok := strings.Cut(line, labelPrefix)
+		if !ok {
+			continue
+		}
+
+		rest := after
+
+		before0, _, ok0 := strings.Cut(rest, `"`)
+		if !ok0 {
+			continue
+		}
+
+		valueStart := strings.LastIndex(line, " ")
+		if valueStart < 0 {
+			continue
+		}
+
+		value, err := strconv.ParseFloat(strings.TrimSpace(line[valueStart+1:]), 64)
+		if err != nil {
+			return nil, fmt.Errorf("parsing metric line %q: %w", line, err)
+		}
+
+		counts[before0] = value
+	}
+
+	return counts, nil
+}
+
+// quiescedMapResponseCounts waits until the whole-peer map response counter
+// stops moving and then returns the whole counter family. A read taken
+// mid-fan-out charges someone else's responses to the change under test.
+func quiescedMapResponseCounts(
+	t *testing.T,
+	slopscale ControlServer,
+	waitingFor string,
+) map[string]float64 {
+	t.Helper()
+
+	var counts map[string]float64
+
+	previous := -1.0
+
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		current, err := mapResponseCountsByType(slopscale)
+		assert.NoError(ct, err)
+		assert.NotEmpty(ct, current, "metrics should carry the map response counter")
+		assert.Equal(ct, previous, current[peersMapResponseType],
+			"whole-peer fan-out is still moving")
+
+		previous = current[peersMapResponseType]
+		counts = current
+	}, integrationutil.HAConvergeTimeout, 2*time.Second, waitingFor)
+
+	return counts
+}
+
+// TestHostinfoChangeReachesPeersOnlyWhenPeerVisible pins which Hostinfo edits
+// are worth a whole-peer resend.
+//
+// Peers render only a handful of Hostinfo fields, so a client toggling one they
+// never read should cost their peers nothing, while a field they do render has
+// to arrive. Shields-up and hostname sit on either side of that line.
+//
+// The observable is slopscale_mapresponse_generated_total{response_type="peers"}:
+// [change.NodeAdded] is the whole-peer broadcast the map request path emits for
+// a Hostinfo edit peers read, and [change.Change.Type] labels it "peers".
+func TestHostinfoChangeReachesPeersOnlyWhenPeerVisible(t *testing.T) {
+	IntegrationSkip(t)
+
+	spec := ScenarioSpec{
+		NodesPerUser: 2,
+		Users:        []string{"user1"},
+	}
+
+	scenario, err := NewScenario(spec)
+	require.NoErrorf(t, err, "failed to create scenario")
+	defer scenario.ShutdownAssertNoPanics(t)
+
+	err = scenario.CreateSlopscaleEnv(
+		[]tsic.Option{},
+		hsic.WithTestName("hostinfopeervisible"),
+	)
+	requireNoErrSlopscaleEnv(t, err)
+
+	allClients, err := scenario.ListTailscaleClients()
+	requireNoErrListClients(t, err)
+	require.Len(t, allClients, 2, "one client changes Hostinfo, the other observes")
+
+	err = scenario.WaitForTailscaleSync()
+	requireNoErrSync(t, err)
+
+	slopscale, err := scenario.Slopscale()
+	requireNoErrGetSlopscale(t, err)
+
+	subject, observer := allClients[0], allClients[1]
+
+	subjectStableID := string(subject.MustStatus().Self.ID)
+	subjectNodeID, err := strconv.ParseUint(subjectStableID, 10, 64)
+	require.NoErrorf(t, err,
+		"slopscale issues numeric stable node IDs, got %q", subjectStableID)
+
+	baseline := quiescedMapResponseCounts(t, slopscale,
+		"registration fan-out should settle before the baseline counter read")
+
+	// Shields-up moves Hostinfo.ShieldsUp and nothing a peer reads.
+	_, _, err = subject.Execute([]string{"tailscale", "set", "--shields-up=true"})
+	require.NoErrorf(t, err, "failed to raise shields on %s", subject.Hostname())
+
+	// Storing Hostinfo and telling peers about it are separate decisions, so
+	// the NodeStore is the sync point that proves the map request landed
+	// whatever the server chose to broadcast.
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		store, err := slopscale.DebugNodeStore()
+		assert.NoError(ct, err)
+
+		node, ok := store[types.NodeID(subjectNodeID)]
+		if !assert.True(ct, ok, "node %d should be in the NodeStore", subjectNodeID) {
+			return
+		}
+
+		if !assert.NotNil(ct, node.Hostinfo, "node %d should carry Hostinfo", subjectNodeID) {
+			return
+		}
+
+		assert.True(ct, node.Hostinfo.ShieldsUp,
+			"slopscale should have processed the shields-up map request")
+	}, integrationutil.HAConvergeTimeout, 1*time.Second,
+		"slopscale should record the shields-up Hostinfo change")
+
+	afterShields := quiescedMapResponseCounts(t, slopscale,
+		"map response counter should settle after the shields-up change")
+
+	t.Logf("map response counts: baseline=%v afterShields=%v", baseline, afterShields)
+
+	// assert, not require: the peer-visible half below is the other side of
+	// the same contract and its evidence is worth having in the same run.
+	assert.Equal(t,
+		baseline[peersMapResponseType],
+		afterShields[peersMapResponseType],
+		"shields-up touches no Hostinfo field a peer reads, so no peer should be handed the whole node again")
+
+	// Hostname is rendered by every peer, so this one has to travel.
+	const newHostname = "shields-up-renamed"
+
+	_, _, err = subject.Execute([]string{"tailscale", "set", "--hostname=" + newHostname})
+	require.NoErrorf(t, err, "failed to set hostname on %s", subject.Hostname())
+
+	require.EventuallyWithT(t, func(ct *assert.CollectT) {
+		status, err := observer.Status()
+		assert.NoError(ct, err)
+
+		var seen bool
+
+		for _, peer := range status.Peer {
+			if string(peer.ID) != subjectStableID {
+				continue
+			}
+
+			seen = true
+
+			assert.Equal(ct, newHostname, peer.HostName,
+				"peer %s should be seen under its new hostname", subjectStableID)
+		}
+
+		assert.True(ct, seen, "observer should still have node %s as a peer", subjectStableID)
+	}, integrationutil.HAConvergeTimeout, 1*time.Second,
+		"hostname is peer-visible, so the rename must reach the peer")
+
+	afterHostname := quiescedMapResponseCounts(t, slopscale,
+		"map response counter should settle after the hostname change")
+
+	t.Logf("map response counts after hostname change: %v", afterHostname)
+
+	require.Greater(t,
+		afterHostname[peersMapResponseType],
+		afterShields[peersMapResponseType],
+		"a hostname change is peer-visible and must fan out as a whole-peer resend")
+}
+
+// TestNodeDeletionEndsLongPoll verifies that deleting a node ends its map
+// session and tells the client to re-authenticate, for every client
+// version in turn. Before the fix the deleted node's long poll was
+// orphaned: the client stayed Running forever against a node that no
+// longer existed, and the server could not shut down while that stream
+// was open.
+//
+// See: https://github.com/juanfont/headscale/issues/3410
+func TestNodeDeletionEndsLongPoll(t *testing.T) {
+	IntegrationSkip(t)
+
+	spec := ScenarioSpec{
+		NodesPerUser: len(MustTestVersions),
+		Users:        []string{"user1"},
+	}
+
+	scenario, err := NewScenario(spec)
+	require.NoError(t, err)
+	defer scenario.ShutdownAssertNoPanics(t)
+
+	err = scenario.CreateSlopscaleEnv([]tsic.Option{}, hsic.WithTestName("deletelongpoll"))
+	requireNoErrSlopscaleEnv(t, err)
+
+	err = scenario.WaitForTailscaleSync()
+	requireNoErrSync(t, err)
+
+	slopscale, err := scenario.Slopscale()
+	require.NoError(t, err)
+
+	allClients, err := scenario.ListTailscaleClients()
+	requireNoErrListClients(t, err)
+	require.NotEmpty(t, allClients)
+
+	for _, client := range allClients {
+		require.NoError(t, client.WaitForRunning(integrationutil.StatusReadyTimeout),
+			"client %s must be Running before the deletion", client.Hostname())
+	}
+
+	var nodeIDsByName map[string]uint64
+
+	assert.EventuallyWithT(t, func(ct *assert.CollectT) {
+		nodes, err := slopscale.ListNodes()
+		if !assert.NoError(ct, err) || !assert.Len(ct, nodes, len(allClients)) {
+			return
+		}
+
+		ids := make(map[string]uint64, len(nodes))
+
+		for _, node := range nodes {
+			ids[node.Name] = mustParseID(node.Id)
+		}
+
+		for _, client := range allClients {
+			if !assert.Contains(ct, ids, client.Hostname()) {
+				return
+			}
+		}
+
+		nodeIDsByName = ids
+	}, integrationutil.StatusReadyTimeout, integrationutil.SlowPoll, "node list should name every client before deletion")
+	require.Len(t, nodeIDsByName, len(allClients))
+
+	for i, deleted := range allClients {
+		deletedID, ok := nodeIDsByName[deleted.Hostname()]
+		require.True(t, ok, "node list must contain client %s", deleted.Hostname())
+		require.NoError(t, slopscale.DeleteNode(deletedID))
+
+		require.NoError(t, deleted.WaitForNeedsLogin(integrationutil.StatusReadyTimeout),
+			"deleted client %s must stop polling and ask for a new login", deleted.Hostname())
+
+		for _, client := range allClients[i+1:] {
+			assert.EventuallyWithT(t, func(ct *assert.CollectT) {
+				status, err := client.Status()
+				if !assert.NoError(ct, err) || !assert.NotNil(ct, status) {
+					return
+				}
+
+				assert.Equal(ct, "Running", status.BackendState)
+			}, integrationutil.StatusReadyTimeout, integrationutil.SlowPoll,
+				"deleting a peer must not disturb client %s", client.Hostname())
+		}
 	}
 }
 

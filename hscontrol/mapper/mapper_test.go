@@ -797,3 +797,64 @@ func TestMapResponseNeverContainsSelfAsPeer(t *testing.T) {
 		})
 	}
 }
+
+// TestNoSelfAsPeerDuringRealNodeChurn exercises the change flow poll.go
+// drives (connect, disconnect, reconnect, policy reload, key expiry) and
+// scans every delivered [tailcfg.MapResponse] for the recipient's own node.
+func TestNoSelfAsPeerDuringRealNodeChurn(t *testing.T) {
+	t.Parallel()
+
+	// How long a node's stream must stay silent before the churn counts
+	// as settled and the scan moves on to the next node. The batcher
+	// flushes every few milliseconds, so this is many batches.
+	const quietPeriod = 500 * time.Millisecond
+
+	for _, tt := range policyShapes {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			testData, cleanup := setupBatcherWithTestData(t, NewBatcherAndMapper, 2, 3, largeBufferSize)
+			defer cleanup()
+
+			_, err := testData.State.SetPolicy([]byte(tt.policy))
+			require.NoError(t, err)
+
+			batcher := testData.Batcher
+
+			for i := range testData.Nodes {
+				tn := &testData.Nodes[i]
+				require.NoError(t, batcher.AddNode(tn.n.ID, tn.ch, 100, nil))
+			}
+
+			// Drop and re-add every node but the first, then reload the
+			// policy and expire the one node that never reconnected.
+			for i := 1; i < len(testData.Nodes); i++ {
+				tn := &testData.Nodes[i]
+				batcher.RemoveNode(tn.n.ID, tn.ch)
+				require.NoError(t, batcher.AddNode(tn.n.ID, tn.ch, 100, nil))
+			}
+
+			_, err = testData.State.SetPolicy([]byte(tt.policy))
+			require.NoError(t, err)
+
+			expiry := time.Now().Add(time.Hour)
+
+			_, c, err := testData.State.SetNodeExpiry(testData.Nodes[0].n.ID, &expiry)
+			require.NoError(t, err)
+			batcher.AddWork(c)
+
+			for i := range testData.Nodes {
+				tn := &testData.Nodes[i]
+
+				for quiet := false; !quiet; {
+					select {
+					case resp := <-tn.ch:
+						assertSelfNotAPeer(t, tn.n.ID, resp, "churn")
+					case <-time.After(quietPeriod):
+						quiet = true
+					}
+				}
+			}
+		})
+	}
+}

@@ -275,7 +275,7 @@ func (node *Node) postureInputsEqual(other *Node) bool {
 		return false
 	}
 
-	if !hostinfoPostureEqual(node.Hostinfo, other.Hostinfo) {
+	if !HostinfoPostureEqual(node.Hostinfo, other.Hostinfo) {
 		return false
 	}
 
@@ -302,9 +302,10 @@ func (node *Node) serialNumbers() []string {
 	return node.Posture.SerialNumbers
 }
 
-// hostinfoPostureEqual compares the Hostinfo fields the attribute map
-// carries.
-func hostinfoPostureEqual(a, b *tailcfg.Hostinfo) bool {
+// HostinfoPostureEqual compares the Hostinfo fields the attribute map
+// carries, so a map request that moves none of them needs no policy
+// refresh.
+func HostinfoPostureEqual(a, b *tailcfg.Hostinfo) bool {
 	if a == nil || b == nil {
 		return a == nil && b == nil
 	}

@@ -9,6 +9,6 @@
     "validate": "blume validate"
   },
   "dependencies": {
-    "blume": "1.6.3"
+    "blume": "1.6.4"
   }
 }

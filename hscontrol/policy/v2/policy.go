@@ -48,6 +48,10 @@ type PolicyManager struct {
 	// reads an ip: attribute, so a node's source address change is only a
 	// policy change then.
 	usesSourceAddress bool
+	// usesPostures is set by the last compile when a grant in use carries
+	// a posture, so a node's posture inputs are only policy-affecting
+	// while some posture can read them.
+	usesPostures bool
 
 	filterHash deephash.Sum
 	filter     []tailcfg.FilterRule
@@ -844,34 +848,57 @@ func (pm *PolicyManager) MatchersForNode(node types.NodeView) ([]matcher.Match, 
 	return pm.matchersForNodeLocked(node), nil
 }
 
-// SetUsers updates the users in the policy manager and updates the filter rules.
-func (pm *PolicyManager) SetUsers(users []types.User) (bool, error) {
+// SetUsers replaces the user list and recompiles when it changed. Both results
+// are false for an unchanged list, so callers can skip the peer-map rebuild
+// and the client refresh that a user change would otherwise require.
+func (pm *PolicyManager) SetUsers(users []types.User) (bool, bool, error) {
 	if pm == nil {
-		return false, nil
+		return false, false, nil
 	}
 
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
+	if equalUsers(pm.users, users) {
+		return false, false, nil
+	}
+
+	prev := pm.users
 	pm.users = users
 
-	// Clear SSH policy map when users change to force SSH policy recomputation
-	// This ensures that if SSH policy compilation previously failed due to missing users,
-	// it will be retried with the new user list
+	// SSH policies resolve users by name, so they are recomputed on any
+	// user change.
 	pm.sshPolicyMap.Clear()
 
-	changed, err := pm.updateLocked()
+	policyChanged, err := pm.updateLocked()
 	if err != nil {
-		return false, err
+		// Keep the old list so a retry with the same input recompiles
+		// instead of being treated as unchanged.
+		pm.users = prev
+
+		return false, false, err
 	}
 
-	// If SSH policies exist, force a policy change when users are updated
-	// This ensures nodes get updated SSH policies even if other policy hashes didn't change
+	// SSH rules embed user identity, so a user change needs a client refresh
+	// even when the filter hash did not move.
 	if pm.pol != nil && len(pm.pol.SSHs) > 0 {
-		return true, nil
+		policyChanged = true
 	}
 
-	return changed, nil
+	return policyChanged, true, nil
+}
+
+// equalUsers compares user lists ignoring order and every field the policy
+// does not read, so a row touch such as an OIDC login is not a change.
+func equalUsers(a, b []types.User) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	byID := func(l, r types.User) int { return cmp.Compare(l.ID, r.ID) }
+	a, b = slices.SortedFunc(slices.Values(a), byID), slices.SortedFunc(slices.Values(b), byID)
+
+	return slices.EqualFunc(a, b, func(l, r types.User) bool { return l.PolicyEqual(&r) })
 }
 
 // SetNodes updates the nodes in the policy manager and updates the filter rules.
@@ -1889,6 +1916,7 @@ func (pm *PolicyManager) updateLocked() (bool, error) {
 	}
 
 	pm.usesSourceAddress = pm.pol.usesSourceAddress()
+	pm.usesPostures = pm.pol.usesPostures()
 
 	// Compile all grants once. Both global and per-node filter
 	// rules are derived from these compiled grants.
@@ -2081,7 +2109,13 @@ func (pm *PolicyManager) nodesHavePolicyAffectingChanges(newNodes views.Slice[ty
 			return true
 		}
 
-		if newNode.HasPolicyChange(oldNode) {
+		if newNode.HasPolicyChangeIgnoringPosture(oldNode) {
+			return true
+		}
+
+		// A client reporting a new OS or version moves the posture
+		// attribute map, which only matters while a grant reads it.
+		if pm.usesPostures && newNode.HasPostureInputChange(oldNode) {
 			return true
 		}
 

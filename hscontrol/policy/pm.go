@@ -67,7 +67,10 @@ type PolicyManager interface {
 	// Enforces reports whether the tailnet has a packet filter at all, from
 	// the file or an enabled access rule.
 	Enforces() bool
-	SetUsers(users []types.User) (bool, error)
+	// SetUsers replaces the user list. policyChanged reports whether clients
+	// need a policy refresh; peerMapChanged reports whether user-derived peer
+	// adjacency may have changed. Both are false when the list is unchanged.
+	SetUsers(users []types.User) (policyChanged, peerMapChanged bool, err error)
 	SetNodes(nodes views.Slice[types.NodeView]) (bool, error)
 	// NodeCanHaveTag reports whether the given node can have the given tag.
 	NodeCanHaveTag(node types.NodeView, tag string) bool

@@ -180,6 +180,7 @@ const (
 	TypePeers   = "peers"
 	TypeConfig  = "config"
 	TypePing    = "ping"
+	TypeEmpty   = "empty"
 	TypeUnknown = "unknown"
 )
 
@@ -193,6 +194,7 @@ var Types = []string{
 	TypePeers,
 	TypeConfig,
 	TypePing,
+	TypeEmpty,
 	TypeUnknown,
 }
 
@@ -200,6 +202,11 @@ var Types = []string{
 // This provides a bounded set of values suitable for Prometheus labels,
 // unlike [Change.Reason] which is free-form text for logging.
 func (r Change) Type() string {
+	// A suppressed update is a healthy outcome, not an unclassified one.
+	if r.IsEmpty() {
+		return TypeEmpty
+	}
+
 	if r.IsFull() {
 		return TypeFull
 	}
