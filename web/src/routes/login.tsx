@@ -1,6 +1,6 @@
 import { Banner } from "@cloudflare/kumo/components/banner";
 import { Button } from "@cloudflare/kumo/components/button";
-import { SignInIcon, WaveformIcon } from "@phosphor-icons/react";
+import { SignInIcon } from "@phosphor-icons/react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 import { object, optional, string } from "valibot";
@@ -8,6 +8,7 @@ import { object, optional, string } from "valibot";
 import { ApiError } from "~/api/error.ts";
 import { consoleAuthQuery, meQuery } from "~/auth/me.ts";
 import { consolePath } from "~/auth/session.ts";
+import { Mark } from "~/components/layout/mark.tsx";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
 import { Callout } from "~/components/ui/callout.tsx";
 import { Code } from "~/components/ui/code.tsx";
@@ -88,7 +89,7 @@ function LoginPage(): ReactElement {
           <Frame className="shadow-lg ring-kumo-line">
             <FramePanel className="flex flex-col gap-6 px-6 py-6">
               <div className="flex flex-col gap-3">
-                <WaveformIcon className="size-8 text-kumo-brand" weight="duotone" />
+                <Mark className="size-8 text-kumo-brand" />
                 <div className="flex flex-col gap-1">
                   <h1 className="text-xl font-semibold text-kumo-strong">Sign in to slopscale</h1>
                   <p className="text-kumo-subtle">
