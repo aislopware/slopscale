@@ -4,6 +4,17 @@
 
 ### Changes
 
+- The access graph's _Who reaches what_ map is drawn as a heatmap. Each cell is a rounded tile a step apart from its neighbours instead of a filled table cell, a closed pair is a faint tile rather than a blank, a machine against itself is hatched, and the three shades of one blue are set per theme so they tell apart in dark mode too. Up to eight groups the tiles carry their words; past that the cells shrink to squares so sixty groups fit on one screen, the column names stand on end, and the pair under the pointer, or the focused one, is read out on the line under the map. Hovering a cell picks out its row and column and steps the rest back. The legend sits on the band beside the title
+- A person's avatar is a blend of two hues seeded by their name rather than one flat tint, so every person's mark is its own, and a Linux machine's mark is Tux as Simple Icons draws him, which still reads as a penguin at 14px
+- A domain token leads with the registered site and steps its subdomain back, with a dot in a hue seeded by the site, so a list of hosts under two sites reads as two groups
+- The overview's _Machines_ and _Users_ tiles carry a meter for the connected and the approved share, and _Recently active_ shows each machine's owner as an avatar and its OS mark before the name
+- A line runs along the top of the header while the next page's data loads, so a click on the sidebar shows it landed instead of nothing until the page changes; a dropped connection is tried once more before the page says the server did not answer
+- The join commands the console hands out carry `--accept-routes`, so a machine uses the subnet routes and app connectors the tailnet advertises without a second command
+
+### Fixes
+
+- The policy editor no longer marks `tailscale.com/cap/relay` and the other capabilities under `tailscale.com` that the server accepts (`drive`, `webui`, `kubernetes`, `tsidp`, `secrets`) as an error; it refuses the rest of that domain, as the server does
+
 - The console's sidebar has no _Administration_ group. Console sign-ins are a page of their own, _Sign-ins_ under _Access_ next to _Keys_ and _My access_, because every signed-in user has sign-ins of their own; the page that was _Settings → Sessions_ is now at `/admin/sign-ins`. What is left, _Tailnet_, _Server_ and _Integrations_, is the _Settings_ group, and only a role that may read them sees it, so a member's sidebar ends at _Access_
 - The macOS and iOS configuration profiles served at `/apple` carry the identifier `com.github.aislopware.slopscale` instead of `com.github.juanfont.slopscale`, and the Debian package names Cong Tran as maintainer. A profile installed from an earlier version keeps working; installing the new one adds a second profile, so remove the old one first
 
