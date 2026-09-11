@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -24,10 +25,11 @@ func validDERPSettings() DERPSettings {
 			}},
 		}},
 		Server: DERPServerSettings{
-			Enabled:    true,
-			RegionID:   999,
-			RegionCode: "slopscale",
-			STUNAddr:   "0.0.0.0:3478",
+			Enabled:     true,
+			RegionID:    999,
+			RegionCode:  "slopscale",
+			STUNEnabled: true,
+			STUNAddr:    "0.0.0.0:3478",
 		},
 	}
 }
@@ -115,6 +117,10 @@ func TestDERPSettingsValidate(t *testing.T) {
 		{"embedded without stun", func(s *DERPSettings) { s.Server.STUNAddr = "" }, ErrDERPSTUNAddrInvalid},
 		{"embedded stun without port", func(s *DERPSettings) { s.Server.STUNAddr = "0.0.0.0" }, ErrDERPSTUNAddrInvalid},
 		{"embedded stun port 0 is allowed", func(s *DERPSettings) { s.Server.STUNAddr = "127.0.0.1:0" }, nil},
+		{"embedded stun off ignores the address", func(s *DERPSettings) {
+			s.Server.STUNEnabled = false
+			s.Server.STUNAddr = ""
+		}, nil},
 		{"embedded ipv4 not v4", func(s *DERPSettings) { s.Server.IPv4 = "::1" }, ErrDERPServerIPInvalid},
 		{"embedded ipv6 not v6", func(s *DERPSettings) { s.Server.IPv6 = "1.2.3.4" }, ErrDERPServerIPInvalid},
 		{
@@ -142,6 +148,22 @@ func TestDERPSettingsValidate(t *testing.T) {
 			assert.ErrorIs(t, err, ErrDERPSettingsInvalid)
 		})
 	}
+}
+
+// TestDERPServerSettingsUnmarshalSTUNDefault proves a stored settings row
+// from before the STUN switch existed keeps STUN on, and one that turns
+// it off is read as such.
+func TestDERPServerSettingsUnmarshalSTUNDefault(t *testing.T) {
+	t.Parallel()
+
+	var s DERPServerSettings
+
+	require.NoError(t, json.Unmarshal([]byte(`{"enabled":true,"stunAddr":"0.0.0.0:3478"}`), &s))
+	assert.True(t, s.STUNEnabled, "a row without the field keeps STUN on")
+	assert.Equal(t, "0.0.0.0:3478", s.STUNAddr)
+
+	require.NoError(t, json.Unmarshal([]byte(`{"enabled":true,"stunEnabled":false}`), &s))
+	assert.False(t, s.STUNEnabled)
 }
 
 func TestDERPSettingsRegionsMap(t *testing.T) {
@@ -173,6 +195,7 @@ func TestDERPConfigSettings(t *testing.T) {
 		ServerEnabled:    true,
 		ServerRegionID:   999,
 		ServerRegionCode: "hs",
+		STUNEnabled:      true,
 		STUNAddr:         "0.0.0.0:3478",
 		AutoUpdate:       true,
 		UpdateFrequency:  3 * time.Hour,
@@ -183,6 +206,7 @@ func TestDERPConfigSettings(t *testing.T) {
 	assert.NotNil(t, s.URLs)
 	assert.NotNil(t, s.Regions)
 	assert.True(t, s.Server.Enabled)
+	assert.True(t, s.Server.STUNEnabled)
 	assert.Equal(t, tailcfg.DERPRegionID(999), s.Server.RegionID)
 	assert.Equal(t, 3*time.Hour, s.UpdateFrequency)
 

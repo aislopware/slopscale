@@ -68,7 +68,11 @@ type DERPServerSettings struct {
 	// VerifyClients admits only this tailnet's machines. Left out of a
 	// request it is on; a response always carries it.
 	VerifyClients *bool `json:"verifyClients,omitempty" required:"false"`
-	// STUNAddr is the UDP host:port STUN listens on.
+	// STUNEnabled answers STUN on STUNAddr and publishes it in the map.
+	// Left out of a request it is on; a response always carries it.
+	STUNEnabled *bool `json:"stunEnabled,omitempty" required:"false"`
+	// STUNAddr is the UDP host:port STUN listens on, ignored while STUN
+	// is off.
 	STUNAddr string `json:"stunAddr,omitempty" required:"false"`
 	// IPv4 and IPv6 are public addresses published next to the host name.
 	IPv4 string `json:"ipv4,omitempty" required:"false"`
@@ -223,6 +227,7 @@ func derpServerFrom(s types.DERPServerSettings) DERPServerSettings {
 		RegionCode:    s.RegionCode,
 		RegionName:    s.RegionName,
 		VerifyClients: &s.VerifyClients,
+		STUNEnabled:   &s.STUNEnabled,
 		STUNAddr:      s.STUNAddr,
 		IPv4:          s.IPv4,
 		IPv6:          s.IPv6,
@@ -231,10 +236,16 @@ func derpServerFrom(s types.DERPServerSettings) DERPServerSettings {
 
 func derpServerTo(s DERPServerSettings) types.DERPServerSettings {
 	// Verification is the safe side, so a request that says nothing
-	// about it gets it rather than an open relay.
+	// about it gets it rather than an open relay. STUN is on unless the
+	// request turns it off, as it was before the switch existed.
 	verify := true
 	if s.VerifyClients != nil {
 		verify = *s.VerifyClients
+	}
+
+	stunEnabled := true
+	if s.STUNEnabled != nil {
+		stunEnabled = *s.STUNEnabled
 	}
 
 	return types.DERPServerSettings{
@@ -243,6 +254,7 @@ func derpServerTo(s DERPServerSettings) types.DERPServerSettings {
 		RegionCode:    s.RegionCode,
 		RegionName:    s.RegionName,
 		VerifyClients: verify,
+		STUNEnabled:   stunEnabled,
 		STUNAddr:      s.STUNAddr,
 		IPv4:          s.IPv4,
 		IPv6:          s.IPv6,

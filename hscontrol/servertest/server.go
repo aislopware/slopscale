@@ -223,6 +223,7 @@ func NewServer(tb testing.TB, opts ...ServerOption) *TestServer {
 			ServerRegionCode:                   "slopscale",
 			ServerRegionName:                   "Slopscale Embedded DERP",
 			ServerVerifyClients:                true,
+			STUNEnabled:                        true,
 			STUNAddr:                           "127.0.0.1:0",
 			AutomaticallyAddEmbeddedDerpRegion: true,
 		},

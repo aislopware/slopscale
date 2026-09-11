@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/aislopware/slopscale/hscontrol/egress"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
@@ -247,6 +248,35 @@ func TestShuffleDERPMapWithoutBaseDomain(t *testing.T) {
 // TestBuildSanitizesRegions proves a fetched map with a null relay, a
 // relay under the wrong region id, a duplicate name and a null region
 // builds into one the clients can rely on.
+// TestEmbeddedRegionSTUN proves the embedded region carries the STUN port
+// while STUN is on and a negative port, which tells clients not to ask,
+// while it is off.
+func TestEmbeddedRegionSTUN(t *testing.T) {
+	t.Parallel()
+
+	settings := types.DERPServerSettings{
+		Enabled:     true,
+		RegionID:    999,
+		RegionCode:  "slopscale",
+		STUNEnabled: true,
+		STUNAddr:    "0.0.0.0:3479",
+	}
+
+	region, err := EmbeddedRegion(t.Context(), "https://derp.example", settings)
+	require.NoError(t, err)
+	require.Len(t, region.Nodes, 1)
+	assert.Equal(t, 3479, region.Nodes[0].STUNPort)
+
+	settings.STUNEnabled = false
+	settings.STUNAddr = ""
+
+	region, err = EmbeddedRegion(t.Context(), "https://derp.example", settings)
+	require.NoError(t, err)
+	require.Len(t, region.Nodes, 1)
+	assert.Equal(t, -1, region.Nodes[0].STUNPort, "no STUN port is published while STUN is off")
+	assert.Equal(t, 443, region.Nodes[0].DERPPort)
+}
+
 func TestBuildSanitizesRegions(t *testing.T) {
 	t.Parallel()
 

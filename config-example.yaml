@@ -99,8 +99,17 @@ derp:
     # Only allow clients associated with this server access
     verify_clients: true
 
+    # Answer STUN on stun_listen_addr and publish the port in the DERP map,
+    # so machines learn their public address from the relay. Turn it off
+    # when the relay sits on the machines' own network and they reach its
+    # public address through their router: the replies then name the
+    # router instead of the public address, disagree with Tailscale's
+    # STUN servers, and every machine there reports a hard NAT.
+    # Tailscale's relays still answer STUN for them.
+    stun_enabled: true
+
     # Listens over UDP at the configured address for STUN connections - to help with NAT traversal.
-    # Required while the embedded DERP server is enabled.
+    # Required while the embedded DERP server is enabled with STUN.
     #
     # For more details on how this works, check this great article: https://tailscale.com/blog/how-tailscale-works/
     stun_listen_addr: "0.0.0.0:3478"

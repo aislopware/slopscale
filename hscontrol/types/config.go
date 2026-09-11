@@ -372,6 +372,7 @@ type DERPConfig struct {
 	ServerRegionName                   string
 	ServerPrivateKeyPath               string
 	ServerVerifyClients                bool
+	STUNEnabled                        bool
 	STUNAddr                           string
 	URLs                               []url.URL
 	Paths                              []string
@@ -814,7 +815,7 @@ func LoadConfig(path string, isFile bool) error {
 	viper.SetDefault("derp.server.region_code", "slopscale")
 	viper.SetDefault("derp.server.region_name", "Slopscale Embedded DERP")
 	viper.SetDefault("derp.server.verify_clients", true)
-	viper.SetDefault("derp.server.stun.enabled", true)
+	viper.SetDefault("derp.server.stun_enabled", true)
 	viper.SetDefault("derp.server.stun_listen_addr", "0.0.0.0:3478")
 	viper.SetDefault("derp.server.automatically_add_embedded_derp_region", true)
 	viper.SetDefault("derp.urls", []string{TailscaleDERPMapURL})
@@ -1112,6 +1113,7 @@ func derpConfig() DERPConfig {
 	serverRegionCode := viper.GetString("derp.server.region_code")
 	serverRegionName := viper.GetString("derp.server.region_name")
 	serverVerifyClients := viper.GetBool("derp.server.verify_clients")
+	stunEnabled := viper.GetBool("derp.server.stun_enabled")
 	stunAddr := viper.GetString("derp.server.stun_listen_addr")
 	privateKeyPath := util.AbsolutePathFromConfigPath(
 		viper.GetString("derp.server.private_key_path"),
@@ -1130,9 +1132,9 @@ func derpConfig() DERPConfig {
 		"derp.server.automatically_add_embedded_derp_region",
 	)
 
-	if serverEnabled && stunAddr == "" {
+	if serverEnabled && stunEnabled && stunAddr == "" {
 		log.Fatal().
-			Msg("derp.server.stun_listen_addr must be set if derp.server.enabled is true")
+			Msg("derp.server.stun_listen_addr must be set if derp.server.enabled and derp.server.stun_enabled are true")
 	}
 
 	urlStrs := viper.GetStringSlice("derp.urls")
@@ -1171,6 +1173,7 @@ func derpConfig() DERPConfig {
 		ServerRegionName:                   serverRegionName,
 		ServerVerifyClients:                serverVerifyClients,
 		ServerPrivateKeyPath:               privateKeyPath,
+		STUNEnabled:                        stunEnabled,
 		STUNAddr:                           stunAddr,
 		URLs:                               urls,
 		Paths:                              paths,

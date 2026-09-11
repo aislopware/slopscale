@@ -39,6 +39,7 @@ const base: DerpSettings = {
     regionCode: "slopscale",
     regionName: "",
     verifyClients: true,
+    stunEnabled: true,
     stunAddr: "0.0.0.0:3478",
     ipv4: "",
     ipv6: "",
@@ -143,6 +144,13 @@ describe("validation", () => {
     expect(serverError(draft, [900])).toBeNull();
     expect(serverError({ ...draft, regionId: "900" }, [900])).not.toBeNull();
     expect(serverFromDraft(draft, false)).toStrictEqual({ ...base.server, enabled: false });
+  });
+
+  it("ignores the STUN address while STUN is off", () => {
+    const draft = { ...serverDraft(base.server), stunAddr: "bad" };
+
+    expect(serverError(draft, [])).not.toBeNull();
+    expect(serverError({ ...draft, stunEnabled: false }, [])).toBeNull();
   });
 
   it("names the field a relay error belongs to", () => {

@@ -22,6 +22,7 @@ func derpFlags(cmd *cobra.Command) {
 	cmd.Flags().String("region-name", "", "")
 	cmd.Flags().Bool("verify-clients", true, "")
 	cmd.Flags().String("stun", "0.0.0.0:3478", "")
+	cmd.Flags().Bool("stun-enabled", true, "")
 	cmd.Flags().String("ipv4", "", "")
 	cmd.Flags().String("ipv6", "", "")
 
@@ -66,6 +67,7 @@ func sampleDERP() clientv1.DERP {
 				RegionCode:    &code,
 				RegionName:    &name,
 				VerifyClients: &verify,
+				StunEnabled:   &verify,
 				StunAddr:      &stun,
 				Ipv4:          &ip4,
 			},
@@ -175,9 +177,11 @@ func TestDERPCommands(t *testing.T) {
 			wantIn: []string{"Source: set through the API"},
 		},
 		{
-			name:  "set changes the relay fields",
-			src:   setDERPCmd,
-			flags: map[string]string{"region-id": "950", "stun": "0.0.0.0:3479", "verify-clients": "false"},
+			name: "set changes the relay fields",
+			src:  setDERPCmd,
+			flags: map[string]string{
+				"region-id": "950", "stun": "0.0.0.0:3479", "verify-clients": "false", "stun-enabled": "false",
+			},
 			routes: map[string]apiHandler{
 				"GET /api/v1/derp": getCurrent,
 				"PUT /api/v1/derp": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
@@ -193,6 +197,8 @@ func TestDERPCommands(t *testing.T) {
 					assert.Equal(t, "0.0.0.0:3479", *body.Server.StunAddr)
 					require.NotNil(t, body.Server.VerifyClients)
 					assert.False(t, *body.Server.VerifyClients)
+					require.NotNil(t, body.Server.StunEnabled)
+					assert.False(t, *body.Server.StunEnabled)
 
 					writeJSON(t, w, overridden)
 				},

@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -47,7 +48,8 @@ type DERPSettings struct {
 }
 
 // DERPServerSettings configures the embedded relay. It is served on the
-// server_url, so that must be https, and STUN on its own UDP port.
+// server_url, so that must be https, and STUN on its own UDP port unless
+// STUN is off.
 type DERPServerSettings struct {
 	Enabled bool `json:"enabled"`
 	// RegionID is the region the relay is published as; it replaces a
@@ -57,12 +59,35 @@ type DERPServerSettings struct {
 	RegionName string               `json:"regionName"`
 	// VerifyClients admits only nodes of this tailnet.
 	VerifyClients bool `json:"verifyClients"`
+	// STUNEnabled answers STUN on STUNAddr and publishes the port in the
+	// map. Off, the region is published without STUN and STUNAddr is
+	// ignored: for a relay on the machines' own network, reached through
+	// the router, whose STUN replies would name the router instead of the
+	// public address and make every machine there report a hard NAT.
+	STUNEnabled bool `json:"stunEnabled"`
 	// STUNAddr is the UDP host:port STUN listens on.
 	STUNAddr string `json:"stunAddr"`
 	// IPv4 and IPv6 are the relay's public addresses, published so clients
 	// reach it while DNS is down; empty leaves them to DNS.
 	IPv4 string `json:"ipv4"`
 	IPv6 string `json:"ipv6"`
+}
+
+// UnmarshalJSON reads the settings with STUN on unless the JSON turns it
+// off, so a settings row stored before the switch existed keeps STUN.
+func (s *DERPServerSettings) UnmarshalJSON(data []byte) error {
+	type plain DERPServerSettings
+
+	out := plain{STUNEnabled: true}
+
+	err := json.Unmarshal(data, &out)
+	if err != nil {
+		return fmt.Errorf("decoding embedded relay settings: %w", err)
+	}
+
+	*s = DERPServerSettings(out)
+
+	return nil
 }
 
 // DERPCustomRegion is a region of relays the operator runs.
@@ -164,6 +189,7 @@ func (d *DERPConfig) Settings() DERPSettings {
 			RegionCode:    d.ServerRegionCode,
 			RegionName:    d.ServerRegionName,
 			VerifyClients: d.ServerVerifyClients,
+			STUNEnabled:   d.STUNEnabled,
 			STUNAddr:      d.STUNAddr,
 			IPv4:          d.IPv4,
 			IPv6:          d.IPv6,
@@ -298,15 +324,11 @@ func (s DERPServerSettings) validate() error {
 		return fmt.Errorf("%w: embedded relay", ErrDERPRegionCodeEmpty)
 	}
 
-	_, port, err := net.SplitHostPort(s.STUNAddr)
-	if err != nil {
-		return fmt.Errorf("%w: %q", ErrDERPSTUNAddrInvalid, s.STUNAddr)
-	}
-
-	// Port 0 lets the kernel pick, which tests rely on.
-	p, err := strconv.Atoi(port)
-	if err != nil || p < 0 || p > 65535 {
-		return fmt.Errorf("%w: %q", ErrDERPSTUNAddrInvalid, s.STUNAddr)
+	if s.STUNEnabled {
+		err := s.validateSTUNAddr()
+		if err != nil {
+			return err
+		}
 	}
 
 	if s.IPv4 != "" {
@@ -321,6 +343,21 @@ func (s DERPServerSettings) validate() error {
 		if err != nil || !addr.Is6() {
 			return fmt.Errorf("%w: %q", ErrDERPServerIPInvalid, s.IPv6)
 		}
+	}
+
+	return nil
+}
+
+func (s DERPServerSettings) validateSTUNAddr() error {
+	_, port, err := net.SplitHostPort(s.STUNAddr)
+	if err != nil {
+		return fmt.Errorf("%w: %q", ErrDERPSTUNAddrInvalid, s.STUNAddr)
+	}
+
+	// Port 0 lets the kernel pick, which tests rely on.
+	p, err := strconv.Atoi(port)
+	if err != nil || p < 0 || p > 65535 {
+		return fmt.Errorf("%w: %q", ErrDERPSTUNAddrInvalid, s.STUNAddr)
 	}
 
 	return nil
