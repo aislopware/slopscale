@@ -19,6 +19,7 @@ import { isActive, pagesOf, placeOf, visibleGroups } from "~/components/layout/n
 import { QuickSearch } from "~/components/layout/quick-search.tsx";
 import { ThemeToggle } from "~/components/layout/theme-toggle.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
+import { RoleBadge } from "~/components/users/role-badge.tsx";
 import { BreadcrumbProvider, useBreadcrumbLeaf } from "~/lib/breadcrumbs.tsx";
 import { pendingRouteCount } from "~/lib/node.ts";
 
@@ -345,9 +346,9 @@ function AccountMenu({ me }: { readonly me: Me }): ReactElement {
             <Avatar name={name} size="lg" />
             <span className="flex min-w-0 flex-col gap-0.5">
               <span className="truncate font-medium text-kumo-default">{name}</span>
-              <span className="truncate text-xs text-kumo-subtle">
-                {kindLabels[me.kind] ?? me.kind}
-                {role === null ? "" : ` · ${role}`}
+              <span className="flex min-w-0 items-center gap-1.5 text-xs text-kumo-subtle">
+                <span className="truncate">{kindLabels[me.kind] ?? me.kind}</span>
+                {role === null ? null : <RoleBadge role={me.role} size="sm" />}
               </span>
             </span>
           </DropdownMenu.Label>

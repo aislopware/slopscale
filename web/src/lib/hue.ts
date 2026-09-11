@@ -31,8 +31,17 @@ export function seededColours(
   seed: string,
   steps?: number,
 ): { readonly backgroundColor: string; readonly color: string } {
-  const hue = hueOf(seed, steps);
+  return hueColours(hueOf(seed, steps));
+}
 
+/**
+ * The same quiet tint for a hue chosen by hand, so a fixed vocabulary (the roles) matches the
+ * marks.
+ */
+export function hueColours(hue: number): {
+  readonly backgroundColor: string;
+  readonly color: string;
+} {
   return {
     backgroundColor: `light-dark(oklch(0.93 0.045 ${hue}), oklch(0.3 0.05 ${hue}))`,
     color: `light-dark(oklch(0.42 0.11 ${hue}), oklch(0.86 0.07 ${hue}))`,

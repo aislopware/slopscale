@@ -14,6 +14,7 @@ import { NeedsAttention } from "~/components/overview/needs-attention.tsx";
 import { QuickActions } from "~/components/overview/quick-actions.tsx";
 import { RecentActivity } from "~/components/overview/recent-activity.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
+import { RoleBadge } from "~/components/users/role-badge.tsx";
 
 const noNodes: readonly Node[] = [];
 const noUsers: readonly User[] = [];
@@ -35,9 +36,11 @@ function SignedIn({ me }: { readonly me: Me }): ReactElement {
   const role = roleLabel(me);
 
   return (
-    <span>
-      Signed in as <span className="font-medium text-kumo-default">{displayName(me)}</span>
-      {role === null ? null : ` · ${role}`}
+    <span className="inline-flex items-center gap-1.5">
+      <span>
+        Signed in as <span className="font-medium text-kumo-default">{displayName(me)}</span>
+      </span>
+      {role === null ? null : <RoleBadge role={me.role} size="sm" />}
     </span>
   );
 }

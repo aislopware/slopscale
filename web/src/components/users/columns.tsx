@@ -8,7 +8,7 @@ import { Avatar } from "~/components/ui/avatar.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { UserMenu } from "~/components/users/menu.tsx";
-import { roleName } from "~/components/users/roles.ts";
+import { RoleBadge } from "~/components/users/role-badge.tsx";
 import { userLabel } from "~/lib/node.ts";
 
 const helper = createAppColumnHelper<User>();
@@ -40,7 +40,7 @@ export const columns = helper.columns([
     id: "role",
     header: "Role",
     enableSorting: true,
-    cell: ({ row }) => <span>{roleName(row.original.role)}</span>,
+    cell: ({ row }) => <RoleBadge role={row.original.role} />,
     meta: { className: "whitespace-nowrap" },
   }),
   helper.accessor((user) => (user.approved ? 1 : 0), {

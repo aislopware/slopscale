@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 0.39.0 (unreleased)
+
+### Changes
+
+- A member sees their machines in the console. Signed in with the member role, the _Machines_ page lists the machines the user owns and the ones other users share with them, each machine's page opens with its addresses, connectivity, client health and routes, and the user can rename a machine of their own, expire its key or turn key expiry off, remove it and share it. Tags, routes, approval, suspension and preferences stay with the roles that hold the scopes, and any other machine is reported as not found. Before, the page was hidden and the API refused every node read to a member, so a member's console was empty
+- A user's role is a chip in the role's own tint, the same tint on every page: orange for the owner, purple for an admin, blue for a network admin, green for an IT admin, yellow for an auditor, and the plain recessed surface for a member. The users and invitations tables, the account menu, the overview's signed-in line and the session page show it, so a list of users says who holds a role before the words are read
+- A member reaches _Settings → Sessions_ to see and end their own console sign-ins, which the server already allowed, and the overview's first-machine guide tells a caller who cannot mint pre-auth keys to sign in on the machine instead
+- `GET /api/v1/node`, `GET /api/v1/node/{id}` and the machine's live reads (`/health`, `/tls-cert`, `/preferences`) answer any credential owned by a user with the nodes that user owns and the ones shared with them; `DELETE /api/v1/node/{id}`, `/expire` and `/rename` accept the owner of the node. `GET /api/v1/user` answers such a credential with the user directory, names and pictures only, so a member can share a machine with a colleague by name. A key minted with a scope list, or an OAuth token, is bounded by that list and gets none of this; `GET /api/v1/whoami` reports it as `scoped`. See [what a member gets](https://aislopware.github.io/slopscale/ref/roles#what-a-member-gets)
+
+### Fixes
+
+- A link to the server pasted in Slack unfurls with its card image. Slack asks `HEAD` for the image before it fetches it, and `/opengraph.png` answered 405, which left a broken picture under the card; the image, the favicon and the root page now answer `HEAD` as they answer `GET`
+
 ## 0.38.0 (2026-09-11)
 
 ### Changes

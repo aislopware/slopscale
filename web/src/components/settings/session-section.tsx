@@ -10,6 +10,7 @@ import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { ValueList } from "~/components/ui/value-list.tsx";
+import { RoleBadge } from "~/components/users/role-badge.tsx";
 
 const kindLabels: Record<string, string> = {
   api_key: "API key",
@@ -37,7 +38,7 @@ function consoleItems(me: Me): readonly Definition[] {
         role === null ? (
           <span className="text-kumo-subtle">Not bound to a user</span>
         ) : (
-          <span>{role}</span>
+          <RoleBadge role={me.role} />
         ),
     },
     { label: "Scopes", value: <ScopeList me={me} /> },
