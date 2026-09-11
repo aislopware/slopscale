@@ -114,23 +114,27 @@ function PortsCell({ service }: { readonly service: ServiceRow }): ReactElement 
   return <span className="font-mono text-[0.9em]">{service.ports.join(", ")}</span>;
 }
 
-/** Where the service stands and who serves it: the state, then the primary host or the count. */
+/**
+ * Where the service stands and who serves it: the state, then the primary host or the count. The
+ * "No host" badge is the whole story for a service nobody announces, so that row has no second
+ * line.
+ */
 function HostsCell({ service }: { readonly service: ServiceRow }): ReactElement {
   const { tone, label } = reachStates[service.reach];
 
   return (
-    <div className="flex min-w-0 flex-col gap-0.5">
+    <div className="flex min-w-0 flex-col items-start gap-0.5">
       <Badge tone={tone}>{label}</Badge>
-      <span className="truncate text-xs text-kumo-subtle">{hostSummary(service)}</span>
+      {service.hosts.length === 0 ? null : (
+        <span className="truncate text-xs whitespace-nowrap text-kumo-subtle">
+          {hostSummary(service)}
+        </span>
+      )}
     </div>
   );
 }
 
 function hostSummary(service: ServiceRow): string {
-  if (service.hosts.length === 0) {
-    return "No machine announces it";
-  }
-
   const count = service.hosts.length === 1 ? "1 host" : `${service.hosts.length} hosts`;
 
   return service.primaryHost === "" ? count : `${count} · ${service.primaryHost} serving`;

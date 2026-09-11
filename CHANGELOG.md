@@ -9,6 +9,7 @@
 - An app's domains in the Apps table, the learned routes on a connector's page, the split DNS domains, the search domains and a per-group DNS rule's domains are drawn as name tokens in the code face on the recessed surface, with a wildcard's `*.` stepped back, so a column of domains reads as a column of names
 - A machine's operating system shows as its logo (Apple, Windows, Linux, Android, a phone for iOS, a set for tvOS) before its name in the machines list, on its page's title line and under the client version in its Overview, with the full name and version one hover away. The v1 API's node carries the new `os` and `osVersion` fields the client reports
 - The browser tab is titled after the page (_Machines - Slopscale_, _backup-nas - Machines - Slopscale_) instead of _Slopscale_ everywhere, so tabs and history tell apart
+- Table cells that stacked a badge and a note no longer say the same thing twice or break mid-phrase: an expired machine reads _Key expired_ over _3 days ago_ on one line each, a service nobody announces is just _No host_, a pre-auth key's options and an API key's scopes stay on their lines, and an SSH session's target no longer wraps at the hyphen
 
 ## 0.36.0 (2026-09-11)
 

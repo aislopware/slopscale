@@ -34,7 +34,7 @@ export const apiKeyColumns = helper.columns([
     header: "Scopes",
     enableSorting: false,
     cell: ({ row }) => <ScopesCell scopes={row.original.scopes} />,
-    meta: { className: "hidden min-w-32 md:table-cell" },
+    meta: { className: "hidden min-w-40 whitespace-nowrap md:table-cell" },
   }),
   helper.accessor((apiKey) => apiKey.userId ?? "", {
     id: "user",

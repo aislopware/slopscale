@@ -287,11 +287,12 @@ function StatusCell({ node }: { readonly node: Node }): ReactElement {
   const soon = expiryWorthShowing(parseTime(node.expiry));
 
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="flex flex-col items-start gap-1 whitespace-nowrap">
       <StatusBadge status={status} />
+      {/* The badge already says the key expired; the line under it only says when. */}
       {soon ? (
         <span className="text-xs text-kumo-subtle">
-          {status === "expired" ? "Expired " : "Expires "}
+          {status === "expired" ? null : "Expires "}
           <RelativeTime value={node.expiry} />
         </span>
       ) : null}

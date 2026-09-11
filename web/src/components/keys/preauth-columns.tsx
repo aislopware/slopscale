@@ -60,7 +60,7 @@ export const preAuthKeyColumns = helper.columns([
     cell: ({ row, table }) => (
       <TypeCell authKey={row.original} groups={table.options.meta?.groups ?? []} />
     ),
-    meta: { className: "hidden min-w-36 sm:table-cell" },
+    meta: { className: "hidden min-w-44 sm:table-cell" },
   }),
   helper.accessor((authKey) => statusOrder[preAuthKeyStatus(authKey)], {
     id: "status",
@@ -119,7 +119,7 @@ function KeyCell({ authKey }: { readonly authKey: PreAuthKey }): ReactElement {
 
 function UserCell({ name }: { readonly name: string }): ReactElement {
   return (
-    <span className="flex max-w-64 min-w-0 items-center gap-2" title={name}>
+    <span className="flex max-w-48 min-w-0 items-center gap-2" title={name}>
       <Avatar name={name} size="sm" />
       <span className="truncate text-kumo-default">{name}</span>
     </span>
@@ -135,7 +135,15 @@ function TypeCell({
 }): ReactElement {
   return (
     <div className="flex min-w-0 flex-col items-start gap-1">
-      <span className="text-kumo-default">{traits(authKey).join(" · ")}</span>
+      {/* A line may break between two options, never inside one: "Needs approval" stays whole. */}
+      <span className="text-kumo-default">
+        {traits(authKey).map((word, index) => (
+          <span key={word} className="whitespace-nowrap">
+            {index === 0 ? "" : " · "}
+            {word}
+          </span>
+        ))}
+      </span>
       {authKey.aclTags.length === 0 ? null : <TagList tags={authKey.aclTags} size="sm" />}
       {authKey.groupIds.length === 0 ? null : (
         <Labelled label="Groups">

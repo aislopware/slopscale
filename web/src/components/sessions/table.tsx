@@ -62,7 +62,9 @@ function RecordingRow({
         <RelativeTime value={recording.startedAt} />
       </Table.Cell>
       <Table.Cell>{sessionSource(recording)}</Table.Cell>
-      <Table.Cell className="font-mono text-sm">{sessionTarget(recording)}</Table.Cell>
+      <Table.Cell className="font-mono text-sm whitespace-nowrap">
+        {sessionTarget(recording)}
+      </Table.Cell>
       <Table.Cell className="max-w-64 truncate font-mono text-sm text-kumo-subtle">
         {recording.command === "" ? "shell" : recording.command}
       </Table.Cell>
