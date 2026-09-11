@@ -1371,9 +1371,14 @@ func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	r.Get(strings.TrimSuffix(web.LegacyPrefix, "/"), web.LegacyHandler)
 	r.Get(web.LegacyPrefix+"*", web.LegacyHandler)
 
+	// Slack's link unfurler asks HEAD for the card image before it fetches
+	// it, and chi answers 405 to a method the route did not name.
 	r.Get("/favicon.ico", FaviconHandler)
+	r.Head("/favicon.ico", FaviconHandler)
 	r.Get(templates.OpenGraphPath, OpenGraphHandler)
+	r.Head(templates.OpenGraphPath, OpenGraphHandler)
 	r.Get("/", web.RootHandler)
+	r.Head("/", web.RootHandler)
 
 	return r
 }
