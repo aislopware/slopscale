@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 0.32.0 (202x-xx-xx)
+
+### Changes
+
+- Map requests that only bump LastSeen, endpoints or the DERP region no longer resend the whole node to every peer: each request is reduced to the narrowest change it justifies, a Hostinfo field no peer reads (shields-up, device model, client version) is stored without a broadcast, and a client reporting a new OS or version only recompiles the policy when a grant in use names a posture. Going offline sends peers the offline patch alone, health probes that change nothing no longer write, a user list that did not change no longer recompiles the policy, and an empty change is dropped before fan-out. Adds `slopscale_mapper_changes_dropped_total` and `slopscale_ha_health_updates_total` [juanfont/headscale#3417](https://github.com/juanfont/headscale/issues/3417)
+- Two copies of the same node loaded separately no longer count as a policy change because their user pointers differ, and enabling or approving exit routes now does, so `autogroup:internet` follows the approval
+- The noise transport serves HTTP/2 through the standard library, as the `golang.org/x/net/http2` server it used is deprecated; nothing changes on the wire
+- Fix a node being listed among its own peers in an incremental map update, which crashes the Tailscale Android app on the device list [juanfont/headscale#3459](https://github.com/juanfont/headscale/pull/3459)
+- The container documentation mounts `/tmp` as tmpfs alongside the socket directory, as the image expects
+- The console's sidebar lists _Keys_ under _Access_, next to the access controls and _My access_, instead of under _Administration_. A member with no admin role has API keys of their own, so the group that held them could not be called administration; _Administration_ now holds only the settings and the integrations, which only a role that may read them sees
+
 ## 0.31.0 (2026-09-11)
 
 ### Changes
