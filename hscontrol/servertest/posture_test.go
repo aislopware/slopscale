@@ -160,6 +160,20 @@ func TestPostureCollection(t *testing.T) {
 	})
 
 	t.Run("an expiring attribute disappears on its own", func(t *testing.T) {
+		// A grant has to read the attribute for its expiry to be a policy
+		// change; posture inputs of a policy that names no posture are
+		// stored without a recompute.
+		changed, err := srv.State().SetPolicy([]byte(`{
+			"postures": {"posture:oncall": ["custom:oncall == true"]},
+			"grants": [{"src": ["*"], "dst": ["*"], "ip": ["*"], "srcPosture": ["posture:oncall"]}]
+		}`))
+		require.NoError(t, err)
+		require.True(t, changed)
+
+		changes, err := srv.State().ReloadPolicy()
+		require.NoError(t, err)
+		srv.App.Change(changes...)
+
 		expiry := time.Now().Add(1500 * time.Millisecond).UTC().Format(time.RFC3339Nano)
 
 		status, body := apiCall(t, client, ownerKey, http.MethodPut,
@@ -177,7 +191,7 @@ func TestPostureCollection(t *testing.T) {
 
 		c, err := srv.State().ExpireNodeAttributes(time.Now())
 		require.NoError(t, err)
-		assert.False(t, c.IsEmpty(), "the sweep drops it and recomputes")
+		assert.False(t, c.IsEmpty(), "the sweep drops it and recomputes, since a grant reads it")
 
 		body = postureOf(t, mac.NodeIDString())
 		custom, _ := body["custom"].([]any)
