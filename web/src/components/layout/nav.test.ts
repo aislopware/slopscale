@@ -47,17 +47,12 @@ describe("a signed-in member", () => {
     approvedAt: null,
   };
 
-  it("gets their machines, their keys, their access and their sessions", () => {
+  it("gets their machines, their keys, their access and their sign-ins, and no Settings group", () => {
     const groups = visibleGroups({ ...member({}), user });
     const labels = groups.flatMap((group) => group.items.map((item) => item.label));
 
-    expect(labels).toStrictEqual(["Overview", "Machines", "Keys", "My access", "Settings"]);
-
-    const settings = groups
-      .flatMap((group) => group.items)
-      .find((item) => item.label === "Settings");
-
-    expect(settings?.children?.map((child) => child.label)).toStrictEqual(["Sessions"]);
+    expect(labels).toStrictEqual(["Overview", "Machines", "Keys", "My access", "Sign-ins"]);
+    expect(groups.map((group) => group.label)).toStrictEqual([undefined, "Tailnet", "Access"]);
   });
 
   it("gets none of it through a key minted with scopes", () => {

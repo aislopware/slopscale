@@ -8,10 +8,12 @@ import {
   HandWavingIcon,
   HardDrivesIcon,
   BroadcastIcon,
+  ComputerTowerIcon,
   KeyIcon,
   WebhooksLogoIcon,
   PathIcon,
   ShieldCheckIcon,
+  SignInIcon,
   SignpostIcon,
   SquaresFourIcon,
   TerminalWindowIcon,
@@ -55,9 +57,8 @@ export type NavPath =
   | "/integrations/webhooks"
   | "/integrations/log-streams"
   | "/integrations/posture"
-  | "/settings"
+  | "/sign-ins"
   | "/settings/tailnet"
-  | "/settings/sessions"
   | "/settings/server"
   | "/audit"
   | "/sessions";
@@ -105,11 +106,12 @@ export interface NavGroup {
 
 /**
  * The sidebar, grouped by what the operator is doing: the machines and people on the tailnet, who
- * may reach what and the keys that let a machine or a program in, how packets and names travel,
- * what happened, and the switches and outbound integrations that only an administrator sees. Keys
- * sit under Access rather than Administration because every member has API keys of their own. A
- * page with several parts of its own is a branch with a page per part, so every part has an address
- * and a place in the sidebar.
+ * may reach what and the credentials that let a machine, a program or a browser in, how packets and
+ * names travel, what happened, and the switches and outbound integrations that only an
+ * administrator sees. Keys and sign-ins sit under Access because every member has API keys and
+ * console sessions of their own, which keeps Settings a group only an administrator sees. A page
+ * with several parts of its own is a branch with a page per part, so every part has an address and
+ * a place in the sidebar.
  */
 export const navGroups: readonly NavGroup[] = [
   { items: [{ to: "/", label: "Overview", icon: SquaresFourIcon, exact: true }] },
@@ -154,6 +156,7 @@ export const navGroups: readonly NavGroup[] = [
         ],
       },
       { to: "/access", label: "My access", icon: HandWavingIcon },
+      { to: "/sign-ins", label: "Sign-ins", icon: SignInIcon, when: actsAsUser },
     ],
   },
   {
@@ -213,17 +216,19 @@ export const navGroups: readonly NavGroup[] = [
     ],
   },
   {
-    label: "Administration",
+    label: "Settings",
     items: [
       {
-        to: "/settings",
-        label: "Settings",
+        to: "/settings/tailnet",
+        label: "Tailnet",
         icon: GearSixIcon,
-        children: [
-          { to: "/settings/tailnet", label: "Tailnet", scope: "feature_settings:read" },
-          { to: "/settings/sessions", label: "Sessions", when: actsAsUser },
-          { to: "/settings/server", label: "Server", scope: "feature_settings:read" },
-        ],
+        scope: "feature_settings:read",
+      },
+      {
+        to: "/settings/server",
+        label: "Server",
+        icon: ComputerTowerIcon,
+        scope: "feature_settings:read",
       },
       {
         to: "/integrations",

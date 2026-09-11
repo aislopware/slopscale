@@ -1,16 +1,8 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
-import { can } from "~/auth/me.ts";
-
-/**
- * Settings is a branch of the sidebar; its address opens the first page under it the caller may
- * read. A member has only their sessions there.
- */
+/** Settings has no page of its own; its address opens the tailnet settings. */
 export const Route = createFileRoute("/_app/settings/")({
-  beforeLoad: ({ context }) => {
-    throw redirect({
-      to: can(context.me, "feature_settings:read") ? "/settings/tailnet" : "/settings/sessions",
-      replace: true,
-    });
+  beforeLoad: () => {
+    throw redirect({ to: "/settings/tailnet", replace: true });
   },
 });

@@ -4,6 +4,7 @@
 
 ### Changes
 
+- The console's sidebar has no _Administration_ group. Console sign-ins are a page of their own, _Sign-ins_ under _Access_ next to _Keys_ and _My access_, because every signed-in user has sign-ins of their own; the page that was _Settings → Sessions_ is now at `/admin/sign-ins`. What is left, _Tailnet_, _Server_ and _Integrations_, is the _Settings_ group, and only a role that may read them sees it, so a member's sidebar ends at _Access_
 - The macOS and iOS configuration profiles served at `/apple` carry the identifier `com.github.aislopware.slopscale` instead of `com.github.juanfont.slopscale`, and the Debian package names Cong Tran as maintainer. A profile installed from an earlier version keeps working; installing the new one adds a second profile, so remove the old one first
 
 ## 0.40.0 (2026-09-11)

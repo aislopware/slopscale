@@ -19,6 +19,7 @@ import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppNetworksRouteImport } from './routes/_app/networks'
 import { Route as AppRoutesRouteImport } from './routes/_app/routes'
 import { Route as AppSessionsRouteImport } from './routes/_app/sessions'
+import { Route as AppSignInsRouteImport } from './routes/_app/sign-ins'
 import { Route as AppUsersRouteImport } from './routes/_app/users'
 import { Route as AppDnsIndexRouteImport } from './routes/_app/dns/index'
 import { Route as AppDnsNameserversRouteImport } from './routes/_app/dns/nameservers'
@@ -51,7 +52,6 @@ import { Route as AppServicesIndexRouteImport } from './routes/_app/services/ind
 import { Route as AppServicesLabelRouteImport } from './routes/_app/services/$label'
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppSettingsServerRouteImport } from './routes/_app/settings/server'
-import { Route as AppSettingsSessionsRouteImport } from './routes/_app/settings/sessions'
 import { Route as AppSettingsTailnetRouteImport } from './routes/_app/settings/tailnet'
 import { Route as AppMachinesNodeIdSshRouteImport } from './routes/_app/machines/$nodeId_.ssh'
 
@@ -102,6 +102,11 @@ const AppRoutesRoute = AppRoutesRouteImport.update({
 const AppSessionsRoute = AppSessionsRouteImport.update({
   id: '/sessions',
   path: '/sessions',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSignInsRoute = AppSignInsRouteImport.update({
+  id: '/sign-ins',
+  path: '/sign-ins',
   getParentRoute: () => AppRoute,
 } as any)
 const AppUsersRoute = AppUsersRouteImport.update({
@@ -265,11 +270,6 @@ const AppSettingsServerRoute = AppSettingsServerRouteImport.update({
   path: '/settings/server',
   getParentRoute: () => AppRoute,
 } as any)
-const AppSettingsSessionsRoute = AppSettingsSessionsRouteImport.update({
-  id: '/settings/sessions',
-  path: '/settings/sessions',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppSettingsTailnetRoute = AppSettingsTailnetRouteImport.update({
   id: '/settings/tailnet',
   path: '/settings/tailnet',
@@ -291,6 +291,7 @@ export interface FileRoutesByFullPath {
   '/networks': typeof AppNetworksRoute
   '/routes': typeof AppRoutesRoute
   '/sessions': typeof AppSessionsRoute
+  '/sign-ins': typeof AppSignInsRoute
   '/users': typeof AppUsersRoute
   '/dns/nameservers': typeof AppDnsNameserversRoute
   '/dns/records': typeof AppDnsRecordsRoute
@@ -315,7 +316,6 @@ export interface FileRoutesByFullPath {
   '/relays/sources': typeof AppRelaysSourcesRoute
   '/services/$label': typeof AppServicesLabelRoute
   '/settings/server': typeof AppSettingsServerRoute
-  '/settings/sessions': typeof AppSettingsSessionsRoute
   '/settings/tailnet': typeof AppSettingsTailnetRoute
   '/dns/': typeof AppDnsIndexRoute
   '/integrations/': typeof AppIntegrationsIndexRoute
@@ -336,6 +336,7 @@ export interface FileRoutesByTo {
   '/networks': typeof AppNetworksRoute
   '/routes': typeof AppRoutesRoute
   '/sessions': typeof AppSessionsRoute
+  '/sign-ins': typeof AppSignInsRoute
   '/users': typeof AppUsersRoute
   '/': typeof AppIndexRoute
   '/dns/nameservers': typeof AppDnsNameserversRoute
@@ -361,7 +362,6 @@ export interface FileRoutesByTo {
   '/relays/sources': typeof AppRelaysSourcesRoute
   '/services/$label': typeof AppServicesLabelRoute
   '/settings/server': typeof AppSettingsServerRoute
-  '/settings/sessions': typeof AppSettingsSessionsRoute
   '/settings/tailnet': typeof AppSettingsTailnetRoute
   '/dns': typeof AppDnsIndexRoute
   '/integrations': typeof AppIntegrationsIndexRoute
@@ -384,6 +384,7 @@ export interface FileRoutesById {
   '/_app/networks': typeof AppNetworksRoute
   '/_app/routes': typeof AppRoutesRoute
   '/_app/sessions': typeof AppSessionsRoute
+  '/_app/sign-ins': typeof AppSignInsRoute
   '/_app/users': typeof AppUsersRoute
   '/_app/': typeof AppIndexRoute
   '/_app/dns/nameservers': typeof AppDnsNameserversRoute
@@ -409,7 +410,6 @@ export interface FileRoutesById {
   '/_app/relays/sources': typeof AppRelaysSourcesRoute
   '/_app/services/$label': typeof AppServicesLabelRoute
   '/_app/settings/server': typeof AppSettingsServerRoute
-  '/_app/settings/sessions': typeof AppSettingsSessionsRoute
   '/_app/settings/tailnet': typeof AppSettingsTailnetRoute
   '/_app/dns/': typeof AppDnsIndexRoute
   '/_app/integrations/': typeof AppIntegrationsIndexRoute
@@ -433,6 +433,7 @@ export interface FileRouteTypes {
     | '/networks'
     | '/routes'
     | '/sessions'
+    | '/sign-ins'
     | '/users'
     | '/dns/nameservers'
     | '/dns/records'
@@ -457,7 +458,6 @@ export interface FileRouteTypes {
     | '/relays/sources'
     | '/services/$label'
     | '/settings/server'
-    | '/settings/sessions'
     | '/settings/tailnet'
     | '/dns/'
     | '/integrations/'
@@ -478,6 +478,7 @@ export interface FileRouteTypes {
     | '/networks'
     | '/routes'
     | '/sessions'
+    | '/sign-ins'
     | '/users'
     | '/'
     | '/dns/nameservers'
@@ -503,7 +504,6 @@ export interface FileRouteTypes {
     | '/relays/sources'
     | '/services/$label'
     | '/settings/server'
-    | '/settings/sessions'
     | '/settings/tailnet'
     | '/dns'
     | '/integrations'
@@ -525,6 +525,7 @@ export interface FileRouteTypes {
     | '/_app/networks'
     | '/_app/routes'
     | '/_app/sessions'
+    | '/_app/sign-ins'
     | '/_app/users'
     | '/_app/'
     | '/_app/dns/nameservers'
@@ -550,7 +551,6 @@ export interface FileRouteTypes {
     | '/_app/relays/sources'
     | '/_app/services/$label'
     | '/_app/settings/server'
-    | '/_app/settings/sessions'
     | '/_app/settings/tailnet'
     | '/_app/dns/'
     | '/_app/integrations/'
@@ -638,6 +638,13 @@ declare module '@tanstack/react-router' {
       path: '/sessions'
       fullPath: '/sessions'
       preLoaderRoute: typeof AppSessionsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/sign-ins': {
+      id: '/_app/sign-ins'
+      path: '/sign-ins'
+      fullPath: '/sign-ins'
+      preLoaderRoute: typeof AppSignInsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/users': {
@@ -864,13 +871,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsServerRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/settings/sessions': {
-      id: '/_app/settings/sessions'
-      path: '/settings/sessions'
-      fullPath: '/settings/sessions'
-      preLoaderRoute: typeof AppSettingsSessionsRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/settings/tailnet': {
       id: '/_app/settings/tailnet'
       path: '/settings/tailnet'
@@ -896,6 +896,7 @@ interface AppRouteChildren {
   AppNetworksRoute: typeof AppNetworksRoute
   AppRoutesRoute: typeof AppRoutesRoute
   AppSessionsRoute: typeof AppSessionsRoute
+  AppSignInsRoute: typeof AppSignInsRoute
   AppUsersRoute: typeof AppUsersRoute
   AppIndexRoute: typeof AppIndexRoute
   AppDnsNameserversRoute: typeof AppDnsNameserversRoute
@@ -921,7 +922,6 @@ interface AppRouteChildren {
   AppRelaysSourcesRoute: typeof AppRelaysSourcesRoute
   AppServicesLabelRoute: typeof AppServicesLabelRoute
   AppSettingsServerRoute: typeof AppSettingsServerRoute
-  AppSettingsSessionsRoute: typeof AppSettingsSessionsRoute
   AppSettingsTailnetRoute: typeof AppSettingsTailnetRoute
   AppDnsIndexRoute: typeof AppDnsIndexRoute
   AppIntegrationsIndexRoute: typeof AppIntegrationsIndexRoute
@@ -942,6 +942,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppNetworksRoute: AppNetworksRoute,
   AppRoutesRoute: AppRoutesRoute,
   AppSessionsRoute: AppSessionsRoute,
+  AppSignInsRoute: AppSignInsRoute,
   AppUsersRoute: AppUsersRoute,
   AppIndexRoute: AppIndexRoute,
   AppDnsNameserversRoute: AppDnsNameserversRoute,
@@ -967,7 +968,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppRelaysSourcesRoute: AppRelaysSourcesRoute,
   AppServicesLabelRoute: AppServicesLabelRoute,
   AppSettingsServerRoute: AppSettingsServerRoute,
-  AppSettingsSessionsRoute: AppSettingsSessionsRoute,
   AppSettingsTailnetRoute: AppSettingsTailnetRoute,
   AppDnsIndexRoute: AppDnsIndexRoute,
   AppIntegrationsIndexRoute: AppIntegrationsIndexRoute,

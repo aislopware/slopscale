@@ -5,17 +5,17 @@ import { SessionSection } from "~/components/settings/session-section.tsx";
 import { ConsoleSessionsSection } from "~/components/settings/sessions-section.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
-export const Route = createFileRoute("/_app/settings/sessions")({
-  component: SessionsSettingsPage,
+export const Route = createFileRoute("/_app/sign-ins")({
+  component: SignInsPage,
 });
 
-function SessionsSettingsPage(): ReactElement {
+function SignInsPage(): ReactElement {
   const { me } = Route.useRouteContext();
 
   return (
     <>
       <PageHeader
-        title="Sessions"
+        title="Sign-ins"
         description="The credential this browser holds, and every console session on the server."
       />
       <div className="flex flex-col gap-6">

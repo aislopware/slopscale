@@ -90,7 +90,7 @@ A sign-in opens a session that lasts seven days. There is no sliding renewal,
 so a stolen cookie is bounded the same way as a fresh one, and _Sign out_ in
 the account menu ends the session it was made from.
 
-Every session is listed under _Settings → Sessions_ with the user it belongs to,
+Every session is listed under _Sign-ins_ with the user it belongs to,
 when it was opened, when it last made a request, and the address and browser it
 came from. An administrator sees every session and can end any of them; a
 member sees and ends only their own. Ending a session takes effect on that
@@ -190,14 +190,14 @@ the user it created.
 
 The sidebar starts with the overview and is then grouped by what you are
 doing. *Tailnet* holds machines and users. *Access* holds the access controls,
-the keys and, for everyone, the page to ask for temporary access; a member
-sees their own machines and their own API keys. *Connectivity* holds networks, routes,
-services, apps, DNS and relays. *Logs* holds the audit log and the
-[SSH session recordings](/ref/ssh-recording). *Administration* holds the
-settings and the integrations, and only a role that may read them sees it,
-except _Settings → Sessions_, which every signed-in user has for their own sign-ins. An item with several parts, such as _Access controls_, _DNS_,
-_Relays_, _Settings_, _Keys_ or _Integrations_, opens into a page per part,
-each with its own address.
+the keys, the page to ask for temporary access and the console sign-ins; a
+member sees their own machines, their own API keys and their own sign-ins.
+*Connectivity* holds networks, routes, services, apps, DNS and relays. *Logs*
+holds the audit log and the [SSH session recordings](/ref/ssh-recording).
+*Settings* holds the tailnet settings, the server page and the integrations,
+and only a role that may read them sees it. An item with several parts, such
+as _Access controls_, _DNS_, _Relays_, _Keys_ or _Integrations_, opens into a
+page per part, each with its own address.
 A count next to _Machines_, _Users_, _Routes_ and _Requests_ says how many
 are waiting for approval. The arrow in the sidebar footer
 collapses it to an icon rail. *Quick search*, or ++cmd+k++ / ++ctrl+k++,
@@ -284,14 +284,14 @@ out*.
 - **Audit log**: who changed what, newest first, with filters by action, user
   and time, and _Export_ as CSV or JSON with the same filters; see
   [Audit log](/ref/audit).
-- **Settings**: a page each for the tailnet switches
+- **Sign-ins**: the console [sessions](#sessions) with _End_ and _Sign out
+  everywhere_ next to the signed-in credential's role and scopes.
+- **Settings**: a _Tailnet_ page for the tailnet switches
   ([device and user approval](/ref/approval), device trust, the key expiry cap,
   [SSH recording](/ref/ssh-recording), and the state of [tailnet lock](/ref/tailnet-lock) with
-  _Switch off_), the console [sessions](#sessions) with _End_ and _Sign out
-  everywhere_ next to the signed-in credential's role and scopes, and the
-  server's build, addresses, DERP regions and config file values with a
-  _Maintenance_ section holding the IP address backfill
-  (`slopscale nodes backfillips`).
+  _Switch off_), and a _Server_ page for the server's build, addresses, DERP
+  regions and config file values with a _Maintenance_ section holding the IP
+  address backfill (`slopscale nodes backfillips`).
 
 ## SSH from the console
 
