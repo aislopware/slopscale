@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hueOf, seededColours } from "~/lib/hue.ts";
+import { hueOf, seededColours, seededGradient } from "~/lib/hue.ts";
 
 describe(hueOf, () => {
   // The colour is a property of the seed, not of the render, so a name is the same colour in
@@ -34,5 +34,17 @@ describe(seededColours, () => {
 
     expect(backgroundColor).toMatch(/^light-dark\(oklch\(.+\), oklch\(.+\)\)$/u);
     expect(color).toContain(`${hueOf("tag:web", 12)}`);
+  });
+});
+
+describe(seededGradient, () => {
+  it("blends two hues of the seed and inks the text from the first", () => {
+    const { backgroundImage, color } = seededGradient("Alice Nguyen");
+
+    expect(backgroundImage).toMatch(
+      /^linear-gradient\(\d+deg, light-dark\(.+\), light-dark\(.+\)\)$/u,
+    );
+    expect(color).toContain(`${hueOf("Alice Nguyen")}`);
+    expect(seededGradient("Bob Tran").backgroundImage).not.toBe(backgroundImage);
   });
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
 
 import { Avatar, initials } from "~/components/ui/avatar.tsx";
-import { seededColours } from "~/lib/hue.ts";
+import { seededGradient } from "~/lib/hue.ts";
 
 describe(initials, () => {
   it("takes the first letter of the first two words, or two of the only one", () => {
@@ -23,8 +23,8 @@ describe(Avatar, () => {
     const alice = view.getByText("AN").element();
     const bob = view.getByText("BT").element();
 
-    expect(getComputedStyle(alice).backgroundColor).not.toBe(getComputedStyle(bob).backgroundColor);
-    expect(getComputedStyle(alice).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
-    expect(alice.getAttribute("style")).toContain(seededColours("Alice Nguyen").backgroundColor);
+    expect(getComputedStyle(alice).backgroundImage).not.toBe(getComputedStyle(bob).backgroundImage);
+    expect(getComputedStyle(alice).backgroundImage).toContain("linear-gradient");
+    expect(alice.getAttribute("style")).toContain(seededGradient("Alice Nguyen").backgroundImage);
   });
 });

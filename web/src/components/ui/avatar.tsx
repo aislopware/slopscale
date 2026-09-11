@@ -2,7 +2,7 @@ import { cn } from "@cloudflare/kumo/utils";
 import type { Icon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
-import { seededColours } from "~/lib/hue.ts";
+import { seededGradient } from "~/lib/hue.ts";
 
 /** Initials from a name: "Alice Nguyen" → "AN", "jane.doe" → "JA". */
 export function initials(name: string): string {
@@ -27,10 +27,10 @@ const iconSizes: Record<keyof typeof sizes, number> = { sm: 12, base: 14, lg: 16
 /**
  * Identity mark: a squircle with a hairline ring so it sits on the surface instead of floating.
  * Sized to the row it lives in, never to touch-target minimums. A person is their initials on a
- * tint seeded by their name, so the same person is the same colour in every list and two people
- * with the same initials still tell apart; something that is not a person, such as a key or the
- * server itself, is an icon on the neutral mark, so a column of actors still lines up while the
- * kind is told at a glance.
+ * blend of two hues seeded by their name, so the same person is the same colour in every list and
+ * two people with the same initials still tell apart; something that is not a person, such as a key
+ * or the server itself, is an icon on the neutral mark, so a column of actors still lines up while
+ * the kind is told at a glance.
  */
 export function Avatar({
   name,
@@ -53,7 +53,7 @@ export function Avatar({
         sizes[size],
         className,
       )}
-      style={Mark === undefined ? seededColours(name) : undefined}
+      style={Mark === undefined ? seededGradient(name) : undefined}
     >
       {Mark === undefined ? initials(name) : <Mark size={iconSizes[size]} weight="bold" />}
     </span>

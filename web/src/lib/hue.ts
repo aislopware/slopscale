@@ -47,3 +47,42 @@ export function hueColours(hue: number): {
     color: `light-dark(oklch(0.42 0.11 ${hue}), oklch(0.86 0.07 ${hue}))`,
   };
 }
+
+/** The least and the most a companion hue sits from the first, in degrees. */
+const spreadMin = 40;
+const spreadRange = 60;
+/** Where the gradient's angle starts and how far it ranges, in degrees. */
+const angleMin = 110;
+const angleRange = 140;
+/** The hash bits the spread and the angle are read from, so neither repeats the hue's. */
+const spreadBits = 4096;
+const angleBits = 65_536;
+
+/**
+ * A second hue for the same seed, 40° to 100° round the circle from the first, so the pair is
+ * analogous: close enough to blend into one colour and far enough to move across the mark.
+ */
+function companionHue(seed: string): number {
+  const spread = spreadMin + (Math.floor(hashOf(seed) / spreadBits) % spreadRange);
+
+  return (hueOf(seed) + spread) % hueSteps;
+}
+
+/**
+ * Two of the seed's hues blended across a mark at an angle the seed picks, so every person's avatar
+ * is its own colour field instead of one of twelve flat tints, while the lightness stays the quiet
+ * band of the tags and the ink keeps the same contrast on both themes.
+ */
+export function seededGradient(seed: string): {
+  readonly backgroundImage: string;
+  readonly color: string;
+} {
+  const first = hueOf(seed);
+  const second = companionHue(seed);
+  const angle = angleMin + (Math.floor(hashOf(seed) / angleBits) % angleRange);
+
+  return {
+    backgroundImage: `linear-gradient(${angle}deg, light-dark(oklch(0.9 0.07 ${first}), oklch(0.36 0.08 ${first})), light-dark(oklch(0.82 0.1 ${second}), oklch(0.28 0.08 ${second})))`,
+    color: `light-dark(oklch(0.34 0.11 ${first}), oklch(0.9 0.06 ${first}))`,
+  };
+}
