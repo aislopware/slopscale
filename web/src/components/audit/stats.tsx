@@ -1,10 +1,14 @@
+import type { TimeseriesData } from "@cloudflare/kumo/components/chart";
+import { ChartPalette, TimeseriesChart } from "@cloudflare/kumo/components/chart";
 import { cn } from "@cloudflare/kumo/utils";
 import type { ReactElement } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
 import { clientError } from "~/components/audit/cells.tsx";
 import { Frame, framePanelClass } from "~/components/ui/frame.tsx";
-import { formatAbsolute, minuteSeconds, parseTime } from "~/lib/time.ts";
+import { echarts } from "~/lib/echarts.ts";
+import { useDarkMode } from "~/lib/theme.ts";
+import { daySeconds, formatAbsolute, minuteSeconds, parseTime } from "~/lib/time.ts";
 
 /** One actor: the user behind the call, or the credential kind when no user is bound. */
 function actorKey(event: AuditEvent): string {
@@ -44,7 +48,6 @@ export const bucketCount = 24;
 const millisecond = 1000;
 /** The narrowest window a bar can stand for, so a burst within one minute still spreads out. */
 const minSpanMs = bucketCount * minuteSeconds * millisecond;
-const percent = 100;
 
 export interface Bucket {
   readonly start: Date;
@@ -92,17 +95,18 @@ export function bucketEvents(events: readonly AuditEvent[], now = new Date()): B
   return counts;
 }
 
-function barTitle(bucket: Bucket): string {
-  const failed = bucket.failed === 0 ? "" : `, ${bucket.failed} failed`;
-
-  return `${formatAbsolute(bucket.start)}: ${bucket.total} ${bucket.total === 1 ? "event" : "events"}${failed}`;
-}
+const chartHeight = 140;
+const dayMs = daySeconds * millisecond;
+const timeOfDay = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+const dayOfMonth = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 
 /**
- * Event volume over the loaded window as a strip of bars, the failed share of each in the danger
- * colour: where the activity was, and whether the failures came in a burst or trickled through.
+ * Event volume over the loaded window, one stacked bar per slice with the failed share in the
+ * attention colour: where the activity was, and whether the failures came in a burst or trickled
+ * through. Kumo's chart draws the axes and tooltip; the palette follows the resolved theme.
  */
 function Activity({ events }: { readonly events: readonly AuditEvent[] }): ReactElement | null {
+  const dark = useDarkMode();
   const buckets = bucketEvents(events);
   const tallest = Math.max(...buckets.map((bucket) => bucket.total));
 
@@ -110,36 +114,36 @@ function Activity({ events }: { readonly events: readonly AuditEvent[] }): React
     return null;
   }
 
-  const [first] = buckets;
+  const from = buckets[0]?.start ?? new Date();
+  const last = buckets.at(-1)?.start ?? from;
+  const withinDay = last.getTime() - from.getTime() < dayMs;
+  const series: TimeseriesData[] = [
+    {
+      name: "Succeeded",
+      color: ChartPalette.categorical(0, dark),
+      data: buckets.map((bucket) => [bucket.start.getTime(), bucket.total - bucket.failed]),
+    },
+    {
+      name: "Failed",
+      color: ChartPalette.semantic("Attention", dark),
+      data: buckets.map((bucket) => [bucket.start.getTime(), bucket.failed]),
+    },
+  ];
 
   return (
     <div className={cn(framePanelClass, "flex flex-col gap-1 px-5 py-4 sm:col-span-3")}>
       <span className="text-sm text-kumo-subtle">Activity</span>
-      <figure
-        aria-label={`Events over time, ${bucketCount} bars from ${formatAbsolute(first?.start ?? new Date())} to now`}
-        className="flex h-12 items-end gap-0.5 border-b border-kumo-line"
-      >
-        {buckets.map((bucket) => (
-          <span
-            key={bucket.start.getTime()}
-            title={barTitle(bucket)}
-            className="flex h-full flex-1 flex-col justify-end overflow-hidden rounded-t-xs"
-          >
-            <span
-              className="bg-kumo-danger"
-              style={{ height: `${(bucket.failed / tallest) * percent}%` }}
-            />
-            <span
-              className="bg-kumo-contrast"
-              style={{ height: `${((bucket.total - bucket.failed) / tallest) * percent}%` }}
-            />
-          </span>
-        ))}
-      </figure>
-      <span className="flex justify-between text-xs text-kumo-subtle">
-        <span>{formatAbsolute(first?.start ?? new Date())}</span>
-        <span>Now</span>
-      </span>
+      <TimeseriesChart
+        echarts={echarts}
+        type="bar"
+        data={series}
+        height={chartHeight}
+        isDarkMode={dark}
+        yAxisTickCount={3}
+        xAxisTickFormat={(value) => (withinDay ? timeOfDay : dayOfMonth).format(new Date(value))}
+        tooltipValueFormat={(value) => `${value} ${value === 1 ? "event" : "events"}`}
+        ariaDescription={`Events over time, ${bucketCount} bars from ${formatAbsolute(from)} to now`}
+      />
     </div>
   );
 }

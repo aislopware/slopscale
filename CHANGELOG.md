@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.35.0 (unreleased)
+
+### Changes
+
+- The audit log's _Activity_ strip is a Kumo bar chart: succeeded and failed events stacked per slice in the chart palette, with a value axis, time ticks along the bottom and a tooltip naming the slice and both counts, in place of the black bars with a red cap that had no scale and no hover
+
 ## 0.34.0 (2026-09-11)
 
 ### Changes

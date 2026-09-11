@@ -46,8 +46,21 @@ function serverTheme(): Theme {
   return "system";
 }
 
+function readDark(): boolean {
+  return document.documentElement.dataset["mode"] === "dark";
+}
+
+function serverDark(): boolean {
+  return false;
+}
+
 export const theme = { get: read, set: setTheme, subscribe };
 
 export function useTheme(): Theme {
   return useSyncExternalStore(subscribe, read, serverTheme);
+}
+
+/** The mode in effect once "system" is resolved, for code that cannot follow the CSS tokens. */
+export function useDarkMode(): boolean {
+  return useSyncExternalStore(subscribe, readDark, serverDark);
 }
