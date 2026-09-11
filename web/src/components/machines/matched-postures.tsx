@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
@@ -8,6 +7,7 @@ import type { Node } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { SectionRow } from "~/components/ui/section.tsx";
+import { ValueList } from "~/components/ui/value-list.tsx";
 
 /** The postures the machine satisfies right now, so an operator can see why a rule admits it. */
 export function MatchedPostures({
@@ -60,13 +60,7 @@ export function MatchedPostures({
       {postures.length === 0 ? (
         <p className="text-sm text-kumo-subtle">No posture matches this machine.</p>
       ) : (
-        <div className="flex flex-wrap gap-1">
-          {postures.map((posture) => (
-            <Badge key={posture.id} variant="secondary" className="max-w-64">
-              <span className="truncate">{posture.name}</span>
-            </Badge>
-          ))}
-        </div>
+        <ValueList items={postures.map((posture) => posture.name)} />
       )}
     </SectionRow>
   );

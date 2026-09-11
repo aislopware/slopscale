@@ -31,11 +31,11 @@ export function parsePort(entry: string): PortSpec {
 }
 
 /**
- * The chips an edge's ports become: one per protocol, in the order the policy listed them, with
+ * The lines an edge's ports become: one per protocol, in the order the policy listed them, with
  * that protocol's ports gathered behind it. A protocol whose ports include `*` is open on all of
  * them, so the rest of its list says nothing and is dropped.
  */
-export function portChips(ports: readonly string[]): string[] {
+export function portLines(ports: readonly string[]): string[] {
   const byProtocol = new Map<string, string[]>();
 
   for (const entry of ports) {
@@ -49,10 +49,10 @@ export function portChips(ports: readonly string[]): string[] {
     }
   }
 
-  return [...byProtocol].map(([protocol, ranges]) => chipText(protocol, ranges));
+  return [...byProtocol].map(([protocol, ranges]) => lineText(protocol, ranges));
 }
 
-function chipText(protocol: string, ranges: readonly string[]): string {
+function lineText(protocol: string, ranges: readonly string[]): string {
   const every = ranges.includes(everything);
 
   // Bare ports under every protocol; "*" alone means everything, which reads as nothing at all.
@@ -69,9 +69,9 @@ function chipText(protocol: string, ranges: readonly string[]): string {
 
 /** The ports of an edge on one line, for a hover or a screen reader. */
 export function summarisePorts(ports: readonly string[]): string {
-  const chips = portChips(ports);
+  const lines = portLines(ports);
 
-  return chips.length === 0 ? "No ports" : chips.join(" · ");
+  return lines.length === 0 ? "No ports" : lines.join(" · ");
 }
 
 /** The logins an edge's SSH rules open, in words; empty when SSH is closed. */

@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Collapsible } from "@cloudflare/kumo/components/collapsible";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
@@ -16,6 +15,7 @@ import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { Status } from "~/components/ui/status.tsx";
+import { ValueList } from "~/components/ui/value-list.tsx";
 import { isTagged, nodeName, userLabel } from "~/lib/node.ts";
 import { formatAbsolute, formatRelative, parseTime } from "~/lib/time.ts";
 
@@ -233,15 +233,7 @@ export function AddressesSection({ node }: { readonly node: Node }): ReactElemen
 
 function Owner({ node }: { readonly node: Node }): ReactElement {
   if (isTagged(node)) {
-    return (
-      <span className="flex flex-wrap justify-end gap-1">
-        {node.tags.map((tag) => (
-          <Badge key={tag} variant="secondary">
-            <span className="font-mono">{tag}</span>
-          </Badge>
-        ))}
-      </span>
-    );
+    return <ValueList items={node.tags} mono className="items-end" />;
   }
 
   return <span>{userLabel(node.user)}</span>;

@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 
 import type { Invite, User } from "~/api/queries.ts";
-import { GroupChips } from "~/components/access/group-chips.tsx";
+import { GroupNames } from "~/components/access/group-names.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
@@ -63,7 +63,7 @@ export const inviteColumns = helper.columns([
       const groups = table.options.meta?.groups;
 
       return groups === undefined ? null : (
-        <GroupChips ids={row.original.groupIds} groups={groups} />
+        <GroupNames ids={row.original.groupIds} groups={groups} max={2} />
       );
     },
     meta: { className: "hidden lg:table-cell" },

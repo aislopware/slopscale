@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { cn } from "@cloudflare/kumo/utils";
@@ -10,6 +9,7 @@ import { Avatar } from "~/components/ui/avatar.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { Status } from "~/components/ui/status.tsx";
+import { ValueList } from "~/components/ui/value-list.tsx";
 import { formatAbsolute, parseTime } from "~/lib/time.ts";
 
 /** How the API names each kind of actor, in the console's words. */
@@ -194,16 +194,16 @@ function rawText(value: unknown): string {
 }
 
 /**
- * The first couple of detail fields as chips. The rest are counted in a "+N" chip that names them
- * on hover; the row itself opens on click, so every field stays one click away and the column keeps
- * its width.
+ * The first couple of detail fields as key=value lines. The rest are counted in a "+N" button that
+ * names them on hover; the row itself opens on click, so every field stays one click away and the
+ * column keeps its width.
  */
 export function DetailCell({
   event,
   onOpen,
 }: {
   readonly event: AuditEvent;
-  /** Opens the row: the "+N" chip is a button of its own, so the row's click does not reach it. */
+  /** Opens the row: the "+N" button is its own, so the row's click does not reach it. */
   readonly onOpen: () => void;
 }): ReactNode {
   const fields = Object.entries(event.detail);
@@ -216,16 +216,8 @@ export function DetailCell({
   const hidden = fields.slice(maxDetailFields).map(([key]) => key);
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1">
-      {shown.map(([key, value]) => (
-        <Badge
-          key={key}
-          variant="secondary"
-          className="max-w-full shrink-0 font-mono text-[0.85em] font-normal"
-        >
-          <span className="min-w-0 truncate">{`${key}=${detailText(value)}`}</span>
-        </Badge>
-      ))}
+    <div className="flex min-w-0 items-start gap-2">
+      <ValueList items={shown.map(([key, value]) => `${key}=${detailText(value)}`)} mono truncate />
       {hidden.length === 0 ? null : (
         <Tooltip
           content={hidden.join(", ")}

@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -17,6 +16,7 @@ import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { toast } from "~/components/ui/toast.ts";
+import { ValueList } from "~/components/ui/value-list.tsx";
 import { userLabel } from "~/lib/node.ts";
 import { parseTime } from "~/lib/time.ts";
 
@@ -30,7 +30,7 @@ export const oauthClientColumns = helper.columns([
       header: "Client",
       enableSorting: true,
       cell: ({ row }) => <ClientCell client={row.original} />,
-      meta: { className: "min-w-56" },
+      meta: { className: "min-w-56 align-top" },
     },
   ),
   helper.accessor((client) => (client.keyType === "federated" ? "Federated identity" : "Client"), {
@@ -38,28 +38,23 @@ export const oauthClientColumns = helper.columns([
     header: "Kind",
     enableSorting: true,
     cell: ({ getValue }) => <span className="text-kumo-default">{getValue()}</span>,
-    meta: { className: "hidden min-w-32 whitespace-nowrap sm:table-cell" },
+    meta: { className: "hidden min-w-32 align-top whitespace-nowrap sm:table-cell" },
   }),
   // Scopes are the column that gives way first: they wrap onto as many lines as they need, so the
-  // tags beside them keep the width one pill asks for.
+  // tags beside them keep the width one of them asks for.
   helper.accessor((client) => client.scopes.join(" "), {
     id: "scopes",
     header: "Scopes",
     enableSorting: false,
-    cell: ({ row }) => <Chips values={row.original.scopes} />,
-    meta: { className: "min-w-32" },
+    cell: ({ row }) => <ValueList items={row.original.scopes} label={scopeLabel} />,
+    meta: { className: "min-w-32 align-top" },
   }),
   helper.accessor((client) => client.tags.join(" "), {
     id: "tags",
     header: "Tags",
     enableSorting: false,
-    cell: ({ row }) =>
-      row.original.tags.length === 0 ? (
-        <span className="text-kumo-subtle">None</span>
-      ) : (
-        <Chips values={row.original.tags} mono />
-      ),
-    meta: { className: "hidden min-w-28 md:table-cell" },
+    cell: ({ row }) => <ValueList items={row.original.tags} mono />,
+    meta: { className: "hidden min-w-28 align-top md:table-cell" },
   }),
   helper.accessor((client) => client.userId ?? "", {
     id: "user",
@@ -69,7 +64,7 @@ export const oauthClientColumns = helper.columns([
     cell: ({ row, table }) => (
       <CreatorCell userId={row.original.userId} users={table.options.meta?.users ?? emptyUsers} />
     ),
-    meta: { className: "hidden min-w-28 whitespace-nowrap 2xl:table-cell" },
+    meta: { className: "hidden min-w-28 align-top whitespace-nowrap 2xl:table-cell" },
   }),
   helper.accessor((client) => parseTime(client.createdAt)?.getTime() ?? 0, {
     id: "created",
@@ -82,7 +77,7 @@ export const oauthClientColumns = helper.columns([
         <RelativeTime value={row.original.createdAt} />
       </span>
     ),
-    meta: { className: "hidden whitespace-nowrap 2xl:table-cell" },
+    meta: { className: "hidden align-top whitespace-nowrap 2xl:table-cell" },
   }),
   helper.display({
     id: "actions",
@@ -162,31 +157,6 @@ function ClientCell({ client }: { readonly client: OAuthClient }): ReactElement 
       ) : null}
       <OAuthClientDetailsDialog client={client} open={showing} onOpenChange={setShowing} />
     </div>
-  );
-}
-
-/** Scopes by their console names; tags as the policy spells them. */
-function Chips({
-  values,
-  mono = false,
-}: {
-  readonly values: readonly string[];
-  readonly mono?: boolean;
-}): ReactElement {
-  return (
-    <span className="flex flex-wrap gap-1">
-      {values.map((value) =>
-        mono ? (
-          <Badge key={value} variant="outline" className="font-mono">
-            {value}
-          </Badge>
-        ) : (
-          <Badge key={value} variant="secondary">
-            {scopeLabel(value)}
-          </Badge>
-        ),
-      )}
-    </span>
   );
 }
 

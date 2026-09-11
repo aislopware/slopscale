@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { cn } from "@cloudflare/kumo/utils";
 import { CaretDownIcon, CaretRightIcon, GlobeIcon, PathIcon } from "@phosphor-icons/react";
@@ -24,6 +23,7 @@ import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
+import { ValueList } from "~/components/ui/value-list.tsx";
 import { nodeName } from "~/lib/node.ts";
 
 const helper = createAppColumnHelper<RoutesRow>();
@@ -207,13 +207,9 @@ function NetworksCell({ row }: { readonly row: RoutesRow }): ReactElement | null
   }
 
   return (
-    <div className="flex flex-wrap gap-1">
-      {row.networks.map((network) => (
-        <Badge key={network.id} variant={network.enabled ? "secondary" : "outline"}>
-          {network.name}
-        </Badge>
-      ))}
-    </div>
+    <ValueList
+      items={row.networks.map((network) => ({ value: network.name, muted: !network.enabled }))}
+    />
   );
 }
 

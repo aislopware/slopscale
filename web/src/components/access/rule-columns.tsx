@@ -7,7 +7,7 @@ import { errorMessage } from "~/api/error.ts";
 import type { AccessRule, Group, Posture } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { GroupChips } from "~/components/access/group-chips.tsx";
+import { GroupNames } from "~/components/access/group-names.tsx";
 import { groupName, isBuiltinRule, protocolSummary } from "~/components/access/model.ts";
 import { useAccessMutations } from "~/components/access/mutations.ts";
 import { postureName } from "~/components/access/posture-model.ts";
@@ -68,7 +68,7 @@ export const ruleColumns = helper.columns([
     enableSorting: false,
     enableGlobalFilter: false,
     cell: ({ row }) => <DirectionCell bidirectional={row.original.bidirectional} />,
-    // Its own narrow column, top aligned, so the arrow sits on the first line between the chips.
+    // Its own narrow column, top aligned, so the arrow sits on the first line between the names.
     meta: { className: "w-10 px-0 text-center align-top" },
   }),
   helper.accessor((rule) => rule.destinationNames, {
@@ -76,7 +76,7 @@ export const ruleColumns = helper.columns([
     header: "Destinations",
     enableSorting: false,
     cell: ({ row, table }) => (
-      <GroupChips
+      <GroupNames
         ids={row.original.destinationGroupIds}
         groups={table.options.meta?.groups ?? []}
       />
@@ -154,7 +154,7 @@ function SourcesCell({ rule }: { readonly rule: RuleRow }): ReactElement {
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <GroupChips ids={rule.sourceGroupIds} groups={groups ?? []} />
+      <GroupNames ids={rule.sourceGroupIds} groups={groups ?? []} />
       {rule.postureIds.length === 0 ? null : (
         <span className="text-xs whitespace-normal text-kumo-subtle" title={rule.postureNames}>
           Requires {rule.postureNames}

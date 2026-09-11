@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Collapsible } from "@cloudflare/kumo/components/collapsible";
 import { CaretDownIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
@@ -25,20 +24,18 @@ function BlockRow({
       {names.length === 0 ? (
         <span className="text-kumo-subtle">{empty}</span>
       ) : (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-col items-start gap-0.5">
           {names.map((name) => (
             <button
               key={name}
               type="button"
               title={`Find ${name} in the policy`}
-              className="rounded-full hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none"
+              className="rounded-sm text-left font-mono text-[0.9em] [overflow-wrap:anywhere] text-kumo-default hover:underline focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none"
               onClick={() => {
                 onSelect(name);
               }}
             >
-              <Badge variant="secondary" className="font-mono font-normal">
-                {name}
-              </Badge>
+              {name}
             </button>
           ))}
         </div>

@@ -103,9 +103,10 @@ describe("the pre-auth key table", () => {
   it("carries tags in the type cell instead of a column of their own", async () => {
     const screen = await render(<PreAuthTable keys={[tagged]} />);
 
-    await expect.element(screen.getByText("Tags")).not.toBeInTheDocument();
-    await expect.element(screen.getByText("tag:ci")).toBeVisible();
-    await expect.element(screen.getByText("tag:prod")).toBeVisible();
+    await expect
+      .element(screen.getByRole("columnheader", { name: "Tags" }))
+      .not.toBeInTheDocument();
+    await expect.element(screen.getByText("tag:ci, tag:prod")).toBeVisible();
     await expect.element(screen.getByText("Reusable")).toBeVisible();
   });
 

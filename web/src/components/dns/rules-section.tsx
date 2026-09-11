@@ -6,7 +6,7 @@ import type { ReactElement } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { DnsRule, Group } from "~/api/queries.ts";
-import { GroupChips } from "~/components/access/group-chips.tsx";
+import { GroupNames } from "~/components/access/group-names.tsx";
 import { DnsRuleDialog } from "~/components/dns/rule-dialog.tsx";
 import type { DnsRuleMutations } from "~/components/dns/rule-mutations.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
@@ -149,7 +149,7 @@ function RuleSummary({
           {rule.nameservers.join(", ")}
         </span>
       </div>
-      <GroupChips ids={rule.groupIds} groups={groups} emptyLabel="No group" />
+      <GroupNames ids={rule.groupIds} groups={groups} emptyLabel="No group" />
     </div>
   );
 }

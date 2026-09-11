@@ -15,7 +15,7 @@ import {
   nodesById,
   ownerLabel,
   parsePort,
-  portChips,
+  portLines,
   sshLogins,
   sshPhrase,
   summarisePorts,
@@ -57,32 +57,32 @@ describe(parsePort, () => {
   });
 });
 
-describe(portChips, () => {
+describe(portLines, () => {
   it("gathers the ports of a protocol behind it, in the order they arrived", () => {
-    expect(portChips(["tcp:22", "tcp:443", "udp:53"])).toStrictEqual(["tcp:22, 443", "udp:53"]);
+    expect(portLines(["tcp:22", "tcp:443", "udp:53"])).toStrictEqual(["tcp:22, 443", "udp:53"]);
   });
 
   it("keeps ports without a protocol on their own", () => {
-    expect(portChips(["22", "1-100"])).toStrictEqual(["22, 1-100"]);
+    expect(portLines(["22", "1-100"])).toStrictEqual(["22, 1-100"]);
   });
 
   it("says everything in words and drops what a wildcard makes moot", () => {
-    expect(portChips(["*"])).toStrictEqual(["Every port"]);
-    expect(portChips(["22", "*"])).toStrictEqual(["Every port"]);
-    expect(portChips(["tcp:22", "tcp:*"])).toStrictEqual(["tcp:*"]);
+    expect(portLines(["*"])).toStrictEqual(["Every port"]);
+    expect(portLines(["22", "*"])).toStrictEqual(["Every port"]);
+    expect(portLines(["tcp:22", "tcp:*"])).toStrictEqual(["tcp:*"]);
   });
 
   it("names a protocol that has no ports", () => {
-    expect(portChips(["icmp", "tcp:22"])).toStrictEqual(["icmp", "tcp:22"]);
+    expect(portLines(["icmp", "tcp:22"])).toStrictEqual(["icmp", "tcp:22"]);
   });
 
   it("drops a repeated entry", () => {
-    expect(portChips(["tcp:22", "tcp:22"])).toStrictEqual(["tcp:22"]);
+    expect(portLines(["tcp:22", "tcp:22"])).toStrictEqual(["tcp:22"]);
   });
 });
 
 describe(summarisePorts, () => {
-  it("joins the chips, and says so when there are none", () => {
+  it("joins the lines, and says so when there are none", () => {
     expect(summarisePorts(["tcp:22", "udp:53"])).toBe("tcp:22 · udp:53");
     expect(summarisePorts([])).toBe("No ports");
   });

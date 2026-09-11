@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Combobox } from "@cloudflare/kumo/components/combobox";
 import { Field } from "@cloudflare/kumo/components/field";
 import type { ReactElement, ReactNode } from "react";
@@ -39,7 +38,7 @@ export function MultiPicker({
     (id) => items.find((item) => item.value === id) ?? { value: id, label: `#${id}` },
   );
 
-  // A picker nobody may edit shows its members as plain badges: a disabled combobox would still
+  // A picker nobody may edit shows its members as plain text: a disabled combobox would still
   // draw removable-looking chips and an input that invites typing.
   if (disabled) {
     return (
@@ -52,8 +51,8 @@ export function MultiPicker({
             <li className="text-sm text-kumo-subtle">{placeholder}</li>
           ) : (
             selected.map((item) => (
-              <li key={item.value}>
-                <Badge variant="outline">{item.label}</Badge>
+              <li key={item.value} className="text-sm text-kumo-default">
+                {item.label}
               </li>
             ))
           )}

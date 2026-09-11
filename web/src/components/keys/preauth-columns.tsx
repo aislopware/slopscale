@@ -1,5 +1,4 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { Group, PreAuthKey } from "~/api/queries.ts";
@@ -136,21 +135,33 @@ function TypeCell({
   return (
     <div className="flex min-w-0 flex-col items-start gap-1">
       <span className="text-kumo-default">{traits(authKey).join(" · ")}</span>
-      {authKey.aclTags.length === 0 && authKey.groupIds.length === 0 ? null : (
-        <span className="flex flex-wrap gap-1">
-          {authKey.aclTags.map((tag) => (
-            <Badge key={tag} variant="outline" className="font-mono">
-              {tag}
-            </Badge>
-          ))}
-          {authKey.groupIds.map((id) => (
-            <Badge key={id} variant="outline">
-              {groupName(groups, id)}
-            </Badge>
-          ))}
-        </span>
+      {authKey.aclTags.length === 0 ? null : (
+        <Labelled label="Tags">
+          <span className="font-mono text-[0.9em]">{authKey.aclTags.join(", ")}</span>
+        </Labelled>
+      )}
+      {authKey.groupIds.length === 0 ? null : (
+        <Labelled label="Groups">
+          {authKey.groupIds.map((id) => groupName(groups, id)).join(", ")}
+        </Labelled>
       )}
     </div>
+  );
+}
+
+/** One line of the Options cell: what the values are, then the values themselves. */
+function Labelled({
+  label,
+  children,
+}: {
+  readonly label: string;
+  readonly children: ReactNode;
+}): ReactElement {
+  return (
+    <span className="min-w-0 text-sm [overflow-wrap:anywhere] text-kumo-default">
+      <span className="text-kumo-subtle">{label} </span>
+      {children}
+    </span>
   );
 }
 

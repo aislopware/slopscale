@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 
 import type { User } from "~/api/queries.ts";
-import { GroupChips } from "~/components/access/group-chips.tsx";
+import { GroupNames } from "~/components/access/group-names.tsx";
 import { groupsOfUser } from "~/components/access/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
@@ -62,9 +62,10 @@ export const columns = helper.columns([
       const groups = table.options.meta?.groups;
 
       return groups === undefined ? null : (
-        <GroupChips
+        <GroupNames
           ids={groupsOfUser(groups, row.original).map((group) => group.id)}
           groups={groups}
+          max={2}
         />
       );
     },

@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { SignOutIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
@@ -10,6 +9,7 @@ import { SettingRow } from "~/components/settings/setting-row.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { Section } from "~/components/ui/section.tsx";
+import { ValueList } from "~/components/ui/value-list.tsx";
 
 const kindLabels: Record<string, string> = {
   api_key: "API key",
@@ -76,17 +76,5 @@ function ScopeList({ me }: { readonly me: Me }): ReactElement {
     return <span>All access</span>;
   }
 
-  if (me.scopes.length === 0) {
-    return <span className="text-kumo-subtle">None</span>;
-  }
-
-  return (
-    <span className="flex flex-wrap justify-end gap-1">
-      {me.scopes.map((scope) => (
-        <Badge key={scope} variant="secondary" className="font-mono text-[0.9em] font-normal">
-          {scope}
-        </Badge>
-      ))}
-    </span>
-  );
+  return <ValueList items={me.scopes} mono className="items-end" />;
 }

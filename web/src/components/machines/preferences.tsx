@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { PencilSimpleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
@@ -23,6 +22,7 @@ import type { Definition } from "~/components/ui/definition-list.tsx";
 import { HelpTip } from "~/components/ui/hover-popover.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { Status, StatusDetail } from "~/components/ui/status.tsx";
+import { ValueList } from "~/components/ui/value-list.tsx";
 
 const buttonIconSize = 12;
 
@@ -160,8 +160,7 @@ function facts(preferences: NodePreferences): Definition[] {
         </Label>
       ),
       value: <Routes routes={preferences.advertiseRoutes} />,
-      // Half a row is narrower than one prefix, which would cut the
-      // start off every chip.
+      // Half a row is narrower than one prefix, which would wrap every one of them.
       wide: preferences.advertiseRoutes.length > 0,
     },
     ...preferenceSwitches.map(({ key, label, hint }) => ({
@@ -196,21 +195,8 @@ function Default(): ReactElement {
   return <span className="text-kumo-subtle">Its own hostname</span>;
 }
 
-/** A route is an identifier the operator picks out of a list, so it is a pill, not a state. */
 function Routes({ routes }: { readonly routes: readonly string[] }): ReactElement {
-  if (routes.length === 0) {
-    return <span className="text-kumo-subtle">None</span>;
-  }
-
-  return (
-    <span className="flex flex-wrap justify-end gap-1">
-      {routes.map((route) => (
-        <Badge key={route} variant="secondary">
-          <span className="font-mono">{route}</span>
-        </Badge>
-      ))}
-    </span>
-  );
+  return <ValueList items={routes} mono className="items-end" />;
 }
 
 function OnOff({ on }: { readonly on: boolean }): ReactElement {

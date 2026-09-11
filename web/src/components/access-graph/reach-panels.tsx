@@ -1,14 +1,14 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import type { AccessGraphEdge, AccessGraphNode } from "~/api/schema.gen.ts";
-import { edgeListView, edgeRows, portChips, sshLogins } from "~/components/access-graph/model.ts";
+import { edgeListView, edgeRows, portLines, sshLogins } from "~/components/access-graph/model.ts";
 import type { Peer } from "~/components/access-graph/model.ts";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 import { Note, Status } from "~/components/ui/status.tsx";
+import { ValueList } from "~/components/ui/value-list.tsx";
 
 /** One side of a machine's access: the edges it is the source of, or the ones it is the target of. */
 export interface ReachPanelProps {
@@ -93,11 +93,11 @@ function EdgeRow({
       <Owner node={node} />
       <dl className="flex flex-col gap-1.5">
         <Fact label="Ports">
-          <Chips values={portChips(edge.ports)} empty="None" />
+          <ValueList items={portLines(edge.ports)} mono empty="None" />
         </Fact>
         {edge.routes.length === 0 ? null : (
           <Fact label="Routes">
-            <Chips values={edge.routes} empty="None" />
+            <ValueList items={edge.routes} mono empty="None" />
           </Fact>
         )}
         {logins === "" ? null : (
@@ -110,7 +110,7 @@ function EdgeRow({
         )}
         {edge.capabilities.length === 0 ? null : (
           <Fact label="Capabilities">
-            <Chips values={edge.capabilities} empty="None" />
+            <ValueList items={edge.capabilities} mono empty="None" />
           </Fact>
         )}
       </dl>
@@ -118,7 +118,7 @@ function EdgeRow({
   );
 }
 
-/** Who the machine belongs to: its tags as pills, or its owner's login as plain text. */
+/** Who the machine belongs to: its tags, or its owner's login. */
 function Owner({ node }: { readonly node: AccessGraphNode | undefined }): ReactElement | null {
   if (node === undefined) {
     return null;
@@ -126,11 +126,11 @@ function Owner({ node }: { readonly node: AccessGraphNode | undefined }): ReactE
 
   if (node.tags.length > 0) {
     return (
-      <span className="flex flex-wrap gap-1">
+      <span className="flex flex-wrap gap-x-2 text-xs text-kumo-subtle">
         {node.tags.map((tag) => (
-          <Badge key={tag} variant="secondary">
+          <span key={tag} className="font-mono">
             {tag}
-          </Badge>
+          </span>
         ))}
       </span>
     );
@@ -153,27 +153,5 @@ function Fact({
       <dt className="w-24 shrink-0 text-xs text-kumo-subtle">{label}</dt>
       <dd className="min-w-0 flex-1">{children}</dd>
     </div>
-  );
-}
-
-function Chips({
-  values,
-  empty,
-}: {
-  readonly values: readonly string[];
-  readonly empty: string;
-}): ReactElement {
-  if (values.length === 0) {
-    return <span className="text-kumo-subtle">{empty}</span>;
-  }
-
-  return (
-    <span className="flex min-w-0 flex-wrap items-center gap-1">
-      {values.map((value) => (
-        <Badge key={value} variant="secondary" className="max-w-full">
-          <span className="truncate">{value}</span>
-        </Badge>
-      ))}
-    </span>
   );
 }

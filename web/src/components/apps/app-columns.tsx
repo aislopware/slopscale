@@ -1,6 +1,4 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Popover } from "@cloudflare/kumo/components/popover";
-import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
@@ -16,11 +14,12 @@ import {
 } from "~/components/apps/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Status } from "~/components/ui/status.tsx";
+import { ValueList } from "~/components/ui/value-list.tsx";
 
 const helper = createAppColumnHelper<App>();
 
-/** How many chips a cell shows before the rest become "+N more". */
-const maxChips = 2;
+/** How many values a cell shows before the rest become "+N more". */
+const maxValues = 2;
 const openDelay = 150;
 
 export const appColumns = helper.columns([
@@ -29,28 +28,30 @@ export const appColumns = helper.columns([
     header: "Name",
     enableSorting: true,
     cell: ({ row }) => <NameCell app={row.original} />,
-    meta: { className: "w-[24%] min-w-44" },
+    meta: { className: "w-[24%] min-w-44 align-top" },
   }),
   helper.accessor((app) => app.domains.join(" "), {
     id: "domains",
     header: "Domains",
     enableSorting: false,
-    cell: ({ row }) => <ChipsCell values={row.original.domains} empty="No domain" />,
-    meta: { className: "min-w-44" },
+    cell: ({ row }) => (
+      <ValueList items={row.original.domains} max={maxValues} mono empty="No domain" />
+    ),
+    meta: { className: "min-w-44 align-top" },
   }),
   helper.accessor((app) => app.connectors.join(" "), {
     id: "connectors",
     header: "Connectors",
     enableSorting: false,
     cell: ({ row }) => <ConnectorsCell app={row.original} />,
-    meta: { className: "hidden md:table-cell" },
+    meta: { className: "hidden align-top md:table-cell" },
   }),
   helper.accessor((app) => app.nodes.map((node) => node.name).join(" "), {
     id: "machines",
     header: "Machines",
     enableSorting: false,
     cell: ({ row }) => <MachinesCell app={row.original} />,
-    meta: { className: "hidden whitespace-nowrap lg:table-cell" },
+    meta: { className: "hidden align-top whitespace-nowrap lg:table-cell" },
   }),
   helper.accessor((app) => totalLearnedRoutes(app.nodes), {
     id: "learned",
@@ -59,7 +60,7 @@ export const appColumns = helper.columns([
     enableGlobalFilter: false,
     cell: ({ getValue }) => <span className="text-kumo-subtle">{getValue()}</span>,
     // The whole row fits a 1280px screen without Learned routes, and xl starts at 1280.
-    meta: { className: "hidden 2xl:table-cell", numeric: true },
+    meta: { className: "hidden align-top 2xl:table-cell", numeric: true },
   }),
   helper.accessor((app) => totalPendingRoutes(app.nodes), {
     id: "pending",
@@ -67,7 +68,7 @@ export const appColumns = helper.columns([
     enableSorting: true,
     enableGlobalFilter: false,
     cell: ({ row }) => <PendingCell app={row.original} />,
-    meta: { className: "whitespace-nowrap", numeric: true },
+    meta: { className: "align-top whitespace-nowrap", numeric: true },
   }),
   helper.display({
     id: "actions",
@@ -96,43 +97,12 @@ function NameCell({ app }: { readonly app: App }): ReactElement {
   );
 }
 
-/** The first few values as pills, with the rest counted rather than wrapped over three lines. */
-function ChipsCell({
-  values,
-  empty,
-}: {
-  readonly values: readonly string[];
-  readonly empty: string;
-}): ReactElement {
-  if (values.length === 0) {
-    return <span className="text-kumo-subtle">{empty}</span>;
-  }
-
-  const shown = values.slice(0, maxChips);
-  const rest = values.length - shown.length;
-
-  return (
-    <span className="flex min-w-0 flex-wrap items-center gap-1">
-      {shown.map((value) => (
-        <Badge key={value} variant="secondary" className="max-w-full">
-          <span className="truncate">{value}</span>
-        </Badge>
-      ))}
-      {rest === 0 ? null : (
-        <Tooltip content={values.join(", ")}>
-          <span className="text-xs whitespace-nowrap text-kumo-subtle">{`+${rest} more`}</span>
-        </Tooltip>
-      )}
-    </span>
-  );
-}
-
 function ConnectorsCell({ app }: { readonly app: App }): ReactElement {
   if (everyConnector(app.connectors)) {
     return <span className="text-kumo-subtle">Every connector</span>;
   }
 
-  return <ChipsCell values={app.connectors} empty="Every connector" />;
+  return <ValueList items={app.connectors} max={maxValues} mono empty="Every connector" />;
 }
 
 /**

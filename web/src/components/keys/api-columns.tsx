@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
@@ -14,6 +13,7 @@ import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { toast } from "~/components/ui/toast.ts";
+import { ValueList } from "~/components/ui/value-list.tsx";
 import { userLabel } from "~/lib/node.ts";
 import { parseTime } from "~/lib/time.ts";
 
@@ -100,21 +100,9 @@ function KeyCell({ apiKey }: { readonly apiKey: ApiKey }): ReactElement {
   );
 }
 
-/** The scopes as badges; a key without any acts with its owner's whole role. */
+/** The scopes by their console names; a key without any acts with its owner's whole role. */
 function ScopesCell({ scopes }: { readonly scopes: readonly string[] }): ReactElement {
-  if (scopes.length === 0) {
-    return <span className="text-kumo-subtle">Whole role</span>;
-  }
-
-  return (
-    <span className="flex flex-wrap gap-1">
-      {scopes.map((scope) => (
-        <Badge key={scope} variant="secondary">
-          {scopeLabel(scope)}
-        </Badge>
-      ))}
-    </span>
-  );
+  return <ValueList items={scopes} label={scopeLabel} empty="Whole role" />;
 }
 
 function UserCell({

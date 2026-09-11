@@ -1,4 +1,3 @@
-import { Badge } from "@cloudflare/kumo/components/badge";
 import { Button } from "@cloudflare/kumo/components/button";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import {
@@ -128,9 +127,9 @@ function NameCell({ node }: { readonly node: Node }): ReactElement {
           <span className="truncate font-mono text-xs">{node.name}</span>
         )}
         {node.tags.map((tag) => (
-          <Badge key={tag} variant="secondary">
-            <span className="font-mono">{tag}</span>
-          </Badge>
+          <span key={tag} className="font-mono">
+            {tag}
+          </span>
         ))}
         <Attributes node={node} />
       </div>

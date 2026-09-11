@@ -67,7 +67,9 @@ export function DataTable({ empty, footer, onRowClick }: DataTableProps): ReactE
                       <Table.Head
                         key={header.id}
                         {...(meta?.sticky === undefined ? {} : { sticky: meta.sticky })}
-                        className={cellClass(meta, overflowing)}
+                        // A column whose cells sit at the top still has its heading on the
+                        // header row's line, so `align-top` in the meta reaches the cells alone.
+                        className={cn(cellClass(meta, overflowing), "align-middle")}
                       >
                         {header.isPlaceholder ? null : (
                           <HeaderContent

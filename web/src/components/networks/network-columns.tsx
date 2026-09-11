@@ -6,7 +6,7 @@ import { errorMessage } from "~/api/error.ts";
 import type { Group, Network } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { GroupChips } from "~/components/access/group-chips.tsx";
+import { GroupNames } from "~/components/access/group-names.tsx";
 import { groupName, isNarrowed, protocolSummary } from "~/components/access/model.ts";
 import { prefixesSummary } from "~/components/networks/model.ts";
 import { useNetworkMutations } from "~/components/networks/mutations.ts";
@@ -63,7 +63,7 @@ export const networkColumns = helper.columns([
     header: "Groups",
     enableSorting: false,
     cell: ({ row, table }) => (
-      <GroupChips ids={row.original.groupIds} groups={table.options.meta?.groups ?? []} />
+      <GroupNames ids={row.original.groupIds} groups={table.options.meta?.groups ?? []} max={2} />
     ),
     meta: { className: "hidden min-w-32 md:table-cell" },
   }),
