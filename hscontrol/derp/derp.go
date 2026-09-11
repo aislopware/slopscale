@@ -300,14 +300,19 @@ func EmbeddedRegion(ctx context.Context, serverURL string, s types.DERPServerSet
 		}
 	}
 
-	_, stunPortStr, err := net.SplitHostPort(s.STUNAddr)
-	if err != nil {
-		return tailcfg.DERPRegion{}, fmt.Errorf("splitting STUN address %q: %w", s.STUNAddr, err)
-	}
+	// A negative port tells clients the relay answers no STUN.
+	stunPort := -1
 
-	stunPort, err := strconv.Atoi(stunPortStr)
-	if err != nil {
-		return tailcfg.DERPRegion{}, fmt.Errorf("parsing STUN port %q: %w", stunPortStr, err)
+	if s.STUNEnabled {
+		_, stunPortStr, err := net.SplitHostPort(s.STUNAddr)
+		if err != nil {
+			return tailcfg.DERPRegion{}, fmt.Errorf("splitting STUN address %q: %w", s.STUNAddr, err)
+		}
+
+		stunPort, err = strconv.Atoi(stunPortStr)
+		if err != nil {
+			return tailcfg.DERPRegion{}, fmt.Errorf("parsing STUN port %q: %w", stunPortStr, err)
+		}
 	}
 
 	return tailcfg.DERPRegion{

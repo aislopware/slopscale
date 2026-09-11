@@ -3032,6 +3032,7 @@ export interface components {
             regionId?: number;
             regionName?: string;
             stunAddr?: string;
+            stunEnabled?: boolean;
             verifyClients?: boolean;
         };
         DERPSettings: {

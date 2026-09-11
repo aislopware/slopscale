@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"strings"
 	"sync"
 	"testing"
@@ -51,11 +52,12 @@ func testVerify(req *http.Request, w io.Writer) error {
 // testServerSettings turns the relay on with STUN on a free loopback port.
 func testServerSettings() types.DERPServerSettings {
 	return types.DERPServerSettings{
-		Enabled:    true,
-		RegionID:   999,
-		RegionCode: "slopscale",
-		RegionName: "Slopscale Embedded DERP",
-		STUNAddr:   "127.0.0.1:0",
+		Enabled:     true,
+		RegionID:    999,
+		RegionCode:  "slopscale",
+		RegionName:  "Slopscale Embedded DERP",
+		STUNEnabled: true,
+		STUNAddr:    "127.0.0.1:0",
 	}
 }
 
@@ -212,6 +214,31 @@ func TestDERPServerApply(t *testing.T) {
 	settings.VerifyClients = false
 	require.NoError(t, srv.Apply(settings))
 	assert.Same(t, verifying, srv.server(), "the same or a looser rule keeps the clients")
+}
+
+// TestDERPServerSTUNOff proves the relay serves without STUN when the
+// settings turn STUN off, binds it when they turn it on and closes the
+// socket again when they turn it off.
+func TestDERPServerSTUNOff(t *testing.T) {
+	t.Parallel()
+
+	settings := testServerSettings()
+	settings.STUNEnabled = false
+	settings.STUNAddr = ""
+
+	srv := newTestDERPServer(t, settings)
+	assert.True(t, srv.Enabled())
+	assert.Empty(t, srv.STUNAddr(), "no STUN socket while STUN is off")
+
+	settings.STUNEnabled = true
+	settings.STUNAddr = "127.0.0.1:0"
+	require.NoError(t, srv.Apply(settings))
+	assert.NotEmpty(t, srv.STUNAddr())
+
+	settings.STUNEnabled = false
+	require.NoError(t, srv.Apply(settings))
+	assert.Empty(t, srv.STUNAddr(), "turning STUN off closes the socket")
+	assert.True(t, srv.Enabled(), "the relay keeps serving")
 }
 
 func TestDERPServerApplyBadSTUNAddrKeepsState(t *testing.T) {
@@ -481,6 +508,57 @@ func TestDERPProbeHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestServerSTUNListenerAnswersIPv4Family proves a dual-stack socket,
+// which reports an IPv4 client as a v4-mapped IPv6 address, answers with
+// the client's IPv4 address, as the client sent from one.
+func TestServerSTUNListenerAnswersIPv4Family(t *testing.T) {
+	t.Parallel()
+
+	serverConn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv6unspecified})
+	if err != nil {
+		t.Skipf("no dual-stack UDP socket: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		serverSTUNListener(ctx, serverConn)
+	}()
+
+	t.Cleanup(func() {
+		cancel()
+
+		_ = serverConn.Close()
+
+		<-done
+	})
+
+	serverAddr, ok := serverConn.LocalAddr().(*net.UDPAddr)
+	require.True(t, ok)
+
+	clientConn, err := net.DialUDP("udp4", nil, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: serverAddr.Port})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = clientConn.Close() })
+	require.NoError(t, clientConn.SetDeadline(time.Now().Add(testTimeout)))
+
+	txID := stun.NewTxID()
+	_, err = clientConn.Write(stun.Request(txID))
+	require.NoError(t, err)
+
+	buf := make([]byte, 1500)
+	n, err := clientConn.Read(buf)
+	require.NoError(t, err)
+
+	clientAddr, err := netip.ParseAddrPort(clientConn.LocalAddr().String())
+	require.NoError(t, err)
+	require.True(t, clientAddr.Addr().Is4())
+	assert.Equal(t, stun.Response(txID, clientAddr), buf[:n],
+		"the reply names the client's IPv4 address, not its v4-mapped form")
 }
 
 func TestServerSTUNListener(t *testing.T) {

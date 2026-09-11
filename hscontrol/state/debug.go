@@ -140,7 +140,10 @@ func (s *State) DebugDERPMap() string {
 			fmt.Fprintf(&sb, "    - %s (%s:%d)\n",
 				node.Name, node.HostName, node.DERPPort)
 
-			if node.STUNPort != 0 {
+			switch {
+			case node.STUNPort < 0:
+				sb.WriteString("      STUN: off\n")
+			case node.STUNPort != 0:
 				fmt.Fprintf(&sb, "      STUN: %d\n", node.STUNPort)
 			}
 		}

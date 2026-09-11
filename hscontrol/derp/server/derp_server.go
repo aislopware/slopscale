@@ -88,9 +88,10 @@ func NewDERPServer(derpKey key.NodePrivate, verify VerifyFunc) *DERPServer {
 }
 
 // Apply brings the relay to the settings: it starts STUN on the settings'
-// address (rebinding when the address changed), turns client verification
-// on or off and opens the handler; or, when the settings turn the relay
-// off, stops STUN, closes the handler and drops the connected clients.
+// address (rebinding when the address changed, stopping it when STUN is
+// off), turns client verification on or off and opens the handler; or,
+// when the settings turn the relay off, stops STUN, closes the handler and
+// drops the connected clients.
 // Turning verification on drops them too, so every client is admitted
 // under the new rule when it reconnects. A STUN bind failure leaves the
 // relay as it was and is returned.
@@ -109,7 +110,9 @@ func (d *DERPServer) Apply(s types.DERPServerSettings) error {
 		return nil
 	}
 
-	if d.stunConn == nil || d.stunAddr != s.STUNAddr {
+	if !s.STUNEnabled {
+		d.stopSTUNLocked()
+	} else if d.stunConn == nil || d.stunAddr != s.STUNAddr {
 		packetConn, err := new(net.ListenConfig).ListenPacket(context.Background(), "udp", s.STUNAddr)
 		if err != nil {
 			return fmt.Errorf("opening STUN listener on %s: %w", s.STUNAddr, err)
@@ -457,10 +460,13 @@ func serverSTUNListener(ctx context.Context, packetConn *net.UDPConn) {
 			continue
 		}
 
+		// A dual-stack socket reports an IPv4 client as a v4-mapped IPv6
+		// address; unmapped, the reply carries the IPv4 family the client
+		// sent from.
 		addr, _ := netip.AddrFromSlice(udpAddr.IP)
 		res := stun.Response(
 			txid,
-			netip.AddrPortFrom(addr, uint16(udpAddr.Port)), //nolint:gosec // port is always <=65535
+			netip.AddrPortFrom(addr.Unmap(), uint16(udpAddr.Port)), //nolint:gosec // port is always <=65535
 		)
 
 		_, err = packetConn.WriteTo(res, udpAddr)

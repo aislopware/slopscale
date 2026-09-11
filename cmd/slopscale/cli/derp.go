@@ -45,6 +45,9 @@ func init() {
 	setDERPCmd.Flags().Bool("verify-clients", true, "Admit only this tailnet's machines to the embedded relay")
 	setDERPCmd.Flags().String("stun", "0.0.0.0:3478", "UDP host:port the embedded relay's STUN listens on")
 	setDERPCmd.Flags().
+		Bool("stun-enabled", true, "Answer STUN on the embedded relay and publish it in the map. "+
+			"Turn off when the relay's STUN replies reach machines through their own router")
+	setDERPCmd.Flags().
 		String("ipv4", "", "Public IPv4 published for the embedded relay. If empty, machines rely on DNS")
 	setDERPCmd.Flags().
 		String("ipv6", "", "Public IPv6 published for the embedded relay. If empty, machines rely on DNS")
@@ -360,6 +363,10 @@ func applySetDERPFlags(cmd *cobra.Command, body *clientv1.SetDERPRequestBody) {
 		body.Server.StunAddr = optionalString(cmd, "stun")
 	}
 
+	if cmd.Flags().Changed("stun-enabled") {
+		body.Server.StunEnabled = optionalBool(cmd, "stun-enabled")
+	}
+
 	if cmd.Flags().Changed("ipv4") {
 		body.Server.Ipv4 = optionalString(cmd, "ipv4")
 	}
@@ -445,6 +452,9 @@ func printEmbeddedDERP(d *clientv1.DERP) {
 		fmt.Println("Embedded relay: unavailable (derp.server.private_key_path is not set)")
 	case !s.Enabled:
 		fmt.Println("Embedded relay: off")
+	case d.RelayRunning && d.StunAddr == "":
+		fmt.Printf("Embedded relay: running at %s as region %d (%s), STUN off\n",
+			d.ServerUrl, derefInt(s.RegionId), derefString(s.RegionCode))
 	case d.RelayRunning:
 		fmt.Printf("Embedded relay: running at %s as region %d (%s), STUN on %s\n",
 			d.ServerUrl, derefInt(s.RegionId), derefString(s.RegionCode), d.StunAddr)

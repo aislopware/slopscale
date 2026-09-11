@@ -438,6 +438,7 @@ export interface ServerDraft {
   readonly regionCode: string;
   readonly regionName: string;
   readonly verifyClients: boolean;
+  readonly stunEnabled: boolean;
   readonly stunAddr: string;
   readonly ipv4: string;
   readonly ipv6: string;
@@ -452,6 +453,7 @@ export function serverDraft(server: DerpServerSettings): ServerDraft {
     regionCode: server.regionCode ?? "slopscale",
     regionName: server.regionName ?? "",
     verifyClients: server.verifyClients ?? true,
+    stunEnabled: server.stunEnabled ?? true,
     stunAddr: server.stunAddr ?? "0.0.0.0:3478",
     ipv4: server.ipv4 ?? "",
     ipv6: server.ipv6 ?? "",
@@ -465,6 +467,7 @@ export function serverFromDraft(draft: ServerDraft, enabled: boolean): DerpServe
     regionCode: draft.regionCode.trim(),
     regionName: draft.regionName.trim(),
     verifyClients: draft.verifyClients,
+    stunEnabled: draft.stunEnabled,
     stunAddr: draft.stunAddr.trim(),
     ipv4: draft.ipv4.trim(),
     ipv6: draft.ipv6.trim(),
@@ -479,7 +482,7 @@ export function serverFieldErrors(
   const checks: readonly (readonly [keyof ServerDraft, string | null])[] = [
     ["regionId", regionIdError(draft.regionId.trim(), taken)],
     ["regionCode", regionCodeError(draft.regionCode.trim())],
-    ["stunAddr", stunAddrError(draft.stunAddr.trim())],
+    ["stunAddr", draft.stunEnabled ? stunAddrError(draft.stunAddr.trim()) : null],
     ["ipv4", ipv4Error(draft.ipv4.trim(), false)],
     ["ipv6", ipv6Error(draft.ipv6.trim(), false)],
   ];

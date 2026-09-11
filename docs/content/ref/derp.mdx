@@ -76,6 +76,14 @@ A few things to know when changing the relays while machines use them:
 - With the schedule off the map is not fetched again until you refetch it, in the console or with
   `slopscale derp refresh`.
 - The embedded relay is published on the STUN port it is bound to, so a `stun_listen_addr` with port 0 works.
+- `stun_enabled: false` in the file, `slopscale derp set --stun-enabled=false`, `stunEnabled` on `PUT /api/v1/derp`
+  or the switch on the console's _Relays_ page publish the relay without STUN and close the listener; Tailscale's
+  relays still answer STUN. Do this when the relay sits on the machines' own network and they reach its public address
+  through their router (hairpin NAT): the relay then sees the router's private address as the machine's source, its
+  STUN reply says so, that disagrees with what Tailscale's STUN servers say, and every machine on that network reports
+  a hard NAT (`MappingVariesByDestIP: true` in `tailscale netcheck`) while advertising the router's private address as
+  its public endpoint. The other fix is a router that rewrites hairpinned traffic to its public address instead of its
+  own private one, which keeps STUN on and consistent.
 - The audit log records the map URLs without user info or query strings.
 
 ### Remove Tailscale's DERP servers

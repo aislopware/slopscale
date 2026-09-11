@@ -1050,6 +1050,8 @@ components:
           type: string
         stunAddr:
           type: string
+        stunEnabled:
+          type: boolean
         verifyClients:
           type: boolean
       required:

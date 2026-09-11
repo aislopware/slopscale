@@ -50,6 +50,10 @@ function regionLabel(server: Derp["effective"]["server"]): string {
 }
 
 function stunFact(derp: Derp): Definition {
+  if (derp.effective.server.stunEnabled === false) {
+    return { label: "STUN", value: <Muted>Off. Machines ask the Tailscale relays instead</Muted> };
+  }
+
   if (derp.relayRunning) {
     return { label: "STUN", value: derp.stunAddr, copy: derp.stunAddr };
   }
@@ -308,12 +312,20 @@ function ServerForm({
         placeholder: "Slopscale embedded relay",
         description: "Leave empty to use the code.",
       })}
-      {field({
-        field: "stunAddr",
-        label: "STUN address",
-        placeholder: "0.0.0.0:3478",
-        description: "The UDP host:port STUN listens on. Open it on the firewall.",
-      })}
+      <StunSwitch
+        checked={draft.stunEnabled}
+        onChange={(on) => {
+          update({ stunEnabled: on });
+        }}
+      />
+      {draft.stunEnabled
+        ? field({
+            field: "stunAddr",
+            label: "STUN address",
+            placeholder: "0.0.0.0:3478",
+            description: "The UDP host:port STUN listens on. Open it on the firewall.",
+          })
+        : null}
       <div className="grid items-start gap-4 sm:grid-cols-2">
         {field({
           field: "ipv4",
@@ -375,6 +387,30 @@ function ServerField({
         onChange(event.target.value);
       }}
       onBlur={onBlur}
+    />
+  );
+}
+
+function StunSwitch({
+  checked,
+  onChange,
+}: {
+  readonly checked: boolean;
+  readonly onChange: (checked: boolean) => void;
+}): ReactElement {
+  return (
+    <Switch
+      checked={checked}
+      onCheckedChange={onChange}
+      label={
+        <span className="flex flex-col gap-0.5">
+          <span className="font-medium text-kumo-default">Answer STUN</span>
+          <span className="text-xs text-kumo-subtle">
+            Turn off when machines on the relay&apos;s own network reach it through their router and
+            report a hard NAT.
+          </span>
+        </span>
+      }
     />
   );
 }
