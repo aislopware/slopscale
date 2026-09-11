@@ -15,6 +15,14 @@ describe(describeTrouble, () => {
     });
   });
 
+  it("reads a 404 without problem details as the proxy answering for a restarting server", () => {
+    expect(describeTrouble(new ApiError(404, undefined, "404 page not found"))).toMatchObject({
+      kind: "unreachable",
+      code: "HTTP 404",
+      title: "The server did not answer",
+    });
+  });
+
   it("reads a failed fetch the same way", () => {
     expect(describeTrouble(new TypeError("Failed to fetch"))).toMatchObject({
       kind: "unreachable",

@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.30.1 (202x-xx-xx)
+
+### Changes
+
+- The console no longer reports "Page not found" when a reverse proxy in front of slopscale answers a bare 404 while the server restarts; the page now says the server did not answer and may be restarting. Every error slopscale sends itself carries problem details, so a 404 without them can only come from the proxy
+
 ## 0.30.0 (2026-09-10)
 
 **Minimum supported Tailscale client version: v1.82.0**

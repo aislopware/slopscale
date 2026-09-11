@@ -98,6 +98,12 @@ function byStatus(error: ApiError): Omit<Trouble, "message" | "instance"> {
     };
   }
 
+  // slopscale answers every error as problem details. A bare 404 is the proxy in front of it
+  // finding no backend, which is what a restart looks like from the browser.
+  if (error.status === statusNotFound && error.problem === undefined) {
+    return { ...unreachable, code };
+  }
+
   if (error.status === statusNotFound) {
     return {
       kind: "missing",
