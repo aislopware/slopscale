@@ -2,6 +2,7 @@ import { Banner } from "@cloudflare/kumo/components/banner";
 import { Button } from "@cloudflare/kumo/components/button";
 import { SignInIcon } from "@phosphor-icons/react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { useEffect } from "react";
 import type { ReactElement } from "react";
 import { object, optional, string } from "valibot";
 
@@ -76,6 +77,10 @@ function LoginPage(): ReactElement {
   const { redirect: target, invite, error } = Route.useSearch();
   const { oidc } = Route.useLoaderData();
   const problem = signInProblem(error);
+
+  useEffect(() => {
+    document.title = "Sign in - Slopscale";
+  }, []);
 
   return (
     <div className="flex min-h-dvh flex-col bg-kumo-canvas">

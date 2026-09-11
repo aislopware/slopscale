@@ -5,7 +5,7 @@ import { cn } from "@cloudflare/kumo/utils";
 import { MagnifyingGlassIcon, SignOutIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import { accessRequestsQuery, nodesQuery, usersQuery } from "~/api/queries.ts";
@@ -268,6 +268,20 @@ function Brand(): ReactElement {
   );
 }
 
+/** The tab's title from the trail: "backup-nas - Machines - Slopscale", so tabs and history read. */
+export function documentTitle(section: string | undefined, page: string | null): string {
+  return [page, section, "Slopscale"]
+    .filter((part): part is string => part !== undefined && part !== null && part !== "")
+    .filter((part, index, parts) => parts.indexOf(part) === index)
+    .join(" - ");
+}
+
+function useDocumentTitle(title: string): void {
+  useEffect(() => {
+    document.title = title;
+  }, [title]);
+}
+
 /**
  * Breadcrumb trail: the sidebar item, then the page under it when the item is a branch, or the page
  * a detail route announced through useBreadcrumb. A branch's crumb goes straight to its first page
@@ -277,6 +291,8 @@ function Trail({ place }: { readonly place: NavPlace | undefined }): ReactElemen
   const leaf = useBreadcrumbLeaf();
   const current = place?.item;
   const last: string | null = place?.child?.label ?? leaf;
+
+  useDocumentTitle(documentTitle(current?.label, last));
 
   return (
     <div className="flex min-w-0 items-center gap-2">

@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render } from "vitest-browser-react";
 
 import type { Me } from "~/auth/me.ts";
-import { Shell } from "~/components/layout/shell.tsx";
+import { documentTitle, Shell } from "~/components/layout/shell.tsx";
 
 const allAccess: Me = {
   kind: "api_key",
@@ -69,7 +69,23 @@ function clickPart(root: Element, selector: string): void {
   root.querySelector(selector)?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 }
 
+describe(documentTitle, () => {
+  // The tab reads page first, so a row of tabs tells apart by what is in front.
+  it("puts the page before its section and the product last, each once", () => {
+    expect(documentTitle("Machines", "backup-nas")).toBe("backup-nas - Machines - Slopscale");
+    expect(documentTitle("Machines", null)).toBe("Machines - Slopscale");
+    expect(documentTitle("Keys", "Keys")).toBe("Keys - Slopscale");
+    expect(documentTitle(undefined, null)).toBe("Slopscale");
+  });
+});
+
 describe(Shell, () => {
+  it("titles the tab after the page it shows", async () => {
+    await render(app(allAccess));
+
+    await expect.poll(() => document.title).toBe("Overview - Slopscale");
+  });
+
   it("opens the account menu for a key without a user", async () => {
     const screen = await render(app(allAccess));
 

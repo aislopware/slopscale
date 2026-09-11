@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## Unreleased
+
+### Changes
+
+- Tags in the console are chips again, tinted by their name: `tag:prod` is the same colour on every page and two tags tell apart before they are read. The chip carries the `tag:` prefix lighter than the name, and shows wherever a tag does: the machines list and a machine's page, the app connectors, pre-auth keys, OAuth clients, the access graph's headers and reach panels, and the policy file's building blocks. Domains, routes, groups and scopes stay text
+- Every form that takes tags (a machine's _Edit tags_, a new or edited app's connectors, a pre-auth key, an OAuth client or federated identity) is one field that offers the tailnet's tags as you type: the ones the policy's `tagOwners` hands out, the ones machines carry, and the ones apps, keys and clients name. A name nobody carries yet is offered as _New tag_ and taken with Enter, a pasted list lands as chips at once, the `tag:` prefix is added and the case folded, and a name the server would refuse says why under the field instead of failing on save
+- An app's domains in the Apps table, the learned routes on a connector's page and a split DNS rule's domains are drawn as name tokens in the code face on the recessed surface, with a wildcard's `*.` stepped back, so a column of domains reads as a column of names
+- A machine's operating system shows as its logo (Apple, Windows, Linux, Android, a phone for iOS, a set for tvOS) before its name in the machines list, on its page's title line and under the client version in its Overview, with the full name and version one hover away. The v1 API's node carries the new `os` and `osVersion` fields the client reports
+- The browser tab is titled after the page (_Machines - Slopscale_, _backup-nas - Machines - Slopscale_) instead of _Slopscale_ everywhere, so tabs and history tell apart
+
 ## 0.36.0 (2026-09-11)
 
 ### Changes
