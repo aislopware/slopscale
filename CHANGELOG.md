@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## 0.37.0 (unreleased)
+## 0.37.0 (2026-09-11)
 
 ### Changes
 
