@@ -105,6 +105,7 @@ export function MachineMenu({
       <MachineDialogs
         dialog={dialog}
         node={node}
+        me={me}
         users={users}
         mutations={mutations}
         onOpenChange={close}
@@ -328,12 +329,14 @@ function MachineMenuItems({
 function MachineDialogs({
   dialog,
   node,
+  me,
   users,
   mutations,
   onOpenChange,
 }: {
   readonly dialog: Dialog | null;
   readonly node: Node;
+  readonly me: Me;
   readonly users: readonly User[];
   readonly mutations: ReturnType<typeof useNodeMutations>;
   readonly onOpenChange: (open: boolean) => void;
@@ -343,7 +346,7 @@ function MachineDialogs({
   return (
     <>
       <RenameDialog open={dialog === "rename"} {...props} />
-      <TagsDialog open={dialog === "tags"} {...props} />
+      <TagsDialog open={dialog === "tags"} me={me} {...props} />
       <RoutesDialog open={dialog === "routes"} {...props} />
       <ShareDialog open={dialog === "share"} users={users} {...props} />
       <ResetAttestationDialog open={dialog === "attestation"} {...props} />

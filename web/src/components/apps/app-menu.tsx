@@ -47,7 +47,13 @@ export function AppMenu({ app, me }: { readonly app: App; readonly me: Me }): Re
           Delete…
         </DropdownMenu.Item>
       </RowMenu>
-      <AppDialog app={app} open={dialog === "edit"} onOpenChange={close} mutations={mutations} />
+      <AppDialog
+        app={app}
+        me={me}
+        open={dialog === "edit"}
+        onOpenChange={close}
+        mutations={mutations}
+      />
       <DeleteAppDialog
         app={app}
         open={dialog === "delete"}

@@ -1,5 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { Input, InputArea } from "@cloudflare/kumo/components/input";
+import { Input } from "@cloudflare/kumo/components/input";
 import { Select } from "@cloudflare/kumo/components/select";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { useQuery } from "@tanstack/react-query";
@@ -16,7 +16,7 @@ import { CreatedKey, useCreatedKey } from "~/components/keys/created-key.tsx";
 import { expirationFor, expiryOptions } from "~/components/keys/expiration.ts";
 import type { ExpiryChoice } from "~/components/keys/expiration.ts";
 import { usePreAuthKeyMutations } from "~/components/keys/mutations.ts";
-import { Code } from "~/components/ui/code.tsx";
+import { useKnownTags } from "~/components/tags/use-known-tags.ts";
 import {
   DialogClose,
   DialogContent,
@@ -25,6 +25,7 @@ import {
   DialogRoot,
 } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
+import { TagField } from "~/components/ui/tag-field.tsx";
 import { userLabel } from "~/lib/node.ts";
 
 interface Draft {
@@ -33,7 +34,7 @@ interface Draft {
   readonly reusable: boolean;
   readonly ephemeral: boolean;
   readonly preauthorized: boolean;
-  readonly tags: string;
+  readonly tags: readonly string[];
   readonly groupIds: readonly string[];
 }
 
@@ -43,21 +44,11 @@ const emptyDraft: Draft = {
   reusable: false,
   ephemeral: false,
   preauthorized: true,
-  tags: "",
+  tags: [],
   groupIds: [],
 };
 
 const revealNote = "The key is shown only once. Copy it now.";
-const tagRows = 2;
-
-/** Splits the textarea into tags, adding the `tag:` prefix the policy expects. */
-export function parseTags(text: string): string[] {
-  return text
-    .split(/[\s,]+/u)
-    .map((tag) => tag.trim())
-    .filter((tag) => tag !== "")
-    .map((tag) => (tag.startsWith("tag:") ? tag : `tag:${tag}`));
-}
 
 /**
  * What the caller came for. The keys page mints a key; everywhere else the key is a means to an end
@@ -126,6 +117,7 @@ function CreatePreAuthKeyForm({
   const mayListUsers = can(me, "users:read");
   const users = useQuery({ ...usersQuery, enabled: mayListUsers });
   const groups = useQuery({ ...groupsQuery, enabled: can(me, "policy_file:read") });
+  const knownTags = useKnownTags(me);
   const { create } = usePreAuthKeyMutations();
   const [draft, setDraft] = useState<Draft>({ ...emptyDraft, userId: me.user?.id ?? "" });
   const userList = users.data?.users ?? [];
@@ -145,7 +137,7 @@ function CreatePreAuthKeyForm({
           ephemeral: draft.ephemeral,
           preauthorized: draft.preauthorized,
           expiration: expirationFor(draft.expiry),
-          aclTags: parseTags(draft.tags),
+          aclTags: [...draft.tags],
           groupIds: [...draft.groupIds],
         },
       },
@@ -163,6 +155,7 @@ function CreatePreAuthKeyForm({
         draft={{ ...draft, userId }}
         users={mayListUsers ? userList : undefined}
         groups={groups.data?.groups}
+        knownTags={knownTags}
         onChange={update}
       />
       <DialogError message={create.isError ? errorMessage(create.error) : undefined} />
@@ -187,6 +180,7 @@ function PreAuthKeyFields({
   draft,
   users,
   groups,
+  knownTags,
   onChange,
 }: {
   readonly draft: Draft;
@@ -194,6 +188,8 @@ function PreAuthKeyFields({
   readonly users: readonly User[] | undefined;
   /** The groups a registered machine may join, or undefined when the caller may not list them. */
   readonly groups: readonly Group[] | undefined;
+  /** The tags the tailnet knows, offered as the operator types. */
+  readonly knownTags: readonly string[];
   readonly onChange: (patch: Partial<Draft>) => void;
 }): ReactElement {
   return (
@@ -255,14 +251,11 @@ function PreAuthKeyFields({
           }}
         />
       </Switch.Group>
-      <InputArea
-        label="Tags"
-        required={false}
-        description={<TagsHint />}
+      <TagField
+        description="A tagged machine belongs to its tags, not the user."
+        placeholder="tag:server"
         value={draft.tags}
-        spellCheck={false}
-        placeholder="tag:server, tag:prod"
-        minRows={tagRows}
+        suggestions={knownTags}
         onValueChange={(tags) => {
           onChange({ tags });
         }}
@@ -280,15 +273,6 @@ function PreAuthKeyFields({
           empty="No group matches. Create one under Access controls."
         />
       )}
-    </>
-  );
-}
-
-function TagsHint(): ReactElement {
-  return (
-    <>
-      Comma separated. <Code>tag:</Code> is added when missing, and a tagged machine belongs to its
-      tags, not the user.
     </>
   );
 }

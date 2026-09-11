@@ -104,7 +104,7 @@ export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): Rea
           />
         </table.AppTable>
       </Frame>
-      <AppDialog open={creating} onOpenChange={setCreating} mutations={mutations} />
+      <AppDialog me={me} open={creating} onOpenChange={setCreating} mutations={mutations} />
     </>
   );
 }

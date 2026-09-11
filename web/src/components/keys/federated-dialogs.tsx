@@ -1,6 +1,6 @@
 import { Banner } from "@cloudflare/kumo/components/banner";
 import { Button } from "@cloudflare/kumo/components/button";
-import { Input, InputArea } from "@cloudflare/kumo/components/input";
+import { Input } from "@cloudflare/kumo/components/input";
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactElement, SubmitEvent } from "react";
@@ -24,8 +24,8 @@ import {
 } from "~/components/keys/federated.ts";
 import type { ClaimRuleEntry } from "~/components/keys/federated.ts";
 import { useOAuthClientMutations } from "~/components/keys/mutations.ts";
-import { parseTags } from "~/components/keys/preauth-dialogs.tsx";
 import { needsTags, scopeItems } from "~/components/keys/scopes.ts";
+import { useKnownTags } from "~/components/tags/use-known-tags.ts";
 import { Code } from "~/components/ui/code.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
 import {
@@ -36,8 +36,7 @@ import {
   DialogRoot,
 } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
-
-const tagRows = 2;
+import { TagField } from "~/components/ui/tag-field.tsx";
 
 export function CreateFederatedIdentityDialog({
   me,
@@ -161,7 +160,8 @@ function CreateFederatedIdentityForm({
   const [subject, setSubject] = useState("");
   const [rules, setRules] = useState<readonly ClaimRuleEntry[]>([]);
   const [scopes, setScopes] = useState<readonly string[]>([]);
-  const [tags, setTags] = useState("");
+  const [tags, setTags] = useState<readonly string[]>([]);
+  const knownTags = useKnownTags(me);
 
   const issuerError = issuer === "" ? undefined : validateIssuerUrl(issuer);
   const rulesError = validateClaimRules(rules);
@@ -172,7 +172,7 @@ function CreateFederatedIdentityForm({
     subject.trim() !== "" &&
     audience.trim() !== "" &&
     scopes.length > 0 &&
-    (!needsTags(scopes) || parseTags(tags).length > 0);
+    (!needsTags(scopes) || tags.length > 0);
 
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -192,7 +192,7 @@ function CreateFederatedIdentityForm({
           subject: subject.trim(),
           customClaimRules: claimRulesToRecord(rules),
           scopes: [...scopes],
-          tags: parseTags(tags),
+          tags: [...tags],
         },
       },
       {
@@ -236,18 +236,16 @@ function CreateFederatedIdentityForm({
         onValueChange={setScopes}
         empty="No scope matches."
       />
-      <InputArea
-        label="Tags"
+      <TagField
         required={needsTags(scopes)}
         description={
           needsTags(scopes)
             ? "Machine and pre-auth key scopes need tags. Everything created by the token is owned by them."
             : "Tags the token may put on the machines and keys it creates."
         }
+        placeholder="tag:ci"
         value={tags}
-        spellCheck={false}
-        placeholder="tag:ci, tag:server"
-        minRows={tagRows}
+        suggestions={knownTags}
         onValueChange={setTags}
       />
       <DialogError message={create.isError ? errorMessage(create.error) : undefined} />

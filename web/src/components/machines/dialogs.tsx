@@ -1,13 +1,15 @@
 // DeleteResource is exported from the package root only.
 import { DeleteResource } from "@cloudflare/kumo";
 import { Button } from "@cloudflare/kumo/components/button";
-import { Input, InputArea } from "@cloudflare/kumo/components/input";
+import { Input } from "@cloudflare/kumo/components/input";
 import { useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { Node } from "~/api/queries.ts";
+import type { Me } from "~/auth/me.ts";
 import type { useNodeMutations } from "~/components/machines/mutations.ts";
+import { useKnownTags } from "~/components/tags/use-known-tags.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import {
   DialogClose,
@@ -16,6 +18,7 @@ import {
   DialogFooter,
   DialogRoot,
 } from "~/components/ui/dialog.tsx";
+import { TagField } from "~/components/ui/tag-field.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { dnsLabelIssue } from "~/lib/dns-label.ts";
 import { nodeName } from "~/lib/node.ts";
@@ -123,15 +126,13 @@ function RenameForm({
   );
 }
 
-function parseTags(text: string): string[] {
-  return text
-    .split(/[\s,]+/u)
-    .map((tag) => tag.trim())
-    .filter((tag) => tag !== "")
-    .map((tag) => (tag.startsWith("tag:") ? tag : `tag:${tag}`));
-}
-
-export function TagsDialog({ node, open, onOpenChange, mutations }: NodeDialogProps): ReactElement {
+export function TagsDialog({
+  node,
+  me,
+  open,
+  onOpenChange,
+  mutations,
+}: NodeDialogProps & { readonly me: Me }): ReactElement {
   return (
     <DialogRoot open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -139,24 +140,29 @@ export function TagsDialog({ node, open, onOpenChange, mutations }: NodeDialogPr
         title="Edit tags"
         description="A tagged machine belongs to its tags instead of a user. Clearing every tag hands it back to the user that registered it."
       >
-        <TagsForm node={node} onOpenChange={onOpenChange} mutations={mutations} />
+        <TagsForm node={node} me={me} onOpenChange={onOpenChange} mutations={mutations} />
       </DialogContent>
     </DialogRoot>
   );
 }
 
-function TagsForm({ node, onOpenChange, mutations }: Omit<NodeDialogProps, "open">): ReactElement {
-  const [text, setText] = useState(node.tags.join("\n"));
+function TagsForm({
+  node,
+  me,
+  onOpenChange,
+  mutations,
+}: Omit<NodeDialogProps, "open"> & { readonly me: Me }): ReactElement {
+  const [draft, setDraft] = useState<readonly string[]>(node.tags);
+  const suggestions = useKnownTags(me);
   const { setTags } = mutations;
-  const tags = parseTags(text);
 
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
     setTags.mutate(
-      { params: { path: { nodeId: node.id } }, body: { tags } },
+      { params: { path: { nodeId: node.id } }, body: { tags: [...draft] } },
       {
         onSuccess: () => {
-          toast.success(tags.length === 0 ? "Tags removed" : "Tags updated");
+          toast.success(draft.length === 0 ? "Tags removed" : "Tags updated");
           onOpenChange(false);
         },
       },
@@ -165,19 +171,12 @@ function TagsForm({ node, onOpenChange, mutations }: Omit<NodeDialogProps, "open
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <InputArea
-        label="Tags"
-        description={
-          <>
-            One per line or comma separated; <span className="font-mono">tag:</span> is added when
-            missing.
-          </>
-        }
-        value={text}
-        spellCheck={false}
-        placeholder={"tag:server\ntag:prod"}
-        rows={4}
-        onValueChange={setText}
+      <TagField
+        description="The tags the policy hands out come up as you type; a new one can be typed in full."
+        placeholder="tag:server"
+        value={draft}
+        suggestions={suggestions}
+        onValueChange={setDraft}
       />
       <DialogError message={setTags.isError ? errorMessage(setTags.error) : undefined} />
       <FormFooter label="Save tags" pending={setTags.isPending} />

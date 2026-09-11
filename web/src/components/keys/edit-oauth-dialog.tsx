@@ -1,5 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { Input, InputArea } from "@cloudflare/kumo/components/input";
+import { Input } from "@cloudflare/kumo/components/input";
 import type { ReactElement, SubmitEvent } from "react";
 import { useState } from "react";
 
@@ -16,8 +16,8 @@ import {
 } from "~/components/keys/federated.ts";
 import type { ClaimRuleEntry } from "~/components/keys/federated.ts";
 import { useOAuthClientMutations } from "~/components/keys/mutations.ts";
-import { parseTags } from "~/components/keys/preauth-dialogs.tsx";
 import { needsTags, scopeItemsWithExisting } from "~/components/keys/scopes.ts";
+import { useKnownTags } from "~/components/tags/use-known-tags.ts";
 import {
   DialogClose,
   DialogContent,
@@ -26,10 +26,9 @@ import {
   DialogRoot,
 } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
+import { TagField } from "~/components/ui/tag-field.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { useBaseline } from "~/lib/use-baseline.ts";
-
-const tagRows = 2;
 
 export function EditOAuthClientDialog({
   client,
@@ -78,7 +77,7 @@ function canSubmitEdit({
 }: {
   readonly dirty: boolean;
   readonly scopes: readonly string[];
-  readonly tags: string;
+  readonly tags: readonly string[];
   readonly isFederated: boolean;
   readonly issuerError?: string | undefined;
   readonly rulesError?: string | undefined;
@@ -88,7 +87,7 @@ function canSubmitEdit({
   if (!dirty || scopes.length === 0) {
     return false;
   }
-  if (needsTags(scopes) && parseTags(tags).length === 0) {
+  if (needsTags(scopes) && tags.length === 0) {
     return false;
   }
   if (isFederated) {
@@ -112,11 +111,13 @@ function ScopesAndTagsFields({
 }: {
   readonly me?: Me | undefined;
   readonly scopes: readonly string[];
-  readonly tags: string;
+  readonly tags: readonly string[];
   readonly existingScopes: readonly string[];
   readonly onScopesChange: (scopes: string[]) => void;
-  readonly onTagsChange: (tags: string) => void;
+  readonly onTagsChange: (tags: string[]) => void;
 }): ReactElement {
+  const knownTags = useKnownTags(me);
+
   return (
     <>
       <MultiPicker
@@ -128,18 +129,16 @@ function ScopesAndTagsFields({
         onValueChange={onScopesChange}
         empty="No scope matches."
       />
-      <InputArea
-        label="Tags"
+      <TagField
         required={needsTags(scopes)}
         description={
           needsTags(scopes)
             ? "Machine and pre-auth key scopes need tags. Everything created is owned by them."
             : "Tags the tokens may put on the machines and keys created."
         }
+        placeholder="tag:ci"
         value={tags}
-        spellCheck={false}
-        placeholder="tag:ci, tag:server"
-        minRows={tagRows}
+        suggestions={knownTags}
         onValueChange={onTagsChange}
       />
     </>
@@ -163,7 +162,7 @@ function EditOAuthClientForm({
 
   const [description, setDescription] = useState(baseline.description);
   const [scopes, setScopes] = useState<readonly string[]>(baseline.scopes);
-  const [tags, setTags] = useState(baseline.tags.join(", "));
+  const [tags, setTags] = useState<readonly string[]>(baseline.tags);
   const [issuer, setIssuer] = useState(baseline.issuer);
   const [audience, setAudience] = useState(baseline.audience);
   const [subject, setSubject] = useState(baseline.subject);
@@ -177,7 +176,7 @@ function EditOAuthClientForm({
   const diff = diffOAuthClient(baseline, {
     description,
     scopes,
-    tags: parseTags(tags),
+    tags,
     issuer,
     audience,
     subject,

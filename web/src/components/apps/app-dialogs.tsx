@@ -5,26 +5,29 @@ import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { App } from "~/api/queries.ts";
+import type { Me } from "~/auth/me.ts";
 import {
   appDomainError,
   appRouteError,
   appValidationError,
-  connectorTagError,
   normalizeConnectorTag,
   normalizeDomain,
 } from "~/components/apps/model.ts";
 import type { AppDraft } from "~/components/apps/model.ts";
 import type { AppMutations } from "~/components/apps/mutations.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
+import { useKnownTags } from "~/components/tags/use-known-tags.ts";
 import { Code } from "~/components/ui/code.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { ListField } from "~/components/ui/list-field.tsx";
+import { TagField } from "~/components/ui/tag-field.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { listValues } from "~/lib/list.ts";
 
 export interface AppDialogProps {
   /** The app to edit; absent when creating one. */
   readonly app?: App | undefined;
+  readonly me: Me;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly mutations: AppMutations;
@@ -74,9 +77,10 @@ function cleanDraft(draft: AppDraft): {
   };
 }
 
-function AppForm({ app, onOpenChange, mutations }: Omit<AppDialogProps, "open">): ReactElement {
+function AppForm({ app, me, onOpenChange, mutations }: Omit<AppDialogProps, "open">): ReactElement {
   // The lists hold their rows as typed; a wrong row is what holds the form, a blank one is nothing.
   const [draft, setDraft] = useState<AppDraft>(() => draftFrom(app));
+  const knownTags = useKnownTags(me);
   const mutation = app === undefined ? mutations.create : mutations.update;
   const update = (patch: Partial<AppDraft>): void => {
     setDraft((current) => ({ ...current, ...patch }));
@@ -148,15 +152,12 @@ function AppForm({ app, onOpenChange, mutations }: Omit<AppDialogProps, "open">)
           update({ domains });
         }}
       />
-      <ListField
+      <TagField
         label="Connectors"
         description="Tags of the machines that serve the app. Leave empty for every connector."
         placeholder="tag:connector"
-        addLabel="Add connector"
-        optional
-        value={draft.connectors}
-        normalize={normalizeConnectorTag}
-        validate={connectorTagError}
+        value={draft.connectors.filter((connector) => connector !== "*")}
+        suggestions={knownTags}
         onValueChange={(connectors) => {
           update({ connectors });
         }}

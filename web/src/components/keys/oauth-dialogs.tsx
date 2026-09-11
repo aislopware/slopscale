@@ -1,5 +1,5 @@
 import { Button } from "@cloudflare/kumo/components/button";
-import { Input, InputArea } from "@cloudflare/kumo/components/input";
+import { Input } from "@cloudflare/kumo/components/input";
 import type { ReactElement, SubmitEvent } from "react";
 import { useState } from "react";
 
@@ -7,8 +7,8 @@ import { errorMessage } from "~/api/error.ts";
 import type { Me } from "~/auth/me.ts";
 import { CreatedKey, useCreatedKey } from "~/components/keys/created-key.tsx";
 import { useOAuthClientMutations } from "~/components/keys/mutations.ts";
-import { parseTags } from "~/components/keys/preauth-dialogs.tsx";
 import { needsTags, scopeItems } from "~/components/keys/scopes.ts";
+import { useKnownTags } from "~/components/tags/use-known-tags.ts";
 import {
   DialogClose,
   DialogContent,
@@ -17,12 +17,12 @@ import {
   DialogRoot,
 } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
+import { TagField } from "~/components/ui/tag-field.tsx";
 
 export { CreateFederatedIdentityDialog } from "~/components/keys/federated-dialogs.tsx";
 export { EditOAuthClientDialog } from "~/components/keys/edit-oauth-dialog.tsx";
 
 const revealNote = "The secret is shown only once. Copy it now.";
-const tagRows = 2;
 
 export function CreateOAuthClientDialog({
   me,
@@ -69,8 +69,9 @@ function CreateOAuthClientForm({
   const { create } = useOAuthClientMutations();
   const [description, setDescription] = useState("");
   const [scopes, setScopes] = useState<readonly string[]>([]);
-  const [tags, setTags] = useState("");
-  const canSubmit = scopes.length > 0 && (!needsTags(scopes) || parseTags(tags).length > 0);
+  const [tags, setTags] = useState<readonly string[]>([]);
+  const knownTags = useKnownTags(me);
+  const canSubmit = scopes.length > 0 && (!needsTags(scopes) || tags.length > 0);
 
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -81,7 +82,7 @@ function CreateOAuthClientForm({
     }
 
     create.mutate(
-      { body: { description: description.trim(), scopes: [...scopes], tags: parseTags(tags) } },
+      { body: { description: description.trim(), scopes: [...scopes], tags: [...tags] } },
       {
         onSuccess: (data) => {
           onCreated(data.clientSecret ?? "");
@@ -110,18 +111,16 @@ function CreateOAuthClientForm({
         onValueChange={setScopes}
         empty="No scope matches."
       />
-      <InputArea
-        label="Tags"
+      <TagField
         required={needsTags(scopes)}
         description={
           needsTags(scopes)
             ? "Machine and pre-auth key scopes need tags. Everything the client creates is owned by them."
             : "Tags the client may put on the machines and keys it creates."
         }
+        placeholder="tag:ci"
         value={tags}
-        spellCheck={false}
-        placeholder="tag:ci, tag:server"
-        minRows={tagRows}
+        suggestions={knownTags}
         onValueChange={setTags}
       />
       <DialogError message={create.isError ? errorMessage(create.error) : undefined} />
