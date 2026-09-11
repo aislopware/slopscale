@@ -123,7 +123,7 @@ func registerUsers(api huma.API, b Backend) {
 			return nil, mapError("creating user", err)
 		}
 
-		audit.Target(ctx, "", formatID(user.ID), user.Name)
+		audit.Target(ctx, "", formatID(user.ID), user.Display())
 
 		b.Change(policyChanged)
 
@@ -155,7 +155,7 @@ func registerUsers(api huma.API, b Backend) {
 
 		// The name the caller addressed, so the entry still names the user
 		// as it was; newName carries the result.
-		audit.Target(ctx, "", "", oldUser.Name)
+		audit.Target(ctx, "", "", oldUser.Display())
 		audit.Detail(ctx, "newName", in.NewName)
 
 		_, c, err := b.State.RenameUser(types.UserID(oldUser.ID), in.NewName)
@@ -218,7 +218,7 @@ func registerUserLifecycle(api huma.API, b Backend) {
 			return nil, mapError("deleting user", err)
 		}
 
-		audit.Target(ctx, "", "", user.Name)
+		audit.Target(ctx, "", "", user.Display())
 
 		policyChanged, err := b.State.DeleteUser(types.UserID(user.ID))
 		if err != nil {
@@ -331,7 +331,7 @@ func registerUserRole(api huma.API, b Backend) {
 			return nil, mapError("setting user role", err)
 		}
 
-		audit.Target(ctx, "", "", user.Name)
+		audit.Target(ctx, "", "", user.Display())
 
 		b.Change(policyChanged)
 
@@ -398,7 +398,7 @@ func handleUpdateUser(ctx context.Context, b Backend, in *updateUserInput) (*use
 		return nil, mapError("updating user", err)
 	}
 
-	audit.Target(ctx, "", formatID(user.ID), user.Name)
+	audit.Target(ctx, "", formatID(user.ID), user.Display())
 
 	b.Change(c)
 
