@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 0.34.0 (unreleased)
+
+### Changes
+
+- The console shows the state of each row in a table's status column and on a page's title line as a tinted badge (Connected, Needs approval, Expired, Approved, Failing) rather than a coloured word, so the rows to look at stand out in a long list. A fact about a thing inside its details (Funnel on, key valid, an update available) stays a word, so a detail panel is still a list of words
+- Monospace text in the console (addresses, hostnames, keys, commands) is set in Geist Mono, bundled with the console, instead of whatever the browser had. SF Mono read heavier and wider than the text beside it, and Windows fell back to Consolas
+- A machine's _Client_ row no longer carries an _Update now_ button beside the version and the state; _Update client_ in the machine's Actions menu does that, and the row says _Update available_ with how to update one hover away. The button's border was cut off by the row
+- The _Server_ settings page shows one fact per line: the database only says _Unreachable_ when it is, the base domain and MagicDNS are two rows, and the key expiry, Funnel and DERP rows put their qualifier under the value instead of beside it. The Funnel row counts the ingress nodes whether or not the embedded ingress is on, so a server that relies on an external ingress node sees it
+- The console's access graph draws machines the policy treats alike as one row and one column, so a tailnet of any size fits on a screen and the old limit of 60 machines is gone: sixty laptops that reach the same servers the same way are one row named by their owner or tags. Two machines share a row only when every other machine reaches both the same way and they reach each other the same way, so a cell stands for every pair between its row and column. Each cell says what the row may open on the column (every port, the ports, SSH only) and is tinted by how much; hovering it names the pair and the counts, and a row's machines are listed under its header with a link to each one's own two lists
+- A copyable value in the console (a URL, an address, a key) no longer loses its last character to an ellipsis when there is room for it: the control's hover tint reaches past its text, and its width cap did not allow for that
+- The console's sign-in page carries the slopscale mark instead of a placeholder icon
+- The console's avatars carry a tint seeded by the name, so the same person is the same colour in every list and two people with the same initials tell apart; keys, the CLI and the server keep the neutral mark
+
 ## 0.33.0 (2026-09-11)
 
 ### Changes
