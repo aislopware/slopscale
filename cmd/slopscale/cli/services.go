@@ -27,14 +27,14 @@ func init() {
 
 	createServiceCmd.Flags().StringP("name", "n", "", "Service name, svc:web or web; a DNS label")
 	createServiceCmd.Flags().String("display-name", "", "The label clients show")
-	createServiceCmd.Flags().StringP("comment", "c", "", "A note for operators")
+	createServiceCmd.Flags().String("comment", "", "A note for operators")
 	createServiceCmd.Flags().
 		StringSliceP("port", "p", []string{}, "Protocol and ports clients are told about, such as tcp:443 or udp:53-60")
 	mustMarkRequired(createServiceCmd, "name")
 
 	updateServiceCmd.Flags().StringP("name", "n", "", "Service name, svc:web or web")
 	updateServiceCmd.Flags().String("display-name", "", "The label clients show")
-	updateServiceCmd.Flags().StringP("comment", "c", "", "A note for operators")
+	updateServiceCmd.Flags().String("comment", "", "A note for operators")
 	updateServiceCmd.Flags().StringSliceP("port", "p", []string{}, "Protocol and ports; pass an empty value to clear")
 	mustMarkRequired(updateServiceCmd, "name")
 

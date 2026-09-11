@@ -5,6 +5,7 @@
 ### Changes
 
 - The console no longer reports "Page not found" when a reverse proxy in front of slopscale answers a bare 404 while the server restarts; the page now says the server did not answer and may be restarting. Every error slopscale sends itself carries problem details, so a 404 without them can only come from the proxy
+- `slopscale apps create`, `apps update`, `services create` and `services update` no longer crash on start: their `-c` shorthand (`--connector`, `--comment`) collided with the global `-c --config`. The long flags are unchanged; the shorthand is gone. A test now walks every command so a shorthand that shadows a global flag cannot ship again
 
 ## 0.30.0 (2026-09-10)
 

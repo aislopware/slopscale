@@ -16,7 +16,7 @@ func appFlags(cmd *cobra.Command) {
 	cmd.Flags().Uint64P("id", "i", 0, "")
 	cmd.Flags().StringP("name", "n", "", "")
 	cmd.Flags().StringSliceP("domain", "d", []string{}, "")
-	cmd.Flags().StringSliceP("connector", "c", []string{"*"}, "")
+	cmd.Flags().StringSlice("connector", []string{"*"}, "")
 	cmd.Flags().StringSliceP("route", "r", []string{}, "")
 	cmd.Flags().String("description", "", "")
 }

@@ -26,7 +26,7 @@ func init() {
 
 	createAppCmd.Flags().StringP("name", "n", "", "App name")
 	createAppCmd.Flags().StringSliceP("domain", "d", []string{}, "Domain the connectors route (repeatable)")
-	createAppCmd.Flags().StringSliceP("connector", "c", []string{"*"}, "Connector node tags (repeatable, default *)")
+	createAppCmd.Flags().StringSlice("connector", []string{"*"}, "Connector node tags (repeatable, default *)")
 	createAppCmd.Flags().StringSliceP("route", "r", []string{}, "CIDRs the connectors advertise (repeatable)")
 	createAppCmd.Flags().String("description", "", "App description")
 	mustMarkRequired(createAppCmd, "name")
@@ -34,7 +34,7 @@ func init() {
 	updateAppCmd.Flags().Uint64P("id", "i", 0, "App identifier (ID)")
 	updateAppCmd.Flags().StringP("name", "n", "", "App name")
 	updateAppCmd.Flags().StringSliceP("domain", "d", []string{}, "Domain the connectors route (repeatable)")
-	updateAppCmd.Flags().StringSliceP("connector", "c", []string{}, "Connector node tags (repeatable)")
+	updateAppCmd.Flags().StringSlice("connector", []string{}, "Connector node tags (repeatable)")
 	updateAppCmd.Flags().StringSliceP("route", "r", []string{}, "CIDRs the connectors advertise (repeatable)")
 	updateAppCmd.Flags().String("description", "", "App description")
 	mustMarkRequired(updateAppCmd, "id")
