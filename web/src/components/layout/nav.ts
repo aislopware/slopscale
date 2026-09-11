@@ -98,9 +98,11 @@ export interface NavGroup {
 
 /**
  * The sidebar, grouped by what the operator is doing: the machines and people on the tailnet, who
- * may reach what, how packets and names travel, what happened, and the switches, credentials and
- * outbound integrations that configure all of it. A page with several parts of its own is a branch
- * with a page per part, so every part has an address and a place in the sidebar.
+ * may reach what and the keys that let a machine or a program in, how packets and names travel,
+ * what happened, and the switches and outbound integrations that only an administrator sees. Keys
+ * sit under Access rather than Administration because every member has API keys of their own. A
+ * page with several parts of its own is a branch with a page per part, so every part has an address
+ * and a place in the sidebar.
  */
 export const navGroups: readonly NavGroup[] = [
   { items: [{ to: "/", label: "Overview", icon: SquaresFourIcon, exact: true }] },
@@ -132,6 +134,16 @@ export const navGroups: readonly NavGroup[] = [
           { to: "/policy/postures", label: "Postures" },
           { to: "/policy/requests", label: "Requests", badge: "pendingRequests" },
           { to: "/policy/file", label: "Policy file" },
+        ],
+      },
+      {
+        to: "/keys",
+        label: "Keys",
+        icon: KeyIcon,
+        children: [
+          { to: "/keys/pre-auth", label: "Pre-auth keys", scope: "auth_keys:read" },
+          { to: "/keys/api", label: "API keys" },
+          { to: "/keys/oauth", label: "OAuth clients", scope: "oauth_keys:read" },
         ],
       },
       { to: "/access", label: "My access", icon: HandWavingIcon },
@@ -205,16 +217,6 @@ export const navGroups: readonly NavGroup[] = [
           { to: "/settings/tailnet", label: "Tailnet" },
           { to: "/settings/sessions", label: "Sessions" },
           { to: "/settings/server", label: "Server" },
-        ],
-      },
-      {
-        to: "/keys",
-        label: "Keys",
-        icon: KeyIcon,
-        children: [
-          { to: "/keys/pre-auth", label: "Pre-auth keys", scope: "auth_keys:read" },
-          { to: "/keys/api", label: "API keys" },
-          { to: "/keys/oauth", label: "OAuth clients", scope: "oauth_keys:read" },
         ],
       },
       {
