@@ -4,7 +4,7 @@ import type { ReactElement, ReactNode } from "react";
 
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { connectCommand, serverUrl } from "~/components/machines/connect.ts";
+import { connectCommand, signInCommand } from "~/components/machines/connect.ts";
 import { Code } from "~/components/ui/code.tsx";
 import { CommandBox } from "~/components/ui/command-text.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
@@ -105,7 +105,7 @@ export function GetStarted({ me, onAddMachine }: GetStartedProps): ReactElement 
             Run this on the machine and sign in as yourself. It joins as one of your machines and
             appears here.
           </p>
-          <CommandBox size="sm" command={`tailscale up --login-server=${serverUrl()}`} />
+          <CommandBox size="sm" command={signInCommand()} />
         </Step>
       )}
     </Section>

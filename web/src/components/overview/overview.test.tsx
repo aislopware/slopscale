@@ -241,7 +241,7 @@ describe(GetStarted, () => {
     await expect
       .element(
         screen.getByText(
-          `tailscale up --login-server=${globalThis.location.origin} --authkey=<key>`,
+          `tailscale up --login-server=${globalThis.location.origin} --accept-routes --authkey=<key>`,
           {
             exact: false,
           },
@@ -265,9 +265,12 @@ describe(GetStarted, () => {
 
     await expect
       .element(
-        screen.getByText(`tailscale up --login-server=${globalThis.location.origin}`, {
-          exact: true,
-        }),
+        screen.getByText(
+          `tailscale up --login-server=${globalThis.location.origin} --accept-routes`,
+          {
+            exact: true,
+          },
+        ),
       )
       .toBeVisible();
     await expect

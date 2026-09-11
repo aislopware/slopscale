@@ -28,7 +28,7 @@ function queried(element: ReactElement): ReactElement {
 describe(connectCommand, () => {
   it("points the machine at this console with the key it was given", () => {
     expect(connectCommand("secret")).toBe(
-      `tailscale up --login-server=${globalThis.location.origin} --authkey=secret`,
+      `tailscale up --login-server=${globalThis.location.origin} --accept-routes --authkey=secret`,
     );
   });
 });

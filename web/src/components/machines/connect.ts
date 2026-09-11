@@ -4,12 +4,24 @@ export function serverUrl(): string {
 }
 
 /**
+ * The flags every join command carries after the server: `--accept-routes`, so a machine uses the
+ * subnet routes and app connectors the tailnet advertises without a second command, which is what
+ * the hosted control plane's clients do by default on every platform but Linux.
+ */
+export const joinFlags = "--accept-routes";
+
+/** The command that signs a machine in as whoever runs it, for the overview's first steps. */
+export function signInCommand(): string {
+  return `tailscale up --login-server=${serverUrl()} ${joinFlags}`;
+}
+
+/**
  * The single command that puts a machine on this tailnet. With a key in hand it needs no further
  * input, so the "Add machine" dialog can hand over a line that is ready to paste; without one the
  * placeholder shows where the key goes.
  */
 export function connectCommand(key: string): string {
-  return `tailscale up --login-server=${serverUrl()} --authkey=${key}`;
+  return `${signInCommand()} --authkey=${key}`;
 }
 
 export const platforms = ["linux", "macos", "windows", "docker", "mobile"] as const;
@@ -72,7 +84,7 @@ const builders: Record<Platform, Builder> = {
       "docker run -d --name tailscale --hostname my-container",
       "-v tailscale-state:/var/lib/tailscale -e TS_STATE_DIR=/var/lib/tailscale",
       "--cap-add NET_ADMIN --device /dev/net/tun",
-      `-e TS_AUTHKEY=${key} -e TS_EXTRA_ARGS=--login-server=${server}`,
+      `-e TS_AUTHKEY=${key} -e TS_EXTRA_ARGS="--login-server=${server} ${joinFlags}"`,
       "tailscale/tailscale",
     ];
 
