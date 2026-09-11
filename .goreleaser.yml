@@ -70,7 +70,7 @@ nfpms:
     package_name: slopscale
     priority: optional
     vendor: slopscale
-    maintainer: Kristoffer Dalby <kristoffer@dalby.cc>
+    maintainer: Cong Tran <trancong12102@gmail.com>
     homepage: https://github.com/aislopware/slopscale
     description: |-
       Open source implementation of the Tailscale control server.

@@ -804,8 +804,11 @@ in
     };
   };
 
-  meta.maintainers = with lib.maintainers; [
-    kradalby
-    misterio77
+  meta.maintainers = [
+    {
+      name = "Cong Tran";
+      email = "trancong12102@gmail.com";
+      github = "trancong12102";
+    }
   ];
 }

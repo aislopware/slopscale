@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.41.0 (unreleased)
+
+### Changes
+
+- The macOS and iOS configuration profiles served at `/apple` carry the identifier `com.github.aislopware.slopscale` instead of `com.github.juanfont.slopscale`, and the Debian package names Cong Tran as maintainer. A profile installed from an earlier version keeps working; installing the new one adds a second profile, so remove the old one first
+
 ## 0.40.0 (2026-09-11)
 
 ### Changes
@@ -2017,7 +2023,7 @@ and removed nodes. Previously we sent the entire state of the network every time
 an update was due.
 
 While we have a pretty good
-[test harness](https://github.com/search?q=repo%3Ajuanfont%2Fslopscale+path%3A_test.go&type=code)
+[test harness](https://github.com/search?q=repo%3Aaislopware%2Fslopscale+path%3A_test.go&type=code)
 for validating our changes, the changes came down to
 [284 changed files with 32,316 additions and 24,245 deletions](https://github.com/aislopware/slopscale/compare/b01f1f1867136d9b2d7b1392776eb363b482c525...ed78ecd)
 and bugs are expected. We need help testing this release. In addition, while we
