@@ -54,7 +54,10 @@ export function CopyText({
         void run();
       }}
       className={cn(
-        "group/copy -mx-1 inline-flex max-w-full min-w-0 items-center gap-1 rounded-sm px-1 font-mono text-[0.9em] hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none",
+        // The hover tint reaches 4px past the text either side, so the text keeps the edge every
+        // other value has. A container sized to the control measures its margin box, 8px short of
+        // the text, so the cap is 100% plus those 8px or the last character is always cut.
+        "group/copy -mx-1 inline-flex max-w-[calc(100%+0.5rem)] min-w-0 items-center gap-1 rounded-sm px-1 font-mono text-[0.9em] hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-focus focus-visible:outline-none",
         className,
       )}
     >

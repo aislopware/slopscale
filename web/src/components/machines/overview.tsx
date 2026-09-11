@@ -1,20 +1,14 @@
-import { Button } from "@cloudflare/kumo/components/button";
 import { Collapsible } from "@cloudflare/kumo/components/collapsible";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
-import { ArrowsClockwiseIcon, CaretRightIcon } from "@phosphor-icons/react";
-import { useState } from "react";
+import { CaretRightIcon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 import type { Node } from "~/api/queries.ts";
 import type { NodeHardwareAttestation, NodeTpm } from "~/api/schema.gen.ts";
-import { can } from "~/auth/me.ts";
-import type { Me } from "~/auth/me.ts";
-import { ClientUpdateDialog } from "~/components/machines/dialogs.tsx";
-import { reportClientUpdate, useNodeMutations } from "~/components/machines/mutations.ts";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { Section } from "~/components/ui/section.tsx";
-import { Status } from "~/components/ui/status.tsx";
+import { Status, StatusDetail } from "~/components/ui/status.tsx";
 import { ValueList } from "~/components/ui/value-list.tsx";
 import { isTagged, nodeName, userLabel } from "~/lib/node.ts";
 import { formatAbsolute, formatRelative, parseTime } from "~/lib/time.ts";
@@ -26,25 +20,18 @@ const registerMethods: Record<string, string> = {
 };
 
 const caretSize = 14;
-const buttonIconSize = 12;
 
 /** How the machine was registered and who it answers to. */
-export function OverviewSection({
-  node,
-  me,
-}: {
-  readonly node: Node;
-  readonly me: Me;
-}): ReactElement {
+export function OverviewSection({ node }: { readonly node: Node }): ReactElement {
   return (
     <Section title="Overview">
-      <DefinitionList items={overview(node, me)} columns={2} />
+      <DefinitionList items={overview(node)} columns={2} />
       <Keys node={node} />
     </Section>
   );
 }
 
-function overview(node: Node, me: Me): Definition[] {
+function overview(node: Node): Definition[] {
   return [
     { key: "hostname", label: "Hostname", value: node.name, copy: node.name },
     { key: "owner", label: "Owner", value: <Owner node={node} /> },
@@ -57,7 +44,7 @@ function overview(node: Node, me: Me): Definition[] {
     { key: "created", label: "Created", value: <Timestamp value={node.createdAt} /> },
     { key: "expiry", label: "Key expiry", value: <Expiry node={node} /> },
     { key: "funnel", label: "Funnel", value: <OnOff on={node.funnelEnabled} /> },
-    { key: "client", label: "Client", value: <Client node={node} me={me} /> },
+    { key: "client", label: "Client", value: <Client node={node} /> },
     { key: "attestation", label: "Hardware attestation", value: <Attestation node={node} /> },
     ...(node.tpm === undefined
       ? []
@@ -67,63 +54,34 @@ function overview(node: Node, me: Me): Definition[] {
   ];
 }
 
-/** The Tailscale client version the machine reported, and whether a newer stable one exists. */
-function Client({ node, me }: { readonly node: Node; readonly me: Me }): ReactElement {
+/**
+ * The Tailscale client version the machine reported, and whether a newer stable one exists. The
+ * update itself is an item in the Actions menu with the other things done to the machine; a button
+ * here beside the version and the state made one row three things.
+ */
+function Client({ node }: { readonly node: Node }): ReactElement {
   if (node.clientVersion === "") {
     return <span className="text-kumo-subtle">Unknown until it connects</span>;
   }
 
+  if (!node.updateAvailable) {
+    return <span>{node.clientVersion}</span>;
+  }
+
   return (
-    <span className="flex flex-wrap items-center justify-end gap-2">
+    <span className="inline-flex items-center gap-2">
       <span>{node.clientVersion}</span>
-      {node.updateAvailable ? <Status tone="warning">Update available</Status> : null}
-      {node.updateAvailable && node.online && can(me, "devices:core") ? (
-        <UpdateNow node={node} />
-      ) : null}
-    </span>
-  );
-}
-
-/**
- * Asks the machine to update its own Tailscale installation. The control plane cannot push an
- * update: the client decides, and refuses unless its owner allowed it, so the answer is reported
- * rather than assumed. It asks first, because the client restarts Tailscale to take one on.
- */
-function UpdateNow({ node }: { readonly node: Node }): ReactElement {
-  const { updateClient } = useNodeMutations();
-  const [asking, setAsking] = useState(false);
-
-  return (
-    <>
-      <Button
-        variant="secondary"
-        size="sm"
-        icon={<ArrowsClockwiseIcon size={buttonIconSize} />}
-        loading={updateClient.isPending}
-        onClick={() => {
-          setAsking(true);
-        }}
-      >
-        Update now
-      </Button>
-      <ClientUpdateDialog
-        name={nodeName(node)}
-        open={asking}
-        onOpenChange={setAsking}
-        pending={updateClient.isPending}
-        onConfirm={() => {
-          updateClient.mutate(
-            { params: { path: { nodeId: node.id } }, body: {} },
-            {
-              onSuccess: (update) => {
-                setAsking(false);
-                reportClientUpdate(update);
-              },
-            },
-          );
-        }}
+      <StatusDetail
+        tone="warning"
+        label="Update available"
+        title="A newer stable Tailscale is out"
+        detail={
+          node.online
+            ? "Update client in the Actions menu asks the machine to install it. Tailscale restarts there while it does."
+            : "Update client in the Actions menu asks the machine to install it, once it is connected again."
+        }
       />
-    </>
+    </span>
   );
 }
 

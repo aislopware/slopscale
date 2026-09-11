@@ -71,7 +71,7 @@ function MachinePage(): ReactElement {
       <ClientWarnings node={node} />
       <div className="grid items-start gap-6 min-[1200px]:grid-cols-[minmax(0,2fr)_minmax(0,22rem)]">
         <div className="flex flex-col gap-6">
-          <OverviewSection node={node} me={me} />
+          <OverviewSection node={node} />
           <RoutesSection node={node} canEdit={routes} />
           {node.appConnector && apps.data !== undefined ? (
             <AppConnectorSection node={node} apps={apps.data.apps} />

@@ -3,7 +3,7 @@ import { Input } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { PencilSimpleIcon } from "@phosphor-icons/react";
 import { useRef, useState } from "react";
-import type { ReactElement, ReactNode, SubmitEvent } from "react";
+import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { Derp } from "~/api/queries.ts";
@@ -35,10 +35,6 @@ function Muted({ children }: { readonly children: string }): ReactElement {
  * A fact that runs onto a second line rather than being cut off. The list truncates by default, so
  * a long region name or a warning has no room on a phone.
  */
-function Wrapping({ children }: { readonly children: ReactNode }): ReactElement {
-  return <span className="whitespace-normal">{children}</span>;
-}
-
 function regionLabel(server: Derp["effective"]["server"]): string {
   const base = `${server.regionId ?? ""} · ${server.regionCode ?? ""}`;
 
@@ -84,18 +80,17 @@ function regionFact(derp: Derp): Definition {
   if (!derp.autoAddEmbedded) {
     return {
       label: "Region",
+      wrap: true,
       value: (
-        <Wrapping>
-          <span className="flex flex-wrap items-baseline justify-end gap-x-2">
-            <span>{regionLabel(server)}</span>
-            <Muted>published by the map file, not by these settings</Muted>
-          </span>
-        </Wrapping>
+        <span className="flex flex-wrap items-baseline justify-end gap-x-2">
+          <span>{regionLabel(server)}</span>
+          <Muted>published by the map file, not by these settings</Muted>
+        </span>
       ),
     };
   }
 
-  return { label: "Region", value: <Wrapping>{regionLabel(server)}</Wrapping> };
+  return { label: "Region", value: regionLabel(server), wrap: true };
 }
 
 function facts(derp: Derp): readonly Definition[] {

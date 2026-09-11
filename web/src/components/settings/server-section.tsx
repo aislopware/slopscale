@@ -1,6 +1,7 @@
+import { cn } from "@cloudflare/kumo/utils";
 import { ArrowRightIcon } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import { api } from "~/api/client.ts";
 import type { ServerInfo } from "~/api/queries.ts";
@@ -22,6 +23,8 @@ const databaseLabels: Record<string, string> = { sqlite: "SQLite", postgres: "Po
 
 /** The arrow that says a value leads somewhere, sized to the text beside it. */
 const linkIconSize = 12;
+const inlineLinkClass =
+  "text-kumo-link underline decoration-kumo-line underline-offset-2 hover:decoration-current";
 
 const policyLabels: Record<string, string> = {
   file: "Policy file on disk",
@@ -30,6 +33,26 @@ const policyLabels: Record<string, string> = {
 
 function Muted({ children }: { readonly children: string }): ReactElement {
   return <span className="text-kumo-subtle">{children}</span>;
+}
+
+/**
+ * A value with a second, smaller line under it: what it is, then a qualifier such as where it is
+ * overridden or what it listens on. Two facts side by side on one line read as one value cut in
+ * half; stacked, each reads on its own.
+ */
+function Stacked({
+  children,
+  note,
+}: {
+  readonly children: ReactNode;
+  readonly note: ReactNode;
+}): ReactElement {
+  return (
+    <span className="flex flex-col items-end gap-0.5">
+      <span>{children}</span>
+      <span className="text-xs text-kumo-subtle">{note}</span>
+    </span>
+  );
 }
 
 function buildItems(info: ServerInfo, reachable: boolean): readonly Definition[] {
@@ -41,14 +64,15 @@ function buildItems(info: ServerInfo, reachable: boolean): readonly Definition[]
       value: <RelativeTime value={info.startedAt} />,
     },
     { label: "Go", value: info.goVersion },
+    // A page read out of the database says the database answers; only the failure is worth a word.
     {
       label: "Database",
-      value: (
-        <span className="flex items-center gap-2">
+      value: reachable ? (
+        (databaseLabels[info.database] ?? info.database)
+      ) : (
+        <span className="inline-flex items-center gap-2">
           <span>{databaseLabels[info.database] ?? info.database}</span>
-          <Status tone={reachable ? "success" : "danger"}>
-            {reachable ? "Reachable" : "Unreachable"}
-          </Status>
+          <Status tone="danger">Unreachable</Status>
         </span>
       ),
     },
@@ -61,20 +85,10 @@ function networkItems(info: ServerInfo): readonly Definition[] {
     { label: "Listening on", value: info.listenAddr, copy: info.listenAddr },
     { label: "IPv4 range", value: info.ipv4Prefix, copy: info.ipv4Prefix },
     { label: "IPv6 range", value: info.ipv6Prefix, copy: info.ipv6Prefix },
-    {
-      label: "MagicDNS",
-      value:
-        info.baseDomain === "" ? (
-          <Muted>Off</Muted>
-        ) : (
-          <span className="flex items-center gap-2">
-            <span className="font-mono text-[0.9em]">{info.baseDomain}</span>
-            <Status tone={info.magicDns ? "success" : "neutral"}>
-              {info.magicDns ? "On" : "Off"}
-            </Status>
-          </span>
-        ),
-    },
+    ...(info.baseDomain === ""
+      ? [{ label: "Base domain", value: <Muted>None</Muted> }]
+      : [{ label: "Base domain", value: info.baseDomain, copy: info.baseDomain }]),
+    { label: "MagicDNS", value: info.magicDns ? "On" : <Muted>Off</Muted> },
     { label: "TLS", value: tlsLabels[info.tls] ?? info.tls },
     {
       label: "Identity provider",
@@ -109,15 +123,24 @@ function policyItems(info: ServerInfo): readonly Definition[] {
     },
     {
       label: "Config file key expiry",
+      wrap: true,
       value: (
-        <span className="flex items-center gap-2">
+        <Stacked
+          note={
+            <>
+              {"Overridden by "}
+              <Link to="/settings/tailnet" className={inlineLinkClass}>
+                Settings › Tailnet
+              </Link>
+            </>
+          }
+        >
           {info.nodeExpiry === "" ? (
             <Muted>Never, unless the client asks for an expiry</Muted>
           ) : (
             info.nodeExpiry
           )}
-          <span className="text-kumo-subtle">Overridden by Settings › Tailnet</span>
-        </span>
+        </Stacked>
       ),
     },
     { label: "Ephemeral timeout", value: info.ephemeralInactivityTimeout },
@@ -131,28 +154,35 @@ function policyItems(info: ServerInfo): readonly Definition[] {
           <span className="text-kumo-subtle">Clients resolve the server URL</span>
         ),
     },
-    {
-      label: "Funnel",
-      value: (
-        <span className="flex flex-wrap items-center gap-2">
-          <span>
-            {info.funnelIngressNodes === 0
-              ? "No ingress node has joined"
-              : `${info.funnelIngressNodes} ingress ${info.funnelIngressNodes === 1 ? "node" : "nodes"}`}
-          </span>
-          <Status tone={info.funnelIngress ? "success" : "neutral"}>
-            {info.funnelIngress ? "Embedded ingress running" : "Embedded ingress off"}
-          </Status>
-          <span className="text-kumo-subtle">
-            {info.funnelIngress && info.funnelListenAddrs.length > 0
-              ? `Listening on ${info.funnelListenAddrs.join(", ")}. `
-              : ""}
-            Ports {info.funnelPorts.join(", ")}
-          </span>
-        </span>
-      ),
-    },
+    { label: "Funnel", value: <FunnelValue info={info} />, wrap: true },
   ];
+}
+
+/**
+ * Funnel: how many ingress nodes serve it, with the embedded ingress's state and the allowed ports
+ * under that. The count comes first because Funnel delivers nothing without an ingress node, and an
+ * external one counts as much as the embedded one; only a server with neither gets a word.
+ */
+function FunnelValue({ info }: { readonly info: ServerInfo }): ReactElement {
+  if (!info.funnelIngress && info.funnelIngressNodes === 0) {
+    return <Muted>Embedded ingress off</Muted>;
+  }
+
+  const listening =
+    info.funnelIngress && info.funnelListenAddrs.length > 0
+      ? `Embedded ingress on ${info.funnelListenAddrs.join(", ")}`
+      : `Embedded ingress ${info.funnelIngress ? "on" : "off"}`;
+  const ports = info.funnelPorts.length > 0 ? ` · Ports ${info.funnelPorts.join(", ")}` : "";
+
+  return (
+    <Stacked note={`${listening}${ports}`}>
+      {info.funnelIngressNodes === 0 ? (
+        <Status tone="warning">No ingress node has joined</Status>
+      ) : (
+        `${info.funnelIngressNodes} ingress ${info.funnelIngressNodes === 1 ? "node" : "nodes"}`
+      )}
+    </Stacked>
+  );
 }
 
 /** The latest stable Tailscale client the server found, or why it has none. */
@@ -178,21 +208,16 @@ export function ServerSection({ info }: { readonly info: ServerInfo }): ReactEle
     ...policyItems(info),
     {
       label: "DERP relays",
+      wrap: true,
       value: (
-        <span className="flex items-center gap-2">
-          <Link
-            to="/relays/map"
-            className="flex items-center gap-1 text-kumo-link underline decoration-kumo-line underline-offset-2 hover:decoration-current"
-          >
+        <Stacked note={info.derpServer ? "Embedded relay running" : "Embedded relay off"}>
+          <Link to="/relays/map" className={cn(inlineLinkClass, "flex items-center gap-1")}>
             {info.derpRegions === 0
               ? "No regions"
               : `${info.derpRegions} ${info.derpRegions === 1 ? "region" : "regions"}`}
             <ArrowRightIcon size={linkIconSize} aria-hidden />
           </Link>
-          <Status tone={info.derpServer ? "success" : "neutral"}>
-            {info.derpServer ? "Embedded relay running" : "Embedded relay off"}
-          </Status>
-        </span>
+        </Stacked>
       ),
     },
   ];
@@ -200,7 +225,7 @@ export function ServerSection({ info }: { readonly info: ServerInfo }): ReactEle
   return (
     <Section
       title="Server"
-      description="These values come from the config file and change only with a restart."
+      description="Values from the config file change only with a restart; the rest is read live."
       bodyClassName="p-0"
     >
       <DefinitionList items={items} />
