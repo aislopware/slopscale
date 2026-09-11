@@ -882,6 +882,7 @@ type DERPServerSettings struct {
 	RegionId      *int64  `json:"regionId,omitempty"`
 	RegionName    *string `json:"regionName,omitempty"`
 	StunAddr      *string `json:"stunAddr,omitempty"`
+	StunEnabled   *bool   `json:"stunEnabled,omitempty"`
 	VerifyClients *bool   `json:"verifyClients,omitempty"`
 }
 
