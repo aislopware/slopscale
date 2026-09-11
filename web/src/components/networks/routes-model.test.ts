@@ -57,6 +57,8 @@ function node(id: string, spec: NodeSpec = {}): Node {
     globalExitNode: false,
     funnelEnabled: false,
     clientVersion: "",
+    os: "",
+    osVersion: "",
     updateAvailable: false,
     ephemeral: false,
     id,

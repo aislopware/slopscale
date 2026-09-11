@@ -23,6 +23,8 @@ function fakeNode(availableRoutes: readonly string[], approvedRoutes: readonly s
     globalExitNode: false,
     funnelEnabled: false,
     clientVersion: "",
+    os: "",
+    osVersion: "",
     updateAvailable: false,
     id: "1",
     ipAddresses: [],

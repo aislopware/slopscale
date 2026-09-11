@@ -48,6 +48,8 @@ function node(id: string, overrides: Partial<Node> = {}): Node {
     globalExitNode: false,
     funnelEnabled: false,
     clientVersion: "",
+    os: "",
+    osVersion: "",
     updateAvailable: false,
     ephemeral: false,
     id,

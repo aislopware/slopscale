@@ -3482,6 +3482,10 @@ export interface components {
             netInfo?: components["schemas"]["NodeNetInfo"];
             nodeKey: string;
             online: boolean;
+            /** @description The operating system the client reported, as Tailscale names it (linux, macOS, windows, iOS, android, freebsd); empty until it connects. */
+            os: string;
+            /** @description The operating system version the client reported, such as 15.1 or Ubuntu 24.04; empty until it connects. */
+            osVersion: string;
             preAuthKey: components["schemas"]["NodePreAuthKey"];
             /** @enum {string} */
             registerMethod: "REGISTER_METHOD_UNSPECIFIED" | "REGISTER_METHOD_AUTH_KEY" | "REGISTER_METHOD_CLI" | "REGISTER_METHOD_OIDC";

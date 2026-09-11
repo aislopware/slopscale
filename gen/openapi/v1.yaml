@@ -2166,6 +2166,12 @@ components:
           type: string
         online:
           type: boolean
+        os:
+          description: The operating system the client reported, as Tailscale names it (linux, macOS, windows, iOS, android, freebsd); empty until it connects.
+          type: string
+        osVersion:
+          description: The operating system version the client reported, such as 15.1 or Ubuntu 24.04; empty until it connects.
+          type: string
         preAuthKey:
           $ref: "#/components/schemas/NodePreAuthKey"
         registerMethod:
@@ -2240,6 +2246,8 @@ components:
         - funnelEnabled
         - clientVersion
         - updateAvailable
+        - os
+        - osVersion
         - ephemeral
         - appConnector
         - sshServer

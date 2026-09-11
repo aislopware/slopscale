@@ -86,6 +86,12 @@ type Node struct {
 	ClientVersion   string `doc:"The Tailscale client version the node last reported, such as 1.86.2; empty until it connects."                            json:"clientVersion"`   //nolint:lll // struct tag
 	UpdateAvailable bool   `doc:"true when a newer stable Tailscale client exists than the one the node runs; see latestClientVersion on the server info." json:"updateAvailable"` //nolint:lll // struct tag
 
+	// OS and OSVersion are what the client reports about the machine it
+	// runs on, as Tailscale spells them (linux, macOS, windows, iOS,
+	// android, freebsd, tvOS); the console draws the OS mark from them.
+	OS        string `doc:"The operating system the client reported, as Tailscale names it (linux, macOS, windows, iOS, android, freebsd); empty until it connects." json:"os"`        //nolint:lll // struct tag
+	OSVersion string `doc:"The operating system version the client reported, such as 15.1 or Ubuntu 24.04; empty until it connects."                                 json:"osVersion"` //nolint:lll // struct tag
+
 	// Ephemeral covers both an ephemeral pre-auth key and a client that asked
 	// to be ephemeral when it registered.
 	Ephemeral bool `doc:"true when the node is deleted on logout or after the ephemeral timeout." json:"ephemeral"`
@@ -837,6 +843,8 @@ func (b Backend) nodeFromView(view types.NodeView) Node {
 	if hi := view.Hostinfo(); hi.Valid() {
 		n.ClientVersion = clientversion.Short(hi.IPNVersion())
 		n.UpdateAvailable = clientversion.Outdated(hi.IPNVersion(), b.State.LatestClientVersion())
+		n.OS = hi.OS()
+		n.OSVersion = hi.OSVersion()
 		n.AppConnector = hi.AppConnector().EqualBool(true)
 		n.SSHServer = hi.SSH_HostKeys().Len() > 0
 		n.NetInfo = netInfoFrom(view, b.derpRegions())

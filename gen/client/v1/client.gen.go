@@ -1462,9 +1462,15 @@ type Node struct {
 	Name                string                   `json:"name"`
 
 	// NetInfo The client's last network report; absent until it connects.
-	NetInfo        *NodeNetInfo       `json:"netInfo,omitempty"`
-	NodeKey        string             `json:"nodeKey"`
-	Online         bool               `json:"online"`
+	NetInfo *NodeNetInfo `json:"netInfo,omitempty"`
+	NodeKey string       `json:"nodeKey"`
+	Online  bool         `json:"online"`
+
+	// Os The operating system the client reported, as Tailscale names it (linux, macOS, windows, iOS, android, freebsd); empty until it connects.
+	Os string `json:"os"`
+
+	// OsVersion The operating system version the client reported, such as 15.1 or Ubuntu 24.04; empty until it connects.
+	OsVersion      string             `json:"osVersion"`
 	PreAuthKey     NodePreAuthKey     `json:"preAuthKey"`
 	RegisterMethod NodeRegisterMethod `json:"registerMethod"`
 

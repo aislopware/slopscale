@@ -35,6 +35,8 @@ const router: Node = {
   globalExitNode: false,
   funnelEnabled: false,
   clientVersion: "",
+  os: "",
+  osVersion: "",
   updateAvailable: false,
   ephemeral: false,
   clientWarnings: ["ip-forwarding-off", "something-new"],

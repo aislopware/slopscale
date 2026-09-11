@@ -44,6 +44,8 @@ function node(
     approvedServices: approved,
     availableRoutes: [],
     clientVersion: "",
+    os: "",
+    osVersion: "",
     clientWarnings: [],
     createdAt: stamp,
     discoKey: "discokey:1",

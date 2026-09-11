@@ -43,6 +43,8 @@ function node(id: string, available: string[], approved: string[]): Node {
     globalExitNode: false,
     funnelEnabled: false,
     clientVersion: "",
+    os: "",
+    osVersion: "",
     updateAvailable: false,
     ephemeral: false,
     id,
