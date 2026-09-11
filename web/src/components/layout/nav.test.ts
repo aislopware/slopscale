@@ -5,7 +5,14 @@ import type { Me } from "~/auth/me.ts";
 import { isActive, pagesOf, placeOf, visibleGroups } from "~/components/layout/nav.ts";
 
 function member(permissions: Me["permissions"]): Me {
-  return { kind: "session", role: "member", allAccess: false, scopes: [], permissions };
+  return {
+    kind: "session",
+    role: "member",
+    allAccess: false,
+    scoped: false,
+    scopes: [],
+    permissions,
+  };
 }
 
 describe(visibleGroups, () => {
@@ -24,6 +31,42 @@ describe(visibleGroups, () => {
 });
 
 const reader = member({ "devices:core:read": true, "policy_file:read": true });
+
+describe("a signed-in member", () => {
+  const user = {
+    id: "7",
+    name: "ada",
+    createdAt: "",
+    displayName: "",
+    email: "",
+    providerId: "",
+    provider: "",
+    profilePicUrl: "",
+    role: "member",
+    approved: true,
+    approvedAt: null,
+  };
+
+  it("gets their machines, their keys, their access and their sessions", () => {
+    const groups = visibleGroups({ ...member({}), user });
+    const labels = groups.flatMap((group) => group.items.map((item) => item.label));
+
+    expect(labels).toStrictEqual(["Overview", "Machines", "Keys", "My access", "Settings"]);
+
+    const settings = groups
+      .flatMap((group) => group.items)
+      .find((item) => item.label === "Settings");
+
+    expect(settings?.children?.map((child) => child.label)).toStrictEqual(["Sessions"]);
+  });
+
+  it("gets none of it through a key minted with scopes", () => {
+    const groups = visibleGroups({ ...member({}), user, scoped: true });
+    const labels = groups.flatMap((group) => group.items.map((item) => item.label));
+
+    expect(labels).toStrictEqual(["Overview", "Keys", "My access"]);
+  });
+});
 
 describe(placeOf, () => {
   const groups = visibleGroups(reader);

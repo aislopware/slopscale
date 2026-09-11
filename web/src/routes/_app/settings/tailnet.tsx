@@ -9,8 +9,10 @@ import { KeyExpirySection } from "~/components/settings/key-expiry-section.tsx";
 import { SSHRecordingSection } from "~/components/settings/ssh-recording-section.tsx";
 import { TailnetLockSection } from "~/components/settings/tailnet-lock-section.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
+import { requireScope } from "~/lib/require-scope.ts";
 
 export const Route = createFileRoute("/_app/settings/tailnet")({
+  beforeLoad: requireScope("feature_settings:read"),
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.query(settingsQuery),

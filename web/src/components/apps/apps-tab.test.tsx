@@ -24,6 +24,7 @@ const operator: Me = {
   kind: "session",
   role: "admin",
   allAccess: false,
+  scoped: false,
   scopes: [],
   permissions: { policy_file: true },
 };

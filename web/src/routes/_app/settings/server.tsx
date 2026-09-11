@@ -7,8 +7,10 @@ import { can } from "~/auth/me.ts";
 import { MaintenanceSection } from "~/components/settings/maintenance-section.tsx";
 import { ServerSection } from "~/components/settings/server-section.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
+import { requireScope } from "~/lib/require-scope.ts";
 
 export const Route = createFileRoute("/_app/settings/server")({
+  beforeLoad: requireScope("feature_settings:read"),
   loader: async ({ context }) => {
     await context.queryClient.query(serverInfoQuery);
   },

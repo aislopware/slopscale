@@ -31,7 +31,7 @@ import {
   TagsDialog,
 } from "~/components/machines/dialogs.tsx";
 import { reportClientUpdate, useNodeMutations } from "~/components/machines/mutations.ts";
-import { ownerId } from "~/components/machines/owner.ts";
+import { ownsNode } from "~/components/machines/owner.ts";
 import { RoutesDialog } from "~/components/machines/routes-dialog.tsx";
 import { ShareDialog } from "~/components/machines/share-dialog.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
@@ -239,8 +239,8 @@ function MachineMenuItems({
 }): ReactElement {
   const core = can(me, "devices:core");
   const routes = can(me, "devices:routes");
-  const ownNode = me.user !== undefined && ownerId(node) === me.user.id;
-  const share = core || ownNode;
+  // A member looks after their own machines: the name, the key, the shares and whether it stays.
+  const own = core || ownsNode(me, node);
 
   return (
     <>
@@ -256,7 +256,7 @@ function MachineMenuItems({
       ) : null}
       <DropdownMenu.Item
         icon={PencilSimpleIcon}
-        disabled={!core}
+        disabled={!own}
         onClick={() => {
           onOpen("rename");
         }}
@@ -275,7 +275,7 @@ function MachineMenuItems({
       <RouteItems node={node} routes={routes} mutations={mutations} onOpen={onOpen} />
       <DropdownMenu.Item
         icon={ShareNetworkIcon}
-        disabled={!share || isTagged(node)}
+        disabled={!own || isTagged(node)}
         onClick={() => {
           onOpen("share");
         }}
@@ -299,7 +299,7 @@ function MachineMenuItems({
           <SuspendItem node={node} core={core} mutations={mutations} onOpen={onOpen} />
           <DropdownMenu.Item
             icon={ClockIcon}
-            disabled={!core}
+            disabled={!own}
             onClick={() => {
               onOpen("expire");
             }}
@@ -309,7 +309,7 @@ function MachineMenuItems({
           <DropdownMenu.Item
             icon={TrashIcon}
             variant="danger"
-            disabled={!core}
+            disabled={!own}
             onClick={() => {
               onOpen("delete");
             }}

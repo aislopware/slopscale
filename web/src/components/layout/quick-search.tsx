@@ -9,7 +9,7 @@ import type { ReactElement } from "react";
 import { nodesQuery, usersQuery } from "~/api/queries.ts";
 import type { Node, User } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
-import { can } from "~/auth/me.ts";
+import { can, canSeeMachines } from "~/auth/me.ts";
 import type { NavPage } from "~/components/layout/nav.ts";
 
 interface Command {
@@ -68,7 +68,7 @@ export function QuickSearch({
 }): ReactElement {
   const [query, setQuery] = useState("");
   const navigate = useNavigate();
-  const nodes = useQuery({ ...nodesQuery, enabled: open && can(me, "devices:core:read") });
+  const nodes = useQuery({ ...nodesQuery, enabled: open && canSeeMachines(me) });
   const users = useQuery({ ...usersQuery, enabled: open && can(me, "users:read") });
 
   useShortcut(open, onOpenChange);

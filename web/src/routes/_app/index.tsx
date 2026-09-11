@@ -5,7 +5,7 @@ import type { ReactElement } from "react";
 
 import { nodesQuery, usersQuery } from "~/api/queries.ts";
 import type { Node, User } from "~/api/queries.ts";
-import { can, displayName, roleLabel } from "~/auth/me.ts";
+import { can, canSeeMachines, displayName, roleLabel } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { CreatePreAuthKeyDialog } from "~/components/keys/preauth-dialogs.tsx";
 import { GetStarted } from "~/components/overview/get-started.tsx";
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/_app/")({
     const { me, queryClient } = context;
 
     await Promise.all([
-      can(me, "devices:core:read") ? queryClient.query(nodesQuery) : Promise.resolve(),
+      canSeeMachines(me) ? queryClient.query(nodesQuery) : Promise.resolve(),
       can(me, "users:read") ? queryClient.query(usersQuery) : Promise.resolve(),
     ]);
   },
@@ -44,7 +44,7 @@ function SignedIn({ me }: { readonly me: Me }): ReactElement {
 
 function OverviewPage(): ReactElement {
   const { me } = Route.useRouteContext();
-  const nodes = useQuery({ ...nodesQuery, enabled: can(me, "devices:core:read") });
+  const nodes = useQuery({ ...nodesQuery, enabled: canSeeMachines(me) });
   const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
   const [addingMachine, setAddingMachine] = useState(false);
   const nodeList = nodes.data?.nodes;

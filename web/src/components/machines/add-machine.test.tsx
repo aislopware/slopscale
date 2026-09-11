@@ -13,6 +13,7 @@ const operator: Me = {
   kind: "session",
   role: "admin",
   allAccess: false,
+  scoped: false,
   scopes: [],
   permissions: { auth_keys: true, "devices:core": true },
 };

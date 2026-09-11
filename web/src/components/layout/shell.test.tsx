@@ -17,6 +17,7 @@ const allAccess: Me = {
   kind: "api_key",
   role: "member",
   allAccess: true,
+  scoped: false,
   scopes: [],
   permissions: { all: true, "devices:core:read": true, "users:read": true },
 };
@@ -100,7 +101,7 @@ describe(Shell, () => {
 
   it("hides pages the caller may not read", async () => {
     const screen = await render(
-      app({ ...allAccess, allAccess: false, permissions: { "users:read": true } }),
+      app({ ...allAccess, allAccess: false, scoped: false, permissions: { "users:read": true } }),
     );
 
     await expect.element(screen.getByRole("link", { name: "Users" })).toBeVisible();
@@ -110,7 +111,7 @@ describe(Shell, () => {
 
   it("opens the quick search palette on the pages the caller may see", async () => {
     const screen = await render(
-      app({ ...allAccess, allAccess: false, permissions: { "users:read": true } }),
+      app({ ...allAccess, allAccess: false, scoped: false, permissions: { "users:read": true } }),
     );
 
     await screen.getByRole("button", { name: /Quick search/u }).click();
@@ -131,6 +132,7 @@ describe(Shell, () => {
       app({
         ...allAccess,
         allAccess: false,
+        scoped: false,
         permissions: { "logs:configuration:read": true },
       }),
     );

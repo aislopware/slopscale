@@ -16,6 +16,7 @@ describe(scopeItems, () => {
       kind: "api_key",
       role: "network-admin",
       allAccess: false,
+      scoped: false,
       scopes: ["dns", "policy_file:read"],
       permissions: { dns: true, "dns:read": true, "policy_file:read": true, users: false },
     };
@@ -34,6 +35,7 @@ describe(scopeItemsWithExisting, () => {
       kind: "api_key",
       role: "network-admin",
       allAccess: false,
+      scoped: false,
       scopes: ["dns"],
       permissions: { dns: true, users: false },
     };

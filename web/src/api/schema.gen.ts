@@ -1065,7 +1065,7 @@ export interface paths {
         };
         /**
          * List nodes
-         * @description Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         * @description A credential with devices:core:read lists every node. Any other credential owned by a user lists the nodes that user owns and the ones shared with them, so a member sees their own machines; a credential without a user sees none.
          */
         get: operations["listNodes"];
         put?: never;
@@ -1085,14 +1085,14 @@ export interface paths {
         };
         /**
          * Get node
-         * @description Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         * @description A credential with devices:core:read reads any node. Any other credential owned by a user reads the nodes that user owns and the ones shared with them; every other node is not found.
          */
         get: operations["getNode"];
         put?: never;
         post?: never;
         /**
          * Delete node
-         * @description Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         * @description Removes the node from the tailnet. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member removes their own machines.
          */
         delete: operations["deleteNode"];
         options?: never;
@@ -1273,7 +1273,7 @@ export interface paths {
         put?: never;
         /**
          * Expire node
-         * @description Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         * @description Expires the node's key now or at the given time, or turns key expiry off for it. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member expires their own machines' keys and turns their expiry off.
          */
         post: operations["expireNode"];
         delete?: never;
@@ -1335,9 +1335,7 @@ export interface paths {
         };
         /**
          * Get node client health
-         * @description Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why.
-         *
-         *     Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         * @description Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
          */
         get: operations["getNodeClientHealth"];
         put?: never;
@@ -1421,9 +1419,7 @@ export interface paths {
         };
         /**
          * Get node preferences
-         * @description Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does.
-         *
-         *     Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         * @description Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
          */
         get: operations["getNodePreferences"];
         put?: never;
@@ -1451,7 +1447,7 @@ export interface paths {
         put?: never;
         /**
          * Rename node
-         * @description Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         * @description Needs the devices:core scope, or a credential owned by the user the node belongs to: a member renames their own machines.
          */
         post: operations["renameNode"];
         delete?: never;
@@ -1568,9 +1564,7 @@ export interface paths {
         };
         /**
          * Get node TLS certificate status
-         * @description Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed.
-         *
-         *     Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         * @description Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
          */
         get: operations["getNodeTLSCertStatus"];
         put?: never;
@@ -2246,7 +2240,7 @@ export interface paths {
         };
         /**
          * List users
-         * @description Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         * @description A credential with users:read lists every user in full. Any other credential owned by a user gets the directory instead: the id, name, display name and picture of every approved user, so a member can share a machine with a colleague by name, and no filter. A credential without a user, or minted with a scope list, gets nothing.
          */
         get: operations["listUsers"];
         put?: never;
@@ -4297,6 +4291,8 @@ export interface components {
                 [key: string]: boolean;
             };
             role: string;
+            /** @description true when the credential is bounded by a scope list of its own rather than standing for its user, so it gets no self-service access (own machines, the user directory). */
+            scoped: boolean;
             scopes: string[];
             user?: components["schemas"]["User"];
         };

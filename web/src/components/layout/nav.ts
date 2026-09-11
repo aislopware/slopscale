@@ -19,7 +19,7 @@ import {
 } from "@phosphor-icons/react";
 
 import type { Me, Scope } from "~/auth/me.ts";
-import { can } from "~/auth/me.ts";
+import { actsAsUser, can, canSeeMachines } from "~/auth/me.ts";
 
 export type NavPath =
   | "/"
@@ -71,6 +71,8 @@ export interface NavChild {
   readonly label: string;
   /** Hidden without this scope. */
   readonly scope?: Scope;
+  /** Shown to a caller this admits, whatever their scopes. */
+  readonly when?: (me: Me) => boolean;
   /** Which live count the sidebar shows next to the page. */
   readonly badge?: NavBadge;
 }
@@ -79,8 +81,13 @@ export interface NavItem {
   readonly to: NavPath;
   readonly label: string;
   readonly icon: Icon;
-  /** Hidden without this scope; members without any scope still get their machines. */
+  /** Hidden without this scope. */
   readonly scope?: Scope;
+  /**
+   * Shown to a caller this admits, whatever their scopes: the machines list has a member's own
+   * machines in it, and every signed-in user has console sessions of their own.
+   */
+  readonly when?: (me: Me) => boolean;
   readonly exact?: boolean;
   /** Which live count the sidebar shows next to the item. */
   readonly badge?: NavBadge;
@@ -113,7 +120,7 @@ export const navGroups: readonly NavGroup[] = [
         to: "/machines",
         label: "Machines",
         icon: DesktopIcon,
-        scope: "devices:core:read",
+        when: canSeeMachines,
         badge: "pendingNodes",
       },
       { to: "/users", label: "Users", icon: UsersIcon, scope: "users:read", badge: "pendingUsers" },
@@ -212,11 +219,10 @@ export const navGroups: readonly NavGroup[] = [
         to: "/settings",
         label: "Settings",
         icon: GearSixIcon,
-        scope: "feature_settings:read",
         children: [
-          { to: "/settings/tailnet", label: "Tailnet" },
-          { to: "/settings/sessions", label: "Sessions" },
-          { to: "/settings/server", label: "Server" },
+          { to: "/settings/tailnet", label: "Tailnet", scope: "feature_settings:read" },
+          { to: "/settings/sessions", label: "Sessions", when: actsAsUser },
+          { to: "/settings/server", label: "Server", scope: "feature_settings:read" },
         ],
       },
       {
@@ -247,7 +253,7 @@ export function visibleGroups(me: Me): NavGroup[] {
 
   for (const group of navGroups) {
     const items = group.items
-      .filter((item) => item.scope === undefined || can(me, item.scope))
+      .filter((item) => admits(item, me))
       .map((item) => visibleItem(item, me))
       .filter((item) => item !== null);
 
@@ -259,14 +265,21 @@ export function visibleGroups(me: Me): NavGroup[] {
   return groups;
 }
 
+/** A page without a scope is for everyone; with one, for callers holding it or named by `when`. */
+function admits(item: NavItem | NavChild, me: Me): boolean {
+  if (item.when !== undefined) {
+    return item.when(me) || (item.scope !== undefined && can(me, item.scope));
+  }
+
+  return item.scope === undefined || can(me, item.scope);
+}
+
 function visibleItem(item: NavItem, me: Me): NavItem | null {
   if (item.children === undefined) {
     return item;
   }
 
-  const children = item.children.filter(
-    (child) => child.scope === undefined || can(me, child.scope),
-  );
+  const children = item.children.filter((child) => admits(child, me));
 
   return children.length === 0 ? null : { ...item, children };
 }

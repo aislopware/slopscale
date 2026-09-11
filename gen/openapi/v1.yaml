@@ -4101,6 +4101,9 @@ components:
           type: object
         role:
           type: string
+        scoped:
+          description: true when the credential is bounded by a scope list of its own rather than standing for its user, so it gets no self-service access (own machines, the user directory).
+          type: boolean
         scopes:
           items:
             type: string
@@ -4111,6 +4114,7 @@ components:
         - kind
         - role
         - allAccess
+        - scoped
         - scopes
         - permissions
       type: object
@@ -6469,7 +6473,7 @@ paths:
       x-required-scope: devices:routes
   /api/v1/node:
     get:
-      description: Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      description: A credential with devices:core:read lists every node. Any other credential owned by a user lists the nodes that user owns and the ones shared with them, so a member sees their own machines; a credential without a user sees none.
       operationId: listNodes
       parameters:
         - explode: false
@@ -6495,7 +6499,6 @@ paths:
       summary: List nodes
       tags:
         - Nodes
-      x-required-scope: devices:core:read
   /api/v1/node/backfillips:
     post:
       description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -6563,7 +6566,7 @@ paths:
       x-required-scope: devices:core
   /api/v1/node/{nodeId}:
     delete:
-      description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      description: "Removes the node from the tailnet. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member removes their own machines."
       operationId: deleteNode
       parameters:
         - in: path
@@ -6591,9 +6594,8 @@ paths:
       tags:
         - Nodes
       x-audit-action: node.delete
-      x-required-scope: devices:core
     get:
-      description: Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      description: A credential with devices:core:read reads any node. Any other credential owned by a user reads the nodes that user owns and the ones shared with them; every other node is not found.
       operationId: getNode
       parameters:
         - in: path
@@ -6620,7 +6622,6 @@ paths:
       summary: Get node
       tags:
         - Nodes
-      x-required-scope: devices:core:read
   /api/v1/node/{nodeId}/app-connector-routes:
     get:
       description: |-
@@ -6971,7 +6972,7 @@ paths:
       x-required-scope: devices:core
   /api/v1/node/{nodeId}/expire:
     post:
-      description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      description: "Expires the node's key now or at the given time, or turns key expiry off for it. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member expires their own machines' keys and turns their expiry off."
       operationId: expireNode
       parameters:
         - in: path
@@ -7004,7 +7005,6 @@ paths:
       tags:
         - Nodes
       x-audit-action: node.expire
-      x-required-scope: devices:core
   /api/v1/node/{nodeId}/global-exit-node:
     post:
       description: |-
@@ -7080,10 +7080,7 @@ paths:
       x-required-scope: devices:core
   /api/v1/node/{nodeId}/health:
     get:
-      description: |-
-        Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why.
-
-        Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      description: "Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}."
       operationId: getNodeClientHealth
       parameters:
         - in: path
@@ -7110,7 +7107,6 @@ paths:
       summary: Get node client health
       tags:
         - Nodes
-      x-required-scope: devices:core:read
   /api/v1/node/{nodeId}/posture:
     get:
       description: |-
@@ -7210,10 +7206,7 @@ paths:
       x-required-scope: devices:posture_attributes:read
   /api/v1/node/{nodeId}/preferences:
     get:
-      description: |-
-        Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does.
-
-        Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      description: "Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}."
       operationId: getNodePreferences
       parameters:
         - in: path
@@ -7240,7 +7233,6 @@ paths:
       summary: Get node preferences
       tags:
         - Nodes
-      x-required-scope: devices:core:read
     patch:
       description: |-
         Changes the preferences the body names on the connected node and answers with what the client ended up with. Needs the machine to have opted in by running `tailscale set --remote-config` on it, which hands the tailnet admin its whole local API; without that the node answers 409.
@@ -7282,7 +7274,7 @@ paths:
       x-required-scope: devices:core
   /api/v1/node/{nodeId}/rename/{newName}:
     post:
-      description: Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      description: "Needs the devices:core scope, or a credential owned by the user the node belongs to: a member renames their own machines."
       operationId: renameNode
       parameters:
         - in: path
@@ -7315,7 +7307,6 @@ paths:
       tags:
         - Nodes
       x-audit-action: node.rename
-      x-required-scope: devices:core
   /api/v1/node/{nodeId}/share:
     post:
       description: Gives the user's personal devices access to the node wherever the policy names autogroup:shared, and marks the node as shared in their netmaps. The node gets no access back. A member may share the nodes they own; sharing any node needs the devices scope.
@@ -7494,10 +7485,7 @@ paths:
       x-required-scope: devices:core
   /api/v1/node/{nodeId}/tls-cert:
     get:
-      description: |-
-        Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed.
-
-        Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      description: "Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}."
       operationId: getNodeTLSCertStatus
       parameters:
         - in: path
@@ -7524,7 +7512,6 @@ paths:
       summary: Get node TLS certificate status
       tags:
         - Nodes
-      x-required-scope: devices:core:read
   /api/v1/nodes/client-update:
     post:
       description: |-
@@ -8779,7 +8766,7 @@ paths:
       x-required-scope: feature_settings
   /api/v1/user:
     get:
-      description: Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      description: "A credential with users:read lists every user in full. Any other credential owned by a user gets the directory instead: the id, name, display name and picture of every approved user, so a member can share a machine with a colleague by name, and no filter. A credential without a user, or minted with a scope list, gets nothing."
       operationId: listUsers
       parameters:
         - explode: false
@@ -8816,7 +8803,6 @@ paths:
       summary: List users
       tags:
         - Users
-      x-required-scope: users:read
     post:
       description: Requires the `users` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: createUser

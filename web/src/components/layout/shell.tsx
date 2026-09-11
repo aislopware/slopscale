@@ -10,7 +10,7 @@ import type { ReactElement, ReactNode } from "react";
 
 import { accessRequestsQuery, nodesQuery, usersQuery } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
-import { can, displayName, roleLabel } from "~/auth/me.ts";
+import { can, canSeeMachines, displayName, roleLabel } from "~/auth/me.ts";
 import { signOut } from "~/auth/session.ts";
 import { pendingCount } from "~/components/access/request-model.ts";
 import { Mark } from "~/components/layout/mark.tsx";
@@ -228,7 +228,7 @@ function NavBranch({
 type PendingCounts = Readonly<Record<NavBadge, number>>;
 
 function usePendingCounts(me: Me): PendingCounts {
-  const nodes = useQuery({ ...nodesQuery, enabled: can(me, "devices:core:read") });
+  const nodes = useQuery({ ...nodesQuery, enabled: canSeeMachines(me) });
   const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
   const requests = useQuery({ ...accessRequestsQuery, enabled: can(me, "policy_file:read") });
   const nodeList = nodes.data?.nodes ?? [];

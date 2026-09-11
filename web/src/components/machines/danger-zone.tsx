@@ -10,8 +10,17 @@ import { toast } from "~/components/ui/toast.ts";
 
 type Pending = "suspend" | "expire" | "delete" | null;
 
-/** The actions that cut a machine off, kept away from the rest of the page. */
-export function DangerZone({ node }: { readonly node: Node }): ReactElement {
+/**
+ * The actions that cut a machine off, kept away from the rest of the page. Suspending is an
+ * administrator's call; a member expires and removes their own machines.
+ */
+export function DangerZone({
+  node,
+  canSuspend,
+}: {
+  readonly node: Node;
+  readonly canSuspend: boolean;
+}): ReactElement {
   const mutations = useNodeMutations();
   const [pending, setPending] = useState<Pending>(null);
   const close = (open: boolean): void => {
@@ -23,39 +32,41 @@ export function DangerZone({ node }: { readonly node: Node }): ReactElement {
   return (
     <>
       <Section title="Danger zone">
-        <DangerRow
-          title={node.suspended ? "Lift the suspension" : "Suspend this machine"}
-          description={
-            node.suspended
-              ? "Gives the machine its peers back. Nobody needs to sign in on it."
-              : "Cuts the machine off without touching its key. Reversible at any time."
-          }
-          action={
-            <Button
-              variant="secondary"
-              loading={mutations.suspend.isPending}
-              onClick={() => {
-                if (node.suspended) {
-                  mutations.suspend.mutate(
-                    { params: { path: { nodeId: node.id } }, body: { suspended: false } },
-                    {
-                      onSuccess: () => {
-                        toast.success("Suspension lifted");
+        {canSuspend ? (
+          <DangerRow
+            title={node.suspended ? "Lift the suspension" : "Suspend this machine"}
+            description={
+              node.suspended
+                ? "Gives the machine its peers back. Nobody needs to sign in on it."
+                : "Cuts the machine off without touching its key. Reversible at any time."
+            }
+            action={
+              <Button
+                variant="secondary"
+                loading={mutations.suspend.isPending}
+                onClick={() => {
+                  if (node.suspended) {
+                    mutations.suspend.mutate(
+                      { params: { path: { nodeId: node.id } }, body: { suspended: false } },
+                      {
+                        onSuccess: () => {
+                          toast.success("Suspension lifted");
+                        },
+                        onError: (error) => {
+                          toast.error("Could not lift the suspension", error);
+                        },
                       },
-                      onError: (error) => {
-                        toast.error("Could not lift the suspension", error);
-                      },
-                    },
-                  );
-                } else {
-                  setPending("suspend");
-                }
-              }}
-            >
-              {node.suspended ? "Lift suspension" : "Suspend"}
-            </Button>
-          }
-        />
+                    );
+                  } else {
+                    setPending("suspend");
+                  }
+                }}
+              >
+                {node.suspended ? "Lift suspension" : "Suspend"}
+              </Button>
+            }
+          />
+        ) : null}
         <DangerRow
           title="Expire the machine key"
           description="Disconnects the machine until someone signs in on it again."

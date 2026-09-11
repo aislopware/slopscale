@@ -4,7 +4,7 @@ import type { ReactElement, ReactNode } from "react";
 
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { connectCommand } from "~/components/machines/connect.ts";
+import { connectCommand, serverUrl } from "~/components/machines/connect.ts";
 import { Code } from "~/components/ui/code.tsx";
 import { CommandBox } from "~/components/ui/command-text.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
@@ -48,14 +48,18 @@ export interface GetStartedProps {
 }
 
 /**
- * The three steps between an empty tailnet and its first machine, with the server URL already
- * filled in. It replaces the recent activity list while no machine has ever registered.
+ * The steps between an empty list and its first machine, with the server URL already filled in. It
+ * replaces the recent activity list while no machine has ever registered. A caller who may mint
+ * pre-auth keys gets the key flow; anyone else, a member with no machine of their own included,
+ * signs in on the machine instead.
  */
 export function GetStarted({ me, onAddMachine }: GetStartedProps): ReactElement {
+  const withKey = can(me, "auth_keys");
+
   return (
     <Section
       title="Connect your first machine"
-      description="No machine has joined yet."
+      description={withKey ? "No machine has joined yet." : "No machine of yours has joined yet."}
       bodyClassName="p-0"
     >
       <Step
@@ -71,32 +75,39 @@ export function GetStarted({ me, onAddMachine }: GetStartedProps): ReactElement 
           Install the Tailscale client on the machine you want on the tailnet.
         </p>
       </Step>
-      <Step
-        index={2}
-        title="Create a pre-auth key"
-        action={
-          <Button
-            variant="secondary"
-            icon={KeyIcon}
-            disabled={!can(me, "auth_keys")}
-            onClick={onAddMachine}
+      {withKey ? (
+        <>
+          <Step
+            index={2}
+            title="Create a pre-auth key"
+            action={
+              <Button variant="secondary" icon={KeyIcon} onClick={onAddMachine}>
+                Create key
+              </Button>
+            }
           >
-            Create key
-          </Button>
-        }
-      >
-        <p className="text-kumo-subtle">
-          The machine registers with the key instead of signing in, so it belongs to the user you
-          pick.
-        </p>
-      </Step>
-      <Step index={3} title="Point the machine at this server">
-        <p className="text-kumo-subtle">
-          Run this on the machine, with the key from step 2 in place of{" "}
-          <Code className="text-kumo-warning">{keyPlaceholder}</Code>.
-        </p>
-        <CommandBox size="sm" command={connectCommand(keyPlaceholder)} />
-      </Step>
+            <p className="text-kumo-subtle">
+              The machine registers with the key instead of signing in, so it belongs to the user
+              you pick.
+            </p>
+          </Step>
+          <Step index={3} title="Point the machine at this server">
+            <p className="text-kumo-subtle">
+              Run this on the machine, with the key from step 2 in place of{" "}
+              <Code className="text-kumo-warning">{keyPlaceholder}</Code>.
+            </p>
+            <CommandBox size="sm" command={connectCommand(keyPlaceholder)} />
+          </Step>
+        </>
+      ) : (
+        <Step index={2} title="Sign in on the machine">
+          <p className="text-kumo-subtle">
+            Run this on the machine and sign in as yourself. It joins as one of your machines and
+            appears here.
+          </p>
+          <CommandBox size="sm" command={`tailscale up --login-server=${serverUrl()}`} />
+        </Step>
+      )}
     </Section>
   );
 }

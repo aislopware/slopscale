@@ -13,6 +13,8 @@ export interface MachinesEmptyProps {
   /** Whether a search or a user filter is narrowing the rows as well. */
   readonly narrowed: boolean;
   readonly canCreateKeys: boolean;
+  /** The caller sees only their own machines, so an empty list means they have none yet. */
+  readonly ownOnly?: boolean;
   readonly onAddMachine: () => void;
   readonly onClearFilters: () => void;
 }
@@ -26,9 +28,21 @@ export function MachinesEmpty({
   status,
   narrowed,
   canCreateKeys,
+  ownOnly = false,
   onAddMachine,
   onClearFilters,
 }: MachinesEmptyProps): ReactElement {
+  if (total === 0 && ownOnly) {
+    return (
+      <Empty
+        size="sm"
+        className={tableEmptyClass}
+        title="No machines of yours yet"
+        description="Sign in on a machine and it appears here. Machines other users share with you show here too."
+      />
+    );
+  }
+
   if (total === 0) {
     return (
       <Empty

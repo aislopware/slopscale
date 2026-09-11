@@ -76,7 +76,10 @@ current [role](/ref/roles), read on every request:
 - An auditor sees everything and can change nothing, an `it-admin` cannot
   approve routes, and so on. Pages the user cannot read are hidden; actions
   they cannot take are disabled.
-- A member sees only the overview, their own machines and their own API keys.
+- A member sees the overview, their own machines and the ones shared with
+  them, their own API keys, their access requests and their console
+  sessions. They can rename, expire, remove and share a machine of their
+  own, and nothing else; see [what a member gets](/ref/roles#what-a-member-gets).
 
 Everything the console changes is written to the [audit log](/ref/audit) with
 the signed-in user as the actor.
@@ -188,10 +191,11 @@ the user it created.
 The sidebar starts with the overview and is then grouped by what you are
 doing. *Tailnet* holds machines and users. *Access* holds the access controls,
 the keys and, for everyone, the page to ask for temporary access; a member
-sees their own API keys there. *Connectivity* holds networks, routes,
+sees their own machines and their own API keys. *Connectivity* holds networks, routes,
 services, apps, DNS and relays. *Logs* holds the audit log and the
 [SSH session recordings](/ref/ssh-recording). *Administration* holds the
-settings and the integrations, and only a role that may read them sees it. An item with several parts, such as _Access controls_, _DNS_,
+settings and the integrations, and only a role that may read them sees it,
+except _Settings → Sessions_, which every signed-in user has for their own sign-ins. An item with several parts, such as _Access controls_, _DNS_,
 _Relays_, _Settings_, _Keys_ or _Integrations_, opens into a page per part,
 each with its own address.
 A count next to _Machines_, _Users_, _Routes_ and _Requests_ says how many

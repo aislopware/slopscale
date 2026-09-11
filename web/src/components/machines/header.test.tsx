@@ -6,6 +6,7 @@ import { sshDisabledReason } from "./header.tsx";
 
 const mockMeWithUser: Me = {
   allAccess: true,
+  scoped: false,
   kind: "api_key",
   permissions: {
     all: true,
@@ -54,6 +55,7 @@ const mockMeWithUser: Me = {
 
 const mockMeWithoutUser: Me = {
   allAccess: true,
+  scoped: false,
   kind: "api_key",
   permissions: mockMeWithUser.permissions,
   role: "admin",

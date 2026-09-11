@@ -50,9 +50,23 @@ export function can(me: Me, scope: Scope): boolean {
   return me.permissions[scope] === true;
 }
 
-/** True for a member-role key: it may still act on the caller's own nodes. */
-export function isMember(me: Me): boolean {
-  return me.role === "member" || me.role === "";
+/**
+ * True when the caller stands for a signed-in user rather than for a scope list: a console session
+ * or a key minted without scopes. Such a caller looks after their own machines and reads the user
+ * directory by name whatever their role; a key minted with scopes gets exactly those.
+ */
+export function actsAsUser(me: Me): boolean {
+  return me.user !== undefined && !me.scoped;
+}
+
+/** True when the machines list has something for the caller: every machine, or their own. */
+export function canSeeMachines(me: Me): boolean {
+  return can(me, "devices:core:read") || actsAsUser(me);
+}
+
+/** True when the caller may list users: in full with the scope, by name as a user. */
+export function canListUsers(me: Me): boolean {
+  return can(me, "users:read") || actsAsUser(me);
 }
 
 export function displayName(me: Me): string {

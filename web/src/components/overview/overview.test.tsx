@@ -20,6 +20,7 @@ const admin: Me = {
   kind: "session",
   role: "admin",
   allAccess: false,
+  scoped: false,
   scopes: [],
   permissions: {
     "devices:core": true,
@@ -250,7 +251,7 @@ describe(GetStarted, () => {
     await expect.element(screen.getByRole("button", { name: "Create key" })).toBeEnabled();
   });
 
-  it("disables the key button without the scope", async () => {
+  it("offers the sign-in command without the scope", async () => {
     const screen = await render(
       app(
         <GetStarted
@@ -262,6 +263,15 @@ describe(GetStarted, () => {
       ),
     );
 
-    await expect.element(screen.getByRole("button", { name: "Create key" })).toBeDisabled();
+    await expect
+      .element(
+        screen.getByText(`tailscale up --login-server=${globalThis.location.origin}`, {
+          exact: true,
+        }),
+      )
+      .toBeVisible();
+    await expect
+      .element(screen.getByRole("button", { name: "Create key" }))
+      .not.toBeInTheDocument();
   });
 });

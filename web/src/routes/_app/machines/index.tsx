@@ -6,7 +6,7 @@ import { fallback, object, optional, picklist, pipe, transform, unknown } from "
 
 import { nodesQuery, usersQuery } from "~/api/queries.ts";
 import type { Node } from "~/api/queries.ts";
-import { can } from "~/auth/me.ts";
+import { can, canListUsers } from "~/auth/me.ts";
 import { CreatePreAuthKeyDialog } from "~/components/keys/preauth-dialogs.tsx";
 import { MachineBulkBar } from "~/components/machines/bulk-bar.tsx";
 import { columns, emptyUsers, selectableColumns } from "~/components/machines/columns.tsx";
@@ -70,7 +70,7 @@ export const Route = createFileRoute("/_app/machines/")({
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.query(nodesQuery),
-      can(context.me, "users:read") ? context.queryClient.query(usersQuery) : Promise.resolve(),
+      canListUsers(context.me) ? context.queryClient.query(usersQuery) : Promise.resolve(),
     ]);
   },
   component: MachinesPage,
@@ -82,12 +82,15 @@ function MachinesPage(): ReactElement {
   const navigate = useNavigate({ from: Route.fullPath });
   const nodes = useSuspenseQuery({ ...nodesQuery, ...machinePolling });
   const [addingMachine, setAddingMachine] = useState(false);
-  const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
+  // A member gets the directory, names only, so the share dialog and the shared-with marks can
+  // name people; the owner filter is for a caller who sees other people's machines at all.
+  const users = useQuery({ ...usersQuery, enabled: canListUsers(me) });
   const view = filtersFromSearch(search);
   const machines = nodes.data.nodes;
   const rows = filterNodes(machines, view);
   const deferred = useDeferredValue(view.query);
   const mayAct = can(me, "devices:core");
+  const mayFilterByUser = can(me, "users:read") && can(me, "devices:core:read");
 
   const table = useAppTable({
     data: rows,
@@ -121,14 +124,22 @@ function MachinesPage(): ReactElement {
 
   return (
     <>
-      <PageHeader title="Machines" meta={summary(machines)} />
+      <PageHeader
+        title="Machines"
+        description={
+          can(me, "devices:core:read")
+            ? undefined
+            : "Your own machines, and the ones other users share with you."
+        }
+        meta={summary(machines)}
+      />
       <MachinesToolbar
         me={me}
         query={view.query}
         onAddMachine={addMachine}
         status={view.status}
         user={view.user}
-        users={users.data?.users}
+        users={mayFilterByUser ? users.data?.users : undefined}
         tags={tagOptions(machines)}
         tag={view.tag}
         attestation={view.attestation}
@@ -152,7 +163,7 @@ function MachinesPage(): ReactElement {
       />
       <Frame>
         <FilterChips
-          chips={machineChips(view, users.data?.users, setFilters)}
+          chips={machineChips(view, mayFilterByUser ? users.data?.users : undefined, setFilters)}
           onClearAll={clearFilters}
         />
         <MachineBulkBar selection={selection} nodes={matching.map((row) => row.original)} />
@@ -173,6 +184,7 @@ function MachinesPage(): ReactElement {
                     view.attestation !== defaultAttestation
                   }
                   canCreateKeys={can(me, "auth_keys")}
+                  ownOnly={!can(me, "devices:core:read")}
                   onAddMachine={addMachine}
                   onClearFilters={clearFilters}
                 />

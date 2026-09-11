@@ -5,10 +5,9 @@ import { useState } from "react";
 import type { ReactElement } from "react";
 
 import type { Node, User } from "~/api/queries.ts";
-import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
-import { ownerId } from "~/components/machines/owner.ts";
+import { mayManageNode } from "~/components/machines/owner.ts";
 import { ShareDialog } from "~/components/machines/share-dialog.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
@@ -27,8 +26,7 @@ export function SharingSection({
 }): ReactElement {
   const mutations = useNodeMutations();
   const [sharing, setSharing] = useState(false);
-  const ownNode = me.user !== undefined && ownerId(node) === me.user.id;
-  const canEdit = (can(me, "devices:core") || ownNode) && !isTagged(node);
+  const canEdit = mayManageNode(me, node) && !isTagged(node);
 
   return (
     <>
