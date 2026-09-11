@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
 
-import { Domain, DomainList } from "~/components/ui/domain.tsx";
+import { Domain, DomainList, splitDomain } from "~/components/ui/domain.tsx";
 
 function tint(token: Element | null): string {
   return token instanceof Element ? getComputedStyle(token).backgroundColor : "";
@@ -16,6 +16,18 @@ describe(Domain, () => {
     expect(token?.textContent).toBe("*.example.com");
     expect(token?.querySelector(".text-kumo-subtle")?.textContent).toBe("*.");
     expect(tint(token)).not.toBe("rgba(0, 0, 0, 0)");
+  });
+});
+
+describe(splitDomain, () => {
+  it("finds the registered site under a plain or a country registry suffix", () => {
+    expect(splitDomain("kibana-prod.jmango360.dev")).toStrictEqual({
+      sub: "kibana-prod.",
+      site: "jmango360.dev",
+    });
+    expect(splitDomain("ifconfig.me")).toStrictEqual({ sub: "", site: "ifconfig.me" });
+    expect(splitDomain("www.bbc.co.uk")).toStrictEqual({ sub: "www.", site: "bbc.co.uk" });
+    expect(splitDomain("a.b.example.com")).toStrictEqual({ sub: "a.b.", site: "example.com" });
   });
 });
 
