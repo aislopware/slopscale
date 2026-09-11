@@ -17,6 +17,7 @@ import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { FromFileBadge } from "~/components/dns/source.tsx";
 import { ValueDialog } from "~/components/dns/value-dialog.tsx";
 import { Code } from "~/components/ui/code.tsx";
+import { Domain } from "~/components/ui/domain.tsx";
 import { Section } from "~/components/ui/section.tsx";
 
 export function SearchDomainsSection({
@@ -35,7 +36,7 @@ export function SearchDomainsSection({
   if (dns.baseDomain !== "") {
     entries.push({
       key: `base:${dns.baseDomain}`,
-      value: dns.baseDomain,
+      value: <Domain domain={dns.baseDomain} />,
       aside: <FromFileBadge />,
     });
   }
@@ -43,7 +44,7 @@ export function SearchDomainsSection({
   for (const domain of settings.searchDomains) {
     entries.push({
       key: domain,
-      value: domain,
+      value: <Domain domain={domain} />,
       menuLabel: `Actions for search domain ${domain}`,
       onRemove: () => {
         mutations.apply(withoutSearchDomain(settings, domain), `Removed ${domain}`);

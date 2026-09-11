@@ -22,6 +22,7 @@ import type { DnsMutations } from "~/components/dns/mutations.ts";
 import { ExitNodeToggle } from "~/components/dns/nameservers-section.tsx";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
+import { Domain } from "~/components/ui/domain.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
@@ -74,8 +75,8 @@ export function SplitDnsSection({
         entries.map(([domain, servers]) => (
           <SectionRow key={domain} className="flex items-center justify-between gap-4 py-2.5">
             <div className="grid min-w-0 flex-1 gap-x-6 gap-y-0.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-              <span className="min-w-0 font-mono text-sm font-medium break-all text-kumo-strong">
-                {domain}
+              <span className="flex min-w-0">
+                <Domain domain={domain} />
               </span>
               <span className="min-w-0 font-mono text-sm break-all text-kumo-subtle">
                 {servers.join(", ")}
