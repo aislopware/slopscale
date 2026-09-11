@@ -260,7 +260,7 @@ function CountBadge({ count }: { readonly count: number }): ReactElement | null 
 function Brand(): ReactElement {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2 px-2 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0">
-      <Mark className="size-5 shrink-0 text-kumo-brand" />
+      <Mark className="size-5 shrink-0" />
       <span className="flex-1 truncate font-semibold text-kumo-strong group-data-[state=collapsed]/sidebar:hidden">
         slopscale
       </span>

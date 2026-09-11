@@ -215,6 +215,7 @@ input:focus-visible {
 /* Logo */
 .slopscale-logo {
   display: block;
+  color: var(--md-default-fg-color);
   width: 400px;
   max-width: 100%;
   height: auto;

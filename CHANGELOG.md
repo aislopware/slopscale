@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.38.0 (unreleased)
+
+### Changes
+
+- The mark is orange everywhere: the console's sidebar and sign-in page, the server's registration and client pages, the favicon, the docs site and the README draw the nine dots in the brand orange with the unlit ones faded, in place of the black or white they took from the text colour. The wordmark on the server's pages follows the page's text colour, so it is readable in dark mode too
+
 ## 0.37.0 (2026-09-11)
 
 ### Changes

@@ -94,7 +94,7 @@ function LoginPage(): ReactElement {
           <Frame className="shadow-lg ring-kumo-line">
             <FramePanel className="flex flex-col gap-6 px-6 py-6">
               <div className="flex flex-col gap-3">
-                <Mark className="size-8 text-kumo-brand" />
+                <Mark className="size-8" />
                 <div className="flex flex-col gap-1">
                   <h1 className="text-xl font-semibold text-kumo-strong">Sign in to slopscale</h1>
                   <p className="text-kumo-subtle">
