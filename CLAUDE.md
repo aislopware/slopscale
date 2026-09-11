@@ -214,13 +214,22 @@ them rather than adding to them.
 - Commits follow Conventional Commits with the Go package as scope:
   `fix(db): scope DestroyUser to the target user's pre-auth keys`,
   `feat(policy/v2): ...`, `docs: ...`. Imperative mood, lowercase, no period.
+  The subject is the changelog line, so a `feat` or `fix` subject says what
+  an operator gets, not what the code does; a prek commit-msg hook and the
+  PR title check refuse anything that does not parse.
 - Regenerated `gen/` code goes in its own commit, before the code that uses
   it. CI checks that `gen/` matches its sources.
-- User-facing changes get a CHANGELOG.md entry under the unreleased version,
-  written for operators and linked to the PR.
-- A release is cut by the Release workflow, run by hand with the version. It
-  takes the version's CHANGELOG section as the release notes and refuses to
-  run without one, so the `## X.Y.Z (202x-xx-xx)` heading must exist first.
+- CHANGELOG.md is written by release-please, never by hand. Every push to
+  main refreshes a `chore: release vX.Y.Z` pull request that prepends the
+  next version's section from the `feat`, `fix`, `perf`, `revert` and
+  `deps` commits since the last tag (`feat` bumps minor, `fix` patch, `!`
+  or a `BREAKING CHANGE:` footer minor while the major is 0; the other
+  types release nothing and show nowhere). Merging that PR tags, publishes
+  the GitHub release and runs goreleaser. A wrong line is fixed by editing
+  the body of the PR that carried the commit with a `BEGIN_COMMIT_OVERRIDE`
+  block; a specific version is forced with a `Release-As: X.Y.Z` footer.
+  `release-please-config.json` and `.release-please-manifest.json` hold the
+  settings and the last released version.
 - zerolog: with four or more fields, or conditional ones, build incrementally
   and reassign, `e = e.Str(k, v)`. Forgetting the reassignment silently drops
   the field.

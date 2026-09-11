@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "go",
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": false,
+  "include-v-in-tag": true,
+  "include-component-in-tag": false,
+  "changelog-path": "CHANGELOG.md",
+  "pull-request-title-pattern": "chore: release v${version}",
+  "pull-request-header": "A release is ready. Read the notes below as an operator would, fix a wrong line by editing the commit's PR body with a BEGIN_COMMIT_OVERRIDE block, and merge to tag and publish.",
+  "changelog-sections": [
+    { "type": "feat", "section": "Changes" },
+    { "type": "fix", "section": "Fixes" },
+    { "type": "perf", "section": "Performance" },
+    { "type": "revert", "section": "Reverts" },
+    { "type": "deps", "section": "Dependencies" },
+    { "type": "docs", "section": "Documentation", "hidden": true },
+    { "type": "chore", "section": "Miscellaneous", "hidden": true },
+    { "type": "ci", "section": "Miscellaneous", "hidden": true },
+    { "type": "build", "section": "Miscellaneous", "hidden": true },
+    { "type": "test", "section": "Miscellaneous", "hidden": true },
+    { "type": "refactor", "section": "Miscellaneous", "hidden": true },
+    { "type": "style", "section": "Miscellaneous", "hidden": true }
+  ],
+  "packages": {
+    ".": {}
+  }
+}

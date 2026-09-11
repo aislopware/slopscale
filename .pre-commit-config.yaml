@@ -6,6 +6,9 @@
 # and recorded golden fixtures.
 exclude: ^(gen|openapi)/|^hscontrol/testdata/apiv1_golden/
 
+# The commit-msg hook needs `prek install` once more after this line landed.
+default_install_hook_types: [pre-commit, commit-msg]
+
 repos:
   # Built-in hooks from pre-commit/pre-commit-hooks
   # prek will use fast-path optimized versions automatically
@@ -28,6 +31,29 @@ repos:
       - id: fix-byte-order-marker
       - id: mixed-line-ending
       - id: trailing-whitespace
+
+  # The commit subject is the changelog line and the version bump
+  # (release-please), so it has to parse as a Conventional Commit.
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args:
+          [
+            feat,
+            fix,
+            perf,
+            revert,
+            deps,
+            docs,
+            chore,
+            ci,
+            build,
+            test,
+            refactor,
+            style,
+          ]
 
   # Local hooks for project-specific tooling
   - repo: local

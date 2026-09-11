@@ -1,0 +1,42 @@
+name: PR title
+
+# A squash merge takes the pull request's title as the commit subject on
+# main, and release-please turns that subject into a version bump and a line
+# in CHANGELOG.md, so the title has to be a Conventional Commit. No paths
+# filter: a required check with one never reports on a docs-only PR.
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+permissions:
+  pull-requests: read
+
+jobs:
+  title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            perf
+            revert
+            deps
+            docs
+            chore
+            ci
+            build
+            test
+            refactor
+            style
+          # Imperative, lowercase, no period, as in the commit convention.
+          subjectPattern: ^[a-z0-9].*[^.]$
+          subjectPatternError: The subject "{subject}" must start lowercase and not end with a period.

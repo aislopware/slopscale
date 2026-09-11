@@ -9,7 +9,10 @@ before:
 
 release:
   prerelease: auto
-  draft: true
+  # release-please publishes the release when the Release PR merges; the
+  # notes file carries its body back in, so replace puts the footer under it.
+  draft: false
+  mode: replace
   # A footer, not a header: a release page leads with what changed. As a
   # header this paragraph pushed all forty-odd sections of the release below
   # a heading about upgrading, which is not what they are.
