@@ -32,10 +32,12 @@ repos:
   # Local hooks for project-specific tooling
   - repo: local
     hooks:
-      # nixpkgs-fmt for Nix files
+      # nixpkgs-fmt for Nix files, the version the flake pins; the bare shell
+      # does not carry it, so resolve it through the dev shell like
+      # vendor-hash does.
       - id: nixpkgs-fmt
         name: nixpkgs-fmt
-        entry: nixpkgs-fmt
+        entry: nix develop --command -- nixpkgs-fmt
         language: system
         files: \.nix$
 
