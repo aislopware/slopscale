@@ -1,11 +1,27 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/console-dark.png">
-  <img alt="The slopscale admin console, open on one machine" src="docs/assets/readme/console-light.png">
-</picture>
+<h1 align="center">
+  <img src="docs/assets/logo/slopscale-mark.svg" alt="" width="56"><br>
+  slopscale
+</h1>
 
-# <img src="docs/assets/logo/slopscale-mark.svg" alt="" width="32" align="middle"> slopscale
+<p align="center">An open source, self-hosted implementation of the Tailscale control server.</p>
 
-An open source, self-hosted implementation of the Tailscale control server.
+<p align="center">
+  <a href="https://aislopware.github.io/slopscale/">Documentation</a>
+  &nbsp;·&nbsp;
+  <a href="https://aislopware.github.io/slopscale/usage/getting-started/">Getting started</a>
+  &nbsp;·&nbsp;
+  <a href="https://aislopware.github.io/slopscale/setup/install/container/">Install</a>
+  &nbsp;·&nbsp;
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/console-dark.png">
+    <img alt="The slopscale admin console, open on one machine" src="docs/assets/readme/console-light.png">
+  </picture>
+</p>
+
 Point the stock Tailscale clients at slopscale instead of the hosted control
 plane: your machines exchange WireGuard keys, get their IP addresses, DNS
 and DERP relay from a server you run, under an access policy you write.
