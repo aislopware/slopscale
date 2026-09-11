@@ -2442,8 +2442,11 @@ type Whoami struct {
 	Kind        string          `json:"kind"`
 	Permissions map[string]bool `json:"permissions"`
 	Role        string          `json:"role"`
-	Scopes      []string        `json:"scopes"`
-	User        *User           `json:"user,omitempty"`
+
+	// Scoped true when the credential is bounded by a scope list of its own rather than standing for its user, so it gets no self-service access (own machines, the user directory).
+	Scoped bool     `json:"scoped"`
+	Scopes []string `json:"scopes"`
+	User   *User    `json:"user,omitempty"`
 }
 
 // GetAccessGraphParams defines parameters for GetAccessGraph.
@@ -3742,7 +3745,7 @@ type ClientInterface interface {
 
 	// ListNodes List nodes
 	//
-	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// A credential with devices:core:read lists every node. Any other credential owned by a user lists the nodes that user owns and the ones shared with them, so a member sees their own machines; a credential without a user sees none.
 	//
 	// Corresponds with GET /api/v1/node (the `ListNodes` operationId).
 	ListNodes(ctx context.Context, params *ListNodesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3763,14 +3766,14 @@ type ClientInterface interface {
 
 	// DeleteNode Delete node
 	//
-	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Removes the node from the tailnet. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member removes their own machines.
 	//
 	// Corresponds with DELETE /api/v1/node/{nodeId} (the `DeleteNode` operationId).
 	DeleteNode(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetNode Get node
 	//
-	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// A credential with devices:core:read reads any node. Any other credential owned by a user reads the nodes that user owns and the ones shared with them; every other node is not found.
 	//
 	// Corresponds with GET /api/v1/node/{nodeId} (the `GetNode` operationId).
 	GetNode(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3917,7 +3920,7 @@ type ClientInterface interface {
 
 	// ExpireNodeWithBody Expire node
 	//
-	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Expires the node's key now or at the given time, or turns key expiry off for it. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member expires their own machines' keys and turns their expiry off.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3926,7 +3929,7 @@ type ClientInterface interface {
 
 	// ExpireNode Expire node
 	//
-	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Expires the node's key now or at the given time, or turns key expiry off for it. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member expires their own machines' keys and turns their expiry off.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3966,9 +3969,7 @@ type ClientInterface interface {
 
 	// GetNodeClientHealth Get node client health
 	//
-	// Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why.
-	//
-	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
 	//
 	// Corresponds with GET /api/v1/node/{nodeId}/health (the `GetNodeClientHealth` operationId).
 	GetNodeClientHealth(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4000,9 +4001,7 @@ type ClientInterface interface {
 
 	// GetNodePreferences Get node preferences
 	//
-	// Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does.
-	//
-	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
 	//
 	// Corresponds with GET /api/v1/node/{nodeId}/preferences (the `GetNodePreferences` operationId).
 	GetNodePreferences(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4031,7 +4030,7 @@ type ClientInterface interface {
 
 	// RenameNode Rename node
 	//
-	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Needs the devices:core scope, or a credential owned by the user the node belongs to: a member renames their own machines.
 	//
 	// Corresponds with POST /api/v1/node/{nodeId}/rename/{newName} (the `RenameNode` operationId).
 	RenameNode(ctx context.Context, nodeId string, newName string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4108,9 +4107,7 @@ type ClientInterface interface {
 
 	// GetNodeTLSCertStatus Get node TLS certificate status
 	//
-	// Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed.
-	//
-	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
 	//
 	// Corresponds with GET /api/v1/node/{nodeId}/tls-cert (the `GetNodeTLSCertStatus` operationId).
 	GetNodeTLSCertStatus(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4665,7 +4662,7 @@ type ClientInterface interface {
 
 	// ListUsers List users
 	//
-	// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// A credential with users:read lists every user in full. Any other credential owned by a user gets the directory instead: the id, name, display name and picture of every approved user, so a member can share a machine with a colleague by name, and no filter. A credential without a user, or minted with a scope list, gets nothing.
 	//
 	// Corresponds with GET /api/v1/user (the `ListUsers` operationId).
 	ListUsers(ctx context.Context, params *ListUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -6815,7 +6812,7 @@ func (c *Client) UpdateNetwork(ctx context.Context, id string, body UpdateNetwor
 
 // ListNodes List nodes
 //
-// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// A credential with devices:core:read lists every node. Any other credential owned by a user lists the nodes that user owns and the ones shared with them, so a member sees their own machines; a credential without a user sees none.
 //
 // Corresponds with GET /api/v1/node (the `ListNodes` operationId).
 func (c *Client) ListNodes(ctx context.Context, params *ListNodesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6866,7 +6863,7 @@ func (c *Client) RegisterNode(ctx context.Context, params *RegisterNodeParams, r
 
 // DeleteNode Delete node
 //
-// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Removes the node from the tailnet. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member removes their own machines.
 //
 // Corresponds with DELETE /api/v1/node/{nodeId} (the `DeleteNode` operationId).
 func (c *Client) DeleteNode(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6883,7 +6880,7 @@ func (c *Client) DeleteNode(ctx context.Context, nodeId string, reqEditors ...Re
 
 // GetNode Get node
 //
-// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// A credential with devices:core:read reads any node. Any other credential owned by a user reads the nodes that user owns and the ones shared with them; every other node is not found.
 //
 // Corresponds with GET /api/v1/node/{nodeId} (the `GetNode` operationId).
 func (c *Client) GetNode(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7180,7 +7177,7 @@ func (c *Client) GetNodeDiagnostic(ctx context.Context, nodeId string, kind GetN
 
 // ExpireNodeWithBody Expire node
 //
-// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Expires the node's key now or at the given time, or turns key expiry off for it. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member expires their own machines' keys and turns their expiry off.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7199,7 +7196,7 @@ func (c *Client) ExpireNodeWithBody(ctx context.Context, nodeId string, contentT
 
 // ExpireNode Expire node
 //
-// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Expires the node's key now or at the given time, or turns key expiry off for it. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member expires their own machines' keys and turns their expiry off.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7279,9 +7276,7 @@ func (c *Client) ResetNodeHardwareAttestation(ctx context.Context, nodeId string
 
 // GetNodeClientHealth Get node client health
 //
-// Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why.
-//
-// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
 //
 // Corresponds with GET /api/v1/node/{nodeId}/health (the `GetNodeClientHealth` operationId).
 func (c *Client) GetNodeClientHealth(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7353,9 +7348,7 @@ func (c *Client) ListNodePostures(ctx context.Context, nodeId string, reqEditors
 
 // GetNodePreferences Get node preferences
 //
-// Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does.
-//
-// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
 //
 // Corresponds with GET /api/v1/node/{nodeId}/preferences (the `GetNodePreferences` operationId).
 func (c *Client) GetNodePreferences(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7414,7 +7407,7 @@ func (c *Client) UpdateNodePreferences(ctx context.Context, nodeId string, body 
 
 // RenameNode Rename node
 //
-// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Needs the devices:core scope, or a credential owned by the user the node belongs to: a member renames their own machines.
 //
 // Corresponds with POST /api/v1/node/{nodeId}/rename/{newName} (the `RenameNode` operationId).
 func (c *Client) RenameNode(ctx context.Context, nodeId string, newName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7581,9 +7574,7 @@ func (c *Client) SetTags(ctx context.Context, nodeId string, body SetTagsJSONReq
 
 // GetNodeTLSCertStatus Get node TLS certificate status
 //
-// Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed.
-//
-// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
 //
 // Corresponds with GET /api/v1/node/{nodeId}/tls-cert (the `GetNodeTLSCertStatus` operationId).
 func (c *Client) GetNodeTLSCertStatus(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8728,7 +8719,7 @@ func (c *Client) DisableTailnetLock(ctx context.Context, reqEditors ...RequestEd
 
 // ListUsers List users
 //
-// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// A credential with users:read lists every user in full. Any other credential owned by a user gets the directory instead: the id, name, display name and picture of every approved user, so a member can share a machine with a colleague by name, and no filter. A credential without a user, or minted with a scope list, gets nothing.
 //
 // Corresponds with GET /api/v1/user (the `ListUsers` operationId).
 func (c *Client) ListUsers(ctx context.Context, params *ListUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -16608,7 +16599,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListNodesWithResponse List nodes
 	//
-	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// A credential with devices:core:read lists every node. Any other credential owned by a user lists the nodes that user owns and the ones shared with them, so a member sees their own machines; a credential without a user sees none.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16635,7 +16626,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteNodeWithResponse Delete node
 	//
-	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Removes the node from the tailnet. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member removes their own machines.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16644,7 +16635,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetNodeWithResponse Get node
 	//
-	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// A credential with devices:core:read reads any node. Any other credential owned by a user reads the nodes that user owns and the ones shared with them; every other node is not found.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16801,7 +16792,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExpireNodeWithBodyWithResponse Expire node
 	//
-	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Expires the node's key now or at the given time, or turns key expiry off for it. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member expires their own machines' keys and turns their expiry off.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16810,7 +16801,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExpireNodeWithResponse Expire node
 	//
-	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Expires the node's key now or at the given time, or turns key expiry off for it. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member expires their own machines' keys and turns their expiry off.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16852,9 +16843,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetNodeClientHealthWithResponse Get node client health
 	//
-	// Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why.
-	//
-	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16894,9 +16883,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetNodePreferencesWithResponse Get node preferences
 	//
-	// Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does.
-	//
-	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16927,7 +16914,7 @@ type ClientWithResponsesInterface interface {
 
 	// RenameNodeWithResponse Rename node
 	//
-	// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Needs the devices:core scope, or a credential owned by the user the node belongs to: a member renames their own machines.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -17010,9 +16997,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetNodeTLSCertStatusWithResponse Get node TLS certificate status
 	//
-	// Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed.
-	//
-	// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -17617,7 +17602,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListUsersWithResponse List users
 	//
-	// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	// A credential with users:read lists every user in full. Any other credential owned by a user gets the directory instead: the id, name, display name and picture of every approved user, so a member can share a machine with a colleague by name, and no filter. A credential without a user, or minted with a scope list, gets nothing.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -27187,7 +27172,7 @@ func (c *ClientWithResponses) UpdateNetworkWithResponse(ctx context.Context, id 
 
 // ListNodesWithResponse List nodes
 //
-// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// A credential with devices:core:read lists every node. Any other credential owned by a user lists the nodes that user owns and the ones shared with them, so a member sees their own machines; a credential without a user sees none.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27232,7 +27217,7 @@ func (c *ClientWithResponses) RegisterNodeWithResponse(ctx context.Context, para
 
 // DeleteNodeWithResponse Delete node
 //
-// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Removes the node from the tailnet. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member removes their own machines.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27247,7 +27232,7 @@ func (c *ClientWithResponses) DeleteNodeWithResponse(ctx context.Context, nodeId
 
 // GetNodeWithResponse Get node
 //
-// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// A credential with devices:core:read reads any node. Any other credential owned by a user reads the nodes that user owns and the ones shared with them; every other node is not found.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27494,7 +27479,7 @@ func (c *ClientWithResponses) GetNodeDiagnosticWithResponse(ctx context.Context,
 
 // ExpireNodeWithBodyWithResponse Expire node
 //
-// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Expires the node's key now or at the given time, or turns key expiry off for it. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member expires their own machines' keys and turns their expiry off.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27509,7 +27494,7 @@ func (c *ClientWithResponses) ExpireNodeWithBodyWithResponse(ctx context.Context
 
 // ExpireNodeWithResponse Expire node
 //
-// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Expires the node's key now or at the given time, or turns key expiry off for it. Needs the devices:core scope, or a credential owned by the user the node belongs to: a member expires their own machines' keys and turns their expiry off.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27575,9 +27560,7 @@ func (c *ClientWithResponses) ResetNodeHardwareAttestationWithResponse(ctx conte
 
 // GetNodeClientHealthWithResponse Get node client health
 //
-// Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why.
-//
-// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Asks the connected node for the warnings it would show its own user, which is where a node that is connected but not working says why. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27641,9 +27624,7 @@ func (c *ClientWithResponses) ListNodePosturesWithResponse(ctx context.Context, 
 
 // GetNodePreferencesWithResponse Get node preferences
 //
-// Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does.
-//
-// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Asks the connected node for the preferences its owner set: the routes it advertises, whether it accepts routes and DNS, which exit node it uses and the rest of the curated set. Reading needs no opt-in; changing them does. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27692,7 +27673,7 @@ func (c *ClientWithResponses) UpdateNodePreferencesWithResponse(ctx context.Cont
 
 // RenameNodeWithResponse Rename node
 //
-// Requires the `devices:core` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Needs the devices:core scope, or a credential owned by the user the node belongs to: a member renames their own machines.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27829,9 +27810,7 @@ func (c *ClientWithResponses) SetTagsWithResponse(ctx context.Context, nodeId st
 
 // GetNodeTLSCertStatusWithResponse Get node TLS certificate status
 //
-// Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed.
-//
-// Requires the `devices:core:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// Asks the connected node about the certificate it caches for its own MagicDNS name, which Serve and Funnel need and which fails quietly when it cannot be renewed. Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28790,7 +28769,7 @@ func (c *ClientWithResponses) DisableTailnetLockWithResponse(ctx context.Context
 
 // ListUsersWithResponse List users
 //
-// Requires the `users:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+// A credential with users:read lists every user in full. Any other credential owned by a user gets the directory instead: the id, name, display name and picture of every approved user, so a member can share a machine with a colleague by name, and no filter. A credential without a user, or minted with a scope list, gets nothing.
 //
 // Returns a wrapper object for the known response body format(s).
 //
