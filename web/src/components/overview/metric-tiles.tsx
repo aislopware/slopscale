@@ -26,17 +26,40 @@ const tileClass = cn(
 
 type Tone = "neutral" | "warning";
 
+const percent = 100;
+
+/**
+ * How much of the number the context line speaks for, as a line under it: a recessed track and an
+ * ink fill, so "8 connected" of 9 is seen before it is read. Nothing is drawn for a number that is
+ * not a share of anything.
+ */
+function Meter({ share, of }: { readonly share: number; readonly of: number }): ReactElement {
+  const width = of === 0 ? 0 : Math.round((share / of) * percent);
+
+  return (
+    <span
+      aria-hidden
+      className="mt-1 block h-1 w-full overflow-hidden rounded-full bg-kumo-recessed"
+    >
+      <span className="block h-full rounded-full bg-kumo-contrast" style={{ width: `${width}%` }} />
+    </span>
+  );
+}
+
 /** A label, the number and one line of context; no icon, the words say what the number counts. */
 function TileBody({
   label,
   value,
   context,
   tone = "neutral",
+  share,
 }: {
   readonly label: string;
   readonly value: number;
   readonly context: ReactNode;
   readonly tone?: Tone;
+  /** How much of the number the context counts, for a meter under it. */
+  readonly share?: number;
 }): ReactElement {
   return (
     <>
@@ -50,6 +73,7 @@ function TileBody({
         {value}
       </span>
       <span className="truncate text-xs text-kumo-subtle">{context}</span>
+      {share === undefined ? null : <Meter share={share} of={value} />}
     </>
   );
 }
@@ -63,6 +87,7 @@ function MachinesTile({ nodes }: { readonly nodes: readonly Node[] }): ReactElem
         label="Machines"
         value={nodes.length}
         context={online === 0 ? "None connected" : `${online} connected`}
+        share={online}
       />
     </Link>
   );
@@ -113,6 +138,7 @@ function UsersTile({
         label="Users"
         value={users.length}
         context={pending === 0 ? "All approved" : `${pending} waiting`}
+        share={users.length - pending}
       />
     </Link>
   );
