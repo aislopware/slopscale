@@ -5,8 +5,8 @@ import { GroupNames } from "~/components/access/group-names.tsx";
 import { groupsOfUser } from "~/components/access/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { Status } from "~/components/ui/status.tsx";
 import { UserMenu } from "~/components/users/menu.tsx";
 import { roleName } from "~/components/users/roles.ts";
 import { userLabel } from "~/lib/node.ts";
@@ -49,9 +49,9 @@ export const columns = helper.columns([
     enableSorting: true,
     enableGlobalFilter: false,
     cell: ({ row }) => (
-      <Status tone={row.original.approved ? "success" : "warning"}>
+      <Badge tone={row.original.approved ? "success" : "warning"}>
         {row.original.approved ? "Approved" : "Needs approval"}
-      </Status>
+      </Badge>
     ),
     meta: { className: "whitespace-nowrap" },
   }),
@@ -108,7 +108,7 @@ function NameCell({ user }: { readonly user: User }): ReactElement {
   const title = [label, user.email, provider ?? ""].filter((part) => part !== "").join(", ");
 
   return (
-    <div className="flex max-w-64 items-center gap-2.5" title={title}>
+    <div className="flex max-w-80 items-center gap-2.5" title={title}>
       <Avatar name={label} size="lg" />
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate font-medium text-kumo-default">{label}</span>

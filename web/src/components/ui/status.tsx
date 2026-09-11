@@ -24,9 +24,10 @@ const texts: Record<Tone, string> = {
 const noteIconSize = 14;
 
 /**
- * A state as words: "Connected", "Pending", "Failed". Plain text, not a pill and not a dot, so a
- * column of states reads as a column and the word alone carries the meaning. A pill is for a thing
- * the operator can pick out, such as a tag; a state is a fact about the row.
+ * A state as words: "On", "Valid", "Update available". Plain text, not a pill and not a dot, for a
+ * fact about a thing inside a definition list, a sentence or a cell that says something else too.
+ * The state of the thing itself, in a table's state column or a page header, is `Badge` from
+ * `ui/badge.tsx`, so a page carries one tinted state per thing and the rest stays words.
  */
 export function Status({
   tone,

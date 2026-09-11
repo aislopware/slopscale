@@ -12,9 +12,9 @@ import type { Node } from "~/api/queries.ts";
 import { SSHTerminal } from "~/components/ssh/terminal.tsx";
 import { UsernameField, usernamePrefillStep } from "~/components/ssh/username-field.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
+import { Badge } from "~/components/ui/badge.tsx";
 import { Callout } from "~/components/ui/callout.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
-import { Status } from "~/components/ui/status.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
 import { nodeName } from "~/lib/node.ts";
@@ -150,7 +150,7 @@ function SSHPage(): ReactElement {
         title={title}
         meta={
           <>
-            <Status tone={statuses[state.status].tone}>{statuses[state.status].label}</Status>
+            <Badge tone={statuses[state.status].tone}>{statuses[state.status].label}</Badge>
             {session === null ? null : (
               <>
                 <span aria-hidden>·</span>

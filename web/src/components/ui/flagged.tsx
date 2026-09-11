@@ -44,9 +44,9 @@ export function Flagged({
       <Popover.Trigger
         openOnHover
         delay={openDelay}
-        className="inline-flex max-w-full rounded-full outline-none focus-visible:ring-2 focus-visible:ring-kumo-focus"
+        className="inline-flex max-w-full rounded-md outline-none focus-visible:ring-2 focus-visible:ring-kumo-focus"
       >
-        <Badge variant={variants[tone]} icon={icon} className="max-w-full">
+        <Badge variant={variants[tone]} icon={icon} className="max-w-full rounded-md">
           <span className="truncate">{children}</span>
         </Badge>
       </Popover.Trigger>

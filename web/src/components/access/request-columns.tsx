@@ -4,8 +4,8 @@ import { RequestMenu } from "~/components/access/request-menu.tsx";
 import { phaseLabels } from "~/components/access/request-model.ts";
 import type { RequestPhase, RequestRow } from "~/components/access/request-model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { Status } from "~/components/ui/status.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
 import { formatDuration } from "~/lib/time.ts";
 
@@ -102,7 +102,7 @@ export const requestColumns = helper.columns([
 function StatusCell({ request }: { readonly request: RequestRow }): ReactElement {
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <Status tone={phaseTones[request.phase]}>{phaseLabels[request.phase]}</Status>
+      <Badge tone={phaseTones[request.phase]}>{phaseLabels[request.phase]}</Badge>
       <Detail request={request} />
     </div>
   );

@@ -10,8 +10,8 @@ import {
   streamState,
 } from "~/components/logstreams/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { Status } from "~/components/ui/status.tsx";
 import { UrlText } from "~/components/ui/url-text.tsx";
 
 const helper = createAppColumnHelper<LogStream>();
@@ -80,7 +80,7 @@ function DeliveryCell({ stream }: { readonly stream: LogStream }): ReactElement 
   const state = streamState(stream);
 
   if (state === "disabled") {
-    return <Status tone="neutral">Disabled</Status>;
+    return <Badge tone="neutral">Disabled</Badge>;
   }
 
   if (state === "never") {
@@ -90,7 +90,7 @@ function DeliveryCell({ stream }: { readonly stream: LogStream }): ReactElement 
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
       <Tooltip content={stream.lastDeliveryStatus}>
-        <Status tone={state === "ok" ? "success" : "danger"}>{statusLabel(stream)}</Status>
+        <Badge tone={state === "ok" ? "success" : "danger"}>{statusLabel(stream)}</Badge>
       </Tooltip>
       <span className="whitespace-nowrap text-kumo-subtle">
         <RelativeTime value={stream.lastDeliveryAt} />

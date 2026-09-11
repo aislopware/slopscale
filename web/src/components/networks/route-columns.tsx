@@ -20,6 +20,7 @@ import {
 import type { RouteAdvertiser, RouteGroup, RoutesRow } from "~/components/networks/routes-model.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
@@ -229,7 +230,7 @@ function StatusCell({ row }: { readonly row: RoutesRow }): ReactElement {
 
   // A flat row reads as the one machine's state; a group counts how many of them are waiting.
   if (row.advertisers.length > 1 && row.pending > 0) {
-    return <Status tone="warning">{`${row.pending} pending`}</Status>;
+    return <Badge tone="warning">{`${row.pending} pending`}</Badge>;
   }
 
   return <RouteStatusText status={groupStatus(row)} />;
@@ -237,13 +238,13 @@ function StatusCell({ row }: { readonly row: RoutesRow }): ReactElement {
 
 function RouteStatusText({ status }: { readonly status: RouteStatus }): ReactElement {
   if (status === "stale") {
-    return <Status tone="warning">No longer advertised</Status>;
+    return <Badge tone="warning">No longer advertised</Badge>;
   }
 
   return (
-    <Status tone={status === "approved" ? "success" : "warning"}>
+    <Badge tone={status === "approved" ? "success" : "warning"}>
       {status === "approved" ? "Approved" : "Pending"}
-    </Status>
+    </Badge>
   );
 }
 

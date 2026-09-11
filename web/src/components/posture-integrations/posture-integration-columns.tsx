@@ -10,8 +10,8 @@ import {
 } from "~/components/posture-integrations/model.ts";
 import { PostureIntegrationMenu } from "~/components/posture-integrations/posture-integration-menu.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { Status } from "~/components/ui/status.tsx";
 
 const helper = createAppColumnHelper<PostureIntegration>();
 const openDelay = 150;
@@ -96,7 +96,7 @@ function StatusCell({ integration }: { readonly integration: PostureIntegration 
           delay={openDelay}
           className="inline-flex cursor-pointer items-center outline-none focus-visible:ring-2 focus-visible:ring-kumo-focus"
         >
-          <Status tone={tone}>{label}</Status>
+          <Badge tone={tone}>{label}</Badge>
         </Popover.Trigger>
         <Popover.Content side="top" className="max-w-72 gap-1 p-3">
           <Popover.Title className="text-sm leading-5 font-medium">Sync failed</Popover.Title>
@@ -108,7 +108,7 @@ function StatusCell({ integration }: { readonly integration: PostureIntegration 
     );
   }
 
-  return <Status tone={tone}>{label}</Status>;
+  return <Badge tone={tone}>{label}</Badge>;
 }
 
 function LastSyncCell({ integration }: { readonly integration: PostureIntegration }): ReactElement {

@@ -7,14 +7,20 @@
 @source "../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
 @import "@cloudflare/kumo/styles";
 @import "tailwindcss";
+@import "@fontsource-variable/geist-mono";
 
 /*
  * The type is Kumo's own stack, the platform's UI face. Inter was never loaded here, so it only
  * showed up on machines that had it installed, and it is the face every generated UI reaches for.
+ *
+ * The monospace face is bundled, because the platform one is not the same face twice: SF Mono
+ * is wide and heavy beside the system sans, so every address and hostname read as bolder than
+ * the label next to it, and Windows fell back to Consolas. Geist Mono is narrow, light and
+ * neutral at 12px, and its subsets (Latin, Latin extended, Vietnamese, Cyrillic) load on demand.
  */
 @theme {
   --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
     monospace;
 }
 

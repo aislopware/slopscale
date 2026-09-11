@@ -15,9 +15,9 @@ import type { ReactElement, ReactNode } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
 import { Avatar } from "~/components/ui/avatar.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
-import { Status } from "~/components/ui/status.tsx";
 import { ValueList } from "~/components/ui/value-list.tsx";
 import { formatAbsolute, parseTime } from "~/lib/time.ts";
 
@@ -209,7 +209,7 @@ export function TargetCell({ event }: { readonly event: AuditEvent }): ReactNode
 export function ResultCell({ event }: { readonly event: AuditEvent }): ReactElement {
   const failed = event.outcome >= clientError;
 
-  return <Status tone={failed ? "danger" : "success"}>{failed ? "Failed" : "Success"}</Status>;
+  return <Badge tone={failed ? "danger" : "success"}>{failed ? "Failed" : "Success"}</Badge>;
 }
 
 /**

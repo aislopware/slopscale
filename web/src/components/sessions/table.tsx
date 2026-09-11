@@ -23,13 +23,13 @@ import { tableEmptyClass } from "~/components/table/empty.ts";
 import type { CursorPaging } from "~/components/table/page-window.ts";
 import { CursorBand } from "~/components/table/paging.tsx";
 import { TableScroll } from "~/components/table/scroll-panel.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { frameTableClass, frameTableRowClass, pinnedEdgeClass } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
-import { Status } from "~/components/ui/status.tsx";
 
 const stateTones: Record<RecordingState, { tone: Tone; label: string }> = {
   recording: { tone: "warning", label: "Recording" },
@@ -40,7 +40,7 @@ const stateTones: Record<RecordingState, { tone: Tone; label: string }> = {
 function StateBadge({ recording }: { readonly recording: SSHRecording }): ReactElement {
   const badge = stateTones[recordingState(recording)];
 
-  return <Status tone={badge.tone}>{badge.label}</Status>;
+  return <Badge tone={badge.tone}>{badge.label}</Badge>;
 }
 
 function RecordingRow({

@@ -3,9 +3,9 @@ import type { ReactElement } from "react";
 import type { Invite, User } from "~/api/queries.ts";
 import { GroupNames } from "~/components/access/group-names.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
-import { Status } from "~/components/ui/status.tsx";
 import { InviteMenu } from "~/components/users/invite-menu.tsx";
 import { inviteState } from "~/components/users/invites.ts";
 import type { InviteState } from "~/components/users/invites.ts";
@@ -96,7 +96,7 @@ export const inviteColumns = helper.columns([
     cell: ({ row }) => {
       const state = inviteState(row.original);
 
-      return <Status tone={stateTones[state]}>{stateLabels[state]}</Status>;
+      return <Badge tone={stateTones[state]}>{stateLabels[state]}</Badge>;
     },
     meta: { className: "whitespace-nowrap" },
   }),

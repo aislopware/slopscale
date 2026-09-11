@@ -8,6 +8,7 @@ import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { approvedServicesOf, withServiceApproved } from "~/components/services/model.ts";
 import { useServiceMutations } from "~/components/services/mutations.ts";
+import { Badge } from "~/components/ui/badge.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { CommandBox } from "~/components/ui/command-text.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
@@ -154,12 +155,12 @@ export function AnnouncementStatus({
   readonly active: boolean;
 }): ReactElement {
   if (!announced) {
-    return <Status tone="neutral">Not announced</Status>;
+    return <Badge tone="neutral">Not announced</Badge>;
   }
 
   return (
-    <Status tone={active ? "success" : "warning"}>
+    <Badge tone={active ? "success" : "warning"}>
       {active ? "Advertising" : "Not advertising"}
-    </Status>
+    </Badge>
   );
 }

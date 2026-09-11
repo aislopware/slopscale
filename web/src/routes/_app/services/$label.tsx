@@ -14,13 +14,13 @@ import {
   serviceTitle,
 } from "~/components/services/model.ts";
 import { ServiceMenu } from "~/components/services/service-menu.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
 import { RouteNotFound } from "~/components/ui/error-page.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section } from "~/components/ui/section.tsx";
-import { Status } from "~/components/ui/status.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
 import { isIpv4 } from "~/lib/ip.ts";
 import { requireScope } from "~/lib/require-scope.ts";
@@ -86,7 +86,7 @@ function ServiceHeader({
       title={serviceTitle(service)}
       meta={
         <>
-          <Status tone={tone}>{label}</Status>
+          <Badge tone={tone}>{label}</Badge>
           <span aria-hidden>·</span>
           <span className="font-mono">{service.name}</span>
           {service.comment === "" ? null : (

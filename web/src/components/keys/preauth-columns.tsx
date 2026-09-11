@@ -12,9 +12,9 @@ import { preAuthKeyStatus, statusOrder } from "~/components/keys/status.ts";
 import type { KeyStatus } from "~/components/keys/status.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Avatar } from "~/components/ui/avatar.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
-import { Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { userLabel } from "~/lib/node.ts";
 import { parseTime } from "~/lib/time.ts";
@@ -118,7 +118,7 @@ function KeyCell({ authKey }: { readonly authKey: PreAuthKey }): ReactElement {
 
 function UserCell({ name }: { readonly name: string }): ReactElement {
   return (
-    <span className="flex max-w-44 min-w-0 items-center gap-2" title={name}>
+    <span className="flex max-w-64 min-w-0 items-center gap-2" title={name}>
       <Avatar name={name} size="sm" />
       <span className="truncate text-kumo-default">{name}</span>
     </span>
@@ -206,7 +206,7 @@ const statusTones: Record<KeyStatus, Tone> = {
 };
 
 function StatusCell({ status }: { readonly status: KeyStatus }): ReactElement {
-  return <Status tone={statusTones[status]}>{statusLabels[status]}</Status>;
+  return <Badge tone={statusTones[status]}>{statusLabels[status]}</Badge>;
 }
 
 function PreAuthKeyMenu({

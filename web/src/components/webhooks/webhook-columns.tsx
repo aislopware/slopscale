@@ -3,8 +3,8 @@ import type { ReactElement } from "react";
 
 import type { Webhook } from "~/api/queries.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { Status } from "~/components/ui/status.tsx";
 import { UrlText } from "~/components/ui/url-text.tsx";
 import {
   countEvents,
@@ -111,7 +111,7 @@ function DeliveryCell({ webhook }: { readonly webhook: Webhook }): ReactElement 
   return (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
       <Tooltip content={webhook.lastDeliveryStatus}>
-        <Status tone={state === "ok" ? "success" : "danger"}>{deliveryLabel(webhook)}</Status>
+        <Badge tone={state === "ok" ? "success" : "danger"}>{deliveryLabel(webhook)}</Badge>
       </Tooltip>
       <span className="whitespace-nowrap text-kumo-subtle">
         <RelativeTime value={webhook.lastDeliveryAt} />

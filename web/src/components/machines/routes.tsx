@@ -7,11 +7,11 @@ import { errorMessage } from "~/api/error.ts";
 import type { Node } from "~/api/queries.ts";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
 import { withRouteApproved } from "~/components/networks/model.ts";
+import { Badge } from "~/components/ui/badge.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { Flagged } from "~/components/ui/flagged.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
-import { Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { advertisesExit, exitRoutes, isExitNode, isExitRoute } from "~/lib/node.ts";
 
@@ -89,7 +89,7 @@ function RouteRow({
         <RouteName route={route} exit={exit} available={available} />
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <Status tone={approved ? "success" : "warning"}>{approved ? "Approved" : "Pending"}</Status>
+        <Badge tone={approved ? "success" : "warning"}>{approved ? "Approved" : "Pending"}</Badge>
         <Button
           variant={approved ? "ghost" : "secondary"}
           size="sm"

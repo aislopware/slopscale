@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import { Status } from "~/components/ui/status.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
 import type { NodeStatus } from "~/lib/node.ts";
 
@@ -22,5 +22,5 @@ export function statusTone(status: NodeStatus): Tone {
 
 /** The one status indicator for a machine: the same wording everywhere, coloured by tone. */
 export function StatusBadge({ status }: { readonly status: NodeStatus }): ReactElement {
-  return <Status tone={statusTone(status)}>{statusLabel(status)}</Status>;
+  return <Badge tone={statusTone(status)}>{statusLabel(status)}</Badge>;
 }

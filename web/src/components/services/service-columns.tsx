@@ -5,8 +5,8 @@ import { reachStates } from "~/components/services/model.ts";
 import type { ServiceRow } from "~/components/services/model.ts";
 import { ServiceMenu } from "~/components/services/service-menu.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
+import { Badge } from "~/components/ui/badge.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
-import { Status } from "~/components/ui/status.tsx";
 
 const helper = createAppColumnHelper<ServiceRow>();
 
@@ -100,7 +100,7 @@ function AddressesCell({ service }: { readonly service: ServiceRow }): ReactElem
   return (
     <div className="flex flex-col items-start gap-0.5 whitespace-nowrap text-kumo-subtle">
       {service.addresses.map((address) => (
-        <CopyText key={address} value={address} className="max-w-none" />
+        <CopyText key={address} value={address} />
       ))}
     </div>
   );
@@ -120,7 +120,7 @@ function HostsCell({ service }: { readonly service: ServiceRow }): ReactElement 
 
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
-      <Status tone={tone}>{label}</Status>
+      <Badge tone={tone}>{label}</Badge>
       <span className="truncate text-xs text-kumo-subtle">{hostSummary(service)}</span>
     </div>
   );
