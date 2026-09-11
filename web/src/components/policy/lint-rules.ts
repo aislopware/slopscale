@@ -137,14 +137,31 @@ export function lintAcl(lint: Lint, node: JsonNode): void {
   lintSelf(lint, { sources, destinations }, true);
 }
 
+/**
+ * The capabilities under tailscale.com a policy may grant, the same list the server accepts
+ * (`tailscaleCapAllowlist` in `hscontrol/policy/v2`): the ones a stock client acts on. The rest of
+ * that domain is the server's to stamp, such as the ingress and relay-target companions.
+ */
+const tailscaleCaps = new Set([
+  "tailscale.com/cap/drive",
+  "tailscale.com/cap/relay",
+  "tailscale.com/cap/webui",
+  "tailscale.com/cap/kubernetes",
+  "tailscale.com/cap/tsidp",
+  "tailscale.com/cap/secrets",
+]);
+
 function lintApp(lint: Lint, node: JsonNode): boolean {
   const object = lint.object(node, "app");
 
   for (const { key, value } of object?.entries ?? []) {
     if (!key.name.includes("/") || key.name.includes("://")) {
       lint.error(key, 'A capability is named domain/path, such as "example.com/cap"');
-    } else if (key.name.startsWith("tailscale.com/")) {
-      lint.error(key, "Capabilities under tailscale.com are reserved");
+    } else if (key.name.startsWith("tailscale.com/") && !tailscaleCaps.has(key.name)) {
+      lint.error(
+        key,
+        `Capabilities under tailscale.com are reserved, except ${[...tailscaleCaps].join(", ")}`,
+      );
     }
 
     lint.array(value, `the values of ${key.name}`);

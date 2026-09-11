@@ -7,6 +7,20 @@ function messages(text: string): string[] {
 }
 
 describe(lintPolicy, () => {
+  it("grants the tailscale.com capabilities the server accepts and refuses the rest", () => {
+    expect(
+      messages(`{
+        "tagOwners": { "tag:gw": ["alice@"] },
+        "grants": [
+          { "src": ["autogroup:member"], "dst": ["tag:gw"], "app": { "tailscale.com/cap/relay": [{}] } },
+          { "src": ["autogroup:member"], "dst": ["tag:gw"], "app": { "tailscale.com/cap/ingress": [{}] } },
+        ],
+      }`),
+    ).toStrictEqual([
+      "Capabilities under tailscale.com are reserved, except tailscale.com/cap/drive, tailscale.com/cap/relay, tailscale.com/cap/webui, tailscale.com/cap/kubernetes, tailscale.com/cap/tsidp, tailscale.com/cap/secrets",
+    ]);
+  });
+
   it("takes a service as a destination and as an auto approver key", () => {
     expect(
       messages(`{
