@@ -6,13 +6,13 @@ const inset = 20;
 const pitch = 30;
 const radius = 11;
 const unlitOpacity = 0.3;
-/** The brand orange, the same in both themes: a logo keeps its colour, it does not follow the text. */
-const orange = "#f6821f";
+/** The brand blue, the same in both themes: a logo keeps its colour, it does not follow the text. */
+const blue = "#2caff9";
 
-/** The slopscale mark: orange dots, the unlit ones faded, on whatever surface it sits. */
+/** The slopscale mark: blue dots, the unlit ones faded, on whatever surface it sits. */
 export function Mark({ className }: { readonly className?: string }): ReactElement {
   return (
-    <svg viewBox="0 0 100 100" aria-hidden className={className} fill={orange}>
+    <svg viewBox="0 0 100 100" aria-hidden className={className} fill={blue}>
       {rows.flatMap((row, rowIndex) =>
         Array.from(row, (cell, columnIndex) => {
           const cx = inset + columnIndex * pitch;

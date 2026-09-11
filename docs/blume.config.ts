@@ -8,9 +8,9 @@ export default defineConfig({
   content: { root: "content" },
   github: { owner: "aislopware", repo: "slopscale", dir: "docs" },
   deployment: { site: "https://aislopware.github.io", base: "/slopscale" },
-  theme: { accent: "orange", radius: "md", mode: "system" },
+  theme: { accent: "sky", radius: "md", mode: "system" },
   seo: {
-    og: { logo: "/mark.svg", palette: { accent: "#f6821f" } },
+    og: { logo: "/mark.svg", palette: { accent: "#2caff9" } },
     software: { license: "BSD-3-Clause", operatingSystem: "Linux", price: 0 },
   },
   navigation: { sidebar: { display: "group" } },

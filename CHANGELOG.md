@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.40.0 (unreleased)
+
+### Changes
+
+- The mark is sky blue: the nine dots in the console, on the server's pages, in the favicon, on the social card and on the docs site are drawn in `#2caff9` instead of orange, and the docs site's accent follows. Every aislopware project carries one hue of its own at the same lightness so the family tells apart in a repo list, and orange is the organisation's
+
 ## 0.39.0 (2026-09-11)
 
 ### Changes
