@@ -22,6 +22,17 @@
   --font-mono:
     "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
     monospace;
+  /* The bar that runs along the top while a page's data loads: a third of the width, left to right. */
+  --animate-route-progress: route-progress 1.2s ease-in-out infinite;
+
+  @keyframes route-progress {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
 }
 
 @layer base {

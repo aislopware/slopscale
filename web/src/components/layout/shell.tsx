@@ -138,6 +138,7 @@ export function Shell({
         </Sidebar>
         <div className="flex min-h-svh min-w-0 flex-1 flex-col bg-kumo-canvas">
           <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 border-b border-kumo-line bg-kumo-base px-4 lg:px-6">
+            <RouteProgress />
             <Trail place={place} />
             <div className="flex items-center gap-2">
               <ThemeToggle />
@@ -364,5 +365,27 @@ function AccountMenu({ me }: { readonly me: Me }): ReactElement {
         </DropdownMenu.Group>
       </DropdownMenu.Content>
     </DropdownMenu>
+  );
+}
+
+/**
+ * The line along the top of the header while the next page's loader runs. The router keeps the
+ * current page on screen until the data is in, so without it a click on the sidebar does nothing
+ * visible for as long as the request takes; with it the click has landed. It appears only after
+ * 150ms, so a page whose data is already cached never flashes it, and goes at once.
+ */
+function RouteProgress(): ReactElement {
+  const pending = useRouterState({ select: (state) => state.status === "pending" });
+
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute inset-x-0 top-0 h-0.5 overflow-hidden transition-opacity duration-0",
+        pending ? "opacity-100 delay-150" : "opacity-0 delay-0",
+      )}
+    >
+      <div className="h-full w-1/3 animate-route-progress bg-kumo-contrast" />
+    </div>
   );
 }

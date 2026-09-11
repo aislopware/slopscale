@@ -7,11 +7,17 @@ import { routeTree } from "~/routeTree.gen.ts";
 
 const staleTime = 15_000;
 
+/** How many times a request the browser never got an answer to is sent again before it fails. */
+const networkRetries = 1;
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime,
-      retry: false,
+      // A refused request is an answer and is shown as one; a dropped connection, which fetch
+      // reports as a TypeError, is tried once more before the page says the server did not answer.
+      retry: (failureCount, error): boolean =>
+        error instanceof TypeError && failureCount < networkRetries,
       refetchOnWindowFocus: true,
     },
   },
