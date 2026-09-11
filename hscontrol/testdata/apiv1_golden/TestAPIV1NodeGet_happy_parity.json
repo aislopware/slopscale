@@ -25,6 +25,8 @@
       "name": "node-a",
       "nodeKey": "\u003csecret\u003e",
       "online": false,
+      "os": "",
+      "osVersion": "",
       "preAuthKey": {
         "aclTags": [],
         "createdAt": "\u003ctimestamp\u003e",

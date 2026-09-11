@@ -25,6 +25,8 @@
       "name": "node-b",
       "nodeKey": "\u003csecret\u003e",
       "online": false,
+      "os": "",
+      "osVersion": "",
       "preAuthKey": {
         "aclTags": [
           "tag:initial"
