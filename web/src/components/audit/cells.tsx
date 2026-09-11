@@ -1,7 +1,16 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { cn } from "@cloudflare/kumo/utils";
+import type { Icon } from "@phosphor-icons/react";
+import {
+  DesktopIcon,
+  GearSixIcon,
+  KeyIcon,
+  TerminalWindowIcon,
+  UserIcon,
+} from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
+import { Fragment } from "react";
 import type { ReactElement, ReactNode } from "react";
 
 import type { AuditEvent } from "~/api/queries.ts";
@@ -22,17 +31,59 @@ const actorKinds: Record<string, string> = {
   system: "System",
 };
 
+/**
+ * The mark for an actor that is not a person: the kind of credential, or the server. A person, a
+ * key or a session bound to a user, keeps their initials.
+ */
+const actorIcons: Record<string, Icon> = {
+  api_key: KeyIcon,
+  local: TerminalWindowIcon,
+  node: DesktopIcon,
+  oauth: KeyIcon,
+  session: UserIcon,
+  system: GearSixIcon,
+};
+
+/**
+ * Verbs after which the thing is gone or the request was turned down: the rows an operator scans a
+ * log for, so they alone take the danger colour.
+ */
+const destructiveVerbs: ReadonlySet<string> = new Set([
+  "delete",
+  "deny",
+  "expire",
+  "reject",
+  "revoke",
+  "unshare",
+]);
+
 /** How the API names each kind of target, in the console's words. */
 const targetKinds: Record<string, string> = {
+  access_request: "Access request",
+  access_rule: "Access rule",
   apikey: "API key",
+  app: "App",
+  derp: "Relays",
+  dns: "DNS",
+  dns_rule: "DNS rule",
+  group: "Group",
+  invite: "Invitation",
   key: "Key",
+  logstream: "Log stream",
+  network: "Network",
   node: "Machine",
+  oauth_client: "OAuth client",
   oauthclient: "OAuth client",
   policy: "Policy",
+  posture: "Posture",
+  posture_integration: "Posture integration",
   preauthkey: "Pre-auth key",
+  service: "Service",
   session: "Session",
   settings: "Settings",
+  sshrecording: "SSH recording",
   user: "User",
+  webhook: "Webhook",
 };
 
 export const clientError = 400;
@@ -69,11 +120,12 @@ function actorKindLine(event: AuditEvent): string | null {
 export function ActorCell({ event }: { readonly event: AuditEvent }): ReactElement {
   const name = actorName(event);
   const kind = actorKindLine(event);
+  const icon = event.actorUserId === "" ? (actorIcons[event.actorKind] ?? UserIcon) : undefined;
 
   return (
     <div className="flex min-w-0 items-start gap-2">
       <span className="flex h-lh items-center">
-        <Avatar name={name} size="sm" />
+        <Avatar name={name} size="sm" {...(icon === undefined ? {} : { icon })} />
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate text-kumo-default">{name}</span>
@@ -83,8 +135,29 @@ export function ActorCell({ event }: { readonly event: AuditEvent }): ReactEleme
   );
 }
 
+/**
+ * The action as the API spells it, object first and verb last: the object steps back and the verb
+ * carries the line, so "node.delete" and "node.rename" are told apart by the word that differs. A
+ * break opportunity after each dot lets a long name wrap at a segment instead of running into the
+ * next column; anywhere is the last resort for one segment wider than the column.
+ */
 export function ActionCell({ event }: { readonly event: AuditEvent }): ReactElement {
-  return <code className="font-mono text-[0.9em] text-kumo-default">{event.action}</code>;
+  const segments = event.action.split(".");
+  const verb = segments.pop() ?? "";
+
+  return (
+    <code className="font-mono text-[0.9em] [overflow-wrap:anywhere]">
+      {segments.map((segment, index) => (
+        <Fragment key={segments.slice(0, index + 1).join(".")}>
+          <span className="text-kumo-subtle">{`${segment}.`}</span>
+          <wbr />
+        </Fragment>
+      ))}
+      <span className={destructiveVerbs.has(verb) ? "text-kumo-danger" : "text-kumo-default"}>
+        {verb}
+      </span>
+    </code>
+  );
 }
 
 function TargetLink({

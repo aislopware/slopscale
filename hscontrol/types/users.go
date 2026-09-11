@@ -159,6 +159,15 @@ func (u *User) Display() string {
 	return cmp.Or(u.DisplayName, u.Username())
 }
 
+// AuditName is the name the audit log records for the user: the username
+// when there is one, else the display name, else what [User.Username]
+// falls back to. A user from an identity provider that sends no username
+// has only a display name and an email, and an empty name in the log made
+// the console show the session id in its place.
+func (u *User) AuditName() string {
+	return cmp.Or(u.Name, u.DisplayName, u.Username())
+}
+
 // Username returns the user's login name via the view; see [User.Username].
 func (v UserView) Username() string {
 	if !v.Valid() {

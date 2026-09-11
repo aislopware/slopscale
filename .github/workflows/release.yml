@@ -141,9 +141,49 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: ./.github/actions/setup
+        id: setup
         with:
           go-key: release
           bun: "true"
+
+      # The release cache is keyed on go.sum and the toolchain, so the first
+      # release after a dependency or Go update starts cold and compiles the
+      # tree three times over (6m39s of the 0.32.0 run, against about a
+      # minute warm). The Go workflow's cross jobs built the same three
+      # targets with the same flags for the commit being released, one
+      # cache each; laid over the release cache they make that first
+      # release as warm as the next. Restore only: the release job saves
+      # the union under its own key at the end.
+      - name: Go cache from the cross build (amd64)
+        if: steps.setup.outputs.go-cache-hit != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-cross-linux-amd64-${{ hashFiles('go.sum', 'flake.lock', 'sqlite.cflags') }}
+          restore-keys: |
+            go-cross-linux-amd64-
+      - name: Go cache from the cross build (arm64)
+        if: steps.setup.outputs.go-cache-hit != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-cross-linux-arm64-${{ hashFiles('go.sum', 'flake.lock', 'sqlite.cflags') }}
+          restore-keys: |
+            go-cross-linux-arm64-
+      - name: Go cache from the cross build (armv7)
+        if: steps.setup.outputs.go-cache-hit != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: go-cross-linux-arm7-${{ hashFiles('go.sum', 'flake.lock', 'sqlite.cflags') }}
+          restore-keys: |
+            go-cross-linux-arm7-
 
       - name: goreleaser
         run: goreleaser release --clean --release-notes "$RUNNER_TEMP/notes.md"

@@ -213,7 +213,7 @@ func userName(sink Sink, id types.UserID) string {
 		return ""
 	}
 
-	return user.Name
+	return user.AuditName()
 }
 
 // remoteIP strips the port from a remote address; the port says nothing

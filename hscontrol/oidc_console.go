@@ -142,7 +142,7 @@ func (a *AuthProviderOIDC) handleConsoleCallback(
 	audit.Record(a.h.state, &types.AuditEvent{
 		ActorKind:   types.ActorSession,
 		ActorUserID: types.UserID(user.ID),
-		ActorName:   user.Name,
+		ActorName:   user.AuditName(),
 		Action:      "console.login",
 		TargetKind:  "session",
 		TargetID:    strconv.FormatUint(session.ID, 10),
@@ -265,7 +265,7 @@ func (a *AuthProviderOIDC) syncConfiguredGroups(user *types.User, claims *types.
 		Action:     "group.sync",
 		TargetKind: "user",
 		TargetID:   strconv.FormatUint(uint64(user.ID), 10),
-		TargetName: user.Name,
+		TargetName: user.AuditName(),
 		Detail:     map[string]any{"groups": names, "source": "oidc.groups"},
 	})
 

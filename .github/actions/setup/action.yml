@@ -21,6 +21,13 @@ inputs:
     description: Also restore the Playwright browsers.
     default: "false"
 
+outputs:
+  go-cache-hit:
+    description: >-
+      "true" when the Go cache was restored from its exact key, so the
+      caller knows the build cache already holds this go.sum and toolchain.
+    value: ${{ steps.go.outputs.cache-hit }}
+
 runs:
   using: composite
   steps:
@@ -31,6 +38,7 @@ runs:
     # grow by one entry per push; hestia shares the same 10 GB budget. Later
     # pushes restore the last one and recompile only the packages that changed.
     - name: Go build and module cache
+      id: go
       if: inputs.go-key != ''
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:

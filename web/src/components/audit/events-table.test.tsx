@@ -59,6 +59,27 @@ const fromTheCli: AuditEvent = {
   remoteAddr: "10.0.0.2",
 };
 
+/** A system event with a name wider than the Action column. */
+const longAction: AuditEvent = {
+  id: "43",
+  createdAt: new Date().toISOString(),
+  actorKind: "system",
+  actorUserId: "",
+  actorName: "",
+  action: "node.attestation.key_changed",
+  targetKind: "node",
+  targetId: "7",
+  targetName: "laptop",
+  outcome: 200,
+  detail: {},
+  remoteAddr: "",
+};
+
+/** Where an element ends; nothing has no edge, so a missing cell fails the comparison. */
+function rightEdge(element: Element | null): number {
+  return element === null ? Number.NaN : element.getBoundingClientRect().right;
+}
+
 function noop(): void {
   // The table only reports the click; paging belongs to the page.
 }
@@ -141,6 +162,23 @@ describe(EventsTable, () => {
 
     await expect.element(screen.getByText("CLI")).toBeVisible();
     await expect.element(screen.getByText("unknown")).not.toBeInTheDocument();
+  });
+
+  // The columns are fixed, so a cell that neither wraps nor truncates runs into its neighbour: the
+  // attestation events did, until the action got a break opportunity at every dot.
+  it("wraps a long action inside its column instead of running into the next", async () => {
+    const screen = await render(app({ ...base, events: [longAction] }));
+    const code = screen.getByText("node.attestation.key_changed").element();
+
+    expect(rightEdge(code)).toBeLessThanOrEqual(rightEdge(code.closest("td")));
+  });
+
+  it("marks an actor that is not a person with an icon, not initials", async () => {
+    const screen = await render(app({ ...base, events: [deletion, fromTheCli] }));
+
+    await expect.element(screen.getByText("AD")).toBeVisible();
+    await expect.element(screen.getByText("CL")).not.toBeInTheDocument();
+    expect(screen.container.querySelectorAll("span[aria-hidden] svg")).toHaveLength(1);
   });
 
   it("links a node target to its machine and a user target to the user list", async () => {

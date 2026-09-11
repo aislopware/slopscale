@@ -553,3 +553,32 @@ func TestOIDCClaimsJSONToUser(t *testing.T) {
 		})
 	}
 }
+
+func TestUserAuditName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		user User
+		want string
+	}{
+		{
+			name: "username first",
+			user: User{Name: "alice", DisplayName: "Alice", Email: "alice@example.com"},
+			want: "alice",
+		},
+		{
+			name: "display name without a username",
+			user: User{DisplayName: "Cong Tran", Email: "cong@example.com"},
+			want: "Cong Tran",
+		},
+		{name: "email alone", user: User{Email: "cong@example.com"}, want: "cong@example.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, tt.user.AuditName())
+		})
+	}
+}

@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 0.33.0 (unreleased)
+
+### Changes
+
+- The console's audit log no longer lets a long action name such as `node.attestation.attested` run into the target column: the name wraps at a dot when the column is too narrow, and the Time and Action columns are wider. The action reads object first in the subtle colour and verb last, and a verb after which something is gone (`delete`, `deny`, `expire`, `reject`, `revoke`, `unshare`) is in the danger colour, so the rows to look at stand out in a long list
+- The audit log's actor column marks an actor that is not a person with an icon of its kind (a key, a terminal for the CLI, a machine, a gear for the server) instead of initials made from its label, every kind of target is named in the console's words (Access request, DNS rule, Webhook) instead of the API's spelling, and the summary above the table gained an activity strip: event volume over the loaded window in 24 bars, the failed share of each in the danger colour
+- Audit events of a user whose identity provider sends no username now carry the user's display name, or failing that the email, rather than an empty name that left the console showing the session id in its place; user targets are named the same way. A user with a username is recorded as before
+
 ## 0.32.0 (2026-09-11)
 
 ### Changes

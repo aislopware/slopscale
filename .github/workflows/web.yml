@@ -36,6 +36,10 @@ defaults:
     shell: nix develop --fallback --command bash -e {0}
 
 jobs:
+  # Two runners, alike in length: the static checks and the generated types
+  # on one, the build and every test on the other. In one job the steps ran
+  # in series and a console change waited about three minutes for its
+  # answer; split, it waits for the longer half.
   check:
     runs-on: ubuntu-latest
     steps:
@@ -44,11 +48,12 @@ jobs:
         with:
           go-key: web
           bun: "true"
-          playwright: "true"
 
       - name: Typecheck, lint and format
         run: make lint-web
 
+      # The OpenAPI generator compiles most of the server, so this job needs
+      # the Go cache as much as the tests do.
       - name: Check generated API types
         run: |
           make web-generate
@@ -56,6 +61,16 @@ jobs:
             echo "Console API types or the HuJSON parser are not up to date; run 'make web-generate' and commit."
             exit 1
           fi
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          go-key: web
+          bun: "true"
+          playwright: "true"
 
       - name: Build
         run: make web
