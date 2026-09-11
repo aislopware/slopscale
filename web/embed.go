@@ -94,9 +94,17 @@ func LegacyHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, target, http.StatusMovedPermanently)
 }
 
+// serverURLPlaceholder is what index.html carries where the server's own
+// address belongs: the social card a chat or a feed draws for a shared
+// console link needs absolute URLs, and the bundle is built before the
+// address is known.
+const serverURLPlaceholder = "__SLOPSCALE_URL__"
+
 // Handler serves the console. Mount it at both Prefix without the trailing
-// slash (to redirect) and Prefix followed by a wildcard.
-func Handler() http.Handler {
+// slash (to redirect) and Prefix followed by a wildcard. serverURL is the
+// address the server is reached at, written into the entry page's social
+// card tags.
+func Handler(serverURL string) http.Handler {
 	sub, err := fs.Sub(dist, "dist")
 	if err != nil {
 		// The embed directive guarantees the directory exists.
@@ -131,7 +139,7 @@ func Handler() http.Handler {
 		}
 
 		if rel == "" || rel == indexFile {
-			serveIndex(w, r, sub)
+			serveIndex(w, r, sub, serverURL)
 
 			return
 		}
@@ -143,7 +151,7 @@ func Handler() http.Handler {
 		}
 
 		if errors.Is(statErr, fs.ErrNotExist) {
-			serveIndex(w, r, sub)
+			serveIndex(w, r, sub, serverURL)
 
 			return
 		}
@@ -208,7 +216,9 @@ func serveGzipped(w http.ResponseWriter, r *http.Request, sub fs.FS, rel string)
 
 // serveIndex writes index.html uncached so a new release is picked up on the
 // next load while its hashed assets stay cached.
-func serveIndex(w http.ResponseWriter, r *http.Request, sub fs.FS) {
+// serveIndex serves the SPA entry with the server's address in place of the
+// placeholder its social card tags carry.
+func serveIndex(w http.ResponseWriter, r *http.Request, sub fs.FS, serverURL string) {
 	index, err := fs.ReadFile(sub, indexFile)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -216,9 +226,11 @@ func serveIndex(w http.ResponseWriter, r *http.Request, sub fs.FS) {
 		return
 	}
 
+	page := strings.ReplaceAll(string(index), serverURLPlaceholder, strings.TrimSuffix(serverURL, "/"))
+
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	http.ServeContent(w, r, indexFile, time.Time{}, strings.NewReader(string(index)))
+	http.ServeContent(w, r, indexFile, time.Time{}, strings.NewReader(page))
 }
 
 // The page served in place of the console when the binary was built without it. It is its own

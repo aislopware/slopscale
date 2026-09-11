@@ -31,6 +31,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/mapper"
 	"github.com/aislopware/slopscale/hscontrol/recorder"
 	"github.com/aislopware/slopscale/hscontrol/state"
+	"github.com/aislopware/slopscale/hscontrol/templates"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/aislopware/slopscale/hscontrol/util"
@@ -120,6 +121,10 @@ func NewSlopscale(cfg *types.Config) (*Slopscale, error) {
 	// dials through this policy, and the URL validators check it, so it is
 	// installed before anything can be validated or delivered.
 	egress.SetDefault(cfg.Egress.Policy())
+
+	// The pages the server renders name the server in their social card, so
+	// a link to a sign-in or a client page unfurls with the server's own image.
+	templates.SetServerURL(cfg.ServerURL)
 
 	noisePrivateKey, err := readOrCreatePrivateKey(cfg.NoisePrivateKeyPath)
 	if err != nil {
@@ -1360,12 +1365,14 @@ func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	// The admin console is a static bundle embedded at build time; it
 	// authenticates against /api/v1 with an API key, so nothing here is
 	// privileged. See package web.
-	r.Handle(strings.TrimSuffix(web.Prefix, "/"), web.Handler())
-	r.Handle(web.Prefix+"*", web.Handler())
+	console := web.Handler(h.cfg.ServerURL)
+	r.Handle(strings.TrimSuffix(web.Prefix, "/"), console)
+	r.Handle(web.Prefix+"*", console)
 	r.Get(strings.TrimSuffix(web.LegacyPrefix, "/"), web.LegacyHandler)
 	r.Get(web.LegacyPrefix+"*", web.LegacyHandler)
 
 	r.Get("/favicon.ico", FaviconHandler)
+	r.Get(templates.OpenGraphPath, OpenGraphHandler)
 	r.Get("/", web.RootHandler)
 
 	return r

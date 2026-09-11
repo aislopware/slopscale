@@ -431,3 +431,10 @@ func FaviconHandler(writer http.ResponseWriter, req *http.Request) {
 	writer.Header().Set("Content-Type", "image/png")
 	http.ServeContent(writer, req, "favicon.ico", time.Unix(0, 0), bytes.NewReader(assets.Favicon))
 }
+
+// OpenGraphHandler serves the social card the server's pages name as their
+// og:image.
+func OpenGraphHandler(writer http.ResponseWriter, req *http.Request) {
+	writer.Header().Set("Content-Type", "image/png")
+	http.ServeContent(writer, req, "opengraph.png", time.Unix(0, 0), bytes.NewReader(assets.OpenGraph))
+}

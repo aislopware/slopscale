@@ -5,6 +5,7 @@
 ### Changes
 
 - The mark is orange everywhere: the console's sidebar and sign-in page, the server's registration and client pages, the favicon, the docs site and the README draw the nine dots in the brand orange with the unlit ones faded, in place of the black or white they took from the text colour. The wordmark on the server's pages follows the page's text colour, so it is readable in dark mode too
+- A link to the server unfurls with a card in Slack, Telegram, Discord, Facebook and the like: the console's entry page and every page the server renders (sign-in, registration, the Apple and Windows client pages) carry Open Graph and Twitter card tags naming the server, a description and a 1200×630 image served at `/opengraph.png`, with the absolute URLs those crawlers need built from `server_url`. The docs site's generated cards carry the mark instead of an initial in a tile
 
 ## 0.37.0 (2026-09-11)
 

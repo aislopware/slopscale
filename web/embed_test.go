@@ -10,11 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// testServerURL carries a trailing slash to check the handler drops it
+// before it joins a path to it.
+const testServerURL = "https://hs.example.test/"
+
 func serve(t *testing.T, method, target string) *httptest.ResponseRecorder {
 	t.Helper()
 
 	rec := httptest.NewRecorder()
-	Handler().ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), method, target, http.NoBody))
+	Handler(testServerURL).ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), method, target, http.NoBody))
 
 	return rec
 }
@@ -67,6 +71,9 @@ func TestHandlerServesConsole(t *testing.T) {
 	require.Equal(t, http.StatusOK, index.Code)
 	assert.Equal(t, "no-cache", index.Header().Get("Cache-Control"))
 	assert.Contains(t, index.Body.String(), `id="root"`)
+	assert.Contains(t, index.Body.String(), `property="og:image" content="https://hs.example.test/opengraph.png"`,
+		"the social card names the server's own address")
+	assert.NotContains(t, index.Body.String(), serverURLPlaceholder)
 
 	deep := serve(t, http.MethodGet, "/console/machines/42?x=1")
 	assert.Equal(t, http.StatusOK, deep.Code)

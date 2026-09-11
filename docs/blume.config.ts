@@ -3,12 +3,16 @@ import { defineConfig } from "blume";
 export default defineConfig({
   title: "slopscale",
   description:
-    "A fork of headscale, the open source Tailscale control server, with a built-in admin console.",
-  logo: { image: { light: "/mark.svg", dark: "/mark-dark.svg", alt: "slopscale" }, text: "slopscale" },
+    "An open source, self-hosted implementation of the Tailscale control server, with a built-in admin console.",
+  logo: { image: "/mark.svg", text: "slopscale" },
   content: { root: "content" },
   github: { owner: "aislopware", repo: "slopscale", dir: "docs" },
   deployment: { site: "https://aislopware.github.io", base: "/slopscale" },
   theme: { accent: "orange", radius: "md", mode: "system" },
+  seo: {
+    og: { logo: "/mark.svg", palette: { accent: "#f6821f" } },
+    software: { license: "BSD-3-Clause", operatingSystem: "Linux", price: 0 },
+  },
   navigation: { sidebar: { display: "group" } },
   toc: true,
   lastModified: true,
