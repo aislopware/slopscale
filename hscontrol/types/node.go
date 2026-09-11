@@ -1270,9 +1270,27 @@ func equalUnordered[E comparable](a, b []E, cmp func(E, E) int) bool {
 
 // HasPolicyChange reports whether the node has changes that affect
 // policy evaluation. Includes approved subnet routes because they act
-// as source identity in [Node.CanAccess] for subnet-to-subnet ACLs.
+// as source identity in [Node.CanAccess] for subnet-to-subnet ACLs,
+// and enabled exit routes because autogroup:internet and exit-node
+// reduction depend on which exit nodes are advertised-and-approved.
 func (nv NodeView) HasPolicyChange(other NodeView) bool {
-	if nv.UserID() != other.UserID() {
+	return nv.hasPolicyChangeExceptPosture(other) || nv.HasPostureInputChange(other)
+}
+
+// hasPolicyChangeExceptPosture is [NodeView.HasPolicyChange] for every
+// input but the posture attributes.
+func (nv NodeView) hasPolicyChangeExceptPosture(other NodeView) bool {
+	// UserID() is a pointer view, so comparing it directly compares
+	// pointer identity: two copies of the same node loaded separately
+	// would count as a change. Compare the value.
+	if nv.TypedUserID() != other.TypedUserID() {
+		return true
+	}
+
+	// The policy resolves ownership through the loaded association, so
+	// compare it as well as the raw foreign key.
+	if nv.User().Valid() != other.User().Valid() ||
+		(nv.User().Valid() && nv.User().ID() != other.User().ID()) {
 		return true
 	}
 
@@ -1288,6 +1306,10 @@ func (nv NodeView) HasPolicyChange(other NodeView) bool {
 		return true
 	}
 
+	if !equalPrefixesUnordered(nv.ExitRoutes(), other.ExitRoutes()) {
+		return true
+	}
+
 	if !views.SliceEqual(nv.SharedWith(), other.SharedWith()) {
 		return true
 	}
@@ -1298,14 +1320,22 @@ func (nv NodeView) HasPolicyChange(other NodeView) bool {
 
 	// The services a node hosts put addresses on it and caps on every
 	// node that can reach them.
-	if !nv.ж.servicesEqual(other.ж) {
-		return true
-	}
+	return !nv.ж.servicesEqual(other.ж)
+}
 
-	// The policy's postures read the attribute map, so what feeds it
-	// counts: the reported OS and versions, the serials and the custom
-	// attributes.
+// HasPostureInputChange reports whether an input of the posture attribute
+// map moved (see [HostinfoPostureEqual] and the posture record). It is part
+// of [NodeView.HasPolicyChange]; the policy manager reads it on its own so a
+// policy that names no posture can ignore a client reporting a new OS
+// version instead of recompiling for every node.
+func (nv NodeView) HasPostureInputChange(other NodeView) bool {
 	return !nv.ж.postureInputsEqual(other.ж)
+}
+
+// HasPolicyChangeIgnoringPosture is [NodeView.HasPolicyChange] without the
+// posture inputs, for a caller that knows whether the policy reads them.
+func (nv NodeView) HasPolicyChangeIgnoringPosture(other NodeView) bool {
+	return nv.hasPolicyChangeExceptPosture(other)
 }
 
 // TailNodes converts a slice of [NodeView] values into Tailscale [tailcfg.Node] values.

@@ -30,6 +30,7 @@ docker run \
   --detach \
   --read-only \
   --tmpfs /var/run/slopscale \
+  --tmpfs /tmp \
   --volume "$(pwd)/config:/etc/slopscale:ro" \
   --volume "$(pwd)/lib:/var/lib/slopscale" \
   --publish 127.0.0.1:8080:8080 \

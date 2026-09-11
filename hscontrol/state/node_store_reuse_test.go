@@ -1,6 +1,7 @@
 package state
 
 import (
+	"net/netip"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -9,6 +10,8 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"tailscale.com/tailcfg"
+	"tailscale.com/types/key"
 )
 
 // countingPeers is a [PeersFunc] that makes every node a peer of every
@@ -136,4 +139,159 @@ func BenchmarkUpdateNodePeerMap(b *testing.B) {
 			store.UpdateNode(1, func(n *types.Node) { n.Tags = []string{tag} })
 		}
 	})
+}
+
+// TestUpdateNodeRecomputesPeersOnlyForRelationInputs pins which fields make
+// a write recompute the peer relationship (see peerInputsChanged): what the
+// policy reads, admission, exit-node status, routes and the user identity.
+// An announced but unapproved route is included on purpose. Everything
+// else carries the previous peer map forward.
+func TestUpdateNodeRecomputesPeersOnlyForRelationInputs(t *testing.T) {
+	t.Parallel()
+
+	subnet := netip.MustParsePrefix("10.77.0.0/24")
+
+	tests := []struct {
+		name          string
+		mutate        func(*types.Node)
+		wantRecompute bool
+	}{
+		{name: "last seen", mutate: func(n *types.Node) { n.LastSeen = new(time.Now()) }},
+		{name: "node key", mutate: func(n *types.Node) { n.NodeKey = key.NewNode().Public() }},
+		{name: "expiry", mutate: func(n *types.Node) { n.Expiry = new(time.Now()) }},
+		{name: "online", mutate: func(n *types.Node) { n.IsOnline = new(true) }},
+		{name: "unhealthy", mutate: func(n *types.Node) { n.Unhealthy = true }},
+		{
+			name: "endpoints",
+			mutate: func(n *types.Node) {
+				n.Endpoints = []netip.AddrPort{netip.MustParseAddrPort("203.0.113.1:41641")}
+			},
+		},
+		{name: "tags", mutate: func(n *types.Node) { n.Tags = []string{"tag:x"} }, wantRecompute: true},
+		{
+			name: "ipv4",
+			mutate: func(n *types.Node) {
+				ip := netip.MustParseAddr("100.64.9.9")
+				n.IPv4 = &ip
+			},
+			wantRecompute: true,
+		},
+		{
+			name: "announced route",
+			mutate: func(n *types.Node) {
+				n.Hostinfo = &tailcfg.Hostinfo{RoutableIPs: []netip.Prefix{subnet}}
+			},
+			wantRecompute: true,
+		},
+		{
+			name:          "approved route",
+			mutate:        func(n *types.Node) { n.ApprovedRoutes = []netip.Prefix{subnet} },
+			wantRecompute: true,
+		},
+		{name: "approval", mutate: func(n *types.Node) { n.ApprovedAt = new(time.Now()) }, wantRecompute: true},
+		{name: "user association", mutate: func(n *types.Node) { n.User = nil }, wantRecompute: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var calls atomic.Int64
+
+			node1 := createTestNode(1, 1, "user1", "node1")
+			node2 := createTestNode(2, 2, "user2", "node2")
+
+			store := NewNodeStore(types.Nodes{&node1, &node2}, countingPeers(&calls), TestBatchSize, TestBatchTimeout)
+			store.Start()
+
+			defer store.Stop()
+
+			calls.Store(0)
+
+			_, ok := store.UpdateNode(1, tt.mutate)
+			require.True(t, ok)
+
+			var want int64
+			if tt.wantRecompute {
+				want = 1
+			}
+
+			assert.Equal(t, want, calls.Load())
+		})
+	}
+}
+
+// TestHealthOnlyWriteReusesPeerMap ensures a health flip re-elects routes
+// without recomputing the peer relationship.
+func TestHealthOnlyWriteReusesPeerMap(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int64
+
+	// Two HA candidates for the same prefix.
+	node1 := createTestNode(1, 1, "user1", "router1")
+	node2 := createTestNode(2, 1, "user1", "router2")
+
+	pfx := netip.MustParsePrefix("10.99.0.0/24")
+	node1.Hostinfo = &tailcfg.Hostinfo{Hostname: "router1", RoutableIPs: []netip.Prefix{pfx}}
+	node2.Hostinfo = &tailcfg.Hostinfo{Hostname: "router2", RoutableIPs: []netip.Prefix{pfx}}
+	node1.ApprovedRoutes = []netip.Prefix{pfx}
+	node2.ApprovedRoutes = []netip.Prefix{pfx}
+	node1.IsOnline = new(true)
+	node2.IsOnline = new(true)
+
+	store := NewNodeStore(types.Nodes{&node1, &node2}, countingPeers(&calls), TestBatchSize, TestBatchTimeout)
+	store.Start()
+
+	defer store.Stop()
+
+	primary, ok := store.PrimaryRouteFor(pfx)
+	require.True(t, ok)
+	require.Equal(t, types.NodeID(1), primary)
+
+	calls.Store(0)
+
+	// Healthy -> healthy is a no-op: healthSetter(true) clears an
+	// Unhealthy bit the node never had.
+	_, ok = store.UpdateNode(1, healthSetter(true))
+	require.True(t, ok)
+
+	// Healthy -> unhealthy moves the primary, but Unhealthy is an
+	// election input, not a relation input.
+	_, ok = store.UpdateNode(1, healthSetter(false))
+	require.True(t, ok)
+
+	primary, ok = store.PrimaryRouteFor(pfx)
+	require.True(t, ok)
+	require.Equal(t, types.NodeID(2), primary)
+
+	// Unhealthy -> unhealthy is a no-op again.
+	_, ok = store.UpdateNode(1, healthSetter(false))
+	require.True(t, ok)
+
+	assert.Equal(t, int64(0), calls.Load(), "no health-only write may recompute the peer map")
+}
+
+// TestRebuildPeerMapsAfterStopReturns ensures a rebuild requested after the
+// writer has exited does not block the caller forever.
+func TestRebuildPeerMapsAfterStopReturns(t *testing.T) {
+	t.Parallel()
+
+	node := createTestNode(1, 1, "user1", "node1")
+	store := NewNodeStore(types.Nodes{&node}, allowAllPeersFunc, TestBatchSize, TestBatchTimeout)
+	store.Start()
+	store.Stop()
+
+	done := make(chan struct{})
+
+	go func() {
+		store.RebuildPeerMaps()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("RebuildPeerMaps hung after Stop")
+	}
 }

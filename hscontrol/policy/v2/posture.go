@@ -314,6 +314,40 @@ func (pol *Policy) usesSourceAddress() bool {
 	return false
 }
 
+// usesPostures reports whether a grant in use carries a posture, so a
+// change in a node's posture inputs can move the filter. A default
+// posture applies to every grant that names none, so it counts on its
+// own; access rules become grants with their postures attached.
+func (pol *Policy) usesPostures() bool {
+	if pol == nil {
+		return false
+	}
+
+	if len(pol.DefaultSrcPosture) > 0 {
+		return true
+	}
+
+	for _, acl := range pol.ACLs {
+		if len(acl.SrcPosture) > 0 {
+			return true
+		}
+	}
+
+	for _, grant := range pol.Grants {
+		if len(grant.SrcPosture) > 0 {
+			return true
+		}
+	}
+
+	for _, grant := range accessGrants(pol.access) {
+		if len(grant.SrcPosture) > 0 {
+			return true
+		}
+	}
+
+	return false
+}
+
 // nextScheduleBoundary returns the next instant a schedule of a posture
 // in use opens or closes, or the zero time when none is scheduled.
 func (pol *Policy) nextScheduleBoundary(now time.Time) time.Time {

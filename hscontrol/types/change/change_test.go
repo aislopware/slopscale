@@ -581,9 +581,9 @@ func TestChange_Type(t *testing.T) {
 			want: "ping",
 		},
 		{
-			name:     "empty is unknown",
+			name:     "empty",
 			response: Change{},
-			want:     "unknown",
+			want:     "empty",
 		},
 	}
 
@@ -763,6 +763,9 @@ func TestTypesMatchesChangeType(t *testing.T) {
 		DERPMap().Type(),
 		PingNode(1, &tailcfg.PingRequest{}).Type(),
 		Change{}.Type(),
+		// The fallthrough for a shape no category names; no constructor
+		// produces one, so it is listed by name.
+		TypeUnknown,
 	}
 
 	assert.ElementsMatch(t, Types, categories,

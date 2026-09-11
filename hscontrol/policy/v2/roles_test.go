@@ -1,6 +1,7 @@
 package v2
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/aislopware/slopscale/hscontrol/types"
@@ -167,11 +168,16 @@ func TestPolicyManagerStampsRoleCapsWithoutPolicy(t *testing.T) {
 	assert.Nil(t, pm.NodeCapMap(4))
 
 	// Demoting the admin and promoting the member flows through SetUsers.
+	// The manager keeps the slice it was given, so mutate a copy: the
+	// same backing array would compare equal to itself.
+	users = slices.Clone(users)
 	users[1].Role = types.RoleMember
 	users[3].Role = types.RoleAdmin
 
-	_, err = pm.SetUsers(users)
+	policyChanged, peerMapChanged, err := pm.SetUsers(users)
 	require.NoError(t, err)
+	assert.False(t, policyChanged, "a role change does not move the filter")
+	assert.True(t, peerMapChanged, "a role change moves the role autogroups")
 
 	assert.Nil(t, pm.NodeCapMap(2))
 	assert.Contains(t, pm.NodeCapMap(4), nodecap.Admin)

@@ -4,6 +4,7 @@ import (
 	"net/netip"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/policy/matcher"
 	"github.com/aislopware/slopscale/hscontrol/types"
@@ -2617,4 +2618,137 @@ func TestTagOwnedByTags(t *testing.T) {
 		var nilPM *PolicyManager
 		require.False(t, nilPM.TagOwnedByTags("tag:leaf", []string{"tag:root"}))
 	})
+}
+
+func TestSetUsers(t *testing.T) {
+	const allowAll = `{"acls":[{"action":"accept","src":["*"],"dst":["*:*"]}]}`
+
+	const sshCheck = `{
+		"ssh": [
+			{
+				"action": "check",
+				"src": ["user1@slopscale.net"],
+				"dst": ["autogroup:self"],
+				"users": ["root"]
+			}
+		]
+	}`
+
+	tests := []struct {
+		name   string
+		policy string
+		mutate func(*types.User)
+
+		wantPolicyChanged  bool
+		wantPeerMapChanged bool
+	}{
+		{
+			name:   "identical users without ssh",
+			policy: allowAll,
+			mutate: func(*types.User) {},
+		},
+		{
+			name:   "identical users with ssh",
+			policy: sshCheck,
+			mutate: func(*types.User) {},
+		},
+		{
+			name:   "timestamp bump only",
+			policy: sshCheck,
+			mutate: func(u *types.User) { u.UpdatedAt = u.UpdatedAt.Add(time.Hour) },
+		},
+		{
+			name:   "display name change without ssh",
+			policy: allowAll,
+			mutate: func(u *types.User) { u.DisplayName = "Renamed" },
+		},
+		{
+			name:   "email change without ssh",
+			policy: allowAll,
+			mutate: func(u *types.User) { u.Email = "other@slopscale.net" },
+
+			wantPeerMapChanged: true,
+		},
+		{
+			name:   "role change without ssh",
+			policy: allowAll,
+			mutate: func(u *types.User) { u.Role = types.RoleAdmin },
+
+			wantPeerMapChanged: true,
+		},
+		{
+			name:   "rename with ssh",
+			policy: sshCheck,
+			mutate: func(u *types.User) { u.Name = "renamed" },
+
+			wantPolicyChanged:  true,
+			wantPeerMapChanged: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			users := types.Users{{ID: 1, Name: "user1", Email: "user1@slopscale.net"}}
+
+			pm, err := NewPolicyManager([]byte(tt.policy), users, types.Nodes{}.ViewSlice())
+			require.NoError(t, err)
+
+			updated := slices.Clone(users)
+			tt.mutate(&updated[0])
+
+			policyChanged, peerMapChanged, err := pm.SetUsers(updated)
+			require.NoError(t, err)
+			require.Equal(t, tt.wantPolicyChanged, policyChanged, "policyChanged")
+			require.Equal(t, tt.wantPeerMapChanged, peerMapChanged, "peerMapChanged")
+		})
+	}
+}
+
+// TestSetNodesPostureInputsOnlyMatterWhenPolicyUsesPostures pins that a
+// client reporting a new OS or version only recompiles when a grant in
+// use carries a posture: without one nothing in the filter reads the
+// posture attribute map, so the change is stored and nothing is resent.
+func TestSetNodesPostureInputsOnlyMatterWhenPolicyUsesPostures(t *testing.T) {
+	t.Parallel()
+
+	const allowAll = `{"acls":[{"action":"accept","src":["*"],"dst":["*:*"]}]}`
+
+	const withPosture = `{
+		"postures": {"posture:linux": ["node:os == 'linux'"]},
+		"grants": [{"src": ["*"], "dst": ["*"], "ip": ["*"], "srcPosture": ["posture:linux"]}]
+	}`
+
+	tests := []struct {
+		name   string
+		policy string
+		want   bool
+	}{
+		{name: "no posture in use", policy: allowAll, want: false},
+		{name: "posture in use", policy: withPosture, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			users := types.Users{{ID: 1, Name: "user1", Email: "user1@slopscale.net"}}
+			node := &types.Node{
+				ID:       1,
+				UserID:   new(uint(1)),
+				User:     &users[0],
+				IPv4:     new(netip.MustParseAddr("100.64.0.1")),
+				Hostinfo: &tailcfg.Hostinfo{Hostname: "node", OS: "linux", OSVersion: "1"},
+			}
+
+			pm, err := NewPolicyManager([]byte(tt.policy), users, types.Nodes{node}.ViewSlice())
+			require.NoError(t, err)
+
+			upgraded := node.Clone()
+			upgraded.Hostinfo.OSVersion = "2"
+
+			changed, err := pm.SetNodes(types.Nodes{upgraded}.ViewSlice())
+			require.NoError(t, err)
+			require.Equal(t, tt.want, changed)
+		})
+	}
 }
