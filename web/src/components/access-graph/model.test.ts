@@ -2,16 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import type { AccessGraphEdge, AccessGraphNode } from "~/api/schema.gen.ts";
 import {
-  buildMatrix,
+  accessClasses,
+  buildAccessMap,
+  cellLabel,
   clampCell,
   edgeListView,
   edgePreview,
   edgeRows,
   edgeSummary,
-  fitsMatrix,
+  fitsMap,
   groupEdges,
-  maxMatrixNodes,
+  maxMapClasses,
   nextCell,
+  openness,
   nodesById,
   ownerLabel,
   parsePort,
@@ -183,40 +186,194 @@ describe(ownerLabel, () => {
   });
 });
 
-describe(fitsMatrix, () => {
-  it("draws a tailnet up to the limit and nothing at all when empty", () => {
-    expect(fitsMatrix(0)).toBe(false);
-    expect(fitsMatrix(maxMatrixNodes)).toBe(true);
-    expect(fitsMatrix(maxMatrixNodes + 1)).toBe(false);
+describe(fitsMap, () => {
+  it("draws a map up to the limit and nothing at all when empty", () => {
+    expect(fitsMap(0)).toBe(false);
+    expect(fitsMap(maxMapClasses)).toBe(true);
+    expect(fitsMap(maxMapClasses + 1)).toBe(false);
   });
 });
 
-describe(buildMatrix, () => {
-  const nodes = [node("2", "beta"), node("1", "alpha"), node("3", "gamma")];
-  const matrix = buildMatrix(nodes, [edge("1", "2", { ports: ["tcp:22"] }), edge("3", "1")]);
+describe(openness, () => {
+  it("grades an edge by its ports, with only a bare wildcard as everything", () => {
+    expect(openness(edge("1", "2", { ports: ["*"] }))).toBe("all");
+    expect(openness(edge("1", "2", { ports: ["tcp:22", "udp:*"] }))).toBe("some");
+    expect(openness(edge("1", "2", { ports: ["tcp:22"] }))).toBe("some");
+    expect(openness(edge("1", "2", { sshUsers: ["*"] }))).toBe("other");
+  });
+});
 
-  it("puts both axes in name order", () => {
-    expect(matrix.columns.map((one) => one.name)).toStrictEqual(["alpha", "beta", "gamma"]);
-    expect(matrix.rows.map((row) => row.src.name)).toStrictEqual(["alpha", "beta", "gamma"]);
+describe(cellLabel, () => {
+  it("says in a few words which ports the cell opens", () => {
+    expect(cellLabel(edge("1", "2", { ports: ["*"] }))).toBe("All ports");
+    expect(cellLabel(edge("1", "2", { ports: ["*"], sshUsers: ["root"] }))).toBe("All ports · SSH");
+    expect(cellLabel(edge("1", "2", { ports: ["tcp:22", "tcp:443"] }))).toBe("tcp:22, 443");
+    expect(cellLabel(edge("1", "2", { ports: ["udp:*"] }))).toBe("udp:*");
   });
 
-  it("fills a cell only where the policy opens the pair", () => {
-    const [alpha] = matrix.rows;
+  it("names what is open when no port is", () => {
+    expect(cellLabel(edge("1", "2", { sshUsers: ["*"] }))).toBe("SSH only");
+    expect(cellLabel(edge("1", "2", { routes: ["10.0.0.0/8"] }))).toBe("Routes only");
+    expect(cellLabel(edge("1", "2", { capabilities: ["x"] }))).toBe("Capabilities only");
+    expect(
+      cellLabel(edge("1", "2", { sshUsers: ["*"], routes: ["10.0.0.0/8"], capabilities: ["x"] })),
+    ).toBe("SSH · Routes · Capabilities");
+  });
+});
 
-    expect(alpha?.cells.map((cell) => cell.edge !== undefined)).toStrictEqual([false, true, false]);
-    expect(alpha?.cells[0]?.self).toBe(true);
-    expect(alpha?.cells[1]?.edge?.ports).toStrictEqual(["tcp:22"]);
+describe(accessClasses, () => {
+  // Three laptops that reach the two servers the same way, and each other on every port, are one
+  // class; the servers, which reach nothing, are another; a server that also reaches the laptops
+  // is a third.
+  const laptops = ["1", "2", "3"].map((id) => node(id, `laptop-${id}`));
+  const servers = ["8", "9"].map((id) => node(id, `server-${id}`, { user: "", tags: ["tag:srv"] }));
+  const edges = [
+    ...laptops.flatMap((from) =>
+      laptops.filter((to) => to.id !== from.id).map((to) => edge(from.id, to.id, { ports: ["*"] })),
+    ),
+    ...laptops.flatMap((from) => servers.map((to) => edge(from.id, to.id, { ports: ["tcp:22"] }))),
+  ];
+
+  it("puts machines the policy treats alike in one class", () => {
+    const classes = accessClasses([...laptops, ...servers], edges);
+    const names = classes.map((members) => members.map((one) => one.name).toSorted());
+
+    expect(names).toStrictEqual([
+      ["laptop-1", "laptop-2", "laptop-3"],
+      ["server-8", "server-9"],
+    ]);
   });
 
-  it("counts the open pairs", () => {
-    expect(matrix.open).toBe(2);
+  it("splits a class on a machine that reaches something the others do not", () => {
+    const classes = accessClasses(
+      [...laptops, ...servers],
+      [
+        ...edges,
+        edge("9", "1", { ports: ["*"] }),
+        edge("9", "2", { ports: ["*"] }),
+        edge("9", "3", { ports: ["*"] }),
+      ],
+    );
+
+    expect(
+      classes.map((members) => members.length).toSorted((left, right) => left - right),
+    ).toStrictEqual([1, 1, 3]);
   });
 
-  it("never fills the diagonal, even when the graph carries a self edge", () => {
-    const self = buildMatrix([node("1", "alpha")], [edge("1", "1", { ports: ["*"] })]);
+  it("keeps two pairs that reach only their own partner in two classes, not one", () => {
+    const pairs = ["a", "b", "c", "d"].map((id) => node(id, id));
+    const classes = accessClasses(pairs, [
+      edge("a", "b", { ports: ["*"] }),
+      edge("b", "a", { ports: ["*"] }),
+      edge("c", "d", { ports: ["*"] }),
+      edge("d", "c", { ports: ["*"] }),
+    ]);
 
-    expect(self.open).toBe(0);
-    expect(self.rows[0]?.cells[0]?.edge).toBeUndefined();
+    expect(classes.map((members) => members.map((one) => one.id))).toStrictEqual([
+      ["a", "b"],
+      ["c", "d"],
+    ]);
+  });
+
+  it("keeps the machines of a cycle apart", () => {
+    const ring = ["a", "b", "c"].map((id) => node(id, id));
+    const classes = accessClasses(ring, [
+      edge("a", "c", { ports: ["*"] }),
+      edge("c", "b", { ports: ["*"] }),
+      edge("b", "a", { ports: ["*"] }),
+    ]);
+
+    expect(classes).toHaveLength(3);
+  });
+
+  it("tells capability sets apart, not just their presence", () => {
+    const classes = accessClasses(
+      [node("1", "a"), node("2", "b"), node("3", "c")],
+      [edge("3", "1", { capabilities: ["x"] }), edge("3", "2", { capabilities: ["y"] })],
+    );
+
+    expect(classes).toHaveLength(3);
+  });
+
+  it("ignores a self edge and keeps a machine without edges", () => {
+    const classes = accessClasses(
+      [node("1", "a"), node("2", "b")],
+      [edge("1", "1", { ports: ["*"] })],
+    );
+
+    expect(classes).toHaveLength(1);
+    expect(classes[0]).toHaveLength(2);
+  });
+});
+
+describe(buildAccessMap, () => {
+  const nodes = [
+    node("1", "laptop-1"),
+    node("2", "laptop-2"),
+    node("8", "web", { user: "", tags: ["tag:web"] }),
+    node("9", "other", { user: "bob" }),
+  ];
+  const map = buildAccessMap(nodes, [
+    edge("1", "2", { ports: ["*"] }),
+    edge("2", "1", { ports: ["*"] }),
+    edge("1", "8", { ports: ["tcp:443"] }),
+    edge("2", "8", { ports: ["tcp:443"] }),
+    edge("9", "8", { ports: ["tcp:443"] }),
+  ]);
+
+  it("names a class by what its machines share, a class of one by its machine", () => {
+    expect(map.classes.map((group) => [group.label, group.detail, group.tagged])).toStrictEqual([
+      ["ada", "laptop-1 +1", false],
+      ["other", "bob", false],
+      ["web", "tag:web", false],
+    ]);
+  });
+
+  it("names a tagged class by its tags and puts owners before tags", () => {
+    const tagged = buildAccessMap(
+      [
+        node("1", "web-1", { user: "", tags: ["tag:web"] }),
+        node("2", "web-2", { user: "", tags: ["tag:web"] }),
+        node("3", "laptop", { user: "zed@example.com" }),
+      ],
+      [edge("3", "1", { ports: ["tcp:443"] }), edge("3", "2", { ports: ["tcp:443"] })],
+    );
+
+    expect(tagged.classes.map((group) => [group.label, group.detail, group.tagged])).toStrictEqual([
+      ["laptop", "zed", false],
+      ["tag:web", "web-1 +1", true],
+    ]);
+  });
+
+  it("fills a cell with the edge any pair between the two classes carries", () => {
+    const [laptops] = map.rows;
+
+    expect(laptops?.cells.map((cell) => cell.edge?.ports)).toStrictEqual([
+      ["*"],
+      undefined,
+      ["tcp:443"],
+    ]);
+    expect(laptops?.cells[0]?.self).toBe(false);
+  });
+
+  it("marks a class of one against itself and counts machines and pairs", () => {
+    const [, bob] = map.rows;
+
+    expect(bob?.cells[1]?.self).toBe(true);
+    expect(bob?.cells[1]?.edge).toBeUndefined();
+    expect(map.machines).toBe(4);
+    expect(map.open).toBe(5);
+  });
+
+  it("names a mixed class by its owners without their domains and counts the rest", () => {
+    const mixed = buildAccessMap(
+      ["a", "b", "c", "d"].map((user, index) =>
+        node(String(index), user, { user: `${user}@example.com` }),
+      ),
+      [],
+    );
+
+    expect(mixed.classes.map((group) => group.label)).toStrictEqual(["a, b +2"]);
   });
 });
 

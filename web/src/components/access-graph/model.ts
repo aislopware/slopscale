@@ -211,67 +211,283 @@ export function ownerLabel(node: AccessGraphNode | undefined): string {
 }
 
 /**
- * How many machines the matrix draws before it stops being readable. Past this the page asks for
- * one machine instead: 61 columns of two-letter cells say less than one machine's two lists.
+ * How many access classes the map draws before it stops being readable. Machines with the same
+ * access share a row, so a tailnet of hundreds is usually a map of a dozen; a policy written per
+ * machine is the one that grows past this, and for that the page asks for one machine instead.
  */
-export const maxMatrixNodes = 60;
+export const maxMapClasses = 60;
 
-export function fitsMatrix(count: number): boolean {
-  return count > 0 && count <= maxMatrixNodes;
+export function fitsMap(count: number): boolean {
+  return count > 0 && count <= maxMapClasses;
 }
 
-export interface MatrixCell {
-  /** The machine the column stands for. */
-  readonly dst: AccessGraphNode;
-  /** What the row's machine may do to it, absent when the policy opens nothing. */
-  readonly edge: AccessGraphEdge | undefined;
-  /** Whether the cell is a machine against itself, which the graph never carries an edge for. */
-  readonly self: boolean;
+/** What an edge opens, as the cell that stands for it is tinted. */
+export type Openness = "all" | "some" | "other";
+
+/**
+ * How open an edge is: every port, some ports, or nothing on the packet filter but SSH, a route or
+ * a capability. Three steps of one tint, so a map reads at a glance which pairs are wide open.
+ */
+export function openness(edge: AccessGraphEdge): Openness {
+  // A bare `*` only: `udp:*` is every port of one protocol, which is still some of them.
+  if (edge.ports.some((entry) => entry === everything)) {
+    return "all";
+  }
+
+  return edge.ports.length > 0 ? "some" : "other";
 }
 
-export interface MatrixRow {
-  /** The machine the row stands for. */
-  readonly src: AccessGraphNode;
-  readonly cells: readonly MatrixCell[];
+/** The two or three words a cell has room for; the popover carries the rest. */
+export function cellLabel(edge: AccessGraphEdge): string {
+  const open = openness(edge);
+  const ssh = edge.sshUsers.length > 0;
+
+  if (open === "all") {
+    return ssh ? "All ports · SSH" : "All ports";
+  }
+
+  if (open === "some") {
+    const lines = portLines(edge.ports);
+
+    return ssh ? `${lines.join(", ")} · SSH` : lines.join(", ");
+  }
+
+  const kinds = [
+    ...(ssh ? ["SSH"] : []),
+    ...(edge.routes.length > 0 ? ["Routes"] : []),
+    ...(edge.capabilities.length > 0 ? ["Capabilities"] : []),
+  ];
+
+  // "only" when there is one kind; two or three kinds are listed, so nothing reads as narrower
+  // than it is.
+  return kinds.length === 1 ? `${kinds[0]} only` : kinds.join(" · ");
 }
 
-export interface Matrix {
-  readonly columns: readonly AccessGraphNode[];
-  readonly rows: readonly MatrixRow[];
-  /** How many ordered pairs of machines the policy opens. */
-  readonly open: number;
+function edgeLabel(edge: AccessGraphEdge): string {
+  return JSON.stringify([
+    edge.ports.toSorted(),
+    edge.sshUsers.toSorted(),
+    edge.sshCheck,
+    edge.routes.toSorted(),
+    edge.capabilities.toSorted(),
+  ]);
 }
 
 function pairKey(src: string, dst: string): string {
   return `${src}>${dst}`;
 }
 
+/** What every machine opens on every other, as a string per ordered pair, "" for nothing. */
+interface Relations {
+  readonly nodes: readonly AccessGraphNode[];
+  readonly between: (src: string, dst: string) => string;
+}
+
 /**
- * The whole tailnet as rows of sources against columns of destinations, both in name order so the
- * two axes read the same way.
+ * Whether two machines may share a class: every third machine sees them the same way in both
+ * directions, and what they open on each other is the same both ways. Checking against one member
+ * is enough, because the relation is transitive: if a third machine cannot tell one from the other,
+ * or the other from a third, it cannot tell the first from the third either.
  */
-export function buildMatrix(
+function alike(one: AccessGraphNode, other: AccessGraphNode, relations: Relations): boolean {
+  const { between } = relations;
+
+  return (
+    between(one.id, other.id) === between(other.id, one.id) &&
+    relations.nodes.every(
+      (third) =>
+        third.id === one.id ||
+        third.id === other.id ||
+        (between(one.id, third.id) === between(other.id, third.id) &&
+          between(third.id, one.id) === between(third.id, other.id)),
+    )
+  );
+}
+
+/**
+ * Machines that the policy treats the same: two machines share a class when every other machine
+ * reaches, and is reached by, both of them the same way, and they reach each other the same way.
+ * That is the coarsest grouping in which every pair between two classes carries the same edge, so
+ * one cell can stand for all of them. Grouping by the classes of a machine's neighbours instead
+ * (colour refinement) is coarser but wrong for a map: two pairs that reach only their own partner
+ * look alike, and one cell would then say every member reaches every other.
+ *
+ * A self edge says nothing about how a machine treats others and is left out. Machines are bucketed
+ * first by the multiset of what they open on and receive from every other machine, which any two
+ * members of a class share, so the pairwise check runs only inside a bucket.
+ */
+export function accessClasses(
   nodes: readonly AccessGraphNode[],
   edges: readonly AccessGraphEdge[],
-): Matrix {
-  const columns = nodes.toSorted((left, right) => left.name.localeCompare(right.name));
-  const byPair = new Map(edges.map((edge) => [pairKey(edge.src, edge.dst), edge]));
+): AccessGraphNode[][] {
+  const byPair = new Map(
+    edges
+      .filter((one) => one.src !== one.dst)
+      .map((one) => [pairKey(one.src, one.dst), edgeLabel(one)]),
+  );
+  const relations: Relations = {
+    nodes,
+    between: (src, dst) => byPair.get(pairKey(src, dst)) ?? "",
+  };
+  const buckets = new Map<string, AccessGraphNode[][]>();
 
-  const rows = columns.map((src) => ({
+  for (const node of nodes) {
+    const key = nodes
+      .filter((other) => other.id !== node.id)
+      .map(
+        (other) =>
+          `${relations.between(node.id, other.id)}\t${relations.between(other.id, node.id)}`,
+      )
+      .toSorted()
+      .join("\n");
+    const classes = buckets.get(key) ?? [];
+    const home = classes.find(([first]) => first !== undefined && alike(first, node, relations));
+
+    if (home === undefined) {
+      classes.push([node]);
+    } else {
+      home.push(node);
+    }
+    buckets.set(key, classes);
+  }
+
+  return [...buckets.values()].flat();
+}
+
+export interface AccessClass {
+  readonly id: string;
+  /** The machines, in name order. */
+  readonly members: readonly AccessGraphNode[];
+  /** The machine's name for a class of one; else what the members share: tags, an owner, or owners. */
+  readonly label: string;
+  /**
+   * Under the label: the owner for a class of one, else the first machine and how many more, so two
+   * classes with the same owner still read apart.
+   */
+  readonly detail: string;
+  /** Whether the label is tags, which read in the mono face. */
+  readonly tagged: boolean;
+}
+
+/** How many owners a mixed class names before it counts the rest. */
+const namedOwners = 2;
+
+/** A login without its domain: the part that tells people apart, in the room a header has. */
+export function shortOwner(node: AccessGraphNode): string {
+  if (node.tags.length > 0) {
+    return node.tags.join(", ");
+  }
+
+  if (node.user === "") {
+    return "No owner";
+  }
+
+  const at = node.user.indexOf("@");
+
+  return at === -1 ? node.user : node.user.slice(0, at);
+}
+
+function classLabel(
+  members: readonly AccessGraphNode[],
+): Pick<AccessClass, "label" | "detail" | "tagged"> {
+  const [only] = members;
+
+  if (only !== undefined && members.length === 1) {
+    return { label: only.name, detail: shortOwner(only), tagged: false };
+  }
+
+  const detail = `${only?.name ?? ""} +${members.length - 1}`;
+  const tags = new Set(members.map((node) => node.tags.join(", ")));
+  const [firstTags] = tags;
+
+  if (tags.size === 1 && firstTags !== undefined && firstTags !== "") {
+    return { label: firstTags, detail, tagged: true };
+  }
+
+  const owners = [...new Set(members.map((node) => shortOwner(node)))].toSorted();
+
+  if (owners.length <= namedOwners) {
+    return { label: owners.join(", "), detail, tagged: false };
+  }
+
+  const rest = owners.length - namedOwners;
+
+  return { label: `${owners.slice(0, namedOwners).join(", ")} +${rest}`, detail, tagged: false };
+}
+
+/** The class a machine is in, or undefined for a machine the map does not list. */
+export type ClassIndex = ReadonlyMap<string, AccessClass>;
+
+export interface MapCell {
+  readonly dst: AccessClass;
+  /** What any member of the row reaches any member of the column with, or nothing at all. */
+  readonly edge: AccessGraphEdge | undefined;
+  /** A class of one machine against itself, which has no pair to speak of. */
+  readonly self: boolean;
+}
+
+export interface MapRow {
+  readonly src: AccessClass;
+  readonly cells: readonly MapCell[];
+}
+
+export interface AccessMap {
+  readonly classes: readonly AccessClass[];
+  readonly rows: readonly MapRow[];
+  /** How many ordered pairs of machines the policy opens. */
+  readonly open: number;
+  /** How many machines the map stands for. */
+  readonly machines: number;
+}
+
+function byLabel(left: AccessClass, right: AccessClass): number {
+  // Owners' machines first, then tagged ones, each run in label order, so the map reads people
+  // then servers the way the rules are written.
+  if (left.tagged !== right.tagged) {
+    return left.tagged ? 1 : -1;
+  }
+
+  return left.label.localeCompare(right.label) || right.members.length - left.members.length;
+}
+
+/**
+ * The tailnet as rows of source classes against columns of destination classes. Any pair between
+ * two classes carries the same edge, so one is enough for the cell; a class against itself takes
+ * the edge between two of its members.
+ */
+export function buildAccessMap(
+  nodes: readonly AccessGraphNode[],
+  edges: readonly AccessGraphEdge[],
+): AccessMap {
+  const byPair = new Map(edges.map((edge) => [pairKey(edge.src, edge.dst), edge]));
+  const classes = accessClasses(nodes, edges)
+    .map((members, index): AccessClass => {
+      const sorted = members.toSorted((left, right) => left.name.localeCompare(right.name));
+      const { label, detail, tagged } = classLabel(sorted);
+
+      return { id: String(index), members: sorted, label, detail, tagged };
+    })
+    .toSorted(byLabel);
+
+  const edgeBetween = (src: AccessClass, dst: AccessClass): AccessGraphEdge | undefined => {
+    const [from] = src.members;
+    const to = dst.members.find((node) => node.id !== from?.id);
+
+    return from === undefined || to === undefined ? undefined : byPair.get(pairKey(from.id, to.id));
+  };
+
+  const rows = classes.map((src) => ({
     src,
-    cells: columns.map((dst) => ({
-      dst,
-      edge: src.id === dst.id ? undefined : byPair.get(pairKey(src.id, dst.id)),
-      self: src.id === dst.id,
-    })),
+    cells: classes.map((dst) => {
+      const self = src.id === dst.id && src.members.length === 1;
+
+      return { dst, edge: self ? undefined : edgeBetween(src, dst), self };
+    }),
   }));
 
-  const open = rows.reduce(
-    (sum, row) => sum + row.cells.filter((cell) => cell.edge !== undefined).length,
-    0,
-  );
+  const open = edges.filter((edge) => edge.src !== edge.dst).length;
 
-  return { columns, rows, open };
+  return { classes, rows, open, machines: nodes.length };
 }
 
 /** Where the matrix's one tab stop sits: a row and a column of the same machine list. */

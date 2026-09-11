@@ -5,13 +5,13 @@ import { object, optional, pipe, transform, unknown } from "valibot";
 
 import { accessGraphQuery } from "~/api/queries.ts";
 import type { AccessGraph, AccessGraphNode } from "~/api/schema.gen.ts";
+import { AccessMapView } from "~/components/access-graph/access-map.tsx";
 import { MachinePicker } from "~/components/access-graph/machine-picker.tsx";
-import { AccessMatrix } from "~/components/access-graph/matrix.tsx";
 import {
-  buildMatrix,
-  fitsMatrix,
+  buildAccessMap,
+  fitsMap,
   groupEdges,
-  maxMatrixNodes,
+  maxMapClasses,
   nodesById,
 } from "~/components/access-graph/model.ts";
 import { ReachPanel } from "~/components/access-graph/reach-panels.tsx";
@@ -123,7 +123,7 @@ function Machine({
   );
 }
 
-/** The whole tailnet at once, while it is small enough to read as a grid. */
+/** The whole tailnet at once, while its classes are few enough to read as a grid. */
 function Tailnet({
   graph,
   onPick,
@@ -142,16 +142,18 @@ function Tailnet({
     );
   }
 
-  if (!fitsMatrix(graph.nodes.length)) {
+  const map = buildAccessMap(graph.nodes, graph.edges);
+
+  if (!fitsMap(map.classes.length)) {
     return (
       <Section title="Who reaches what" bodyClassName="p-0">
         <SectionEmpty
-          title="Too many machines for the grid"
-          description={`A grid stops being readable past ${countMachines(maxMatrixNodes)}. Pick one machine to see what it reaches and what reaches it.`}
+          title="Too many groups for the map"
+          description={`Machines the policy treats alike share a row, and this policy treats ${countMachines(graph.nodes.length)} as ${map.classes.length} groups; a map stops being readable past ${maxMapClasses}. Pick one machine to see what it reaches and what reaches it.`}
         />
       </Section>
     );
   }
 
-  return <AccessMatrix matrix={buildMatrix(graph.nodes, graph.edges)} onPick={onPick} />;
+  return <AccessMapView map={map} onPick={onPick} />;
 }
