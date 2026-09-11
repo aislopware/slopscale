@@ -138,13 +138,15 @@ export function EventsTable({
         {(overflowing) => (
           // Fixed layout: every column but Details has a set width, so Details takes what is left
           // of the panel and its lines cut at that width instead of stretching the table past the
-          // panel. The minimum keeps the columns readable on a phone, where the panel scrolls.
+          // panel. A fixed column does not grow for its content, so every cell in one either
+          // truncates or wraps; a value that does neither runs into the next column. The minimum
+          // keeps the columns readable on a phone, where the panel scrolls.
           <Table className={cn(frameTableClass, "min-w-[800px] table-fixed")}>
             <Table.Header variant="compact">
               <Table.Row>
-                <Table.Head className="w-28">Time</Table.Head>
+                <Table.Head className="w-32">Time</Table.Head>
                 <Table.Head className="w-40">Actor</Table.Head>
-                <Table.Head className="w-44">Action</Table.Head>
+                <Table.Head className="w-56">Action</Table.Head>
                 <Table.Head className="w-40">Target</Table.Head>
                 <Table.Head className="w-24">Result</Table.Head>
                 <Table.Head className="hidden lg:table-cell">Details</Table.Head>

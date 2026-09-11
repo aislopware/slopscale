@@ -1,4 +1,5 @@
 import { cn } from "@cloudflare/kumo/utils";
+import type { Icon } from "@phosphor-icons/react";
 import type { ReactElement } from "react";
 
 /** Initials from a name: "Alice Nguyen" → "AN", "jane.doe" → "JA". */
@@ -19,16 +20,23 @@ const sizes = {
   lg: "size-8 text-xs",
 } as const;
 
+const iconSizes: Record<keyof typeof sizes, number> = { sm: 12, base: 14, lg: 16 };
+
 /**
  * Identity mark: a muted squircle with a hairline ring so it sits on the surface instead of
- * floating. Sized to the row it lives in, never to touch-target minimums.
+ * floating. Sized to the row it lives in, never to touch-target minimums. A person is their
+ * initials; something that is not a person, such as a key or the server itself, is an icon in the
+ * same mark, so a column of actors still lines up while the kind is told at a glance.
  */
 export function Avatar({
   name,
+  icon: Mark,
   size = "base",
   className,
 }: {
   readonly name: string;
+  /** Stands in for the initials when the name is not a person's. */
+  readonly icon?: Icon;
   readonly size?: keyof typeof sizes;
   readonly className?: string;
 }): ReactElement {
@@ -41,7 +49,7 @@ export function Avatar({
         className,
       )}
     >
-      {initials(name)}
+      {Mark === undefined ? initials(name) : <Mark size={iconSizes[size]} weight="bold" />}
     </span>
   );
 }
