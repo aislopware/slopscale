@@ -24,6 +24,7 @@ import { Avatar } from "~/components/ui/avatar.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { CopyText } from "~/components/ui/copy-text.tsx";
 import { Flagged } from "~/components/ui/flagged.tsx";
+import { OsMark } from "~/components/ui/os-mark.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { TagList } from "~/components/ui/tag.tsx";
 import {
@@ -116,13 +117,16 @@ function NameCell({ node }: { readonly node: Node }): ReactElement {
 
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
-      <Link
-        to="/machines/$nodeId"
-        params={{ nodeId: node.id }}
-        className="block truncate font-medium text-kumo-default hover:text-kumo-link hover:underline focus-visible:underline"
-      >
-        {name}
-      </Link>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <OsMark os={node.os} version={node.osVersion} />
+        <Link
+          to="/machines/$nodeId"
+          params={{ nodeId: node.id }}
+          className="block min-w-0 truncate font-medium text-kumo-default hover:text-kumo-link hover:underline focus-visible:underline"
+        >
+          {name}
+        </Link>
+      </span>
       <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-kumo-subtle">
         {node.name === name ? null : (
           <span className="truncate font-mono text-xs">{node.name}</span>

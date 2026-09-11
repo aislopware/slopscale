@@ -7,10 +7,12 @@ import type { Node } from "~/api/queries.ts";
 import type { NodeHardwareAttestation, NodeTpm } from "~/api/schema.gen.ts";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import type { Definition } from "~/components/ui/definition-list.tsx";
+import { OsMark } from "~/components/ui/os-mark.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { Status, StatusDetail } from "~/components/ui/status.tsx";
 import { TagList } from "~/components/ui/tag.tsx";
 import { isTagged, nodeName, userLabel } from "~/lib/node.ts";
+import { osLabel } from "~/lib/os.ts";
 import { formatAbsolute, formatRelative, parseTime } from "~/lib/time.ts";
 
 const registerMethods: Record<string, string> = {
@@ -64,23 +66,39 @@ function Client({ node }: { readonly node: Node }): ReactElement {
     return <span className="text-kumo-subtle">Unknown until it connects</span>;
   }
 
+  const platform =
+    node.os === "" ? null : (
+      <span className="inline-flex items-center gap-1 text-xs text-kumo-subtle">
+        <OsMark os={node.os} version={node.osVersion} size={12} />
+        {osLabel(node.os, node.osVersion)}
+      </span>
+    );
+
   if (!node.updateAvailable) {
-    return <span>{node.clientVersion}</span>;
+    return (
+      <span className="inline-flex flex-col items-end gap-0.5">
+        <span>{node.clientVersion}</span>
+        {platform}
+      </span>
+    );
   }
 
   return (
-    <span className="inline-flex items-center gap-2">
-      <span>{node.clientVersion}</span>
-      <StatusDetail
-        tone="warning"
-        label="Update available"
-        title="A newer stable Tailscale is out"
-        detail={
-          node.online
-            ? "Update client in the Actions menu asks the machine to install it. Tailscale restarts there while it does."
-            : "Update client in the Actions menu asks the machine to install it, once it is connected again."
-        }
-      />
+    <span className="inline-flex flex-col items-end gap-0.5">
+      <span className="inline-flex items-center gap-2">
+        <span>{node.clientVersion}</span>
+        <StatusDetail
+          tone="warning"
+          label="Update available"
+          title="A newer stable Tailscale is out"
+          detail={
+            node.online
+              ? "Update client in the Actions menu asks the machine to install it. Tailscale restarts there while it does."
+              : "Update client in the Actions menu asks the machine to install it, once it is connected again."
+          }
+        />
+      </span>
+      {platform}
     </span>
   );
 }

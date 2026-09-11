@@ -9,10 +9,12 @@ import { MachineMenu } from "~/components/machines/menu.tsx";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
 import { StatusBadge } from "~/components/machines/status-badge.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
+import { OsMark } from "~/components/ui/os-mark.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { TagList } from "~/components/ui/tag.tsx";
 import { isTagged, nodeName, nodeStatus, ownerLabel } from "~/lib/node.ts";
+import { osLabel } from "~/lib/os.ts";
 
 const registerMethods: Record<string, string> = {
   REGISTER_METHOD_AUTH_KEY: "registered with a pre-auth key",
@@ -95,6 +97,15 @@ function MachineFacts({ node }: { readonly node: Node }): ReactElement {
       <StatusBadge status={nodeStatus(node)} />
       <span aria-hidden>·</span>
       {isTagged(node) ? <TagList tags={node.tags} size="sm" /> : <span>{ownerLabel(node)}</span>}
+      {node.os === "" ? null : (
+        <>
+          <span aria-hidden>·</span>
+          <span className="inline-flex items-center gap-1">
+            <OsMark os={node.os} version={node.osVersion} />
+            {osLabel(node.os, node.osVersion)}
+          </span>
+        </>
+      )}
       <span aria-hidden>·</span>
       <span>{registerMethods[node.registerMethod] ?? "registered"}</span>
       {node.ephemeral ? (
