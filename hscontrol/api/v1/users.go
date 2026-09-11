@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/aislopware/slopscale/hscontrol/api/principal"
 	"github.com/aislopware/slopscale/hscontrol/audit"
 	"github.com/aislopware/slopscale/hscontrol/scope"
 	"github.com/aislopware/slopscale/hscontrol/types"
@@ -230,14 +231,22 @@ func registerUserLifecycle(api huma.API, b Backend) {
 		return &deleteUserOutput{}, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "listUsers",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/user",
 		Summary:     "List users",
-		Tags:        []string{"Users"},
-		Security:    bearerAuth,
-	}, scope.UsersRead), func(_ context.Context, in *listUsersInput) (*listUsersOutput, error) {
+		Description: "A credential with users:read lists every user in full. Any other credential " +
+			"owned by a user gets the directory instead: the id, name, display name and picture of " +
+			"every approved user, so a member can share a machine with a colleague by name, and no " +
+			"filter. A credential without a user, or minted with a scope list, gets nothing.",
+		Tags:     []string{"Users"},
+		Security: bearerAuth,
+	}, func(ctx context.Context, in *listUsersInput) (*listUsersOutput, error) {
+		if p := caller(ctx); !p.Allows(scope.UsersRead) {
+			return listUserDirectory(b, p, in)
+		}
+
 		// Gateway parity: a non-numeric id is a 400 even when other filters win.
 		if in.ID != "" {
 			_, err := strconv.ParseUint(in.ID, 10, 64)
@@ -265,6 +274,52 @@ func registerUserLifecycle(api huma.API, b Backend) {
 
 		return out, nil
 	})
+}
+
+// listUserDirectory is the user list for a caller without the users scope
+// that stands for a user (see actsAsUser): who is on the tailnet, by name,
+// and nothing more. The console needs it to
+// name the users a machine is shared with and to offer them in the share
+// dialog. Filters are refused rather than answered, so the list is not an
+// oracle for anyone's email address.
+func listUserDirectory(b Backend, p principal.Principal, in *listUsersInput) (*listUsersOutput, error) {
+	if !actsAsUser(p) {
+		return nil, huma.Error403Forbidden("credential is missing the required scope " + string(scope.UsersRead))
+	}
+
+	if in.Name != "" || in.Email != "" || in.ID != "" {
+		return nil, huma.Error403Forbidden("filtering the user list needs the " + string(scope.UsersRead) + " scope")
+	}
+
+	users, err := b.State.ListAllUsers()
+	if err != nil {
+		return nil, huma.Error500InternalServerError("listing users", err)
+	}
+
+	slices.SortFunc(users, func(a, b types.User) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
+
+	out := &listUsersOutput{}
+	out.Body.Users = make([]User, 0, len(users))
+
+	for i := range users {
+		full := userFromView(users[i].View())
+		if !full.Approved {
+			continue
+		}
+
+		out.Body.Users = append(out.Body.Users, User{
+			ID:            full.ID,
+			Name:          full.Name,
+			DisplayName:   full.DisplayName,
+			ProfilePicURL: full.ProfilePicURL,
+			Approved:      true,
+			Role:          types.RoleMember.String(),
+		})
+	}
+
+	return out, nil
 }
 
 // listUsersFiltered reproduces the gRPC ListUsers precedence: name, then email,

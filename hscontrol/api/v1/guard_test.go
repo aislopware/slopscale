@@ -27,6 +27,22 @@ var selfEnforcedOps = map[string]bool{
 	"GET /api/v1/apikey":                  true,
 	"DELETE /api/v1/apikey/{prefix}":      true,
 
+	// A member sees the nodes they own and the ones shared with them, and
+	// renames, expires and removes their own (requireNodeVisible,
+	// requireOwnNodeAccess); the live reads a machine's page makes follow
+	// the same visibility.
+	"GET /api/v1/node":                            true,
+	"GET /api/v1/node/{nodeId}":                   true,
+	"GET /api/v1/node/{nodeId}/health":            true,
+	"GET /api/v1/node/{nodeId}/tls-cert":          true,
+	"GET /api/v1/node/{nodeId}/preferences":       true,
+	"DELETE /api/v1/node/{nodeId}":                true,
+	"POST /api/v1/node/{nodeId}/expire":           true,
+	"POST /api/v1/node/{nodeId}/rename/{newName}": true,
+
+	// A member gets the user directory, names only (listUserDirectory).
+	"GET /api/v1/user": true,
+
 	// Sharing lets a member act on the nodes they own (requireShareAccess).
 	"POST /api/v1/node/{nodeId}/share":            true,
 	"DELETE /api/v1/node/{nodeId}/share/{userId}": true,

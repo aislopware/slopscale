@@ -24,6 +24,12 @@ type Whoami struct {
 	Role string `json:"role"`
 	// AllAccess reports whether the caller passes every scope.
 	AllAccess bool `json:"allAccess"`
+	// Scoped reports whether the credential carries its own scope list (a
+	// key minted with scopes, an OAuth token) rather than standing for its
+	// user; a scoped credential gets none of what the user may do for
+	// themselves, such as seeing their own machines.
+	//nolint:lll // doc tag
+	Scoped bool `doc:"true when the credential is bounded by a scope list of its own rather than standing for its user, so it gets no self-service access (own machines, the user directory)." json:"scoped"`
 	// Scopes the caller holds; empty when allAccess.
 	Scopes []string `json:"scopes" nullable:"false"`
 	// Permissions is every known scope with whether the caller holds it.
@@ -65,6 +71,7 @@ func whoamiFromPrincipal(p principal.Principal) Whoami {
 	w := Whoami{
 		Role:        p.Role.String(),
 		AllAccess:   !p.Bounded,
+		Scoped:      p.Scoped,
 		Scopes:      []string{},
 		Permissions: make(map[string]bool, len(scope.Known())),
 	}

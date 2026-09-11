@@ -19,6 +19,7 @@ import (
 	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
+	"tailscale.com/types/views"
 )
 
 func init() {
@@ -278,22 +279,20 @@ func registerNodes(api huma.API, b Backend) {
 }
 
 func registerNodeReadOps(api huma.API, b Backend) {
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "getNode",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/node/{nodeId}",
 		Summary:     "Get node",
-		Tags:        []string{"Nodes"},
-		Security:    bearerAuth,
-	}, scope.DevicesCoreRead), func(_ context.Context, in *getNodeInput) (*nodeOutput, error) {
-		nodeID, err := parseNodeID(in.NodeID)
+		Description: "A credential with devices:core:read reads any node. Any other credential " +
+			"owned by a user reads the nodes that user owns and the ones shared with them; " +
+			"every other node is not found.",
+		Tags:     []string{"Nodes"},
+		Security: bearerAuth,
+	}, func(ctx context.Context, in *getNodeInput) (*nodeOutput, error) {
+		node, err := requireNodeVisible(ctx, b, in.NodeID)
 		if err != nil {
 			return nil, err
-		}
-
-		node, ok := b.State.GetNodeByID(nodeID)
-		if !ok {
-			return nil, huma.Error404NotFound("node not found")
 		}
 
 		out := &nodeOutput{}
@@ -303,22 +302,25 @@ func registerNodeReadOps(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "listNodes",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/node",
 		Summary:     "List nodes",
-		Tags:        []string{"Nodes"},
-		Security:    bearerAuth,
-	}, scope.DevicesCoreRead), func(_ context.Context, in *listNodesInput) (*listNodesOutput, error) {
-		nodes := b.State.ListNodes()
+		Description: "A credential with devices:core:read lists every node. Any other credential " +
+			"owned by a user lists the nodes that user owns and the ones shared with them, so a " +
+			"member sees their own machines; a credential without a user sees none.",
+		Tags:     []string{"Nodes"},
+		Security: bearerAuth,
+	}, func(ctx context.Context, in *listNodesInput) (*listNodesOutput, error) {
+		nodes := b.visibleNodes(caller(ctx))
 		if in.User != "" {
 			user, err := b.State.GetUserByName(in.User)
 			if err != nil {
 				return nil, mapError("listing nodes", err)
 			}
 
-			nodes = b.State.ListNodesByUser(types.UserID(user.ID))
+			nodes = nodesOwnedBy(nodes, types.UserID(user.ID))
 		}
 
 		out := &listNodesOutput{}
@@ -349,24 +351,21 @@ func registerNodeReadOps(api huma.API, b Backend) {
 }
 
 func registerNodeWriteOps(api huma.API, b Backend) {
-	huma.Register(api, audited(withScope(huma.Operation{
+	huma.Register(api, audited(huma.Operation{
 		OperationID: "deleteNode",
 		Method:      http.MethodDelete,
 		Path:        "/api/v1/node/{nodeId}",
 		Summary:     "Delete node",
-		Tags:        []string{"Nodes"},
-		Security:    bearerAuth,
-	}, scope.DevicesCore), "node.delete", "node", "nodeId"), func(
+		Description: "Removes the node from the tailnet. Needs the devices:core scope, or a " +
+			"credential owned by the user the node belongs to: a member removes their own machines.",
+		Tags:     []string{"Nodes"},
+		Security: bearerAuth,
+	}, "node.delete", "node", "nodeId"), func(
 		ctx context.Context, in *deleteNodeInput,
 	) (*deleteNodeOutput, error) {
-		nodeID, err := parseNodeID(in.NodeID)
+		node, err := requireOwnNodeAccess(ctx, b, in.NodeID)
 		if err != nil {
 			return nil, err
-		}
-
-		node, ok := b.State.GetNodeByID(nodeID)
-		if !ok {
-			return nil, huma.Error404NotFound("node not found")
 		}
 
 		audit.Target(ctx, "", "", node.GivenName())
@@ -383,37 +382,42 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 		return &deleteNodeOutput{}, nil
 	})
 
-	huma.Register(api, audited(withScope(huma.Operation{
+	huma.Register(api, audited(huma.Operation{
 		OperationID: "expireNode",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/{nodeId}/expire",
 		Summary:     "Expire node",
-		Tags:        []string{"Nodes"},
-		Security:    bearerAuth,
-	}, scope.DevicesCore), "node.expire", "node", "nodeId"), func(
+		Description: "Expires the node's key now or at the given time, or turns key expiry off for " +
+			"it. Needs the devices:core scope, or a credential owned by the user the node belongs " +
+			"to: a member expires their own machines' keys and turns their expiry off.",
+		Tags:     []string{"Nodes"},
+		Security: bearerAuth,
+	}, "node.expire", "node", "nodeId"), func(
 		ctx context.Context, in *expireNodeInput,
 	) (*nodeOutput, error) {
 		return handleExpireNode(ctx, b, in)
 	})
 
-	huma.Register(api, audited(withScope(huma.Operation{
+	huma.Register(api, audited(huma.Operation{
 		OperationID: "renameNode",
 		Method:      http.MethodPost,
 		Path:        "/api/v1/node/{nodeId}/rename/{newName}",
 		Summary:     "Rename node",
-		Tags:        []string{"Nodes"},
-		Security:    bearerAuth,
-	}, scope.DevicesCore), "node.rename", "node", "nodeId"), func(
+		Description: "Needs the devices:core scope, or a credential owned by the user the node " +
+			"belongs to: a member renames their own machines.",
+		Tags:     []string{"Nodes"},
+		Security: bearerAuth,
+	}, "node.rename", "node", "nodeId"), func(
 		ctx context.Context, in *renameNodeInput,
 	) (*nodeOutput, error) {
-		nodeID, err := parseNodeID(in.NodeID)
+		owned, err := requireOwnNodeAccess(ctx, b, in.NodeID)
 		if err != nil {
 			return nil, err
 		}
 
 		audit.Detail(ctx, "newName", in.NewName)
 
-		node, nodeChange, err := b.State.RenameNode(nodeID, in.NewName)
+		node, nodeChange, err := b.State.RenameNode(owned.ID(), in.NewName)
 		if err != nil {
 			return nil, mapError("renaming node", err)
 		}
@@ -478,10 +482,12 @@ func registerNodeWriteOps(api huma.API, b Backend) {
 // expires); explicit expiry honoured; absent/zero body expires now. Both set
 // is a 400.
 func handleExpireNode(ctx context.Context, b Backend, in *expireNodeInput) (*nodeOutput, error) {
-	nodeID, err := parseNodeID(in.NodeID)
+	owned, err := requireOwnNodeAccess(ctx, b, in.NodeID)
 	if err != nil {
 		return nil, err
 	}
+
+	nodeID := owned.ID()
 
 	var (
 		disableExpiry bool
@@ -1036,4 +1042,18 @@ func parseNodeID(s string) (types.NodeID, error) {
 	}
 
 	return types.NodeID(id), nil
+}
+
+// nodesOwnedBy narrows a listing to the personal machines of one user, so
+// the ?user= filter never widens what the caller may see.
+func nodesOwnedBy(nodes views.Slice[types.NodeView], userID types.UserID) views.Slice[types.NodeView] {
+	var owned []types.NodeView
+
+	for _, node := range nodes.All() {
+		if !node.IsTagged() && node.UserID().Valid() && types.UserID(node.UserID().Get()) == userID {
+			owned = append(owned, node)
+		}
+	}
+
+	return views.SliceOf(owned)
 }

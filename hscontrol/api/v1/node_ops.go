@@ -196,15 +196,10 @@ func mapNodeOpError(msg string, err error) error {
 
 // nodeToAsk finds the node an operation targets and reports whether its
 // client is connected, as [collectNodePosture] does.
-func (b Backend) nodeToAsk(id string) (types.NodeView, bool, error) {
-	nodeID, err := parseNodeID(id)
+func (b Backend) nodeToAsk(ctx context.Context, id string) (types.NodeView, bool, error) {
+	view, err := requireNodeVisible(ctx, b, id)
 	if err != nil {
 		return types.NodeView{}, false, err
-	}
-
-	view, ok := b.State.GetNodeByID(nodeID)
-	if !ok {
-		return types.NodeView{}, false, huma.Error404NotFound("node not found")
 	}
 
 	return view, view.IsOnline().Valid() && view.IsOnline().Get(), nil
@@ -221,7 +216,7 @@ func registerNodeClientUpdate(api huma.API, b Backend) {
 		Tags:     []string{"Nodes"},
 		Security: bearerAuth,
 	}, scope.DevicesCoreRead), func(ctx context.Context, in *nodeIDInput) (*nodeClientUpdateOutput, error) {
-		view, online, err := b.nodeToAsk(in.NodeID)
+		view, online, err := b.nodeToAsk(ctx, in.NodeID)
 		if err != nil {
 			return nil, err
 		}
@@ -247,7 +242,7 @@ func registerNodeClientUpdate(api huma.API, b Backend) {
 	}, scope.DevicesCore), "node.client_update.start", "node", "nodeId"), func(
 		ctx context.Context, in *startNodeClientUpdateInput,
 	) (*nodeClientUpdateOutput, error) {
-		view, online, err := b.nodeToAsk(in.NodeID)
+		view, online, err := b.nodeToAsk(ctx, in.NodeID)
 		if err != nil {
 			return nil, err
 		}
@@ -348,17 +343,18 @@ func clientUpdateBody(update types.ClientUpdate) NodeClientUpdate {
 }
 
 func registerNodeHealth(api huma.API, b Backend) {
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "getNodeClientHealth",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/node/{nodeId}/health",
 		Summary:     "Get node client health",
 		Description: "Asks the connected node for the warnings it would show its own user, which is " +
-			"where a node that is connected but not working says why.",
+			"where a node that is connected but not working says why. " +
+			"Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.",
 		Tags:     []string{"Nodes"},
 		Security: bearerAuth,
-	}, scope.DevicesCoreRead), func(ctx context.Context, in *nodeIDInput) (*nodeClientHealthOutput, error) {
-		view, online, err := b.nodeToAsk(in.NodeID)
+	}, func(ctx context.Context, in *nodeIDInput) (*nodeClientHealthOutput, error) {
+		view, online, err := b.nodeToAsk(ctx, in.NodeID)
 		if err != nil {
 			return nil, err
 		}
@@ -404,7 +400,7 @@ func registerNodeHealth(api huma.API, b Backend) {
 	}, scope.DevicesCore), "node.diagnostics.read", "node", "nodeId"), func(
 		ctx context.Context, in *nodeDiagnosticInput,
 	) (*huma.StreamResponse, error) {
-		view, online, err := b.nodeToAsk(in.NodeID)
+		view, online, err := b.nodeToAsk(ctx, in.NodeID)
 		if err != nil {
 			return nil, err
 		}
@@ -486,7 +482,7 @@ func registerNodeConnectorAndCert(api huma.API, b Backend) {
 		Tags:     []string{"Nodes"},
 		Security: bearerAuth,
 	}, scope.DevicesCoreRead), func(ctx context.Context, in *nodeIDInput) (*nodeConnectorOutput, error) {
-		view, online, err := b.nodeToAsk(in.NodeID)
+		view, online, err := b.nodeToAsk(ctx, in.NodeID)
 		if err != nil {
 			return nil, err
 		}
@@ -511,17 +507,18 @@ func registerNodeConnectorAndCert(api huma.API, b Backend) {
 		return &nodeConnectorOutput{Body: NodeAppConnectorRoutes{Domains: domains}}, nil
 	})
 
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "getNodeTLSCertStatus",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/node/{nodeId}/tls-cert",
 		Summary:     "Get node TLS certificate status",
 		Description: "Asks the connected node about the certificate it caches for its own MagicDNS " +
-			"name, which Serve and Funnel need and which fails quietly when it cannot be renewed.",
+			"name, which Serve and Funnel need and which fails quietly when it cannot be renewed. " +
+			"Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.",
 		Tags:     []string{"Nodes"},
 		Security: bearerAuth,
-	}, scope.DevicesCoreRead), func(ctx context.Context, in *nodeIDInput) (*nodeTLSCertOutput, error) {
-		view, online, err := b.nodeToAsk(in.NodeID)
+	}, func(ctx context.Context, in *nodeIDInput) (*nodeTLSCertOutput, error) {
+		view, online, err := b.nodeToAsk(ctx, in.NodeID)
 		if err != nil {
 			return nil, err
 		}
@@ -541,18 +538,19 @@ func registerNodeConnectorAndCert(api huma.API, b Backend) {
 }
 
 func registerNodePreferences(api huma.API, b Backend) {
-	huma.Register(api, withScope(huma.Operation{
+	huma.Register(api, huma.Operation{
 		OperationID: "getNodePreferences",
 		Method:      http.MethodGet,
 		Path:        "/api/v1/node/{nodeId}/preferences",
 		Summary:     "Get node preferences",
 		Description: "Asks the connected node for the preferences its owner set: the routes it " +
 			"advertises, whether it accepts routes and DNS, which exit node it uses and the rest " +
-			"of the curated set. Reading needs no opt-in; changing them does.",
+			"of the curated set. Reading needs no opt-in; changing them does. " +
+			"Visible to whoever may read the node: see GET /api/v1/node/{nodeId}.",
 		Tags:     []string{"Nodes"},
 		Security: bearerAuth,
-	}, scope.DevicesCoreRead), func(ctx context.Context, in *nodeIDInput) (*nodePreferencesOutput, error) {
-		view, online, err := b.nodeToAsk(in.NodeID)
+	}, func(ctx context.Context, in *nodeIDInput) (*nodePreferencesOutput, error) {
+		view, online, err := b.nodeToAsk(ctx, in.NodeID)
 		if err != nil {
 			return nil, err
 		}
@@ -579,7 +577,7 @@ func registerNodePreferences(api huma.API, b Backend) {
 	}, scope.DevicesCore), "node.preferences.update", "node", "nodeId"), func(
 		ctx context.Context, in *updateNodePreferencesInput,
 	) (*nodePreferencesOutput, error) {
-		view, online, err := b.nodeToAsk(in.NodeID)
+		view, online, err := b.nodeToAsk(ctx, in.NodeID)
 		if err != nil {
 			return nil, err
 		}

@@ -148,8 +148,11 @@ func TestRBACRolesEndToEnd(t *testing.T) {
 	})
 
 	t.Run("member is denied everything else", func(t *testing.T) {
-		status, _ := apiCall(t, client, memberKey, http.MethodGet, v1+"/user", nil)
+		status, _ := apiCall(t, client, memberKey, http.MethodPost, v1+"/user", map[string]any{"name": "sneaky"})
 		assert.Equal(t, http.StatusForbidden, status)
+
+		status, _ = apiCall(t, client, memberKey, http.MethodGet, v1+"/user?email=a@b.c", nil)
+		assert.Equal(t, http.StatusForbidden, status, "the directory a member gets takes no filter")
 
 		status, _ = apiCall(t, client, memberKey, http.MethodGet, v1+"/policy", nil)
 		assert.Equal(t, http.StatusForbidden, status)

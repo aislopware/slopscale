@@ -42,15 +42,11 @@ func requireShareAccess(ctx context.Context, b Backend, nodeID types.NodeID) err
 	}
 
 	p := caller(ctx)
-	if p.Allows(scope.DevicesCore) {
+	if p.Allows(scope.DevicesCore) || ownsNode(p, node) {
 		return nil
 	}
 
-	if node.IsTagged() || !node.UserID().Valid() || types.UserID(node.UserID().Get()) != p.UserID {
-		return huma.Error403Forbidden("only the node's owner or an administrator may share it")
-	}
-
-	return nil
+	return huma.Error403Forbidden("only the node's owner or an administrator may share it")
 }
 
 func registerSharing(api huma.API, b Backend) {

@@ -32,6 +32,34 @@ are `policy_file`, `devices:routes`, `dns` and `services`; webhooks and posture 
 its operations, so a credential means the same thing on both APIs. Run
 `GET /api/v1/whoami` to see the role and permissions a credential carries.
 
+## What a member gets
+
+A member holds no scope, but every user looks after their own things, so
+the [console](/ref/console) and the v1 API give a signed-in user a
+self-service view whatever their role:
+
+- **Their own machines**, and the machines other users [share](/ref/sharing)
+  with them. `GET /api/v1/node` lists them and `GET /api/v1/node/{id}`
+  reads one, with the live reads a machine's page makes (client health,
+  certificate, preferences). Any other machine, tagged ones included, is
+  not found, so a member cannot enumerate the tailnet.
+- On a machine they own: rename it, expire its key or turn key expiry off,
+  remove it, share it and take a share back. A machine shared with them is
+  theirs to see, not to change. Tags, routes, approval, suspension and the
+  machine's preferences stay with the roles that hold the scopes.
+- **The user directory**: `GET /api/v1/user` answers with every approved
+  user's id, name, display name and picture, and nothing else (no email,
+  provider or role), so a member can share a machine with a colleague by
+  name. The list takes no filter for such a caller.
+- Their own API keys, [access requests](/ref/temporary-access) and console
+  sessions, and a browser SSH session to a machine of theirs.
+
+This is what the signed-in user may do for themselves, so it goes with the
+credentials that stand for the user: a console session, or an API key
+minted without scopes. A key minted with a scope list, or an OAuth token,
+is bounded by exactly that list and gets none of it; `whoami` reports such
+a credential as `scoped`.
+
 ## The owner
 
 The tailnet has exactly one owner.
