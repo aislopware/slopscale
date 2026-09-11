@@ -4,7 +4,7 @@ import { userEvent } from "vitest/browser";
 
 import type { AccessGraphEdge, AccessGraphNode } from "~/api/schema.gen.ts";
 import { AccessMapView } from "~/components/access-graph/access-map.tsx";
-import { buildAccessMap } from "~/components/access-graph/model.ts";
+import { buildAccessMap, maxTileClasses } from "~/components/access-graph/model.ts";
 
 const nodes: AccessGraphNode[] = [
   { id: "1", name: "alpha", user: "ada", tags: [], online: true, routes: [] },
@@ -76,6 +76,36 @@ describe(AccessMapView, () => {
 
     await userEvent.keyboard("{Home}");
     expect(active()["col"]).toBe("0");
+  });
+
+  it("shrinks the cells to squares past the tile limit and reads the focused pair out", async () => {
+    // One machine per class, each reaching only the next, so no two share a row.
+    const many = Array.from({ length: maxTileClasses + 1 }, (_, index): AccessGraphNode => ({
+      id: String(index + 1),
+      name: `m${String(index + 1).padStart(2, "0")}`,
+      user: `u${String(index + 1).padStart(2, "0")}`,
+      tags: [],
+      online: true,
+      routes: [],
+    }));
+    const chain = many
+      .slice(1)
+      .map((node, index) => edge(String(index + 1), node.id, { ports: ["tcp:443"] }));
+    const screen = await render(
+      <AccessMapView
+        map={buildAccessMap(many, chain)}
+        onPick={vi.fn<(nodeId: string) => void>()}
+      />,
+    );
+    const cells = screen.container.querySelectorAll<HTMLElement>("td [data-row]");
+
+    expect(cells).toHaveLength((maxTileClasses + 1) ** 2);
+    expect(cells[1]?.textContent).toBe("");
+    await expect.element(screen.getByText("One machine against itself")).toBeVisible();
+
+    cells[0]?.focus();
+    await userEvent.keyboard("{ArrowRight}");
+    await expect.element(screen.getByText("tcp:443")).toBeVisible();
   });
 
   it("lists a class's machines under its header and picks one", async () => {

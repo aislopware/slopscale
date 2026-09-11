@@ -15,6 +15,7 @@ export function Section({
   description,
   actions,
   children,
+  footer,
   className,
   bodyClassName,
   panel = true,
@@ -23,6 +24,8 @@ export function Section({
   readonly description?: ReactNode;
   readonly actions?: ReactNode;
   readonly children: ReactNode;
+  /** A line on the band under the panel, such as a readout of what is under the pointer. */
+  readonly footer?: ReactNode;
   readonly className?: string;
   /** Classes for the panel; pass `p-0` for lists that draw their own edges. */
   readonly bodyClassName?: string;
@@ -48,6 +51,7 @@ export function Section({
         )}
       </FrameBand>
       {panel ? <FramePanel className={bodyClassName}>{children}</FramePanel> : children}
+      {footer === undefined ? null : <FrameBand className="px-5 pt-2 pb-1.5">{footer}</FrameBand>}
     </Frame>
   );
 }

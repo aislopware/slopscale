@@ -5,6 +5,7 @@ import {
   accessClasses,
   buildAccessMap,
   cellLabel,
+  cellSummary,
   clampCell,
   edgeListView,
   edgePreview,
@@ -12,7 +13,9 @@ import {
   edgeSummary,
   fitsMap,
   groupEdges,
+  mapDensity,
   maxMapClasses,
+  maxTileClasses,
   nextCell,
   openness,
   nodesById,
@@ -399,6 +402,26 @@ describe(edgeListView, () => {
     const short = rows.slice(0, edgePreview);
 
     expect(edgeListView(short, false)).toStrictEqual({ rows: short, hidden: 0 });
+  });
+});
+
+describe(mapDensity, () => {
+  it("keeps words in the cells while they fit across a screen", () => {
+    expect(mapDensity(1)).toBe("tiles");
+    expect(mapDensity(maxTileClasses)).toBe("tiles");
+    expect(mapDensity(maxTileClasses + 1)).toBe("squares");
+  });
+});
+
+describe(cellSummary, () => {
+  const dst = { id: "0", members: [], label: "beta", detail: "", tagged: false };
+
+  it("reads the pair out in full, or says why there is nothing to read", () => {
+    expect(cellSummary({ dst, self: false, edge: edge("1", "2", { ports: ["tcp:22"] }) })).toBe(
+      "tcp:22",
+    );
+    expect(cellSummary({ dst, self: false, edge: undefined })).toBe("Nothing open");
+    expect(cellSummary({ dst, self: true, edge: undefined })).toBe("One machine against itself");
   });
 });
 

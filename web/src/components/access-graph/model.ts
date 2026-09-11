@@ -221,6 +221,28 @@ export function fitsMap(count: number): boolean {
   return count > 0 && count <= maxMapClasses;
 }
 
+/**
+ * How many classes fit across a screen as tiles with words in them. Past that a cell shrinks to a
+ * square and the words move to the line under the map, so sixty classes still fit on one screen.
+ */
+export const maxTileClasses = 8;
+
+/** Whether a map's cells are tiles with words in them or bare squares. */
+export type MapDensity = "tiles" | "squares";
+
+export function mapDensity(size: number): MapDensity {
+  return size <= maxTileClasses ? "tiles" : "squares";
+}
+
+/** What one cell says when read out in full: the pair's summary, or why there is none. */
+export function cellSummary(cell: MapCell): string {
+  if (cell.self) {
+    return "One machine against itself";
+  }
+
+  return cell.edge === undefined ? "Nothing open" : edgeSummary(cell.edge);
+}
+
 /** What an edge opens, as the cell that stands for it is tinted. */
 export type Openness = "all" | "some" | "other";
 
