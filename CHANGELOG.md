@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.36.0 (unreleased)
+
+### Changes
+
+- An app connector that withdraws a route, because the domain left the app or the app was deleted, loses the approval for it too, so its Routes list no longer fills with approved routes it stopped advertising. Exit routes are left alone, and a subnet router still keeps its approvals when it stops advertising a route, so a `tailscale up` without the flag does not cost a re-approval
+
 ## 0.35.0 (2026-09-11)
 
 ### Changes

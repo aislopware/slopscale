@@ -73,8 +73,11 @@ automatically for the app's connectors. Any other advertised routes, such
 as broader subnets (`10.0.0.0/16`) or exit routes, are not covered by the app
 and require manual approval by an operator (or policy `autoApprovers.routes`).
 
-When an app is deleted, routes its connectors already had approved stay
-approved on the nodes.
+When a domain leaves an app, or the app is deleted, the connector withdraws
+the routes it learned for it and the server drops their approvals with them,
+so the connector's route list only holds what it advertises. Exit routes are
+left alone, and a plain subnet router keeps its approvals when it stops
+advertising a route, as before.
 
 ## DNS
 

@@ -40,6 +40,7 @@ import (
 	"github.com/puzpuzpuz/xsync/v4"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
 	"tailscale.com/types/tkatype"
@@ -2793,6 +2794,24 @@ func (s *State) UpdateNodeFromMapRequest(
 			}
 		}
 
+		// An app connector's advertised set is the client's own: it adds
+		// a host route when a domain resolves and withdraws it when the
+		// domain leaves the app, so an approval it withdrew is dead
+		// weight the console would flag forever. It goes with the route.
+		// Exit routes stay, the connector does not manage them, and a
+		// plain subnet router keeps its approvals as before: a
+		// `tailscale up` without the flag must not cost a re-approval.
+		if newHostinfo != nil && newHostinfo.AppConnector.EqualBool(true) {
+			base := currentNode.ApprovedRoutes
+			if routeChange {
+				base = autoApprovedRoutes
+			}
+
+			if kept, pruned := withoutWithdrawnRoutes(base, newHostinfo.RoutableIPs); pruned {
+				autoApprovedRoutes, routeChange = kept, true
+			}
+		}
+
 		// Log when routes change but approval doesn't
 		if delta.routesChanged && !routeChange {
 			if hi := req.Hostinfo; hi != nil {
@@ -4060,6 +4079,16 @@ func routesChanged(oldNode types.NodeView, newHI *tailcfg.Hostinfo) bool {
 	slices.SortFunc(newRoutes, netip.Prefix.Compare)
 
 	return !slices.Equal(oldRoutes, newRoutes)
+}
+
+// withoutWithdrawnRoutes returns approved without the routes announced no
+// longer carries, exit routes excepted, and whether anything was dropped.
+func withoutWithdrawnRoutes(approved, announced []netip.Prefix) ([]netip.Prefix, bool) {
+	kept := slices.DeleteFunc(slices.Clone(approved), func(route netip.Prefix) bool {
+		return !tsaddr.IsExitRoute(route) && !slices.Contains(announced, route)
+	})
+
+	return kept, len(kept) != len(approved)
 }
 
 // peerChangePersistWorthy reports whether a peer change carries anything that

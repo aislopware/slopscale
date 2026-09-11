@@ -12,6 +12,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
 	"tailscale.com/types/opt"
@@ -990,6 +991,58 @@ func TestBuildMapRequestChangeResponse(t *testing.T) {
 			require.Equal(t, tt.wantKeys, patch.Key != nil && patch.DiscoKey != nil, "keys on patch")
 			require.Equal(t, tt.wantEndpoints, patch.Endpoints != nil, "endpoints on patch")
 			require.Equal(t, tt.wantDERP, patch.DERPRegion, "DERP on patch")
+		})
+	}
+}
+
+// TestMapRequestAppConnectorWithdrawalDropsApproval pins that an approval an
+// app connector withdrew goes with the route, exit routes excepted, while a
+// subnet router keeps its approvals for the day it advertises again.
+func TestMapRequestAppConnectorWithdrawalDropsApproval(t *testing.T) {
+	t.Parallel()
+
+	learned := netip.MustParsePrefix("203.0.113.7/32")
+	withdrawn := netip.MustParsePrefix("203.0.113.8/32")
+	approved := []netip.Prefix{learned, withdrawn, tsaddr.AllIPv4(), tsaddr.AllIPv6()}
+	announced := []netip.Prefix{learned, tsaddr.AllIPv4(), tsaddr.AllIPv6()}
+
+	tests := []struct {
+		name         string
+		appConnector opt.Bool
+		want         []netip.Prefix
+	}{
+		{name: "app connector", appConnector: opt.NewBool(true), want: announced},
+		{name: "subnet router", appConnector: opt.Bool(""), want: approved},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, s, nodeID := persistTestSetup(t)
+			t.Cleanup(func() { _ = s.Close() })
+
+			_, _, err := s.SetApprovedRoutes(nodeID, approved)
+			require.NoError(t, err)
+
+			nv, ok := s.GetNodeByID(nodeID)
+			require.True(t, ok)
+
+			c, err := s.UpdateNodeFromMapRequest(nodeID, tailcfg.MapRequest{
+				NodeKey:  nv.NodeKey(),
+				DiscoKey: nv.DiscoKey(),
+				Hostinfo: &tailcfg.Hostinfo{
+					Hostname:     nv.Hostname(),
+					AppConnector: tt.appConnector,
+					RoutableIPs:  announced,
+				},
+			})
+			require.NoError(t, err)
+			require.False(t, c.IsEmpty(), "announcing routes is a change")
+
+			after, ok := s.GetNodeByID(nodeID)
+			require.True(t, ok)
+			require.ElementsMatch(t, tt.want, after.ApprovedRoutes().AsSlice())
 		})
 	}
 }
