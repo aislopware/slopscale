@@ -77,9 +77,7 @@ export function appDomainError(value: string): string | null {
     return "Enter a domain.";
   }
 
-  return isAppDomain(trimmed)
-    ? null
-    : `"${trimmed}" is not a valid domain. Use example.com or *.example.com.`;
+  return isAppDomain(trimmed) ? null : "Enter a domain such as example.com or *.example.com.";
 }
 
 /** The first problem among the domains, or null. */

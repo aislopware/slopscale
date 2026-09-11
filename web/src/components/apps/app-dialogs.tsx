@@ -15,11 +15,12 @@ import {
 } from "~/components/apps/model.ts";
 import type { AppDraft } from "~/components/apps/model.ts";
 import type { AppMutations } from "~/components/apps/mutations.ts";
-import { TagInput, usePendingLists } from "~/components/apps/tag-input.tsx";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
+import { ListField } from "~/components/ui/list-field.tsx";
 import { toast } from "~/components/ui/toast.ts";
+import { listValues } from "~/lib/list.ts";
 
 export interface AppDialogProps {
   /** The app to edit; absent when creating one. */
@@ -38,7 +39,7 @@ export function AppDialog(props: AppDialogProps): ReactElement {
       <DialogContent
         size="lg"
         title={editing ? "Edit app" : "New app"}
-        description="The connectors resolve these domains, advertise a route for every address they learn and forward the traffic."
+        description="The connectors resolve the domains and route every address they learn."
       >
         <AppForm {...props} />
       </DialogContent>
@@ -56,16 +57,32 @@ function draftFrom(app: App | undefined): AppDraft {
   };
 }
 
+/** The draft as the request wants it: the lists tidied, the blank rows dropped. */
+function cleanDraft(draft: AppDraft): {
+  readonly name: string;
+  readonly description: string;
+  readonly domains: string[];
+  readonly connectors: string[];
+  readonly routes: string[];
+} {
+  return {
+    name: draft.name.trim(),
+    description: draft.description.trim(),
+    domains: listValues(draft.domains, normalizeDomain),
+    connectors: listValues(draft.connectors, normalizeConnectorTag),
+    routes: listValues(draft.routes),
+  };
+}
+
 function AppForm({ app, onOpenChange, mutations }: Omit<AppDialogProps, "open">): ReactElement {
+  // The lists hold their rows as typed; a wrong row is what holds the form, a blank one is nothing.
   const [draft, setDraft] = useState<AppDraft>(() => draftFrom(app));
-  const lists = usePendingLists();
   const mutation = app === undefined ? mutations.create : mutations.update;
   const update = (patch: Partial<AppDraft>): void => {
     setDraft((current) => ({ ...current, ...patch }));
   };
-  // An entry typed but not yet a chip counts as incomplete: submitting would drop it, and an empty
-  // connector list means every connector rather than the one the operator can see.
-  const incomplete = appValidationError(draft) !== null || lists.pending;
+  const body = cleanDraft(draft);
+  const incomplete = appValidationError(body) !== null;
 
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -74,14 +91,6 @@ function AppForm({ app, onOpenChange, mutations }: Omit<AppDialogProps, "open">)
     if (incomplete || mutation.isPending) {
       return;
     }
-
-    const body = {
-      name: draft.name.trim(),
-      description: draft.description.trim(),
-      domains: [...draft.domains],
-      connectors: [...draft.connectors],
-      routes: [...draft.routes],
-    };
 
     if (app === undefined) {
       mutations.create.mutate(
@@ -127,36 +136,38 @@ function AppForm({ app, onOpenChange, mutations }: Omit<AppDialogProps, "open">)
           update({ description: event.target.value });
         }}
       />
-      <TagInput
+      <ListField
         label="Domains"
-        description="example.com or *.example.com. Every address one of these resolves to becomes a route."
+        description="example.com or *.example.com."
         placeholder="crm.example.com"
+        addLabel="Add domain"
         value={draft.domains}
-        onPendingChange={lists.track("domains")}
         normalize={normalizeDomain}
         validate={appDomainError}
         onValueChange={(domains) => {
           update({ domains });
         }}
       />
-      <TagInput
+      <ListField
         label="Connectors"
-        description="The tags of the machines that serve the app. Leave empty for every connector."
+        description="Tags of the machines that serve the app. Leave empty for every connector."
         placeholder="tag:connector"
+        addLabel="Add connector"
+        optional
         value={draft.connectors}
-        onPendingChange={lists.track("connectors")}
         normalize={normalizeConnectorTag}
         validate={connectorTagError}
         onValueChange={(connectors) => {
           update({ connectors });
         }}
       />
-      <TagInput
+      <ListField
         label="Routes"
-        description="CIDRs the connectors advertise whatever the domains resolve to. No default routes."
+        description="CIDRs the connectors always advertise. No default routes."
         placeholder="10.0.0.0/24"
+        addLabel="Add route"
+        optional
         value={draft.routes}
-        onPendingChange={lists.track("routes")}
         validate={appRouteError}
         onValueChange={(routes) => {
           update({ routes });

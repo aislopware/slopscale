@@ -105,14 +105,14 @@ export function hasPreferenceChanges(changes: UpdateNodePreferencesRequestBody):
 
 /**
  * Whether the dialog may send what it has. An empty hostname is a valid preference — it tells the
- * client to use the machine's own OS name — so it never holds the form; only a half-typed list
+ * client to use the machine's own OS name — so it never holds the form; only a wrong row in a list
  * does, along with there being nothing to send.
  */
 export function canSavePreferences(
   changes: UpdateNodePreferencesRequestBody,
-  pendingLists: boolean,
+  invalidLists: boolean,
 ): boolean {
-  return !pendingLists && hasPreferenceChanges(changes);
+  return !invalidLists && hasPreferenceChanges(changes);
 }
 
 /** The exit node in use, by stable id or address; empty means the machine routes for itself. */

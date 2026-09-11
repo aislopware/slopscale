@@ -9,7 +9,6 @@ import { errorMessage } from "~/api/error.ts";
 import { invalidate } from "~/api/queries.ts";
 import type { Node } from "~/api/queries.ts";
 import type { NodePreferences } from "~/api/schema.gen.ts";
-import { TagInput, usePendingLists } from "~/components/apps/tag-input.tsx";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import {
   canSavePreferences,
@@ -18,7 +17,9 @@ import {
 } from "~/components/machines/preferences-model.ts";
 import { prefixError } from "~/components/networks/model.ts";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
+import { ListField } from "~/components/ui/list-field.tsx";
 import { toast } from "~/components/ui/toast.ts";
+import { listError, listValues } from "~/lib/list.ts";
 import { useBaseline } from "~/lib/use-baseline.ts";
 
 export interface PreferencesDialogProps {
@@ -73,8 +74,10 @@ function PreferencesForm({
   // The answer the form opened on, kept as it was. The machine is asked again while the dialog is
   // open, and diffing against a fresher answer would send back fields nobody touched.
   const baseline = useBaseline(preferences, node.id);
-  const [draft, setDraft] = useState<NodePreferences>(baseline);
-  const lists = usePendingLists();
+  const [fields, setFields] = useState<NodePreferences>(baseline);
+  // The routes as typed, blank rows and all; the draft carries what they are worth.
+  const [routes, setRoutes] = useState<readonly string[]>(baseline.advertiseRoutes);
+  const draft: NodePreferences = { ...fields, advertiseRoutes: listValues(routes) };
   const queryClient = useQueryClient();
   const save = api.useMutation("patch", "/api/v1/node/{nodeId}/preferences", {
     onSuccess: async () => {
@@ -84,7 +87,7 @@ function PreferencesForm({
     },
   });
   const changes = preferenceChanges(draft, baseline);
-  const incomplete = !canSavePreferences(changes, lists.pending);
+  const incomplete = !canSavePreferences(changes, listError(routes, prefixError) !== null);
 
   function submit(event: SubmitEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -107,7 +110,7 @@ function PreferencesForm({
         value={draft.hostname}
         spellCheck={false}
         onChange={(event) => {
-          setDraft({ ...draft, hostname: event.target.value });
+          setFields({ ...fields, hostname: event.target.value });
         }}
       />
       <Input
@@ -118,21 +121,20 @@ function PreferencesForm({
         spellCheck={false}
         placeholder="None"
         onChange={(event) => {
-          setDraft({ ...draft, exitNode: event.target.value });
+          setFields({ ...fields, exitNode: event.target.value });
         }}
       />
-      <TagInput
+      <ListField
         label="Advertised routes"
         description="The prefixes the machine offers to route. They still need approving before any peer uses them."
         placeholder="10.0.0.0/24"
-        value={draft.advertiseRoutes}
+        addLabel="Add route"
+        optional
+        value={routes}
         validate={prefixError}
-        onPendingChange={lists.track("routes")}
-        onValueChange={(routes) => {
-          setDraft({ ...draft, advertiseRoutes: routes });
-        }}
+        onValueChange={setRoutes}
       />
-      <Switches draft={draft} onChange={setDraft} />
+      <Switches draft={fields} onChange={setFields} />
       <DialogError message={save.isError ? errorMessage(save.error) : undefined} />
       <FormFooter label="Save preferences" pending={save.isPending} disabled={incomplete} />
     </form>

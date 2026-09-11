@@ -87,12 +87,12 @@ describe("domain validation", () => {
   it("reports appDomainError message", () => {
     expect(appDomainError("")).toBe("Enter a domain.");
     expect(appDomainError("example.com")).toBeNull();
-    expect(appDomainError("invalid")).toContain("not a valid domain");
+    expect(appDomainError("invalid")).toContain("Enter a domain such as");
   });
 
   it("validates list of domains", () => {
     expect(domainsError(["example.com", "*.internal.net"])).toBeNull();
-    expect(domainsError(["example.com", "bad domain"])).toContain("not a valid domain");
+    expect(domainsError(["example.com", "bad domain"])).toContain("Enter a domain such as");
   });
 });
 
@@ -173,7 +173,7 @@ describe(appValidationError, () => {
 
   it("validates domains in draft", () => {
     expect(appValidationError({ ...validDraft, domains: ["bad domain"] })).toContain(
-      "not a valid domain",
+      "Enter a domain such as",
     );
   });
 
