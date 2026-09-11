@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/web"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -68,5 +69,26 @@ func TestIsConfiguredAdminEmailVerified(t *testing.T) {
 
 			assert.Equal(t, tt.want, a.isConfiguredAdmin(claims))
 		})
+	}
+}
+
+// TestConsoleRedirectStaysInsideTheConsole pins where a sign-in may send
+// the browser afterwards: a page of the console, the same page when the
+// link still names the console's old prefix, and nowhere else.
+func TestConsoleRedirectStaysInsideTheConsole(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"":                               web.Prefix,
+		"/console/machines?q=alice":      "/console/machines?q=alice",
+		"/admin/machines?q=alice":        "/console/machines?q=alice",
+		"/admin":                         web.Prefix,
+		"/elsewhere":                     web.Prefix,
+		"//evil.example/console/":        web.Prefix,
+		"https://evil.example/console/x": web.Prefix,
+	}
+
+	for raw, want := range cases {
+		assert.Equal(t, want, consoleRedirect(raw), raw)
 	}
 }

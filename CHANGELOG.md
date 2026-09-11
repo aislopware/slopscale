@@ -1,9 +1,12 @@
 # CHANGELOG
 
-## 0.30.1 (202x-xx-xx)
+## 0.31.0 (202x-xx-xx)
 
 ### Changes
 
+- The admin console moved from `/admin/` to `/console/`, and the server's front page (`/`) now sends a browser to it instead of showing a blank page. `/admin/` and everything under it redirect to the same page under `/console/`, so links in webhooks, invitations and bookmarks made before this release keep working. A proxy rule that blocks the console should cover both paths
+- The console's app and machine preference forms edit a list of domains, connectors or routes as rows, each in its own input with a remove button and an "Add …" button under them, instead of chips in one box. A row can be read whole and edited in place, Enter adds the next row, and a wrong row says why under itself. A long domain no longer pushes the dialog wider than the screen
+- Tags, groups, scopes, domains, routes and other identifiers across the console are plain text, one per line, rather than pills. A pill had to truncate to fit and hid the part that told two values apart
 - The console no longer reports "Page not found" when a reverse proxy in front of slopscale answers a bare 404 while the server restarts; the page now says the server did not answer and may be restarting. Every error slopscale sends itself carries problem details, so a 404 without them can only come from the proxy
 - `slopscale apps create`, `apps update`, `services create` and `services update` no longer crash on start: their `-c` shorthand (`--connector`, `--comment`) collided with the global `-c --config`. The long flags are unchanged; the shorthand is gone. A test now walks every command so a shorthand that shadows a global flag cannot ship again
 

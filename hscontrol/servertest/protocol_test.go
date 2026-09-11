@@ -236,7 +236,7 @@ func TestFeatureQueryTellsHowToEnable(t *testing.T) {
 	off := query("serve")
 	assert.False(t, off.Complete)
 	assert.Contains(t, off.Text, "granting the https node attribute")
-	assert.Equal(t, srv.URL+"/admin/policy", off.URL)
+	assert.Equal(t, srv.URL+"/console/policy", off.URL)
 	// The CLI exits 0 after printing the text unless told to wait.
 	assert.True(t, off.ShouldWait)
 

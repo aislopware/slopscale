@@ -2,14 +2,17 @@
 title: "Admin console"
 ---
 
-Slopscale ships a web console at `/admin/` on the server's own address. It
+Slopscale ships a web console at `/console/` on the server's own address. It
 lists machines, users and keys, edits the policy, approves devices and users,
 shares nodes and marks the global exit node from a browser, the same things
 the CLI and the API do.
 
 The console is a static, client-rendered application embedded in the
 `slopscale` binary. It keeps no state on the server and needs no extra process:
-open `https://<your server>/admin/` and it loads.
+open `https://<your server>/console/` and it loads. The server's front page,
+`https://<your server>/`, sends a browser there too, and the console's old
+address, `/admin/`, still works: a link made before 0.31 is redirected to the
+same page under `/console/`.
 
 ## Signing in
 
@@ -135,7 +138,7 @@ the longest the server accepts. `slopscale invites list` shows which
 invitations are still pending, `slopscale invites resend <id>` mints a fresh
 link for one, and `slopscale invites delete <id>` withdraws it.
 
-The link is `https://<your server>/admin/login?invite=<token>` and is shown
+The link is `https://<your server>/console/login?invite=<token>` and is shown
 once: the server keeps only a hash of the token, as it does for a session
 cookie or a pre-auth key. When [`notifications.smtp`](/ref/webhooks) is
 configured the link is also mailed to the address, and the response says
@@ -376,8 +379,8 @@ $ make build
 `make web` now also runs `make wasm`, which compiles
 `tailscale.com/cmd/tsconnect/wasm` with the Go toolchain (about 30 MB raw,
 7 MB gzipped, embedded gzipped), and the client is served under
-`/admin/tsconnect/`. Running `make wasm` alone builds only the WebAssembly
-client. A binary built without `make web` still serves `/admin/`, with a page
+`/console/tsconnect/`. Running `make wasm` alone builds only the WebAssembly
+client. A binary built without `make web` still serves `/console/`, with a page
 saying the console is missing, and the API works as usual. A console built
 without `make wasm` shows a notice on the terminal page.
 
@@ -399,13 +402,13 @@ sign-in comes back as `jane.doe@example.com`, who is listed in that server's
 
 ```console
 $ go run ./cmd/dev                       # server on :8080, provider on :9100
-$ open http://127.0.0.1:8080/admin/      # Continue with single sign-on
+$ open http://127.0.0.1:8080/console/      # Continue with single sign-on
 ```
 
 To sign in from the Vite development server instead, start slopscale with
 its public URL set to Vite's origin, so the provider sends the browser back
 there: `go run ./cmd/dev -server-url http://localhost:5173`, then
-`bun run dev` in `web/` and open `http://localhost:5173/admin/`.
+`bun run dev` in `web/` and open `http://localhost:5173/console/`.
 
 `make test-e2e` runs the same flow in a browser: it builds the console,
 starts `cmd/dev`, signs in through the mock provider, checks the audit log
@@ -415,13 +418,14 @@ provider without a browser.
 
 ## Serving behind a reverse proxy
 
-The console lives under `/admin/` on the same origin as the API, so a
+The console lives under `/console/` on the same origin as the API, so a
 [reverse proxy](/ref/integration/reverse-proxy) that forwards the whole host
 needs no extra rules. It sends a `Content-Security-Policy` that allows its own
 origin, `'wasm-unsafe-eval'` for the in-browser client, and `connect-src wss:`
 so the client can reach DERP relays over WebSockets; do not embed it in another
 site's frame.
 
-If you prefer the console not to be reachable, block `/admin/` at the proxy.
+If you prefer the console not to be reachable, block `/console/` and `/admin/`
+at the proxy.
 Everything it does is also available through the API with the same key, so
 this only removes the page, not the capability.

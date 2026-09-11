@@ -25,7 +25,7 @@ const (
 )
 
 // k8sOperatorPolicy is the tagOwners policy the Tailscale Kubernetes operator
-// requires: tag:k8s-operator is self/admin-owned, and the operator
+// requires: tag:k8s-operator is self/console-owned, and the operator
 // (tag:k8s-operator) owns tag:k8s so it can mint auth keys for the proxy nodes
 // it spins up. The wildcard ACL lets the in-cluster proxies and the out-of-cluster
 // tsic client reach each other for the connectivity checks.

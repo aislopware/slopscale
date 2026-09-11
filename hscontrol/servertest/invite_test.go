@@ -65,7 +65,7 @@ func inviteToken(t *testing.T, link string) string {
 	u, err := url.Parse(link)
 	require.NoError(t, err)
 
-	require.Equal(t, "/admin/login", u.Path, "the link points at the console's sign-in page")
+	require.Equal(t, "/console/login", u.Path, "the link points at the console's sign-in page")
 
 	token := u.Query().Get(hscontrol.InviteTokenParam)
 	require.NotEmpty(t, token, "the invite link carries no token: %s", link)

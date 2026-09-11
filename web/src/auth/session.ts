@@ -24,5 +24,5 @@ export async function signOut(): Promise<void> {
 
 /** The console's own path for a router location, as the server's redirect parameter wants it. */
 export function consolePath(location: string): string {
-  return location.startsWith("/admin/") ? location : `/admin${location}`;
+  return location.startsWith("/console/") ? location : `/console${location}`;
 }

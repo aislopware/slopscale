@@ -28,7 +28,7 @@ import (
 	"tailscale.com/cmd/tsconnect/wasmbuild"
 )
 
-// manifest is what the console fetches at /admin/tsconnect/manifest.json.
+// manifest is what the console fetches at /console/tsconnect/manifest.json.
 type manifest struct {
 	// Wasm is the file name of the client, hashed so it caches forever.
 	Wasm string `json:"wasm"`

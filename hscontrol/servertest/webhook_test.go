@@ -166,7 +166,7 @@ func TestWebhookDeliveries(t *testing.T) {
 	assert.Equal(t, "hooked", nodeData["deviceName"], "no base domain, so the name alone")
 	assert.Equal(t, owner.Username(), nodeData["managedBy"])
 	assert.NotEmpty(t, nodeData["nodeID"])
-	assert.Contains(t, nodeData["url"], "/admin/machines/")
+	assert.Contains(t, nodeData["url"], "/console/machines/")
 
 	// Unsubscribed events stay away: a policy update is not delivered.
 	status, body = apiCall(t, client, ownerKey, http.MethodPost, v1+"/webhook/"+id+"/test", nil)

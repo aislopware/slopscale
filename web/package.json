@@ -2,7 +2,7 @@
   "name": "slopscale-admin",
   "version": "0.0.0",
   "private": true,
-  "description": "Slopscale admin console: a client-rendered React app served by the slopscale server under /admin/.",
+  "description": "Slopscale admin console: a client-rendered React app served by the slopscale server under /console/.",
   "workspaces": [
     "codegen"
   ],

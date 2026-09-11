@@ -1,7 +1,7 @@
 # Admin console
 
 The slopscale admin console: a client-rendered React application served by the
-server at `/admin/` (see `embed.go`, which embeds `dist/` into the binary).
+server at `/console/` (see `embed.go`, which embeds `dist/` into the binary).
 
 ## Stack
 
@@ -45,7 +45,7 @@ server at `/admin/` (see `embed.go`, which embeds `dist/` into the binary).
 
 ```console
 $ bun install            # once; the lockfile pins everything
-$ bun run dev            # http://localhost:5173/admin/, proxies /api and /oidc to $SLOPSCALE_URL or 127.0.0.1:8080
+$ bun run dev            # http://localhost:5173/console/, proxies /api and /oidc to $SLOPSCALE_URL or 127.0.0.1:8080
 $ bun run check          # typecheck + lint + format check + tests
 $ bun run build          # writes dist/, which the Go build embeds
 $ bun run e2e            # builds, starts a real server (cmd/dev) and signs in through a browser

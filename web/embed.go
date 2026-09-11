@@ -3,7 +3,7 @@
 //
 // The console is a static bundle that talks to /api/v1 with the API key the
 // operator pastes at sign-in, so the server only has to deliver files. A
-// binary built without running `make web` still serves a page under /admin/
+// binary built without running `make web` still serves a page under /console/
 // that says so instead of a 404.
 package web
 
@@ -26,7 +26,12 @@ var dist embed.FS
 
 // Prefix is the path the console is mounted at, with a trailing slash. Vite's
 // `base` in web/vite.config.ts must match it.
-const Prefix = "/admin/"
+const Prefix = "/console/"
+
+// LegacyPrefix is where the console lived before 0.31. A link made then, in
+// a webhook, an invitation or a bookmark, is sent on to Prefix with the rest
+// of its path and its query kept.
+const LegacyPrefix = "/admin/"
 
 // indexFile is the SPA entry; every unknown path under Prefix serves it so
 // the client router can take over after a reload or a pasted link.
@@ -61,6 +66,34 @@ func Built() bool {
 	return err == nil
 }
 
+// RootHandler sends the server's front door to the console: there is nothing
+// else for a browser at "/", and an operator who types the bare address
+// expects to land somewhere.
+func RootHandler(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, Prefix, http.StatusFound)
+}
+
+// LegacyHandler sends a request for the console's old address to its new
+// one. Mount it at LegacyPrefix without the trailing slash and LegacyPrefix
+// followed by a wildcard, like Handler.
+func LegacyHandler(w http.ResponseWriter, r *http.Request) {
+	// "/admin" without the slash has nothing after the prefix.
+	rel, ok := strings.CutPrefix(r.URL.Path, LegacyPrefix)
+	if !ok {
+		rel = ""
+	}
+
+	target := Prefix + rel
+
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+
+	// The target always starts with Prefix on this origin; the request only supplies what follows.
+	//nolint:gosec // G710: not an open redirect, see above.
+	http.Redirect(w, r, target, http.StatusMovedPermanently)
+}
+
 // Handler serves the console. Mount it at both Prefix without the trailing
 // slash (to redirect) and Prefix followed by a wildcard.
 func Handler() http.Handler {
@@ -85,7 +118,7 @@ func Handler() http.Handler {
 
 		rel, ok := strings.CutPrefix(r.URL.Path, Prefix)
 		if !ok {
-			// "/admin" without the slash: relative asset URLs need it.
+			// "/console" without the slash: relative asset URLs need it.
 			http.Redirect(w, r, Prefix, http.StatusMovedPermanently)
 
 			return

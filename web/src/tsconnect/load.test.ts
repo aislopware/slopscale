@@ -7,7 +7,7 @@ import {
   TsConnectNotBuiltError,
 } from "~/tsconnect/load.ts";
 
-const manifestUrl = "/admin/tsconnect/manifest.json";
+const manifestUrl = "/console/tsconnect/manifest.json";
 const statusNotFound = 404;
 const statusServerError = 500;
 
@@ -26,16 +26,16 @@ describe(buildTsConnectUrls, () => {
   const manifest = { wasm: "main-hash123.wasm", execJs: "wasm_exec.js" };
 
   it("puts the client next to the console's base path", () => {
-    const urls = buildTsConnectUrls("/admin/");
+    const urls = buildTsConnectUrls("/console/");
 
     expect(urls.manifestUrl).toBe(manifestUrl);
-    expect(urls.scriptUrl(manifest)).toBe("/admin/tsconnect/wasm_exec.js");
-    expect(urls.wasmUrl(manifest)).toBe("/admin/tsconnect/main-hash123.wasm");
+    expect(urls.scriptUrl(manifest)).toBe("/console/tsconnect/wasm_exec.js");
+    expect(urls.wasmUrl(manifest)).toBe("/console/tsconnect/main-hash123.wasm");
   });
 
   it("does not care whether the base path ends in a slash", () => {
-    expect(buildTsConnectUrls("/admin").manifestUrl).toBe(manifestUrl);
-    expect(buildTsConnectUrls("/admin//").manifestUrl).toBe(manifestUrl);
+    expect(buildTsConnectUrls("/console").manifestUrl).toBe(manifestUrl);
+    expect(buildTsConnectUrls("/console//").manifestUrl).toBe(manifestUrl);
   });
 
   it("serves from the root when the console is mounted there", () => {

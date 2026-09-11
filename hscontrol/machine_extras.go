@@ -181,7 +181,7 @@ func (ns *noiseServer) featureQueryResponse(node types.NodeView, feature string)
 				"to the machine in the policy file, under Access controls. This command waits for that.",
 			featureTitle(feature), strings.Join(missing, " and "),
 		),
-		URL:        ns.slopscale.cfg.ServerURL + "/admin/policy",
+		URL:        ns.slopscale.cfg.ServerURL + "/console/policy",
 		ShouldWait: true,
 	}
 }

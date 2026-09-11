@@ -44,7 +44,7 @@ func TestDisplayMessages(t *testing.T) {
 				assert.Equal(t, tailcfg.SeverityMedium, approval.Severity)
 				assert.True(t, approval.ImpactsConnectivity)
 				require.NotNil(t, approval.PrimaryAction)
-				assert.Equal(t, "https://control.example.com/admin/machines", approval.PrimaryAction.URL)
+				assert.Equal(t, "https://control.example.com/console/machines", approval.PrimaryAction.URL)
 			} else {
 				assert.Nil(t, approval)
 			}

@@ -26,7 +26,7 @@ func inviteResendFlags(cmd *cobra.Command) {
 	cmd.Flags().String("expiry", "", "")
 }
 
-const inviteURL = "https://slopscale.example.com/admin/login?invite=deadbeef"
+const inviteURL = "https://slopscale.example.com/console/login?invite=deadbeef"
 
 func inviteFixture() clientv1.Invite {
 	createdBy := "1"

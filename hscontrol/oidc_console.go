@@ -80,8 +80,14 @@ func (a *AuthProviderOIDC) ConsoleLoginHandler(writer http.ResponseWriter, req *
 }
 
 // consoleRedirect keeps a redirect inside the console: a path under the
-// console's prefix, never another origin or a protocol-relative URL.
+// console's prefix, never another origin or a protocol-relative URL. A
+// path under the console's old prefix, from a link made before the move,
+// is taken to mean the same page under the new one.
 func consoleRedirect(raw string) string {
+	if rest, ok := strings.CutPrefix(raw, web.LegacyPrefix); ok {
+		raw = web.Prefix + rest
+	}
+
 	if raw == "" || !strings.HasPrefix(raw, web.Prefix) || strings.HasPrefix(raw, "//") {
 		return web.Prefix
 	}

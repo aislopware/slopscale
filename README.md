@@ -14,7 +14,7 @@ slopscale is a fork of [headscale](https://github.com/juanfont/headscale)
 with these improvements:
 
 - Faster map responses, lower memory use, a smaller database footprint
-- Built-in admin console at `/admin/`
+- Built-in admin console at `/console/`
 - User roles, device and user approval, machine sharing, groups and access
   rules, temporary access, device trust
 - OAuth clients with scopes, so the Tailscale Terraform provider and Kubernetes

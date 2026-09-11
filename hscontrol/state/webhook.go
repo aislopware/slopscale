@@ -277,7 +277,7 @@ func (s *State) consoleURL(path string) string {
 		return ""
 	}
 
-	return strings.TrimSuffix(s.cfg.ServerURL, "/") + "/admin/" + path
+	return strings.TrimSuffix(s.cfg.ServerURL, "/") + "/console/" + path
 }
 
 // userLabel names a user the way Tailscale's events do: the email when

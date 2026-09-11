@@ -85,7 +85,7 @@ jobs:
           go-key: servertest
           bun: "true"
       # The console sign-in cases need the embedded console; without a build
-      # the server answers 503 for /admin/.
+      # the server answers 503 for /console/.
       - name: Build admin console
         run: make web
       - name: go test ./hscontrol/servertest

@@ -1362,9 +1362,11 @@ func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	// privileged. See package web.
 	r.Handle(strings.TrimSuffix(web.Prefix, "/"), web.Handler())
 	r.Handle(web.Prefix+"*", web.Handler())
+	r.Get(strings.TrimSuffix(web.LegacyPrefix, "/"), web.LegacyHandler)
+	r.Get(web.LegacyPrefix+"*", web.LegacyHandler)
 
 	r.Get("/favicon.ico", FaviconHandler)
-	r.Get("/", BlankHandler)
+	r.Get("/", web.RootHandler)
 
 	return r
 }

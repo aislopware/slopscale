@@ -259,7 +259,7 @@ func run() error {
 		`
 === Slopscale Dev Environment ===
   Server:  http://127.0.0.1:%d
-  Console: %s/admin/  (sign in through the mock provider as %s, an admin)
+  Console: %s/console/  (sign in through the mock provider as %s, an admin)
   OIDC:    %s
   Metrics: http://127.0.0.1:%d
   Debug:   http://127.0.0.1:%d/debug/ping

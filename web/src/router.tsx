@@ -23,7 +23,7 @@ export interface RouterContext {
 
 export const router = createRouter({
   routeTree,
-  basepath: "/admin",
+  basepath: "/console",
   context: { queryClient },
   defaultPreload: "intent",
   defaultPreloadStaleTime: 0,

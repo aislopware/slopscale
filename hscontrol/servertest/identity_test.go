@@ -330,7 +330,7 @@ func TestApprovalMessage(t *testing.T) {
 		msg, ok := nm.DisplayMessages["slopscale-approval"]
 
 		return !authorized(nm) && ok && strings.Contains(msg.Title, "waiting for approval") &&
-			msg.PrimaryAction != nil && strings.HasSuffix(msg.PrimaryAction.URL, "/admin/machines")
+			msg.PrimaryAction != nil && strings.HasSuffix(msg.PrimaryAction.URL, "/console/machines")
 	})
 
 	status, body = apiCall(t, client, ownerKey, http.MethodPost, v1+"/node/"+carol.NodeIDString()+"/approve", nil)

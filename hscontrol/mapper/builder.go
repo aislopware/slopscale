@@ -145,7 +145,7 @@ func displayMessages(nv types.NodeView, serverURL string) map[tailcfg.DisplayMes
 			Severity:            tailcfg.SeverityMedium,
 			ImpactsConnectivity: true,
 			PrimaryAction: &tailcfg.DisplayMessageAction{
-				URL:   strings.TrimSuffix(serverURL, "/") + "/admin/machines",
+				URL:   strings.TrimSuffix(serverURL, "/") + "/console/machines",
 				Label: "Open the admin console",
 			},
 		}
