@@ -10,6 +10,7 @@ import { GroupNames } from "~/components/access/group-names.tsx";
 import { DnsRuleDialog } from "~/components/dns/rule-dialog.tsx";
 import type { DnsRuleMutations } from "~/components/dns/rule-mutations.ts";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { Domain } from "~/components/ui/domain.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 
@@ -142,8 +143,10 @@ function RuleSummary({
         {rule.enabled ? null : <span className="text-xs text-kumo-subtle">Disabled</span>}
       </span>
       <div className="grid min-w-0 gap-x-6 gap-y-0.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]">
-        <span className="min-w-0 font-mono text-sm break-all text-kumo-default">
-          {rule.domains.join(", ")}
+        <span className="flex min-w-0 flex-wrap gap-1">
+          {rule.domains.map((domain) => (
+            <Domain key={domain} domain={domain} />
+          ))}
         </span>
         <span className="min-w-0 font-mono text-sm break-all text-kumo-subtle">
           {rule.nameservers.join(", ")}

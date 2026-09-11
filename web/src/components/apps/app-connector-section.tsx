@@ -13,6 +13,7 @@ import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper, useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
+import { Domain } from "~/components/ui/domain.tsx";
 import { Section, SectionEmpty, SectionRow } from "~/components/ui/section.tsx";
 
 const buttonIconSize = 12;
@@ -76,7 +77,7 @@ const columns = helper.columns([
   helper.display({
     id: "domain",
     header: "Domain",
-    cell: ({ row }) => <span className="font-mono">{row.original.domain}</span>,
+    cell: ({ row }) => <Domain domain={row.original.domain} />,
   }),
   helper.display({
     id: "addresses",
