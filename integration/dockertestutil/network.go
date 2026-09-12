@@ -47,9 +47,30 @@ func (n *Network) Inspect() mobynetwork.Inspect {
 	return n.inspect
 }
 
-// Close removes the network. Containers must have left it.
+// Close removes the network. Whatever is still attached, usually the
+// test-suite container itself, is force-disconnected first, as
+// dockertest v3 did; otherwise the daemon refuses with "has active
+// endpoints" and the leaked networks exhaust the address pools within
+// one CI job.
 func (n *Network) Close() error {
-	_, err := n.docker.NetworkRemove(context.Background(), n.inspect.ID, client.NetworkRemoveOptions{})
+	ctx := context.Background()
+
+	current, err := n.docker.NetworkInspect(ctx, n.inspect.ID, client.NetworkInspectOptions{})
+	if err != nil {
+		return fmt.Errorf("inspecting network %s: %w", n.inspect.Name, err)
+	}
+
+	for containerID := range current.Network.Containers {
+		_, err = n.docker.NetworkDisconnect(ctx, n.inspect.ID, client.NetworkDisconnectOptions{
+			Container: containerID,
+			Force:     true,
+		})
+		if err != nil {
+			log.Printf("disconnecting %s from network %s: %s", containerID, n.inspect.Name, err)
+		}
+	}
+
+	_, err = n.docker.NetworkRemove(ctx, n.inspect.ID, client.NetworkRemoveOptions{})
 	if err != nil {
 		return fmt.Errorf("removing network %s: %w", n.inspect.Name, err)
 	}

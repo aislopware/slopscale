@@ -1611,6 +1611,12 @@ func TestOIDCExpiryAfterRestart(t *testing.T) {
 	_, err = doLoginURL(ts.Hostname(), u)
 	require.NoError(t, err)
 
+	// The server registers the node before the client has fetched its
+	// netmap and persisted its prefs. A restart in that window (a graceful
+	// SIGTERM stops tailscaled within a second) leaves a state file without
+	// WantRunning, and the client comes back in NeedsLogin.
+	require.NoError(t, ts.WaitForRunning(integrationutil.PeerSyncTimeout()))
+
 	t.Logf("Validating initial login and expiry at %s", time.Now().Format(TimestampFormat))
 
 	// Verify initial expiry is set
