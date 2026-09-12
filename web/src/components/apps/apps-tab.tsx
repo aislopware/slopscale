@@ -1,14 +1,16 @@
 import { Button } from "@cloudflare/kumo/components/button";
 import { Empty } from "@cloudflare/kumo/components/empty";
 import { PlusIcon } from "@phosphor-icons/react";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 
 import type { App } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { appColumns } from "~/components/apps/app-columns.tsx";
+import type { AppRow } from "~/components/apps/app-columns.tsx";
 import { AppDialog } from "~/components/apps/app-dialogs.tsx";
+import { useLearnedCounts } from "~/components/apps/learned.ts";
 import { countApps } from "~/components/apps/model.ts";
 import { useAppMutations } from "~/components/apps/mutations.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
@@ -32,9 +34,14 @@ export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): Rea
   const query = useDeferredValue(search);
   const [creating, setCreating] = useState(false);
   const mutations = useAppMutations();
+  const learned = useLearnedCounts(apps, me);
+  const rows = useMemo(
+    (): AppRow[] => apps.map((app) => ({ ...app, learned: learned?.get(app.id) ?? null })),
+    [apps, learned],
+  );
 
   const table = useAppTable({
-    data: apps,
+    data: rows,
     columns: appColumns,
     getRowId: (app) => app.id,
     state: { globalFilter: query },

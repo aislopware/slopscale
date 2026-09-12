@@ -21,9 +21,43 @@ export function connectorLabel(connector: string): string {
   return connector === "*" ? "Every connector" : connector;
 }
 
-/** Total single-address routes learned across connector nodes. */
-export function totalLearnedRoutes(nodes: readonly { readonly learnedRoutes: number }[]): number {
-  return nodes.reduce((sum, node) => sum + node.learnedRoutes, 0);
+/**
+ * Whether an app domain covers a domain a connector learned: itself, or for `*.example.com` any
+ * name under it, which is the client's own rule (a wildcard does not cover its bare domain).
+ */
+export function domainCovers(pattern: string, domain: string): boolean {
+  const wanted = normalizeDomain(pattern);
+  const learned = normalizeDomain(domain);
+
+  if (wanted.startsWith("*.")) {
+    return learned.endsWith(wanted.slice(1));
+  }
+
+  return learned === wanted;
+}
+
+/**
+ * How many routes the connectors have learned for an app: the distinct addresses across every
+ * answer, counted once, for the domains the app covers. A connector serving several apps answers
+ * with everything it learned, so the answer is narrowed to the app before counting.
+ */
+export function learnedForApp(
+  domains: readonly string[],
+  answers: readonly Readonly<Record<string, string[] | null>>[],
+): number {
+  const addresses = new Set<string>();
+
+  for (const answer of answers) {
+    for (const [domain, learned] of Object.entries(answer)) {
+      if (domains.some((pattern) => domainCovers(pattern, domain))) {
+        for (const address of learned ?? []) {
+          addresses.add(address);
+        }
+      }
+    }
+  }
+
+  return addresses.size;
 }
 
 /** Total unapproved routes waiting across connector nodes. */

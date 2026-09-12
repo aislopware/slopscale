@@ -7,7 +7,7 @@ import type { ReactElement } from "react";
 import { errorMessage } from "~/api/error.ts";
 import { nodeAppConnectorRoutesQuery } from "~/api/queries.ts";
 import type { App, Node } from "~/api/queries.ts";
-import { appsForNode, learnedRoutes } from "~/components/apps/model.ts";
+import { appsForNode, learnedForApp, learnedRoutes } from "~/components/apps/model.ts";
 import type { LearnedRoute } from "~/components/apps/model.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper, useAppTable } from "~/components/table/app-table.tsx";
@@ -65,7 +65,7 @@ function AppsSection({
           description="The machine advertises the connector, but no app picks up its tags yet."
         />
       ) : (
-        served.map((app) => <AppRow key={app.id} app={app} nodeId={node.id} />)
+        served.map((app) => <AppRow key={app.id} app={app} node={node} />)
       )}
     </Section>
   );
@@ -210,10 +210,17 @@ function Addresses({ addresses }: { readonly addresses: readonly string[] }): Re
   return <span className="font-mono">{addresses.join(", ")}</span>;
 }
 
-function AppRow({ app, nodeId }: { readonly app: App; readonly nodeId: string }): ReactElement {
-  const here = app.nodes.find((node) => node.nodeId === nodeId);
-  const learned = here?.learnedRoutes ?? 0;
+/**
+ * One app the machine serves, with how many routes it learned for that app. The figure comes from
+ * the same question the Learned routes section asks the machine, narrowed to the app's domains: the
+ * server's own count is for the whole machine and would read the same on every row.
+ */
+function AppRow({ app, node }: { readonly app: App; readonly node: Node }): ReactElement {
+  const routes = useQuery({ ...nodeAppConnectorRoutesQuery(node.id), enabled: node.online });
+  const here = app.nodes.find((candidate) => candidate.nodeId === node.id);
   const pending = here?.pending ?? 0;
+  const learned =
+    routes.data === undefined ? null : learnedForApp(app.domains, [routes.data.domains]);
 
   return (
     <SectionRow className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5">
@@ -230,7 +237,10 @@ function AppRow({ app, nodeId }: { readonly app: App; readonly nodeId: string })
         )}
       </div>
       <span className="shrink-0 text-sm text-kumo-subtle">
-        {pending === 0 ? `${learned} learned` : `${learned} learned · ${pending} pending`}
+        {[
+          ...(learned === null ? [] : [`${learned} learned`]),
+          ...(pending === 0 ? [] : [`${pending} pending`]),
+        ].join(" · ")}
       </span>
     </SectionRow>
   );

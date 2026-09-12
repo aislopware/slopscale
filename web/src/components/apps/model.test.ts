@@ -11,16 +11,17 @@ import {
   connectorTagError,
   connectorsError,
   countApps,
+  domainCovers,
   domainsError,
   everyConnector,
   isAppDomain,
+  learnedForApp,
   learnedRoutes,
   machinesLabel,
   normalizeConnectorTag,
   normalizeDomain,
   pendingSearch,
   routesError,
-  totalLearnedRoutes,
   totalPendingRoutes,
 } from "~/components/apps/model.ts";
 import type { AppDraft } from "~/components/apps/model.ts";
@@ -41,11 +42,6 @@ describe("sums and counts", () => {
     { online: false, learnedRoutes: 3, pending: 0 },
     { online: true, learnedRoutes: 2, pending: 1 },
   ];
-
-  it("calculates total learned routes", () => {
-    expect(totalLearnedRoutes(nodes)).toBe(10);
-    expect(totalLearnedRoutes([])).toBe(0);
-  });
 
   it("calculates total pending routes", () => {
     expect(totalPendingRoutes(nodes)).toBe(3);
@@ -250,5 +246,41 @@ describe(learnedRoutes, () => {
 
   it("has nothing to show before the connector resolved anything", () => {
     expect(learnedRoutes({})).toStrictEqual([]);
+  });
+});
+
+describe(domainCovers, () => {
+  it("covers the domain itself, whatever its case or trailing dot", () => {
+    expect(domainCovers("crm.example.com", "CRM.example.com.")).toBe(true);
+    expect(domainCovers("crm.example.com", "api.crm.example.com")).toBe(false);
+  });
+
+  it("covers every name under a wildcard, not the bare domain", () => {
+    expect(domainCovers("*.example.com", "crm.example.com")).toBe(true);
+    expect(domainCovers("*.example.com", "api.crm.example.com")).toBe(true);
+    expect(domainCovers("*.example.com", "example.com")).toBe(false);
+    expect(domainCovers("*.example.com", "notexample.com")).toBe(false);
+  });
+});
+
+describe(learnedForApp, () => {
+  const answer = {
+    "crm.example.com": ["1.2.3.4", "1.2.3.5"],
+    "wiki.example.com": ["1.2.3.4", "9.9.9.9"],
+    "api.crm.example.com": null,
+  };
+
+  it("counts only the addresses learned for the app's own domains", () => {
+    expect(learnedForApp(["crm.example.com"], [answer])).toBe(2);
+    expect(learnedForApp(["wiki.example.com"], [answer])).toBe(2);
+  });
+
+  it("counts an address once across domains and connectors", () => {
+    expect(learnedForApp(["*.example.com"], [answer, answer])).toBe(3);
+  });
+
+  it("has nothing for an app no connector answered for", () => {
+    expect(learnedForApp(["crm.example.com"], [])).toBe(0);
+    expect(learnedForApp(["other.example.net"], [answer])).toBe(0);
   });
 });

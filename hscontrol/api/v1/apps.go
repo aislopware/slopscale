@@ -44,8 +44,9 @@ type AppNode struct {
 	// (tailscale set --advertise-connector).
 	Connector bool `doc:"true while the client reports running the connector service." json:"connector"`
 	// LearnedRoutes counts the single-address routes the node advertises,
-	// which is what a connector learns from the app's domains; Pending
-	// counts those an operator has not approved and the app does not cover.
+	// for every app it serves: only the node itself knows which address
+	// belongs to which domain (GET /node/{id}/app-connector-routes asks
+	// it). Pending counts the advertised routes nobody has approved yet.
 	LearnedRoutes int `doc:"Single-address routes the node advertises."   json:"learnedRoutes"`
 	Pending       int `doc:"Advertised routes that are not approved yet." json:"pending"`
 }

@@ -1,15 +1,15 @@
 import { Popover } from "@cloudflare/kumo/components/popover";
 import { Link } from "@tanstack/react-router";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import type { App, AppNode } from "~/api/queries.ts";
 import { AppMenu } from "~/components/apps/app-menu.tsx";
+import type { LearnedCount } from "~/components/apps/learned.ts";
 import {
   connectorMachineCounts,
   everyConnector,
   machinesLabel,
   pendingSearch,
-  totalLearnedRoutes,
   totalPendingRoutes,
 } from "~/components/apps/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
@@ -17,7 +17,10 @@ import { DomainList } from "~/components/ui/domain.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { TagList } from "~/components/ui/tag.tsx";
 
-const helper = createAppColumnHelper<App>();
+/** An app with what its connectors have learned for it, asked of the machines themselves. */
+export type AppRow = App & { readonly learned: LearnedCount | null };
+
+const helper = createAppColumnHelper<AppRow>();
 
 /** How many values a cell shows before the rest become "+N more". */
 const maxValues = 2;
@@ -54,12 +57,12 @@ export const appColumns = helper.columns([
     cell: ({ row }) => <MachinesCell app={row.original} />,
     meta: { className: "hidden align-top whitespace-nowrap lg:table-cell" },
   }),
-  helper.accessor((app) => totalLearnedRoutes(app.nodes), {
+  helper.accessor((app) => app.learned?.count ?? 0, {
     id: "learned",
     header: "Learned routes",
     enableSorting: true,
     enableGlobalFilter: false,
-    cell: ({ getValue }) => <span className="text-kumo-subtle">{getValue()}</span>,
+    cell: ({ row }) => <LearnedCell learned={row.original.learned} />,
     // The whole row fits a 1280px screen without Learned routes, and xl starts at 1280.
     meta: { className: "hidden align-top 2xl:table-cell", numeric: true },
   }),
@@ -152,6 +155,53 @@ function MachineRow({ node }: { readonly node: AppNode }): ReactElement {
         <span className="text-xs text-kumo-subtle">Not running the connector</span>
       )}
     </li>
+  );
+}
+
+/**
+ * How many routes the app's connectors learned for it, or why there is no figure: the caller cannot
+ * ask machines, none of the app's connectors is connected, or none has answered yet. A figure from
+ * some of several connectors says so, since the rest may know more.
+ */
+function LearnedCell({ learned }: { readonly learned: LearnedCount | null }): ReactElement {
+  if (learned === null) {
+    return <Muted title="Asking the connectors needs devices:core:read.">{"\u2014"}</Muted>;
+  }
+
+  if (learned.connected === 0) {
+    return <Muted title="No connector is connected to ask.">{"\u2014"}</Muted>;
+  }
+
+  if (learned.answered === 0) {
+    return <Muted title="Asking the connectors\u2026">{"\u2026"}</Muted>;
+  }
+
+  const partial = learned.answered < learned.connected;
+
+  return (
+    <Muted
+      title={
+        partial
+          ? `From ${learned.answered} of ${learned.connected} connected connectors.`
+          : undefined
+      }
+    >
+      {partial ? `${learned.count}+` : learned.count}
+    </Muted>
+  );
+}
+
+function Muted({
+  title,
+  children,
+}: {
+  readonly title?: string | undefined;
+  readonly children: ReactNode;
+}): ReactElement {
+  return (
+    <span className="text-kumo-subtle" {...(title === undefined ? {} : { title })}>
+      {children}
+    </span>
   );
 }
 
