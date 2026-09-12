@@ -165,9 +165,14 @@ function RecordForm({
   );
   const [touched, setTouched] = useState(false);
 
+  // A failure from the last form must not greet this one. Only `reset` goes in the dependencies:
+  // the mutation object is rebuilt on every render and `reset` itself notifies, so depending on
+  // the whole object ran the effect after every render it caused, without end.
+  const { reset } = mutations.set;
+
   useEffect(() => {
-    mutations.set.reset();
-  }, [mutations.set]);
+    reset();
+  }, [reset]);
   const issue = recordError(record);
   const placeholderName =
     dns.baseDomain === "" ? "grafana.example.com" : `grafana.${dns.baseDomain}`;
