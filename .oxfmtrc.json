@@ -2,6 +2,7 @@
   "$schema": "./web/node_modules/oxfmt/configuration_schema.json",
   "printWidth": 80,
   "ignorePatterns": [
+    "CHANGELOG.md",
     "gen",
     "docs",
     "web",
