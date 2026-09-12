@@ -88,6 +88,16 @@
   button[data-kumo-component="Button"]:disabled {
     filter: grayscale(1);
   }
+
+  /*
+   * Kumo's text input keeps the browser's intrinsic width (twenty characters, about 178px) as its
+   * minimum, so in a grid column narrower than that, the Value field of a two-column form in a
+   * 384px dialog, it ran past the panel's edge. A field's width is its column's, never its own.
+   */
+  input.kumo-input-placeholder,
+  textarea.kumo-input-placeholder {
+    min-width: 0;
+  }
 }
 
 /*
