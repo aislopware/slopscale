@@ -3,6 +3,7 @@ module github.com/aislopware/slopscale
 go 1.27.1
 
 require (
+	codeberg.org/miekg/dns v0.6.109
 	github.com/arl/statsviz v0.8.2
 	github.com/cenkalti/backoff/v7 v7.0.0
 	github.com/chasefleming/elem-go v0.36.0
@@ -22,7 +23,6 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/mattn/go-sqlite3 v1.14.52
-	github.com/miekg/dns v1.1.73
 	github.com/moby/moby/api v1.56.0
 	github.com/moby/moby/client v0.6.0
 	github.com/oapi-codegen/runtime v1.7.0
@@ -139,6 +139,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.30 // indirect
 	github.com/mdlayher/netlink v1.11.2 // indirect
 	github.com/mdlayher/socket v0.7.0 // indirect
+	github.com/miekg/dns v1.1.73 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/user v0.4.1 // indirect
