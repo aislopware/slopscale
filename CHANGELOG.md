@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [0.41.0](https://github.com/aislopware/slopscale/compare/v0.40.0...v0.41.0) (2026-09-12)
+
+
+### Changes
+
+* **web:** blend two hues in a person's avatar and draw Tux for Linux ([4b1a6e4](https://github.com/aislopware/slopscale/commit/4b1a6e4272e5f9377aa86f4fe54b9dad64aec607))
+* **web:** draw the access map as a heatmap with tiles up to eight groups and squares beyond ([0547ab6](https://github.com/aislopware/slopscale/commit/0547ab6a0a34ed44667c072a3c89a296612d9bad))
+* **web:** hand out join commands with --accept-routes ([a3a4104](https://github.com/aislopware/slopscale/commit/a3a4104be92be66e8a279fad853f7d5c65dad49a))
+* **web:** lead a domain token with its registered site and key the family by hue ([f065ff0](https://github.com/aislopware/slopscale/commit/f065ff02ade1a2e1460a5440cc6b70d8ea87ac1c))
+* **web:** meter the connected and approved shares on the overview and show owners and OS marks ([29ee1b7](https://github.com/aislopware/slopscale/commit/29ee1b7ff98b116aa870cd047470727b9220e1c8))
+* **web:** move console sign-ins under Access and drop the Administration group ([115d7db](https://github.com/aislopware/slopscale/commit/115d7db873e8a86a71c8bac1efafea8eb8125e5d))
+* **web:** run a progress line while a page loads and retry a dropped connection once ([a2132f1](https://github.com/aislopware/slopscale/commit/a2132f1bfe967b2afbf6e16cc01902f7b9a9ccb5))
+
+
+### Fixes
+
+* **web:** accept the tailscale.com capabilities the server allows in the policy lint ([173b9af](https://github.com/aislopware/slopscale/commit/173b9af4612dc5541a5b0fe70318d37b3d4ac168))
+
+
+### Dependencies
+
+* update the toolchain, drop dead modules for the standard library and maintained forks ([#8](https://github.com/aislopware/slopscale/issues/8)) ([c5353e6](https://github.com/aislopware/slopscale/commit/c5353e6d01be78c3f61bca01814c725a94428d49))
+
 ## 0.40.0 (2026-09-11)
 
 ### Changes
