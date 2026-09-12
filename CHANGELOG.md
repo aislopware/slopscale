@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.41.2](https://github.com/aislopware/slopscale/compare/v0.41.1...v0.41.2) (2026-09-12)
+
+
+### Fixes
+
+* **web:** space a tailnet's people over the whole colour wheel ([a92fdba](https://github.com/aislopware/slopscale/commit/a92fdba0d4606199feda74061be5cedf1ef20c91))
+
 ## [0.41.1](https://github.com/aislopware/slopscale/compare/v0.41.0...v0.41.1) (2026-09-12)
 
 
