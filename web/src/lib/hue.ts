@@ -73,6 +73,28 @@ export function hueColours(hue: number): {
   };
 }
 
+/**
+ * The golden angle: each step round the circle lands as far from every earlier step as any sequence
+ * can, so ids 1, 2, 3… are 137° apart and never bunch the way hashed names do in a small team
+ * (seven people, four of them green).
+ */
+const goldenAngle = 137.508;
+
+/** True when the id is the server's integer id, the only kind the golden angle may be applied to. */
+const integerId = /^\d+$/u;
+
+/**
+ * The base hue of a mark: spaced by the golden angle from the integer id when there is one, so the
+ * few people on a tailnet are as far apart as they can be; hashed from the seed otherwise.
+ */
+export function baseHue(seed: string, id?: string): number {
+  if (id !== undefined && integerId.test(id)) {
+    return Math.round((Number(id) * goldenAngle) % hueSteps);
+  }
+
+  return hueOf(seed);
+}
+
 /** The least and the most a companion hue sits from the first, in degrees. */
 const spreadMin = 40;
 const spreadRange = 60;
@@ -87,24 +109,28 @@ const angleBits = 65_536;
  * A second hue for the same seed, 40° to 100° round the circle from the first, so the pair is
  * analogous: close enough to blend into one colour and far enough to move across the mark.
  */
-function companionHue(seed: string): number {
+function companionHue(seed: string, first: number): number {
   const spread = spreadMin + (Math.floor(hashOf(seed) / spreadBits) % spreadRange);
 
-  return (hueOf(seed) + spread) % hueSteps;
+  return (first + spread) % hueSteps;
 }
 
 /**
- * Two of the seed's hues blended across a mark at an angle the seed picks, so every person's avatar
- * is its own colour field instead of one of twelve flat tints. The mark is richer than a tag chip
- * (the tags' quiet band left every blue and every green the same pale wash at 24px, so most of a
- * team looked alike), while the ink keeps the same contrast on both themes.
+ * Two hues blended across a mark at an angle the seed picks, so every person's avatar is its own
+ * colour field instead of one of twelve flat tints. The base hue comes from the id when there is
+ * one (see `baseHue`), the companion and the angle from the name. The mark is richer than a tag
+ * chip (the tags' quiet band left every blue and every green the same pale wash at 24px, so most of
+ * a team looked alike), while the ink keeps the same contrast on both themes.
  */
-export function seededGradient(seed: string): {
+export function seededGradient(
+  seed: string,
+  id?: string,
+): {
   readonly backgroundImage: string;
   readonly color: string;
 } {
-  const first = hueOf(seed);
-  const second = companionHue(seed);
+  const first = baseHue(seed, id);
+  const second = companionHue(seed, first);
   const angle = angleMin + (Math.floor(hashOf(seed) / angleBits) % angleRange);
 
   return {

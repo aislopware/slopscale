@@ -39,7 +39,11 @@ function ActivityRow({ node }: { readonly node: Node }): ReactElement {
       params={{ nodeId: node.id }}
       className="group flex items-center gap-3 px-5 py-2.5 text-kumo-default no-underline not-first:border-t not-first:border-kumo-hairline hover:bg-kumo-tint"
     >
-      {isTagged(node) ? <Avatar name={owner} icon={TagIcon} /> : <Avatar name={owner} />}
+      {isTagged(node) ? (
+        <Avatar name={owner} icon={TagIcon} />
+      ) : (
+        <Avatar name={owner} id={node.user.id} />
+      )}
       <span className="flex min-w-0 items-center gap-1.5">
         <OsMark os={node.os} version={node.osVersion} />
         <span className="min-w-0 truncate font-medium text-kumo-default group-hover:text-kumo-link group-hover:underline group-focus-visible:underline">

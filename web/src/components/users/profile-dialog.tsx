@@ -128,6 +128,7 @@ function EditProfileForm({
       <PicturePreview
         url={pictureError === undefined ? pictureUrl.trim() : ""}
         name={userLabel(user)}
+        id={user.id}
       />
       <DialogError message={update.isError ? errorMessage(update.error) : undefined} />
       <DialogFooter>
@@ -168,9 +169,11 @@ function pictureUrlError(url: string): string | undefined {
 function PicturePreview({
   url,
   name,
+  id,
 }: {
   readonly url: string;
   readonly name: string;
+  readonly id: string;
 }): ReactElement | null {
   const [failed, setFailed] = useState<string | null>(null);
 
@@ -182,7 +185,7 @@ function PicturePreview({
     <div className="flex items-center gap-3 text-sm text-kumo-subtle">
       {failed === url ? (
         <>
-          <Avatar name={name} size="lg" />
+          <Avatar name={name} id={id} size="lg" />
           <span>Did not load from this browser. It may still load from the clients.</span>
         </>
       ) : (

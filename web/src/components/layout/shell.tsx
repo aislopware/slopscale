@@ -337,14 +337,14 @@ function AccountMenu({ me }: { readonly me: Me }): ReactElement {
             title={name}
             className="flex cursor-pointer items-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-kumo-brand"
           >
-            <Avatar name={name} size="lg" />
+            <Avatar name={name} id={me.user?.id ?? ""} size="lg" />
           </button>
         }
       />
       <DropdownMenu.Content align="end" className="min-w-56">
         <DropdownMenu.Group>
           <DropdownMenu.Label className="flex items-center gap-2">
-            <Avatar name={name} size="lg" />
+            <Avatar name={name} id={me.user?.id ?? ""} size="lg" />
             <span className="flex min-w-0 flex-col gap-0.5">
               <span className="truncate font-medium text-kumo-default">{name}</span>
               <span className="flex min-w-0 items-center gap-1.5 text-xs text-kumo-subtle">

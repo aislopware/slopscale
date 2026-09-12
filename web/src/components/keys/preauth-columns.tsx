@@ -48,7 +48,7 @@ export const preAuthKeyColumns = helper.columns([
     id: "user",
     header: "User",
     enableSorting: true,
-    cell: ({ row }) => <UserCell name={userLabel(row.original.user)} />,
+    cell: ({ row }) => <UserCell name={userLabel(row.original.user)} id={row.original.user.id} />,
     meta: { className: "hidden min-w-36 sm:table-cell" },
   }),
   // A column of its own for tags was empty on most rows, so they ride along in this cell; the
@@ -117,10 +117,10 @@ function KeyCell({ authKey }: { readonly authKey: PreAuthKey }): ReactElement {
   );
 }
 
-function UserCell({ name }: { readonly name: string }): ReactElement {
+function UserCell({ name, id }: { readonly name: string; readonly id: string }): ReactElement {
   return (
     <span className="flex max-w-48 min-w-0 items-center gap-2" title={name}>
-      <Avatar name={name} size="sm" />
+      <Avatar name={name} id={id} size="sm" />
       <span className="truncate text-kumo-default">{name}</span>
     </span>
   );

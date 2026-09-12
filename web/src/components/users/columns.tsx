@@ -109,7 +109,7 @@ function NameCell({ user }: { readonly user: User }): ReactElement {
 
   return (
     <div className="flex max-w-80 items-center gap-2.5" title={title}>
-      <Avatar name={label} size="lg" />
+      <Avatar name={label} id={user.id} size="lg" />
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate font-medium text-kumo-default">{label}</span>
         {parts.length === 0 ? null : (

@@ -125,7 +125,12 @@ export function ActorCell({ event }: { readonly event: AuditEvent }): ReactEleme
   return (
     <div className="flex min-w-0 items-start gap-2">
       <span className="flex h-lh items-center">
-        <Avatar name={name} size="sm" {...(icon === undefined ? {} : { icon })} />
+        <Avatar
+          name={name}
+          id={event.actorUserId}
+          size="sm"
+          {...(icon === undefined ? {} : { icon })}
+        />
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="truncate text-kumo-default">{name}</span>

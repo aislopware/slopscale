@@ -121,7 +121,7 @@ function UserCell({
 
   return (
     <span className="flex min-w-0 items-center gap-2">
-      <Avatar name={name} size="sm" />
+      <Avatar name={name} id={userId} size="sm" />
       <span className="truncate text-kumo-default">{name}</span>
     </span>
   );
