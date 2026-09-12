@@ -6,7 +6,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/spf13/viper"
+	"github.com/aislopware/slopscale/hscontrol/conf"
 	"tailscale.com/tailcfg"
 )
 
@@ -72,8 +72,8 @@ func (c *Config) DialPlan() *tailcfg.ControlDialPlan {
 
 func clientUpdatesConfig() (ClientUpdatesConfig, error) {
 	cfg := ClientUpdatesConfig{
-		Check:    viper.GetBool("client_updates.check"),
-		Interval: viper.GetDuration("client_updates.interval"),
+		Check:    conf.GetBool("client_updates.check"),
+		Interval: conf.GetDuration("client_updates.interval"),
 	}
 
 	err := cfg.Validate()
@@ -89,7 +89,7 @@ func clientUpdatesConfig() (ClientUpdatesConfig, error) {
 var ErrControlDialPlanAddrInvalid = errors.New("control_dial_plan entries must be IP addresses")
 
 func controlDialPlanConfig() ([]netip.Addr, error) {
-	raw := viper.GetStringSlice("control_dial_plan")
+	raw := conf.GetStringSlice("control_dial_plan")
 	addrs := make([]netip.Addr, 0, len(raw))
 
 	for _, s := range raw {

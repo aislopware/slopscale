@@ -11,15 +11,15 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/conf"
 	"github.com/pterm/pterm"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // The command tests in this package drive the real RunE closures against a
-// fake API. The CLI resolves its endpoint through viper (cli.address,
+// fake API. The CLI resolves its endpoint through the conf store (cli.address,
 // cli.api_key) and prints through os.Stdout and pterm's default writer, all
 // process-wide, so those tests run serially and never call t.Parallel. Tests
 // of pure functions do.
@@ -49,17 +49,17 @@ func serveAPI(t *testing.T, routes map[string]apiHandler) {
 	pointCLIAt(t, server.URL)
 }
 
-// pointCLIAt sets the viper keys newSlopscaleCLIWithConfig and newV2Client
+// pointCLIAt sets the conf keys newSlopscaleCLIWithConfig and newV2Client
 // read, so clientRunE and withClient build a remote client for baseURL. The
 // keys already exist for operators, which keeps production free of test hooks.
 func pointCLIAt(t *testing.T, baseURL string) {
 	t.Helper()
 
-	viper.Set("cli.address", baseURL)
-	viper.Set("cli.api_key", testAPIKey)
-	viper.Set("cli.timeout", "5s")
-	viper.Set("cli.insecure", false)
-	t.Cleanup(viper.Reset)
+	conf.Set("cli.address", baseURL)
+	conf.Set("cli.api_key", testAPIKey)
+	conf.Set("cli.timeout", "5s")
+	conf.Set("cli.insecure", false)
+	t.Cleanup(conf.Reset)
 }
 
 // serveAPIOnSocket is serveAPI over a unix socket, exercising the local-trust
@@ -88,10 +88,10 @@ func serveAPIOnSocket(t *testing.T, routes map[string]apiHandler) {
 	server.Start()
 	t.Cleanup(server.Close)
 
-	viper.Set("cli.address", "")
-	viper.Set("cli.timeout", "5s")
-	viper.Set("unix_socket", socketPath)
-	t.Cleanup(viper.Reset)
+	conf.Set("cli.address", "")
+	conf.Set("cli.timeout", "5s")
+	conf.Set("unix_socket", socketPath)
+	t.Cleanup(conf.Reset)
 }
 
 // newTestCommand wraps src's RunE in a fresh cobra command so tests never

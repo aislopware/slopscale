@@ -8,8 +8,8 @@ import (
 
 	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
 	clientv2 "github.com/aislopware/slopscale/gen/client/v2"
+	"github.com/aislopware/slopscale/hscontrol/conf"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -364,7 +364,7 @@ func TestNewV2ClientTransports(t *testing.T) {
 
 	t.Run("remote address without an api key is rejected", func(t *testing.T) {
 		pointCLIAt(t, "https://slopscale.example.com")
-		viper.Set("cli.api_key", "")
+		conf.Set("cli.api_key", "")
 
 		_, _, _, err := newV2Client()
 		require.ErrorIs(t, err, errAPIKeyNotSet)
@@ -390,7 +390,7 @@ func TestNewV2ClientTransports(t *testing.T) {
 		t.Cleanup(server.Close)
 
 		pointCLIAt(t, server.URL)
-		viper.Set("cli.insecure", true)
+		conf.Set("cli.insecure", true)
 
 		cmd := newTestCommand(t, listOAuthClientsCmd, oauthFlags, map[string]string{"output": "json-line"})
 

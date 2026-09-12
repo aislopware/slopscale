@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/spf13/viper"
+	"github.com/aislopware/slopscale/hscontrol/conf"
 )
 
 const (
@@ -28,7 +28,7 @@ func AbsolutePathFromConfigPath(path string) string {
 	// If a relative path is provided, prefix it with the directory where
 	// the config file was found.
 	if (path != "") && !strings.HasPrefix(path, string(os.PathSeparator)) {
-		dir, _ := filepath.Split(viper.ConfigFileUsed())
+		dir, _ := filepath.Split(conf.ConfigFileUsed())
 		if dir != "" {
 			path = filepath.Join(dir, path)
 		}
@@ -38,7 +38,7 @@ func AbsolutePathFromConfigPath(path string) string {
 }
 
 func GetFileMode(key string) fs.FileMode {
-	modeStr := viper.GetString(key)
+	modeStr := conf.GetString(key)
 
 	mode, err := strconv.ParseUint(modeStr, Base8, BitSize32)
 	if err != nil {
