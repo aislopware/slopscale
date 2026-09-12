@@ -40,7 +40,7 @@
     "@tanstack/react-query": "5.102.8",
     "@tanstack/react-router": "1.170.35",
     "@tanstack/react-table": "9.2.4",
-    "@tanstack/react-virtual": "3.14.11",
+    "@tanstack/react-virtual": "3.14.12",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "codemirror": "6.0.2",

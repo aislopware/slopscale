@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/integration/dockertestutil"
-	"github.com/cenkalti/backoff/v5"
+	"github.com/cenkalti/backoff/v7"
 	cerrdefs "github.com/containerd/errdefs"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"

@@ -40,7 +40,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
 	"github.com/aislopware/slopscale/web"
-	"github.com/cenkalti/backoff/v5"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/metrics"

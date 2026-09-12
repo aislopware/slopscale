@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/hscontrol/types"
-	"github.com/cenkalti/backoff/v5"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/fsnotify/fsnotify"
 	"github.com/rs/zerolog/log"
 	"tailscale.com/tailcfg"

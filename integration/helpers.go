@@ -20,7 +20,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/aislopware/slopscale/integration/integrationutil"
 	"github.com/aislopware/slopscale/integration/tsic"
-	"github.com/cenkalti/backoff/v5"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/google/go-cmp/cmp"
 	"github.com/oauth2-proxy/mockoidc"
 	"github.com/stretchr/testify/assert"

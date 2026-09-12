@@ -22,7 +22,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/aislopware/slopscale/integration/integrationutil"
-	"github.com/cenkalti/backoff/v5"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"tailscale.com/ipn"

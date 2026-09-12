@@ -4,7 +4,7 @@ go 1.27.1
 
 require (
 	github.com/arl/statsviz v0.8.2
-	github.com/cenkalti/backoff/v5 v5.0.3
+	github.com/cenkalti/backoff/v7 v7.0.0
 	github.com/chasefleming/elem-go v0.36.0
 	github.com/coder/websocket v1.8.15
 	github.com/containerd/errdefs v1.0.0
@@ -33,11 +33,12 @@ require (
 	github.com/prometheus/common v0.71.0
 	github.com/pterm/pterm v0.12.83
 	github.com/puzpuzpuz/xsync/v4 v4.5.0
-	github.com/realclientip/realclientip-go v1.0.0
+	github.com/realclientip/realclientip-go v1.0.1-0.20260615104152-545b12e0e8c7
 	github.com/rs/zerolog v1.35.1
 	github.com/samber/lo v1.53.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
+	github.com/stapelberg/postgrestest v0.0.0-20260719202844-86e9de46c66d
 	github.com/stretchr/testify v1.12.1
 	github.com/tailscale/hujson v0.0.0-20260727124030-b80ff77dac4f
 	github.com/tailscale/squibble v0.0.0-20260831233316-9a4c8961e6f5
@@ -52,7 +53,6 @@ require (
 	pgregory.net/rapid v1.3.0
 	tailscale.com v1.103.0-pre.0.20260911203917-e2ed432399c9
 	tailscale.com/client/tailscale/v2 v2.10.1
-	zombiezen.com/go/postgrestest v1.0.1
 )
 
 require (

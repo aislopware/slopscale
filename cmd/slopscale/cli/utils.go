@@ -18,7 +18,7 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
-	"github.com/cenkalti/backoff/v5"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/prometheus/common/model"
 	"github.com/pterm/pterm"
 	"github.com/rs/zerolog/log"
