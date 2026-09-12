@@ -3,12 +3,10 @@ package hsic
 import "github.com/aislopware/slopscale/hscontrol/types"
 
 func MinimumConfigYAML() string {
-	// derp.urls has to be emptied here rather than through the environment.
-	// It defaults to Tailscale's public map, and viper reads an empty
-	// environment variable as unset and falls back to that default, so
-	// SLOPSCALE_DERP_URLS="" quietly published 28 public regions next to the
-	// embedded one and clients picked whichever relay was nearest to the
-	// runner. [WithPublicDERP] sets the variable, which still wins over this.
+	// derp.urls defaults to Tailscale's public map, which would publish 28
+	// public regions next to the embedded one and let clients pick whichever
+	// relay is nearest to the runner. The file empties it; [WithPublicDERP]
+	// sets the variable, which still wins over this.
 	return `
 private_key_path: /tmp/private.key
 noise:
