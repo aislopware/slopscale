@@ -17,6 +17,22 @@ describe(hueOf, () => {
     }
   });
 
+  // The names people tell apart the least must not get the marks that differ the least: a
+  // one-character change moves the hue as far as an unrelated name would.
+  it("moves a near-identical name across the wheel", () => {
+    const pairs = [
+      ["Cong Tran", "Cong Tram"],
+      ["Nguyen Van A", "Nguyen Van B"],
+      ["hieu", "hieu2"],
+    ] as const;
+
+    for (const [one, other] of pairs) {
+      const apart = Math.abs(hueOf(one) - hueOf(other));
+
+      expect(Math.min(apart, 360 - apart)).toBeGreaterThanOrEqual(10);
+    }
+  });
+
   it("snaps to the palette's steps when asked, so two different hues are far apart", () => {
     const hues = ["tag:web", "tag:ci", "tag:prod", "tag:db", "tag:office"].map((tag) =>
       hueOf(tag, 12),

@@ -1,17 +1,42 @@
 const hueSteps = 360;
-const hashMultiplier = 31;
-/** Keeps the running hash inside the range multiplication is exact in. */
-const hashModulus = 4_294_967_296;
+/**
+ * FNV-1a's 32-bit offset basis (0x811C9DC5) and prime (0x01000193), in decimal because oxfmt and
+ * oxlint disagree on hex case.
+ */
+const fnvOffset = 2_166_136_261;
+const fnvPrime = 16_777_619;
+/**
+ * MurmurHash3's 32-bit finaliser: shifts and multipliers that spread every input bit to every
+ * output bit.
+ */
+const mixShiftOuter = 16;
+const mixShiftInner = 13;
+const mixMultiplierFirst = 2_246_822_507; // 0x85EBCA6B
+const mixMultiplierSecond = 3_266_489_909; // 0xC2B2AE35
 
+/**
+ * FNV-1a over the seed's code points, then MurmurHash3's finaliser, so a one-character change moves
+ * every bit of the hash. A plain polynomial hash moved the hue by the difference of the last
+ * character alone: "Cong Tran" and "Cong Tram" were one degree apart, and the names people tell
+ * apart the least got the marks that differed the least.
+ */
+/* eslint-disable no-bitwise -- a hash is arithmetic on bits; the operators are the point. */
 function hashOf(seed: string): number {
-  let hash = 0;
+  let hash = fnvOffset;
 
   for (const char of seed) {
-    hash = (hash * hashMultiplier + (char.codePointAt(0) ?? 0)) % hashModulus;
+    hash = Math.imul(hash ^ (char.codePointAt(0) ?? 0), fnvPrime) >>> 0;
   }
 
-  return hash;
+  hash ^= hash >>> mixShiftOuter;
+  hash = Math.imul(hash, mixMultiplierFirst) >>> 0;
+  hash ^= hash >>> mixShiftInner;
+  hash = Math.imul(hash, mixMultiplierSecond) >>> 0;
+  hash ^= hash >>> mixShiftOuter;
+
+  return hash >>> 0;
 }
+/* eslint-enable no-bitwise */
 
 /**
  * A hash of the seed onto the hue circle: the same seed is the same hue on every page and visit.
@@ -70,8 +95,9 @@ function companionHue(seed: string): number {
 
 /**
  * Two of the seed's hues blended across a mark at an angle the seed picks, so every person's avatar
- * is its own colour field instead of one of twelve flat tints, while the lightness stays the quiet
- * band of the tags and the ink keeps the same contrast on both themes.
+ * is its own colour field instead of one of twelve flat tints. The mark is richer than a tag chip
+ * (the tags' quiet band left every blue and every green the same pale wash at 24px, so most of a
+ * team looked alike), while the ink keeps the same contrast on both themes.
  */
 export function seededGradient(seed: string): {
   readonly backgroundImage: string;
@@ -82,7 +108,7 @@ export function seededGradient(seed: string): {
   const angle = angleMin + (Math.floor(hashOf(seed) / angleBits) % angleRange);
 
   return {
-    backgroundImage: `linear-gradient(${angle}deg, light-dark(oklch(0.9 0.07 ${first}), oklch(0.36 0.08 ${first})), light-dark(oklch(0.82 0.1 ${second}), oklch(0.28 0.08 ${second})))`,
-    color: `light-dark(oklch(0.34 0.11 ${first}), oklch(0.9 0.06 ${first}))`,
+    backgroundImage: `linear-gradient(${angle}deg, light-dark(oklch(0.84 0.11 ${first}), oklch(0.42 0.11 ${first})), light-dark(oklch(0.72 0.15 ${second}), oklch(0.32 0.11 ${second})))`,
+    color: `light-dark(oklch(0.3 0.12 ${first}), oklch(0.92 0.06 ${first}))`,
   };
 }
