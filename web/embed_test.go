@@ -1,6 +1,8 @@
 package web
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -95,6 +97,45 @@ func TestHandlerServesConsole(t *testing.T) {
 	missing := serve(t, http.MethodGet, "/console/assets/nope.js")
 	assert.Equal(t, http.StatusOK, missing.Code, "unknown asset paths fall back to the SPA entry")
 	assert.NotEqual(t, cacheForever, missing.Header().Get("Cache-Control"))
+}
+
+// TestHandlerAdmitsInlineScriptByHash checks the policy carries the hash of
+// the colour-mode script in the served page, so the browser runs it before
+// the first paint instead of blocking it.
+func TestHandlerAdmitsInlineScriptByHash(t *testing.T) {
+	t.Parallel()
+
+	if !Built() {
+		t.Skip("console not built")
+	}
+
+	index := serve(t, http.MethodGet, "/console/")
+	require.Equal(t, http.StatusOK, index.Code)
+
+	scripts := inlineScripts(index.Body.String())
+	require.Len(t, scripts, 1, "index.html carries exactly the colour-mode script inline")
+	assert.Contains(t, scripts[0], "prefers-color-scheme")
+
+	sum := sha256.Sum256([]byte(scripts[0]))
+	want := "'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"
+
+	_, directives, found := strings.Cut(index.Header().Get("Content-Security-Policy"), "script-src")
+	require.True(t, found)
+
+	directive, _, _ := strings.Cut(directives, ";")
+	assert.Equal(t, " 'self' 'wasm-unsafe-eval' "+want, directive)
+}
+
+func TestInlineScriptsSkipExternal(t *testing.T) {
+	t.Parallel()
+
+	page := `<head><script>a()</script><script src="/x.js"></script><script>
+b()
+</script></head>`
+
+	assert.Equal(t, []string{"a()", "\nb()\n"}, inlineScripts(page))
+	assert.Empty(t, inlineScripts(`<script src="/x.js"></script>`))
+	assert.Empty(t, inlineScripts(`<script>unterminated`))
 }
 
 func TestRootHandlerSendsToConsole(t *testing.T) {

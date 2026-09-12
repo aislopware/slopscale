@@ -9,8 +9,11 @@ package web
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"embed"
+	"encoding/base64"
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"path"
@@ -51,7 +54,10 @@ const cacheForever = "public, max-age=31536000, immutable"
 // origin except for wss:, which the in-browser client needs to reach the
 // tailnet's relays; which relays is the DERP map's call, so the policy
 // admits any secure websocket rather than a list that would go stale.
-const contentSecurityPolicy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; " +
+// The entry page carries an inline script that sets the colour mode before
+// the first paint; scriptSources adds its hash so the policy admits it and
+// nothing else inline.
+const contentSecurityPolicy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'%s; " +
 	"style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; " +
 	"connect-src 'self' wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 
@@ -113,6 +119,7 @@ func Handler(serverURL string) http.Handler {
 
 	files := http.FileServerFS(sub)
 	built := Built()
+	policy := fmt.Sprintf(contentSecurityPolicy, scriptSources(sub))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
@@ -122,7 +129,7 @@ func Handler(serverURL string) http.Handler {
 			return
 		}
 
-		w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
+		w.Header().Set("Content-Security-Policy", policy)
 
 		rel, ok := strings.CutPrefix(r.URL.Path, Prefix)
 		if !ok {
@@ -176,6 +183,54 @@ func Handler(serverURL string) http.Handler {
 		r2.URL.Path = "/" + rel
 		files.ServeHTTP(w, r2)
 	})
+}
+
+// scriptSources returns a CSP source expression, with a leading space, for
+// every inline script in the entry page: the SHA-256 of the text between the
+// tags, which is what a browser checks. Vite leaves a classic inline script
+// untouched, so the hash of the embedded page is the hash of the served one;
+// serveIndex's placeholder is outside the script. An unbuilt bundle has no
+// page and adds nothing.
+func scriptSources(sub fs.FS) string {
+	index, err := fs.ReadFile(sub, indexFile)
+	if err != nil {
+		return ""
+	}
+
+	var sources strings.Builder
+
+	for _, script := range inlineScripts(string(index)) {
+		sum := sha256.Sum256([]byte(script))
+
+		sources.WriteString(" 'sha256-")
+		sources.WriteString(base64.StdEncoding.EncodeToString(sum[:]))
+		sources.WriteString("'")
+	}
+
+	return sources.String()
+}
+
+// inlineScripts returns the body of every attribute-less <script> element in
+// the page, in order. External scripts carry src and are covered by 'self'.
+func inlineScripts(page string) []string {
+	const open, closing = "<script>", "</script>"
+
+	var scripts []string
+
+	for {
+		_, rest, found := strings.Cut(page, open)
+		if !found {
+			return scripts
+		}
+
+		body, after, found := strings.Cut(rest, closing)
+		if !found {
+			return scripts
+		}
+
+		scripts = append(scripts, body)
+		page = after
+	}
 }
 
 // isHashedTsconnect reports whether the path is a hashed file of the
