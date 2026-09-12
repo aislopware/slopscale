@@ -10,6 +10,7 @@ import (
 	"time"
 
 	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/hscontrol/mockoidc"
 	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/integration/hsic"
@@ -17,7 +18,6 @@ import (
 	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/oauth2-proxy/mockoidc"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -28,13 +28,13 @@ import (
 func TestOIDCAuthenticationPingAll(t *testing.T) {
 	IntegrationSkip(t)
 
-	// Logins to [mockoidc.MockOIDC] is served by a queue with a strict order,
+	// Logins to [mockoidc.Server] is served by a queue with a strict order,
 	// if we use more than one node per user, the order of the logins
 	// will not be deterministic and the test will fail.
 	spec := ScenarioSpec{
 		NodesPerUser: 1,
 		Users:        []string{"user1", "user2"},
-		OIDCUsers: []mockoidc.MockUser{
+		OIDCUsers: []mockoidc.User{
 			oidcMockUser("user1", true),
 			oidcMockUser("user2", false),
 		},
@@ -142,7 +142,7 @@ func TestOIDCExpireNodesBasedOnTokenExpiry(t *testing.T) {
 	spec := ScenarioSpec{
 		NodesPerUser: 1,
 		Users:        []string{"user1", "user2"},
-		OIDCUsers: []mockoidc.MockUser{
+		OIDCUsers: []mockoidc.User{
 			oidcMockUser("user1", true),
 			oidcMockUser("user2", false),
 		},
@@ -410,7 +410,7 @@ func TestOIDCAuthenticationWithPKCE(t *testing.T) {
 	spec := ScenarioSpec{
 		NodesPerUser: 1,
 		Users:        []string{"user1"},
-		OIDCUsers: []mockoidc.MockUser{
+		OIDCUsers: []mockoidc.User{
 			oidcMockUser("user1", true),
 		},
 	}
@@ -466,7 +466,7 @@ func TestOIDCReloginSameNodeNewUser(t *testing.T) {
 		// First login creates the first OIDC user
 		// Second login logs in the same node, which creates a new node
 		// Third login logs in the same node back into the original user
-		OIDCUsers: []mockoidc.MockUser{
+		OIDCUsers: []mockoidc.User{
 			oidcMockUser("user1", true),
 			oidcMockUser("user2", true),
 			oidcMockUser("user1", true),
@@ -1038,7 +1038,7 @@ func TestOIDCFollowUpUrl(t *testing.T) {
 	// Create no nodes and no users
 	scenario, err := NewScenario(
 		ScenarioSpec{
-			OIDCUsers: []mockoidc.MockUser{
+			OIDCUsers: []mockoidc.User{
 				oidcMockUser("user1", true),
 			},
 		},
@@ -1152,7 +1152,7 @@ func TestOIDCMultipleOpenedLoginUrls(t *testing.T) {
 
 	scenario, err := NewScenario(
 		ScenarioSpec{
-			OIDCUsers: []mockoidc.MockUser{
+			OIDCUsers: []mockoidc.User{
 				oidcMockUser("user1", true),
 			},
 		},
@@ -1282,7 +1282,7 @@ func TestOIDCReloginSameNodeSameUser(t *testing.T) {
 
 	// Create scenario with same user for both login attempts
 	scenario, err := NewScenario(ScenarioSpec{
-		OIDCUsers: []mockoidc.MockUser{
+		OIDCUsers: []mockoidc.User{
 			oidcMockUser("user1", true), // Initial login
 			oidcMockUser("user1", true), // Relogin with same user
 		},
@@ -1571,7 +1571,7 @@ func TestOIDCExpiryAfterRestart(t *testing.T) {
 	IntegrationSkip(t)
 
 	scenario, err := NewScenario(ScenarioSpec{
-		OIDCUsers: []mockoidc.MockUser{
+		OIDCUsers: []mockoidc.User{
 			oidcMockUser("user1", true),
 		},
 	})
@@ -1717,7 +1717,7 @@ func TestOIDCACLPolicyOnJoin(t *testing.T) {
 	spec := ScenarioSpec{
 		NodesPerUser: 1,
 		Users:        []string{gatewayUser},
-		OIDCUsers: []mockoidc.MockUser{
+		OIDCUsers: []mockoidc.User{
 			oidcMockUser(oidcUser, true),
 		},
 	}
@@ -2024,7 +2024,7 @@ func TestOIDCReloginSameUserRoutesPreserved(t *testing.T) {
 
 	// Create scenario with same user for both login attempts
 	scenario, err := NewScenario(ScenarioSpec{
-		OIDCUsers: []mockoidc.MockUser{
+		OIDCUsers: []mockoidc.User{
 			oidcMockUser("user1", true), // Initial login
 			oidcMockUser("user1", true), // Relogin with same user
 		},

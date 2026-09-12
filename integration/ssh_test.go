@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/mockoidc"
 	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
 	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/aislopware/slopscale/integration/hsic"
 	"github.com/aislopware/slopscale/integration/integrationutil"
 	"github.com/aislopware/slopscale/integration/tsic"
-	"github.com/oauth2-proxy/mockoidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -912,7 +912,7 @@ func TestSSHOneUserToOneCheckModeOIDC(t *testing.T) {
 		NodesPerUser:         1,
 		Users:                []string{"user1", "user2"},
 		OIDCSkipUserCreation: true,
-		OIDCUsers: []mockoidc.MockUser{
+		OIDCUsers: []mockoidc.User{
 			// First 2: consumed during node registration
 			oidcMockUser("user1", true),
 			oidcMockUser("user2", true),
@@ -1586,7 +1586,7 @@ func TestSSHLocalpart(t *testing.T) {
 			spec := ScenarioSpec{
 				NodesPerUser: 1,
 				Users:        []string{"user1", "user2"},
-				OIDCUsers: []mockoidc.MockUser{
+				OIDCUsers: []mockoidc.User{
 					oidcMockUser("user1", true),
 					oidcMockUser("user2", true),
 				},

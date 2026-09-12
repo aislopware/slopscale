@@ -24,13 +24,13 @@ import (
 
 	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
 	"github.com/aislopware/slopscale/hscontrol/capver"
+	"github.com/aislopware/slopscale/hscontrol/mockoidc"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/aislopware/slopscale/integration/dsic"
 	"github.com/aislopware/slopscale/integration/hsic"
 	"github.com/aislopware/slopscale/integration/integrationutil"
 	"github.com/aislopware/slopscale/integration/tsic"
-	"github.com/oauth2-proxy/mockoidc"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"github.com/puzpuzpuz/xsync/v4"
@@ -170,7 +170,7 @@ type ScenarioSpec struct {
 	// This is because the MockOIDC server can only serve login
 	// requests based on a queue it has been given on startup.
 	// We currently only populates it with one login request per user.
-	OIDCUsers     []mockoidc.MockUser
+	OIDCUsers     []mockoidc.User
 	OIDCAccessTTL time.Duration
 
 	// KeepSeededRule leaves the rule a fresh database is seeded with
@@ -1626,7 +1626,7 @@ const (
 
 var errStatusCodeNotOK = errors.New("status code not OK")
 
-func (s *Scenario) runMockOIDC(accessTTL time.Duration, users []mockoidc.MockUser) error {
+func (s *Scenario) runMockOIDC(accessTTL time.Duration, users []mockoidc.User) error {
 	port, err := dockertestutil.RandomFreeHostPort()
 	if err != nil {
 		log.Fatalf("finding open port: %s", err)

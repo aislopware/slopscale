@@ -6,12 +6,12 @@ import (
 	"time"
 
 	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/hscontrol/mockoidc"
 	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/aislopware/slopscale/integration/hsic"
 	"github.com/aislopware/slopscale/integration/integrationutil"
 	"github.com/aislopware/slopscale/integration/tsic"
-	"github.com/oauth2-proxy/mockoidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -3689,7 +3689,7 @@ func TestTagsOIDCReauthAddOwnedTag(t *testing.T) {
 	// listed twice: once for the initial login and once for the reauth.
 	spec := ScenarioSpec{
 		NodesPerUser: 0,
-		OIDCUsers: []mockoidc.MockUser{
+		OIDCUsers: []mockoidc.User{
 			oidcMockUser(oidcUser, true),
 			oidcMockUser(oidcUser, true),
 		},

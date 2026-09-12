@@ -15,6 +15,7 @@ import (
 	"time"
 
 	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/hscontrol/mockoidc"
 	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/util"
@@ -22,7 +23,6 @@ import (
 	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/cenkalti/backoff/v7"
 	"github.com/google/go-cmp/cmp"
-	"github.com/oauth2-proxy/mockoidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -1034,11 +1034,11 @@ func tagApprover(name string) policyv2.AutoApprover {
 	return new(policyv2.Tag(name))
 }
 
-// oidcMockUser creates a [mockoidc.MockUser] for OIDC authentication testing.
+// oidcMockUser creates a [mockoidc.User] for OIDC authentication testing.
 // Generates consistent test user data with configurable email verification status
 // for validating OIDC integration flows in slopscale authentication tests.
-func oidcMockUser(username string, emailVerified bool) mockoidc.MockUser {
-	return mockoidc.MockUser{
+func oidcMockUser(username string, emailVerified bool) mockoidc.User {
+	return mockoidc.User{
 		Subject:           username,
 		PreferredUsername: username,
 		Email:             username + "@slopscale.net",

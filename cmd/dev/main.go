@@ -19,7 +19,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/oauth2-proxy/mockoidc"
+	"github.com/aislopware/slopscale/hscontrol/mockoidc"
 )
 
 const (
@@ -392,13 +392,13 @@ func extractAuthKey(data []byte) (string, error) {
 // startMockOIDC serves a mock OpenID Connect provider on the loopback port.
 // Every authorization request signs in as oidcUser without a login page,
 // which is what the console's e2e test and local development want.
-func startMockOIDC(ctx context.Context, port int) (*mockoidc.MockOIDC, error) {
-	provider, err := mockoidc.NewServer(nil)
+func startMockOIDC(ctx context.Context, port int) (*mockoidc.Server, error) {
+	provider, err := mockoidc.NewServer()
 	if err != nil {
 		return nil, fmt.Errorf("creating mock OIDC provider: %w", err)
 	}
 
-	// With nothing queued every login is mockoidc.DefaultUser, whose
+	// With nothing queued every login is [mockoidc.DefaultUser], whose
 	// email is oidcUser.
 	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	if err != nil {

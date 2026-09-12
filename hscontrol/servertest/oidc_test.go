@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/mockoidc"
 	"github.com/aislopware/slopscale/hscontrol/servertest"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/oauth2-proxy/mockoidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -42,8 +42,8 @@ var csrfValueRE = regexp.MustCompile(`value="([^"]*)"`)
 // oidcUser builds a mock identity. The provider only releases claims the
 // requested scopes cover, so the test config asks for profile, email and
 // groups.
-func oidcUser(subject, email string, verified bool, groups ...string) mockoidc.MockUser {
-	return mockoidc.MockUser{
+func oidcUser(subject, email string, verified bool, groups ...string) mockoidc.User {
+	return mockoidc.User{
 		Subject:           subject,
 		PreferredUsername: subject,
 		Email:             email,
@@ -55,16 +55,16 @@ func oidcUser(subject, email string, verified bool, groups ...string) mockoidc.M
 // startMockOIDC runs an in-process OpenID Connect provider on a real loopback
 // port, because Slopscale reaches the issuer with a plain [http.Client].
 // Logins pop users off a queue in order, so every test gets its own provider.
-func startMockOIDC(t *testing.T, users ...mockoidc.MockUser) *mockoidc.MockOIDC {
+func startMockOIDC(t *testing.T, users ...mockoidc.User) *mockoidc.Server {
 	t.Helper()
 
-	provider, err := mockoidc.NewServer(nil)
+	provider, err := mockoidc.NewServer()
 	require.NoError(t, err)
 
 	provider.AccessTTL = oidcTokenTTL
 
 	for i := range users {
-		provider.QueueUser(&users[i])
+		provider.QueueUser(users[i])
 	}
 
 	ln, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
@@ -82,8 +82,8 @@ func startMockOIDC(t *testing.T, users ...mockoidc.MockUser) *mockoidc.MockOIDC 
 func newOIDCServer(
 	t *testing.T,
 	mutate func(*types.OIDCConfig),
-	users ...mockoidc.MockUser,
-) (*servertest.TestServer, *mockoidc.MockOIDC) {
+	users ...mockoidc.User,
+) (*servertest.TestServer, *mockoidc.Server) {
 	t.Helper()
 
 	provider := startMockOIDC(t, users...)
@@ -291,7 +291,7 @@ func TestOIDCReloginUpdatesUser(t *testing.T) {
 
 	srv, provider := newOIDCServer(t, nil,
 		oidcUser("bob", "bob@example.com", true),
-		mockoidc.MockUser{
+		mockoidc.User{
 			Subject:           "bob",
 			PreferredUsername: "robert",
 			Email:             "robert@example.com",
@@ -368,7 +368,7 @@ func TestOIDCAuthorization(t *testing.T) {
 	tests := []struct {
 		name       string
 		mutate     func(*types.OIDCConfig)
-		user       mockoidc.MockUser
+		user       mockoidc.User
 		wantStatus int
 	}{
 		{

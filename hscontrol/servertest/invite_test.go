@@ -8,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/aislopware/slopscale/hscontrol"
+	"github.com/aislopware/slopscale/hscontrol/mockoidc"
 	"github.com/aislopware/slopscale/hscontrol/servertest"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/oauth2-proxy/mockoidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +19,7 @@ import (
 // newInviteServer starts a Slopscale server that signs users in through a
 // mock identity provider and, when mail is asked for, delivers through an
 // in-process SMTP server.
-func newInviteServer(t *testing.T, withMail bool, users ...mockoidc.MockUser) (*servertest.TestServer, *smtpServer) {
+func newInviteServer(t *testing.T, withMail bool, users ...mockoidc.User) (*servertest.TestServer, *smtpServer) {
 	t.Helper()
 
 	provider := startMockOIDC(t, users...)
