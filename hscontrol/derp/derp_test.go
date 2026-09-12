@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/conf"
 	"github.com/aislopware/slopscale/hscontrol/egress"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/google/go-cmp/cmp"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -135,9 +135,9 @@ func TestShuffleDERPMapDeterministic(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			viper.Set("dns.base_domain", tt.baseDomain)
+			conf.Set("dns.base_domain", tt.baseDomain)
 
-			defer viper.Reset()
+			defer conf.Reset()
 
 			resetDerpRandomForTesting()
 
@@ -204,7 +204,7 @@ func TestShuffleDERPMapEdgeCases(t *testing.T) {
 }
 
 func TestShuffleDERPMapWithoutBaseDomain(t *testing.T) {
-	viper.Reset()
+	conf.Reset()
 	resetDerpRandomForTesting()
 
 	derpMap := &tailcfg.DERPMap{

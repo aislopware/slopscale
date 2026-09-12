@@ -11,8 +11,8 @@ import (
 	"time"
 
 	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/hscontrol/conf"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -249,7 +249,7 @@ func TestMustMarkRequired(t *testing.T) {
 		func() { mustMarkRequired(cmd, "missing") })
 }
 
-// The tests below touch process-wide state (stdout, stderr, os.Args, viper,
+// The tests below touch process-wide state (stdout, stderr, os.Args, the conf store,
 // pterm) and therefore run serially.
 
 func TestPrintOutput(t *testing.T) {
@@ -428,7 +428,7 @@ func TestNewSlopscaleCLIWithConfig(t *testing.T) {
 
 	t.Run("remote address without an api key is rejected", func(t *testing.T) {
 		pointCLIAt(t, "https://slopscale.example.com")
-		viper.Set("cli.api_key", "")
+		conf.Set("cli.api_key", "")
 
 		_, client, _, err := newSlopscaleCLIWithConfig()
 		require.ErrorIs(t, err, errAPIKeyNotSet)
@@ -471,7 +471,7 @@ func TestNewSlopscaleCLIWithConfig(t *testing.T) {
 		t.Cleanup(server.Close)
 
 		pointCLIAt(t, server.URL)
-		viper.Set("cli.insecure", true)
+		conf.Set("cli.insecure", true)
 
 		ctx, client, cancel, err := newSlopscaleCLIWithConfig()
 		require.NoError(t, err)
@@ -518,8 +518,8 @@ func TestNewSlopscaleCLIWithConfig(t *testing.T) {
 }
 
 func TestNewSlopscaleServerWithConfigRejectsEmptyConfig(t *testing.T) {
-	viper.Reset()
-	t.Cleanup(viper.Reset)
+	conf.Reset()
+	t.Cleanup(conf.Reset)
 
 	app, err := newSlopscaleServerWithConfig()
 	require.ErrorContains(t, err, "loading configuration")

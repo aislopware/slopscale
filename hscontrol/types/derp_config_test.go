@@ -3,7 +3,7 @@ package types
 import (
 	"testing"
 
-	"github.com/spf13/viper"
+	"github.com/aislopware/slopscale/hscontrol/conf"
 )
 
 // TestDerpConfigSkipsMalformedURL ensures a malformed derp.urls entry is
@@ -11,10 +11,10 @@ import (
 // nil *url.URL that url.Parse returns on error, which crashed the server at
 // startup.
 func TestDerpConfigSkipsMalformedURL(t *testing.T) {
-	viper.Reset()
-	defer viper.Reset()
+	conf.Reset()
+	defer conf.Reset()
 
-	viper.Set("derp.urls", []string{
+	conf.Set("derp.urls", []string{
 		"https://controlplane.tailscale.com/derpmap/default",
 		"://bad",
 	})

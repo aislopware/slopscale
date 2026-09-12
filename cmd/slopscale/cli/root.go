@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/conf"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"golang.org/x/mod/semver"
 )
 
@@ -70,12 +70,12 @@ func initConfig() {
 		zerolog.SetGlobalLevel(zerolog.Disabled)
 	}
 
-	logFormat := viper.GetString("log.format")
+	logFormat := conf.GetString("log.format")
 	if logFormat == types.JSONLogFormat {
 		log.Logger = log.Output(os.Stdout)
 	}
 
-	disableUpdateCheck := viper.GetBool("disable_check_updates")
+	disableUpdateCheck := conf.GetBool("disable_check_updates")
 	if !disableUpdateCheck && !machineOutput {
 		versionInfo := types.GetVersionInfo()
 		if (runtime.GOOS == "linux" || runtime.GOOS == "darwin") &&

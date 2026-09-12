@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/conf"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/util"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,16 +33,16 @@ func TestConfigFileLoading(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test that config file was interpreted correctly
-	assert.Equal(t, "http://127.0.0.1:8080", viper.GetString("server_url"))
-	assert.Equal(t, "127.0.0.1:8080", viper.GetString("listen_addr"))
-	assert.Equal(t, "127.0.0.1:9090", viper.GetString("metrics_listen_addr"))
-	assert.Equal(t, "sqlite", viper.GetString("database.type"))
-	assert.Equal(t, "/var/lib/slopscale/db.sqlite", viper.GetString("database.sqlite.path"))
-	assert.Empty(t, viper.GetString("tls_letsencrypt_hostname"))
-	assert.Equal(t, ":http", viper.GetString("tls_letsencrypt_listen"))
-	assert.Equal(t, "HTTP-01", viper.GetString("tls_letsencrypt_challenge_type"))
+	assert.Equal(t, "http://127.0.0.1:8080", conf.GetString("server_url"))
+	assert.Equal(t, "127.0.0.1:8080", conf.GetString("listen_addr"))
+	assert.Equal(t, "127.0.0.1:9090", conf.GetString("metrics_listen_addr"))
+	assert.Equal(t, "sqlite", conf.GetString("database.type"))
+	assert.Equal(t, "/var/lib/slopscale/db.sqlite", conf.GetString("database.sqlite.path"))
+	assert.Empty(t, conf.GetString("tls_letsencrypt_hostname"))
+	assert.Equal(t, ":http", conf.GetString("tls_letsencrypt_listen"))
+	assert.Equal(t, "HTTP-01", conf.GetString("tls_letsencrypt_challenge_type"))
 	assert.Equal(t, fs.FileMode(0o770), util.GetFileMode("unix_socket_permission"))
-	assert.False(t, viper.GetBool("logtail.enabled"))
+	assert.False(t, conf.GetBool("logtail.enabled"))
 }
 
 func TestConfigLoading(t *testing.T) {
@@ -63,14 +63,14 @@ func TestConfigLoading(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test that config file was interpreted correctly
-	assert.Equal(t, "http://127.0.0.1:8080", viper.GetString("server_url"))
-	assert.Equal(t, "127.0.0.1:8080", viper.GetString("listen_addr"))
-	assert.Equal(t, "127.0.0.1:9090", viper.GetString("metrics_listen_addr"))
-	assert.Equal(t, "sqlite", viper.GetString("database.type"))
-	assert.Equal(t, "/var/lib/slopscale/db.sqlite", viper.GetString("database.sqlite.path"))
-	assert.Empty(t, viper.GetString("tls_letsencrypt_hostname"))
-	assert.Equal(t, ":http", viper.GetString("tls_letsencrypt_listen"))
-	assert.Equal(t, "HTTP-01", viper.GetString("tls_letsencrypt_challenge_type"))
+	assert.Equal(t, "http://127.0.0.1:8080", conf.GetString("server_url"))
+	assert.Equal(t, "127.0.0.1:8080", conf.GetString("listen_addr"))
+	assert.Equal(t, "127.0.0.1:9090", conf.GetString("metrics_listen_addr"))
+	assert.Equal(t, "sqlite", conf.GetString("database.type"))
+	assert.Equal(t, "/var/lib/slopscale/db.sqlite", conf.GetString("database.sqlite.path"))
+	assert.Empty(t, conf.GetString("tls_letsencrypt_hostname"))
+	assert.Equal(t, ":http", conf.GetString("tls_letsencrypt_listen"))
+	assert.Equal(t, "HTTP-01", conf.GetString("tls_letsencrypt_challenge_type"))
 	assert.Equal(t, fs.FileMode(0o770), util.GetFileMode("unix_socket_permission"))
-	assert.False(t, viper.GetBool("logtail.enabled"))
+	assert.False(t, conf.GetBool("logtail.enabled"))
 }
