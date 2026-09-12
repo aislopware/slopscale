@@ -14,8 +14,7 @@ import (
 
 	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/aislopware/slopscale/integration/integrationutil"
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
+	"github.com/ory/dockertest/v4"
 	"tailscale.com/util/rands"
 )
 
@@ -37,9 +36,9 @@ type DERPServerInContainer struct {
 	version  string
 	hostname string
 
-	pool      *dockertest.Pool
-	container *dockertest.Resource
-	networks  []*dockertest.Network
+	pool      *dockertestutil.Pool
+	container dockertest.ClosableResource
+	networks  []*dockertestutil.Network
 
 	stunPort            int
 	derpPort            int
@@ -67,7 +66,7 @@ func WithCACert(cert []byte) Option {
 // the DERPer instance, if the parameter is nil, a new network,
 // isolating the DERPer, will be created. If a network is
 // passed, the DERPer instance will join the given network.
-func WithOrCreateNetwork(network *dockertest.Network) Option {
+func WithOrCreateNetwork(network *dockertestutil.Network) Option {
 	return func(dsic *DERPServerInContainer) {
 		if network != nil {
 			dsic.networks = append(dsic.networks, network)
@@ -110,9 +109,9 @@ func WithExtraHosts(hosts []string) Option {
 
 // New returns a new [tsic.TailscaleInContainer] instance.
 func New(
-	pool *dockertest.Pool,
+	pool *dockertestutil.Pool,
 	version string,
-	networks []*dockertest.Network,
+	networks []*dockertestutil.Network,
 	opts ...Option,
 ) (*DERPServerInContainer, error) {
 	hash := rands.HexString(dsicHashLength)
@@ -167,7 +166,7 @@ func New(
 		fmt.Fprintf(&cmdArgs, " --verify-client-url=%s", dsic.withVerifyClientURL)
 	}
 
-	runOptions := &dockertest.RunOptions{
+	runOptions := &dockertestutil.RunSpec{
 		Name:       hostname,
 		Networks:   dsic.networks,
 		ExtraHosts: dsic.withExtraHosts,
@@ -191,26 +190,19 @@ func New(
 		return nil, err
 	}
 
-	var container *dockertest.Resource
+	var container dockertest.ClosableResource
+
+	versionBranch := "v" + version
+	if version == "head" {
+		versionBranch = "main"
+	}
 
 	buildOptions := &dockertest.BuildOptions{
 		Dockerfile: "Dockerfile.derper",
 		ContextDir: dockerContextPath,
-		BuildArgs:  []docker.BuildArg{},
+		BuildArgs:  map[string]*string{"VERSION_BRANCH": &versionBranch},
 	}
 
-	switch version {
-	case "head":
-		buildOptions.BuildArgs = append(buildOptions.BuildArgs, docker.BuildArg{
-			Name:  "VERSION_BRANCH",
-			Value: "main",
-		})
-	default:
-		buildOptions.BuildArgs = append(buildOptions.BuildArgs, docker.BuildArg{
-			Name:  "VERSION_BRANCH",
-			Value: "v" + version,
-		})
-	}
 	// Add integration test labels if running under hi tool
 	dockertestutil.DockerAddIntegrationLabels(runOptions, "derp")
 
@@ -218,7 +210,7 @@ func New(
 	// [TestDERPVerifyEndpoint] needs a DERPer, so pre-building it would
 	// make all twenty shards download the image to save that one shard a
 	// single build.
-	container, err = pool.BuildAndRunWithBuildOptions(
+	container, err = pool.BuildAndRun(
 		buildOptions,
 		runOptions,
 		dockertestutil.DockerRestartPolicy,
@@ -273,7 +265,7 @@ func (t *DERPServerInContainer) Shutdown() error {
 		)
 	}
 
-	return t.pool.Purge(t.container)
+	return t.container.Close(context.Background())
 }
 
 // GetCert returns the CA certificate that clients should trust to
@@ -295,7 +287,7 @@ func (t *DERPServerInContainer) Version() string {
 // ID returns the Docker container ID of the [DERPServerInContainer]
 // instance.
 func (t *DERPServerInContainer) ID() string {
-	return t.container.Container.ID
+	return t.container.ID()
 }
 
 func (t *DERPServerInContainer) GetHostname() string {
@@ -347,8 +339,8 @@ func (t *DERPServerInContainer) WaitForRunning() error {
 }
 
 // ConnectToNetwork connects the DERPer instance to a network.
-func (t *DERPServerInContainer) ConnectToNetwork(network *dockertest.Network) error {
-	return t.container.ConnectToNetwork(network)
+func (t *DERPServerInContainer) ConnectToNetwork(network *dockertestutil.Network) error {
+	return t.container.ConnectToNetwork(context.Background(), network)
 }
 
 // WriteFile save file inside the container.

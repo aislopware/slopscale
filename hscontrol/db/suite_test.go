@@ -9,7 +9,7 @@ import (
 
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
-	"zombiezen.com/go/postgrestest"
+	"github.com/stapelberg/postgrestest"
 )
 
 func newSQLiteTestDB() (*HSDatabase, error) {
@@ -51,7 +51,7 @@ func newPostgresDBForTest(t *testing.T) *url.URL {
 
 	ctx := t.Context()
 
-	srv, err := postgrestest.Start(ctx)
+	srv, err := postgrestest.Start(ctx, postgrestest.WithSQLDriver("pgx"))
 	if err != nil {
 		t.Skipf("start postgres: %s", err)
 	}
@@ -75,12 +75,20 @@ func newSlopscaleDBFromPostgresURL(t *testing.T, pu *url.URL) *HSDatabase {
 	pass, _ := pu.User.Password()
 	port, _ := strconv.Atoi(pu.Port())
 
+	// postgrestest listens on a unix socket only and carries its
+	// directory in the host query parameter; libpq treats a host
+	// starting with / as a socket directory.
+	host := pu.Hostname()
+	if host == "" {
+		host = pu.Query().Get("host")
+	}
+
 	db, err := NewSlopscaleDatabase(
 		&types.Config{
 			Database: types.DatabaseConfig{
 				Type: types.DatabasePostgres,
 				Postgres: types.PostgresConfig{
-					Host: pu.Hostname(),
+					Host: host,
 					User: pu.User.Username(),
 					Name: strings.TrimLeft(pu.Path, "/"),
 					Pass: pass,

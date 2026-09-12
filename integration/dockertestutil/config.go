@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ory/dockertest/v3"
 	"tailscale.com/util/rands"
 )
 
@@ -22,10 +21,10 @@ func GetIntegrationRunID() string {
 	return os.Getenv("SLOPSCALE_INTEGRATION_RUN_ID")
 }
 
-// DockerAddIntegrationLabels adds integration test labels to Docker [dockertest.RunOptions].
+// DockerAddIntegrationLabels adds integration test labels to a [RunSpec].
 // This allows the hi tool to identify containers belonging to specific test runs.
-// This function should be called before passing [dockertest.RunOptions] to dockertest functions.
-func DockerAddIntegrationLabels(opts *dockertest.RunOptions, testType string) {
+// This function should be called before passing the spec to [Pool.Run].
+func DockerAddIntegrationLabels(opts *RunSpec, testType string) {
 	runID := GetIntegrationRunID()
 	if runID == "" {
 		panic("SLOPSCALE_INTEGRATION_RUN_ID environment variable is required")

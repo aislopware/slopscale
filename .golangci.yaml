@@ -170,6 +170,8 @@ linters:
         # jet executes on (a pool, a transaction or a prepared statement).
         - github\.com/go-jet/jet/v2/sqlite\.(SelectStatement|BoolExpression|Expression)
         - github\.com/go-jet/jet/v2/qrm\.DB
+        # dockertest v4 hands out containers only as these interfaces.
+        - github\.com/ory/dockertest/v4\.(ClosableResource|Resource)
         - hscontrol/policy\.PolicyManager
         - hscontrol\.AuthProvider
         - hscontrol/policy/v2\.(Alias|Owner|AutoApprover|ResolvedAddresses)

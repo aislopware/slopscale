@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/mockoidc"
 	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
-	"github.com/oauth2-proxy/mockoidc"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 )
@@ -82,7 +82,7 @@ func mockOIDC() error {
 		return errMockOidcUsersNotDefined
 	}
 
-	var users []mockoidc.MockUser
+	var users []mockoidc.User
 
 	err := json.Unmarshal([]byte(userStr), &users)
 	if err != nil {
@@ -98,7 +98,7 @@ func mockOIDC() error {
 		return fmt.Errorf("parsing mock OIDC port %q: %w", portStr, err)
 	}
 
-	mock, err := getMockOIDC(clientID, clientSecret, users)
+	mock, err := newMockOIDC(clientID, clientSecret, users)
 	if err != nil {
 		return err
 	}
@@ -122,40 +122,27 @@ func mockOIDC() error {
 	return nil
 }
 
-func getMockOIDC(clientID, clientSecret string, users []mockoidc.MockUser) (*mockoidc.MockOIDC, error) {
-	keypair, err := mockoidc.NewKeypair(nil)
+func newMockOIDC(clientID, clientSecret string, users []mockoidc.User) (*mockoidc.Server, error) {
+	mock, err := mockoidc.NewServer()
 	if err != nil {
-		return nil, fmt.Errorf("creating mock OIDC keypair: %w", err)
+		return nil, fmt.Errorf("creating mock OIDC server: %w", err)
 	}
 
-	userQueue := mockoidc.UserQueue{}
+	mock.ClientID = clientID
+	mock.ClientSecret = clientSecret
+	mock.AccessTTL = accessTTL
+	mock.RefreshTTL = refreshTTL
 
 	for _, user := range users {
-		userQueue.Push(&user)
+		mock.QueueUser(user)
 	}
 
-	mock := mockoidc.MockOIDC{
-		ClientID:                      clientID,
-		ClientSecret:                  clientSecret,
-		AccessTTL:                     accessTTL,
-		RefreshTTL:                    refreshTTL,
-		CodeChallengeMethodsSupported: []string{"plain", "S256"},
-		Keypair:                       keypair,
-		SessionStore:                  mockoidc.NewSessionStore(),
-		UserQueue:                     &userQueue,
-		ErrorQueue:                    &mockoidc.ErrorQueue{},
-	}
-
-	_ = mock.AddMiddleware(func(h http.Handler) http.Handler {
+	mock.Use(func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Info().Msgf("request: %+v", r)
+			log.Info().Str("method", r.Method).Str("url", r.URL.String()).Msg("request")
 			h.ServeHTTP(w, r)
-
-			if r.Response != nil {
-				log.Info().Msgf("response: %+v", r.Response)
-			}
 		})
 	})
 
-	return &mock, nil
+	return mock, nil
 }

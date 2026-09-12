@@ -19,10 +19,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/conf"
 	"github.com/aislopware/slopscale/hscontrol/egress"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
 	"go.yaml.in/yaml/v3"
 	"tailscale.com/envknob"
 	"tailscale.com/tailcfg"
@@ -369,7 +369,7 @@ func derpRandom() *rand.Rand {
 	defer derpRandomMu.Unlock()
 
 	if derpRandomInst == nil {
-		seed := cmp.Or(viper.GetString("dns.base_domain"), time.Now().String())
+		seed := cmp.Or(conf.GetString("dns.base_domain"), time.Now().String())
 		derpRandomInst = rand.New( //nolint:gosec // weak random is fine for DERP scrambling
 			rand.NewPCG(crc64.Checksum([]byte(seed), crc64Table), 0),
 		)

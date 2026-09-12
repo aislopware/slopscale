@@ -9,9 +9,9 @@ import (
 	"time"
 
 	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/hscontrol/conf"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -161,7 +161,7 @@ func TestPolicyCommands(t *testing.T) {
 	runCommandCases(t, policyFlags, cases)
 }
 
-// loadBypassConfig points viper at a server config whose database is a fresh
+// loadBypassConfig points the conf store at a server config whose database is a fresh
 // SQLite file, so the --bypass-server-and-access-database-directly path can
 // open a real database. It returns the directory holding that database.
 func loadBypassConfig(t *testing.T) string {
@@ -192,9 +192,9 @@ dns:
 	configPath := filepath.Join(dir, "config.yaml")
 	require.NoError(t, os.WriteFile(configPath, []byte(config), 0o600))
 
-	viper.Reset()
+	conf.Reset()
 	require.NoError(t, types.LoadConfig(configPath, true))
-	t.Cleanup(viper.Reset)
+	t.Cleanup(conf.Reset)
 
 	return dir
 }
@@ -275,8 +275,8 @@ func TestPolicyBypassCommands(t *testing.T) {
 }
 
 func TestPolicyBypassWithoutServerConfig(t *testing.T) {
-	viper.Reset()
-	t.Cleanup(viper.Reset)
+	conf.Reset()
+	t.Cleanup(conf.Reset)
 
 	cmd := newTestCommand(t, getPolicy, policyFlags, map[string]string{bypassFlag: "true", "force": "true"})
 

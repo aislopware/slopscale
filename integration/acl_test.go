@@ -11,12 +11,12 @@ import (
 	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
 	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
 	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/aislopware/slopscale/integration/hsic"
 	"github.com/aislopware/slopscale/integration/integrationutil"
 	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/ory/dockertest/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -1347,7 +1347,7 @@ func TestACLAutogroupTagged(t *testing.T) {
 			// Get the network for this scenario
 			networks := scenario.Networks()
 
-			var network *dockertest.Network
+			var network *dockertestutil.Network
 			if len(networks) > 0 {
 				network = networks[0]
 			}
@@ -1663,7 +1663,7 @@ func TestACLAutogroupSelf(t *testing.T) {
 	// Add router node for user-router (single shared router node)
 	networks := scenario.Networks()
 
-	var network *dockertest.Network
+	var network *dockertestutil.Network
 	if len(networks) > 0 {
 		network = networks[0]
 	}

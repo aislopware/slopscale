@@ -3,6 +3,8 @@ package hscontrol
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"runtime/pprof"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -37,12 +40,10 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/aislopware/slopscale/hscontrol/util/zlog/zf"
 	"github.com/aislopware/slopscale/web"
-	"github.com/cenkalti/backoff/v5"
-	"github.com/davecgh/go-spew/spew"
+	"github.com/cenkalti/backoff/v7"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/metrics"
-	"github.com/pkg/profile"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
@@ -306,20 +307,24 @@ func (h *Slopscale) Serve() error {
 	capver.CanOldCodeBeCleanedUp()
 
 	if profilingEnabled {
-		if profilingPath != "" {
-			err = os.MkdirAll(profilingPath, os.ModePerm)
-			if err != nil {
-				log.Fatal().Err(err).Msg("failed to create profiling directory")
-			}
-
-			defer profile.Start(profile.ProfilePath(profilingPath)).Stop()
-		} else {
-			defer profile.Start().Stop()
+		stopProfile, profileErr := startCPUProfile(profilingPath)
+		if profileErr != nil {
+			log.Fatal().Err(profileErr).Msg("failed to start CPU profile")
 		}
+
+		defer stopProfile()
 	}
 
 	if dumpConfig {
-		spew.Dump(h.cfg)
+		durations := json.WithMarshalers(json.MarshalToFunc(func(enc *jsontext.Encoder, d time.Duration) error {
+			return enc.WriteToken(jsontext.String(d.String()))
+		}))
+
+		dumpErr := json.MarshalWrite(os.Stdout, h.cfg, jsontext.WithIndent("  "), durations)
+		if dumpErr != nil {
+			log.Warn().Err(dumpErr).Msg("config does not marshal; printing raw")
+			fmt.Printf("%+v\n", *h.cfg)
+		}
 	}
 
 	versionInfo := types.GetVersionInfo()
@@ -1535,4 +1540,44 @@ func (e *zerologLogEntry) Panic(
 		Interface("panic", v).
 		Bytes("stack", stack).
 		Msg("http handler panic")
+}
+
+// startCPUProfile writes cpu.pprof under dir, or under a fresh temporary
+// directory when dir is empty, and returns the function that stops it.
+func startCPUProfile(dir string) (func(), error) {
+	var err error
+	if dir == "" {
+		dir, err = os.MkdirTemp("", "slopscale-profile")
+	} else {
+		err = os.MkdirAll(dir, os.ModePerm)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("creating profile directory: %w", err)
+	}
+
+	path := filepath.Join(dir, "cpu.pprof")
+
+	f, err := os.Create(path)
+	if err != nil {
+		return nil, fmt.Errorf("creating profile: %w", err)
+	}
+
+	err = pprof.StartCPUProfile(f)
+	if err != nil {
+		f.Close()
+
+		return nil, fmt.Errorf("starting profile: %w", err)
+	}
+
+	log.Info().Str("path", path).Msg("cpu profile started")
+
+	return func() {
+		pprof.StopCPUProfile()
+
+		closeErr := f.Close()
+		if closeErr != nil {
+			log.Error().Err(closeErr).Str("path", path).Msg("closing cpu profile")
+		}
+	}, nil
 }

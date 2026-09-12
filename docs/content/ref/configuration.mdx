@@ -50,6 +50,18 @@ curl -o config.yaml https://raw.githubusercontent.com/aislopware/slopscale/v0.36
 
 :::
 
+## Environment variables
+
+Every key in the file can be overridden by an environment variable: prefix `SLOPSCALE_`, uppercase, dots
+replaced by underscores, so `dns.base_domain` is `SLOPSCALE_DNS_BASE_DOMAIN` and `oidc.client_secret` is
+`SLOPSCALE_OIDC_CLIENT_SECRET`. A variable wins over the file, the file over the built-in default.
+
+- Lists are space separated: `SLOPSCALE_DNS_NAMESERVERS_GLOBAL="1.1.1.1 8.8.8.8"`.
+- Maps are JSON objects: `SLOPSCALE_DNS_NAMESERVERS_SPLIT='{"example.com": ["10.0.0.53"]}'`.
+- Durations take Go syntax: `SLOPSCALE_NODE_EXPIRY=720h`.
+- A variable set to an empty string is an explicit empty value, not a request for the default:
+  `SLOPSCALE_DERP_URLS=""` disables the public DERP map. Unset the variable to get the default back.
+
 ## Settings that live only in the file
 
 Most of what an operator changes day to day (DNS, DERP relays, key expiry, approval, the tailnet switches) is

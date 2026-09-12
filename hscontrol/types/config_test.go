@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/aislopware/slopscale/hscontrol/conf"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
@@ -283,12 +283,12 @@ func TestReadConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			viper.Reset()
+			conf.Reset()
 
 			err := LoadConfig(tt.configPath, true)
 			require.NoError(t, err)
 
-			conf, err := tt.setup(t)
+			got, err := tt.setup(t)
 
 			if tt.wantErr != "" {
 				assert.Equal(t, tt.wantErr, err.Error())
@@ -298,7 +298,7 @@ func TestReadConfig(t *testing.T) {
 
 			require.NoError(t, err)
 
-			if diff := cmp.Diff(tt.want, conf); diff != "" {
+			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("ReadConfig() mismatch (-want +got):\n%s", diff)
 			}
 		})
@@ -320,11 +320,11 @@ func TestReadConfigFromEnv(t *testing.T) {
 				"SLOPSCALE_PREFIXES_V4":                     "100.64.0.0/10",
 			},
 			setup: func(t *testing.T) (any, error) {
-				t.Logf("all settings: %#v", viper.AllSettings())
+				t.Logf("all settings: %#v", conf.AllSettings())
 
-				assert.Equal(t, "trace", viper.GetString("log.level"))
-				assert.Equal(t, "100.64.0.0/10", viper.GetString("prefixes.v4"))
-				assert.False(t, viper.GetBool("database.sqlite.write_ahead_log"))
+				assert.Equal(t, "trace", conf.GetString("log.level"))
+				assert.Equal(t, "100.64.0.0/10", conf.GetString("prefixes.v4"))
+				assert.False(t, conf.GetBool("database.sqlite.write_ahead_log"))
 
 				return nil, nil //nolint:nilnil // test setup returns nil to indicate no expected value
 			},
@@ -345,7 +345,7 @@ func TestReadConfigFromEnv(t *testing.T) {
 				//   `[{ name: "prometheus.myvpn.example.com", type: "A", value: "100.64.0.4" }]`,
 			},
 			setup: func(t *testing.T) (any, error) {
-				t.Logf("all settings: %#v", viper.AllSettings())
+				t.Logf("all settings: %#v", conf.AllSettings())
 
 				dns, err := dns()
 				if err != nil {
@@ -378,15 +378,15 @@ func TestReadConfigFromEnv(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
-			viper.Reset()
+			conf.Reset()
 
 			err := LoadConfig("testdata/minimal.yaml", true)
 			require.NoError(t, err)
 
-			conf, err := tt.setup(t)
+			got, err := tt.setup(t)
 			require.NoError(t, err)
 
-			if diff := cmp.Diff(tt.want, conf, cmpopts.EquateEmpty()); diff != "" {
+			if diff := cmp.Diff(tt.want, got, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("ReadConfig() mismatch (-want +got):\n%s", diff)
 			}
 		})
@@ -760,10 +760,10 @@ func TestTrustedProxies(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			viper.Reset()
+			conf.Reset()
 
 			if tt.input != nil {
-				viper.Set("trusted_proxies", tt.input)
+				conf.Set("trusted_proxies", tt.input)
 			}
 
 			got, err := trustedProxies()

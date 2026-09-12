@@ -8,8 +8,8 @@ import (
 	"github.com/aislopware/slopscale/hscontrol"
 	policyv2 "github.com/aislopware/slopscale/hscontrol/policy/v2"
 	"github.com/aislopware/slopscale/hscontrol/types"
+	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/aislopware/slopscale/integration/hsic"
-	"github.com/ory/dockertest/v3"
 	"tailscale.com/tailcfg"
 )
 
@@ -21,7 +21,7 @@ type ControlServer interface {
 	SaveProfile(path string) error
 	Execute(command []string) (string, error)
 	WriteFile(path string, content []byte) error
-	ConnectToNetwork(network *dockertest.Network) error
+	ConnectToNetwork(network *dockertestutil.Network) error
 	GetHealthEndpoint() string
 	GetEndpoint() string
 	GetIPEndpoint() string
@@ -44,7 +44,7 @@ type ControlServer interface {
 	SetNodeTags(nodeID uint64, tags []string) error
 	GetCert() []byte
 	GetHostname() string
-	GetIPInNetwork(network *dockertest.Network) string
+	GetIPInNetwork(network *dockertestutil.Network) string
 	SetPolicy(pol *policyv2.Policy) error
 	GetAllMapReponses() (map[types.NodeID][]tailcfg.MapResponse, error)
 	PrimaryRoutes() (*types.DebugRoutes, error)

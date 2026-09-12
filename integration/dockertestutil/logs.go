@@ -8,37 +8,38 @@ import (
 	"os"
 	"path"
 
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/client"
+	"github.com/ory/dockertest/v4"
 )
 
 const filePerm = 0o644
 
+// WriteLog copies the container's whole log so far into stdout and stderr.
 func WriteLog(
-	pool *dockertest.Pool,
-	resource *dockertest.Resource,
+	pool *Pool,
+	resource dockertest.Resource,
 	stdout io.Writer,
 	stderr io.Writer,
 ) error {
-	return pool.Client.Logs(
-		docker.LogsOptions{
-			Context:      context.TODO(),
-			Container:    resource.Container.ID,
-			OutputStream: stdout,
-			ErrorStream:  stderr,
-			Tail:         "all",
-			RawTerminal:  false,
-			Stdout:       true,
-			Stderr:       true,
-			Follow:       false,
-			Timestamps:   false,
-		},
-	)
+	logs, err := pool.Docker.ContainerLogs(context.Background(), resource.ID(), client.ContainerLogsOptions{
+		ShowStdout: true,
+		ShowStderr: true,
+		Tail:       "all",
+	})
+	if err != nil {
+		return err
+	}
+	defer logs.Close()
+
+	_, err = stdcopy.StdCopy(stdout, stderr, logs)
+
+	return err
 }
 
 func SaveLog(
-	pool *dockertest.Pool,
-	resource *dockertest.Resource,
+	pool *Pool,
+	resource dockertest.Resource,
 	basePath string,
 ) (string, string, error) {
 	err := os.MkdirAll(basePath, os.ModePerm)
@@ -53,9 +54,11 @@ func SaveLog(
 		return "", "", err
 	}
 
-	log.Printf("Saving logs for %s to %s\n", resource.Container.Name, basePath)
+	name := resource.Container().Name
 
-	stdoutPath := path.Join(basePath, resource.Container.Name+".stdout.log")
+	log.Printf("Saving logs for %s to %s\n", name, basePath)
+
+	stdoutPath := path.Join(basePath, name+".stdout.log")
 
 	err = os.WriteFile(
 		stdoutPath,
@@ -66,7 +69,7 @@ func SaveLog(
 		return "", "", err
 	}
 
-	stderrPath := path.Join(basePath, resource.Container.Name+".stderr.log")
+	stderrPath := path.Join(basePath, name+".stderr.log")
 
 	err = os.WriteFile(
 		stderrPath,

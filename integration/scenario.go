@@ -24,15 +24,15 @@ import (
 
 	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
 	"github.com/aislopware/slopscale/hscontrol/capver"
+	"github.com/aislopware/slopscale/hscontrol/mockoidc"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/aislopware/slopscale/integration/dsic"
 	"github.com/aislopware/slopscale/integration/hsic"
 	"github.com/aislopware/slopscale/integration/integrationutil"
 	"github.com/aislopware/slopscale/integration/tsic"
-	"github.com/oauth2-proxy/mockoidc"
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
+	mobynetwork "github.com/moby/moby/api/types/network"
+	"github.com/ory/dockertest/v4"
 	"github.com/puzpuzpuz/xsync/v4"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -104,15 +104,15 @@ type Scenario struct {
 
 	users map[string]*User
 
-	pool          *dockertest.Pool
-	networks      map[string]*dockertest.Network
+	pool          *dockertestutil.Pool
+	networks      map[string]*dockertestutil.Network
 	mockOIDC      scenarioOIDC
-	extraServices map[string][]*dockertest.Resource
+	extraServices map[string][]dockertest.ClosableResource
 
 	mu sync.Mutex
 
 	spec          ScenarioSpec
-	userToNetwork map[string]*dockertest.Network
+	userToNetwork map[string]*dockertestutil.Network
 
 	testHashPrefix     string
 	testDefaultNetwork string
@@ -170,7 +170,7 @@ type ScenarioSpec struct {
 	// This is because the MockOIDC server can only serve login
 	// requests based on a queue it has been given on startup.
 	// We currently only populates it with one login request per user.
-	OIDCUsers     []mockoidc.MockUser
+	OIDCUsers     []mockoidc.User
 	OIDCAccessTTL time.Duration
 
 	// KeepSeededRule leaves the rule a fresh database is seeded with
@@ -185,29 +185,14 @@ type ScenarioSpec struct {
 // NewScenario creates a test [Scenario] which can be used to bootstraps a [ControlServer] with
 // a set of [User]s and [TailscaleClient]s.
 func NewScenario(spec ScenarioSpec) (*Scenario, error) {
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		return nil, fmt.Errorf("connecting to docker: %w", err)
+	maxWait := spec.MaxWait
+	if maxWait == 0 {
+		maxWait = dockertestMaxWait()
 	}
 
-	// dockertest's bundled go-dockerclient stamps image builds with API
-	// v1.25 (the `ver` tag on BuildImageOptions.Dockerfile) whenever the
-	// client has no pinned version. Docker Engine 29 raised the minimum API
-	// version to 1.40 and rejects v1.25 with a 400, which surfaces mid-build
-	// as a "write: broken pipe". Pin the client to the daemon's reported API
-	// version so build (and every other) request uses an accepted path.
-	version, err := pool.Client.Version()
+	pool, err := dockertestutil.NewPool(context.Background(), maxWait)
 	if err != nil {
-		return nil, fmt.Errorf("querying docker API version: %w", err)
-	}
-
-	if api := version.Get("ApiVersion"); api != "" {
-		client, clientErr := docker.NewVersionedClientFromEnv(api)
-		if clientErr != nil {
-			return nil, fmt.Errorf("pinning docker client to API version %s: %w", api, clientErr)
-		}
-
-		pool.Client = client
+		return nil, err
 	}
 
 	// Nothing sweeps the daemon here on purpose. Both sweeps this used to
@@ -218,12 +203,6 @@ func NewScenario(spec ScenarioSpec) (*Scenario, error) {
 	// cache. Either one would reach into a scenario running beside this
 	// one. A scenario closes its own networks in [Scenario.Shutdown], and
 	// `hi clean` sweeps what a crashed run left behind.
-
-	if spec.MaxWait == 0 {
-		pool.MaxWait = dockertestMaxWait()
-	} else {
-		pool.MaxWait = spec.MaxWait
-	}
 
 	testHashPrefix := "hs-" + rands.HexString(scenarioHashLength)
 	s := &Scenario{
@@ -237,7 +216,7 @@ func NewScenario(spec ScenarioSpec) (*Scenario, error) {
 		testDefaultNetwork: testHashPrefix + "-default",
 	}
 
-	var userToNetwork map[string]*dockertest.Network
+	var userToNetwork map[string]*dockertestutil.Network
 
 	if spec.Networks != nil {
 		for name, netSpec := range s.spec.Networks {
@@ -254,8 +233,8 @@ func NewScenario(spec ScenarioSpec) (*Scenario, error) {
 						"%w: %s into %s but already in %s",
 						errUserMultipleNetworks,
 						user,
-						network.Network.Name,
-						n2.Network.Name,
+						network.Name(),
+						n2.Name(),
 					)
 				}
 
@@ -301,11 +280,11 @@ func NewScenario(spec ScenarioSpec) (*Scenario, error) {
 	return s, nil
 }
 
-func (s *Scenario) AddNetwork(name string) (*dockertest.Network, error) {
+func (s *Scenario) AddNetwork(name string) (*dockertestutil.Network, error) {
 	return s.AddNetworkWithSubnet(name, "")
 }
 
-func (s *Scenario) AddNetworkWithSubnet(name, subnet string) (*dockertest.Network, error) {
+func (s *Scenario) AddNetworkWithSubnet(name, subnet string) (*dockertestutil.Network, error) {
 	network, err := dockertestutil.GetFirstOrCreateNetworkWithSubnet(s.pool, name, subnet)
 	if err != nil {
 		return nil, fmt.Errorf("creating or getting network: %w", err)
@@ -330,7 +309,7 @@ func (s *Scenario) AddNetworkWithSubnet(name, subnet string) (*dockertest.Networ
 	return network, nil
 }
 
-func (s *Scenario) Networks() []*dockertest.Network {
+func (s *Scenario) Networks() []*dockertestutil.Network {
 	if len(s.networks) == 0 {
 		panic("Scenario.Networks called with empty network list")
 	}
@@ -338,7 +317,7 @@ func (s *Scenario) Networks() []*dockertest.Network {
 	return slices.Collect(maps.Values(s.networks))
 }
 
-func (s *Scenario) Network(name string) (*dockertest.Network, error) {
+func (s *Scenario) Network(name string) (*dockertestutil.Network, error) {
 	dnetwork, ok := s.networks[s.prefixedNetworkName(name)]
 	if !ok {
 		return nil, fmt.Errorf("no network named: %s", name)
@@ -353,19 +332,17 @@ func (s *Scenario) SubnetOfNetwork(name string) (*netip.Prefix, error) {
 		return nil, fmt.Errorf("no network named: %s", name)
 	}
 
-	if len(dnetwork.Network.IPAM.Config) == 0 {
+	config := dnetwork.Inspect().IPAM.Config
+	if len(config) == 0 {
 		return nil, fmt.Errorf("no IPAM config found in network: %s", name)
 	}
 
-	pref, err := netip.ParsePrefix(dnetwork.Network.IPAM.Config[0].Subnet)
-	if err != nil {
-		return nil, err
-	}
+	pref := config[0].Subnet
 
 	return &pref, nil
 }
 
-func (s *Scenario) Services(name string) ([]*dockertest.Resource, error) {
+func (s *Scenario) Services(name string) ([]dockertest.ClosableResource, error) {
 	res, ok := s.extraServices[s.prefixedNetworkName(name)]
 	if !ok {
 		return nil, fmt.Errorf("no network named: %s", name)
@@ -431,17 +408,19 @@ func (s *Scenario) ShutdownAssertNoPanics(t *testing.T) {
 		}
 	}
 
+	ctx := context.WithoutCancel(t.Context())
+
 	for _, svcs := range s.extraServices {
 		for _, svc := range svcs {
-			err := svc.Close()
+			err := svc.Close(ctx)
 			if err != nil {
-				log.Printf("tearing down service %q: %s", svc.Container.Name, err)
+				log.Printf("tearing down service %q: %s", svc.Container().Name, err)
 			}
 		}
 	}
 
 	if s.mockOIDC.r != nil {
-		err := s.mockOIDC.r.Close()
+		err := s.mockOIDC.r.Close(ctx)
 		if err != nil {
 			log.Printf("tearing down oidc server: %s", err)
 		}
@@ -518,8 +497,8 @@ func (s *Scenario) Slopscale(opts ...hsic.Option) (ControlServer, error) {
 	return slopscale, nil
 }
 
-// Pool returns the [dockertest.Pool] for the scenario.
-func (s *Scenario) Pool() *dockertest.Pool {
+// Pool returns the [dockertestutil.Pool] for the scenario.
+func (s *Scenario) Pool() *dockertestutil.Pool {
 	return s.pool
 }
 
@@ -698,7 +677,7 @@ func (s *Scenario) CreateTailscaleNodesInUser(
 			hostname := slopscale.GetHostname()
 
 			// Determine which network this tailscale client will be in
-			var network *dockertest.Network
+			var network *dockertestutil.Network
 			if s.userToNetwork != nil && s.userToNetwork[userStr] != nil {
 				network = s.userToNetwork[userStr]
 			} else {
@@ -1590,7 +1569,7 @@ func (s *Scenario) runSlopscaleRegister(userStr, body string) error {
 }
 
 type scenarioOIDC struct {
-	r   *dockertest.Resource
+	r   dockertest.ClosableResource
 	cfg *types.OIDCConfig
 }
 
@@ -1626,7 +1605,7 @@ const (
 
 var errStatusCodeNotOK = errors.New("status code not OK")
 
-func (s *Scenario) runMockOIDC(accessTTL time.Duration, users []mockoidc.MockUser) error {
+func (s *Scenario) runMockOIDC(accessTTL time.Duration, users []mockoidc.User) error {
 	port, err := dockertestutil.RandomFreeHostPort()
 	if err != nil {
 		log.Fatalf("finding open port: %s", err)
@@ -1643,12 +1622,12 @@ func (s *Scenario) runMockOIDC(accessTTL time.Duration, users []mockoidc.MockUse
 		return err
 	}
 
-	mockOidcOptions := &dockertest.RunOptions{
+	mockOidcOptions := &dockertestutil.RunSpec{
 		Name:         hostname,
 		Cmd:          []string{"slopscale", "mockoidc"},
 		ExposedPorts: []string{portNotation},
-		PortBindings: map[docker.Port][]docker.PortBinding{
-			docker.Port(portNotation): {{HostPort: strconv.Itoa(port)}},
+		PortBindings: mobynetwork.PortMap{
+			mobynetwork.MustParsePort(portNotation): {{HostPort: strconv.Itoa(port)}},
 		},
 		Networks: s.Networks(),
 		Env: []string{
@@ -1741,9 +1720,9 @@ func (s *Scenario) runMockOIDC(accessTTL time.Duration, users []mockoidc.MockUse
 	return nil
 }
 
-type extraServiceFunc func(*Scenario, string) (*dockertest.Resource, error)
+type extraServiceFunc func(*Scenario, string) (dockertest.ClosableResource, error)
 
-func Webservice(s *Scenario, networkName string) (*dockertest.Resource, error) {
+func Webservice(s *Scenario, networkName string) (dockertest.ClosableResource, error) {
 	hash := rands.HexString(hsicOIDCMockHashLength)
 
 	hostname := "hs-webservice-" + hash
@@ -1753,10 +1732,10 @@ func Webservice(s *Scenario, networkName string) (*dockertest.Resource, error) {
 		return nil, fmt.Errorf("network does not exist: %s", networkName)
 	}
 
-	webOpts := &dockertest.RunOptions{
+	webOpts := &dockertestutil.RunSpec{
 		Name:     hostname,
 		Cmd:      []string{"/bin/sh", "-c", "cd / ; python3 -m http.server --bind :: 80"},
-		Networks: []*dockertest.Network{network},
+		Networks: []*dockertestutil.Network{network},
 		Env:      []string{},
 	}
 

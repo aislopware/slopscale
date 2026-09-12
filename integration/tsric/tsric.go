@@ -8,6 +8,7 @@
 package tsric
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -17,8 +18,7 @@ import (
 
 	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/aislopware/slopscale/integration/integrationutil"
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
+	"github.com/ory/dockertest/v4"
 	"tailscale.com/util/rands"
 )
 
@@ -45,9 +45,9 @@ func getPrebuiltImage() string {
 type TailscaleRustInContainer struct {
 	hostname string
 
-	pool      *dockertest.Pool
-	container *dockertest.Resource
-	network   *dockertest.Network
+	pool      *dockertestutil.Pool
+	container dockertest.ClosableResource
+	network   *dockertestutil.Network
 
 	caCerts      [][]byte
 	slopscaleURL string
@@ -67,8 +67,8 @@ func WithCACert(cert []byte) Option {
 	}
 }
 
-// WithNetwork sets the Docker [dockertest.Network].
-func WithNetwork(network *dockertest.Network) Option {
+// WithNetwork sets the Docker [dockertestutil.Network].
+func WithNetwork(network *dockertestutil.Network) Option {
 	return func(t *TailscaleRustInContainer) {
 		t.network = network
 	}
@@ -113,7 +113,7 @@ func WithRef(ref string) Option {
 
 // New creates and starts a new [TailscaleRustInContainer] instance.
 func New(
-	pool *dockertest.Pool,
+	pool *dockertestutil.Pool,
 	opts ...Option,
 ) (*TailscaleRustInContainer, error) {
 	hash := rands.HexString(tsricHashLength)
@@ -154,9 +154,9 @@ func New(
 
 	entrypoint := t.buildEntrypoint()
 
-	runOptions := &dockertest.RunOptions{
+	runOptions := &dockertestutil.RunSpec{
 		Name:       hostname,
-		Networks:   []*dockertest.Network{t.network},
+		Networks:   []*dockertestutil.Network{t.network},
 		Entrypoint: entrypoint,
 		ExtraHosts: append(t.extraHosts, "host.docker.internal:host-gateway"),
 		Env:        []string{},
@@ -169,7 +169,7 @@ func New(
 		return nil, err
 	}
 
-	var container *dockertest.Resource
+	var container dockertest.ClosableResource
 
 	if prebuiltImage := getPrebuiltImage(); prebuiltImage != "" {
 		log.Printf("Using pre-built tailscale-rs image: %s", prebuiltImage)
@@ -182,7 +182,7 @@ func New(
 		runOptions.Repository = repo
 		runOptions.Tag = tag
 
-		container, err = pool.RunWithOptions(
+		container, err = pool.Run(
 			runOptions,
 			dockertestutil.DockerRestartPolicy,
 			dockertestutil.DockerAllowLocalIPv6,
@@ -197,14 +197,14 @@ func New(
 	} else {
 		// Build from the Dockerfile so callers don't need a local
 		// tailscale-rs checkout; the Dockerfile clones at build time.
-		var buildArgs []docker.BuildArg
+		buildArgs := map[string]*string{}
 
 		if t.repo != "" {
-			buildArgs = append(buildArgs, docker.BuildArg{Name: buildArgRepo, Value: t.repo})
+			buildArgs[buildArgRepo] = &t.repo
 		}
 
 		if t.ref != "" {
-			buildArgs = append(buildArgs, docker.BuildArg{Name: buildArgRef, Value: t.ref})
+			buildArgs[buildArgRef] = &t.ref
 		}
 
 		buildOptions := &dockertest.BuildOptions{
@@ -218,7 +218,7 @@ func New(
 			hostname,
 		)
 
-		container, err = pool.BuildAndRunWithBuildOptions(
+		container, err = pool.BuildAndRun(
 			buildOptions,
 			runOptions,
 			dockertestutil.DockerRestartPolicy,
@@ -254,7 +254,7 @@ func (t *TailscaleRustInContainer) Hostname() string {
 
 // ContainerID returns the Docker container ID.
 func (t *TailscaleRustInContainer) ContainerID() string {
-	return t.container.Container.ID
+	return t.container.ID()
 }
 
 // Shutdown stops and cleans up the container.
@@ -268,7 +268,7 @@ func (t *TailscaleRustInContainer) Shutdown() (string, string, error) {
 		)
 	}
 
-	return stdoutPath, stderrPath, t.pool.Purge(t.container)
+	return stdoutPath, stderrPath, t.container.Close(context.Background())
 }
 
 // SaveLog saves the current container logs to the given path.
@@ -288,6 +288,7 @@ func (t *TailscaleRustInContainer) Execute(
 	options ...dockertestutil.ExecuteCommandOption,
 ) (string, string, error) {
 	return dockertestutil.ExecuteCommand(
+		t.pool,
 		t.container,
 		command,
 		[]string{},

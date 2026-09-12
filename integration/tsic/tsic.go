@@ -22,9 +22,8 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/aislopware/slopscale/integration/integrationutil"
-	"github.com/cenkalti/backoff/v5"
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
+	"github.com/cenkalti/backoff/v7"
+	"github.com/ory/dockertest/v4"
 	"tailscale.com/ipn"
 	"tailscale.com/ipn/ipnstate"
 	"tailscale.com/ipn/store/mem"
@@ -89,9 +88,9 @@ type TailscaleInContainer struct {
 	version  string
 	hostname string
 
-	pool      *dockertest.Pool
-	container *dockertest.Resource
-	network   *dockertest.Network
+	pool      *dockertestutil.Pool
+	container dockertest.ClosableResource
+	network   *dockertestutil.Network
 
 	// "cache"
 	ips  []netip.Addr
@@ -133,9 +132,9 @@ func WithCACert(cert []byte) Option {
 	}
 }
 
-// WithNetwork sets the Docker [dockertest.Network] to use with
+// WithNetwork sets the Docker [dockertestutil.Network] to use with
 // the Tailscale instance.
-func WithNetwork(network *dockertest.Network) Option {
+func WithNetwork(network *dockertestutil.Network) Option {
 	return func(tsic *TailscaleInContainer) {
 		tsic.network = network
 	}
@@ -283,7 +282,7 @@ func WithExtraCommands(commands ...string) Option {
 
 // New returns a new TailscaleInContainer instance.
 func New(
-	pool *dockertest.Pool,
+	pool *dockertestutil.Pool,
 	version string,
 	opts ...Option,
 ) (*TailscaleInContainer, error) {
@@ -325,9 +324,9 @@ func New(
 		return nil, fmt.Errorf("no network set, called from: \n%s", string(debug.Stack()))
 	}
 
-	tailscaleOptions := &dockertest.RunOptions{
+	tailscaleOptions := &dockertestutil.RunSpec{
 		Name:       hostname,
-		Networks:   []*dockertest.Network{tsic.network},
+		Networks:   []*dockertestutil.Network{tsic.network},
 		Entrypoint: tsic.withEntrypoint,
 		ExtraHosts: tsic.withExtraHosts,
 		Env:        []string{},
@@ -371,7 +370,7 @@ func New(
 	// Add integration test labels if running under hi tool
 	dockertestutil.DockerAddIntegrationLabels(tailscaleOptions, tailscaleBin)
 
-	var container *dockertest.Resource
+	var container dockertest.ClosableResource
 
 	if version != VersionHead {
 		// build options are not meaningful with pre-existing images,
@@ -414,7 +413,7 @@ func New(
 			tailscaleOptions.Repository = repo
 			tailscaleOptions.Tag = tag
 
-			container, err = pool.RunWithOptions(
+			container, err = pool.Run(
 				tailscaleOptions,
 				dockertestutil.DockerRestartPolicy,
 				dockertestutil.DockerAllowLocalIPv6,
@@ -431,21 +430,15 @@ func New(
 			buildOptions := &dockertest.BuildOptions{
 				Dockerfile: "Dockerfile.tailscale-HEAD",
 				ContextDir: dockerContextPath,
-				BuildArgs:  []docker.BuildArg{},
+				BuildArgs:  map[string]*string{},
 			}
 
 			buildTags := strings.Join(tsic.buildConfig.tags, ",")
 			if buildTags != "" {
-				buildOptions.BuildArgs = append(
-					buildOptions.BuildArgs,
-					docker.BuildArg{
-						Name:  "BUILD_TAGS",
-						Value: buildTags,
-					},
-				)
+				buildOptions.BuildArgs["BUILD_TAGS"] = &buildTags
 			}
 
-			container, err = pool.BuildAndRunWithBuildOptions(
+			container, err = pool.BuildAndRun(
 				buildOptions,
 				tailscaleOptions,
 				dockertestutil.DockerRestartPolicy,
@@ -523,7 +516,7 @@ func New(
 			log.Printf("Pull failed for %s:%s, error: %v", tailscaleOptions.Repository, tailscaleOptions.Tag, err)
 		}
 
-		container, err = pool.RunWithOptions(
+		container, err = pool.Run(
 			tailscaleOptions,
 			dockertestutil.DockerRestartPolicy,
 			dockertestutil.DockerAllowLocalIPv6,
@@ -542,7 +535,7 @@ func New(
 			log.Printf("Pull failed for %s:%s, error: %v", tailscaleOptions.Repository, tailscaleOptions.Tag, err)
 		}
 
-		container, err = pool.RunWithOptions(
+		container, err = pool.Run(
 			tailscaleOptions,
 			dockertestutil.DockerRestartPolicy,
 			dockertestutil.DockerAllowLocalIPv6,
@@ -588,7 +581,7 @@ func (t *TailscaleInContainer) Shutdown() (string, string, error) {
 		)
 	}
 
-	return stdoutPath, stderrPath, t.pool.Purge(t.container)
+	return stdoutPath, stderrPath, t.container.Close(context.Background())
 }
 
 // Hostname returns the hostname of the Tailscale instance.
@@ -604,7 +597,7 @@ func (t *TailscaleInContainer) Version() string {
 // ContainerID returns the Docker container ID of the [TailscaleInContainer]
 // instance.
 func (t *TailscaleInContainer) ContainerID() string {
-	return t.container.Container.ID
+	return t.container.ID()
 }
 
 // Execute runs a command inside the Tailscale container and returns the
@@ -614,6 +607,7 @@ func (t *TailscaleInContainer) Execute(
 	options ...dockertestutil.ExecuteCommandOption,
 ) (string, string, error) {
 	stdout, stderr, err := dockertestutil.ExecuteCommand(
+		t.pool,
 		t.container,
 		command,
 		[]string{},
@@ -717,7 +711,7 @@ func (t *TailscaleInContainer) Restart() error {
 	}
 
 	// Use Docker API to restart the container
-	err := t.pool.Client.RestartContainer(t.container.Container.ID, 30)
+	err := t.pool.RestartContainer(t.container.ID(), 30)
 	if err != nil {
 		return fmt.Errorf("restarting container %s: %w", t.hostname, err)
 	}
@@ -794,13 +788,13 @@ func (t *TailscaleInContainer) Down() error {
 // network disappears and any in-flight TCP connection is left
 // half-open at the peer — the same failure mode a real cable pull
 // produces, which iptables-based simulations cannot reproduce.
-func (t *TailscaleInContainer) DisconnectFromNetwork(network *dockertest.Network) error {
+func (t *TailscaleInContainer) DisconnectFromNetwork(network *dockertestutil.Network) error {
 	return dockertestutil.DisconnectContainerFromNetwork(t.pool, network, t.hostname)
 }
 
 // ReconnectToNetwork is the inverse of DisconnectFromNetwork: it
 // re-attaches the container to network so traffic can flow again.
-func (t *TailscaleInContainer) ReconnectToNetwork(network *dockertest.Network) error {
+func (t *TailscaleInContainer) ReconnectToNetwork(network *dockertestutil.Network) error {
 	return dockertestutil.ReconnectContainerToNetwork(t.pool, network, t.hostname)
 }
 
@@ -1579,9 +1573,9 @@ func (t *TailscaleInContainer) GetNodePrivateKey() (*key.NodePrivate, error) {
 	return &p.Persist.PrivateNodeKey, nil
 }
 
-// ConnectToNetwork connects the Tailscale container to an additional Docker [dockertest.Network].
-func (t *TailscaleInContainer) ConnectToNetwork(network *dockertest.Network) error {
-	return t.container.ConnectToNetwork(network)
+// ConnectToNetwork connects the Tailscale container to an additional Docker [dockertestutil.Network].
+func (t *TailscaleInContainer) ConnectToNetwork(network *dockertestutil.Network) error {
+	return t.container.ConnectToNetwork(context.Background(), network)
 }
 
 // PacketFilter returns the current packet filter rules from the client's network map.

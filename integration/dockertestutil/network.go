@@ -7,18 +7,76 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/netip"
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff/v5"
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
+	"github.com/cenkalti/backoff/v7"
+	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
+	mobynetwork "github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 )
 
 var (
 	ErrContainerNotFound = errors.New("container not found")
+	ErrNetworkNotFound   = errors.New("network not found")
 	ErrConditionTimeout  = errors.New("condition not met within timeout")
 )
+
+// Network is a docker network the harness created. It satisfies
+// [dockertest.Network], so containers connect to it through dockertest,
+// while creation goes through the moby client for the IPAM subnet.
+type Network struct {
+	docker  *client.Client
+	inspect mobynetwork.Inspect
+}
+
+// ID returns the network's docker ID.
+func (n *Network) ID() string {
+	return n.inspect.ID
+}
+
+// Name returns the network's name.
+func (n *Network) Name() string {
+	return n.inspect.Name
+}
+
+// Inspect returns the network as the daemon reported it at creation.
+func (n *Network) Inspect() mobynetwork.Inspect {
+	return n.inspect
+}
+
+// Close removes the network. Whatever is still attached, usually the
+// test-suite container itself, is force-disconnected first, as
+// dockertest v3 did; otherwise the daemon refuses with "has active
+// endpoints" and the leaked networks exhaust the address pools within
+// one CI job.
+func (n *Network) Close() error {
+	ctx := context.Background()
+
+	current, err := n.docker.NetworkInspect(ctx, n.inspect.ID, client.NetworkInspectOptions{})
+	if err != nil {
+		return fmt.Errorf("inspecting network %s: %w", n.inspect.Name, err)
+	}
+
+	for containerID := range current.Network.Containers {
+		_, err = n.docker.NetworkDisconnect(ctx, n.inspect.ID, client.NetworkDisconnectOptions{
+			Container: containerID,
+			Force:     true,
+		})
+		if err != nil {
+			log.Printf("disconnecting %s from network %s: %s", containerID, n.inspect.Name, err)
+		}
+	}
+
+	_, err = n.docker.NetworkRemove(ctx, n.inspect.ID, client.NetworkRemoveOptions{})
+	if err != nil {
+		return fmt.Errorf("removing network %s: %w", n.inspect.Name, err)
+	}
+
+	return nil
+}
 
 // retryDockerOp absorbs eventual-consistency races in libnetwork endpoint cleanup.
 // Pulls its backoff bounds from retry.go so every helper that drives a
@@ -35,7 +93,7 @@ func retryDockerOp(ctx context.Context, op func() error) error {
 	return err
 }
 
-func GetFirstOrCreateNetwork(pool *dockertest.Pool, name string) (*dockertest.Network, error) {
+func GetFirstOrCreateNetwork(pool *Pool, name string) (*Network, error) {
 	return GetFirstOrCreateNetworkWithSubnet(pool, name, "")
 }
 
@@ -44,69 +102,88 @@ func GetFirstOrCreateNetwork(pool *dockertest.Pool, name string) (*dockertest.Ne
 // pool. Use RFC 5737 TEST-NET ranges (e.g. "198.51.100.0/24") for networks
 // that need to be reachable through Tailscale exit nodes, since Tailscale's
 // shrinkDefaultRoute strips RFC1918 ranges from exit node forwarding filters.
-func GetFirstOrCreateNetworkWithSubnet(pool *dockertest.Pool, name, subnet string) (*dockertest.Network, error) {
-	networks, err := pool.NetworksByName(name)
+func GetFirstOrCreateNetworkWithSubnet(pool *Pool, name, subnet string) (*Network, error) {
+	ctx := context.Background()
+
+	network, err := networkByName(ctx, pool, name)
+	if err == nil {
+		return network, nil
+	}
+
+	if !errors.Is(err, ErrNetworkNotFound) {
+		return nil, err
+	}
+
+	opts := client.NetworkCreateOptions{}
+
+	if subnet != "" {
+		prefix, parseErr := netip.ParsePrefix(subnet)
+		if parseErr != nil {
+			return nil, fmt.Errorf("parsing subnet %q: %w", subnet, parseErr)
+		}
+
+		opts.IPAM = &mobynetwork.IPAM{
+			Config: []mobynetwork.IPAMConfig{{Subnet: prefix}},
+		}
+	}
+
+	_, err = pool.Docker.NetworkCreate(ctx, name, opts)
+	if err != nil {
+		return nil, fmt.Errorf("creating network: %w", err)
+	}
+
+	// Create does not give us an updated version of the resource, so we need to
+	// get it again.
+	return networkByName(ctx, pool, name)
+}
+
+// networkByName resolves an exact network name; docker's name filter
+// matches substrings, so the result is checked.
+func networkByName(ctx context.Context, pool *Pool, name string) (*Network, error) {
+	list, err := pool.Docker.NetworkList(ctx, client.NetworkListOptions{
+		Filters: make(client.Filters).Add("name", name),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("looking up network names: %w", err)
 	}
 
-	if len(networks) == 0 {
-		var opts []func(*docker.CreateNetworkOptions)
-		if subnet != "" {
-			opts = append(opts, func(config *docker.CreateNetworkOptions) {
-				config.IPAM = &docker.IPAMOptions{
-					Config: []docker.IPAMConfig{
-						{Subnet: subnet},
-					},
-				}
-			})
+	for _, summary := range list.Items {
+		if summary.Name != name {
+			continue
 		}
 
-		_, err = pool.CreateNetwork(name, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("creating network: %w", err)
+		info, inspectErr := pool.Docker.NetworkInspect(ctx, summary.ID, client.NetworkInspectOptions{})
+		if inspectErr != nil {
+			return nil, fmt.Errorf("inspecting network %s: %w", name, inspectErr)
 		}
 
-		// Create does not give us an updated version of the resource, so we need to
-		// get it again.
-		networks, err = pool.NetworksByName(name)
-		if err != nil {
-			return nil, fmt.Errorf("looking up network names: %w", err)
-		}
+		return &Network{docker: pool.Docker, inspect: info.Network}, nil
 	}
 
-	return &networks[0], nil
+	return nil, fmt.Errorf("%w: %s", ErrNetworkNotFound, name)
 }
 
 func AddContainerToNetwork(
-	pool *dockertest.Pool,
-	network *dockertest.Network,
+	pool *Pool,
+	network *Network,
 	testContainer string,
 ) error {
-	containers, err := pool.Client.ListContainers(docker.ListContainersOptions{
-		All: true,
-		Filters: map[string][]string{
-			"name": {testContainer},
-		},
-	})
+	containerID, err := lookupContainerID(pool, testContainer)
 	if err != nil {
 		return err
 	}
 
-	// TODO(kradalby): This doesn't work reliably, but calling the exact same functions
-	// seem to work fine...
-	// if container, ok := pool.ContainerByName("/" + testContainer); ok {
-	// 	err := container.ConnectToNetwork(network)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
-
 	return retryDockerOp(context.Background(), func() error {
-		return pool.Client.ConnectNetwork(network.Network.ID, docker.NetworkConnectionOptions{
-			Container: containers[0].ID,
-		})
+		return connectNetwork(pool, network, containerID)
 	})
+}
+
+func connectNetwork(pool *Pool, network *Network, containerID string) error {
+	_, err := pool.Docker.NetworkConnect(context.Background(), network.ID(), client.NetworkConnectOptions{
+		Container: containerID,
+	})
+
+	return err
 }
 
 // DisconnectContainerFromNetwork detaches the container at the docker
@@ -114,8 +191,8 @@ func AddContainerToNetwork(
 // the endpoint before returning — re-attaching during the
 // reprogramming window otherwise fails with "network is unreachable".
 func DisconnectContainerFromNetwork(
-	pool *dockertest.Pool,
-	network *dockertest.Network,
+	pool *Pool,
+	network *Network,
 	testContainer string,
 ) error {
 	containerID, err := lookupContainerID(pool, testContainer)
@@ -124,9 +201,13 @@ func DisconnectContainerFromNetwork(
 	}
 
 	err = retryDockerOp(context.Background(), func() error {
-		return pool.Client.DisconnectNetwork(network.Network.ID, docker.NetworkConnectionOptions{
-			Container: containerID,
-		})
+		_, disconnectErr := pool.Docker.NetworkDisconnect(
+			context.Background(),
+			network.ID(),
+			client.NetworkDisconnectOptions{Container: containerID},
+		)
+
+		return disconnectErr
 	})
 	if err != nil {
 		return err
@@ -147,8 +228,8 @@ func DisconnectContainerFromNetwork(
 // [DisconnectContainerFromNetwork] — re-attaches the container to the
 // network so traffic can flow again.
 func ReconnectContainerToNetwork(
-	pool *dockertest.Pool,
-	network *dockertest.Network,
+	pool *Pool,
+	network *Network,
 	testContainer string,
 ) error {
 	containerID, err := lookupContainerID(pool, testContainer)
@@ -157,15 +238,13 @@ func ReconnectContainerToNetwork(
 	}
 
 	err = retryDockerOp(context.Background(), func() error {
-		connectErr := pool.Client.ConnectNetwork(network.Network.ID, docker.NetworkConnectionOptions{
-			Container: containerID,
-		})
+		connectErr := connectNetwork(pool, network, containerID)
 		if connectErr != nil && isStaleRouteConflict(connectErr) {
 			// Defensive cleanup: a route survived the netns flush
 			// despite the wait above. Drop subnet routes that point
 			// at the disconnected interface so libnetwork can
 			// reprogram the sticky IP, then let the retry budget
-			// try the ConnectNetwork call again.
+			// try the connect call again.
 			removeContainerSubnetRoutes(pool, containerID, network)
 		}
 
@@ -178,60 +257,65 @@ func ReconnectContainerToNetwork(
 	return waitNetworkContainerPresent(pool, network, testContainer, DockerOpMaxElapsedTime)
 }
 
-// lookupContainerID resolves a container name to its docker ID.
-func lookupContainerID(pool *dockertest.Pool, testContainer string) (string, error) {
-	containers, err := pool.Client.ListContainers(docker.ListContainersOptions{
+// lookupContainerID resolves an exact container name to its docker ID;
+// docker's name filter matches substrings, so the names are checked.
+func lookupContainerID(pool *Pool, testContainer string) (string, error) {
+	list, err := pool.Docker.ContainerList(context.Background(), client.ContainerListOptions{
 		All:     true,
-		Filters: map[string][]string{"name": {testContainer}},
+		Filters: make(client.Filters).Add("name", testContainer),
 	})
 	if err != nil {
 		return "", err
 	}
 
-	if len(containers) == 0 {
-		return "", fmt.Errorf("%w: %s", ErrContainerNotFound, testContainer)
+	for _, c := range list.Items {
+		for _, name := range c.Names {
+			if strings.TrimPrefix(name, "/") == testContainer {
+				return c.ID, nil
+			}
+		}
 	}
 
-	return containers[0].ID, nil
+	return "", fmt.Errorf("%w: %s", ErrContainerNotFound, testContainer)
 }
 
 // DisconnectAndReconnect calls Disconnect followed by Reconnect; both
 // primitives drive their own libnetwork settle waits.
 func DisconnectAndReconnect(
-	pool *dockertest.Pool,
-	network *dockertest.Network,
+	pool *Pool,
+	network *Network,
 	testContainer string,
 ) error {
 	err := DisconnectContainerFromNetwork(pool, network, testContainer)
 	if err != nil {
-		return fmt.Errorf("disconnecting %s from %s: %w", testContainer, network.Network.Name, err)
+		return fmt.Errorf("disconnecting %s from %s: %w", testContainer, network.Name(), err)
 	}
 
 	err = ReconnectContainerToNetwork(pool, network, testContainer)
 	if err != nil {
-		return fmt.Errorf("reconnecting %s to %s: %w", testContainer, network.Network.Name, err)
+		return fmt.Errorf("reconnecting %s to %s: %w", testContainer, network.Name(), err)
 	}
 
 	return nil
 }
 
 func waitNetworkContainer(
-	pool *dockertest.Pool,
-	network *dockertest.Network,
+	pool *Pool,
+	network *Network,
 	testContainer string,
 	timeout time.Duration,
 	want bool,
-	match func(docker.Endpoint) bool,
+	match func(mobynetwork.EndpointResource) bool,
 ) error {
 	return pollUntil(timeout, func() (bool, error) {
-		info, err := pool.Client.NetworkInfo(network.Network.ID)
+		info, err := pool.Docker.NetworkInspect(context.Background(), network.ID(), client.NetworkInspectOptions{})
 		if err != nil {
-			return false, fmt.Errorf("inspecting network %s: %w", network.Network.Name, err)
+			return false, fmt.Errorf("inspecting network %s: %w", network.Name(), err)
 		}
 
 		found := false
 
-		for _, c := range info.Containers {
+		for _, c := range info.Network.Containers {
 			if (c.Name == testContainer || c.Name == "/"+testContainer) && match(c) {
 				found = true
 				break
@@ -243,8 +327,8 @@ func waitNetworkContainer(
 }
 
 func waitNetworkContainerAbsent(
-	pool *dockertest.Pool,
-	network *dockertest.Network,
+	pool *Pool,
+	network *Network,
 	testContainer string,
 	timeout time.Duration,
 ) error {
@@ -254,13 +338,13 @@ func waitNetworkContainerAbsent(
 		testContainer,
 		timeout,
 		false,
-		func(docker.Endpoint) bool { return true },
+		func(mobynetwork.EndpointResource) bool { return true },
 	)
 }
 
 func waitNetworkContainerPresent(
-	pool *dockertest.Pool,
-	network *dockertest.Network,
+	pool *Pool,
+	network *Network,
 	testContainer string,
 	timeout time.Duration,
 ) error {
@@ -270,7 +354,7 @@ func waitNetworkContainerPresent(
 		testContainer,
 		timeout,
 		true,
-		func(c docker.Endpoint) bool { return c.IPv4Address != "" },
+		func(c mobynetwork.EndpointResource) bool { return c.IPv4Address.IsValid() },
 	)
 }
 
@@ -280,9 +364,9 @@ func waitNetworkContainerPresent(
 // surviving route blocks a subsequent reconnect at sticky-IP assignment
 // with "conflicts with existing route".
 func waitContainerRouteAbsent(
-	pool *dockertest.Pool,
+	pool *Pool,
 	containerID string,
-	network *dockertest.Network,
+	network *Network,
 	timeout time.Duration,
 ) error {
 	subnets := networkSubnets(network)
@@ -309,7 +393,7 @@ func waitContainerRouteAbsent(
 // removeContainerSubnetRoutes drops residue subnet routes in the
 // container's netns — the leftover that libnetwork's async endpoint
 // teardown can leave behind.
-func removeContainerSubnetRoutes(pool *dockertest.Pool, containerID string, network *dockertest.Network) {
+func removeContainerSubnetRoutes(pool *Pool, containerID string, network *Network) {
 	for _, subnet := range networkSubnets(network) {
 		_, err := execStdout(pool, containerID, []string{"ip", "-4", "route", "del", subnet})
 		if err != nil {
@@ -330,11 +414,14 @@ func isStaleRouteConflict(err error) bool {
 
 // networkSubnets returns the IPAM-configured subnets for a docker
 // network. Empty when IPAM is left to docker defaults.
-func networkSubnets(network *dockertest.Network) []string {
-	out := make([]string, 0, len(network.Network.IPAM.Config))
-	for _, cfg := range network.Network.IPAM.Config {
-		if cfg.Subnet != "" {
-			out = append(out, cfg.Subnet)
+func networkSubnets(network *Network) []string {
+	config := network.Inspect().IPAM.Config
+
+	out := make([]string, 0, len(config))
+
+	for _, cfg := range config {
+		if cfg.Subnet.IsValid() {
+			out = append(out, cfg.Subnet.String())
 		}
 	}
 
@@ -342,28 +429,70 @@ func networkSubnets(network *dockertest.Network) []string {
 }
 
 // execStdout runs a one-shot command in containerID and returns stdout.
-func execStdout(pool *dockertest.Pool, containerID string, cmd []string) (string, error) {
-	exec, err := pool.Client.CreateExec(docker.CreateExecOptions{
-		Container:    containerID,
+func execStdout(pool *Pool, containerID string, cmd []string) (string, error) {
+	var stdout, stderr bytes.Buffer
+
+	_, err := execInContainer(context.Background(), pool.Docker, containerID, cmd, nil, &stdout, &stderr)
+	if err != nil {
+		return stdout.String(), err
+	}
+
+	return stdout.String(), nil
+}
+
+// execInContainer runs cmd in the container with env, copies its output
+// into stdout and stderr and returns the exit code.
+func execInContainer(
+	ctx context.Context,
+	docker *client.Client,
+	containerID string,
+	cmd, env []string,
+	stdout, stderr *bytes.Buffer,
+) (int, error) {
+	created, err := docker.ExecCreate(ctx, containerID, client.ExecCreateOptions{
 		Cmd:          cmd,
+		Env:          env,
 		AttachStdout: true,
 		AttachStderr: true,
 	})
 	if err != nil {
-		return "", fmt.Errorf("create exec: %w", err)
+		return 0, fmt.Errorf("create exec: %w", err)
 	}
 
-	var stdout, stderr bytes.Buffer
-
-	err = pool.Client.StartExec(exec.ID, docker.StartExecOptions{
-		OutputStream: &stdout,
-		ErrorStream:  &stderr,
-	})
+	attached, err := docker.ExecAttach(ctx, created.ID, client.ExecAttachOptions{})
 	if err != nil {
-		return stdout.String(), fmt.Errorf("start exec: %w", err)
+		return 0, fmt.Errorf("start exec: %w", err)
+	}
+	defer attached.Close()
+
+	// The hijacked connection outlives ctx, so a command that never
+	// exits (tailscale up waiting for a login) has to be cut off here,
+	// keeping what it printed so far the way v3 did.
+	copied := make(chan error, 1)
+
+	go func() {
+		_, copyErr := stdcopy.StdCopy(stdout, stderr, attached.Reader)
+		copied <- copyErr
+	}()
+
+	select {
+	case err = <-copied:
+		if err != nil {
+			return 0, fmt.Errorf("read exec: %w", err)
+		}
+	case <-ctx.Done():
+		attached.Close()
+		<-copied
+
+		return 0, ctx.Err()
 	}
 
-	return stdout.String(), nil
+	info, err := docker.ExecInspect(ctx, created.ID, client.ExecInspectOptions{})
+	if err != nil {
+		return 0, fmt.Errorf("inspect exec: %w", err)
+	}
+
+	return info.ExitCode, nil
 }
 
 // pollUntil ticks every DockerOpInitialInterval until check returns
@@ -415,28 +544,27 @@ func RandomFreeHostPort() (int, error) {
 }
 
 // DockerRestartPolicy sets the restart policy for containers.
-func DockerRestartPolicy(config *docker.HostConfig) {
-	config.RestartPolicy = docker.RestartPolicy{
-		Name: "unless-stopped",
+func DockerRestartPolicy(config *container.HostConfig) {
+	config.RestartPolicy = container.RestartPolicy{
+		Name: container.RestartPolicyUnlessStopped,
 	}
 }
 
 // DockerAllowLocalIPv6 allows IPv6 traffic within the container.
-func DockerAllowLocalIPv6(config *docker.HostConfig) {
-	config.NetworkMode = "default"
+func DockerAllowLocalIPv6(config *container.HostConfig) {
 	config.Sysctls = map[string]string{
 		"net.ipv6.conf.all.disable_ipv6": "0",
 	}
 }
 
 // DockerAllowNetworkAdministration gives the container network administration capabilities.
-func DockerAllowNetworkAdministration(config *docker.HostConfig) {
+func DockerAllowNetworkAdministration(config *container.HostConfig) {
 	config.CapAdd = append(config.CapAdd, "NET_ADMIN")
 	config.Privileged = true
 }
 
 // DockerMemoryLimit sets memory limit and disables OOM kill for containers.
-func DockerMemoryLimit(config *docker.HostConfig) {
+func DockerMemoryLimit(config *container.HostConfig) {
 	config.Memory = 2 * 1024 * 1024 * 1024 // 2GB in bytes
-	config.OOMKillDisable = true
+	config.OomKillDisable = new(true)
 }

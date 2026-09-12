@@ -18,7 +18,7 @@ import (
 	"github.com/aislopware/slopscale/integration/hsic"
 	"github.com/aislopware/slopscale/integration/tsic"
 	"github.com/coder/websocket"
-	"github.com/ory/dockertest/v3"
+	"github.com/ory/dockertest/v4"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"tailscale.com/control/controlbase"
@@ -157,6 +157,7 @@ func TestTS2021WASMClientUnderNode(t *testing.T) {
 	// Run the real js/wasm control client under Node: it dials /ts2021 as a
 	// WebSocket GET; success means the Noise handshake completed.
 	stdout, stderr, err := dockertestutil.ExecuteCommand(
+		scenario.Pool(),
 		wasm,
 		[]string{"node", "/app/wasm_exec_node.js", "/app/client.wasm", controlURL, string(controlKeyText)},
 		[]string{},
@@ -174,7 +175,7 @@ func TestTS2021WASMClientUnderNode(t *testing.T) {
 // wasmClientService builds and starts the Node + js/wasm control-client
 // container (Dockerfile.wasmclient) on the given network so it can reach
 // slopscale by hostname. It idles; the test execs the client on demand.
-func wasmClientService(s *Scenario, networkName string) (*dockertest.Resource, error) {
+func wasmClientService(s *Scenario, networkName string) (dockertest.ClosableResource, error) {
 	hash := rands.HexString(hsicOIDCMockHashLength)
 	hostname := "hs-wasmclient-" + hash
 
@@ -183,9 +184,9 @@ func wasmClientService(s *Scenario, networkName string) (*dockertest.Resource, e
 		return nil, fmt.Errorf("network does not exist: %s", networkName)
 	}
 
-	runOpts := &dockertest.RunOptions{
+	runOpts := &dockertestutil.RunSpec{
 		Name:     hostname,
-		Networks: []*dockertest.Network{network},
+		Networks: []*dockertestutil.Network{network},
 		Env:      []string{},
 	}
 	dockertestutil.DockerAddIntegrationLabels(runOpts, "wasmclient")
@@ -195,7 +196,7 @@ func wasmClientService(s *Scenario, networkName string) (*dockertest.Resource, e
 		ContextDir: dockerContextPath,
 	}
 
-	resource, err := s.pool.BuildAndRunWithBuildOptions(
+	resource, err := s.pool.BuildAndRun(
 		buildOpts,
 		runOpts,
 		dockertestutil.DockerRestartPolicy,

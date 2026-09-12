@@ -1,6 +1,8 @@
 package dnsprovider_test
 
 import (
+	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -12,9 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 	"github.com/aislopware/slopscale/hscontrol/dnsprovider"
 	"github.com/aislopware/slopscale/hscontrol/types"
-	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -199,7 +202,17 @@ type updateServer struct {
 func newUpdateServer(t *testing.T, zone, keyName, secret string) *updateServer {
 	t.Helper()
 
-	u := &updateServer{zone: dns.Fqdn(zone), txts: map[string][]string{}}
+	u := &updateServer{zone: dnsutil.Fqdn(zone), txts: map[string][]string{}}
+
+	var signer dns.HmacTSIG
+
+	if keyName != "" {
+		key, err := base64.StdEncoding.DecodeString(secret)
+		require.NoError(t, err)
+
+		signer = dns.HmacTSIG{Secret: key}
+		keyName = dnsutil.Fqdn(keyName)
+	}
 
 	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -207,26 +220,33 @@ func newUpdateServer(t *testing.T, zone, keyName, secret string) *updateServer {
 	u.address = listener.Addr().String()
 	u.server = &dns.Server{
 		Listener: listener,
-		// The default acceptor turns UPDATE away with NOTIMP.
-		MsgAcceptFunc: func(dns.Header) dns.MsgAcceptAction { return dns.MsgAccept },
-		Handler: dns.HandlerFunc(func(w dns.ResponseWriter, r *dns.Msg) {
-			reply := new(dns.Msg)
-			reply.SetReply(r)
+		Handler: dns.HandlerFunc(func(_ context.Context, w dns.ResponseWriter, r *dns.Msg) {
+			// The server hands the handler a message with only the
+			// question unpacked.
+			require.NoError(t, r.Unpack())
+
+			reply := dnsutil.SetReply(new(dns.Msg), r)
 
 			u.mu.Lock()
 			defer u.mu.Unlock()
 
-			if r.Opcode != dns.OpcodeUpdate || len(r.Question) != 1 || r.Question[0].Name != u.zone {
+			if r.Opcode != dns.OpcodeUpdate || len(r.Question) != 1 || r.Question[0].Header().Name != u.zone {
 				reply.Rcode = dns.RcodeRefused
-				_ = w.WriteMsg(reply)
+				_, _ = reply.WriteTo(w)
 
 				return
 			}
 
+			// A signed request is verified with the key it names and
+			// answered with a signature over the request MAC, like a
+			// real authoritative server.
+			var tsig dns.TSIGOption
+
 			if keyName != "" {
-				if r.IsTsig() == nil || w.TsigStatus() != nil {
+				rr, ok := lastTSIG(r)
+				if !ok || rr.Hdr.Name != keyName || dns.TSIGVerify(r, signer, &tsig) != nil {
 					reply.Rcode = dns.RcodeNotAuth
-					_ = w.WriteMsg(reply)
+					_, _ = reply.WriteTo(w)
 
 					return
 				}
@@ -240,19 +260,30 @@ func newUpdateServer(t *testing.T, zone, keyName, secret string) *updateServer {
 				}
 			}
 
-			_ = w.WriteMsg(reply)
+			if keyName != "" {
+				reply.Pseudo = append(reply.Pseudo, dns.NewTSIG(keyName, dns.HmacSHA256, 0))
+				require.NoError(t, dns.TSIGSign(reply, signer, &tsig))
+			}
+
+			_, _ = reply.WriteTo(w)
 		}),
 	}
 
-	if keyName != "" {
-		u.server.TsigSecret = map[string]string{dns.Fqdn(keyName): secret}
-	}
+	go func() { _ = u.server.ListenAndServe() }()
 
-	go func() { _ = u.server.ActivateAndServe() }()
-
-	t.Cleanup(func() { _ = u.server.Shutdown() })
+	t.Cleanup(func() { u.server.Shutdown(t.Context()) })
 
 	return u
+}
+
+func lastTSIG(m *dns.Msg) (*dns.TSIG, bool) {
+	if len(m.Pseudo) == 0 {
+		return nil, false
+	}
+
+	rr, ok := m.Pseudo[len(m.Pseudo)-1].(*dns.TSIG)
+
+	return rr, ok
 }
 
 // TestRFC2136 proves the update lands in the zone, signed when a key
@@ -293,6 +324,10 @@ func TestRFC2136(t *testing.T) {
 
 		require.NoError(t, provider.SetTXT(t.Context(), "_acme-challenge.laptop.ts.example.com", "token"))
 
+		server.mu.Lock()
+		assert.Equal(t, []string{"token"}, server.txts["_acme-challenge.laptop.ts.example.com."])
+		server.mu.Unlock()
+
 		err = provider.SetTXT(t.Context(), "_acme-challenge.laptop.elsewhere.net", "token")
 		require.ErrorIs(t, err, dnsprovider.ErrNameOutsideZone)
 	})
@@ -316,6 +351,11 @@ func TestRFC2136(t *testing.T) {
 		Server: "127.0.0.1:53", TSIGKeyName: "k", TSIGSecret: secret, TSIGAlgorithm: "hmac-sha9000",
 	}, "ts.example.com", time.Minute)
 	require.ErrorIs(t, err, dnsprovider.ErrTSIGAlgorithm)
+
+	_, err = dnsprovider.NewRFC2136(types.RFC2136Config{
+		Server: "127.0.0.1:53", TSIGKeyName: "k", TSIGSecret: "not base64!", TSIGAlgorithm: "hmac-sha256",
+	}, "ts.example.com", time.Minute)
+	require.ErrorIs(t, err, dnsprovider.ErrTSIGSecret)
 }
 
 // TestNew proves the config picks the provider, and that the zone for

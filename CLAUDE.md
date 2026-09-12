@@ -75,6 +75,14 @@ only.
   test skips. Cross builds need a C compiler per target: `zigcc` in the
   devShell maps `GOOS`/`GOARCH` to a zig target and links statically
   against musl.
+- Configuration is read through `hscontrol/conf` (koanf underneath, with
+  the environment consulted per key): defaults, then the YAML file, then
+  `SLOPSCALE_A_B` for `a.b`, then explicit `Set`, later wins. Keys are
+  case-insensitive; env lists are space separated and env maps JSON. An
+  empty variable is an explicit empty value, not a fallback to the default,
+  so a test or compose file that exports `SLOPSCALE_X=` gets an empty `x`.
+  `types.LoadConfig` fills the store; `conf.Reset()` in tests wipes it,
+  environment prefix included.
 - `hscontrol/servertest/` is an in-memory server harness. Prefer it over
   `integration/` when Docker isn't needed. It runs the NodeStore with a 5ms
   write batch, so one change reaches clients as several map responses; check
