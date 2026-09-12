@@ -102,7 +102,7 @@ function Machine({
   const index = nodesById(graph.nodes);
 
   return (
-    <div className="grid items-start gap-6 xl:grid-cols-2">
+    <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
       <ReachPanel
         title="Can reach"
         description={`The machines ${node.name} may open something on.`}

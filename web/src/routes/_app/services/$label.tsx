@@ -56,7 +56,7 @@ function ServicePage(): ReactElement {
   return (
     <>
       <ServiceHeader service={service} me={me} />
-      <div className="grid items-start gap-6 min-[1200px]:grid-cols-[minmax(0,2fr)_minmax(0,22rem)]">
+      <div className="grid grid-cols-1 items-start gap-6 min-[1200px]:grid-cols-[minmax(0,2fr)_minmax(0,22rem)]">
         <HostsSection
           service={service}
           services={services}

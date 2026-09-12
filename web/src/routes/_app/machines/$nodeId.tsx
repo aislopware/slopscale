@@ -70,7 +70,7 @@ function MachinePage(): ReactElement {
     <>
       <MachineHeader node={node} me={me} users={userList} />
       <ClientWarnings node={node} />
-      <div className="grid items-start gap-6 min-[1200px]:grid-cols-[minmax(0,2fr)_minmax(0,22rem)]">
+      <div className="grid grid-cols-1 items-start gap-6 min-[1200px]:grid-cols-[minmax(0,2fr)_minmax(0,22rem)]">
         <div className="flex flex-col gap-6">
           <OverviewSection node={node} />
           <RoutesSection node={node} canEdit={routes} />
