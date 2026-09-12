@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.42.1](https://github.com/aislopware/slopscale/compare/v0.42.0...v0.42.1) (2026-09-12)
+
+
+### Fixes
+
+* **web:** open a dark console without a white flash on reload ([62e9b52](https://github.com/aislopware/slopscale/commit/62e9b52f4e3c671e2b5acf969cb314f511e48488))
+
 ## [0.42.0](https://github.com/aislopware/slopscale/compare/v0.41.3...v0.42.0) (2026-09-12)
 
 
