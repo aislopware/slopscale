@@ -38,8 +38,8 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/capver"
 	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/aislopware/slopscale/integration/integrationutil"
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
+	mobycontainer "github.com/moby/moby/api/types/container"
+	"github.com/ory/dockertest/v4"
 	"tailscale.com/util/rands"
 )
 
@@ -117,15 +117,15 @@ func OperatorChartVersion() string {
 type K3sInContainer struct {
 	hostname string
 
-	pool      *dockertest.Pool
-	container *dockertest.Resource
-	networks  []*dockertest.Network
+	pool      *dockertestutil.Pool
+	container dockertest.ClosableResource
+	networks  []*dockertestutil.Network
 }
 
 // New starts a new [K3sInContainer] joined to the given networks.
 func New(
-	pool *dockertest.Pool,
-	networks []*dockertest.Network,
+	pool *dockertestutil.Pool,
+	networks []*dockertestutil.Network,
 ) (*K3sInContainer, error) {
 	hash := rands.HexString(k3sicHashLength)
 
@@ -160,7 +160,7 @@ func New(
 		return nil, fmt.Errorf("invalid k3s image reference %q", K3sImage)
 	}
 
-	runOptions := &dockertest.RunOptions{
+	runOptions := &dockertestutil.RunSpec{
 		Name:       hostname,
 		Repository: repo,
 		Tag:        tag,
@@ -196,7 +196,7 @@ func New(
 		return nil, err
 	}
 
-	container, err := pool.RunWithOptions(
+	container, err := pool.Run(
 		runOptions,
 		dockertestutil.DockerRestartPolicy,
 		// Privileged + NET_ADMIN: k3s manages iptables/ipvs, mounts cgroups and
@@ -233,7 +233,7 @@ func New(
 // ever runs. Leaving the bind-mount off lets the privileged k3s entrypoint set
 // up cgroup-v2 delegation within its own namespace, which it is
 // designed to do, and workload pods schedule normally.
-func withK3sHostConfig(config *docker.HostConfig) {
+func withK3sHostConfig(config *mobycontainer.HostConfig) {
 	config.Tmpfs = map[string]string{
 		"/run":     "",
 		"/var/run": "",
@@ -255,12 +255,12 @@ func (k *K3sInContainer) Hostname() string {
 
 // ID returns the docker container ID of the [K3sInContainer].
 func (k *K3sInContainer) ID() string {
-	return k.container.Container.ID
+	return k.container.ID()
 }
 
 // ConnectToNetwork connects the cluster container to an additional network.
-func (k *K3sInContainer) ConnectToNetwork(network *dockertest.Network) error {
-	return k.container.ConnectToNetwork(network)
+func (k *K3sInContainer) ConnectToNetwork(network *dockertestutil.Network) error {
+	return k.container.ConnectToNetwork(context.Background(), network)
 }
 
 // Execute runs a command inside the k3s container and returns its stdout.
@@ -270,6 +270,7 @@ func (k *K3sInContainer) ConnectToNetwork(network *dockertest.Network) error {
 // reach the cluster.
 func (k *K3sInContainer) Execute(command []string) (string, string, error) {
 	return dockertestutil.ExecuteCommand(
+		k.pool,
 		k.container,
 		command,
 		[]string{"KUBECONFIG=" + kubeconfigPath},
@@ -527,7 +528,7 @@ func (k *K3sInContainer) Shutdown() error {
 		log.Printf("running k3s-killall in %s: %s", k.hostname, err)
 	}
 
-	return k.pool.Purge(k.container)
+	return k.container.Close(context.Background())
 }
 
 // SaveLog saves the container stdout/stderr logs to a path on the host.

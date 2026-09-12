@@ -10,7 +10,6 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/aislopware/slopscale/integration/tsic"
-	"github.com/ory/dockertest/v3"
 	"tailscale.com/ipn/ipnstate"
 	"tailscale.com/net/netcheck"
 	"tailscale.com/types/key"
@@ -57,9 +56,9 @@ type TailscaleClient interface {
 	MustID() types.NodeID
 	ReadFile(path string) ([]byte, error)
 	PacketFilter() ([]filter.Match, error)
-	ConnectToNetwork(network *dockertest.Network) error
-	DisconnectFromNetwork(network *dockertest.Network) error
-	ReconnectToNetwork(network *dockertest.Network) error
+	ConnectToNetwork(network *dockertestutil.Network) error
+	DisconnectFromNetwork(network *dockertestutil.Network) error
+	ReconnectToNetwork(network *dockertestutil.Network) error
 
 	// FailingPeersAsString returns a formatted-ish multi-line-string of peers in the client
 	// and a bool indicating if the clients online count and peer count is equal.

@@ -11,8 +11,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v7"
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
+	"github.com/moby/moby/client"
 )
 
 const dockerHubServer = "https://index.docker.io/v1/"
@@ -41,17 +40,6 @@ func Credentials() (string, string, CredentialSource) {
 	return "", "", CredentialSourceAnonymous
 }
 
-// AuthConfiguration returns Docker Hub auth for the dockertest pool.
-func AuthConfiguration() docker.AuthConfiguration {
-	u, p, _ := Credentials()
-
-	return docker.AuthConfiguration{
-		Username:      u,
-		Password:      p,
-		ServerAddress: dockerHubServer,
-	}
-}
-
 // RegistryAuth returns base64-encoded credentials for the modern
 // Docker SDK's image.PullOptions{RegistryAuth: ...}, or "" when none.
 func RegistryAuth() (string, error) {
@@ -75,47 +63,52 @@ func RegistryAuth() (string, error) {
 
 // PullWithAuth ensures imageRef is local, pulling with auth and
 // retrying transient errors when it is not.
-func PullWithAuth(pool *dockertest.Pool, imageRef string) error {
-	if img, _ := pool.Client.InspectImage(imageRef); img != nil {
+func PullWithAuth(pool *Pool, imageRef string) error {
+	ctx := context.Background()
+
+	_, err := pool.Docker.ImageInspect(ctx, imageRef)
+	if err == nil {
 		return nil
 	}
 
-	repo, tag := splitImageRef(imageRef)
-	auth := AuthConfiguration()
+	registryAuth, err := RegistryAuth()
+	if err != nil {
+		return err
+	}
 
-	_, err := backoff.Retry(
-		context.Background(),
+	_, err = backoff.Retry(
+		ctx,
 		func() (struct{}, error) {
-			err := pool.Client.PullImage(docker.PullImageOptions{
-				Repository: repo,
-				Tag:        tag,
-			}, auth)
-			if err == nil {
+			pullErr := pullImage(ctx, pool.Docker, imageRef, registryAuth)
+			if pullErr == nil {
 				return struct{}{}, nil
 			}
 
-			if isPermanentPullError(err) {
-				return struct{}{}, backoff.Permanent(err)
+			if isPermanentPullError(pullErr) {
+				return struct{}{}, backoff.Permanent(pullErr)
 			}
 
-			return struct{}{}, fmt.Errorf("pulling %s: %w", imageRef, err)
+			return struct{}{}, fmt.Errorf("pulling %s: %w", imageRef, pullErr)
 		},
 		backoff.WithBackOff(backoff.NewExponentialBackOff()),
 		backoff.WithMaxElapsedTime(60*time.Second),
 	)
 	if err != nil {
-		return fmt.Errorf("pulling %s with auth (source=%s): %w", imageRef, AuthConfiguration().ServerAddress, err)
+		return fmt.Errorf("pulling %s with auth (registry=%s): %w", imageRef, dockerHubServer, err)
 	}
 
 	return nil
 }
 
-func splitImageRef(ref string) (string, string) {
-	if i := strings.LastIndex(ref, ":"); i >= 0 {
-		return ref[:i], ref[i+1:]
+// pullImage pulls imageRef and waits for the daemon to finish.
+func pullImage(ctx context.Context, docker *client.Client, imageRef, registryAuth string) error {
+	resp, err := docker.ImagePull(ctx, imageRef, client.ImagePullOptions{RegistryAuth: registryAuth})
+	if err != nil {
+		return err
 	}
+	defer resp.Close()
 
-	return ref, "latest"
+	return resp.Wait(ctx)
 }
 
 func isPermanentPullError(err error) bool {

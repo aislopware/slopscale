@@ -32,8 +32,8 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/aislopware/slopscale/integration/integrationutil"
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
+	mobynetwork "github.com/moby/moby/api/types/network"
+	"github.com/ory/dockertest/v4"
 	"go.yaml.in/yaml/v3"
 	"tailscale.com/tailcfg"
 	"tailscale.com/util/mak"
@@ -83,11 +83,11 @@ type fileInContainer struct {
 type SlopscaleInContainer struct {
 	hostname string
 
-	pool      *dockertest.Pool
-	container *dockertest.Resource
-	networks  []*dockertest.Network
+	pool      *dockertestutil.Pool
+	container dockertest.ClosableResource
+	networks  []*dockertestutil.Network
 
-	pgContainer *dockertest.Resource
+	pgContainer dockertest.ClosableResource
 
 	// optional config
 	port             int
@@ -303,8 +303,8 @@ func WithTimezone(timezone string) Option {
 
 // New returns a new [SlopscaleInContainer] instance.
 func New(
-	pool *dockertest.Pool,
-	networks []*dockertest.Network,
+	pool *dockertestutil.Pool,
+	networks []*dockertestutil.Network,
 	opts ...Option,
 ) (*SlopscaleInContainer, error) {
 	hash := rands.HexString(hsicHashLength)
@@ -389,7 +389,7 @@ func New(
 			pgTag = tag
 		}
 
-		pgRunOptions := &dockertest.RunOptions{
+		pgRunOptions := &dockertestutil.RunSpec{
 			Name:       "postgres-" + hash,
 			Repository: pgRepo,
 			Tag:        pgTag,
@@ -404,7 +404,7 @@ func New(
 		// Add integration test labels if running under hi tool
 		dockertestutil.DockerAddIntegrationLabels(pgRunOptions, "postgres")
 
-		pg, err := pool.RunWithOptions(pgRunOptions)
+		pg, err := pool.Run(pgRunOptions)
 		if err != nil {
 			return nil, fmt.Errorf("starting postgres container: %w", err)
 		}
@@ -436,7 +436,7 @@ func New(
 	slices.Sort(env)
 	log.Printf("ENV:\n%s", strings.Join(env, "\n"))
 
-	runOptions := &dockertest.RunOptions{
+	runOptions := &dockertestutil.RunSpec{
 		Name:         hsic.hostname,
 		ExposedPorts: append([]string{portProto, "9090/tcp"}, hsic.extraPorts...),
 		Networks:     networks,
@@ -448,23 +448,21 @@ func New(
 	}
 
 	// Bind metrics port to dynamic host port (kernel assigns free port)
-	if runOptions.PortBindings == nil {
-		runOptions.PortBindings = map[docker.Port][]docker.PortBinding{}
+	runOptions.PortBindings = mobynetwork.PortMap{
+		mobynetwork.MustParsePort("9090/tcp"): {{HostPort: "0"}},
 	}
 
-	runOptions.PortBindings["9090/tcp"] = []docker.PortBinding{
-		{HostPort: "0"}, // Let kernel assign a free port
-	}
+	for port, hostPorts := range hsic.hostPortBindings {
+		parsed, err := mobynetwork.ParsePort(port)
+		if err != nil {
+			return nil, fmt.Errorf("host port binding %q: %w", port, err)
+		}
 
-	if len(hsic.hostPortBindings) > 0 {
-		for port, hostPorts := range hsic.hostPortBindings {
-			runOptions.PortBindings[docker.Port(port)] = []docker.PortBinding{}
-			for _, hostPort := range hostPorts {
-				runOptions.PortBindings[docker.Port(port)] = append(
-					runOptions.PortBindings[docker.Port(port)],
-					docker.PortBinding{HostPort: hostPort},
-				)
-			}
+		for _, hostPort := range hostPorts {
+			runOptions.PortBindings[parsed] = append(
+				runOptions.PortBindings[parsed],
+				mobynetwork.PortBinding{HostPort: hostPort},
+			)
 		}
 	}
 
@@ -479,7 +477,7 @@ func New(
 	// Add integration test labels if running under hi tool
 	dockertestutil.DockerAddIntegrationLabels(runOptions, binSlopscale)
 
-	var container *dockertest.Resource
+	var container dockertest.ClosableResource
 
 	// Check if a pre-built image is available via environment variable
 	prebuiltImage := os.Getenv(SlopscaleImageEnv)
@@ -496,7 +494,7 @@ func New(
 		runOptions.Repository = repo
 		runOptions.Tag = tag
 
-		container, err = pool.RunWithOptions(
+		container, err = pool.Run(
 			runOptions,
 			dockertestutil.DockerRestartPolicy,
 			dockertestutil.DockerAllowLocalIPv6,
@@ -508,7 +506,7 @@ func New(
 	case util.IsCI():
 		return nil, errSlopscaleImageRequiredInCI
 	default:
-		container, err = pool.BuildAndRunWithBuildOptions(
+		container, err = pool.BuildAndRun(
 			slopscaleBuildOptions,
 			runOptions,
 			dockertestutil.DockerRestartPolicy,
@@ -632,8 +630,8 @@ func New(
 	return hsic, nil
 }
 
-func (t *SlopscaleInContainer) ConnectToNetwork(network *dockertest.Network) error {
-	return t.container.ConnectToNetwork(network)
+func (t *SlopscaleInContainer) ConnectToNetwork(network *dockertestutil.Network) error {
+	return t.container.ConnectToNetwork(context.Background(), network)
 }
 
 // Shutdown stops and cleans up the Slopscale container.
@@ -694,10 +692,10 @@ func (t *SlopscaleInContainer) Shutdown() (string, string, error) {
 
 	// Cleanup postgres container if enabled.
 	if t.postgres {
-		_ = t.pool.Purge(t.pgContainer)
+		_ = t.pgContainer.Close(context.Background())
 	}
 
-	return stdoutPath, stderrPath, t.pool.Purge(t.container)
+	return stdoutPath, stderrPath, t.container.Close(context.Background())
 }
 
 // WriteLogs writes the current stdout/stderr log of the container to
@@ -978,6 +976,7 @@ func (t *SlopscaleInContainer) Execute(
 	command []string,
 ) (string, error) {
 	stdout, stderr, err := dockertestutil.ExecuteCommand(
+		t.pool,
 		t.container,
 		command,
 		[]string{},
@@ -1030,6 +1029,7 @@ func (t *SlopscaleInContainer) CreateOAuthClient(
 	ctx context.Context,
 	scopes, tags []string,
 ) (string, string, error) {
+	//nolint:contextcheck // Execute has no context; the exec runs under its own timeout
 	apiKey, err := t.Execute([]string{"slopscale", "apikeys", "create", "--expiration", "24h"})
 	if err != nil {
 		return "", "", fmt.Errorf("creating admin api key: %w", err)
@@ -1102,7 +1102,7 @@ func (t *SlopscaleInContainer) GetHostname() string {
 }
 
 // GetIPInNetwork returns the IP address of the [SlopscaleInContainer] in the given network.
-func (t *SlopscaleInContainer) GetIPInNetwork(network *dockertest.Network) string {
+func (t *SlopscaleInContainer) GetIPInNetwork(network *dockertestutil.Network) string {
 	return t.container.GetIPInNetwork(network)
 }
 
@@ -1156,6 +1156,7 @@ func (t *SlopscaleInContainer) WaitForRunning() error {
 // setting KeepSeededRule on its spec.
 func (t *SlopscaleInContainer) DisableSeededRule() error {
 	result, _, err := dockertestutil.ExecuteCommand(
+		t.pool,
 		t.container,
 		[]string{binSlopscale, "access-rules", "list", flagOutput, "json"},
 		[]string{},
@@ -1177,6 +1178,7 @@ func (t *SlopscaleInContainer) DisableSeededRule() error {
 		}
 
 		_, _, err = dockertestutil.ExecuteCommand(
+			t.pool,
 			t.container,
 			[]string{binSlopscale, "access-rules", "disable", flagIdentifier, rule.Id},
 			[]string{},
@@ -1204,6 +1206,7 @@ func (t *SlopscaleInContainer) CreateUser(
 	}
 
 	result, _, err := dockertestutil.ExecuteCommand(
+		t.pool,
 		t.container,
 		command,
 		[]string{},
@@ -1270,6 +1273,7 @@ func (t *SlopscaleInContainer) CreateAuthKeyWithOptions(opts AuthKeyOptions) (*c
 	}
 
 	result, _, err := dockertestutil.ExecuteCommand(
+		t.pool,
 		t.container,
 		command,
 		[]string{},
@@ -1333,6 +1337,7 @@ func (t *SlopscaleInContainer) DeleteAuthKey(
 	}
 
 	_, _, err := dockertestutil.ExecuteCommand(
+		t.pool,
 		t.container,
 		command,
 		[]string{},
@@ -1354,6 +1359,7 @@ func (t *SlopscaleInContainer) ListNodes(
 
 	execUnmarshal := func(command []string) error {
 		result, _, err := dockertestutil.ExecuteCommand(
+			t.pool,
 			t.container,
 			command,
 			[]string{},
@@ -1413,6 +1419,7 @@ func (t *SlopscaleInContainer) DeleteNode(nodeID uint64) error {
 	}
 
 	_, _, err := dockertestutil.ExecuteCommand(
+		t.pool,
 		t.container,
 		command,
 		[]string{},
@@ -1459,6 +1466,7 @@ func (t *SlopscaleInContainer) ListUsers() ([]*clientv1.User, error) {
 	command := []string{binSlopscale, "users", "list", flagOutput, "json"}
 
 	result, _, err := dockertestutil.ExecuteCommand(
+		t.pool,
 		t.container,
 		command,
 		[]string{},
@@ -1507,6 +1515,7 @@ func (t *SlopscaleInContainer) DeleteUser(userID uint64) error {
 	}
 
 	_, _, err := dockertestutil.ExecuteCommand(
+		t.pool,
 		t.container,
 		command,
 		[]string{},
@@ -1606,7 +1615,7 @@ func (t *SlopscaleInContainer) Reload() error {
 // control-plane restart, one of the real-world cases where a pending SSH-check
 // auth session is lost.
 func (t *SlopscaleInContainer) Restart() error {
-	err := t.pool.Client.RestartContainer(t.container.Container.ID, 30)
+	err := t.pool.RestartContainer(t.container.ID(), 30)
 	if err != nil {
 		return fmt.Errorf("restarting slopscale container %s: %w", t.hostname, err)
 	}
@@ -1624,6 +1633,7 @@ func (t *SlopscaleInContainer) ApproveRoutes(id uint64, routes []netip.Prefix) (
 	}
 
 	result, _, err := dockertestutil.ExecuteCommand(
+		t.pool,
 		t.container,
 		command,
 		[]string{},
@@ -1666,6 +1676,7 @@ func (t *SlopscaleInContainer) SetNodeTags(nodeID uint64, tags []string) error {
 	}
 
 	_, _, err := dockertestutil.ExecuteCommand(
+		t.pool,
 		t.container,
 		command,
 		[]string{},

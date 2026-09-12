@@ -3,6 +3,7 @@ package integrationutil
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -18,8 +19,8 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/aislopware/slopscale/integration/dockertestutil"
-	"github.com/ory/dockertest/v3"
-	"github.com/ory/dockertest/v3/docker"
+	"github.com/moby/moby/client"
+	"github.com/ory/dockertest/v4"
 	"tailscale.com/tailcfg"
 )
 
@@ -75,8 +76,8 @@ func ScaledTimeout(d time.Duration) time.Duration {
 }
 
 func WriteFileToContainer(
-	pool *dockertest.Pool,
-	container *dockertest.Resource,
+	pool *dockertestutil.Pool,
+	container dockertest.Resource,
 	path string,
 	data []byte,
 ) error {
@@ -112,6 +113,7 @@ func WriteFileToContainer(
 
 	// Ensure the directory is present inside the container
 	_, _, err = dockertestutil.ExecuteCommand(
+		pool,
 		container,
 		[]string{"mkdir", "-p", dirPath},
 		[]string{},
@@ -120,12 +122,13 @@ func WriteFileToContainer(
 		return fmt.Errorf("ensuring directory: %w", err)
 	}
 
-	err = pool.Client.UploadToContainer(
-		container.Container.ID,
-		docker.UploadToContainerOptions{
-			NoOverwriteDirNonDir: false,
-			Path:                 dirPath,
-			InputStream:          bytes.NewReader(buf.Bytes()),
+	_, err = pool.Docker.CopyToContainer(
+		context.Background(),
+		container.ID(),
+		client.CopyToContainerOptions{
+			DestinationPath:           dirPath,
+			Content:                   bytes.NewReader(buf.Bytes()),
+			AllowOverwriteDirWithFile: true,
 		},
 	)
 	if err != nil {
@@ -136,24 +139,21 @@ func WriteFileToContainer(
 }
 
 func FetchPathFromContainer(
-	pool *dockertest.Pool,
-	container *dockertest.Resource,
+	pool *dockertestutil.Pool,
+	container dockertest.Resource,
 	path string,
 ) ([]byte, error) {
-	buf := bytes.NewBuffer([]byte{})
-
-	err := pool.Client.DownloadFromContainer(
-		container.Container.ID,
-		docker.DownloadFromContainerOptions{
-			OutputStream: buf,
-			Path:         path,
-		},
+	res, err := pool.Docker.CopyFromContainer(
+		context.Background(),
+		container.ID(),
+		client.CopyFromContainerOptions{SourcePath: path},
 	)
 	if err != nil {
 		return nil, err
 	}
+	defer res.Content.Close()
 
-	return buf.Bytes(), nil
+	return io.ReadAll(res.Content)
 }
 
 // CertificateBundle holds the PEM-encoded CA certificate, server certificate,
