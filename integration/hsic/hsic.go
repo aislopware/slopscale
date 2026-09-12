@@ -32,7 +32,6 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/aislopware/slopscale/integration/dockertestutil"
 	"github.com/aislopware/slopscale/integration/integrationutil"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"go.yaml.in/yaml/v3"
@@ -434,7 +433,8 @@ func New(
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
 	}
 
-	log.Printf("ENV: \n%s", spew.Sdump(hsic.env))
+	slices.Sort(env)
+	log.Printf("ENV:\n%s", strings.Join(env, "\n"))
 
 	runOptions := &dockertest.RunOptions{
 		Name:         hsic.hostname,

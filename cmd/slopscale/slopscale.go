@@ -5,13 +5,13 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/cmd/slopscale/cli"
-	"github.com/jagottsicher/termcolor"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"golang.org/x/term"
 )
 
 func main() {
-	colors := termcolor.SupportLevel(os.Stderr) != termcolor.LevelNone
+	colors := term.IsTerminal(int(os.Stderr.Fd())) && os.Getenv("TERM") != "dumb"
 
 	// Adhere to no-color.org manifesto of allowing users to
 	// turn off color in cli/services

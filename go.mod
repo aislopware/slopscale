@@ -12,7 +12,6 @@ require (
 	github.com/creachadair/command v0.2.11
 	github.com/creachadair/flax v0.1.0
 	github.com/danielgtaylor/huma/v2 v2.39.1
-	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/go-chi/metrics v0.1.1
@@ -22,7 +21,6 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.11.0
-	github.com/jagottsicher/termcolor v1.0.2
 	github.com/mattn/go-sqlite3 v1.14.52
 	github.com/miekg/dns v1.1.73
 	github.com/moby/moby/api v1.56.0
@@ -31,7 +29,6 @@ require (
 	github.com/oauth2-proxy/mockoidc v0.0.0-20240214162133-caebfff84d25
 	github.com/ory/dockertest/v3 v3.12.0
 	github.com/oschwald/maxminddb-golang/v2 v2.6.0
-	github.com/pkg/profile v1.7.0
 	github.com/prometheus/client_golang v1.24.1
 	github.com/prometheus/common v0.71.0
 	github.com/pterm/pterm v0.12.83
@@ -51,8 +48,9 @@ require (
 	golang.org/x/mod v0.41.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.23.0
+	golang.org/x/term v0.46.0
 	pgregory.net/rapid v1.3.0
-	tailscale.com v1.103.0-pre.0.20260910194919-023255e8a27e
+	tailscale.com v1.103.0-pre.0.20260911203917-e2ed432399c9
 	tailscale.com/client/tailscale/v2 v2.10.1
 	zombiezen.com/go/postgrestest v1.0.1
 )
@@ -105,7 +103,6 @@ require (
 	github.com/docker/cli v29.8.0+incompatible // indirect
 	github.com/docker/go-connections v0.8.1 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/felixge/fgprof v0.9.5 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fogleman/gg v1.3.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.3 // indirect
@@ -120,7 +117,6 @@ require (
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/btree v1.1.3 // indirect
-	github.com/google/pprof v0.0.0-20260906184651-6331bc6350fe // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gookit/color v1.6.1 // indirect
@@ -170,7 +166,7 @@ require (
 	github.com/tailscale/peercred v0.0.0-20250107143737-35a0c7bd7edc // indirect
 	github.com/tailscale/setec v0.0.0-20260824224040-f8d7a936837c // indirect
 	github.com/tailscale/web-client-prebuilt v0.0.0-20251127225136-f19339b67368 // indirect
-	github.com/tailscale/wireguard-go v0.0.0-20260910010640-7658b3f64aff // indirect
+	github.com/tailscale/wireguard-go v0.0.0-20260911194433-e3222a3340cd // indirect
 	github.com/toqueteos/webbrowser v1.2.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xo/terminfo v1.0.0 // indirect
@@ -187,7 +183,6 @@ require (
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260908163034-4bcc4b2ee518 // indirect
-	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
 	golang.org/x/tools v0.50.0 // indirect
