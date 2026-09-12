@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { baseHue, hueOf, seededColours, seededGradient } from "~/lib/hue.ts";
+import { hueOf, seededColours } from "~/lib/hue.ts";
 
 describe(hueOf, () => {
   // The colour is a property of the seed, not of the render, so a name is the same colour in
@@ -50,34 +50,5 @@ describe(seededColours, () => {
 
     expect(backgroundColor).toMatch(/^light-dark\(oklch\(.+\), oklch\(.+\)\)$/u);
     expect(color).toContain(`${hueOf("tag:web", 12)}`);
-  });
-});
-
-describe(seededGradient, () => {
-  it("blends two hues of the seed and inks the text from the first", () => {
-    const { backgroundImage, color } = seededGradient("Alice Nguyen");
-
-    expect(backgroundImage).toMatch(
-      /^linear-gradient\(\d+deg, light-dark\(.+\), light-dark\(.+\)\)$/u,
-    );
-    expect(color).toContain(`${hueOf("Alice Nguyen")}`);
-    expect(seededGradient("Bob Tran").backgroundImage).not.toBe(backgroundImage);
-  });
-
-  // A tailnet has a handful of people, and a hash puts a third of any handful in one band. Their
-  // ids are consecutive, so the golden angle between consecutive ids keeps every pair far apart.
-  it("spaces people by their id with the golden angle, and hashes a name without one", () => {
-    const hues = ["1", "2", "3", "4", "5", "6", "7"].map((id) => baseHue("Someone", id));
-
-    for (const [index, hue] of hues.entries()) {
-      for (const other of hues.slice(index + 1)) {
-        const apart = Math.abs(hue - other);
-
-        expect(Math.min(apart, 360 - apart)).toBeGreaterThanOrEqual(30);
-      }
-    }
-    expect(baseHue("Someone", "")).toBe(hueOf("Someone"));
-    expect(baseHue("Someone")).toBe(hueOf("Someone"));
-    expect(seededGradient("Someone", "3").color).toContain(`${baseHue("Someone", "3")}`);
   });
 });

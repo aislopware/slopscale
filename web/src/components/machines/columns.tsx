@@ -266,7 +266,7 @@ function OwnerCell({ node }: { readonly node: Node }): ReactElement {
   return (
     // A table cell grows to its content, so the cap is what lets a long name truncate.
     <span className="flex max-w-36 min-w-0 items-center gap-2" title={label}>
-      <Avatar name={label} id={node.user.id} size="sm" />
+      <Avatar name={label} id={node.user.id} src={node.user.profilePicUrl} size="sm" />
       <span className="truncate">{label}</span>
     </span>
   );

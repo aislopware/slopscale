@@ -42,7 +42,7 @@ function ActivityRow({ node }: { readonly node: Node }): ReactElement {
       {isTagged(node) ? (
         <Avatar name={owner} icon={TagIcon} />
       ) : (
-        <Avatar name={owner} id={node.user.id} />
+        <Avatar name={owner} id={node.user.id} src={node.user.profilePicUrl} />
       )}
       <span className="flex min-w-0 items-center gap-1.5">
         <OsMark os={node.os} version={node.osVersion} />

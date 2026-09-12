@@ -185,7 +185,7 @@ function PicturePreview({
     <div className="flex items-center gap-3 text-sm text-kumo-subtle">
       {failed === url ? (
         <>
-          <Avatar name={name} id={id} size="lg" />
+          <Avatar name={name} id={id} size="xl" />
           <span>Did not load from this browser. It may still load from the clients.</span>
         </>
       ) : (
@@ -193,7 +193,7 @@ function PicturePreview({
           <img
             src={url}
             alt=""
-            className="size-8 rounded-md object-cover ring ring-kumo-line"
+            className="size-10 rounded-full object-cover ring ring-kumo-line"
             onError={() => {
               setFailed(url);
             }}

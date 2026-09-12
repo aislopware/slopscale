@@ -98,7 +98,7 @@ function ShareRow({
   return (
     <SectionRow className="flex items-center justify-between gap-4 py-2.5">
       <span className="flex min-w-0 items-center gap-2">
-        <Avatar name={label} id={userId} size="sm" />
+        <Avatar name={label} id={userId} src={user?.profilePicUrl} size="sm" />
         <span className="truncate">{label}</span>
       </span>
       {canEdit ? (
