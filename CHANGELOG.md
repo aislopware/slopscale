@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.41.1](https://github.com/aislopware/slopscale/compare/v0.41.0...v0.41.1) (2026-09-12)
+
+
+### Fixes
+
+* **web:** tell people apart by their avatars, near-identical names included ([cb613d5](https://github.com/aislopware/slopscale/commit/cb613d59a2c88c7aca6fbd175de22b56b0ac9364))
+
 ## [0.41.0](https://github.com/aislopware/slopscale/compare/v0.40.0...v0.41.0) (2026-09-12)
 
 
