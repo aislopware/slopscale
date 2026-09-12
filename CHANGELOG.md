@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.41.3](https://github.com/aislopware/slopscale/compare/v0.41.2...v0.41.3) (2026-09-12)
+
+
+### Fixes
+
+* **web:** count an app's learned routes from its own domains, not the whole connector ([09c0c1e](https://github.com/aislopware/slopscale/commit/09c0c1efee32190dcb274ed864ac296c53489741))
+* **web:** keep the machine, service and access graph pages on a phone's width ([d90395d](https://github.com/aislopware/slopscale/commit/d90395d014cc906cce7810f90cc71d4e8b93a909))
+* **web:** open the add record and split DNS forms without crashing the console ([b03cea8](https://github.com/aislopware/slopscale/commit/b03cea869840406f6e0829219810eb858fe3d7eb))
+
 ## [0.41.2](https://github.com/aislopware/slopscale/compare/v0.41.1...v0.41.2) (2026-09-12)
 
 
