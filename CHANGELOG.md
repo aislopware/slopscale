@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.42.0](https://github.com/aislopware/slopscale/compare/v0.41.3...v0.42.0) (2026-09-12)
+
+
+### Changes
+
+* **web:** show people's pictures on their avatars, initials on a quiet tint when there is none ([07b874a](https://github.com/aislopware/slopscale/commit/07b874a5726b42e7338b562dada0ef20907bfe32))
+
+
+### Fixes
+
+* **web:** keep a dialog's fields inside its panel when a column is narrower than an input ([527ae4d](https://github.com/aislopware/slopscale/commit/527ae4dce5ddb940f04f86a9dd1a2dff022b7f46))
+
 ## [0.41.3](https://github.com/aislopware/slopscale/compare/v0.41.2...v0.41.3) (2026-09-12)
 
 
