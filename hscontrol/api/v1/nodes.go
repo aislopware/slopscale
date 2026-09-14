@@ -160,15 +160,15 @@ type NodeService struct {
 // NodePreAuthKey is the PreAuthKey shape embedded in a Node response. The
 // /preauthkey endpoints own the standalone request/response surface.
 type NodePreAuthKey struct {
-	User       *User      `json:"user"`
-	ID         string     `format:"uint64"   json:"id"`
+	User       *User      `doc:"Absent for a tagged key." json:"user,omitempty"`
+	ID         string     `format:"uint64"                json:"id"`
 	Key        string     `json:"key"`
 	Reusable   bool       `json:"reusable"`
 	Ephemeral  bool       `json:"ephemeral"`
 	Used       bool       `json:"used"`
-	Expiration *time.Time `json:"expiration" nullable:"true"`
-	CreatedAt  *time.Time `json:"createdAt"  nullable:"true"`
-	ACLTags    []string   `json:"aclTags"    nullable:"false"`
+	Expiration *time.Time `json:"expiration"              nullable:"true"`
+	CreatedAt  *time.Time `json:"createdAt"               nullable:"true"`
+	ACLTags    []string   `json:"aclTags"                 nullable:"false"`
 
 	Preauthorized bool `json:"preauthorized"`
 }
@@ -328,14 +328,6 @@ func registerNodeReadOps(api huma.API, b Backend) {
 
 		for i, node := range nodes.All() {
 			n := b.nodeFromView(node)
-
-			// Tags-as-identity: tagged nodes are presented as the special
-			// TaggedDevices user.
-			if node.IsTagged() {
-				user := userFromView(types.TaggedDevices.View())
-				n.User = &user
-			}
-
 			n.SubnetRoutes = servedRoutes(b, node)
 
 			out.Body.Nodes[i] = n
@@ -909,7 +901,14 @@ func nodeFromView(view types.NodeView) Node {
 		n.SuspendedAt = &at
 	}
 
-	if view.User().Valid() {
+	// Tags-as-identity: a tagged node is presented as the TaggedDevices user
+	// on every node response, so the field is never absent and a client sees
+	// the same owner whether it listed the node or fetched it alone.
+	switch {
+	case view.IsTagged():
+		user := userFromView(types.TaggedDevices.View())
+		n.User = &user
+	case view.User().Valid():
 		user := userFromView(view.User())
 		n.User = &user
 	}

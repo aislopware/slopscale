@@ -19,19 +19,20 @@ func init() {
 	registrations = append(registrations, registerPreAuthKeys)
 }
 
-// PreAuthKey is the v1 PreAuthKey message. User is a pointer with no omitempty
-// so tagged (system-created) keys emit "user":null. Expiration and CreatedAt
-// are always emitted, zero-stamped when unset.
+// PreAuthKey is the v1 PreAuthKey message. User is omitted for a tagged key,
+// which belongs to its tags rather than a user, so the schema marks it
+// optional and a client is made to handle its absence. Expiration and
+// CreatedAt are always emitted, zero-stamped when unset.
 type PreAuthKey struct {
-	User       *User     `json:"user"`
-	ID         string    `format:"uint64"   json:"id"`
+	User       *User     `doc:"Absent for a tagged key." json:"user,omitempty"`
+	ID         string    `format:"uint64"                json:"id"`
 	Key        string    `json:"key"`
 	Reusable   bool      `json:"reusable"`
 	Ephemeral  bool      `json:"ephemeral"`
 	Used       bool      `json:"used"`
 	Expiration time.Time `json:"expiration"`
 	CreatedAt  time.Time `json:"createdAt"`
-	ACLTags    []string  `json:"aclTags"    nullable:"false"`
+	ACLTags    []string  `json:"aclTags"                 nullable:"false"`
 
 	Preauthorized bool     `doc:"Registered nodes skip device approval." json:"preauthorized"`
 	GroupIDs      []string `doc:"Groups the registered node joins."      json:"groupIds"      nullable:"false"`
