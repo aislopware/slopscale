@@ -3634,7 +3634,8 @@ export interface components {
             preauthorized: boolean;
             reusable: boolean;
             used: boolean;
-            user: components["schemas"]["User"];
+            /** @description Absent for a tagged key. */
+            user?: components["schemas"]["User"];
         };
         NodePreferences: {
             acceptDns: boolean;
@@ -3890,7 +3891,8 @@ export interface components {
             preauthorized: boolean;
             reusable: boolean;
             used: boolean;
-            user: components["schemas"]["User"];
+            /** @description Absent for a tagged key. */
+            user?: components["schemas"]["User"];
         };
         PreAuthKeyOutputBody: {
             preAuthKey: components["schemas"]["PreAuthKey"];

@@ -1648,7 +1648,9 @@ type NodePreAuthKey struct {
 	Preauthorized bool       `json:"preauthorized"`
 	Reusable      bool       `json:"reusable"`
 	Used          bool       `json:"used"`
-	User          User       `json:"user"`
+
+	// User Absent for a tagged key.
+	User *User `json:"user,omitempty"`
 }
 
 // NodePreferences defines model for NodePreferences.
@@ -1962,7 +1964,9 @@ type PreAuthKey struct {
 	Preauthorized bool `json:"preauthorized"`
 	Reusable      bool `json:"reusable"`
 	Used          bool `json:"used"`
-	User          User `json:"user"`
+
+	// User Absent for a tagged key.
+	User *User `json:"user,omitempty"`
 }
 
 // PreAuthKeyOutputBody defines model for PreAuthKeyOutputBody.
