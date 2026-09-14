@@ -1443,8 +1443,11 @@ type Node struct {
 	DiscoKey       string    `json:"discoKey"`
 
 	// Ephemeral true when the node is deleted on logout or after the ephemeral timeout.
-	Ephemeral bool       `json:"ephemeral"`
-	Expiry    *time.Time `json:"expiry"`
+	Ephemeral bool `json:"ephemeral"`
+
+	// ExitNodePriority Order among the global exit nodes for clients that pick one automatically: the highest wins, 0 is no preference.
+	ExitNodePriority int64      `json:"exitNodePriority"`
+	Expiry           *time.Time `json:"expiry"`
 
 	// FunnelEnabled true while the client has a Funnel endpoint on, exposing a service to the internet through the ingress.
 	FunnelEnabled bool   `json:"funnelEnabled"`
@@ -2180,6 +2183,9 @@ type SetDNSRequestBody struct {
 type SetGlobalExitNodeRequestBody struct {
 	// Enabled false clears the mark.
 	Enabled *bool `json:"enabled,omitempty"`
+
+	// Priority Order among the global exit nodes for clients that pick one automatically: the highest wins, 0 is no preference. Absent keeps the current one; clearing the mark resets it.
+	Priority *int64 `json:"priority,omitempty"`
 }
 
 // SetSuspensionRequestBody defines model for SetSuspensionRequestBody.
@@ -3942,7 +3948,7 @@ type ClientInterface interface {
 
 	// SetGlobalExitNodeWithBody Mark node as global exit node
 	//
-	// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+	// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it. A priority orders several marked nodes: while one has a priority, every node carries traffic-steering and the clients pick the highest one that is online, returning to it when it comes back.
 	//
 	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -3953,7 +3959,7 @@ type ClientInterface interface {
 
 	// SetGlobalExitNode Mark node as global exit node
 	//
-	// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+	// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it. A priority orders several marked nodes: while one has a priority, every node carries traffic-steering and the clients pick the highest one that is online, returning to it when it comes back.
 	//
 	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -7219,7 +7225,7 @@ func (c *Client) ExpireNode(ctx context.Context, nodeId string, body ExpireNodeJ
 
 // SetGlobalExitNodeWithBody Mark node as global exit node
 //
-// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it. A priority orders several marked nodes: while one has a priority, every node carries traffic-steering and the clients pick the highest one that is online, returning to it when it comes back.
 //
 // Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -7240,7 +7246,7 @@ func (c *Client) SetGlobalExitNodeWithBody(ctx context.Context, nodeId string, c
 
 // SetGlobalExitNode Mark node as global exit node
 //
-// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it. A priority orders several marked nodes: while one has a priority, every node carries traffic-steering and the clients pick the highest one that is online, returning to it when it comes back.
 //
 // Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -16814,7 +16820,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetGlobalExitNodeWithBodyWithResponse Mark node as global exit node
 	//
-	// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+	// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it. A priority orders several marked nodes: while one has a priority, every node carries traffic-steering and the clients pick the highest one that is online, returning to it when it comes back.
 	//
 	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -16825,7 +16831,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetGlobalExitNodeWithResponse Mark node as global exit node
 	//
-	// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+	// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it. A priority orders several marked nodes: while one has a priority, every node carries traffic-steering and the clients pick the highest one that is online, returning to it when it comes back.
 	//
 	// Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -27513,7 +27519,7 @@ func (c *ClientWithResponses) ExpireNodeWithResponse(ctx context.Context, nodeId
 
 // SetGlobalExitNodeWithBodyWithResponse Mark node as global exit node
 //
-// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it. A priority orders several marked nodes: while one has a priority, every node carries traffic-steering and the clients pick the highest one that is online, returning to it when it comes back.
 //
 // Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -27530,7 +27536,7 @@ func (c *ClientWithResponses) SetGlobalExitNodeWithBodyWithResponse(ctx context.
 
 // SetGlobalExitNodeWithResponse Mark node as global exit node
 //
-// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+// Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it. A priority orders several marked nodes: while one has a priority, every node carries traffic-steering and the clients pick the highest one that is online, returning to it when it comes back.
 //
 // Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //

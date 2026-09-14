@@ -39,6 +39,7 @@ type nodesTable struct {
 	Posture             sqlite.ColumnString
 	HardwareAttestation sqlite.ColumnString
 	GlobalExitNode      sqlite.ColumnBool
+	ExitNodePriority    sqlite.ColumnInteger
 	Ephemeral           sqlite.ColumnBool
 	VipServices         sqlite.ColumnString
 	ApprovedServices    sqlite.ColumnString
@@ -110,6 +111,7 @@ func newNodesTableImpl(schemaName, tableName, alias string) nodesTable {
 		PostureColumn             = sqlite.StringColumn("posture")
 		HardwareAttestationColumn = sqlite.StringColumn("hardware_attestation")
 		GlobalExitNodeColumn      = sqlite.BoolColumn("global_exit_node")
+		ExitNodePriorityColumn    = sqlite.IntegerColumn("exit_node_priority")
 		EphemeralColumn           = sqlite.BoolColumn("ephemeral")
 		VipServicesColumn         = sqlite.StringColumn("vip_services")
 		ApprovedServicesColumn    = sqlite.StringColumn("approved_services")
@@ -118,9 +120,9 @@ func newNodesTableImpl(schemaName, tableName, alias string) nodesTable {
 		CreatedAtColumn           = sqlite.TimestampColumn("created_at")
 		UpdatedAtColumn           = sqlite.TimestampColumn("updated_at")
 		DeletedAtColumn           = sqlite.TimestampColumn("deleted_at")
-		allColumns                = sqlite.ColumnList{IDColumn, MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, HardwareAttestationColumn, GlobalExitNodeColumn, EphemeralColumn, VipServicesColumn, ApprovedServicesColumn, KeySignatureColumn, NlKeyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
-		mutableColumns            = sqlite.ColumnList{MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, HardwareAttestationColumn, GlobalExitNodeColumn, EphemeralColumn, VipServicesColumn, ApprovedServicesColumn, KeySignatureColumn, NlKeyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
-		defaultColumns            = sqlite.ColumnList{GlobalExitNodeColumn, EphemeralColumn}
+		allColumns                = sqlite.ColumnList{IDColumn, MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, HardwareAttestationColumn, GlobalExitNodeColumn, ExitNodePriorityColumn, EphemeralColumn, VipServicesColumn, ApprovedServicesColumn, KeySignatureColumn, NlKeyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
+		mutableColumns            = sqlite.ColumnList{MachineKeyColumn, NodeKeyColumn, DiscoKeyColumn, EndpointsColumn, HostInfoColumn, Ipv4Column, Ipv6Column, HostnameColumn, GivenNameColumn, UserIDColumn, RegisterMethodColumn, TagsColumn, AuthKeyIDColumn, LastSeenColumn, ExpiryColumn, ApprovedRoutesColumn, ApprovedAtColumn, SuspendedAtColumn, PostureColumn, HardwareAttestationColumn, GlobalExitNodeColumn, ExitNodePriorityColumn, EphemeralColumn, VipServicesColumn, ApprovedServicesColumn, KeySignatureColumn, NlKeyColumn, CreatedAtColumn, UpdatedAtColumn, DeletedAtColumn}
+		defaultColumns            = sqlite.ColumnList{GlobalExitNodeColumn, ExitNodePriorityColumn, EphemeralColumn}
 	)
 
 	return nodesTable{
@@ -149,6 +151,7 @@ func newNodesTableImpl(schemaName, tableName, alias string) nodesTable {
 		Posture:             PostureColumn,
 		HardwareAttestation: HardwareAttestationColumn,
 		GlobalExitNode:      GlobalExitNodeColumn,
+		ExitNodePriority:    ExitNodePriorityColumn,
 		Ephemeral:           EphemeralColumn,
 		VipServices:         VipServicesColumn,
 		ApprovedServices:    ApprovedServicesColumn,

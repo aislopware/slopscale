@@ -1293,7 +1293,7 @@ export interface paths {
         put?: never;
         /**
          * Mark node as global exit node
-         * @description Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+         * @description Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it. A priority orders several marked nodes: while one has a priority, every node carries traffic-steering and the clients pick the highest one that is online, returning to it when it comes back.
          *
          *     Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -3456,6 +3456,11 @@ export interface components {
             discoKey: string;
             /** @description true when the node is deleted on logout or after the ephemeral timeout. */
             ephemeral: boolean;
+            /**
+             * Format: int64
+             * @description Order among the global exit nodes for clients that pick one automatically: the highest wins, 0 is no preference.
+             */
+            exitNodePriority: number;
             /** Format: date-time */
             expiry: string | null;
             /** @description true while the client has a Funnel endpoint on, exposing a service to the internet through the ingress. */
@@ -4024,6 +4029,11 @@ export interface components {
         SetGlobalExitNodeRequestBody: {
             /** @description false clears the mark. */
             enabled?: boolean;
+            /**
+             * Format: int64
+             * @description Order among the global exit nodes for clients that pick one automatically: the highest wins, 0 is no preference. Absent keeps the current one; clearing the mark resets it.
+             */
+            priority?: number;
         };
         SetSuspensionRequestBody: {
             /** @description false lifts the suspension. */
