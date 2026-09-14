@@ -506,9 +506,10 @@ var (
 // that the chosen provider has what it needs.
 func httpsCertsConfig() (HTTPSCertsConfig, error) {
 	cfg := HTTPSCertsConfig{
-		Enabled:  conf.GetBool("https_certificates.enabled"),
-		Provider: DNSProviderKind(conf.GetString("https_certificates.provider")),
-		TTL:      conf.GetDuration("https_certificates.ttl"),
+		Enabled:            conf.GetBool("https_certificates.enabled"),
+		Provider:           DNSProviderKind(conf.GetString("https_certificates.provider")),
+		TTL:                conf.GetDuration("https_certificates.ttl"),
+		PropagationTimeout: conf.GetDuration("https_certificates.propagation_timeout"),
 		Cloudflare: CloudflareDNSConfig{
 			APIToken: conf.GetString("https_certificates.cloudflare.api_token"),
 			ZoneID:   conf.GetString("https_certificates.cloudflare.zone_id"),
@@ -745,6 +746,7 @@ func (c *Config) Domain() string {
 func setNodeServiceDefaults() {
 	conf.SetDefault("https_certificates.enabled", false)
 	conf.SetDefault("https_certificates.ttl", time.Minute)
+	conf.SetDefault("https_certificates.propagation_timeout", time.Minute)
 	conf.SetDefault("https_certificates.rfc2136.tsig_algorithm", "hmac-sha256")
 	conf.SetDefault("ssh_recording.enabled", false)
 	conf.SetDefault("ssh_recording.dir", "/var/lib/slopscale/recordings")

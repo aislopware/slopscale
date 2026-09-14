@@ -337,6 +337,9 @@ policy:
 #   # cloudflare, rfc2136 or command.
 #   provider: cloudflare
 #   ttl: 1m
+#   # How long to wait for the zone's nameservers to serve a record
+#   # before telling the machine to go ahead; 0 does not wait.
+#   propagation_timeout: 1m
 #   cloudflare:
 #     # Needs Zone:Read and DNS:Edit on the zone.
 #     api_token: ""

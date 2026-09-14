@@ -48,6 +48,13 @@ Three providers publish the record:
 
 `ttl` is the records' time to live, a minute by default.
 
+The machine accepts the challenge the moment Slopscale answers, and
+Let's Encrypt looks the record up right away, but a provider's API
+takes a record some seconds before its nameservers serve it. So
+Slopscale answers only once every authoritative nameserver of the zone
+serves the record, giving up after `propagation_timeout`, a minute by
+default; `0` answers as soon as the provider took the record.
+
 ## What a machine may publish
 
 A machine may publish only the challenge record of its own MagicDNS name,

@@ -1,6 +1,7 @@
 package hscontrol
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,6 +45,34 @@ func newDNSProvider(cfg *types.Config) (dnsprovider.Provider, error) {
 	}
 
 	return provider, nil
+}
+
+// publishChallenge writes the record through the provider and, when a
+// propagation timeout is set, waits until the zone's authoritative
+// nameservers serve it: the client accepts the ACME challenge the
+// moment the request is answered, and the CA looks the record up right
+// away, so an answer given before the nameservers have it fails the
+// order.
+func (h *Slopscale) publishChallenge(ctx context.Context, name, value string) error {
+	err := h.dnsProvider.SetTXT(ctx, name, value)
+	if err != nil {
+		return err
+	}
+
+	timeout := h.cfg.HTTPSCerts.PropagationTimeout
+	if timeout <= 0 {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	err = dnsprovider.WaitVisible(ctx, name, value)
+	if err != nil {
+		return fmt.Errorf("waiting for the record to be served: %w", err)
+	}
+
+	return nil
 }
 
 // SetDNSHandler takes a [tailcfg.SetDNSRequest], which a client sends to
@@ -91,7 +120,7 @@ func (ns *noiseServer) SetDNSHandler(writer http.ResponseWriter, req *http.Reque
 		return
 	}
 
-	err = ns.slopscale.dnsProvider.SetTXT(req.Context(), name, request.Value)
+	err = ns.slopscale.publishChallenge(req.Context(), name, request.Value)
 	if err != nil {
 		log.Error().Err(err).Str("name", name).Uint64("node.id", uint64(node.ID())).
 			Msg("publishing ACME challenge record")

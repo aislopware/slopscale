@@ -32,6 +32,11 @@ type HTTPSCertsConfig struct {
 	Provider DNSProviderKind
 	// TTL is the records' time to live.
 	TTL time.Duration
+	// PropagationTimeout is how long set-dns waits for the zone's
+	// authoritative nameservers to serve a record before answering,
+	// because the client accepts the ACME challenge as soon as it gets
+	// the answer. Zero answers as soon as the provider took the record.
+	PropagationTimeout time.Duration
 
 	Cloudflare CloudflareDNSConfig
 	RFC2136    RFC2136Config
