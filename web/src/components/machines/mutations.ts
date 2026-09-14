@@ -4,6 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { api } from "~/api/client.ts";
 import type { Mutation } from "~/api/mutation.ts";
 import { invalidate } from "~/api/queries.ts";
+import type { Node } from "~/api/queries.ts";
 import type { NodeClientUpdate } from "~/api/schema.gen.ts";
 import { toast } from "~/components/ui/toast.ts";
 
@@ -59,6 +60,19 @@ interface NodeMutations {
  * Every node mutation the console performs, each refreshing the node queries on success. Errors are
  * left to the caller so dialogs can show them inline; use `toast.error` where there is no form.
  */
+/** What changed, for the toast: the mark, and the priority when it has one. */
+export function globalExitNodeMessage(
+  node: Pick<Node, "globalExitNode" | "exitNodePriority">,
+): string {
+  if (!node.globalExitNode) {
+    return "No longer a global exit node";
+  }
+
+  return node.exitNodePriority > 0
+    ? `Global exit node, priority ${node.exitNodePriority}`
+    : "Marked as global exit node";
+}
+
 export function useNodeMutations(): NodeMutations {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -96,9 +110,7 @@ export function useNodeMutations(): NodeMutations {
     }),
     setGlobalExitNode: api.useMutation("post", "/api/v1/node/{nodeId}/global-exit-node", {
       onSuccess: async (node) => {
-        toast.success(
-          node.node.globalExitNode ? "Marked as global exit node" : "No longer a global exit node",
-        );
+        toast.success(globalExitNodeMessage(node.node));
         await refresh();
       },
       onError: (error) => {

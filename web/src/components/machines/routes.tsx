@@ -1,7 +1,9 @@
 import { Button } from "@cloudflare/kumo/components/button";
+import { Input } from "@cloudflare/kumo/components/input";
 import { Switch } from "@cloudflare/kumo/components/switch";
 import { GlobeIcon, PathIcon } from "@phosphor-icons/react";
-import type { ReactElement } from "react";
+import { useState } from "react";
+import type { ReactElement, SubmitEvent } from "react";
 
 import { errorMessage } from "~/api/error.ts";
 import type { Node } from "~/api/queries.ts";
@@ -105,6 +107,17 @@ function RouteRow({
   );
 }
 
+/** The digits of a priority field, or null when the text is not a whole number. */
+export function parsePriority(text: string): number | null {
+  const trimmed = text.trim();
+
+  if (!/^\d+$/v.test(trimmed)) {
+    return null;
+  }
+
+  return Number(trimmed);
+}
+
 /** The tailnet-wide preference: one machine every client is told to prefer as its exit node. */
 export function GlobalExitSection({
   node,
@@ -126,7 +139,7 @@ export function GlobalExitSection({
           Global exit node
         </span>
       }
-      bodyClassName="px-5 py-4"
+      bodyClassName="p-0"
       actions={
         <DisabledReason reason={eligible ? undefined : "Not advertising an exit node"}>
           <Switch
@@ -143,12 +156,84 @@ export function GlobalExitSection({
         </DisabledReason>
       }
     >
-      <p className="text-kumo-subtle">
-        {eligible
-          ? "Every client is told to prefer this machine when it picks an exit node automatically."
-          : "The machine must advertise itself as an exit node before it can serve the whole tailnet."}
-      </p>
+      <SectionRow>
+        <p className="text-kumo-subtle">
+          {eligible
+            ? "Every client is told to prefer this machine when it picks an exit node automatically."
+            : "The machine must advertise itself as an exit node before it can serve the whole tailnet."}
+        </p>
+      </SectionRow>
+      {node.globalExitNode ? (
+        <PriorityRow key={`${node.id}:${node.exitNodePriority}`} node={node} canEdit={canEdit} />
+      ) : null}
     </Section>
+  );
+}
+
+/**
+ * The order among several global exit nodes: clients take the highest one that is online. Keyed by
+ * machine and stored value by the caller, so a poll or a move to another machine starts a fresh
+ * draft instead of showing a stale one.
+ */
+function PriorityRow({
+  node,
+  canEdit,
+}: {
+  readonly node: Node;
+  readonly canEdit: boolean;
+}): ReactElement {
+  const { setGlobalExitNode } = useNodeMutations();
+  const stored = String(node.exitNodePriority);
+  const [draft, setDraft] = useState(stored);
+  const parsed = parsePriority(draft);
+  const dirty = draft.trim() !== stored;
+
+  const save = (event: SubmitEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+
+    if (parsed === null) {
+      return;
+    }
+
+    setGlobalExitNode.mutate({
+      params: { path: { nodeId: node.id } },
+      body: { enabled: true, priority: parsed },
+    });
+  };
+
+  return (
+    <SectionRow className="flex flex-wrap items-start justify-between gap-4">
+      <div className="max-w-prose min-w-0">
+        <div className="font-medium text-kumo-default">Priority</div>
+        <p className="text-kumo-subtle">
+          With several global exit nodes, a client picks the highest that is online and returns to
+          it when it comes back. Machines with the same priority are split by each client on its
+          own, and 0 comes last.
+        </p>
+      </div>
+      <form onSubmit={save} className="flex items-start gap-2">
+        <Input
+          aria-label="Priority"
+          className="w-24"
+          value={draft}
+          inputMode="numeric"
+          autoComplete="off"
+          disabled={!canEdit}
+          {...(parsed === null && dirty ? { error: "A whole number, 0 or more" } : {})}
+          onChange={(event) => {
+            setDraft(event.target.value);
+          }}
+        />
+        <Button
+          type="submit"
+          variant="secondary"
+          disabled={!canEdit || !dirty || parsed === null}
+          loading={setGlobalExitNode.isPending}
+        >
+          Save
+        </Button>
+      </form>
+    </SectionRow>
   );
 }
 

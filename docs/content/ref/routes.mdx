@@ -187,6 +187,34 @@ which case each client picks the closest by DERP region. The same operation is
 the mark keeps the approved routes, so the node stays a suggested exit node
 like any other.
 
+### Exit node failover in a fixed order
+
+To have every client use one exit node and fall back to another only while
+the first is offline, mark both and give them a priority, the highest first:
+
+```console
+$ slopscale nodes global-exit-node --identifier 7 --priority 20   # office
+$ slopscale nodes global-exit-node --identifier 8 --priority 10   # data center
+```
+
+While any global exit node has a priority, every node carries the
+`traffic-steering` capability and each marked node's peer view carries its
+priority as `Hostinfo.Location.Priority`, the way Tailscale's own control
+plane steers traffic. A client set to `--exit-node=auto:any` then picks the
+highest priority that is online instead of the closest by DERP region,
+moves to the next one when it goes offline, and returns as soon as the
+higher one is back. Nodes with the same priority, 0 included, are split by
+each client on its own (a stable hash of the two node ids, not DERP
+latency), so give every node its own value when the order matters. Nodes
+with priority 0 come last. Clients older than Tailscale 1.86 ignore the
+priority and keep picking by DERP region.
+
+The priority is part of the mark: marking without `--priority` keeps the
+current one, clearing the mark resets it to 0, and the same field is
+`priority` in the API body and `exitNodePriority` on the node. In the
+console, the machine's routes tab has the field under "Global exit node",
+and the overview tile names the node clients take first.
+
 ### Setup an exit node
 
 #### Configure a node as exit node

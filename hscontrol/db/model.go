@@ -49,6 +49,7 @@ type nodeRow struct {
 	// NULL for a node that never signed a map request with one.
 	HardwareAttestation *string
 	GlobalExitNode      bool
+	ExitNodePriority    int
 	Ephemeral           bool
 	// VipServices is the JSON of [types.NodeServices]; ApprovedServices
 	// the JSON list of names. See schema.sql.
@@ -110,21 +111,22 @@ func nodeRecordsToNodes(records []nodeRecord) (types.Nodes, error) {
 
 func (r *nodeRow) node() (*types.Node, error) {
 	node := &types.Node{
-		ID:             types.NodeID(r.ID),
-		Hostname:       r.Hostname,
-		GivenName:      r.GivenName,
-		UserID:         r.UserID,
-		RegisterMethod: r.RegisterMethod,
-		AuthKeyID:      r.AuthKeyID,
-		Expiry:         r.Expiry,
-		LastSeen:       r.LastSeen,
-		ApprovedAt:     r.ApprovedAt,
-		SuspendedAt:    r.SuspendedAt,
-		GlobalExitNode: r.GlobalExitNode,
-		Ephemeral:      r.Ephemeral,
-		CreatedAt:      r.CreatedAt,
-		UpdatedAt:      r.UpdatedAt,
-		DeletedAt:      r.DeletedAt,
+		ID:               types.NodeID(r.ID),
+		Hostname:         r.Hostname,
+		GivenName:        r.GivenName,
+		UserID:           r.UserID,
+		RegisterMethod:   r.RegisterMethod,
+		AuthKeyID:        r.AuthKeyID,
+		Expiry:           r.Expiry,
+		LastSeen:         r.LastSeen,
+		ApprovedAt:       r.ApprovedAt,
+		SuspendedAt:      r.SuspendedAt,
+		GlobalExitNode:   r.GlobalExitNode,
+		ExitNodePriority: r.ExitNodePriority,
+		Ephemeral:        r.Ephemeral,
+		CreatedAt:        r.CreatedAt,
+		UpdatedAt:        r.UpdatedAt,
+		DeletedAt:        r.DeletedAt,
 	}
 
 	err := unmarshalTextColumn(r.MachineKey, &node.MachineKey)
@@ -242,26 +244,27 @@ func (r *nodeRow) lockKeys(node *types.Node) error {
 // nodeRowFrom serialises node for INSERT/UPDATE ... MODEL.
 func nodeRowFrom(node *types.Node) (nodeRow, error) {
 	row := nodeRow{
-		ID:             node.ID.Uint64(),
-		MachineKey:     node.MachineKey.String(),
-		NodeKey:        node.NodeKey.String(),
-		DiscoKey:       node.DiscoKey.String(),
-		Ipv4:           addrColumn(node.IPv4),
-		Ipv6:           addrColumn(node.IPv6),
-		Hostname:       node.Hostname,
-		GivenName:      node.GivenName,
-		UserID:         node.UserID,
-		RegisterMethod: node.RegisterMethod,
-		AuthKeyID:      node.AuthKeyID,
-		LastSeen:       node.LastSeen,
-		Expiry:         node.Expiry,
-		ApprovedAt:     node.ApprovedAt,
-		SuspendedAt:    node.SuspendedAt,
-		GlobalExitNode: node.GlobalExitNode,
-		Ephemeral:      node.Ephemeral,
-		CreatedAt:      node.CreatedAt,
-		UpdatedAt:      node.UpdatedAt,
-		DeletedAt:      node.DeletedAt,
+		ID:               node.ID.Uint64(),
+		MachineKey:       node.MachineKey.String(),
+		NodeKey:          node.NodeKey.String(),
+		DiscoKey:         node.DiscoKey.String(),
+		Ipv4:             addrColumn(node.IPv4),
+		Ipv6:             addrColumn(node.IPv6),
+		Hostname:         node.Hostname,
+		GivenName:        node.GivenName,
+		UserID:           node.UserID,
+		RegisterMethod:   node.RegisterMethod,
+		AuthKeyID:        node.AuthKeyID,
+		LastSeen:         node.LastSeen,
+		Expiry:           node.Expiry,
+		ApprovedAt:       node.ApprovedAt,
+		SuspendedAt:      node.SuspendedAt,
+		GlobalExitNode:   node.GlobalExitNode,
+		ExitNodePriority: node.ExitNodePriority,
+		Ephemeral:        node.Ephemeral,
+		CreatedAt:        node.CreatedAt,
+		UpdatedAt:        node.UpdatedAt,
+		DeletedAt:        node.DeletedAt,
 	}
 
 	var err error

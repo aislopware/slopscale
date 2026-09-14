@@ -212,9 +212,21 @@ func (pol *Policy) compileNodeAttrs(
 // stampGlobalExitNodes gives every global exit node suggest-exit-node,
 // which [PeerCapMap] surfaces on its peer view once its exit routes are
 // approved, and every node auto-exit-node while at least one exists, so
-// clients may pick a suggested exit node automatically.
+// clients may pick a suggested exit node automatically. While a global
+// exit node has a priority, every node also gets traffic-steering, which
+// makes the client pick by the priority the peer view carries
+// (Hostinfo.Location.Priority) instead of by DERP latency.
 func stampGlobalExitNodes(nodes views.Slice[types.NodeView], stamp func(types.NodeID, nodecap.Cap)) {
-	if !NodesHaveGlobalExitNode(nodes) {
+	global, steering := false, false
+
+	for _, n := range nodes.All() {
+		if n.GlobalExitNode() {
+			global = true
+			steering = steering || n.ExitNodePriority() > 0
+		}
+	}
+
+	if !global {
 		return
 	}
 
@@ -224,6 +236,10 @@ func stampGlobalExitNodes(nodes views.Slice[types.NodeView], stamp func(types.No
 		}
 
 		stamp(n.ID(), nodecap.AutoExitNode)
+
+		if steering {
+			stamp(n.ID(), nodecap.TrafficSteering)
+		}
 	}
 }
 

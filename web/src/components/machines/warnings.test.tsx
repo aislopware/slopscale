@@ -33,6 +33,7 @@ const router: Node = {
   expiry: null,
   givenName: "pi-gateway",
   globalExitNode: false,
+  exitNodePriority: 0,
   funnelEnabled: false,
   clientVersion: "",
   os: "",

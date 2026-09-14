@@ -46,6 +46,7 @@ function node(id: string, overrides: Partial<Node> = {}): Node {
     expiry: null,
     givenName: `machine-${id}`,
     globalExitNode: false,
+    exitNodePriority: 0,
     funnelEnabled: false,
     clientVersion: "",
     os: "",

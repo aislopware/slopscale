@@ -332,6 +332,16 @@ func (pm *PolicyManager) NodeNeedsPeerRecompute(node types.NodeView) bool {
 		return true
 	}
 
+	// A client on an automatic exit node only re-resolves which one it
+	// uses on a full netmap: the online peer patch alone updates its
+	// suggestion and nothing else (ipn/ipnlocal/local.go UpdateNetmapDelta).
+	// Without this, a global exit node coming back would not be taken up
+	// again, whether it is the ranked one the clients should return to
+	// or the only one left while the others are down.
+	if node.IsGlobalExitNode() {
+		return true
+	}
+
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
 

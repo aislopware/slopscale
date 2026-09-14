@@ -677,6 +677,16 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 			id:  "202609191000-oauth-federated-identity",
 			run: migrateFederatedIdentity,
 		},
+		{
+			// Exit node priority: nodes gain exit_node_priority, the
+			// order among global exit nodes for clients that pick one
+			// automatically. 0 for everything that exists keeps the
+			// DERP-based pick.
+			id: "202609201000-exit-node-priority",
+			run: func(tx *Tx) error {
+				return tx.ex.addColumnIfMissing("nodes", "exit_node_priority", typeIntegerZero)
+			},
+		},
 	}
 }
 

@@ -119,6 +119,7 @@ CREATE TABLE nodes(
   key_signature text,
   nl_key text,
   hardware_attestation text,
+  exit_node_priority bigint NOT NULL DEFAULT 0,
   CONSTRAINT fk_nodes_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_nodes_auth_key FOREIGN KEY(auth_key_id) REFERENCES pre_auth_keys(id)
 );

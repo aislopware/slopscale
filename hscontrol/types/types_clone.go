@@ -138,6 +138,7 @@ var _NodeCloneNeedsRegeneration = Node(struct {
 	SourceAddr          netip.Addr
 	SharedWith          []UserID
 	GlobalExitNode      bool
+	ExitNodePriority    int
 	Ephemeral           bool
 	CreatedAt           time.Time
 	UpdatedAt           time.Time

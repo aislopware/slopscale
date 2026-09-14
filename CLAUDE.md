@@ -177,7 +177,20 @@ while one exists, with or without a policy. The node-attrs fast path in
 `refreshNodeAttrsLocked` must stay open while a global exit node exists, and
 `HasPolicyChange` compares the flag so `SetNodes` recompiles. The control
 server cannot make a client use an exit node; the caps only drive the
-client's own suggestion and auto pick.
+client's own suggestion and auto pick. Order among marked nodes is
+`nodes.exit_node_priority`, set by the same call (nil keeps it, clearing
+the mark resets it) and delivered the way the hosted control plane steers
+traffic: while any marked node has one, `stampGlobalExitNodes` puts
+`traffic-steering` on every node and `peerHostinfo` in `types/node.go`
+puts the value on the marked node's peer view as
+`Hostinfo.Location.Priority`, where the client's `net/traffic` scorer reads
+it (highest wins). The peer view's `Location.Priority` is always the
+server's value, never the client's, and is 0 on an unmarked node. A client
+only re-resolves its automatic exit node on a full netmap, not on the
+online patch, so `NodeNeedsPeerRecompute` is true for every global exit
+node: its reconnect sends peers a full map and they take it up again.
+`SetGlobalExitNode` runs under `globalExitMu` so the NodeStore and the
+database never hold values from different calls.
 
 The DERP map is state, not config: `State.SetDERP`/`ResetDERP` store a
 `types.DERPSettings` override in the `settings` table (key `derp`, like

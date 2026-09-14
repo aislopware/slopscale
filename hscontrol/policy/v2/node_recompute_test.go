@@ -68,6 +68,15 @@ func TestNodeNeedsPeerRecompute(t *testing.T) {
 	driveTarget.ID = 5
 	driveTarget.Tags = []string{"tag:drive"}
 
+	globalExit := node("exit", "100.64.0.6", "fd7a:115c:a1e0::6", users[0])
+	globalExit.ID = 6
+	globalExit.GlobalExitNode = true
+
+	rankedExit := node("ranked-exit", "100.64.0.7", "fd7a:115c:a1e0::7", users[0])
+	rankedExit.ID = 7
+	rankedExit.GlobalExitNode = true
+	rankedExit.ExitNodePriority = 20
+
 	tests := []struct {
 		name    string
 		pol     string
@@ -87,6 +96,20 @@ func TestNodeNeedsPeerRecompute(t *testing.T) {
 			pol:     allowAll,
 			nodes:   types.Nodes{subnetRouter},
 			subject: subnetRouter,
+			want:    true,
+		},
+		{
+			name:    "global exit node needs recompute so clients pick it up again",
+			pol:     allowAll,
+			nodes:   types.Nodes{globalExit},
+			subject: globalExit,
+			want:    true,
+		},
+		{
+			name:    "ranked global exit node needs recompute so clients fail back to it",
+			pol:     allowAll,
+			nodes:   types.Nodes{rankedExit},
+			subject: rankedExit,
 			want:    true,
 		},
 		{

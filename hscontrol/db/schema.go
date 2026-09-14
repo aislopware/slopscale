@@ -34,6 +34,9 @@ var (
 	// typeBoolFalse is a boolean that defaults to false, for flags that
 	// existing rows have not opted into.
 	typeBoolFalse = columnType{sqlite: "numeric DEFAULT false", postgres: "boolean DEFAULT false"}
+	// typeIntegerZero is a non-null integer that defaults to 0, for
+	// counters and ranks existing rows have not set.
+	typeIntegerZero = columnType{sqlite: "integer NOT NULL DEFAULT 0", postgres: "bigint NOT NULL DEFAULT 0"}
 )
 
 func (t columnType) forDialect(d dialect) string {

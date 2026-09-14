@@ -28,6 +28,7 @@ func nodeFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSliceP("tags", "t", []string{}, "")
 	cmd.Flags().StringSliceP("routes", "r", []string{}, "")
 	cmd.Flags().Bool("revoke", false, "")
+	cmd.Flags().Int64("priority", 0, "")
 }
 
 // laptopNode is a user-owned, online node with no routes. Timestamps are
@@ -242,8 +243,38 @@ func TestNodeCommands(t *testing.T) {
 						assert.True(t, *body.Enabled)
 					}
 
+					assert.Nil(t, body.Priority, "no --priority keeps the node's priority")
+
 					marked := laptop
 					marked.GlobalExitNode = true
+					writeJSON(t, w, clientv1.NodeOutputBody{Node: marked})
+				},
+			},
+			want: "Node marked as global exit node\n",
+		},
+		{
+			name:  "global-exit-node --priority posts the priority",
+			src:   globalExitNodeCmd,
+			flags: map[string]string{"identifier": "7", "priority": "20"},
+			routes: map[string]apiHandler{
+				"POST /api/v1/node/{id}/global-exit-node": func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+					t.Helper()
+
+					var body clientv1.SetGlobalExitNodeRequestBody
+
+					decodeBody(t, r, &body)
+
+					if assert.NotNil(t, body.Enabled) {
+						assert.True(t, *body.Enabled)
+					}
+
+					if assert.NotNil(t, body.Priority) {
+						assert.EqualValues(t, 20, *body.Priority)
+					}
+
+					marked := laptop
+					marked.GlobalExitNode = true
+					marked.ExitNodePriority = 20
 					writeJSON(t, w, clientv1.NodeOutputBody{Node: marked})
 				},
 			},

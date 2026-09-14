@@ -144,17 +144,46 @@ function UsersTile({
   );
 }
 
+/**
+ * The global exit node every client takes first: the single highest priority. Undefined when none
+ * is marked or the top priority is shared, since each client then splits the tie on its own.
+ */
+export function preferredGlobalExitNode(nodes: readonly Node[]): Node | undefined {
+  const marked = nodes
+    .filter((node) => node.globalExitNode)
+    .toSorted((left, right) => right.exitNodePriority - left.exitNodePriority);
+  const [first, second] = marked;
+
+  if (first === undefined) {
+    return undefined;
+  }
+
+  if (second !== undefined && second.exitNodePriority === first.exitNodePriority) {
+    return undefined;
+  }
+
+  return first;
+}
+
 function ExitTile({ nodes }: { readonly nodes: readonly Node[] }): ReactElement {
-  const global = nodes.find((node) => node.globalExitNode);
+  const global = preferredGlobalExitNode(nodes);
+  const marked = nodes.filter((node) => node.globalExitNode).length;
   const count = nodes.filter((node) => isExitNode(node)).length;
+
+  let context = "No global exit node";
+
+  if (global !== undefined) {
+    context =
+      marked > 1
+        ? `${nodeName(global)} first of ${marked} global`
+        : `${nodeName(global)} is global`;
+  } else if (marked > 1) {
+    context = `${marked} global, no order`;
+  }
 
   return (
     <Link to="/machines" className={tileClass}>
-      <TileBody
-        label="Exit nodes"
-        value={count}
-        context={global === undefined ? "No global exit node" : `${nodeName(global)} is global`}
-      />
+      <TileBody label="Exit nodes" value={count} context={context} />
     </Link>
   );
 }

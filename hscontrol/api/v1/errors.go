@@ -25,6 +25,7 @@ var badRequestErrors = []error{
 	state.ErrGivenNameInvalid,
 	state.ErrGivenNameTaken,
 	state.ErrNodeNameNotUnique,
+	state.ErrExitNodePriorityNegative,
 	state.ErrNodeMarkedTaggedButHasNoTags,
 	state.ErrNodeHasNeitherUserNorTags,
 	state.ErrRequestedTagsInvalidOrNotPermitted,

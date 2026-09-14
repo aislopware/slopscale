@@ -10,6 +10,8 @@ import (
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/key"
 )
@@ -926,4 +928,35 @@ func TestHasNetworkChanges(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestPeerHostinfoPriority pins what a peer view carries in
+// Hostinfo.Location: the server's exit node priority and nothing the
+// client claimed, so a node cannot outrank the operator's order, while the
+// other location fields a client reported survive.
+func TestPeerHostinfoPriority(t *testing.T) {
+	t.Parallel()
+
+	claimed := &tailcfg.Hostinfo{
+		Hostname: "exit",
+		Location: &tailcfg.Location{Country: "Vietnam", Priority: 1000},
+		NetInfo:  &tailcfg.NetInfo{PreferredDERP: 1},
+	}
+
+	view := peerHostinfo(claimed, 0)
+	require.True(t, view.Location().Valid())
+	assert.Equal(t, 0, view.Location().Priority(), "an unranked node carries no priority, whatever it claimed")
+	assert.Equal(t, "Vietnam", view.Location().Country())
+	assert.False(t, view.NetInfo().Valid())
+
+	view = peerHostinfo(claimed, 20)
+	assert.Equal(t, 20, view.Location().Priority())
+	assert.Equal(t, 1000, claimed.Location.Priority, "the node's own record is untouched")
+
+	view = peerHostinfo(&tailcfg.Hostinfo{Hostname: "exit"}, 20)
+	require.True(t, view.Location().Valid())
+	assert.Equal(t, 20, view.Location().Priority())
+
+	view = peerHostinfo(&tailcfg.Hostinfo{Hostname: "exit"}, 0)
+	assert.False(t, view.Location().Valid(), "no location is invented for an unranked node")
 }

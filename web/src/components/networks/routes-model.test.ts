@@ -55,6 +55,7 @@ function node(id: string, spec: NodeSpec = {}): Node {
     expiry: null,
     givenName: `machine-${id}`,
     globalExitNode: false,
+    exitNodePriority: 0,
     funnelEnabled: false,
     clientVersion: "",
     os: "",
