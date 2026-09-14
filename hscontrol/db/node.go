@@ -579,10 +579,17 @@ func (hsdb *HSDatabase) NodeSetApproval(nodeID types.NodeID, approvedAt *time.Ti
 	})
 }
 
-// NodeSetGlobalExitNode records whether the node is a global exit node.
-func (hsdb *HSDatabase) NodeSetGlobalExitNode(nodeID types.NodeID, on bool) error {
+// NodeSetGlobalExitNode records whether the node is a global exit node
+// and its priority among them.
+func (hsdb *HSDatabase) NodeSetGlobalExitNode(nodeID types.NodeID, on bool, priority int) error {
 	return hsdb.Write(func(tx *Tx) error {
-		return updateNodeColumn(tx, nodeID, table.Nodes.GlobalExitNode, on)
+		_, err := tx.executor().exec(
+			table.Nodes.UPDATE(table.Nodes.GlobalExitNode, table.Nodes.ExitNodePriority, table.Nodes.UpdatedAt).
+				SET(on, priority, time.Now()).
+				WHERE(table.Nodes.ID.EQ(jet.Uint64(nodeID.Uint64()))),
+		)
+
+		return err
 	})
 }
 

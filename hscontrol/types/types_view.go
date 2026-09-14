@@ -349,6 +349,15 @@ func (v NodeView) SharedWith() views.Slice[UserID] { return views.SliceOf(v.ж.S
 // approved when it is set. Only [State.SetGlobalExitNode] writes it.
 func (v NodeView) GlobalExitNode() bool { return v.ж.GlobalExitNode }
 
+// ExitNodePriority orders the global exit nodes for a client that
+// picks its exit node automatically: the highest wins, 0 is no
+// preference. While any global exit node has one, every node
+// carries traffic-steering and the marked nodes' peer views carry
+// the value as Hostinfo.Location.Priority, so the client picks by
+// it instead of by DERP latency and returns to the higher one when
+// it comes back. Only [State.SetGlobalExitNode] writes it.
+func (v NodeView) ExitNodePriority() int { return v.ж.ExitNodePriority }
+
 // Ephemeral is set when the client asked to be ephemeral in its
 // register request (a tailscaled with mem: state, a tsnet Server
 // with Ephemeral) rather than through an ephemeral pre-auth key.
@@ -433,6 +442,7 @@ var _NodeViewNeedsRegeneration = Node(struct {
 	SourceAddr          netip.Addr
 	SharedWith          []UserID
 	GlobalExitNode      bool
+	ExitNodePriority    int
 	Ephemeral           bool
 	CreatedAt           time.Time
 	UpdatedAt           time.Time

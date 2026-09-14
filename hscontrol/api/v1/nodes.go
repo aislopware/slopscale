@@ -72,6 +72,8 @@ type Node struct {
 
 	GlobalExitNode bool `doc:"true when every client is told to prefer this exit node." json:"globalExitNode"`
 
+	ExitNodePriority int `doc:"Order among the global exit nodes for clients that pick one automatically: the highest wins, 0 is no preference." json:"exitNodePriority"` //nolint:lll // struct tag
+
 	// AnnouncedServices is what the node reports hosting; ApprovedServices
 	// the names an operator or the policy let it host. See /api/v1/services.
 	AnnouncedServices []NodeService `doc:"The services in the node's serve configuration, as it last reported them." json:"announcedServices" nullable:"false"` //nolint:lll // struct tag
@@ -884,6 +886,7 @@ func nodeFromView(view types.NodeView) Node {
 		Approved:          view.IsApproved(),
 		SharedWith:        sharedWithIDs(view),
 		GlobalExitNode:    view.IsGlobalExitNode(),
+		ExitNodePriority:  view.ExitNodePriority(),
 		FunnelEnabled:     view.FunnelEnabled(),
 		Ephemeral:         view.IsEphemeral(),
 	}

@@ -54,6 +54,7 @@ function node(
     funnelEnabled: false,
     givenName: `machine-${id}`,
     globalExitNode: false,
+    exitNodePriority: 0,
     id,
     ipAddresses: [],
     lastSeen: stamp,

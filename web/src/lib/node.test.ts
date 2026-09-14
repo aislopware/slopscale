@@ -21,6 +21,7 @@ function fakeNode(availableRoutes: readonly string[], approvedRoutes: readonly s
     expiry: "2099-01-01T00:00:00Z",
     givenName: "test-node",
     globalExitNode: false,
+    exitNodePriority: 0,
     funnelEnabled: false,
     clientVersion: "",
     os: "",

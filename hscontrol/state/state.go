@@ -83,6 +83,11 @@ var ErrNodeNotInNodeStore = errors.New("node no longer exists in NodeStore")
 // ErrNodeNameNotUnique is returned when a node name is not unique.
 var ErrNodeNameNotUnique = errors.New("node name is not unique")
 
+// ErrExitNodePriorityNegative is returned when a global exit node is given
+// a negative priority; the client treats 0 as no preference and rejects
+// less.
+var ErrExitNodePriorityNegative = errors.New("exit node priority must be 0 or more")
+
 // ErrRegistrationExpired is returned when a registration has expired.
 var ErrRegistrationExpired = errors.New("registration expired")
 
@@ -126,6 +131,9 @@ type State struct {
 	derpMap atomic.Pointer[tailcfg.DERPMap]
 	// derpMu serialises DERP writes and guards derp.
 	derpMu sync.Mutex
+	// globalExitMu serialises [State.SetGlobalExitNode], so the value the
+	// NodeStore holds and the one persisted are from the same call.
+	globalExitMu sync.Mutex
 	// derp holds the settings override, the embedded relay and the
 	// fetched map sources; see [State.DERP].
 	derp derpState

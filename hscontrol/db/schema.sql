@@ -162,6 +162,11 @@ CREATE TABLE nodes(
   -- global_exit_node marks an exit node every client is told to prefer:
   -- it gets suggest-exit-node and every node auto-exit-node.
   global_exit_node numeric DEFAULT false,
+  -- exit_node_priority orders the global exit nodes for clients that pick
+  -- one automatically: higher first, 0 no preference. While any is set,
+  -- every node gets traffic-steering and the marked nodes' peer views
+  -- carry the value as Hostinfo.Location.Priority.
+  exit_node_priority integer NOT NULL DEFAULT 0,
   -- ephemeral is set when the client asked to be ephemeral in its register
   -- request (RegisterRequest.Ephemeral, as a tailscaled with mem: state or
   -- a tsnet Server with Ephemeral does), without an ephemeral pre-auth

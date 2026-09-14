@@ -13,7 +13,7 @@ import { render } from "vitest-browser-react";
 import type { Node, User } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import { GetStarted } from "~/components/overview/get-started.tsx";
-import { MetricTiles } from "~/components/overview/metric-tiles.tsx";
+import { MetricTiles, preferredGlobalExitNode } from "~/components/overview/metric-tiles.tsx";
 import { NeedsAttention } from "~/components/overview/needs-attention.tsx";
 
 const admin: Me = {
@@ -74,6 +74,7 @@ const laptop: Node = {
   expiry: null,
   givenName: "laptop-alice",
   globalExitNode: false,
+  exitNodePriority: 0,
   funnelEnabled: false,
   clientVersion: "",
   os: "",
@@ -165,6 +166,45 @@ describe(MetricTiles, () => {
     await expect.element(screen.getByText("1 machine, 1 user")).toBeVisible();
     await expect.element(screen.getByText("1 waiting")).toBeVisible();
     await expect.element(screen.getByText("No global exit node")).toBeVisible();
+  });
+
+  it("names the global exit node clients take first", async () => {
+    const office: Node = {
+      ...gateway,
+      id: "10",
+      givenName: "office",
+      name: "office",
+      globalExitNode: true,
+      exitNodePriority: 20,
+    };
+    const dc: Node = {
+      ...gateway,
+      id: "11",
+      givenName: "dc",
+      name: "dc",
+      globalExitNode: true,
+      exitNodePriority: 10,
+    };
+
+    expect(preferredGlobalExitNode([laptop, dc, office])?.id).toBe("10");
+    expect(preferredGlobalExitNode([laptop])).toBeUndefined();
+    expect(
+      preferredGlobalExitNode([office, { ...dc, exitNodePriority: 20 }]),
+      "a shared top priority names nobody",
+    ).toBeUndefined();
+
+    const screen = await render(
+      app(
+        <MetricTiles
+          nodes={[laptop, dc, office]}
+          users={[alice]}
+          nodesLoading={false}
+          usersLoading={false}
+        />,
+      ),
+    );
+
+    await expect.element(screen.getByText("office first of 2 global")).toBeVisible();
   });
 
   it("leaves out the tiles the caller may not read", async () => {

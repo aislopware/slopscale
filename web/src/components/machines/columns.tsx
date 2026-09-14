@@ -145,8 +145,13 @@ function Attributes({ node }: { readonly node: Node }): ReactElement | null {
   const marks: ReactElement[] = [];
 
   if (node.globalExitNode) {
+    const hint =
+      node.exitNodePriority > 0
+        ? `Global exit node, priority ${node.exitNodePriority}`
+        : "Global exit node, preferred by every client";
+
     marks.push(
-      <Mark key="global" hint="Global exit node, preferred by every client">
+      <Mark key="global" hint={hint}>
         <StarIcon size={markSize} weight="fill" className="text-kumo-warning" />
       </Mark>,
     );

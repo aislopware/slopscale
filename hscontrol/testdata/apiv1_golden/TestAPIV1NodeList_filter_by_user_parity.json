@@ -15,6 +15,7 @@
         "createdAt": "\u003ctimestamp\u003e",
         "discoKey": "\u003csecret\u003e",
         "ephemeral": false,
+        "exitNodePriority": 0,
         "expiry": null,
         "funnelEnabled": false,
         "givenName": "node-a",

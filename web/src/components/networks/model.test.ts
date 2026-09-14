@@ -41,6 +41,7 @@ function node(id: string, available: string[], approved: string[]): Node {
     expiry: null,
     givenName: `machine-${id}`,
     globalExitNode: false,
+    exitNodePriority: 0,
     funnelEnabled: false,
     clientVersion: "",
     os: "",

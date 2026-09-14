@@ -50,6 +50,7 @@ function node(id: string, owner: User, tags: string[] = []): Node {
     expiry: null,
     givenName: `machine-${id}`,
     globalExitNode: false,
+    exitNodePriority: 0,
     funnelEnabled: false,
     clientVersion: "",
     os: "",

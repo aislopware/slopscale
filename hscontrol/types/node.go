@@ -235,6 +235,15 @@ type Node struct {
 	// approved when it is set. Only [State.SetGlobalExitNode] writes it.
 	GlobalExitNode bool
 
+	// ExitNodePriority orders the global exit nodes for a client that
+	// picks its exit node automatically: the highest wins, 0 is no
+	// preference. While any global exit node has one, every node
+	// carries traffic-steering and the marked nodes' peer views carry
+	// the value as Hostinfo.Location.Priority, so the client picks by
+	// it instead of by DERP latency and returns to the higher one when
+	// it comes back. Only [State.SetGlobalExitNode] writes it.
+	ExitNodePriority int
+
 	// Ephemeral is set when the client asked to be ephemeral in its
 	// register request (a tailscaled with mem: state, a tsnet Server
 	// with Ephemeral) rather than through an ephemeral pre-auth key.
@@ -1314,7 +1323,7 @@ func (nv NodeView) hasPolicyChangeExceptPosture(other NodeView) bool {
 		return true
 	}
 
-	if nv.GlobalExitNode() != other.GlobalExitNode() {
+	if nv.GlobalExitNode() != other.GlobalExitNode() || nv.ExitNodePriority() != other.ExitNodePriority() {
 		return true
 	}
 
@@ -1451,7 +1460,7 @@ func (nv NodeView) tailNode(
 	if withCapMap {
 		capMap = selfCapMap(cfg, selfPolicyCaps)
 	} else {
-		hostinfo = peerHostinfo(nv.ж.Hostinfo)
+		hostinfo = peerHostinfo(nv.ж.Hostinfo, nv.exitNodePriorityForPeers())
 	}
 
 	tNode := tailcfg.Node{
@@ -1508,15 +1517,41 @@ func (nv NodeView) tailNode(
 // the node's own NAT and DERP latency findings, which only describe the
 // node's path to the network and would tell every peer how it connects.
 // A shallow copy keeps the map path free of a deep clone per peer.
-func peerHostinfo(hi *tailcfg.Hostinfo) tailcfg.HostinfoView {
-	if hi == nil || hi.NetInfo == nil {
+func peerHostinfo(hi *tailcfg.Hostinfo, exitPriority int) tailcfg.HostinfoView {
+	if hi == nil || (hi.NetInfo == nil && hi.Location == nil && exitPriority == 0) {
 		return hi.View()
 	}
 
 	trimmed := *hi
 	trimmed.NetInfo = nil
 
+	// The exit node priority rides on the peer view as
+	// Hostinfo.Location.Priority, where a client with traffic-steering
+	// reads it (tailscale.com/net/traffic Scores). The server's value is
+	// the only one peers see: a client that reported a Location keeps its
+	// other fields but never its own Priority, or a node could outrank
+	// the operator's order by claiming one.
+	if hi.Location != nil || exitPriority != 0 {
+		location := hi.Location.Clone()
+		if location == nil {
+			location = &tailcfg.Location{}
+		}
+
+		location.Priority = exitPriority
+		trimmed.Location = location
+	}
+
 	return trimmed.View()
+}
+
+// exitNodePriorityForPeers is the priority the node's peer view carries:
+// its exit node priority while it is a global exit node, else 0.
+func (nv NodeView) exitNodePriorityForPeers() int {
+	if !nv.GlobalExitNode() {
+		return 0
+	}
+
+	return nv.ExitNodePriority()
 }
 
 // selfCapMap is the CapMap of a node's own entry: the baseline caps every

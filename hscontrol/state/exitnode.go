@@ -13,14 +13,29 @@ import (
 // SetGlobalExitNode marks a node as a global exit node or clears the
 // mark. Marking approves the node's exit routes, so it serves as an exit
 // node as soon as it advertises them; clearing leaves the routes as they
-// are. Every node's capabilities change (auto-exit-node comes and goes
-// with the first and last global exit node), so the result is a
+// are. priority orders the global exit nodes for clients that pick one
+// automatically (highest first, 0 no preference); nil keeps the node's
+// current one and clearing the mark resets it. Every node's capabilities
+// change (auto-exit-node and traffic-steering come and go with the first
+// and last global exit node and priority), so the result is a
 // tailnet-wide recompute.
-func (s *State) SetGlobalExitNode(nodeID types.NodeID, on bool) (types.NodeView, change.Change, error) {
+func (s *State) SetGlobalExitNode(nodeID types.NodeID, on bool, priority *int) (
+	types.NodeView, change.Change, error,
+) {
 	node, ok := s.nodeStore.GetNode(nodeID)
 	if !ok {
 		return types.NodeView{}, change.Change{}, fmt.Errorf("%w: %d", ErrNodeNotInNodeStore, nodeID)
 	}
+
+	if on && priority != nil && *priority < 0 {
+		return types.NodeView{}, change.Change{}, fmt.Errorf("%w: %d", ErrExitNodePriorityNegative, *priority)
+	}
+
+	// One call at a time: the NodeStore update and the database write
+	// below must land in the same order, or a kept priority read by one
+	// call could be persisted over the value another call just set.
+	s.globalExitMu.Lock()
+	defer s.globalExitMu.Unlock()
 
 	var c change.Change
 
@@ -47,10 +62,18 @@ func (s *State) SetGlobalExitNode(nodeID types.NodeID, on bool) (types.NodeView,
 
 	n, _ := s.nodeStore.UpdateNode(nodeID, func(node *types.Node) {
 		node.GlobalExitNode = on
+
+		switch {
+		case !on:
+			node.ExitNodePriority = 0
+		case priority != nil:
+			node.ExitNodePriority = *priority
+		}
 	})
 
-	// persistNodeToDB leaves global_exit_node alone, as it does expiry.
-	err := s.db.NodeSetGlobalExitNode(nodeID, on)
+	// persistNodeToDB leaves global_exit_node and exit_node_priority
+	// alone, as it does expiry.
+	err := s.db.NodeSetGlobalExitNode(nodeID, on, n.ExitNodePriority())
 	if err != nil {
 		return types.NodeView{}, change.Change{}, fmt.Errorf("setting global exit node in database: %w", err)
 	}

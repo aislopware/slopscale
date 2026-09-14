@@ -166,6 +166,7 @@ COL nodes.approved_services text null=YES
 COL nodes.key_signature text null=YES
 COL nodes.nl_key text null=YES
 COL nodes.hardware_attestation text null=YES
+COL nodes.exit_node_priority bigint null=NO default=0
 COL oauth_access_tokens.id bigint null=NO default=nextval('oauth_access_tokens_id_seq'::regclass)
 COL oauth_access_tokens.prefix text null=YES
 COL oauth_access_tokens.hash bytea null=YES
@@ -497,6 +498,7 @@ CON node_shares node_shares_pkey PRIMARY KEY (id)
 CON node_shares node_shares_user_id_not_null NOT NULL user_id
 CON nodes fk_nodes_auth_key FOREIGN KEY (auth_key_id) REFERENCES pre_auth_keys(id)
 CON nodes fk_nodes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+CON nodes nodes_exit_node_priority_not_null NOT NULL exit_node_priority
 CON nodes nodes_id_not_null NOT NULL id
 CON nodes nodes_pkey PRIMARY KEY (id)
 CON oauth_access_tokens oauth_access_tokens_id_not_null NOT NULL id

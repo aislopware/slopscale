@@ -85,6 +85,9 @@ func init() {
 	globalExitNodeCmd.Flags().Uint64P("identifier", "i", 0, "Node identifier (ID)")
 	mustMarkRequired(globalExitNodeCmd, "identifier")
 	globalExitNodeCmd.Flags().Bool("revoke", false, "Clear the mark instead of setting it")
+	globalExitNodeCmd.Flags().Int64("priority", 0,
+		"Order among the global exit nodes for clients that pick one automatically: "+
+			"the highest wins, 0 is no preference")
 	nodeCmd.AddCommand(globalExitNodeCmd)
 
 	accessGraphCmd.Flags().Uint64P("node", "n", 0, "Node identifier (ID)")
@@ -268,22 +271,31 @@ exit routes. The node then carries suggest-exit-node and every node
 auto-exit-node, so clients that use an exit node automatically
 (tailscale set --exit-node=auto:any) pick it.
 
+With several marked nodes, --priority orders them: a client picks the
+highest one that is online and returns to it when it comes back. Leaving
+the flag out keeps the node's priority; clearing the mark resets it.
+
 Use --revoke to clear the mark again.`,
-	RunE: toggleNodeRunE(
-		"setting global exit node",
-		"Node marked as global exit node",
-		"Global exit node mark cleared",
-		func(ctx context.Context, client *clientv1.ClientWithResponses, id string, on bool) (
-			*nodeToggleResponse, error,
-		) {
-			resp, err := client.SetGlobalExitNodeWithResponse(
-				ctx, id, clientv1.SetGlobalExitNodeJSONRequestBody{Enabled: &on},
-			)
-			if err != nil {
-				return nil, err
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			identifier, _ := cmd.Flags().GetUint64("identifier")
+			revoke, _ := cmd.Flags().GetBool("revoke")
+			on := !revoke
+			body := clientv1.SetGlobalExitNodeJSONRequestBody{Enabled: &on}
+
+			if cmd.Flags().Changed("priority") {
+				priority, _ := cmd.Flags().GetInt64("priority")
+				body.Priority = &priority
 			}
 
-			return &nodeToggleResponse{resp.StatusCode(), resp.ApplicationproblemJSONDefault, resp.JSON200}, nil
+			resp, err := client.SetGlobalExitNodeWithResponse(ctx, strconv.FormatUint(identifier, util.Base10), body)
+			if err != nil {
+				return fmt.Errorf("setting global exit node: %w", err)
+			}
+
+			return printNodeToggle(cmd,
+				&nodeToggleResponse{resp.StatusCode(), resp.ApplicationproblemJSONDefault, resp.JSON200},
+				revoke, "Node marked as global exit node", "Global exit node mark cleared")
 		},
 	),
 }
@@ -314,18 +326,24 @@ func toggleNodeRunE(
 				return fmt.Errorf("%s: %w", what, err)
 			}
 
-			if resp.status != http.StatusOK {
-				return apiError(resp.status, resp.problem)
-			}
-
-			msg := onMsg
-			if revoke {
-				msg = offMsg
-			}
-
-			return printOutput(cmd, resp.node.Node, msg)
+			return printNodeToggle(cmd, resp, revoke, onMsg, offMsg)
 		},
 	)
+}
+
+// printNodeToggle prints the node a node on/off endpoint answered, with
+// the message for the direction taken, or the error it answered.
+func printNodeToggle(cmd *cobra.Command, resp *nodeToggleResponse, revoke bool, onMsg, offMsg string) error {
+	if resp.status != http.StatusOK {
+		return apiError(resp.status, resp.problem)
+	}
+
+	msg := onMsg
+	if revoke {
+		msg = offMsg
+	}
+
+	return printOutput(cmd, resp.node.Node, msg)
 }
 
 var shareNodeCmd = &cobra.Command{

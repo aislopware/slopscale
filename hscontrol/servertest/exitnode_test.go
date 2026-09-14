@@ -33,14 +33,36 @@ func peerSuggested(nm *netmap.NetworkMap, hostname string) bool {
 	return false
 }
 
+// peerPriority is the exit node priority the peer named hostname carries
+// on its view in nm (Hostinfo.Location.Priority), 0 when it has none.
+func peerPriority(nm *netmap.NetworkMap, hostname string) int {
+	if nm == nil {
+		return 0
+	}
+
+	for _, p := range nm.Peers {
+		if !p.Hostinfo().Valid() || p.Hostinfo().Hostname() != hostname {
+			continue
+		}
+
+		if loc := p.Hostinfo().Location(); loc.Valid() {
+			return loc.Priority()
+		}
+	}
+
+	return 0
+}
+
 // TestGlobalExitNodeEndToEnd proves exit node suggestions through the v1
 // API and the clients' netmaps. Every approved exit node is suggested on
 // its peers' view of it, as the hosted control plane does, with no policy
 // involved; marking a global exit node approves its routes, narrows the
 // suggestion to the marked nodes, gives them suggest-exit-node in their
-// own view and every client auto-exit-node; clearing the mark widens the
-// suggestion again and keeps the routes. The subtests build on one
-// another, so they run in order.
+// own view and every client auto-exit-node; a priority puts
+// traffic-steering on every client and the value on the marked node's peer
+// view; clearing the mark widens the suggestion again, drops the priority
+// and keeps the routes. The subtests build on one another, so they run in
+// order.
 //
 //nolint:tparallel // later steps depend on the state earlier ones leave behind
 func TestGlobalExitNodeEndToEnd(t *testing.T) {
@@ -135,15 +157,41 @@ func TestGlobalExitNodeEndToEnd(t *testing.T) {
 		})
 	})
 
+	t.Run("a priority steers the clients and survives re-marking without one", func(t *testing.T) {
+		assert.False(t, hasCap(laptop.Netmap(), nodecap.TrafficSteering), "no priority, no steering")
+		assert.Equal(t, 0, peerPriority(laptop.Netmap(), "exit-1"))
+
+		status, body := apiCall(t, client, ownerKey, http.MethodPost, exitURL, map[string]any{"priority": 20})
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, true, field(t, body, "node", "globalExitNode"))
+		assert.EqualValues(t, 20, field(t, body, "node", "exitNodePriority"))
+
+		laptop.WaitForCondition(t, "traffic-steering and the priority on the exit's peer view", exitNodeWait,
+			func(nm *netmap.NetworkMap) bool {
+				return hasCap(nm, nodecap.TrafficSteering) && peerPriority(nm, "exit-1") == 20
+			})
+		assert.Equal(t, 0, peerPriority(laptop.Netmap(), "exit-2"), "an unmarked exit node carries none")
+
+		status, body = apiCall(t, client, ownerKey, http.MethodPost, exitURL, nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.EqualValues(t, 20, field(t, body, "node", "exitNodePriority"), "re-marking keeps the priority")
+
+		status, body = apiCall(t, client, ownerKey, http.MethodPost, exitURL, map[string]any{"priority": -1})
+		require.Equal(t, http.StatusUnprocessableEntity, status, body)
+	})
+
 	t.Run("clearing the mark widens the suggestion again and keeps the routes", func(t *testing.T) {
 		status, body := apiCall(t, client, ownerKey, http.MethodPost, exitURL, map[string]bool{"enabled": false})
 		require.Equal(t, http.StatusOK, status, body)
 		assert.Equal(t, false, field(t, body, "node", "globalExitNode"))
+		assert.EqualValues(t, 0, field(t, body, "node", "exitNodePriority"), "clearing resets the priority")
 		assert.ElementsMatch(t, exitRoutes, field(t, body, "node", "approvedRoutes"))
 
-		laptop.WaitForCondition(t, "both exits suggested, auto-exit-node gone", exitNodeWait,
+		laptop.WaitForCondition(t, "both exits suggested, auto-exit-node and steering gone", exitNodeWait,
 			func(nm *netmap.NetworkMap) bool {
 				return !hasCap(nm, nodecap.AutoExitNode) &&
+					!hasCap(nm, nodecap.TrafficSteering) &&
+					peerPriority(nm, "exit-1") == 0 &&
 					peerSuggested(nm, "exit-1") &&
 					peerSuggested(nm, "exit-2")
 			})

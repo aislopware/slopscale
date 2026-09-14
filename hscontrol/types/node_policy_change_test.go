@@ -155,6 +155,11 @@ func TestHasPolicyChangeFields(t *testing.T) {
 			want:   true,
 		},
 		{
+			name:   "exit node priority",
+			mutate: func(n *Node) { n.ExitNodePriority = 10 },
+			want:   true,
+		},
+		{
 			name:   "reported OS",
 			mutate: func(n *Node) { n.Hostinfo.OS = "linux" },
 			want:   true,

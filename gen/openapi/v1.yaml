@@ -2127,6 +2127,10 @@ components:
         ephemeral:
           description: true when the node is deleted on logout or after the ephemeral timeout.
           type: boolean
+        exitNodePriority:
+          description: "Order among the global exit nodes for clients that pick one automatically: the highest wins, 0 is no preference."
+          format: int64
+          type: integer
         expiry:
           format: date-time
           type:
@@ -2241,6 +2245,7 @@ components:
         - tags
         - sharedWith
         - globalExitNode
+        - exitNodePriority
         - announcedServices
         - approvedServices
         - funnelEnabled
@@ -3603,6 +3608,11 @@ components:
         enabled:
           description: false clears the mark.
           type: boolean
+        priority:
+          description: "Order among the global exit nodes for clients that pick one automatically: the highest wins, 0 is no preference. Absent keeps the current one; clearing the mark resets it."
+          format: int64
+          minimum: 0
+          type: integer
       type: object
     SetSuspensionRequestBody:
       additionalProperties: false
@@ -7008,7 +7018,7 @@ paths:
   /api/v1/node/{nodeId}/global-exit-node:
     post:
       description: |-
-        Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it.
+        Marks an exit node every client is told to prefer, or clears the mark. Marking approves the node's exit routes; the node then carries suggest-exit-node and every node auto-exit-node, so clients that use an exit node automatically (`tailscale set --exit-node=auto:any`) pick it. A priority orders several marked nodes: while one has a priority, every node carries traffic-steering and the clients pick the highest one that is online, returning to it when it comes back.
 
         Requires the `devices:routes` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: setGlobalExitNode
