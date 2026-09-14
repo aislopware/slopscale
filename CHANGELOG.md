@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.43.0](https://github.com/aislopware/slopscale/compare/v0.42.3...v0.43.0) (2026-09-14)
+
+
+### Changes
+
+* **state:** fail over between global exit nodes in a fixed order with a priority ([#17](https://github.com/aislopware/slopscale/issues/17)) ([6b3553a](https://github.com/aislopware/slopscale/commit/6b3553afc654a74a4d9e87e3fca1f06395a97f8b))
+
 ## [0.42.3](https://github.com/aislopware/slopscale/compare/v0.42.2...v0.42.3) (2026-09-14)
 
 
