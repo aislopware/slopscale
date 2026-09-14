@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.42.2](https://github.com/aislopware/slopscale/compare/v0.42.1...v0.42.2) (2026-09-14)
+
+
+### Fixes
+
+* **hscontrol:** answer a machine's ACME challenge only once the zone's nameservers serve the record ([5548638](https://github.com/aislopware/slopscale/commit/55486383cfb9ec21eb829f03cf6aff78b13553cb))
+
 ## [0.42.1](https://github.com/aislopware/slopscale/compare/v0.42.0...v0.42.1) (2026-09-12)
 
 
