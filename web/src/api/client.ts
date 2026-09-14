@@ -5,6 +5,7 @@ import { safeParse } from "valibot";
 
 import { ApiError, problemSchema, statusUnauthorized } from "~/api/error.ts";
 import type { Problem } from "~/api/error.ts";
+import { NetworkError } from "~/api/network.ts";
 import type { paths } from "~/api/schema.gen.ts";
 import { sessionEnded } from "~/auth/ended.ts";
 
@@ -14,7 +15,9 @@ const whoami = "/api/v1/whoami";
 /**
  * The session cookie rides along on every same-origin request, so there is no credential to attach.
  * Errors become `ApiError`. A 401 on anything but the guards' own question means the session ended
- * under an open page, so the router is told and sends the operator back to sign-in.
+ * under an open page, so the router is told and sends the operator back to sign-in. A request the
+ * browser could not deliver at all becomes `NetworkError`; an abort is left as it is, since the
+ * caller asked for it.
  */
 const problems: Middleware = {
   async onResponse({ request, response }) {
@@ -24,7 +27,15 @@ const problems: Middleware = {
 
     throw await refusal(request.url, response, `${response.status} ${response.statusText}`);
   },
+  onError({ error }) {
+    return unreachable(error);
+  },
 };
+
+/** The error a failed fetch is raised as: fetch reports a dropped connection as a TypeError. */
+export function unreachable(error: unknown): NetworkError | undefined {
+  return error instanceof TypeError ? new NetworkError(error) : undefined;
+}
 
 /**
  * What the console throws for a request the server refused, wherever the request came from: the

@@ -58,8 +58,9 @@ const alice: User = {
 
 const secret = "hskey-auth-69968f8036d70dd6a1b2c3d4e5f6";
 
-const plain: PreAuthKey = {
-  aclTags: [],
+/** A tagged key belongs to its tags: the server sends it without a user. */
+const ownerless: PreAuthKey = {
+  aclTags: ["tag:exit"],
   groupIds: [],
   createdAt: "2026-01-01T00:00:00Z",
   ephemeral: false,
@@ -69,8 +70,9 @@ const plain: PreAuthKey = {
   preauthorized: true,
   reusable: true,
   used: false,
-  user: alice,
 };
+
+const plain: PreAuthKey = { ...ownerless, aclTags: [], id: "3", user: alice };
 
 const tagged: PreAuthKey = { ...plain, aclTags: ["tag:ci", "tag:prod"], id: "2" };
 
@@ -98,6 +100,14 @@ describe("the pre-auth key table", () => {
     const screen = await render(<PreAuthTable keys={[plain]} />);
 
     await expect.element(screen.getByText(`${secret.slice(0, previewLength)}…`)).toBeVisible();
+  });
+
+  it("shows a key without a user as tagged instead of failing on the missing owner", async () => {
+    const screen = await render(<PreAuthTable keys={[ownerless, plain]} />);
+
+    await expect.element(screen.getByText("Tagged")).toBeVisible();
+    await expect.element(screen.getByText("Alice Nguyen")).toBeVisible();
+    await expect.element(screen.getByText("tag:exit")).toBeVisible();
   });
 
   it("carries tags in the type cell instead of a column of their own", async () => {

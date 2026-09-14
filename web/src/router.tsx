@@ -1,6 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 
+import { NetworkError } from "~/api/network.ts";
 import { onSessionEnd } from "~/auth/ended.ts";
 import { RouteError, RouteNotFound } from "~/components/ui/error-page.tsx";
 import { routeTree } from "~/routeTree.gen.ts";
@@ -14,10 +15,11 @@ export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime,
-      // A refused request is an answer and is shown as one; a dropped connection, which fetch
-      // reports as a TypeError, is tried once more before the page says the server did not answer.
+      // A refused request is an answer and is shown as one; a dropped connection, which the fetch
+      // layer raises as a NetworkError, is tried once more before the page says the server did not
+      // answer.
       retry: (failureCount, error): boolean =>
-        error instanceof TypeError && failureCount < networkRetries,
+        error instanceof NetworkError && failureCount < networkRetries,
       refetchOnWindowFocus: true,
     },
   },

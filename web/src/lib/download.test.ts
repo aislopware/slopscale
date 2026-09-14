@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { ApiError } from "~/api/error.ts";
+import { NetworkError } from "~/api/network.ts";
 import { onSessionEnd } from "~/auth/ended.ts";
 import { dispositionFileName, downloadFile } from "~/lib/download.ts";
 
@@ -79,6 +80,15 @@ describe(downloadFile, () => {
       expect(error.message).toBe("the machine did not answer in time");
     },
   );
+
+  it("raises a dropped connection as a network error, not the browser's TypeError", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.reject(new TypeError("Failed to fetch"))),
+    );
+
+    await expect(downloadFile(url, "dump.txt")).rejects.toBeInstanceOf(NetworkError);
+  });
 
   it("falls back to the status when the refusal carries no problem document", async () => {
     const plain = new Response("nope", { status: statusBadGateway });

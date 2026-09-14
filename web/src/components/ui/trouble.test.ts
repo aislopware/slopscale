@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ApiError } from "~/api/error.ts";
+import { NetworkError } from "~/api/network.ts";
 import { describeTrouble, sentence } from "~/components/ui/trouble.ts";
 
 describe(describeTrouble, () => {
@@ -24,9 +25,22 @@ describe(describeTrouble, () => {
   });
 
   it("reads a failed fetch the same way", () => {
-    expect(describeTrouble(new TypeError("Failed to fetch"))).toMatchObject({
+    const dropped = new NetworkError(new TypeError("Failed to fetch"));
+
+    expect(describeTrouble(dropped)).toMatchObject({
       kind: "unreachable",
       code: "No connection",
+      message: "Failed to fetch",
+    });
+  });
+
+  it("does not mistake a TypeError from the console's own code for a lost connection", () => {
+    const fault = new TypeError("Cannot read properties of null (reading 'displayName')");
+
+    expect(describeTrouble(fault)).toMatchObject({
+      kind: "console",
+      code: "Console error",
+      message: fault.message,
     });
   });
 

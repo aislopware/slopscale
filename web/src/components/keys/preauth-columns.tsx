@@ -1,7 +1,8 @@
+import { TagIcon } from "@phosphor-icons/react";
 import type { ReactElement, ReactNode } from "react";
 
 import { errorMessage } from "~/api/error.ts";
-import type { Group, PreAuthKey } from "~/api/queries.ts";
+import type { Group, PreAuthKey, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { groupName } from "~/components/access/model.ts";
@@ -34,6 +35,17 @@ function shortName(authKey: PreAuthKey): string {
   return authKey.key.slice(0, nameLength);
 }
 
+/** Matches the tag mark in the machines table so a tagged key and a tagged machine read alike. */
+const markSize = 13;
+
+/**
+ * Who a key registers machines for. A tagged key has no user at all (tags and users are exclusive,
+ * and the server leaves the field out), so it sorts and searches under "Tagged".
+ */
+function ownerLabel(authKey: PreAuthKey): string {
+  return authKey.user === undefined ? "Tagged" : userLabel(authKey.user);
+}
+
 const helper = createAppColumnHelper<PreAuthKey>();
 
 export const preAuthKeyColumns = helper.columns([
@@ -44,11 +56,11 @@ export const preAuthKeyColumns = helper.columns([
     cell: ({ row }) => <KeyCell authKey={row.original} />,
     meta: { className: "min-w-56" },
   }),
-  helper.accessor((authKey) => userLabel(authKey.user), {
+  helper.accessor(ownerLabel, {
     id: "user",
     header: "User",
     enableSorting: true,
-    cell: ({ row }) => <UserCell name={userLabel(row.original.user)} id={row.original.user.id} />,
+    cell: ({ row }) => <UserCell user={row.original.user} />,
     meta: { className: "hidden min-w-36 sm:table-cell" },
   }),
   // A column of its own for tags was empty on most rows, so they ride along in this cell; the
@@ -105,7 +117,9 @@ export const preAuthKeyColumns = helper.columns([
 
 /** On a phone the User and Options columns are hidden, so the key carries their words below it. */
 function KeyCell({ authKey }: { readonly authKey: PreAuthKey }): ReactElement {
-  const words = [userLabel(authKey.user), ...traits(authKey), ...authKey.aclTags];
+  // The tags say "tagged" on their own, so a key without a user adds no owner word here.
+  const owner = authKey.user === undefined ? [] : [userLabel(authKey.user)];
+  const words = [...owner, ...traits(authKey), ...authKey.aclTags];
 
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
@@ -117,10 +131,23 @@ function KeyCell({ authKey }: { readonly authKey: PreAuthKey }): ReactElement {
   );
 }
 
-function UserCell({ name, id }: { readonly name: string; readonly id: string }): ReactElement {
+function UserCell({ user }: { readonly user: User | undefined }): ReactElement {
+  if (user === undefined) {
+    return (
+      <span className="flex items-center gap-1.5 text-kumo-subtle">
+        <span className="flex h-lh items-center">
+          <TagIcon size={markSize} />
+        </span>
+        Tagged
+      </span>
+    );
+  }
+
+  const name = userLabel(user);
+
   return (
     <span className="flex max-w-48 min-w-0 items-center gap-2" title={name}>
-      <Avatar name={name} id={id} size="sm" />
+      <Avatar name={name} id={user.id} size="sm" />
       <span className="truncate text-kumo-default">{name}</span>
     </span>
   );

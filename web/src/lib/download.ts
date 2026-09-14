@@ -1,4 +1,4 @@
-import { refusal } from "~/api/client.ts";
+import { refusal, unreachable } from "~/api/client.ts";
 
 /** How long the blob URL outlives the click that started the download. */
 const revokeDelayMs = 1000;
@@ -64,7 +64,9 @@ function decodeName(value: string, fallback: string): string {
  * `ApiError` and ends the session on a 401.
  */
 export async function downloadFile(url: string, fallbackName: string): Promise<void> {
-  const response = await fetch(url);
+  const response = await fetch(url).catch((error: unknown) => {
+    throw unreachable(error) ?? error;
+  });
 
   if (!response.ok) {
     throw await refusal(

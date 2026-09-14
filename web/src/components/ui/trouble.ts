@@ -1,4 +1,5 @@
 import { ApiError, errorMessage } from "~/api/error.ts";
+import { NetworkError } from "~/api/network.ts";
 
 /**
  * What went wrong, in the terms the page speaks: not the HTTP status but what it means for the
@@ -134,9 +135,12 @@ function byStatus(error: ApiError): Omit<Trouble, "message" | "instance"> {
   };
 }
 
-/** Whether the browser never reached a server at all: fetch fails with a TypeError then. */
+/**
+ * Whether the browser never reached a server at all. The fetch layer says so with a `NetworkError`;
+ * a bare TypeError is a console fault (a null read in a component, say) and is reported as one.
+ */
 function isNetworkFailure(error: unknown): boolean {
-  return error instanceof TypeError;
+  return error instanceof NetworkError;
 }
 
 /** Reads anything a loader or a component threw as a Trouble. */
