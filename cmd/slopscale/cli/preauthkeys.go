@@ -70,7 +70,7 @@ var listPreAuthKeys = &cobra.Command{
 					switch {
 					case len(key.AclTags) > 0:
 						owner = strings.Join(key.AclTags, "\n")
-					case key.User.Id != "":
+					case key.User != nil:
 						owner = key.User.Name
 					}
 

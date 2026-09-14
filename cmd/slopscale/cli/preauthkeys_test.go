@@ -32,7 +32,7 @@ func preAuthKeys() []clientv1.PreAuthKey {
 			Reusable:   true,
 			Expiration: time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC),
 			CreatedAt:  created,
-			User:       clientv1.User{Id: "1", Name: "alice", CreatedAt: created},
+			User:       &clientv1.User{Id: "1", Name: "alice", CreatedAt: created},
 		},
 		{
 			Id:         "6",
