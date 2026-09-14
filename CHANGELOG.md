@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [0.42.3](https://github.com/aislopware/slopscale/compare/v0.42.2...v0.42.3) (2026-09-14)
+
+
+### Fixes
+
+* **api/v1:** leave out the user of a tagged pre-auth key and present tagged nodes the same on every response ([34bd668](https://github.com/aislopware/slopscale/commit/34bd6685ef6c9dcd704b37b15d9d76940b9c79dd))
+* **cli:** list a tagged pre-auth key without a user ([cdd062d](https://github.com/aislopware/slopscale/commit/cdd062dfe03ca6b6965eb774996c58feadd5e42b))
+* **policy:** let a service host accept traffic to its Tailscale Service addresses ([7831b98](https://github.com/aislopware/slopscale/commit/7831b98e0f40229035459ef0f64ef23faa7ae310))
+* **web:** show tagged pre-auth keys instead of failing, and stop reporting console faults as lost connections ([36af1b7](https://github.com/aislopware/slopscale/commit/36af1b71b924151ba2d2fca733c6200a6c1e7bd1))
+
 ## [0.42.2](https://github.com/aislopware/slopscale/compare/v0.42.1...v0.42.2) (2026-09-14)
 
 
