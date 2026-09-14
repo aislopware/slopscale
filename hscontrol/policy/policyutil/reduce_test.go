@@ -788,7 +788,7 @@ func TestReduceFilterRules(t *testing.T) {
 
 				got, _ := pm.Filter()
 				t.Logf("full filter:\n%s", must.Get(json.MarshalIndent(got, "", "  ")))
-				got = policyutil.ReduceFilterRules(tt.node.View(), got)
+				got = policyutil.ReduceFilterRules(tt.node.View(), got, nil)
 
 				if diff := cmp.Diff(tt.want, got); diff != "" {
 					log.Trace().Interface("got", got).Msg("result")
@@ -901,7 +901,7 @@ func TestReduceFilterRulesPartialApproval(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := policyutil.ReduceFilterRules(
-				tt.node.View(), tt.rules,
+				tt.node.View(), tt.rules, nil,
 			)
 			require.Len(t, got, tt.wantCount,
 				"rule count mismatch")
@@ -1265,7 +1265,7 @@ func TestReduceFilterRulesCapGrant(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := policyutil.ReduceFilterRules(tt.node.View(), tt.rules)
+			got := policyutil.ReduceFilterRules(tt.node.View(), tt.rules, nil)
 
 			require.Len(t, got, len(tt.want),
 				"rule count mismatch")
@@ -1414,8 +1414,52 @@ func TestReduceFilterRulesAppConnector(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := policyutil.ReduceFilterRules(tt.node.View(), tt.rules)
+			got := policyutil.ReduceFilterRules(tt.node.View(), tt.rules, nil)
 			require.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// TestReduceFilterRulesServiceHost pins that a rule whose destination is
+// a Tailscale Service reaches the node hosting it: the service address is
+// not one of the host's own, so it would otherwise be dropped and the host
+// would refuse the service's traffic.
+func TestReduceFilterRulesServiceHost(t *testing.T) {
+	t.Parallel()
+
+	host := &types.Node{
+		ID:       1,
+		IPv4:     ap("100.64.0.1"),
+		IPv6:     ap("fd7a:115c:a1e0::1"),
+		Hostinfo: &tailcfg.Hostinfo{},
+	}
+	other := &types.Node{
+		ID:       2,
+		IPv4:     ap("100.64.0.2"),
+		IPv6:     ap("fd7a:115c:a1e0::2"),
+		Hostinfo: &tailcfg.Hostinfo{},
+	}
+
+	serviceRule := tailcfg.FilterRule{
+		SrcIPs: []string{"100.64.0.0/10"},
+		DstPorts: []tailcfg.NetPortRange{
+			{IP: "100.64.0.19/32", Ports: tailcfg.PortRange{First: 443, Last: 443}},
+			{IP: "fd7a:115c:a1e0::13/128", Ports: tailcfg.PortRange{First: 443, Last: 443}},
+		},
+	}
+	servicePrefixes := []netip.Prefix{p("100.64.0.19/32"), p("fd7a:115c:a1e0::13/128")}
+
+	t.Run("host keeps the service destinations", func(t *testing.T) {
+		t.Parallel()
+
+		got := policyutil.ReduceFilterRules(host.View(), []tailcfg.FilterRule{serviceRule}, servicePrefixes)
+		require.Equal(t, []tailcfg.FilterRule{serviceRule}, got)
+	})
+
+	t.Run("a node without the service drops them", func(t *testing.T) {
+		t.Parallel()
+
+		got := policyutil.ReduceFilterRules(other.View(), []tailcfg.FilterRule{serviceRule}, nil)
+		require.Empty(t, got)
+	})
 }

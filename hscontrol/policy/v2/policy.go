@@ -2090,7 +2090,9 @@ func (pm *PolicyManager) filterForNodeLocked(
 		unreduced = pm.filterRulesForNodeLocked(node)
 	}
 
-	reduced := policyutil.ReduceFilterRules(node, unreduced)
+	reduced := policyutil.ReduceFilterRules(
+		node, unreduced, ServicePrefixes(pm.vipServices, node.HostedServices()),
+	)
 	pm.filterRulesMap.Store(node.ID(), reduced)
 
 	return reduced

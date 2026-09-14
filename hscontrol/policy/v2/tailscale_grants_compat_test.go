@@ -292,7 +292,7 @@ func testGrantSuccess(
 				nodes.ViewSlice(),
 			)
 
-			gotRules = policyutil.ReduceFilterRules(node.View(), gotRules)
+			gotRules = policyutil.ReduceFilterRules(node.View(), gotRules, nil)
 
 			wantRules := capture.PacketFilterRules
 

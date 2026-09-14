@@ -17,10 +17,21 @@ import (
 // (from autogroup:self policies) are already node-specific and should not be passed
 // to this function. Use [policy.PolicyManager.FilterForNode] instead, which handles
 // both cases.
-func ReduceFilterRules(node types.NodeView, rules []tailcfg.FilterRule) []tailcfg.FilterRule {
+//
+// servicePrefixes are the addresses of the Tailscale Services the node
+// hosts. A rule whose destination is a service names those addresses,
+// never the host's own, so without them the host's filter drops the
+// service traffic before it reaches the tun device.
+func ReduceFilterRules(
+	node types.NodeView, rules []tailcfg.FilterRule, servicePrefixes []netip.Prefix,
+) []tailcfg.FilterRule {
 	ret := []tailcfg.FilterRule{}
-	subnetRoutes := node.SubnetRoutes()
-	hasExitRoutes := node.IsExitNode()
+	keep := destKeeper{
+		node:            node,
+		subnetRoutes:    node.SubnetRoutes(),
+		servicePrefixes: servicePrefixes,
+		hasExitRoutes:   node.IsExitNode(),
+	}
 	runsConnector := node.Hostinfo().Valid() && node.Hostinfo().AppConnector().EqualBool(true)
 
 	for _, rule := range rules {
@@ -56,29 +67,7 @@ func ReduceFilterRules(node types.NodeView, rules []tailcfg.FilterRule) []tailcf
 				connectorDNS = true
 			}
 
-			if node.InIPSet(expanded) {
-				dests = append(dests, dest)
-				continue
-			}
-
-			// If the node has approved subnet routes, preserve
-			// filter rules targeting those routes.
-			// [types.NodeView.SubnetRoutes] returns only approved,
-			// non-exit routes — matching Tailscale SaaS behavior,
-			// which does not generate filter rules for
-			// advertised-but-unapproved routes. Exit routes
-			// (0.0.0.0/0, ::/0) are excluded by
-			// [types.NodeView.SubnetRoutes] and handled separately
-			// via AllowedIPs/routing.
-			if slices.ContainsFunc(subnetRoutes, expanded.OverlapsPrefix) {
-				dests = append(dests, dest)
-				continue
-			}
-
-			// Exit-route advertisers need rules targeting the
-			// public internet so the kernel filter accepts
-			// traffic forwarded by autogroup:internet sources.
-			if hasExitRoutes && util.IPSetSubsetOf(expanded, util.TheInternet()) {
+			if keep.dest(expanded) {
 				dests = append(dests, dest)
 			}
 		}
@@ -97,6 +86,46 @@ func ReduceFilterRules(node types.NodeView, rules []tailcfg.FilterRule) []tailcf
 	}
 
 	return ret
+}
+
+// destKeeper decides which destinations of a global rule concern a node.
+type destKeeper struct {
+	node            types.NodeView
+	subnetRoutes    []netip.Prefix
+	servicePrefixes []netip.Prefix
+	hasExitRoutes   bool
+}
+
+// dest reports whether the node answers for any address in the set.
+func (k destKeeper) dest(expanded *netipx.IPSet) bool {
+	if k.node.InIPSet(expanded) {
+		return true
+	}
+
+	// If the node has approved subnet routes, preserve
+	// filter rules targeting those routes.
+	// [types.NodeView.SubnetRoutes] returns only approved,
+	// non-exit routes — matching Tailscale SaaS behavior,
+	// which does not generate filter rules for
+	// advertised-but-unapproved routes. Exit routes
+	// (0.0.0.0/0, ::/0) are excluded by
+	// [types.NodeView.SubnetRoutes] and handled separately
+	// via AllowedIPs/routing.
+	if slices.ContainsFunc(k.subnetRoutes, expanded.OverlapsPrefix) {
+		return true
+	}
+
+	// A service host answers on the service's addresses, which
+	// the mapper puts in its AllowedIPs; the filter must admit
+	// them too.
+	if slices.ContainsFunc(k.servicePrefixes, expanded.OverlapsPrefix) {
+		return true
+	}
+
+	// Exit-route advertisers need rules targeting the
+	// public internet so the kernel filter accepts
+	// traffic forwarded by autogroup:internet sources.
+	return k.hasExitRoutes && util.IPSetSubsetOf(expanded, util.TheInternet())
 }
 
 // connectorDNSDests are the destinations an app connector's client checks

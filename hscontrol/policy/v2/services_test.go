@@ -99,6 +99,44 @@ func TestServiceAliasResolvesToServiceAddresses(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidServiceFormat)
 }
 
+// TestServiceHostFilterKeepsServiceDestinations pins that the host's own
+// packet filter admits traffic to the service's addresses: a svc:
+// destination names those, not the host's IPs, so the per-node
+// reduction must keep the rule for the host and drop it for a node that
+// only reports the service or does not host it at all.
+func TestServiceHostFilterKeepsServiceDestinations(t *testing.T) {
+	t.Parallel()
+
+	services, users, nodes := serviceFixture()
+
+	pol := `{"grants": [{"src": ["*"], "dst": ["svc:web"], "ip": ["tcp:443"]}]}`
+
+	pm, err := NewPolicyManager([]byte(pol), users, nodes.ViewSlice())
+	require.NoError(t, err)
+
+	_, err = pm.SetVIPServices(services)
+	require.NoError(t, err)
+
+	dstsFor := func(node types.NodeView) []string {
+		var dsts []string
+
+		rules, err := pm.FilterForNode(node)
+		require.NoError(t, err)
+
+		for _, rule := range rules {
+			for _, d := range rule.DstPorts {
+				dsts = append(dsts, d.IP)
+			}
+		}
+
+		return dsts
+	}
+
+	assert.ElementsMatch(t, []string{"100.64.0.100", "fd7a:115c:a1e0::100"}, dstsFor(nodes[0].View()), "host")
+	assert.Empty(t, dstsFor(nodes[1].View()), "reports the service but is not approved for it")
+	assert.Empty(t, dstsFor(nodes[2].View()), "laptop")
+}
+
 // TestServiceAutoApprovers pins autoApprovers.services: the named tags,
 // users and groups may host the service without an operator.
 func TestServiceAutoApprovers(t *testing.T) {

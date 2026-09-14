@@ -243,6 +243,7 @@ func TestRoutesCompat(t *testing.T) {
 					gotRules := policyutil.ReduceFilterRules(
 						node.View(),
 						compiledRules,
+						nil,
 					)
 
 					wantRules := capture.PacketFilterRules

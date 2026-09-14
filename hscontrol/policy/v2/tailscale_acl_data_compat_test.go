@@ -366,6 +366,7 @@ func testACLSuccess(
 			gotRules := policyutil.ReduceFilterRules(
 				node.View(),
 				compiledRules,
+				nil,
 			)
 
 			wantRules := capture.PacketFilterRules
