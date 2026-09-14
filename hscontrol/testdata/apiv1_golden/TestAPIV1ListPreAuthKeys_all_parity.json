@@ -39,8 +39,7 @@
         "key": "\u003csecret\u003e",
         "preauthorized": true,
         "reusable": false,
-        "used": false,
-        "user": null
+        "used": false
       }
     ]
   }

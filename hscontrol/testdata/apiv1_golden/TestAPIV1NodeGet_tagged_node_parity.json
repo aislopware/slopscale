@@ -64,7 +64,19 @@
         "tag:initial"
       ],
       "updateAvailable": false,
-      "user": null
+      "user": {
+        "approved": false,
+        "approvedAt": null,
+        "createdAt": "\u003ctimestamp\u003e",
+        "displayName": "Tagged Devices",
+        "email": "",
+        "id": "2147455555",
+        "name": "tagged-devices",
+        "profilePicUrl": "",
+        "provider": "",
+        "providerId": "",
+        "role": "member"
+      }
     }
   }
 }
