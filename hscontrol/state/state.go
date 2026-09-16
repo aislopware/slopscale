@@ -134,6 +134,13 @@ type State struct {
 	// globalExitMu serialises [State.SetGlobalExitNode], so the value the
 	// NodeStore holds and the one persisted are from the same call.
 	globalExitMu sync.Mutex
+	// accessMu serialises reading the access model and publishing it, so
+	// two writes that finish together cannot publish in the other order
+	// and leave the policy holding the earlier one. Every write to a
+	// group, rule, network, posture or access request ends in
+	// [State.loadAccessModel], so the lock lives there rather than in each
+	// of them.
+	accessMu sync.Mutex
 	// derp holds the settings override, the embedded relay and the
 	// fetched map sources; see [State.DERP].
 	derp derpState
@@ -376,6 +383,7 @@ func NewState(cfg *types.Config) (*State, error) {
 
 	// Webhooks come after the first loads so that boot emits nothing.
 	s.webhooks = webhook.New(db, tailnetName(cfg))
+	s.webhooks.SetApprovers(s.ApproverEmails)
 
 	if mailer := webhook.NewSMTPMailer(cfg.SMTP); mailer != nil {
 		s.mailer = mailer

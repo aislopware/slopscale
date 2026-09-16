@@ -415,7 +415,12 @@ type AccessRequest struct {
 	Note   string `json:"note"`
 	Reason string `json:"reason"`
 
-	// Status One of pending, approved, denied, cancelled.
+	// RevokeNote Why the access was ended early.
+	RevokeNote string     `json:"revokeNote"`
+	RevokedAt  *time.Time `json:"revokedAt"`
+	RevokedBy  string     `json:"revokedBy"`
+
+	// Status One of pending, approved, denied, cancelled, revoked.
 	Status string `json:"status"`
 	UserId string `json:"userId"`
 }
@@ -434,6 +439,12 @@ type AccessRequestOption struct {
 	Description *string `json:"description,omitempty"`
 	Id          string  `json:"id"`
 	Name        string  `json:"name"`
+}
+
+// AccessRevokeBody defines model for AccessRevokeBody.
+type AccessRevokeBody struct {
+	// Note Why the access is ending; shown to the requester.
+	Note *string `json:"note,omitempty"`
 }
 
 // AccessRule defines model for AccessRule.
@@ -1302,7 +1313,9 @@ type ListUsersOutputBody struct {
 
 // ListWebhooksOutputBody defines model for ListWebhooksOutputBody.
 type ListWebhooksOutputBody struct {
-	Webhooks []Webhook `json:"webhooks"`
+	Approvers     int64     `json:"approvers"`
+	MailAvailable bool      `json:"mailAvailable"`
+	Webhooks      []Webhook `json:"webhooks"`
 }
 
 // LogStream defines model for LogStream.
@@ -2582,6 +2595,9 @@ type ApproveAccessRequestJSONRequestBody = AccessDecisionBody
 // DenyAccessRequestJSONRequestBody defines body for DenyAccessRequest for application/json ContentType.
 type DenyAccessRequestJSONRequestBody = AccessDecisionBody
 
+// RevokeAccessRequestJSONRequestBody defines body for RevokeAccessRequest for application/json ContentType.
+type RevokeAccessRequestJSONRequestBody = AccessRevokeBody
+
 // CreateAccessRuleJSONRequestBody defines body for CreateAccessRule for application/json ContentType.
 type CreateAccessRuleJSONRequestBody = AccessRuleRequestBody
 
@@ -2928,6 +2944,28 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/access-request/{id}/deny (the `DenyAccessRequest` operationId).
 	DenyAccessRequest(ctx context.Context, id string, body DenyAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeAccessRequestWithBody Revoke access request
+	//
+	// Ends an approved request's access now: the membership it granted goes and the policy is rebuilt. Only access that is in effect can be revoked, and an approver may revoke their own.
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/access-request/{id}/revoke (the `RevokeAccessRequest` operationId).
+	RevokeAccessRequestWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RevokeAccessRequest Revoke access request
+	//
+	// Ends an approved request's access now: the membership it granted goes and the policy is rebuilt. Only access that is in effect can be revoked, and an approver may revoke their own.
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/access-request/{id}/revoke (the `RevokeAccessRequest` operationId).
+	RevokeAccessRequest(ctx context.Context, id string, body RevokeAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListAccessRules List access rules
 	//
@@ -5086,6 +5124,48 @@ func (c *Client) DenyAccessRequestWithBody(ctx context.Context, id string, conte
 // Corresponds with POST /api/v1/access-request/{id}/deny (the `DenyAccessRequest` operationId).
 func (c *Client) DenyAccessRequest(ctx context.Context, id string, body DenyAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDenyAccessRequestRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeAccessRequestWithBody Revoke access request
+//
+// Ends an approved request's access now: the membership it granted goes and the policy is rebuilt. Only access that is in effect can be revoked, and an approver may revoke their own.
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/access-request/{id}/revoke (the `RevokeAccessRequest` operationId).
+func (c *Client) RevokeAccessRequestWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeAccessRequestRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RevokeAccessRequest Revoke access request
+//
+// Ends an approved request's access now: the membership it granted goes and the policy is rebuilt. Only access that is in effect can be revoked, and an approver may revoke their own.
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/access-request/{id}/revoke (the `RevokeAccessRequest` operationId).
+func (c *Client) RevokeAccessRequest(ctx context.Context, id string, body RevokeAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRevokeAccessRequestRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -9519,6 +9599,53 @@ func NewDenyAccessRequestRequestWithBody(server string, id string, contentType s
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/access-request/%s/deny", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRevokeAccessRequestRequest calls the generic RevokeAccessRequest builder with application/json body
+func NewRevokeAccessRequestRequest(server string, id string, body RevokeAccessRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRevokeAccessRequestRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewRevokeAccessRequestRequestWithBody constructs an http.Request for the RevokeAccessRequest method, with any body, and a specified content type
+func NewRevokeAccessRequestRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/access-request/%s/revoke", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -15707,6 +15834,28 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/access-request/{id}/deny (the `DenyAccessRequest` operationId).
 	DenyAccessRequestWithResponse(ctx context.Context, id string, body DenyAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*DenyAccessRequestResponse, error)
 
+	// RevokeAccessRequestWithBodyWithResponse Revoke access request
+	//
+	// Ends an approved request's access now: the membership it granted goes and the policy is rebuilt. Only access that is in effect can be revoked, and an approver may revoke their own.
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/access-request/{id}/revoke (the `RevokeAccessRequest` operationId).
+	RevokeAccessRequestWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RevokeAccessRequestResponse, error)
+
+	// RevokeAccessRequestWithResponse Revoke access request
+	//
+	// Ends an approved request's access now: the membership it granted goes and the policy is rebuilt. Only access that is in effect can be revoked, and an approver may revoke their own.
+	//
+	// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/access-request/{id}/revoke (the `RevokeAccessRequest` operationId).
+	RevokeAccessRequestWithResponse(ctx context.Context, id string, body RevokeAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*RevokeAccessRequestResponse, error)
+
 	// ListAccessRulesWithResponse List access rules
 	//
 	// Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -18235,6 +18384,54 @@ func (r DenyAccessRequestResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r DenyAccessRequestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RevokeAccessRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *RequestOutputBody
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RevokeAccessRequestResponse) GetJSON200() *RequestOutputBody {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r RevokeAccessRequestResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r RevokeAccessRequestResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RevokeAccessRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RevokeAccessRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RevokeAccessRequestResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -25740,6 +25937,40 @@ func (c *ClientWithResponses) DenyAccessRequestWithResponse(ctx context.Context,
 	return ParseDenyAccessRequestResponse(rsp)
 }
 
+// RevokeAccessRequestWithBodyWithResponse Revoke access request
+//
+// Ends an approved request's access now: the membership it granted goes and the policy is rebuilt. Only access that is in effect can be revoked, and an approver may revoke their own.
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/access-request/{id}/revoke (the `RevokeAccessRequest` operationId).
+func (c *ClientWithResponses) RevokeAccessRequestWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RevokeAccessRequestResponse, error) {
+	rsp, err := c.RevokeAccessRequestWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeAccessRequestResponse(rsp)
+}
+
+// RevokeAccessRequestWithResponse Revoke access request
+//
+// Ends an approved request's access now: the membership it granted goes and the policy is rebuilt. Only access that is in effect can be revoked, and an approver may revoke their own.
+//
+// Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/access-request/{id}/revoke (the `RevokeAccessRequest` operationId).
+func (c *ClientWithResponses) RevokeAccessRequestWithResponse(ctx context.Context, id string, body RevokeAccessRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*RevokeAccessRequestResponse, error) {
+	rsp, err := c.RevokeAccessRequest(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRevokeAccessRequestResponse(rsp)
+}
+
 // ListAccessRulesWithResponse List access rules
 //
 // Requires the `policy_file:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -29407,6 +29638,39 @@ func ParseDenyAccessRequestResponse(rsp *http.Response) (*DenyAccessRequestRespo
 	}
 
 	response := &DenyAccessRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest RequestOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRevokeAccessRequestResponse parses an HTTP response from a RevokeAccessRequestWithResponse call
+func ParseRevokeAccessRequestResponse(rsp *http.Response) (*RevokeAccessRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RevokeAccessRequestResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

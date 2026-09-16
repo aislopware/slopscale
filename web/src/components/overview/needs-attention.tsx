@@ -6,9 +6,10 @@ import type { ReactElement } from "react";
 import { api } from "~/api/client.ts";
 import type { Mutation } from "~/api/mutation.ts";
 import { invalidate } from "~/api/queries.ts";
-import type { Node, User } from "~/api/queries.ts";
+import type { AccessRequest, Group, Node, User } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
+import { groupName } from "~/components/access/model.ts";
 import { allUsers } from "~/components/overview/links.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { Frame, FramePanel } from "~/components/ui/frame.tsx";
@@ -16,23 +17,40 @@ import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { nodeName, ownerLabel, userLabel } from "~/lib/node.ts";
-import { parseTime } from "~/lib/time.ts";
+import { formatDuration, parseTime } from "~/lib/time.ts";
 
 /** Enough to see what is waiting without turning the overview into a list page. */
 const maxRows = 6;
 
+/** What a row is, said rather than drawn. */
+const kindLabels = {
+  node: "Machine",
+  user: "User",
+  request: "Access request",
+} as const;
+
+/** The scope each kind of row needs before its Approve button is offered. */
+const approveScopes = {
+  node: "devices:core",
+  user: "users",
+  request: "policy_file",
+} as const;
+
 interface PendingRow {
   readonly key: string;
   readonly id: string;
-  readonly kind: "node" | "user";
+  readonly kind: "node" | "user" | "request";
   readonly title: string;
   readonly subtitle: string;
   readonly createdAt: string | null;
+  /** A request the signed-in user filed: nobody decides their own. */
+  readonly own?: boolean;
 }
 
 interface Approvals {
   readonly node: Mutation<"post", "/api/v1/node/{nodeId}/approve">;
   readonly user: Mutation<"post", "/api/v1/user/{id}/approve">;
+  readonly request: Mutation<"post", "/api/v1/access-request/{id}/approve">;
 }
 
 function useApprovals(): Approvals {
@@ -57,6 +75,17 @@ function useApprovals(): Approvals {
         toast.error("Could not approve the user", error);
       },
     }),
+    // Approved here for the duration the requester asked for; the requests page has the form
+    // that grants a different one, with a note.
+    request: api.useMutation("post", "/api/v1/access-request/{id}/approve", {
+      onSuccess: async () => {
+        toast.success("Request approved");
+        await invalidate(queryClient, "/api/v1/access-request", "/api/v1/group");
+      },
+      onError: (error) => {
+        toast.error("Could not approve the request", error);
+      },
+    }),
   };
 }
 
@@ -64,8 +93,40 @@ function at(value: string | null): number {
   return parseTime(value)?.getTime() ?? 0;
 }
 
+/** What the overview asks about; a caller without a scope passes an empty list. */
+export interface Waiting {
+  readonly nodes: readonly Node[];
+  readonly users: readonly User[];
+  readonly requests: readonly AccessRequest[];
+  readonly groups: readonly Group[];
+  /** The signed-in user's id, so their own request is not offered to them. */
+  readonly meId?: string | undefined;
+}
+
+/**
+ * What a request asks for, in the order an approver weighs it: who is asking, for how long, and
+ * which machine. The button next to it grants exactly this, so the row has to say it; the duration
+ * especially, because a month and an hour look the same once they are both "a request".
+ */
+function requestSubtitle(
+  request: AccessRequest,
+  users: readonly User[],
+  nodes: readonly Node[],
+): string {
+  const user = users.find((candidate) => candidate.id === request.userId);
+  const asked = user === undefined ? `User ${request.userId}` : userLabel(user);
+  const node =
+    request.nodeId === undefined
+      ? undefined
+      : nodes.find((candidate) => candidate.id === request.nodeId);
+  const scope = node === undefined ? "every machine they own" : nodeName(node);
+  const why = request.reason === "" ? "no reason given" : request.reason;
+
+  return `${asked} · ${formatDuration(request.durationSeconds)} · ${scope} · ${why}`;
+}
+
 /** Everything waiting for an administrator, oldest first: it has been blocked the longest. */
-export function pendingRows(nodes: readonly Node[], users: readonly User[]): PendingRow[] {
+export function pendingRows({ nodes, users, requests, groups, meId }: Waiting): PendingRow[] {
   const rows: PendingRow[] = [];
 
   for (const node of nodes.filter((candidate) => !candidate.approved)) {
@@ -90,10 +151,33 @@ export function pendingRows(nodes: readonly Node[], users: readonly User[]): Pen
     });
   }
 
+  for (const request of requests.filter((candidate) => candidate.status === "pending")) {
+    rows.push({
+      key: `request-${request.id}`,
+      id: request.id,
+      kind: "request",
+      title: `Access to ${groupName(groups, request.groupId)}`,
+      subtitle: requestSubtitle(request, users, nodes),
+      createdAt: request.createdAt,
+      own: meId !== undefined && request.userId === meId,
+    });
+  }
+
   return rows.toSorted((left, right) => at(left.createdAt) - at(right.createdAt));
 }
 
 function RowTitle({ row }: { readonly row: PendingRow }): ReactElement {
+  if (row.kind === "request") {
+    return (
+      <Link
+        to="/policy/requests"
+        className="truncate font-medium text-kumo-default hover:text-kumo-link hover:underline focus-visible:underline"
+      >
+        {row.title}
+      </Link>
+    );
+  }
+
   if (row.kind === "user") {
     return (
       <Link
@@ -128,15 +212,16 @@ function PendingItem({
   readonly onApprove: (row: PendingRow) => void;
   readonly pending: boolean;
 }): ReactElement {
-  const allowed = row.kind === "node" ? can(me, "devices:core") : can(me, "users");
+  // Nobody decides their own request: the server refuses it, so the button is not offered.
+  const allowed = can(me, approveScopes[row.kind]) && row.own !== true;
 
   return (
     <SectionRow className="flex items-center justify-between gap-4 py-3">
       <div className="flex min-w-0 flex-col gap-0.5">
         <RowTitle row={row} />
         {/* The kind is said, not drawn: a boxed icon beside every row is the generated-UI template. */}
-        <p className="truncate text-xs text-kumo-subtle">
-          {row.kind === "node" ? "Machine" : "User"} · {row.subtitle} · added{" "}
+        <p className="truncate text-xs text-kumo-subtle" title={row.subtitle}>
+          {kindLabels[row.kind]} · {row.subtitle} · {row.kind === "request" ? "asked" : "added"}{" "}
           <RelativeTime value={row.createdAt} />
         </p>
       </div>
@@ -174,7 +259,7 @@ function AllApproved({ me }: { readonly me: Me }): ReactElement {
   return (
     <Frame>
       <FramePanel className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-3 text-kumo-subtle">
-        <span>All machines and users are approved</span>
+        <span>Nothing is waiting for a decision</span>
         <ApprovalSettingsLink me={me} />
       </FramePanel>
     </Frame>
@@ -184,6 +269,8 @@ function AllApproved({ me }: { readonly me: Me }): ReactElement {
 export interface NeedsAttentionProps {
   readonly nodes: readonly Node[];
   readonly users: readonly User[];
+  readonly requests: readonly AccessRequest[];
+  readonly groups: readonly Group[];
   readonly me: Me;
 }
 
@@ -191,11 +278,17 @@ export interface NeedsAttentionProps {
  * What an administrator has to act on. With nothing waiting it drops the card and the heading for a
  * single quiet row: "nothing to do" should not be the loudest thing on the page.
  */
-export function NeedsAttention({ nodes, users, me }: NeedsAttentionProps): ReactElement {
+export function NeedsAttention({
+  nodes,
+  users,
+  requests,
+  groups,
+  me,
+}: NeedsAttentionProps): ReactElement {
   const approve = useApprovals();
-  const rows = pendingRows(nodes, users);
+  const rows = pendingRows({ nodes, users, requests, groups, meId: me.user?.id });
   const shown = rows.slice(0, maxRows);
-  const busy = approve.node.isPending || approve.user.isPending;
+  const busy = approve.node.isPending || approve.user.isPending || approve.request.isPending;
 
   function submit(row: PendingRow): void {
     if (row.kind === "node") {
@@ -204,7 +297,13 @@ export function NeedsAttention({ nodes, users, me }: NeedsAttentionProps): React
       return;
     }
 
-    approve.user.mutate({ params: { path: { id: row.id } }, body: { approved: true } });
+    if (row.kind === "user") {
+      approve.user.mutate({ params: { path: { id: row.id } }, body: { approved: true } });
+
+      return;
+    }
+
+    approve.request.mutate({ params: { path: { id: row.id } }, body: {} });
   }
 
   if (rows.length === 0) {
@@ -214,7 +313,7 @@ export function NeedsAttention({ nodes, users, me }: NeedsAttentionProps): React
   return (
     <Section
       title="Needs attention"
-      description="Nothing here can reach the tailnet until it is approved"
+      description="Machines and users cannot reach the tailnet, and requesters cannot reach what they asked for, until these are decided"
       bodyClassName="p-0"
       actions={<ApprovalSettingsLink me={me} />}
     >
@@ -223,8 +322,13 @@ export function NeedsAttention({ nodes, users, me }: NeedsAttentionProps): React
       ))}
       {rows.length > shown.length ? (
         <SectionRow className="py-2.5">
-          <Link to="/machines" className="text-kumo-link hover:underline">
-            {plural(rows.length - shown.length, "more request")} waiting
+          {/* The overflow is whatever the first six left behind, so it points at the page that
+              holds most of it rather than always at the machines. */}
+          <Link
+            to={rows[maxRows]?.kind === "request" ? "/policy/requests" : "/machines"}
+            className="text-kumo-link hover:underline"
+          >
+            {plural(rows.length - shown.length, "more")} waiting
           </Link>
         </SectionRow>
       ) : null}

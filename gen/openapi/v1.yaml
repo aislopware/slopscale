@@ -138,8 +138,18 @@ components:
           type: string
         reason:
           type: string
+        revokeNote:
+          description: Why the access was ended early.
+          type: string
+        revokedAt:
+          format: date-time
+          type:
+            - string
+            - "null"
+        revokedBy:
+          type: string
         status:
-          description: One of pending, approved, denied, cancelled.
+          description: One of pending, approved, denied, cancelled, revoked.
           type: string
         userId:
           format: uint64
@@ -156,6 +166,9 @@ components:
         - createdAt
         - decidedAt
         - expiresAt
+        - revokedBy
+        - revokedAt
+        - revokeNote
       type: object
     AccessRequestBody:
       additionalProperties: false
@@ -189,6 +202,13 @@ components:
       required:
         - id
         - name
+      type: object
+    AccessRevokeBody:
+      additionalProperties: false
+      properties:
+        note:
+          description: Why the access is ending; shown to the requester.
+          type: string
       type: object
     AccessRule:
       additionalProperties: false
@@ -1826,12 +1846,19 @@ components:
     ListWebhooksOutputBody:
       additionalProperties: false
       properties:
+        approvers:
+          format: int64
+          type: integer
+        mailAvailable:
+          type: boolean
         webhooks:
           items:
             $ref: "#/components/schemas/Webhook"
           type: array
       required:
         - webhooks
+        - mailAvailable
+        - approvers
       type: object
     LogStream:
       additionalProperties: false
@@ -4393,6 +4420,46 @@ paths:
       tags:
         - Access control
       x-audit-action: access_request.deny
+      x-required-scope: policy_file
+  /api/v1/access-request/{id}/revoke:
+    post:
+      description: |-
+        Ends an approved request's access now: the membership it granted goes and the policy is rebuilt. Only access that is in effect can be revoked, and an approver may revoke their own.
+
+        Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: revokeAccessRequest
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessRevokeBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Revoke access request
+      tags:
+        - Access control
+      x-audit-action: access_request.revoke
       x-required-scope: policy_file
   /api/v1/access-rule:
     get:

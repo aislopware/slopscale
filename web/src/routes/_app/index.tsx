@@ -3,8 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import type { ReactElement } from "react";
 
-import { nodesQuery, usersQuery } from "~/api/queries.ts";
-import type { Node, User } from "~/api/queries.ts";
+import { accessRequestsQuery, groupsQuery, nodesQuery, usersQuery } from "~/api/queries.ts";
+import type { AccessRequest, Group, Node, User } from "~/api/queries.ts";
 import { can, canSeeMachines, displayName, roleLabel } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { CreatePreAuthKeyDialog } from "~/components/keys/preauth-dialogs.tsx";
@@ -18,6 +18,8 @@ import { RoleBadge } from "~/components/users/role-badge.tsx";
 
 const noNodes: readonly Node[] = [];
 const noUsers: readonly User[] = [];
+const noRequests: readonly AccessRequest[] = [];
+const noGroups: readonly Group[] = [];
 
 export const Route = createFileRoute("/_app/")({
   loader: async ({ context }) => {
@@ -26,6 +28,8 @@ export const Route = createFileRoute("/_app/")({
     await Promise.all([
       canSeeMachines(me) ? queryClient.query(nodesQuery) : Promise.resolve(),
       can(me, "users:read") ? queryClient.query(usersQuery) : Promise.resolve(),
+      can(me, "policy_file:read") ? queryClient.query(accessRequestsQuery) : Promise.resolve(),
+      can(me, "policy_file:read") ? queryClient.query(groupsQuery) : Promise.resolve(),
     ]);
   },
   component: OverviewPage,
@@ -49,9 +53,14 @@ function OverviewPage(): ReactElement {
   const { me } = Route.useRouteContext();
   const nodes = useQuery({ ...nodesQuery, enabled: canSeeMachines(me) });
   const users = useQuery({ ...usersQuery, enabled: can(me, "users:read") });
+  const seesRequests = can(me, "policy_file:read");
+  const requests = useQuery({ ...accessRequestsQuery, enabled: seesRequests });
+  const groups = useQuery({ ...groupsQuery, enabled: seesRequests });
   const [addingMachine, setAddingMachine] = useState(false);
   const nodeList = nodes.data?.nodes;
   const userList = users.data?.users;
+  const requestList = requests.data?.requests;
+  const groupList = groups.data?.groups;
 
   function addMachine(): void {
     setAddingMachine(true);
@@ -68,10 +77,17 @@ function OverviewPage(): ReactElement {
       <MetricTiles
         nodes={nodeList}
         users={userList}
+        requests={requestList}
         nodesLoading={nodes.isLoading}
         usersLoading={users.isLoading}
       />
-      <NeedsAttention nodes={nodeList ?? noNodes} users={userList ?? noUsers} me={me} />
+      <NeedsAttention
+        nodes={nodeList ?? noNodes}
+        users={userList ?? noUsers}
+        requests={requestList ?? noRequests}
+        groups={groupList ?? noGroups}
+        me={me}
+      />
       <RecentActivity nodes={nodeList ?? noNodes} />
       <CreatePreAuthKeyDialog
         me={me}

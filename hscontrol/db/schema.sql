@@ -350,6 +350,9 @@ CREATE TABLE access_requests(
   created_at datetime,
   decided_at datetime,
   expires_at datetime,
+  revoked_by text,
+  revoked_at datetime,
+  revoke_note text,
 
   CONSTRAINT fk_access_requests_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_access_requests_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,

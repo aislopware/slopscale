@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 
 import { accessRequestsQuery, groupsQuery, nodesQuery, usersQuery } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
+import { ApproverNotice } from "~/components/access/approver-notice.tsx";
 import { pendingCount } from "~/components/access/request-model.ts";
 import { RequestsTab } from "~/components/access/requests-tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
@@ -45,6 +46,7 @@ function RequestsPage(): ReactElement {
         description="Requests to join a group for a set time. An approver decides here, and access ends when the time is up."
         meta={pending === 1 ? "1 waiting for a decision" : `${pending} waiting for a decision`}
       />
+      <ApproverNotice me={me} />
       <RequestsTab
         me={me}
         requests={requests}

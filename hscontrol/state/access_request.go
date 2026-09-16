@@ -2,11 +2,13 @@ package state
 
 import (
 	"fmt"
+	"net/mail"
 	"strconv"
 	"strings"
 	"time"
 
 	hsdb "github.com/aislopware/slopscale/hscontrol/db"
+	"github.com/aislopware/slopscale/hscontrol/scope"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/types/change"
 	"github.com/rs/zerolog/log"
@@ -35,6 +37,45 @@ func (s *State) AccessRequestOptionsFor(userID types.UserID) AccessRequestOption
 	}
 
 	return opts
+}
+
+// ApproverEmails lists the email addresses of the people who may decide
+// access requests: every user whose role holds the policy scope and that
+// has a usable address. It resolves [types.RecipientApprovers] when an
+// email endpoint is sent to, so the list follows the roles.
+//
+// A database failure is returned rather than reported as an empty list,
+// because the two mean opposite things to the sender: nobody to mail is
+// final, while a failed lookup is worth another attempt.
+func (s *State) ApproverEmails() ([]string, error) {
+	users, err := s.db.ListUsers(nil)
+	if err != nil {
+		return nil, fmt.Errorf("listing users to notify the approvers: %w", err)
+	}
+
+	var emails []string
+
+	for _, user := range users {
+		if user.Email == "" || !scope.Grants(scope.ForRole(user.Role), scope.PolicyFile) {
+			continue
+		}
+
+		// An address the identity provider handed over may be anything.
+		// One that a mail server would reject is skipped rather than sent,
+		// because a rejected recipient ends the whole message, and the
+		// other approvers have done nothing wrong.
+		_, parseErr := mail.ParseAddress(user.Email)
+		if parseErr != nil {
+			log.Warn().Str("user", user.Name).
+				Msg("Skipping an approver whose email address is not one a mail server would take")
+
+			continue
+		}
+
+		emails = append(emails, user.Email)
+	}
+
+	return emails, nil
 }
 
 // ListAccessRequests returns every request, or one user's own.
@@ -186,6 +227,53 @@ func (s *State) DenyAccessRequest(id types.AccessRequestID, decision AccessDecis
 	return decided, nil
 }
 
+// AccessRevocation is an approver ending a grant before its expiry.
+type AccessRevocation struct {
+	// RevokedBy names who ended it, for the record.
+	RevokedBy string
+	// Note is why, shown to the requester.
+	Note string
+}
+
+// RevokeAccessRequest ends an approved request's access now: it drops
+// the membership the approval granted and rebuilds the policy. Unlike a
+// decision, an approver may revoke their own access.
+func (s *State) RevokeAccessRequest(
+	id types.AccessRequestID, revocation AccessRevocation,
+) (types.AccessRequest, change.Change, error) {
+	revocation.Note = strings.TrimSpace(revocation.Note)
+
+	err := types.ValidateAccessRequestText(revocation.Note)
+	if err != nil {
+		return types.AccessRequest{}, change.Change{}, err
+	}
+
+	revoked, err := s.db.RevokeAccessRequest(id, hsdb.AccessRequestRevocation{
+		RevokedBy: revocation.RevokedBy,
+		Note:      revocation.Note,
+	})
+	if err != nil {
+		return types.AccessRequest{}, change.Change{}, err
+	}
+
+	c, err := s.loadAccessModel()
+	if err != nil {
+		return types.AccessRequest{}, change.Change{}, err
+	}
+
+	log.Info().
+		Uint64("request.id", uint64(id)).
+		Str("revoked.by", revocation.RevokedBy).
+		Msg("Access request revoked")
+
+	// What ended is this grant. Whether the member still reaches the group
+	// through a permanent membership or another approval is not something
+	// one line can answer, so it does not claim to.
+	s.emitAccessRequest(types.EventAccessRequestRevoked, revoked, "%s's access to %s was ended early (granted for %s).")
+
+	return revoked, c, nil
+}
+
 // checkDecision loads a pending request and refuses a self-decision.
 func (s *State) checkDecision(id types.AccessRequestID, decision AccessDecision) (types.AccessRequest, error) {
 	req, err := s.db.GetAccessRequest(id)
@@ -232,20 +320,22 @@ func (s *State) DeleteAccessRequest(id types.AccessRequestID) error {
 
 // webhookAccessRequestData is the data an access request event carries.
 type webhookAccessRequestData struct {
-	RequestID string `json:"requestID"`
-	User      string `json:"user"`
-	UserID    string `json:"userID"`
-	Group     string `json:"group"`
-	GroupID   string `json:"groupID"`
-	NodeID    string `json:"nodeID,omitempty"`
-	Device    string `json:"deviceName,omitempty"`
-	Duration  string `json:"duration"`
-	Reason    string `json:"reason,omitempty"`
-	Status    string `json:"status"`
-	DecidedBy string `json:"decidedBy,omitempty"`
-	Note      string `json:"note,omitempty"`
-	ExpiresAt string `json:"expiresAt,omitempty"`
-	URL       string `json:"url"`
+	RequestID  string `json:"requestID"`
+	User       string `json:"user"`
+	UserID     string `json:"userID"`
+	Group      string `json:"group"`
+	GroupID    string `json:"groupID"`
+	NodeID     string `json:"nodeID,omitempty"`
+	Device     string `json:"deviceName,omitempty"`
+	Duration   string `json:"duration"`
+	Reason     string `json:"reason,omitempty"`
+	Status     string `json:"status"`
+	DecidedBy  string `json:"decidedBy,omitempty"`
+	Note       string `json:"note,omitempty"`
+	ExpiresAt  string `json:"expiresAt,omitempty"`
+	RevokedBy  string `json:"revokedBy,omitempty"`
+	RevokeNote string `json:"revokeNote,omitempty"`
+	URL        string `json:"url"`
 }
 
 // emitAccessRequest raises an event about a request; format takes the
@@ -256,15 +346,17 @@ func (s *State) emitAccessRequest(t types.WebhookEventType, req types.AccessRequ
 	}
 
 	data := webhookAccessRequestData{
-		RequestID: req.ID.String(),
-		UserID:    userIDString(req.UserID),
-		GroupID:   req.GroupID.String(),
-		Duration:  req.Duration.String(),
-		Reason:    req.Reason,
-		Status:    string(req.Status),
-		DecidedBy: req.DecidedBy,
-		Note:      req.Note,
-		URL:       s.consoleURL("policy?tab=requests"),
+		RequestID:  req.ID.String(),
+		UserID:     userIDString(req.UserID),
+		GroupID:    req.GroupID.String(),
+		Duration:   req.Duration.String(),
+		Reason:     req.Reason,
+		Status:     string(req.Status),
+		DecidedBy:  req.DecidedBy,
+		Note:       req.Note,
+		RevokedBy:  req.RevokedBy,
+		RevokeNote: req.RevokeNote,
+		URL:        s.consoleURL("policy/requests"),
 	}
 
 	data.User = "user " + userIDString(req.UserID)

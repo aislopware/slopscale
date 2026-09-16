@@ -3,7 +3,8 @@ import { cn } from "@cloudflare/kumo/utils";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement, ReactNode } from "react";
 
-import type { Node, User } from "~/api/queries.ts";
+import type { AccessRequest, Node, User } from "~/api/queries.ts";
+import { activeCount, pendingCount } from "~/components/access/request-model.ts";
 import { allUsers } from "~/components/overview/links.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { Frame, framePanelClass } from "~/components/ui/frame.tsx";
@@ -16,6 +17,7 @@ const columnsFor: readonly string[] = [
   "grid-cols-1 sm:grid-cols-2",
   "grid-cols-1 lg:grid-cols-3",
   "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
+  "grid-cols-1 sm:grid-cols-2 lg:grid-cols-5",
 ];
 
 /** Each tile is its own inset panel in the strip's Frame. */
@@ -188,6 +190,26 @@ function ExitTile({ nodes }: { readonly nodes: readonly Node[] }): ReactElement 
   );
 }
 
+/**
+ * Temporary access at a glance: how many grants are in effect, and whether anybody is waiting on an
+ * approver. A request waiting is what an administrator has to act on, so it takes the tone.
+ */
+function AccessTile({ requests }: { readonly requests: readonly AccessRequest[] }): ReactElement {
+  const active = activeCount(requests);
+  const pending = pendingCount(requests);
+
+  return (
+    <Link to="/policy/requests" className={tileClass}>
+      <TileBody
+        label="Temporary access"
+        value={active}
+        context={pending === 0 ? "Nothing to decide" : `${plural(pending, "request")} waiting`}
+        tone={pending === 0 ? "neutral" : "warning"}
+      />
+    </Link>
+  );
+}
+
 function TileSkeleton(): ReactElement {
   return (
     <div aria-busy className={tileClass}>
@@ -201,18 +223,21 @@ function TileSkeleton(): ReactElement {
 export interface MetricTilesProps {
   readonly nodes: readonly Node[] | undefined;
   readonly users: readonly User[] | undefined;
+  /** Undefined when the caller may not read them; the tile is then left out. */
+  readonly requests: readonly AccessRequest[] | undefined;
   readonly nodesLoading: boolean;
   readonly usersLoading: boolean;
 }
 
 /**
- * The four numbers at the top of the overview. Every tile is a link to the page that owns it, and a
- * tile only appears once its data can be read, so a caller without a scope sees a shorter strip
- * rather than an empty box.
+ * The numbers at the top of the overview. Every tile is a link to the page that owns it, and a tile
+ * only appears once its data can be read, so a caller without a scope sees a shorter strip rather
+ * than an empty box.
  */
 export function MetricTiles({
   nodes,
   users,
+  requests,
   nodesLoading,
   usersLoading,
 }: MetricTilesProps): ReactElement | null {
@@ -244,6 +269,10 @@ export function MetricTiles({
     }
   } else {
     tiles.push(<ExitTile key="exits" nodes={nodes} />);
+  }
+
+  if (requests !== undefined) {
+    tiles.push(<AccessTile key="access" requests={requests} />);
   }
 
   if (tiles.length === 0) {

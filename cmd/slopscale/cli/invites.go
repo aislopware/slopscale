@@ -137,7 +137,7 @@ prints and mails the new one. The email, role and groups stay as they were.`,
 var deleteInviteCmd = &cobra.Command{
 	Use:     cmdDelete + " ID",
 	Short:   "Delete an invitation, so its link stops working",
-	Aliases: []string{aliasDel, "revoke"},
+	Aliases: []string{aliasDel, cmdRevoke},
 	Args:    cobra.ExactArgs(1),
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, args []string) error {

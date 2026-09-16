@@ -96,6 +96,13 @@ type (
 	listWebhooksOutput struct {
 		Body struct {
 			Webhooks []Webhook `json:"webhooks" nullable:"false"`
+			// MailAvailable reports whether a mail server is configured; an
+			// email endpoint is refused while it is false.
+			MailAvailable bool `json:"mailAvailable"`
+			// Approvers counts the people the "approvers" recipient would
+			// reach right now: users whose role may decide access requests
+			// and that have an email address.
+			Approvers int `json:"approvers"`
 		}
 	}
 	webhookEventTypesOutput struct {
@@ -195,6 +202,14 @@ func registerWebhooks(api huma.API, b Backend) {
 
 		out := &listWebhooksOutput{}
 		out.Body.Webhooks = make([]Webhook, 0, len(hooks))
+		out.Body.MailAvailable = b.Cfg != nil && b.Cfg.SMTP.Configured()
+
+		approvers, err := b.State.ApproverEmails()
+		if err != nil {
+			return nil, mapError("listing the approvers to mail", err)
+		}
+
+		out.Body.Approvers = len(approvers)
 
 		for _, w := range hooks {
 			out.Body.Webhooks = append(out.Body.Webhooks, webhookFrom(w, false))

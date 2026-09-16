@@ -11,12 +11,14 @@ import { durationChoices } from "~/components/access/request-model.ts";
 import { FormFooter } from "~/components/machines/dialogs.tsx";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { toast } from "~/components/ui/toast.ts";
-import { hourSeconds } from "~/lib/time.ts";
+import { minuteSeconds } from "~/lib/time.ts";
 
-const everyMachine = "";
+const everyMachine = "every";
 const reasonRows = 2;
-const defaultHours = 4;
-const defaultSeconds = defaultHours * hourSeconds;
+// The shortest choice is the default: access asked for in a hurry is the
+// common case, and a request that is too short is extended, not revoked.
+const defaultMinutes = 30;
+const defaultSeconds = defaultMinutes * minuteSeconds;
 
 /** Files an ask to join a requestable group for a while, for one machine or all of the user's. */
 export function RequestAccessDialog({
@@ -59,6 +61,12 @@ function RequestForm({
   const [reason, setReason] = useState("");
   const groupLabel = (id: string): string =>
     options.groups.find((group) => group.id === id)?.name ?? "Choose a group";
+  // A group nobody described says nothing, rather than a line of filler.
+  const groupDescription = (id: string): string | undefined => {
+    const described = options.groups.find((group) => group.id === id)?.description ?? "";
+
+    return described === "" ? undefined : described;
+  };
   const nodeLabel = (id: string): string =>
     id === everyMachine
       ? "Every machine you own"
@@ -90,6 +98,9 @@ function RequestForm({
       <Select
         className="w-full"
         label="Group"
+        // Under the field rather than in the option: the popup is only as wide
+        // as the trigger, and a sentence in an option pushes it past the dialog.
+        description={groupDescription(groupId)}
         value={groupId}
         onValueChange={(value) => {
           setGroupId(value ?? "");
@@ -98,12 +109,7 @@ function RequestForm({
       >
         {options.groups.map((group) => (
           <Select.Option key={group.id} value={group.id}>
-            <span className="flex flex-col">
-              <span>{group.name}</span>
-              {group.description === undefined || group.description === "" ? null : (
-                <span className="text-xs text-kumo-subtle">{group.description}</span>
-              )}
-            </span>
+            {group.name}
           </Select.Option>
         ))}
       </Select>

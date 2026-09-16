@@ -165,6 +165,8 @@ var conflictErrors = []error{
 	types.ErrPostureInUse,
 	types.ErrAccessRequestDecided,
 	types.ErrAccessRequestPendingExists,
+	types.ErrAccessRequestNotActive,
+	types.ErrAccessRequestActive,
 	types.ErrVIPServiceNameTaken,
 	types.ErrAppConnectorNameTaken,
 	types.ErrPostureIntegrationNameTaken,

@@ -83,8 +83,15 @@ func (w Webhook) Host() string {
 	return u.Host
 }
 
+// RecipientApprovers stands for the people who may decide access
+// requests, in an email endpoint's recipient list. It is resolved when
+// the message is sent, so the list follows the roles rather than a list
+// an operator has to keep up to date.
+const RecipientApprovers = "approvers"
+
 // Recipients returns the addresses of an email endpoint, the comma
-// separated list after "mailto:".
+// separated list after "mailto:". [RecipientApprovers] is returned as
+// written; the dispatcher resolves it.
 func (w Webhook) Recipients() []string {
 	u, err := url.Parse(w.URL)
 	if err != nil || u.Scheme != mailtoScheme {
@@ -92,6 +99,12 @@ func (w Webhook) Recipients() []string {
 	}
 
 	return splitAddresses(u.Opaque)
+}
+
+// NotifiesApprovers reports whether the endpoint mails whoever may
+// decide access requests.
+func (w Webhook) NotifiesApprovers() bool {
+	return slices.Contains(w.Recipients(), RecipientApprovers)
 }
 
 func splitAddresses(list string) []string {
@@ -176,12 +189,12 @@ const (
 	EventUserApproved      WebhookEventType = "userApproved"
 	EventUserRoleUpdated   WebhookEventType = "userRoleUpdated"
 	EventUserDeleted       WebhookEventType = "userDeleted"
-	// EventAccessRequestCreated, EventAccessRequestApproved and
-	// EventAccessRequestDenied have no Tailscale counterpart; see
-	// docs/ref/temporary-access.md.
+	// EventAccessRequestCreated and the other access request events have
+	// no Tailscale counterpart; see docs/ref/temporary-access.md.
 	EventAccessRequestCreated  WebhookEventType = "accessRequestCreated"
 	EventAccessRequestApproved WebhookEventType = "accessRequestApproved"
 	EventAccessRequestDenied   WebhookEventType = "accessRequestDenied"
+	EventAccessRequestRevoked  WebhookEventType = "accessRequestRevoked"
 	// EventSSHRecordingFailed has no Tailscale counterpart; a client
 	// reports that a session recording could not start or broke off. See
 	// docs/ref/ssh-recording.md.
@@ -208,6 +221,7 @@ var WebhookEventTypes = []WebhookEventType{
 	EventAccessRequestCreated,
 	EventAccessRequestApproved,
 	EventAccessRequestDenied,
+	EventAccessRequestRevoked,
 	EventSSHRecordingFailed,
 }
 
@@ -294,6 +308,10 @@ func validateWebhookURL(w Webhook) error {
 		}
 
 		for _, addr := range splitAddresses(u.Opaque) {
+			if addr == RecipientApprovers {
+				continue
+			}
+
 			_, addrErr := mail.ParseAddress(addr)
 			if addrErr != nil {
 				return fmt.Errorf("%w: %q", ErrWebhookMailtoInvalid, addr)

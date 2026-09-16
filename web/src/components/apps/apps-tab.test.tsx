@@ -108,8 +108,8 @@ describe(AppsTab, () => {
     // The header of a sortable column is its button.
     await expect.element(screen.getByRole("button", { name: "Pending" })).toBeVisible();
 
-    // Learned routes is the one column that waits for a wider screen; Pending stays.
-    await expect.element(screen.getByText("Learned routes")).not.toBeVisible();
+    // Domains, configured routes and learned addresses share one column at this width.
+    await expect.element(screen.getByText("Domains and routes")).toBeVisible();
 
     expect(scrollsSideways(screen.container)).toBe(false);
   });

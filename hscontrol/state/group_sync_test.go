@@ -66,15 +66,15 @@ func TestSyncUserGroups(t *testing.T) {
 	// The users of a synced group are the claim's business.
 	_, _, err = s.AddGroupUser(sre.ID, bobID, nil)
 	require.ErrorIs(t, err, types.ErrGroupSyncedUsers)
-	_, _, err = s.RemoveGroupUser(eng.ID, bobID)
+	_, _, err = s.RemoveGroupUser(eng.ID, bobID, "test")
 	require.ErrorIs(t, err, types.ErrGroupSyncedUsers)
-	_, _, err = s.SetGroupMembers(eng.ID, nil, []types.UserID{aliceID})
+	_, _, err = s.SetGroupMembers(eng.ID, nil, []types.UserID{aliceID}, "test")
 	require.ErrorIs(t, err, types.ErrGroupSyncedUsers)
 
 	// Nodes can still be added by hand, and the same user set is accepted.
 	node := s.CreateRegisteredNodeForTest(alice, "alice-1")
 	s.PutNodeInStoreForTest(*node)
-	_, _, err = s.SetGroupMembers(eng.ID, []types.NodeID{node.ID}, []types.UserID{bobID, aliceID})
+	_, _, err = s.SetGroupMembers(eng.ID, []types.NodeID{node.ID}, []types.UserID{bobID, aliceID}, "test")
 	require.NoError(t, err)
 	_, _, err = s.AddGroupNode(sre.ID, node.ID, nil)
 	require.NoError(t, err)

@@ -29,6 +29,9 @@ type accessRequestsTable struct {
 	CreatedAt       sqlite.ColumnTimestamp
 	DecidedAt       sqlite.ColumnTimestamp
 	ExpiresAt       sqlite.ColumnTimestamp
+	RevokedBy       sqlite.ColumnString
+	RevokedAt       sqlite.ColumnTimestamp
+	RevokeNote      sqlite.ColumnString
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -82,8 +85,11 @@ func newAccessRequestsTableImpl(schemaName, tableName, alias string) accessReque
 		CreatedAtColumn       = sqlite.TimestampColumn("created_at")
 		DecidedAtColumn       = sqlite.TimestampColumn("decided_at")
 		ExpiresAtColumn       = sqlite.TimestampColumn("expires_at")
-		allColumns            = sqlite.ColumnList{IDColumn, UserIDColumn, NodeIDColumn, GroupIDColumn, ReasonColumn, DurationSecondsColumn, StatusColumn, DecidedByColumn, NoteColumn, CreatedAtColumn, DecidedAtColumn, ExpiresAtColumn}
-		mutableColumns        = sqlite.ColumnList{UserIDColumn, NodeIDColumn, GroupIDColumn, ReasonColumn, DurationSecondsColumn, StatusColumn, DecidedByColumn, NoteColumn, CreatedAtColumn, DecidedAtColumn, ExpiresAtColumn}
+		RevokedByColumn       = sqlite.StringColumn("revoked_by")
+		RevokedAtColumn       = sqlite.TimestampColumn("revoked_at")
+		RevokeNoteColumn      = sqlite.StringColumn("revoke_note")
+		allColumns            = sqlite.ColumnList{IDColumn, UserIDColumn, NodeIDColumn, GroupIDColumn, ReasonColumn, DurationSecondsColumn, StatusColumn, DecidedByColumn, NoteColumn, CreatedAtColumn, DecidedAtColumn, ExpiresAtColumn, RevokedByColumn, RevokedAtColumn, RevokeNoteColumn}
+		mutableColumns        = sqlite.ColumnList{UserIDColumn, NodeIDColumn, GroupIDColumn, ReasonColumn, DurationSecondsColumn, StatusColumn, DecidedByColumn, NoteColumn, CreatedAtColumn, DecidedAtColumn, ExpiresAtColumn, RevokedByColumn, RevokedAtColumn, RevokeNoteColumn}
 		defaultColumns        = sqlite.ColumnList{}
 	)
 
@@ -103,6 +109,9 @@ func newAccessRequestsTableImpl(schemaName, tableName, alias string) accessReque
 		CreatedAt:       CreatedAtColumn,
 		DecidedAt:       DecidedAtColumn,
 		ExpiresAt:       ExpiresAtColumn,
+		RevokedBy:       RevokedByColumn,
+		RevokedAt:       RevokedAtColumn,
+		RevokeNote:      RevokeNoteColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

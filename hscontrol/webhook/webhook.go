@@ -43,6 +43,10 @@ type Dispatcher struct {
 	tailnet string
 	client  *http.Client
 	mailer  Mailer
+	// approvers resolves [types.RecipientApprovers] to the addresses of
+	// the people who may decide access requests, at the moment the
+	// message is sent.
+	approvers func() ([]string, error)
 	// backoff is the wait before each retry; tests shorten it.
 	backoff []time.Duration
 
@@ -131,6 +135,12 @@ func (d *Dispatcher) SetBackoff(backoff []time.Duration) {
 // SetMailer sets how email endpoints are delivered; with none, they fail.
 func (d *Dispatcher) SetMailer(m Mailer) {
 	d.mailer = m
+}
+
+// SetApprovers sets how [types.RecipientApprovers] is resolved. Without
+// one the token resolves to nothing.
+func (d *Dispatcher) SetApprovers(approvers func() ([]string, error)) {
+	d.approvers = approvers
 }
 
 // Reload replaces the endpoints the dispatcher delivers to.
@@ -346,7 +356,8 @@ func (d *Dispatcher) deliverWithRetry(ctx context.Context, endpoint types.Webhoo
 func retryable(status int, err error) bool {
 	if status == 0 {
 		return !errors.Is(err, context.Canceled) && !errors.Is(err, ErrRedirected) &&
-			!errors.Is(err, ErrNoMailer) && !errors.Is(err, ErrMailRejected)
+			!errors.Is(err, ErrNoMailer) && !errors.Is(err, ErrMailRejected) &&
+			!errors.Is(err, ErrNoRecipients)
 	}
 
 	return status >= http.StatusInternalServerError || status == http.StatusTooManyRequests
@@ -441,7 +452,8 @@ func deliveryStatus(status int, err error) string {
 		return "rejected"
 
 	case errors.Is(err, ErrRedirected), errors.Is(err, ErrNoMailer),
-		errors.Is(err, ErrQueueFull), errors.Is(err, ErrClosed):
+		errors.Is(err, ErrNoRecipients), errors.Is(err, ErrQueueFull),
+		errors.Is(err, ErrClosed):
 		// slopscale's own words about its own state, with nothing of the
 		// receiver's network in them.
 		return err.Error()

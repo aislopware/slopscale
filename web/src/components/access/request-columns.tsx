@@ -1,3 +1,4 @@
+import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import type { ReactElement } from "react";
 
 import { RequestMenu } from "~/components/access/request-menu.tsx";
@@ -17,6 +18,7 @@ const phaseTones: Record<RequestPhase, Tone> = {
   expired: "neutral",
   denied: "danger",
   cancelled: "neutral",
+  revoked: "danger",
 };
 
 export const requestColumns = helper.columns([
@@ -46,7 +48,10 @@ export const requestColumns = helper.columns([
         )}
       </div>
     ),
-    meta: { className: "min-w-40" },
+    // The reason is free text of any length, and this is the only column without a width of its
+    // own, so without a cap it takes the slack and pushes the last columns under the pinned one.
+    // min-width still wins over max-width, so the floor holds.
+    meta: { className: "w-[30%] max-w-0 min-w-40" },
   }),
   helper.accessor((request) => request.durationSeconds, {
     id: "duration",
@@ -58,6 +63,14 @@ export const requestColumns = helper.columns([
         {formatDuration(row.original.durationSeconds)}
       </span>
     ),
+    meta: { className: "hidden whitespace-nowrap md:table-cell" },
+  }),
+  helper.accessor((request) => (request.phase === "active" ? request.expiresAt : null), {
+    id: "ends",
+    header: "Ends",
+    enableSorting: true,
+    enableGlobalFilter: false,
+    cell: ({ row }) => <EndsCell request={row.original} />,
     meta: { className: "hidden whitespace-nowrap md:table-cell" },
   }),
   helper.accessor((request) => request.phase, {
@@ -98,6 +111,19 @@ export const requestColumns = helper.columns([
   }),
 ]);
 
+/** How long an active grant still has; nothing for a request that is not in effect. */
+function EndsCell({ request }: { readonly request: RequestRow }): ReactElement | null {
+  if (request.phase !== "active") {
+    return null;
+  }
+
+  return (
+    <span className="whitespace-nowrap text-kumo-subtle">
+      <RelativeTime value={request.expiresAt} />
+    </span>
+  );
+}
+
 /** The phase, and under it who decided, what they said, or when the access ends. */
 function StatusCell({ request }: { readonly request: RequestRow }): ReactElement {
   return (
@@ -111,11 +137,44 @@ function StatusCell({ request }: { readonly request: RequestRow }): ReactElement
 function Detail({ request }: { readonly request: RequestRow }): ReactElement | null {
   const by = request.decidedBy === "" ? "" : ` by ${request.decidedBy}`;
 
-  if (request.phase === "active" || request.phase === "expired") {
+  if (request.phase === "revoked") {
+    const endedBy = request.revokedBy === "" ? "" : ` by ${request.revokedBy}`;
+
+    // Why the access was taken back is the part the requester came to read, so it is on the row
+    // rather than behind a hover only a mouse can reach.
+    return (
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="truncate text-xs text-kumo-subtle">
+          Ended <RelativeTime value={request.revokedAt} />
+          {endedBy}
+        </span>
+        {request.revokeNote === "" ? null : (
+          <Tooltip content={request.revokeNote}>
+            <span className="truncate text-xs text-kumo-subtle">{request.revokeNote}</span>
+          </Tooltip>
+        )}
+      </span>
+    );
+  }
+
+  if (request.phase === "active") {
+    // The Ends column carries the time wherever it is shown; saying it twice in one row is what
+    // pushed the columns after it off the table.
     return (
       <span className="truncate text-xs text-kumo-subtle">
-        {request.phase === "active" ? "Ends " : "Ended "}
-        <RelativeTime value={request.expiresAt} />
+        <span className="md:hidden">
+          Ends <RelativeTime value={request.expiresAt} />
+          {by === "" ? "" : ", "}
+        </span>
+        {by === "" ? null : `approved${by}`}
+      </span>
+    );
+  }
+
+  if (request.phase === "expired") {
+    return (
+      <span className="truncate text-xs text-kumo-subtle">
+        Ended <RelativeTime value={request.expiresAt} />
         {by}
       </span>
     );

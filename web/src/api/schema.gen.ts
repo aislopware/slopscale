@@ -113,6 +113,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/access-request/{id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke access request
+         * @description Ends an approved request's access now: the membership it granted goes and the policy is rebuilt. Only access that is in effect can be revoked, and an approver may revoke their own.
+         *
+         *     Requires the `policy_file` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        post: operations["revokeAccessRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/access-request/options": {
         parameters: {
             query?: never;
@@ -2588,7 +2610,12 @@ export interface components {
             /** @description What the approver said. */
             note: string;
             reason: string;
-            /** @description One of pending, approved, denied, cancelled. */
+            /** Format: date-time */
+            revokedAt: string | null;
+            revokedBy: string;
+            /** @description Why the access was ended early. */
+            revokeNote: string;
+            /** @description One of pending, approved, denied, cancelled, revoked. */
             status: string;
             /** Format: uint64 */
             userId: string;
@@ -2610,6 +2637,10 @@ export interface components {
             /** Format: uint64 */
             id: string;
             name: string;
+        };
+        AccessRevokeBody: {
+            /** @description Why the access is ending; shown to the requester. */
+            note?: string;
         };
         AccessRule: {
             bidirectional: boolean;
@@ -3341,6 +3372,9 @@ export interface components {
             users: components["schemas"]["User"][];
         };
         ListWebhooksOutputBody: {
+            /** Format: int64 */
+            approvers: number;
+            mailAvailable: boolean;
             webhooks: components["schemas"]["Webhook"][];
         };
         LogStream: {
@@ -4322,6 +4356,7 @@ export type AccessGraphNode = components['schemas']['AccessGraphNode'];
 export type AccessRequest = components['schemas']['AccessRequest'];
 export type AccessRequestBody = components['schemas']['AccessRequestBody'];
 export type AccessRequestOption = components['schemas']['AccessRequestOption'];
+export type AccessRevokeBody = components['schemas']['AccessRevokeBody'];
 export type AccessRule = components['schemas']['AccessRule'];
 export type AccessRuleRequestBody = components['schemas']['AccessRuleRequestBody'];
 export type ApiKey = components['schemas']['ApiKey'];
@@ -4716,6 +4751,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AccessDecisionBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    revokeAccessRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessRevokeBody"];
             };
         };
         responses: {

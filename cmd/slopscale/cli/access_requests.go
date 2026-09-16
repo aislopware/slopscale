@@ -8,6 +8,7 @@ import (
 	"time"
 
 	clientv1 "github.com/aislopware/slopscale/gen/client/v1"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/util"
 	"github.com/spf13/cobra"
 )
@@ -16,7 +17,7 @@ func init() {
 	rootCmd.AddCommand(accessRequestsCmd)
 
 	listAccessRequestsCmd.Flags().
-		String("status", "", "Only requests in this status: pending, approved, denied, cancelled")
+		String("status", "", "Only requests in this status: pending, approved, denied, cancelled, revoked")
 	listAccessRequestsCmd.Flags().Bool("mine", false, "Only the caller's own requests")
 	accessRequestsCmd.AddCommand(listAccessRequestsCmd)
 
@@ -36,6 +37,11 @@ func init() {
 	approveAccessRequestCmd.Flags().DurationP("duration", "d", 0, "Grant this long instead of what was asked for")
 	accessRequestsCmd.AddCommand(approveAccessRequestCmd)
 	accessRequestsCmd.AddCommand(denyAccessRequestCmd)
+
+	revokeAccessRequestCmd.Flags().Uint64P("identifier", "i", 0, "Access request identifier (ID)")
+	mustMarkRequired(revokeAccessRequestCmd, "identifier")
+	revokeAccessRequestCmd.Flags().String("note", "", "Why the access is ending")
+	accessRequestsCmd.AddCommand(revokeAccessRequestCmd)
 
 	cancelAccessRequestCmd.Flags().Uint64P("identifier", "i", 0, "Access request identifier (ID)")
 	mustMarkRequired(cancelAccessRequestCmd, "identifier")
@@ -81,7 +87,7 @@ var listAccessRequestsCmd = &cobra.Command{
 					rows = append(rows, []string{
 						r.Id, r.UserId, deref(r.NodeId), r.GroupId,
 						(time.Duration(r.DurationSeconds) * time.Second).String(),
-						r.Status, r.DecidedBy, optionalTime(r.ExpiresAt), r.Reason,
+						r.Status, decidedOrRevokedBy(r), optionalTime(r.ExpiresAt), r.Reason,
 					})
 				}
 
@@ -92,6 +98,16 @@ var listAccessRequestsCmd = &cobra.Command{
 			})
 		},
 	),
+}
+
+// decidedOrRevokedBy names whoever last acted on the request: the
+// revoker for a revoked one, the approver otherwise.
+func decidedOrRevokedBy(r clientv1.AccessRequest) string {
+	if r.Status == string(types.AccessRequestRevoked) && r.RevokedBy != "" {
+		return r.RevokedBy
+	}
+
+	return r.DecidedBy
 }
 
 func deref(s *string) string {
@@ -197,6 +213,32 @@ var denyAccessRequestCmd = &cobra.Command{
 			}
 
 			return printOutput(cmd, resp.JSON200.Request, "Access request denied")
+		},
+	),
+}
+
+var revokeAccessRequestCmd = &cobra.Command{
+	Use:   cmdRevoke,
+	Short: "End an approved request's access now",
+	RunE: clientRunE(
+		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
+			identifier, _ := cmd.Flags().GetUint64("identifier")
+			note, _ := cmd.Flags().GetString("note")
+
+			resp, err := client.RevokeAccessRequestWithResponse(
+				ctx,
+				strconv.FormatUint(identifier, util.Base10),
+				clientv1.RevokeAccessRequestJSONRequestBody{Note: &note},
+			)
+			if err != nil {
+				return fmt.Errorf("revoking access request: %w", err)
+			}
+
+			if resp.StatusCode() != http.StatusOK {
+				return apiError(resp.StatusCode(), resp.ApplicationproblemJSONDefault)
+			}
+
+			return printOutput(cmd, resp.JSON200.Request, "Access revoked")
 		},
 	),
 }

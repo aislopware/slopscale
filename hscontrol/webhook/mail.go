@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/mail"
 	"net/smtp"
+	"slices"
 	"strings"
 	"time"
 
@@ -30,13 +31,68 @@ var ErrNoMailer = errors.New("no mail server is configured")
 // retry will not change.
 var ErrMailRejected = errors.New("mail server rejected the message")
 
+// ErrNoRecipients is returned when every recipient resolved to nothing,
+// which is what an approvers endpoint does while no user holds the role.
+var ErrNoRecipients = errors.New("the endpoint has no recipients to send to")
+
 // mail renders the event as a message and hands it to the mailer.
 func (d *Dispatcher) mail(ctx context.Context, endpoint types.Webhook, event types.WebhookEvent) error {
 	if d.mailer == nil {
 		return ErrNoMailer
 	}
 
-	return d.mailer.Send(ctx, endpoint.Recipients(), mailSubject(event), mailBody(event))
+	to, err := d.resolveRecipients(endpoint.Recipients())
+	if err != nil {
+		return err
+	}
+
+	if len(to) == 0 {
+		return ErrNoRecipients
+	}
+
+	return d.mailer.Send(ctx, to, mailSubject(event), mailBody(event))
+}
+
+// resolveRecipients expands [types.RecipientApprovers] into the current
+// approvers and drops duplicates, so an operator who also lists their own
+// address is mailed once.
+//
+// A failure to look the approvers up is returned rather than read as an
+// empty list: the message is worth another attempt, and an endpoint that
+// also names an address must not quietly mail only that one.
+func (d *Dispatcher) resolveRecipients(recipients []string) ([]string, error) {
+	out := make([]string, 0, len(recipients))
+
+	for _, addr := range recipients {
+		if addr != types.RecipientApprovers {
+			out = appendUnique(out, addr)
+
+			continue
+		}
+
+		if d.approvers == nil {
+			continue
+		}
+
+		approvers, err := d.approvers()
+		if err != nil {
+			return nil, fmt.Errorf("resolving the approvers to mail: %w", err)
+		}
+
+		for _, approver := range approvers {
+			out = appendUnique(out, approver)
+		}
+	}
+
+	return out, nil
+}
+
+func appendUnique(list []string, addr string) []string {
+	if addr == "" || slices.Contains(list, addr) {
+		return list
+	}
+
+	return append(list, addr)
 }
 
 // mailSubject is the event's message with the tailnet in front, cut to

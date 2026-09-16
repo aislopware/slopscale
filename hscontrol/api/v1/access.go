@@ -413,7 +413,7 @@ func registerGroups(api huma.API, b Backend) {
 		b.Change(c)
 
 		if in.Body.NodeIDs != nil || in.Body.UserIDs != nil {
-			group, c, err = setGroupMembersFromBody(b, group, in.Body)
+			group, c, err = setGroupMembersFromBody(ctx, b, group, in.Body)
 			if err != nil {
 				return nil, err
 			}
@@ -459,7 +459,7 @@ func registerGroups(api huma.API, b Backend) {
 		b.Change(c)
 
 		if in.Body.NodeIDs != nil || in.Body.UserIDs != nil {
-			group, c, err = setGroupMembersFromBody(b, group, in.Body)
+			group, c, err = setGroupMembersFromBody(ctx, b, group, in.Body)
 			if err != nil {
 				return nil, err
 			}
@@ -599,7 +599,7 @@ func registerGroupMembers(api huma.API, b Backend) {
 		audit.Detail(ctx, "nodeId", in.NodeID)
 
 		return removeGroupMember(ctx, b, func() (types.AccessGroup, change.Change, error) {
-			return b.State.RemoveGroupNode(id, nodeID)
+			return b.State.RemoveGroupNode(id, nodeID, deciderName(ctx, b))
 		})
 	})
 
@@ -626,7 +626,7 @@ func registerGroupMembers(api huma.API, b Backend) {
 		audit.Detail(ctx, "userId", in.UserID)
 
 		return removeGroupMember(ctx, b, func() (types.AccessGroup, change.Change, error) {
-			return b.State.RemoveGroupUser(id, userID)
+			return b.State.RemoveGroupUser(id, userID, deciderName(ctx, b))
 		})
 	})
 }
@@ -677,7 +677,7 @@ func checkGroupUserEdit(b Backend, id types.GroupID, userIDs *[]string) error {
 	return nil
 }
 
-func setGroupMembersFromBody(b Backend, group types.AccessGroup, body GroupRequestBody) (
+func setGroupMembersFromBody(ctx context.Context, b Backend, group types.AccessGroup, body GroupRequestBody) (
 	types.AccessGroup, change.Change, error,
 ) {
 	nodeIDs := group.NodeIDs
@@ -701,7 +701,7 @@ func setGroupMembersFromBody(b Backend, group types.AccessGroup, body GroupReque
 		userIDs = parsed
 	}
 
-	group, c, err := b.State.SetGroupMembers(group.ID, nodeIDs, userIDs)
+	group, c, err := b.State.SetGroupMembers(group.ID, nodeIDs, userIDs, deciderName(ctx, b))
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, mapError("setting group members", err)
 	}

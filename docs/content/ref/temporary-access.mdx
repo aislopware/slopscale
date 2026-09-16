@@ -68,6 +68,7 @@ slopscale access-requests create --group 4 --node 12 --duration 2h --reason "dep
 slopscale access-requests list --status pending
 slopscale access-requests approve -i 1 --duration 1h --note "one hour is enough"
 slopscale access-requests deny -i 2 --note "ask the team lead first"
+slopscale access-requests revoke -i 1 --note "incident over"
 slopscale access-requests cancel -i 3
 ```
 
@@ -76,8 +77,46 @@ caller may ask for, `POST /api/v1/access-request` files a request,
 `GET /api/v1/access-request` lists them (every one for
 `policy_file:read`, otherwise the caller's own; `?mine=true` and
 `?status=pending` narrow), `POST /api/v1/access-request/{id}/approve`
-and `/deny` decide, and `DELETE /api/v1/access-request/{id}` withdraws
-or deletes.
+and `/deny` decide, `POST /api/v1/access-request/{id}/revoke` ends a
+grant early, and `DELETE /api/v1/access-request/{id}` withdraws or
+deletes.
+
+## Ending a grant early
+
+An approver does not have to wait for a grant to run out. Revoking it
+drops the membership the approval added, rebuilds the policy at once and
+marks the request revoked with who ended it, when and why; the approval's
+own record stays, so the request still says who granted it. Only access
+that is in effect can be revoked, and an approver may revoke their own.
+Deleting a request whose access is in effect is refused: the row is what
+shows the membership, so revoke it first.
+
+The membership only goes when the approval is what put it there. A
+member who was already in the group for good, or whose membership a
+later approval extended further, keeps what it had: revoking one request
+never takes away access another grant or an operator gave.
+
+One member can hold several approvals for the same group at once, and
+they share a single membership that ends with the last of them. Revoking
+one of those does not empty the group: the membership falls back to the
+furthest approval still standing, and goes only when none is left. So
+revoking a long grant leaves a shorter one that has not run out alone,
+and the member keeps the group until that one ends.
+
+Removing the membership by hand says the same thing on the request.
+Taking a machine or user out of the group, in the console, the CLI or
+the API, marks revoked every approval that was keeping it there, so the
+request list and the group never disagree. That path is a membership
+change rather than a decision, so it raises no `accessRequestRevoked`
+event; the requester learns of it the next time they look.
+
+```console
+slopscale access-requests revoke -i 1 --note "incident over"
+```
+
+In the console the row menu on a request in effect has _Revoke access_,
+and the _In effect_ tab of the _Requests_ page lists every grant that is
+running, with when each one ends.
 
 ## When access ends
 
@@ -91,10 +130,18 @@ way to open access by the clock, for a window that repeats every week.
 
 ## Events and audit
 
-The webhook events `accessRequestCreated`, `accessRequestApproved` and
-`accessRequestDenied` carry the requester, the group, the machine, the
-duration, the reason, the note and, once approved, the expiry, so a
-Slack channel can follow the queue. The audit log records
-`access_request.create`, `access_request.approve`, `access_request.deny`
-and `access_request.cancel`, and the existing `group.member.add` and
+The webhook events `accessRequestCreated`, `accessRequestApproved`,
+`accessRequestDenied` and `accessRequestRevoked` carry the requester, the
+group, the machine, the duration, the reason, the note and, once
+approved, the expiry, so a Slack channel can follow the queue. The audit
+log records `access_request.create`, `access_request.approve`,
+`access_request.deny`, `access_request.revoke` and
+`access_request.cancel`, and the existing `group.member.add` and
 `access_rule.*` actions carry the expiry.
+
+An email endpoint sent to `approvers` reaches whoever may decide a
+request without a recipient list to keep up to date; see
+[Webhooks](/ref/webhooks#notifications). Subscribing one to
+`accessRequestCreated` is what stops a request waiting until an approver
+happens to open the page, and the _Requests_ page offers to set it up in
+a click while nothing does.

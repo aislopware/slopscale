@@ -5,12 +5,12 @@ import { nodeAppConnectorRoutesQuery } from "~/api/queries.ts";
 import type { App } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
-import { learnedForApp } from "~/components/apps/model.ts";
+import { learnedAddressesForApp } from "~/components/apps/model.ts";
 
 /** What the connected connectors of one app have learned for it. */
 export interface LearnedCount {
   /** Distinct addresses learned for the app's domains, from the connectors that have answered. */
-  readonly count: number;
+  readonly addresses: readonly string[];
   /** How many of the app's connected connectors have answered so far. */
   readonly answered: number;
   /** How many of the app's connectors are connected and so can be asked. */
@@ -69,10 +69,12 @@ export function useLearnedCounts(apps: readonly App[], me: Me): LearnedCounts {
           .map((nodeId) => byNode.get(nodeId))
           .filter((answer) => answer !== undefined);
 
+        const addresses = learnedAddressesForApp(app.domains, heard);
+
         return [
           app.id,
           {
-            count: learnedForApp(app.domains, heard),
+            addresses,
             answered: heard.length,
             connected: connected.length,
           },

@@ -222,6 +222,214 @@ func TestTemporaryAccess(t *testing.T) {
 	})
 }
 
+// TestRevokeTemporaryAccess proves an approver can end a grant before its
+// expiry, and that removing the membership by hand says the same thing on
+// the request. The subtests build on one another.
+//
+//nolint:tparallel // later steps depend on the state earlier ones leave behind
+func TestRevokeTemporaryAccess(t *testing.T) {
+	t.Parallel()
+
+	srv := servertest.NewServer(t)
+	client := srv.HTTPClient(t)
+	v1 := srv.URL + "/api/v1"
+
+	owner := srv.CreateUser(t, "revoke-owner")
+	ownerKey := srv.CreateAPIKey(t, owner)
+	bob := srv.CreateUser(t, "revoke-bob")
+	bobKey := srv.CreateAPIKey(t, bob)
+
+	server := servertest.NewClient(t, srv, "revoke-server", servertest.WithUser(owner))
+	laptop := servertest.NewClient(t, srv, "revoke-laptop", servertest.WithUser(bob))
+	laptop.WaitForPeerCount(t, 1, postureWait)
+
+	var prodID, opsID, requestID string
+
+	t.Run("an approved request gives the laptop the server", func(t *testing.T) {
+		prodID = createGroup(t, client, ownerKey, v1, map[string]any{"name": "Revoke prod"})
+
+		status, body := apiCall(t, client, ownerKey, http.MethodPost, v1+"/group/"+prodID+"/member",
+			map[string]any{"nodeId": server.NodeIDString()})
+		require.Equal(t, http.StatusOK, status, body)
+
+		opsID = createGroup(t, client, ownerKey, v1,
+			map[string]any{"name": "Revoke ops", "requestable": true})
+
+		status, body = apiCall(t, client, ownerKey, http.MethodPost, v1+"/access-rule", map[string]any{
+			"name": "Revoke ops to prod", "protocol": "all",
+			"sourceGroupIds": []string{opsID}, "destinationGroupIds": []string{prodID},
+		})
+		require.Equal(t, http.StatusOK, status, body)
+
+		laptop.WaitForCondition(t, "no peers", postureWait, func(nm *netmap.NetworkMap) bool {
+			return len(nm.Peers) == 0
+		})
+
+		status, body = apiCall(t, client, bobKey, http.MethodPost, v1+"/access-request", map[string]any{
+			"groupId": opsID, "nodeId": laptop.NodeIDString(), "durationSeconds": 3600,
+		})
+		require.Equal(t, http.StatusOK, status, body)
+
+		id, ok := field(t, body, "request", "id").(string)
+		require.True(t, ok)
+
+		requestID = id
+
+		status, body = apiCall(t, client, ownerKey, http.MethodPost, v1+"/access-request/"+requestID+"/approve",
+			map[string]any{})
+		require.Equal(t, http.StatusOK, status, body)
+
+		laptop.WaitForCondition(t, "the server as a peer", postureWait, func(nm *netmap.NetworkMap) bool {
+			return len(nm.Peers) == 1
+		})
+	})
+
+	t.Run("deleting access that is in effect is refused", func(t *testing.T) {
+		status, body := apiCall(t, client, ownerKey, http.MethodDelete, v1+"/access-request/"+requestID, nil)
+		assert.Equal(t, http.StatusConflict, status, "%v: revoke it first", body)
+	})
+
+	t.Run("a member may not revoke", func(t *testing.T) {
+		status, _ := apiCall(t, client, bobKey, http.MethodPost, v1+"/access-request/"+requestID+"/revoke",
+			map[string]any{})
+		assert.Equal(t, http.StatusForbidden, status, "a member holds no policy scope")
+	})
+
+	t.Run("the owner revokes and the laptop loses the access", func(t *testing.T) {
+		status, body := apiCall(t, client, ownerKey, http.MethodPost, v1+"/access-request/"+requestID+"/revoke",
+			map[string]any{"note": "incident over"})
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, "revoked", field(t, body, "request", "status"))
+		assert.Equal(t, "revoke-owner", field(t, body, "request", "revokedBy"))
+		assert.Equal(t, "incident over", field(t, body, "request", "revokeNote"))
+		assert.NotNil(t, field(t, body, "request", "revokedAt"))
+
+		laptop.WaitForCondition(t, "no peers again", postureWait, func(nm *netmap.NetworkMap) bool {
+			return len(nm.Peers) == 0
+		})
+
+		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/group/"+opsID, nil)
+		require.Equal(t, http.StatusOK, status, body)
+
+		nodeIDs, ok := field(t, body, "group", "nodeIds").([]any)
+		require.True(t, ok)
+		assert.Empty(t, nodeIDs, "the membership went with the revocation")
+
+		status, _ = apiCall(t, client, ownerKey, http.MethodPost, v1+"/access-request/"+requestID+"/revoke",
+			map[string]any{})
+		assert.Equal(t, http.StatusConflict, status, "access that already ended cannot be revoked again")
+	})
+
+	t.Run("removing the membership by hand revokes the request behind it", func(t *testing.T) {
+		status, body := apiCall(t, client, bobKey, http.MethodPost, v1+"/access-request", map[string]any{
+			"groupId": opsID, "nodeId": laptop.NodeIDString(), "durationSeconds": 3600,
+		})
+		require.Equal(t, http.StatusOK, status, body)
+
+		second, ok := field(t, body, "request", "id").(string)
+		require.True(t, ok)
+
+		status, body = apiCall(t, client, ownerKey, http.MethodPost, v1+"/access-request/"+second+"/approve",
+			map[string]any{})
+		require.Equal(t, http.StatusOK, status, body)
+
+		laptop.WaitForCondition(t, "the server back", postureWait, func(nm *netmap.NetworkMap) bool {
+			return len(nm.Peers) == 1
+		})
+
+		status, body = apiCall(t, client, ownerKey, http.MethodDelete,
+			v1+"/group/"+opsID+"/node/"+laptop.NodeIDString(), nil)
+		require.Equal(t, http.StatusOK, status, body)
+
+		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/access-request/"+second, nil)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Equal(t, "revoked", field(t, body, "request", "status"),
+			"the request says what the group says")
+		assert.Equal(t, "revoke-owner", field(t, body, "request", "revokedBy"))
+	})
+
+	// Two approvals for one group share a single membership carrying the
+	// later expiry, so revoking the longer one must leave the shorter one
+	// standing rather than take the whole membership with it.
+	t.Run("revoking the longer of two grants keeps the shorter one", func(t *testing.T) {
+		shortID := fileAndApprove(t, client, bobKey, ownerKey, v1, opsID, laptop.NodeIDString(), 3600)
+
+		laptop.WaitForCondition(t, "the server back", postureWait, func(nm *netmap.NetworkMap) bool {
+			return len(nm.Peers) == 1
+		})
+
+		longID := fileAndApprove(t, client, bobKey, ownerKey, v1, opsID, laptop.NodeIDString(), 7200)
+
+		status, body := apiCall(t, client, ownerKey, http.MethodPost,
+			v1+"/access-request/"+longID+"/revoke", map[string]any{"note": "asked for too long"})
+		require.Equal(t, http.StatusOK, status, body)
+
+		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/access-request/"+shortID, nil)
+		require.Equal(t, http.StatusOK, status, body)
+		require.Equal(t, "approved", field(t, body, "request", "status"), "the shorter grant still stands")
+
+		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/group/"+opsID, nil)
+		require.Equal(t, http.StatusOK, status, body)
+
+		nodeIDs, ok := field(t, body, "group", "nodeIds").([]any)
+		require.True(t, ok)
+		assert.Len(t, nodeIDs, 1, "the membership the shorter approval holds up is still there")
+
+		laptop.WaitForCondition(t, "the server still a peer", postureWait, func(nm *netmap.NetworkMap) bool {
+			return len(nm.Peers) == 1
+		})
+
+		// Taking the last one back does empty the group.
+		status, body = apiCall(t, client, ownerKey, http.MethodPost,
+			v1+"/access-request/"+shortID+"/revoke", map[string]any{})
+		require.Equal(t, http.StatusOK, status, body)
+
+		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/group/"+opsID, nil)
+		require.Equal(t, http.StatusOK, status, body)
+
+		nodeIDs, ok = field(t, body, "group", "nodeIds").([]any)
+		require.True(t, ok)
+		assert.Empty(t, nodeIDs, "nothing holds the membership up any more")
+	})
+}
+
+// fileAndApprove asks for a group as the requester and approves it as the
+// approver, and returns the request's id.
+func fileAndApprove(
+	t *testing.T, client *http.Client, askKey, decideKey, v1, groupID, nodeID string, seconds int,
+) string {
+	t.Helper()
+
+	status, body := apiCall(t, client, askKey, http.MethodPost, v1+"/access-request", map[string]any{
+		"groupId": groupID, "nodeId": nodeID, "durationSeconds": seconds,
+	})
+	require.Equal(t, http.StatusOK, status, body)
+
+	id, ok := field(t, body, "request", "id").(string)
+	require.True(t, ok)
+
+	status, body = apiCall(t, client, decideKey, http.MethodPost, v1+"/access-request/"+id+"/approve",
+		map[string]any{"durationSeconds": seconds})
+	require.Equal(t, http.StatusOK, status, body)
+
+	return id
+}
+
+// createGroup files a group and returns its id.
+func createGroup(
+	t *testing.T, client *http.Client, key, v1 string, body map[string]any,
+) string {
+	t.Helper()
+
+	status, response := apiCall(t, client, key, http.MethodPost, v1+"/group", body)
+	require.Equal(t, http.StatusOK, status, response)
+
+	id, ok := field(t, response, "group", "id").(string)
+	require.True(t, ok)
+
+	return id
+}
+
 func mustRuleID(t *testing.T, s string) types.AccessRuleID {
 	t.Helper()
 
