@@ -23,12 +23,10 @@ import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
 import { isIpv4 } from "~/lib/ip.ts";
-import { requireScope } from "~/lib/require-scope.ts";
 
 const emptyNodes: readonly Node[] = [];
 
 export const Route = createFileRoute("/_app/services/$label")({
-  beforeLoad: requireScope("services:read"),
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.query(servicesQuery),

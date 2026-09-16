@@ -1,9 +1,8 @@
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import { webhookEventTypesQuery, webhooksQuery } from "~/api/queries.ts";
-import { can } from "~/auth/me.ts";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { deliveryState } from "~/components/webhooks/model.ts";
 import { WebhooksTab, countWebhooks } from "~/components/webhooks/webhooks-tab.tsx";
@@ -11,11 +10,6 @@ import { textSearchSchema } from "~/lib/search-text.ts";
 
 export const Route = createFileRoute("/_app/integrations/webhooks")({
   validateSearch: textSearchSchema,
-  beforeLoad: ({ context }) => {
-    if (!can(context.me, "webhooks:read")) {
-      throw redirect({ to: "/integrations/log-streams", replace: true });
-    }
-  },
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.query(webhooksQuery),

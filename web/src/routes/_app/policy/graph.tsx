@@ -18,7 +18,6 @@ import { ReachPanel } from "~/components/access-graph/reach-panels.tsx";
 import { Callout } from "~/components/ui/callout.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
-import { requireScope } from "~/lib/require-scope.ts";
 
 /**
  * The router parses a search value as JSON, so `?node=3` arrives as the number 3 while the id it
@@ -40,7 +39,6 @@ const graphSearchSchema = object({ node: optional(nodeIdSchema) });
 export const Route = createFileRoute("/_app/policy/graph")({
   validateSearch: graphSearchSchema,
   loaderDeps: ({ search }) => ({ node: search.node ?? "" }),
-  beforeLoad: requireScope("policy_file:read"),
   loader: async ({ context, deps }) => {
     await context.queryClient.query(accessGraphQuery(deps.node));
   },

@@ -2,7 +2,7 @@ import { Select } from "@cloudflare/kumo/components/select";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import type { TabsItem } from "@cloudflare/kumo/components/tabs";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { ReactElement } from "react";
 import { fallback, object, optional, picklist, pipe, transform, unknown } from "valibot";
@@ -57,12 +57,6 @@ interface AuditSearch {
 export const Route = createFileRoute("/_app/audit")({
   validateSearch: searchSchema,
   loaderDeps: ({ search }) => search,
-  // The page is nothing but the log, so a caller without the scope has no reason to be here.
-  beforeLoad: ({ context }) => {
-    if (!can(context.me, "logs:configuration:read")) {
-      throw redirect({ to: "/" });
-    }
-  },
   loader: async ({ context, deps }) => {
     const events = auditQuery(filtersOf(deps));
 
