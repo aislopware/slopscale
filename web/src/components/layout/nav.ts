@@ -289,6 +289,32 @@ function visibleItem(item: NavItem, me: Me): NavItem | null {
   return children.length === 0 ? null : { ...item, children };
 }
 
+/**
+ * Where a caller who asked for `pathname` has to go instead, or null when the page is theirs. The
+ * sidebar hides what a caller may not see and this sends the same caller away from the address
+ * typed or followed by hand, so both answer from one rule rather than drifting apart. A path the
+ * sidebar does not know is left alone for the "not found" page.
+ */
+export function redirectFor(me: Me, pathname: string): NavPath | null {
+  if (placeOf(navGroups, pathname) === undefined) {
+    return null;
+  }
+
+  const place = placeOf(visibleGroups(me), pathname);
+
+  if (place === undefined) {
+    return "/";
+  }
+
+  // A branch is not a page of its own: its address, and a page under it the caller may not see, open
+  // the first page left under it.
+  if (place.item.children !== undefined && place.child === undefined) {
+    return place.item.children[0]?.to ?? "/";
+  }
+
+  return null;
+}
+
 export function isActive(item: NavItem | NavChild, pathname: string): boolean {
   const exact = "exact" in item ? (item.exact ?? false) : false;
 

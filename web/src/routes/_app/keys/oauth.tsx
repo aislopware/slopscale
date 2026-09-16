@@ -1,8 +1,7 @@
-import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { ReactElement } from "react";
 
 import { oauthClientsQuery } from "~/api/queries.ts";
-import { can } from "~/auth/me.ts";
 import { OAuthPanel } from "~/components/keys/panels.tsx";
 import { keyControls, keysSearchSchema } from "~/components/keys/search.ts";
 import { PageHeader } from "~/components/ui/page-header.tsx";
@@ -10,11 +9,6 @@ import { PageHeader } from "~/components/ui/page-header.tsx";
 export const Route = createFileRoute("/_app/keys/oauth")({
   validateSearch: keysSearchSchema,
   loaderDeps: () => ({}),
-  beforeLoad: ({ context }) => {
-    if (!can(context.me, "oauth_keys:read")) {
-      throw redirect({ to: "/keys/api", replace: true });
-    }
-  },
   loader: async ({ context }) => {
     await context.queryClient.query(oauthClientsQuery);
   },

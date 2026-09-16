@@ -7,12 +7,10 @@ import { can } from "~/auth/me.ts";
 import { pendingCount } from "~/components/access/request-model.ts";
 import { RequestsTab } from "~/components/access/requests-tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
-import { requireScope } from "~/lib/require-scope.ts";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
 export const Route = createFileRoute("/_app/policy/requests")({
   validateSearch: textSearchSchema,
-  beforeLoad: requireScope("policy_file:read"),
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.query(accessRequestsQuery),

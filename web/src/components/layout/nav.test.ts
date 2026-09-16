@@ -2,7 +2,7 @@ import { SquaresFourIcon } from "@phosphor-icons/react";
 import { describe, expect, it } from "vitest";
 
 import type { Me } from "~/auth/me.ts";
-import { isActive, pagesOf, placeOf, visibleGroups } from "~/components/layout/nav.ts";
+import { isActive, pagesOf, placeOf, redirectFor, visibleGroups } from "~/components/layout/nav.ts";
 
 function member(permissions: Me["permissions"]): Me {
   return {
@@ -32,21 +32,21 @@ describe(visibleGroups, () => {
 
 const reader = member({ "devices:core:read": true, "policy_file:read": true });
 
-describe("a signed-in member", () => {
-  const user = {
-    id: "7",
-    name: "ada",
-    createdAt: "",
-    displayName: "",
-    email: "",
-    providerId: "",
-    provider: "",
-    profilePicUrl: "",
-    role: "member",
-    approved: true,
-    approvedAt: null,
-  };
+const user = {
+  id: "7",
+  name: "ada",
+  createdAt: "",
+  displayName: "",
+  email: "",
+  providerId: "",
+  provider: "",
+  profilePicUrl: "",
+  role: "member",
+  approved: true,
+  approvedAt: null,
+};
 
+describe("a signed-in member", () => {
   it("gets their machines, their keys, their access and their sign-ins, and no Settings group", () => {
     const groups = visibleGroups({ ...member({}), user });
     const labels = groups.flatMap((group) => group.items.map((item) => item.label));
@@ -79,6 +79,53 @@ describe(placeOf, () => {
     expect(place?.item.label).toBe("Machines");
     expect(place?.child).toBeUndefined();
     expect(placeOf(groups, "/nowhere")).toBeUndefined();
+  });
+});
+
+describe(redirectFor, () => {
+  const signedIn = { ...member({}), user };
+
+  it("sends a member away from a page the sidebar does not offer them", () => {
+    const hidden = [
+      "/users",
+      "/settings/tailnet",
+      "/policy/rules",
+      "/dns/nameservers",
+      "/relays/map",
+      "/routes",
+      "/audit",
+    ];
+
+    expect(hidden.map((path) => redirectFor(signedIn, path))).toStrictEqual(hidden.map(() => "/"));
+  });
+
+  it("leaves the pages a member may see alone", () => {
+    expect(redirectFor(signedIn, "/")).toBeNull();
+    expect(redirectFor(signedIn, "/machines/42")).toBeNull();
+    expect(redirectFor(signedIn, "/sign-ins")).toBeNull();
+    expect(redirectFor(signedIn, "/keys/api")).toBeNull();
+    expect(redirectFor(signedIn, "/access")).toBeNull();
+  });
+
+  it("opens the first page left under a branch for its address and for a page held back", () => {
+    expect(redirectFor(signedIn, "/keys")).toBe("/keys/api");
+    expect(redirectFor(signedIn, "/keys/pre-auth")).toBe("/keys/api");
+    expect(redirectFor(reader, "/policy")).toBe("/policy/rules");
+    expect(redirectFor(member({ "logs:configuration:read": true }), "/integrations/webhooks")).toBe(
+      "/integrations/log-streams",
+    );
+  });
+
+  it("holds a key minted with scopes to its scopes", () => {
+    const scoped = { ...member({}), user, scoped: true };
+
+    expect(redirectFor(scoped, "/sign-ins")).toBe("/");
+    expect(redirectFor(scoped, "/machines")).toBe("/");
+  });
+
+  it("leaves a path the sidebar does not know to the not-found page", () => {
+    expect(redirectFor(signedIn, "/nowhere")).toBeNull();
+    expect(redirectFor(signedIn, "/settings")).toBeNull();
   });
 });
 

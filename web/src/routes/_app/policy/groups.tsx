@@ -6,12 +6,10 @@ import { accessRulesQuery, groupsQuery, nodesQuery, usersQuery } from "~/api/que
 import { can } from "~/auth/me.ts";
 import { GroupsTab } from "~/components/access/groups-tab.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
-import { requireScope } from "~/lib/require-scope.ts";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
 export const Route = createFileRoute("/_app/policy/groups")({
   validateSearch: textSearchSchema,
-  beforeLoad: requireScope("policy_file:read"),
   loader: async ({ context }) => {
     await Promise.all([
       context.queryClient.query(groupsQuery),

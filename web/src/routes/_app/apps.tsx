@@ -6,12 +6,10 @@ import { appsQuery } from "~/api/queries.ts";
 import { AppsTab } from "~/components/apps/apps-tab.tsx";
 import { countApps, totalPendingRoutes } from "~/components/apps/model.ts";
 import { PageHeader } from "~/components/ui/page-header.tsx";
-import { requireScope } from "~/lib/require-scope.ts";
 import { textSearchSchema } from "~/lib/search-text.ts";
 
 export const Route = createFileRoute("/_app/apps")({
   validateSearch: textSearchSchema,
-  beforeLoad: requireScope("policy_file:read"),
   loader: async ({ context }) => {
     await context.queryClient.query(appsQuery);
   },
