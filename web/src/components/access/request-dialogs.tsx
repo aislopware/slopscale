@@ -209,6 +209,74 @@ export function DenyRequestDialog({
   );
 }
 
+/** Ends a grant that is still in effect, with a note the requester sees. */
+export function RevokeRequestDialog({
+  request,
+  open,
+  onOpenChange,
+  mutations,
+}: {
+  readonly request: RequestRow;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+  readonly mutations: AccessMutations;
+}): ReactElement {
+  const { revokeRequest } = mutations;
+  const [note, setNote] = useState("");
+
+  function submit(event: SubmitEvent<HTMLFormElement>): void {
+    event.preventDefault();
+
+    revokeRequest.mutate(
+      { params: { path: { id: request.id } }, body: { note: note.trim() } },
+      {
+        onSuccess: () => {
+          onOpenChange(false);
+        },
+      },
+    );
+  }
+
+  return (
+    <DialogRoot open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        size="base"
+        title="Revoke access"
+        description={`${request.userName} loses ${request.groupLabel} now, before the grant runs out. A membership that was already permanent stays.`}
+      >
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <Input
+            label="Note"
+            required={false}
+            value={note}
+            placeholder="The reason, shown to the requester"
+            onChange={(event) => {
+              setNote(event.target.value);
+            }}
+          />
+          <DialogError
+            message={revokeRequest.isError ? errorMessage(revokeRequest.error) : undefined}
+          />
+          <div className="flex justify-end gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                onOpenChange(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" variant="destructive" loading={revokeRequest.isPending}>
+              Revoke
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </DialogRoot>
+  );
+}
+
 /** Withdraws a pending request, or removes a decided one from the record. */
 export function CancelRequestDialog({
   request,

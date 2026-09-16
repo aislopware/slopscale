@@ -8,6 +8,7 @@ import type { AccessRequest, Group, Node, User } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import { requestColumns } from "~/components/access/request-columns.tsx";
 import { requestNames, toRequestRows } from "~/components/access/request-model.ts";
+import type { RequestRow } from "~/components/access/request-model.ts";
 import { useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { tableEmptyClass } from "~/components/table/empty.ts";
@@ -16,13 +17,37 @@ import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
 
-const filters = ["pending", "all"] as const;
+const filters = ["pending", "active", "all"] as const;
 type Filter = (typeof filters)[number];
 
 const filterItems: readonly { value: Filter; label: string }[] = [
   { value: "pending", label: "Pending" },
+  { value: "active", label: "In effect" },
   { value: "all", label: "All" },
 ];
+
+/** The rows a filter shows; "all" keeps the whole record, outcomes included. */
+function rowsFor(rows: readonly RequestRow[], filter: Filter): RequestRow[] {
+  if (filter === "all") {
+    return [...rows];
+  }
+
+  return rows.filter((row) => row.phase === filter);
+}
+
+/** What an empty list says, which depends on why it is empty. */
+const emptyText: Record<Filter, { title: string; description: string }> = {
+  pending: {
+    title: "Nothing to decide",
+    description: "No request is waiting. Users ask under My access, for groups marked requestable.",
+  },
+  active: {
+    title: "No access in effect",
+    description:
+      "Nobody holds temporary access right now. Approved grants show here until they run out.",
+  },
+  all: { title: "No requests", description: "No request matches this search." },
+};
 
 export interface RequestsTabProps {
   readonly me: Me;
@@ -53,10 +78,7 @@ export function RequestsTab({
     () => toRequestRows(requests, requestNames(groups, users, nodes)),
     [requests, groups, users, nodes],
   );
-  const shownRows = useMemo(
-    () => (filter === "pending" ? rows.filter((row) => row.status === "pending") : rows),
-    [rows, filter],
-  );
+  const shownRows = useMemo(() => rowsFor(rows, filter), [rows, filter]);
 
   const table = useAppTable({
     data: shownRows,
@@ -68,7 +90,9 @@ export function RequestsTab({
   });
 
   const shown = table.getRowModel().rows.length;
-  const pending = rows.filter((row) => row.status === "pending").length;
+  const pending = rows.filter((row) => row.phase === "pending").length;
+  const active = rows.filter((row) => row.phase === "active").length;
+  const counts: Record<Filter, number> = { pending, active, all: rows.length };
 
   return (
     <>
@@ -80,7 +104,7 @@ export function RequestsTab({
         />
         <Tabs
           variant="segmented"
-          tabs={countedTabs(filterItems, (value) => (value === "pending" ? pending : rows.length))}
+          tabs={countedTabs(filterItems, (value) => counts[value])}
           value={filter}
           onValueChange={(value) => {
             setFilter(filters.find((known) => known === value) ?? "pending");
@@ -94,12 +118,8 @@ export function RequestsTab({
               <Empty
                 className={tableEmptyClass}
                 size="sm"
-                title={filter === "pending" ? "Nothing to decide" : "No requests"}
-                description={
-                  filter === "pending"
-                    ? "No request is waiting. Users ask under My access, for groups marked requestable."
-                    : "No request matches this search."
-                }
+                title={emptyText[filter].title}
+                description={emptyText[filter].description}
                 contents={
                   search === "" ? undefined : (
                     <Button
@@ -117,7 +137,7 @@ export function RequestsTab({
             footer={
               rows.length === 0 ? undefined : (
                 <TableFooter>
-                  {`Showing ${shown} of ${rows.length === 1 ? "1 request" : `${rows.length} requests`} · ${pending} pending`}
+                  {`Showing ${shown} of ${rows.length === 1 ? "1 request" : `${rows.length} requests`} · ${pending} pending · ${active} in effect`}
                 </TableFooter>
               )
             }

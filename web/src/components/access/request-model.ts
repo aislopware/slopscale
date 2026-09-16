@@ -6,7 +6,7 @@ import { daySeconds, hourSeconds, isPast, minuteSeconds, parseTime } from "~/lib
 export type RequestStatus = AccessRequest["status"];
 
 /** How a request reads once its outcome and, for an approval, its expiry are known. */
-export type RequestPhase = "pending" | "active" | "expired" | "denied" | "cancelled";
+export type RequestPhase = "pending" | "active" | "expired" | "denied" | "cancelled" | "revoked";
 
 export function requestPhase(request: AccessRequest, now: Date = new Date()): RequestPhase {
   switch (request.status) {
@@ -18,6 +18,9 @@ export function requestPhase(request: AccessRequest, now: Date = new Date()): Re
     }
     case "denied": {
       return "denied";
+    }
+    case "revoked": {
+      return "revoked";
     }
     default: {
       return "cancelled";
@@ -31,7 +34,40 @@ export const phaseLabels: Record<RequestPhase, string> = {
   expired: "Expired",
   denied: "Denied",
   cancelled: "Withdrawn",
+  revoked: "Revoked",
 };
+
+/** Access that is in effect now, which is what an approver can end early. */
+export function isActive(request: AccessRequest, now: Date = new Date()): boolean {
+  return requestPhase(request, now) === "active";
+}
+
+export function activeCount(requests: readonly AccessRequest[], now: Date = new Date()): number {
+  return requests.filter((request) => isActive(request, now)).length;
+}
+
+const millisecond = 1000;
+
+/** How long an active grant still has, in seconds; zero once it is over. */
+export function secondsLeft(request: AccessRequest, now: Date = new Date()): number {
+  const ends = parseTime(request.expiresAt);
+
+  if (ends === null) {
+    return 0;
+  }
+
+  return Math.max(0, Math.round((ends.getTime() - now.getTime()) / millisecond));
+}
+
+/** Grants whose time runs out within the hour, the ones worth a second look. */
+export function expiringSoon(
+  requests: readonly AccessRequest[],
+  now: Date = new Date(),
+): AccessRequest[] {
+  return requests.filter(
+    (request) => isActive(request, now) && secondsLeft(request, now) <= hourSeconds,
+  );
+}
 
 const halfHourMinutes = 30;
 const shiftHours = 4;

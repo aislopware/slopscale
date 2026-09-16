@@ -17,6 +17,7 @@ const phaseTones: Record<RequestPhase, Tone> = {
   expired: "neutral",
   denied: "danger",
   cancelled: "neutral",
+  revoked: "danger",
 };
 
 export const requestColumns = helper.columns([
@@ -60,6 +61,14 @@ export const requestColumns = helper.columns([
     ),
     meta: { className: "hidden whitespace-nowrap md:table-cell" },
   }),
+  helper.accessor((request) => (request.phase === "active" ? request.expiresAt : null), {
+    id: "ends",
+    header: "Ends",
+    enableSorting: true,
+    enableGlobalFilter: false,
+    cell: ({ row }) => <EndsCell request={row.original} />,
+    meta: { className: "hidden whitespace-nowrap md:table-cell" },
+  }),
   helper.accessor((request) => request.phase, {
     id: "status",
     header: "Status",
@@ -98,6 +107,19 @@ export const requestColumns = helper.columns([
   }),
 ]);
 
+/** How long an active grant still has; nothing for a request that is not in effect. */
+function EndsCell({ request }: { readonly request: RequestRow }): ReactElement | null {
+  if (request.phase !== "active") {
+    return null;
+  }
+
+  return (
+    <span className="whitespace-nowrap text-kumo-subtle">
+      <RelativeTime value={request.expiresAt} />
+    </span>
+  );
+}
+
 /** The phase, and under it who decided, what they said, or when the access ends. */
 function StatusCell({ request }: { readonly request: RequestRow }): ReactElement {
   return (
@@ -110,6 +132,17 @@ function StatusCell({ request }: { readonly request: RequestRow }): ReactElement
 
 function Detail({ request }: { readonly request: RequestRow }): ReactElement | null {
   const by = request.decidedBy === "" ? "" : ` by ${request.decidedBy}`;
+
+  if (request.phase === "revoked") {
+    const endedBy = request.revokedBy === "" ? "" : ` by ${request.revokedBy}`;
+
+    return (
+      <span className="truncate text-xs text-kumo-subtle" title={request.revokeNote}>
+        Ended <RelativeTime value={request.revokedAt} />
+        {endedBy}
+      </span>
+    );
+  }
 
   if (request.phase === "active" || request.phase === "expired") {
     return (

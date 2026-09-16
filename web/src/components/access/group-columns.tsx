@@ -11,6 +11,7 @@ import {
 } from "~/components/access/model.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
+import { parseTime } from "~/lib/time.ts";
 
 /** A group with its machine count resolved, so the table sorts by what it shows. */
 export interface GroupRow extends Group {
@@ -65,6 +66,14 @@ export const groupColumns = helper.columns([
       <Count value={rulesUsingGroup(table.options.meta?.rules ?? [], row.original).length} />
     ),
     meta: { className: "whitespace-nowrap", numeric: true },
+  }),
+  helper.accessor((group) => temporaryMembers(group).length, {
+    id: "temporary",
+    header: "Temporary",
+    enableSorting: true,
+    enableGlobalFilter: false,
+    cell: ({ row }) => <TemporaryCell group={row.original} />,
+    meta: { className: "hidden whitespace-nowrap md:table-cell", numeric: true },
   }),
   helper.accessor((group) => group.createdAt, {
     id: "created",
@@ -168,6 +177,51 @@ function MachinesCell({ group }: { readonly group: GroupRow }): ReactElement {
       {group.machines === direct ? null : (
         <span className="text-xs text-kumo-subtle">{`${direct} direct`}</span>
       )}
+    </span>
+  );
+}
+
+/** The memberships of the group that end on their own, whether granted by hand or by a request. */
+export function temporaryMembers(group: Group): Group["expiries"] {
+  const now = new Date();
+
+  return group.expiries.filter((expiry) => {
+    const ends = parseTime(expiry.expiresAt);
+
+    return ends !== null && ends > now;
+  });
+}
+
+/** When the next temporary membership of the group runs out, or null when none does. */
+function nextExpiry(group: Group): string | null {
+  const [soonest] = temporaryMembers(group)
+    .map((expiry) => expiry.expiresAt)
+    .toSorted();
+
+  return soonest ?? null;
+}
+
+/**
+ * How many of the group's members are only there for a while, and when the first one goes. It is
+ * the one thing about a group that changes without anybody touching it, so it is worth a column.
+ */
+function TemporaryCell({ group }: { readonly group: GroupRow }): ReactElement {
+  const count = temporaryMembers(group).length;
+
+  if (isBuiltin(group)) {
+    return <span className="text-kumo-subtle">—</span>;
+  }
+
+  if (count === 0) {
+    return <span className="text-kumo-subtle">0</span>;
+  }
+
+  return (
+    <span className="flex min-w-0 flex-col items-end gap-0.5">
+      <span className="text-kumo-default">{count}</span>
+      <span className="text-xs text-kumo-subtle">
+        first <RelativeTime value={nextExpiry(group)} />
+      </span>
     </span>
   );
 }

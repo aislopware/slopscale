@@ -1,5 +1,34 @@
 import type { Webhook } from "~/api/queries.ts";
 
+const mailto = "mailto:";
+
+/**
+ * The recipient that stands for the people who may decide access requests. The server resolves it
+ * when it sends, so the list follows the roles rather than one an operator keeps up to date.
+ */
+export const approversRecipient = "approvers";
+
+/** The URL of an email endpoint sent to the approvers, and nobody else. */
+export const approversMailto = `${mailto}${approversRecipient}`;
+
+/** Whether an endpoint's recipients include the approvers. */
+export function notifiesApprovers(url: string): boolean {
+  return url.startsWith(mailto) && recipientsOf(url).includes(approversRecipient);
+}
+
+/** The recipients of an email endpoint, trimmed; empty for any other kind. */
+export function recipientsOf(url: string): string[] {
+  if (!url.startsWith(mailto)) {
+    return [];
+  }
+
+  return url
+    .slice(mailto.length)
+    .split(",")
+    .map((address) => address.trim())
+    .filter((address) => address !== "");
+}
+
 export type ProviderType =
   | ""
   | "slack"
@@ -90,7 +119,7 @@ const urlFields: Partial<Record<ProviderChoice, UrlField>> = {
   email: {
     label: "Recipients",
     placeholder: "mailto:ops@example.com, security@example.com",
-    hint: "mailto: followed by one or more addresses. The server needs notifications.smtp configured.",
+    hint: `mailto: followed by one or more addresses, or ${approversRecipient} for whoever may decide access requests. The server needs notifications.smtp configured.`,
   },
   ntfy: { label: "Topic URL", placeholder: "https://ntfy.sh/slopscale-ops", hint: "" },
 };
@@ -131,6 +160,7 @@ const eventHints: Readonly<Record<string, string>> = {
   accessRequestCreated: "A user asked for temporary access",
   accessRequestApproved: "An access request was approved",
   accessRequestDenied: "An access request was denied",
+  accessRequestRevoked: "Temporary access was ended early",
 };
 
 export function eventHint(type: string): string {
@@ -177,12 +207,12 @@ export function deliveryLabel(webhook: Pick<Webhook, "lastDeliveryStatus">): str
   return sentence.length > maxLength ? `${sentence.slice(0, maxLength)}…` : sentence;
 }
 
-const mailto = "mailto:";
-
 /** The host of the URL, the part an operator recognises at a glance; the recipients for email. */
 export function urlHost(url: string): string {
   if (url.startsWith(mailto)) {
-    return url.slice(mailto.length).trim();
+    return recipientsOf(url)
+      .map((address) => (address === approversRecipient ? "Approvers" : address))
+      .join(", ");
   }
 
   try {

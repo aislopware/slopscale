@@ -10,7 +10,7 @@ import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
 
-import type { Node, User } from "~/api/queries.ts";
+import type { AccessRequest, Group, Node, User } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import { GetStarted } from "~/components/overview/get-started.tsx";
 import { MetricTiles, preferredGlobalExitNode } from "~/components/overview/metric-tiles.tsx";
@@ -33,6 +33,39 @@ const admin: Me = {
 };
 
 const reader: Me = { ...admin, role: "auditor", permissions: { "devices:core:read": true } };
+
+const approver: Me = { ...admin, permissions: { ...admin.permissions, policy_file: true } };
+
+const ops: Group = {
+  builtin: "",
+  createdAt: "2026-01-01T00:00:00Z",
+  description: "",
+  expiries: [],
+  id: "3",
+  name: "Ops",
+  nodeIds: [],
+  requestable: true,
+  source: "",
+  updatedAt: "2026-01-01T00:00:00Z",
+  userIds: [],
+};
+
+const waitingRequest: AccessRequest = {
+  createdAt: "2026-01-02T00:00:00Z",
+  decidedAt: null,
+  decidedBy: "",
+  durationSeconds: 3600,
+  expiresAt: null,
+  groupId: "3",
+  id: "7",
+  note: "",
+  reason: "on call",
+  revokeNote: "",
+  revokedAt: null,
+  revokedBy: "",
+  status: "pending",
+  userId: "2",
+};
 
 const alice: User = {
   approved: true,
@@ -155,6 +188,7 @@ describe(MetricTiles, () => {
         <MetricTiles
           nodes={[laptop, gateway]}
           users={[alice, newcomer]}
+          requests={undefined}
           nodesLoading={false}
           usersLoading={false}
         />,
@@ -198,6 +232,7 @@ describe(MetricTiles, () => {
         <MetricTiles
           nodes={[laptop, dc, office]}
           users={[alice]}
+          requests={undefined}
           nodesLoading={false}
           usersLoading={false}
         />,
@@ -213,6 +248,7 @@ describe(MetricTiles, () => {
         <MetricTiles
           nodes={[laptop]}
           users={undefined}
+          requests={undefined}
           nodesLoading={false}
           usersLoading={false}
         />,
@@ -224,13 +260,67 @@ describe(MetricTiles, () => {
   });
 });
 
+describe("access requests on the overview", () => {
+  it("lists a waiting request beside the machines and users", async () => {
+    const screen = await render(
+      app(
+        <NeedsAttention
+          nodes={[laptop]}
+          users={[alice]}
+          requests={[waitingRequest]}
+          groups={[ops]}
+          me={approver}
+        />,
+      ),
+    );
+
+    await expect.element(screen.getByRole("link", { name: "Access to Ops" })).toBeVisible();
+    await expect.element(screen.getByText(/Access request · on call/u)).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Approve" })).toBeVisible();
+  });
+
+  it("offers no approval for a request to a caller without the policy scope", async () => {
+    const screen = await render(
+      app(
+        <NeedsAttention
+          nodes={[laptop]}
+          users={[alice]}
+          requests={[waitingRequest]}
+          groups={[ops]}
+          me={admin}
+        />,
+      ),
+    );
+
+    await expect.element(screen.getByText("Access to Ops")).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+  });
+
+  it("counts the grants in effect and what waits on the tile", async () => {
+    const screen = await render(
+      app(
+        <MetricTiles
+          nodes={[laptop]}
+          users={[alice]}
+          requests={[waitingRequest]}
+          nodesLoading={false}
+          usersLoading={false}
+        />,
+      ),
+    );
+
+    await expect.element(screen.getByRole("link", { name: /Temporary access/u })).toBeVisible();
+    await expect.element(screen.getByText("1 request waiting")).toBeVisible();
+  });
+});
+
 describe(NeedsAttention, () => {
   it("stays one quiet row without a heading when nothing is waiting", async () => {
     const screen = await render(
-      app(<NeedsAttention nodes={[laptop]} users={[alice]} me={admin} />),
+      app(<NeedsAttention nodes={[laptop]} users={[alice]} requests={[]} groups={[]} me={admin} />),
     );
 
-    await expect.element(screen.getByText("All machines and users are approved")).toBeVisible();
+    await expect.element(screen.getByText("Nothing is waiting for a decision")).toBeVisible();
     await expect.element(screen.getByRole("link", { name: "Approval settings" })).toBeVisible();
     await expect.element(screen.getByText("Needs attention")).not.toBeInTheDocument();
     await expect.element(screen.getByRole("button", { name: "Approve" })).not.toBeInTheDocument();
@@ -238,7 +328,15 @@ describe(NeedsAttention, () => {
 
   it("lists what is waiting with the action it needs", async () => {
     const screen = await render(
-      app(<NeedsAttention nodes={[laptop, gateway]} users={[alice, newcomer]} me={admin} />),
+      app(
+        <NeedsAttention
+          nodes={[laptop, gateway]}
+          users={[alice, newcomer]}
+          requests={[]}
+          groups={[]}
+          me={admin}
+        />,
+      ),
     );
 
     await expect.element(screen.getByRole("link", { name: "pi-gateway" })).toBeVisible();
@@ -247,7 +345,9 @@ describe(NeedsAttention, () => {
   });
 
   it("offers no approval to a caller who cannot approve", async () => {
-    const screen = await render(app(<NeedsAttention nodes={[gateway]} users={[]} me={reader} />));
+    const screen = await render(
+      app(<NeedsAttention nodes={[gateway]} users={[]} requests={[]} groups={[]} me={reader} />),
+    );
 
     await expect.element(screen.getByText("pi-gateway")).toBeVisible();
     await expect.element(screen.getByRole("button", { name: "Approve" })).not.toBeInTheDocument();
@@ -255,12 +355,18 @@ describe(NeedsAttention, () => {
 
   it("keeps its heading and its warning while something waits", async () => {
     const screen = await render(
-      app(<NeedsAttention nodes={[gateway]} users={[alice]} me={admin} />),
+      app(
+        <NeedsAttention nodes={[gateway]} users={[alice]} requests={[]} groups={[]} me={admin} />,
+      ),
     );
 
     await expect.element(screen.getByText("Needs attention")).toBeVisible();
     await expect
-      .element(screen.getByText("Nothing here can reach the tailnet until it is approved"))
+      .element(
+        screen.getByText(
+          "Machines and users cannot reach the tailnet, and requesters cannot reach what they asked for, until these are decided",
+        ),
+      )
       .toBeVisible();
   });
 });

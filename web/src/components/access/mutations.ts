@@ -22,6 +22,7 @@ export interface AccessMutations {
   readonly createRequest: Mutation<"post", "/api/v1/access-request">;
   readonly approveRequest: Mutation<"post", "/api/v1/access-request/{id}/approve">;
   readonly denyRequest: Mutation<"post", "/api/v1/access-request/{id}/deny">;
+  readonly revokeRequest: Mutation<"post", "/api/v1/access-request/{id}/revoke">;
   readonly cancelRequest: Mutation<"delete", "/api/v1/access-request/{id}">;
 }
 
@@ -88,6 +89,12 @@ export function useAccessMutations(): AccessMutations {
     denyRequest: api.useMutation("post", "/api/v1/access-request/{id}/deny", {
       onSuccess: async () => {
         toast.success("Request denied");
+        await refresh();
+      },
+    }),
+    revokeRequest: api.useMutation("post", "/api/v1/access-request/{id}/revoke", {
+      onSuccess: async () => {
+        toast.success("Access revoked");
         await refresh();
       },
     }),
