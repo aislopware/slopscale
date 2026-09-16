@@ -96,6 +96,13 @@ member who was already in the group for good, or whose membership a
 later approval extended further, keeps what it had: revoking one request
 never takes away access another grant or an operator gave.
 
+One member can hold several approvals for the same group at once, and
+they share a single membership that ends with the last of them. Revoking
+one of those does not empty the group: the membership falls back to the
+furthest approval still standing, and goes only when none is left. So
+revoking a long grant leaves a shorter one that has not run out alone,
+and the member keeps the group until that one ends.
+
 Removing the membership by hand says the same thing on the request.
 Taking a machine or user out of the group, in the console, the CLI or
 the API, marks revoked every approval that was keeping it there, so the

@@ -199,9 +199,15 @@ A recipient may be the word `approvers` instead of an address. It is
 resolved when the message is sent, to the email addresses of every user
 whose role may decide access requests, so the endpoint follows the roles
 rather than a list somebody has to keep up to date. It mixes with plain
-addresses, and a person listed both ways is mailed once. An endpoint
-that resolves to nobody records the delivery as failed rather than
-retrying it.
+addresses, and a person listed both ways is mailed once. An approver
+whose address is not one a mail server would accept is left out, because
+a rejected recipient ends the whole message for everybody on it.
+
+An endpoint that resolves to nobody records the delivery as failed
+rather than retrying it: there is no later attempt at which the answer
+would be different. A lookup that could not be made at all is retried,
+and nothing is sent in the meantime, so an endpoint naming both the
+approvers and an address does not quietly mail only the address.
 
 ```console
 $ slopscale webhooks create --provider email \
