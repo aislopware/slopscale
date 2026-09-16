@@ -34,13 +34,11 @@ export const appColumns = helper.columns([
     cell: ({ row }) => <NameCell app={row.original} />,
     meta: { className: "w-[24%] min-w-44 align-top" },
   }),
-  helper.accessor((app) => app.domains.join(" "), {
+  helper.accessor((app) => `${app.domains.join(" ")} ${app.routes.join(" ")}`, {
     id: "domains",
-    header: "Domains",
+    header: "Domains and routes",
     enableSorting: false,
-    cell: ({ row }) => (
-      <DomainList domains={row.original.domains} max={maxValues} empty="No domain" />
-    ),
+    cell: ({ row }) => <ServesCell app={row.original} />,
     meta: { className: "min-w-44 align-top" },
   }),
   helper.accessor((app) => app.connectors.join(" "), {
@@ -56,15 +54,6 @@ export const appColumns = helper.columns([
     enableSorting: false,
     cell: ({ row }) => <MachinesCell app={row.original} />,
     meta: { className: "hidden align-top whitespace-nowrap lg:table-cell" },
-  }),
-  helper.accessor((app) => app.learned?.count ?? 0, {
-    id: "learned",
-    header: "Learned routes",
-    enableSorting: true,
-    enableGlobalFilter: false,
-    cell: ({ row }) => <LearnedCell learned={row.original.learned} />,
-    // The whole row fits a 1280px screen without Learned routes, and xl starts at 1280.
-    meta: { className: "hidden align-top 2xl:table-cell", numeric: true },
   }),
   helper.accessor((app) => totalPendingRoutes(app.nodes), {
     id: "pending",
@@ -159,50 +148,84 @@ function MachineRow({ node }: { readonly node: AppNode }): ReactElement {
 }
 
 /**
- * How many routes the app's connectors learned for it, or why there is no figure: the caller cannot
- * ask machines, none of the app's connectors is connected, or none has answered yet. A figure from
- * some of several connectors says so, since the rest may know more.
+ * Everything the app covers: its domains, the prefixes it was configured with, and the addresses
+ * its connectors learned for those domains. All three reach the same machines and an operator
+ * checking a route wants them side by side, so they share a cell rather than each taking a column
+ * the table has no width for.
  */
-function LearnedCell({ learned }: { readonly learned: LearnedCount | null }): ReactElement {
-  if (learned === null) {
-    return <Muted title="Asking the connectors needs devices:core:read.">{"\u2014"}</Muted>;
-  }
-
-  if (learned.connected === 0) {
-    return <Muted title="No connector is connected to ask.">{"\u2014"}</Muted>;
-  }
-
-  if (learned.answered === 0) {
-    return <Muted title="Asking the connectors\u2026">{"\u2026"}</Muted>;
-  }
-
-  const partial = learned.answered < learned.connected;
+function ServesCell({ app }: { readonly app: AppRow }): ReactElement {
+  const { learned } = app;
+  const addresses = learned?.addresses ?? [];
 
   return (
-    <Muted
-      title={
-        partial
-          ? `From ${learned.answered} of ${learned.connected} connected connectors.`
-          : undefined
-      }
-    >
-      {partial ? `${learned.count}+` : learned.count}
-    </Muted>
+    <div className="flex min-w-0 flex-col items-start gap-1">
+      {app.domains.length === 0 && app.routes.length === 0 ? (
+        <span className="text-kumo-subtle">No domain or route</span>
+      ) : (
+        <DomainList domains={app.domains} max={maxValues} empty="" />
+      )}
+      {app.routes.length === 0 ? null : (
+        <TagList tags={app.routes} size="sm" max={maxValues} empty="" />
+      )}
+      {addresses.length === 0 ? (
+        <LearnedCell learned={learned} />
+      ) : (
+        <LearnedRoutes addresses={addresses} learned={learned} />
+      )}
+    </div>
   );
 }
 
-function Muted({
-  title,
-  children,
+/**
+ * The addresses the connectors learned, as many as fit and the rest one hover away. A machine that
+ * has not answered yet is said in the caption rather than left to look like nothing was learned.
+ */
+function LearnedRoutes({
+  addresses,
+  learned,
 }: {
-  readonly title?: string | undefined;
-  readonly children: ReactNode;
+  readonly addresses: readonly string[];
+  readonly learned: LearnedCount | null;
 }): ReactElement {
+  const shown = addresses.slice(0, maxValues);
+  const hidden = addresses.slice(shown.length);
+  const partial = learned !== null && learned.answered < learned.connected;
+
   return (
-    <span className="text-kumo-subtle" {...(title === undefined ? {} : { title })}>
-      {children}
+    <span className="flex min-w-0 flex-col items-start gap-0.5">
+      <span className="truncate font-mono text-xs text-kumo-subtle" title={addresses.join(", ")}>
+        {shown.join(", ")}
+        {hidden.length === 0 ? "" : ` +${hidden.length}`}
+      </span>
+      <span className="truncate text-xs text-kumo-subtle">
+        {partial ? `learned, from ${learned.answered} of ${learned.connected}` : "learned"}
+      </span>
     </span>
   );
+}
+
+/**
+ * Why there is nothing to show: the caller cannot ask machines, none of the app's connectors is
+ * connected, or none has answered yet.
+ */
+function LearnedCell({ learned }: { readonly learned: LearnedCount | null }): ReactElement | null {
+  if (learned === null) {
+    return null;
+  }
+
+  if (learned.connected === 0) {
+    return <Muted>No connector connected</Muted>;
+  }
+
+  if (learned.answered === 0) {
+    return <Muted>Asking the connectors{"\u2026"}</Muted>;
+  }
+
+  return <Muted>Nothing learned yet</Muted>;
+}
+
+function Muted({ children }: { readonly children: ReactNode }): ReactElement {
+  return <span className="text-xs text-kumo-subtle">{children}</span>;
 }
 
 /**

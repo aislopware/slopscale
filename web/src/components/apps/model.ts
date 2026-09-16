@@ -45,6 +45,17 @@ export function learnedForApp(
   domains: readonly string[],
   answers: readonly Readonly<Record<string, string[] | null>>[],
 ): number {
+  return learnedAddressesForApp(domains, answers).length;
+}
+
+/**
+ * The addresses the connectors learned for the app's domains, without duplicates and in order. The
+ * count is what a table shows; the addresses are what an operator checks a route against.
+ */
+export function learnedAddressesForApp(
+  domains: readonly string[],
+  answers: readonly Readonly<Record<string, string[] | null>>[],
+): string[] {
   const addresses = new Set<string>();
 
   for (const answer of answers) {
@@ -57,7 +68,7 @@ export function learnedForApp(
     }
   }
 
-  return addresses.size;
+  return [...addresses].toSorted();
 }
 
 /** Total unapproved routes waiting across connector nodes. */
