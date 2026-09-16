@@ -165,7 +165,7 @@ function ServesCell({ app }: { readonly app: AppRow }): ReactElement {
         <DomainList domains={app.domains} max={maxValues} empty="" />
       )}
       {app.routes.length === 0 ? null : (
-        <TagList tags={app.routes} size="sm" max={maxValues} empty="" />
+        <MonoList values={app.routes} className="text-kumo-default" />
       )}
       {addresses.length === 0 ? (
         <LearnedCell learned={learned} />
@@ -173,6 +173,29 @@ function ServesCell({ app }: { readonly app: AppRow }): ReactElement {
         <LearnedRoutes addresses={addresses} learned={learned} />
       )}
     </div>
+  );
+}
+
+/**
+ * A list of addresses, as many as fit and the rest behind the title. Routes and learned addresses
+ * are CIDRs and IPs, which the routes page sets in mono and never as a chip: a seeded-hue chip is
+ * how this console writes a tag, and a route is not one.
+ */
+function MonoList({
+  values,
+  className,
+}: {
+  readonly values: readonly string[];
+  readonly className: string;
+}): ReactElement {
+  const shown = values.slice(0, maxValues);
+  const hidden = values.length - shown.length;
+
+  return (
+    <span className={`truncate font-mono text-xs ${className}`} title={values.join(", ")}>
+      {shown.join(", ")}
+      {hidden === 0 ? "" : ` +${hidden}`}
+    </span>
   );
 }
 
@@ -187,16 +210,11 @@ function LearnedRoutes({
   readonly addresses: readonly string[];
   readonly learned: LearnedCount | null;
 }): ReactElement {
-  const shown = addresses.slice(0, maxValues);
-  const hidden = addresses.slice(shown.length);
   const partial = learned !== null && learned.answered < learned.connected;
 
   return (
     <span className="flex min-w-0 flex-col items-start gap-0.5">
-      <span className="truncate font-mono text-xs text-kumo-subtle" title={addresses.join(", ")}>
-        {shown.join(", ")}
-        {hidden.length === 0 ? "" : ` +${hidden.length}`}
-      </span>
+      <MonoList values={addresses} className="text-kumo-subtle" />
       <span className="truncate text-xs text-kumo-subtle">
         {partial ? `learned, from ${learned.answered} of ${learned.connected}` : "learned"}
       </span>

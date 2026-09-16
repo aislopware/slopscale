@@ -10,8 +10,6 @@ import { learnedAddressesForApp } from "~/components/apps/model.ts";
 /** What the connected connectors of one app have learned for it. */
 export interface LearnedCount {
   /** Distinct addresses learned for the app's domains, from the connectors that have answered. */
-  readonly count: number;
-  /** Those addresses, so the table can show the routes and not only how many there are. */
   readonly addresses: readonly string[];
   /** How many of the app's connected connectors have answered so far. */
   readonly answered: number;
@@ -76,7 +74,6 @@ export function useLearnedCounts(apps: readonly App[], me: Me): LearnedCounts {
         return [
           app.id,
           {
-            count: addresses.length,
             addresses,
             answered: heard.length,
             connected: connected.length,
