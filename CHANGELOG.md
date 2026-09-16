@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## [0.44.0](https://github.com/aislopware/slopscale/compare/v0.43.1...v0.44.0) (2026-09-16)
+
+
+### Changes
+
+* **state:** email the approvers about a new access request, resolved from the roles when it sends ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+* **state:** let an approver end a temporary access grant before it expires ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+* **web:** show an app's routes and learned addresses next to its domains ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+* **web:** show temporary access on the overview and end a grant from the request row ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+
+
+### Fixes
+
+* **db:** keep a shorter grant alive when a longer one is revoked ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+* **state:** keep one bad approver address from stopping the mail to the rest ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+* **state:** publish the access model under a lock so two writes cannot land out of order ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+* **web:** fit the request and group tables beside their pinned column ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+* **webhook:** report an approvers endpoint with nobody to mail as such, not as unreachable ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+* **web:** keep a request's chosen machine visible and start a grant at 30 minutes ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+* **web:** report an endpoint that is set to email new requests but cannot send ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+* **web:** say who asked and for how long before the overview offers to approve ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+* **web:** set an app's routes as addresses rather than tag chips ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+* **web:** stop offering to revoke a grant that has already run out ([3ac522f](https://github.com/aislopware/slopscale/commit/3ac522f404c7d2314dd4b0d8c78795cb58acf68c))
+
 ## [0.43.1](https://github.com/aislopware/slopscale/compare/v0.43.0...v0.43.1) (2026-09-16)
 
 
