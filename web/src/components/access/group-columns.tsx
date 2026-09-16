@@ -1,3 +1,4 @@
+import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import type { ReactElement } from "react";
 
 import type { Group, Node } from "~/api/queries.ts";
@@ -37,7 +38,9 @@ export const groupColumns = helper.columns([
     header: "Group",
     enableSorting: true,
     cell: ({ row }) => <NameCell group={row.original} />,
-    meta: { className: "w-[32%] min-w-52" },
+    // A description of any length would otherwise take the slack and push the counts after it
+    // under the pinned column; min-width still wins over max-width, so the floor holds.
+    meta: { className: "w-[32%] max-w-0 min-w-52" },
   }),
   helper.accessor((group) => group.userIds.length, {
     id: "users",
@@ -202,8 +205,9 @@ function nextExpiry(group: Group): string | null {
 }
 
 /**
- * How many of the group's members are only there for a while, and when the first one goes. It is
- * the one thing about a group that changes without anybody touching it, so it is worth a column.
+ * How many of the group's members are only there for a while. It is the one thing about a group
+ * that changes without anybody touching it, so it is worth a column; when the first one goes is a
+ * hover away, because a count is all the width there is beside the group's own description.
  */
 function TemporaryCell({ group }: { readonly group: GroupRow }): ReactElement {
   const count = temporaryMembers(group).length;
@@ -217,11 +221,17 @@ function TemporaryCell({ group }: { readonly group: GroupRow }): ReactElement {
   }
 
   return (
-    <span className="flex min-w-0 flex-col items-end gap-0.5">
+    <Tooltip content={<FirstExpiry group={group} />}>
       <span className="text-kumo-default">{count}</span>
-      <span className="text-xs text-kumo-subtle">
-        first <RelativeTime value={nextExpiry(group)} />
-      </span>
+    </Tooltip>
+  );
+}
+
+/** When the soonest of the group's temporary memberships runs out. */
+function FirstExpiry({ group }: { readonly group: GroupRow }): ReactElement {
+  return (
+    <span>
+      The first ends <RelativeTime value={nextExpiry(group)} />
     </span>
   );
 }

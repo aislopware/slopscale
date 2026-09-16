@@ -1,3 +1,4 @@
+import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import type { ReactElement } from "react";
 
 import { RequestMenu } from "~/components/access/request-menu.tsx";
@@ -47,7 +48,10 @@ export const requestColumns = helper.columns([
         )}
       </div>
     ),
-    meta: { className: "min-w-40" },
+    // The reason is free text of any length, and this is the only column without a width of its
+    // own, so without a cap it takes the slack and pushes the last columns under the pinned one.
+    // min-width still wins over max-width, so the floor holds.
+    meta: { className: "w-[30%] max-w-0 min-w-40" },
   }),
   helper.accessor((request) => request.durationSeconds, {
     id: "duration",
@@ -136,19 +140,41 @@ function Detail({ request }: { readonly request: RequestRow }): ReactElement | n
   if (request.phase === "revoked") {
     const endedBy = request.revokedBy === "" ? "" : ` by ${request.revokedBy}`;
 
+    // Why the access was taken back is the part the requester came to read, so it is on the row
+    // rather than behind a hover only a mouse can reach.
     return (
-      <span className="truncate text-xs text-kumo-subtle" title={request.revokeNote}>
-        Ended <RelativeTime value={request.revokedAt} />
-        {endedBy}
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="truncate text-xs text-kumo-subtle">
+          Ended <RelativeTime value={request.revokedAt} />
+          {endedBy}
+        </span>
+        {request.revokeNote === "" ? null : (
+          <Tooltip content={request.revokeNote}>
+            <span className="truncate text-xs text-kumo-subtle">{request.revokeNote}</span>
+          </Tooltip>
+        )}
       </span>
     );
   }
 
-  if (request.phase === "active" || request.phase === "expired") {
+  if (request.phase === "active") {
+    // The Ends column carries the time wherever it is shown; saying it twice in one row is what
+    // pushed the columns after it off the table.
     return (
       <span className="truncate text-xs text-kumo-subtle">
-        {request.phase === "active" ? "Ends " : "Ended "}
-        <RelativeTime value={request.expiresAt} />
+        <span className="md:hidden">
+          Ends <RelativeTime value={request.expiresAt} />
+          {by === "" ? "" : ", "}
+        </span>
+        {by === "" ? null : `approved${by}`}
+      </span>
+    );
+  }
+
+  if (request.phase === "expired") {
+    return (
+      <span className="truncate text-xs text-kumo-subtle">
+        Ended <RelativeTime value={request.expiresAt} />
         {by}
       </span>
     );

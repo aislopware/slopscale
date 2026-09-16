@@ -242,7 +242,7 @@ export function RevokeRequestDialog({
       <DialogContent
         size="base"
         title="Revoke access"
-        description={`${request.userName} loses ${request.groupLabel} now, before the grant runs out. A membership that was already permanent stays.`}
+        description={`This grant ends now, before it was due to run out. ${request.userName} keeps ${request.groupLabel} only if something else still gives it to them: a permanent membership, or another approval that has not ended.`}
       >
         <form onSubmit={submit} className="flex flex-col gap-4">
           <Input

@@ -1,4 +1,5 @@
 import { Popover } from "@cloudflare/kumo/components/popover";
+import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement, ReactNode } from "react";
 
@@ -177,9 +178,9 @@ function ServesCell({ app }: { readonly app: AppRow }): ReactElement {
 }
 
 /**
- * A list of addresses, as many as fit and the rest behind the title. Routes and learned addresses
- * are CIDRs and IPs, which the routes page sets in mono and never as a chip: a seeded-hue chip is
- * how this console writes a tag, and a route is not one.
+ * A list of addresses, as many as fit and the rest one hover away. Routes and learned addresses are
+ * CIDRs and IPs, which the routes page sets in mono and never as a chip: a seeded-hue chip is how
+ * this console writes a tag, and a route is not one.
  */
 function MonoList({
   values,
@@ -190,13 +191,16 @@ function MonoList({
 }): ReactElement {
   const shown = values.slice(0, maxValues);
   const hidden = values.length - shown.length;
-
-  return (
-    <span className={`truncate font-mono text-xs ${className}`} title={values.join(", ")}>
+  const line = (
+    <span className={`truncate font-mono text-xs ${className}`}>
       {shown.join(", ")}
       {hidden === 0 ? "" : ` +${hidden}`}
     </span>
   );
+
+  // Only what is cut off needs the rest one hover away, and a tooltip rather than a title so a
+  // keyboard reaches it too.
+  return hidden === 0 ? line : <Tooltip content={values.join(", ")}>{line}</Tooltip>;
 }
 
 /**
