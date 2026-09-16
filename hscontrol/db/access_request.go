@@ -233,10 +233,11 @@ type AccessRequestRevocation struct {
 // membership the approval granted and marks the request revoked, keeping
 // the approval's own record. A request that is not in effect is refused.
 //
-// The membership only goes when it is the one this approval made: a
-// temporary membership that ends no later than the request does. A
-// permanent member, or one another approval extended further, keeps the
-// membership it had before, because this approval did not create it.
+// The membership only goes when this approval is the last thing holding
+// it up. A permanent member, or one another approval extended further,
+// keeps what it had, because this approval did not create it; a member
+// with a second approval still in effect falls back to that one's
+// expiry rather than losing the group.
 func (hsdb *HSDatabase) RevokeAccessRequest(
 	id types.AccessRequestID, revocation AccessRequestRevocation,
 ) (types.AccessRequest, error) {
@@ -278,20 +279,38 @@ func (hsdb *HSDatabase) RevokeAccessRequest(
 	})
 }
 
-// dropGrantedMembership removes the temporary membership the approval
-// granted, if it is still the one the approval made.
+// dropGrantedMembership takes back what the approval granted. A member
+// can hold several approvals for one group at once, and they share a
+// single membership row carrying the latest expiry, so revoking the
+// longest one must not take the shorter one's access with it: the
+// membership falls back to the furthest approval still standing, and
+// only goes when none is left.
+//
+// Either way the row is touched only while its expiry is no later than
+// this approval's, which is what leaves a permanent membership, or one
+// an operator extended by hand, where it is.
 func dropGrantedMembership(q Querier, req types.AccessRequest) error {
+	surviving, err := survivingGrantExpiry(q, req)
+	if err != nil {
+		return err
+	}
+
 	until := jet.TimestampExp(timeArg(req.ExpiresAt.UTC()))
 
 	if req.NodeID != nil {
-		_, err := q.executor().exec(
-			table.GroupNodes.DELETE().WHERE(
-				table.GroupNodes.GroupID.EQ(jet.Uint64(uint64(req.GroupID))).
-					AND(table.GroupNodes.NodeID.EQ(jet.Uint64(req.NodeID.Uint64()))).
-					AND(table.GroupNodes.ExpiresAt.IS_NOT_NULL()).
-					AND(table.GroupNodes.ExpiresAt.LT_EQ(until)),
-			),
-		)
+		where := table.GroupNodes.GroupID.EQ(jet.Uint64(uint64(req.GroupID))).
+			AND(table.GroupNodes.NodeID.EQ(jet.Uint64(req.NodeID.Uint64()))).
+			AND(table.GroupNodes.ExpiresAt.IS_NOT_NULL()).
+			AND(table.GroupNodes.ExpiresAt.LT_EQ(until))
+
+		if surviving != nil {
+			_, err = q.executor().exec(
+				table.GroupNodes.UPDATE(table.GroupNodes.ExpiresAt).SET(surviving.UTC()).WHERE(where),
+			)
+		} else {
+			_, err = q.executor().exec(table.GroupNodes.DELETE().WHERE(where))
+		}
+
 		if err != nil {
 			return fmt.Errorf("revoking node %d in group %d: %w", *req.NodeID, req.GroupID, err)
 		}
@@ -299,19 +318,70 @@ func dropGrantedMembership(q Querier, req types.AccessRequest) error {
 		return nil
 	}
 
-	_, err := q.executor().exec(
-		table.GroupUsers.DELETE().WHERE(
-			table.GroupUsers.GroupID.EQ(jet.Uint64(uint64(req.GroupID))).
-				AND(table.GroupUsers.UserID.EQ(jet.Uint64(uint64(req.UserID)))).
-				AND(table.GroupUsers.ExpiresAt.IS_NOT_NULL()).
-				AND(table.GroupUsers.ExpiresAt.LT_EQ(until)),
-		),
-	)
+	where := table.GroupUsers.GroupID.EQ(jet.Uint64(uint64(req.GroupID))).
+		AND(table.GroupUsers.UserID.EQ(jet.Uint64(uint64(req.UserID)))).
+		AND(table.GroupUsers.ExpiresAt.IS_NOT_NULL()).
+		AND(table.GroupUsers.ExpiresAt.LT_EQ(until))
+
+	if surviving != nil {
+		_, err = q.executor().exec(
+			table.GroupUsers.UPDATE(table.GroupUsers.ExpiresAt).SET(surviving.UTC()).WHERE(where),
+		)
+	} else {
+		_, err = q.executor().exec(table.GroupUsers.DELETE().WHERE(where))
+	}
+
 	if err != nil {
 		return fmt.Errorf("revoking user %d in group %d: %w", req.UserID, req.GroupID, err)
 	}
 
 	return nil
+}
+
+// survivingGrantExpiry is how long the member keeps its place in the
+// group once this approval is taken back: the furthest expiry among the
+// member's other approvals that are still in effect, or nil when the
+// approval being revoked is the only one holding the membership up.
+func survivingGrantExpiry(q Querier, req types.AccessRequest) (*time.Time, error) {
+	at := jet.TimestampExp(timeArg(time.Now().UTC()))
+
+	where := table.AccessRequests.GroupID.EQ(jet.Uint64(uint64(req.GroupID))).
+		AND(table.AccessRequests.ID.NOT_EQ(jet.Uint64(uint64(req.ID)))).
+		AND(table.AccessRequests.Status.EQ(jet.String(string(types.AccessRequestApproved)))).
+		AND(table.AccessRequests.ExpiresAt.IS_NOT_NULL()).
+		AND(table.AccessRequests.ExpiresAt.GT(at))
+
+	if req.NodeID == nil {
+		where = where.AND(table.AccessRequests.UserID.EQ(jet.Uint64(uint64(req.UserID)))).
+			AND(table.AccessRequests.NodeID.IS_NULL())
+	} else {
+		where = where.AND(table.AccessRequests.NodeID.EQ(jet.Uint64(req.NodeID.Uint64())))
+	}
+
+	var others []accessRequestRecord
+
+	err := q.executor().query(
+		jet.SELECT(table.AccessRequests.AllColumns).FROM(table.AccessRequests).WHERE(where),
+		&others,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listing the access requests still granting group %d: %w", req.GroupID, err)
+	}
+
+	var furthest *time.Time
+
+	for _, other := range others {
+		ends := other.AccessRequest.ExpiresAt
+		if ends == nil {
+			continue
+		}
+
+		if furthest == nil || ends.After(*furthest) {
+			furthest = ends
+		}
+	}
+
+	return furthest, nil
 }
 
 // RevokeAccessRequestsForMember marks revoked every approval still in
