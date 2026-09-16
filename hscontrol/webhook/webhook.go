@@ -46,7 +46,7 @@ type Dispatcher struct {
 	// approvers resolves [types.RecipientApprovers] to the addresses of
 	// the people who may decide access requests, at the moment the
 	// message is sent.
-	approvers func() []string
+	approvers func() ([]string, error)
 	// backoff is the wait before each retry; tests shorten it.
 	backoff []time.Duration
 
@@ -139,7 +139,7 @@ func (d *Dispatcher) SetMailer(m Mailer) {
 
 // SetApprovers sets how [types.RecipientApprovers] is resolved. Without
 // one the token resolves to nothing.
-func (d *Dispatcher) SetApprovers(approvers func() []string) {
+func (d *Dispatcher) SetApprovers(approvers func() ([]string, error)) {
 	d.approvers = approvers
 }
 

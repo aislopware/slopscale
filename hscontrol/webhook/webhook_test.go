@@ -3,6 +3,7 @@ package webhook
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -229,7 +230,7 @@ func TestApproversAreResolvedWhenTheMailIsSent(t *testing.T) {
 
 	approvers := []string{"jane@example.com", "ops@example.com"}
 
-	d.SetApprovers(func() []string { return approvers })
+	d.SetApprovers(func() ([]string, error) { return approvers, nil })
 
 	require.NoError(t, d.Test(t.Context(), endpoint))
 	require.Equal(t, 2, mailer.count())
@@ -260,6 +261,16 @@ func TestApproversAreResolvedWhenTheMailIsSent(t *testing.T) {
 	assert.False(t, store.record(12).OK)
 	assert.Equal(t, ErrNoRecipients.Error(), store.status(12))
 	assert.Equal(t, 3, mailer.count(), "nothing was sent")
+
+	// A lookup that failed is not the same state: nobody to mail is final,
+	// a database that did not answer is worth another attempt, and the
+	// address listed beside the token must not be mailed on its own.
+	d.SetApprovers(func() ([]string, error) { return nil, errors.New("database is away") })
+
+	err = d.Test(t.Context(), endpoint)
+	require.ErrorContains(t, err, "database is away")
+	assert.True(t, retryable(0, err), "the message is worth another attempt")
+	assert.Equal(t, 3, mailer.count(), "ops@example.com was not mailed on its own")
 }
 
 func TestMailMessage(t *testing.T) {

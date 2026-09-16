@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"net/mail"
 	"strconv"
 	"strings"
 	"time"
@@ -40,14 +41,16 @@ func (s *State) AccessRequestOptionsFor(userID types.UserID) AccessRequestOption
 
 // ApproverEmails lists the email addresses of the people who may decide
 // access requests: every user whose role holds the policy scope and that
-// has an address. It resolves [types.RecipientApprovers] when an email
-// endpoint is sent to, so the list follows the roles.
-func (s *State) ApproverEmails() []string {
+// has a usable address. It resolves [types.RecipientApprovers] when an
+// email endpoint is sent to, so the list follows the roles.
+//
+// A database failure is returned rather than reported as an empty list,
+// because the two mean opposite things to the sender: nobody to mail is
+// final, while a failed lookup is worth another attempt.
+func (s *State) ApproverEmails() ([]string, error) {
 	users, err := s.db.ListUsers(nil)
 	if err != nil {
-		log.Error().Err(err).Msg("Listing users to notify the approvers")
-
-		return nil
+		return nil, fmt.Errorf("listing users to notify the approvers: %w", err)
 	}
 
 	var emails []string
@@ -57,10 +60,22 @@ func (s *State) ApproverEmails() []string {
 			continue
 		}
 
+		// An address the identity provider handed over may be anything.
+		// One that a mail server would reject is skipped rather than sent,
+		// because a rejected recipient ends the whole message, and the
+		// other approvers have done nothing wrong.
+		_, parseErr := mail.ParseAddress(user.Email)
+		if parseErr != nil {
+			log.Warn().Str("user", user.Name).
+				Msg("Skipping an approver whose email address is not one a mail server would take")
+
+			continue
+		}
+
 		emails = append(emails, user.Email)
 	}
 
-	return emails
+	return emails, nil
 }
 
 // ListAccessRequests returns every request, or one user's own.
@@ -251,7 +266,10 @@ func (s *State) RevokeAccessRequest(
 		Str("revoked.by", revocation.RevokedBy).
 		Msg("Access request revoked")
 
-	s.emitAccessRequest(types.EventAccessRequestRevoked, revoked, "%s no longer has access to %s (granted for %s).")
+	// What ended is this grant. Whether the member still reaches the group
+	// through a permanent membership or another approval is not something
+	// one line can answer, so it does not claim to.
+	s.emitAccessRequest(types.EventAccessRequestRevoked, revoked, "%s's access to %s was ended early (granted for %s).")
 
 	return revoked, c, nil
 }

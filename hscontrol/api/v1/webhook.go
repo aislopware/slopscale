@@ -203,7 +203,13 @@ func registerWebhooks(api huma.API, b Backend) {
 		out := &listWebhooksOutput{}
 		out.Body.Webhooks = make([]Webhook, 0, len(hooks))
 		out.Body.MailAvailable = b.Cfg != nil && b.Cfg.SMTP.Configured()
-		out.Body.Approvers = len(b.State.ApproverEmails())
+
+		approvers, err := b.State.ApproverEmails()
+		if err != nil {
+			return nil, mapError("listing the approvers to mail", err)
+		}
+
+		out.Body.Approvers = len(approvers)
 
 		for _, w := range hooks {
 			out.Body.Webhooks = append(out.Body.Webhooks, webhookFrom(w, false))

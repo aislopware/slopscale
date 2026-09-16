@@ -41,7 +41,11 @@ func (d *Dispatcher) mail(ctx context.Context, endpoint types.Webhook, event typ
 		return ErrNoMailer
 	}
 
-	to := d.resolveRecipients(endpoint.Recipients())
+	to, err := d.resolveRecipients(endpoint.Recipients())
+	if err != nil {
+		return err
+	}
+
 	if len(to) == 0 {
 		return ErrNoRecipients
 	}
@@ -52,7 +56,11 @@ func (d *Dispatcher) mail(ctx context.Context, endpoint types.Webhook, event typ
 // resolveRecipients expands [types.RecipientApprovers] into the current
 // approvers and drops duplicates, so an operator who also lists their own
 // address is mailed once.
-func (d *Dispatcher) resolveRecipients(recipients []string) []string {
+//
+// A failure to look the approvers up is returned rather than read as an
+// empty list: the message is worth another attempt, and an endpoint that
+// also names an address must not quietly mail only that one.
+func (d *Dispatcher) resolveRecipients(recipients []string) ([]string, error) {
 	out := make([]string, 0, len(recipients))
 
 	for _, addr := range recipients {
@@ -66,12 +74,17 @@ func (d *Dispatcher) resolveRecipients(recipients []string) []string {
 			continue
 		}
 
-		for _, approver := range d.approvers() {
+		approvers, err := d.approvers()
+		if err != nil {
+			return nil, fmt.Errorf("resolving the approvers to mail: %w", err)
+		}
+
+		for _, approver := range approvers {
 			out = appendUnique(out, approver)
 		}
 	}
 
-	return out
+	return out, nil
 }
 
 func appendUnique(list []string, addr string) []string {
