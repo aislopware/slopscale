@@ -121,6 +121,7 @@ export function requestNames(
 export function toRequestRows(
   requests: readonly AccessRequest[],
   names: RequestNames,
+  now: Date = new Date(),
 ): RequestRow[] {
   return requests.map((request) => {
     const user = names.users.find((candidate) => candidate.id === request.userId);
@@ -131,7 +132,7 @@ export function toRequestRows(
       userName: user === undefined ? `User ${request.userId}` : userLabel(user),
       nodeLabel: nodeLabelFor(request.nodeId, node),
       groupLabel: groupName(names.groups, request.groupId),
-      phase: requestPhase(request),
+      phase: requestPhase(request, now),
     };
   });
 }

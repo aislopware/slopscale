@@ -16,6 +16,7 @@ import { SearchInput } from "~/components/table/search-input.tsx";
 import { countedTabs } from "~/components/table/tab-count.tsx";
 import { TableFooter, TableToolbar } from "~/components/table/toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
+import { useNow } from "~/lib/use-now.ts";
 
 const filters = ["pending", "active", "all"] as const;
 type Filter = (typeof filters)[number];
@@ -35,7 +36,7 @@ function rowsFor(rows: readonly RequestRow[], filter: Filter): RequestRow[] {
   return rows.filter((row) => row.phase === filter);
 }
 
-/** What an empty list says, which depends on why it is empty. */
+/** What an empty tab says, when nothing was searched for. */
 const emptyText: Record<Filter, { title: string; description: string }> = {
   pending: {
     title: "Nothing to decide",
@@ -44,10 +45,20 @@ const emptyText: Record<Filter, { title: string; description: string }> = {
   active: {
     title: "No access in effect",
     description:
-      "Nobody holds temporary access right now. Approved grants show here until they run out.",
+      "No approved request is in effect. A membership an operator granted by hand is not a request and is not listed here.",
   },
-  all: { title: "No requests", description: "No request matches this search." },
+  all: { title: "No requests", description: "Nobody has asked for temporary access yet." },
 };
+
+/**
+ * Why the list is empty. A search that matched nothing says so, rather than claiming the tab is
+ * empty: the tab's own count is right there beside it, and the two would contradict each other.
+ */
+function emptyFor(filter: Filter, searching: boolean): { title: string; description: string } {
+  return searching
+    ? { title: "No matches", description: "No request here matches this search." }
+    : emptyText[filter];
+}
 
 export interface RequestsTabProps {
   readonly me: Me;
@@ -74,9 +85,12 @@ export function RequestsTab({
 }: RequestsTabProps): ReactElement {
   const query = useDeferredValue(search);
   const [filter, setFilter] = useState<Filter>("pending");
+  // A grant ends on its own, so the phases are re-read on a clock: without one a page left open
+  // keeps a finished grant under "In effect" and goes on offering to revoke it.
+  const now = useNow();
   const rows = useMemo(
-    () => toRequestRows(requests, requestNames(groups, users, nodes)),
-    [requests, groups, users, nodes],
+    () => toRequestRows(requests, requestNames(groups, users, nodes), now),
+    [requests, groups, users, nodes, now],
   );
   const shownRows = useMemo(() => rowsFor(rows, filter), [rows, filter]);
 
@@ -118,8 +132,8 @@ export function RequestsTab({
               <Empty
                 className={tableEmptyClass}
                 size="sm"
-                title={emptyText[filter].title}
-                description={emptyText[filter].description}
+                title={emptyFor(filter, search !== "").title}
+                description={emptyFor(filter, search !== "").description}
                 contents={
                   search === "" ? undefined : (
                     <Button
