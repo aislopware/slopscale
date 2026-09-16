@@ -1,185 +1,19 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  createMemoryHistory,
-  createRootRoute,
-  createRoute,
-  createRouter,
-  RouterProvider,
-} from "@tanstack/react-router";
-import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
 
-import type { AccessRequest, Group, Node, User } from "~/api/queries.ts";
-import type { Me } from "~/auth/me.ts";
+import type { Node } from "~/api/queries.ts";
 import { GetStarted } from "~/components/overview/get-started.tsx";
 import { MetricTiles, preferredGlobalExitNode } from "~/components/overview/metric-tiles.tsx";
 import { NeedsAttention } from "~/components/overview/needs-attention.tsx";
-
-const admin: Me = {
-  kind: "session",
-  role: "admin",
-  allAccess: false,
-  scoped: false,
-  scopes: [],
-  permissions: {
-    "devices:core": true,
-    "devices:core:read": true,
-    users: true,
-    "users:read": true,
-    auth_keys: true,
-    "feature_settings:read": true,
-  },
-};
-
-const reader: Me = { ...admin, role: "auditor", permissions: { "devices:core:read": true } };
-
-const approver: Me = { ...admin, permissions: { ...admin.permissions, policy_file: true } };
-
-const ops: Group = {
-  builtin: "",
-  createdAt: "2026-01-01T00:00:00Z",
-  description: "",
-  expiries: [],
-  id: "3",
-  name: "Ops",
-  nodeIds: [],
-  requestable: true,
-  source: "",
-  updatedAt: "2026-01-01T00:00:00Z",
-  userIds: [],
-};
-
-const waitingRequest: AccessRequest = {
-  createdAt: "2026-01-02T00:00:00Z",
-  decidedAt: null,
-  decidedBy: "",
-  durationSeconds: 3600,
-  expiresAt: null,
-  groupId: "3",
-  id: "7",
-  note: "",
-  reason: "on call",
-  revokeNote: "",
-  revokedAt: null,
-  revokedBy: "",
-  status: "pending",
-  userId: "2",
-};
-
-const alice: User = {
-  approved: true,
-  approvedAt: "2026-01-01T00:00:00Z",
-  createdAt: "2026-01-01T00:00:00Z",
-  displayName: "Alice",
-  email: "alice@example.com",
-  id: "1",
-  name: "alice",
-  profilePicUrl: "",
-  provider: "oidc",
-  providerId: "alice",
-  role: "admin",
-};
-
-const newcomer: User = {
-  ...alice,
-  approved: false,
-  approvedAt: null,
-  displayName: "Bob",
-  email: "bob@example.com",
-  id: "2",
-  name: "bob",
-  role: "member",
-};
-
-const laptop: Node = {
-  appConnector: false,
-  remoteConfig: false,
-  sshServer: false,
-  approved: true,
-  approvedAt: "2026-01-01T00:00:00Z",
-  announcedServices: [],
-  approvedRoutes: [],
-  approvedServices: [],
-  availableRoutes: [],
-  createdAt: "2026-01-01T00:00:00Z",
-  discoKey: "",
-  expiry: null,
-  givenName: "laptop-alice",
-  globalExitNode: false,
-  exitNodePriority: 0,
-  funnelEnabled: false,
-  clientVersion: "",
-  os: "",
-  osVersion: "",
-  updateAvailable: false,
-  ephemeral: false,
-  clientWarnings: [],
-  id: "1",
-  ipAddresses: ["100.64.0.1"],
-  lastSeen: new Date().toISOString(),
-  machineKey: "",
-  name: "laptop-alice",
-  nodeKey: "",
-  online: true,
-  preAuthKey: {
-    aclTags: [],
-    createdAt: null,
-    ephemeral: false,
-    expiration: null,
-    id: "0",
-    key: "",
-    preauthorized: false,
-    reusable: false,
-    used: false,
-    user: alice,
-  },
-  registerMethod: "REGISTER_METHOD_OIDC",
-  sharedWith: [],
-  suspended: false,
-  suspendedAt: null,
-  subnetRoutes: [],
-  tags: [],
-  user: alice,
-};
-
-const gateway: Node = {
-  ...laptop,
-  approved: false,
-  approvedAt: null,
-  announcedServices: [],
-  approvedRoutes: ["0.0.0.0/0"],
-  approvedServices: [],
-  availableRoutes: ["0.0.0.0/0"],
-  givenName: "pi-gateway",
-  id: "2",
-  ipAddresses: ["100.64.0.2"],
-  name: "pi-gateway",
-  online: false,
-};
-
-/** The overview links to other pages, so every piece of it needs a router around it. */
-function app(children: ReactNode): ReactElement {
-  const rootRoute = createRootRoute({ component: () => <div>{children}</div> });
-  const router = createRouter({
-    routeTree: rootRoute.addChildren([
-      createRoute({ getParentRoute: () => rootRoute, path: "/" }),
-      createRoute({ getParentRoute: () => rootRoute, path: "/machines" }),
-      createRoute({ getParentRoute: () => rootRoute, path: "/machines/$nodeId" }),
-      createRoute({ getParentRoute: () => rootRoute, path: "/users" }),
-      createRoute({ getParentRoute: () => rootRoute, path: "/settings" }),
-      createRoute({ getParentRoute: () => rootRoute, path: "/settings/tailnet" }),
-    ]),
-    history: createMemoryHistory({ initialEntries: ["/"] }),
-  });
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>
-  );
-}
+import {
+  admin,
+  alice,
+  app,
+  gateway,
+  laptop,
+  newcomer,
+  reader,
+} from "~/components/overview/overview-fixtures.tsx";
 
 describe(MetricTiles, () => {
   it("counts machines, approvals, users and exit nodes", async () => {
@@ -257,60 +91,6 @@ describe(MetricTiles, () => {
 
     await expect.element(screen.getByText("Machines")).toBeVisible();
     await expect.element(screen.getByText("Users")).not.toBeInTheDocument();
-  });
-});
-
-describe("access requests on the overview", () => {
-  it("lists a waiting request beside the machines and users", async () => {
-    const screen = await render(
-      app(
-        <NeedsAttention
-          nodes={[laptop]}
-          users={[alice]}
-          requests={[waitingRequest]}
-          groups={[ops]}
-          me={approver}
-        />,
-      ),
-    );
-
-    await expect.element(screen.getByRole("link", { name: "Access to Ops" })).toBeVisible();
-    await expect.element(screen.getByText(/Access request · on call/u)).toBeVisible();
-    await expect.element(screen.getByRole("button", { name: "Approve" })).toBeVisible();
-  });
-
-  it("offers no approval for a request to a caller without the policy scope", async () => {
-    const screen = await render(
-      app(
-        <NeedsAttention
-          nodes={[laptop]}
-          users={[alice]}
-          requests={[waitingRequest]}
-          groups={[ops]}
-          me={admin}
-        />,
-      ),
-    );
-
-    await expect.element(screen.getByText("Access to Ops")).toBeVisible();
-    await expect.element(screen.getByRole("button", { name: "Approve" })).not.toBeInTheDocument();
-  });
-
-  it("counts the grants in effect and what waits on the tile", async () => {
-    const screen = await render(
-      app(
-        <MetricTiles
-          nodes={[laptop]}
-          users={[alice]}
-          requests={[waitingRequest]}
-          nodesLoading={false}
-          usersLoading={false}
-        />,
-      ),
-    );
-
-    await expect.element(screen.getByRole("link", { name: /Temporary access/u })).toBeVisible();
-    await expect.element(screen.getByText("1 request waiting")).toBeVisible();
   });
 });
 

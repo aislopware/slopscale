@@ -17,7 +17,7 @@ import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { nodeName, ownerLabel, userLabel } from "~/lib/node.ts";
-import { parseTime } from "~/lib/time.ts";
+import { formatDuration, parseTime } from "~/lib/time.ts";
 
 /** Enough to see what is waiting without turning the overview into a list page. */
 const maxRows = 6;
@@ -43,6 +43,8 @@ interface PendingRow {
   readonly title: string;
   readonly subtitle: string;
   readonly createdAt: string | null;
+  /** A request the signed-in user filed: nobody decides their own. */
+  readonly own?: boolean;
 }
 
 interface Approvals {
@@ -97,10 +99,34 @@ export interface Waiting {
   readonly users: readonly User[];
   readonly requests: readonly AccessRequest[];
   readonly groups: readonly Group[];
+  /** The signed-in user's id, so their own request is not offered to them. */
+  readonly meId?: string | undefined;
+}
+
+/**
+ * What a request asks for, in the order an approver weighs it: who is asking, for how long, and
+ * which machine. The button next to it grants exactly this, so the row has to say it; the duration
+ * especially, because a month and an hour look the same once they are both "a request".
+ */
+function requestSubtitle(
+  request: AccessRequest,
+  users: readonly User[],
+  nodes: readonly Node[],
+): string {
+  const user = users.find((candidate) => candidate.id === request.userId);
+  const asked = user === undefined ? `User ${request.userId}` : userLabel(user);
+  const node =
+    request.nodeId === undefined
+      ? undefined
+      : nodes.find((candidate) => candidate.id === request.nodeId);
+  const scope = node === undefined ? "every machine they own" : nodeName(node);
+  const why = request.reason === "" ? "no reason given" : request.reason;
+
+  return `${asked} · ${formatDuration(request.durationSeconds)} · ${scope} · ${why}`;
 }
 
 /** Everything waiting for an administrator, oldest first: it has been blocked the longest. */
-export function pendingRows({ nodes, users, requests, groups }: Waiting): PendingRow[] {
+export function pendingRows({ nodes, users, requests, groups, meId }: Waiting): PendingRow[] {
   const rows: PendingRow[] = [];
 
   for (const node of nodes.filter((candidate) => !candidate.approved)) {
@@ -131,8 +157,9 @@ export function pendingRows({ nodes, users, requests, groups }: Waiting): Pendin
       id: request.id,
       kind: "request",
       title: `Access to ${groupName(groups, request.groupId)}`,
-      subtitle: request.reason === "" ? "No reason given" : request.reason,
+      subtitle: requestSubtitle(request, users, nodes),
       createdAt: request.createdAt,
+      own: meId !== undefined && request.userId === meId,
     });
   }
 
@@ -185,14 +212,15 @@ function PendingItem({
   readonly onApprove: (row: PendingRow) => void;
   readonly pending: boolean;
 }): ReactElement {
-  const allowed = can(me, approveScopes[row.kind]);
+  // Nobody decides their own request: the server refuses it, so the button is not offered.
+  const allowed = can(me, approveScopes[row.kind]) && row.own !== true;
 
   return (
     <SectionRow className="flex items-center justify-between gap-4 py-3">
       <div className="flex min-w-0 flex-col gap-0.5">
         <RowTitle row={row} />
         {/* The kind is said, not drawn: a boxed icon beside every row is the generated-UI template. */}
-        <p className="truncate text-xs text-kumo-subtle">
+        <p className="truncate text-xs text-kumo-subtle" title={row.subtitle}>
           {kindLabels[row.kind]} · {row.subtitle} · {row.kind === "request" ? "asked" : "added"}{" "}
           <RelativeTime value={row.createdAt} />
         </p>
@@ -258,7 +286,7 @@ export function NeedsAttention({
   me,
 }: NeedsAttentionProps): ReactElement {
   const approve = useApprovals();
-  const rows = pendingRows({ nodes, users, requests, groups });
+  const rows = pendingRows({ nodes, users, requests, groups, meId: me.user?.id });
   const shown = rows.slice(0, maxRows);
   const busy = approve.node.isPending || approve.user.isPending || approve.request.isPending;
 
