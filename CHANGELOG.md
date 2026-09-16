@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.43.1](https://github.com/aislopware/slopscale/compare/v0.43.0...v0.43.1) (2026-09-16)
+
+
+### Fixes
+
+* **web:** keep a console page behind the same rule that hides it from the sidebar ([#19](https://github.com/aislopware/slopscale/issues/19)) ([41142bd](https://github.com/aislopware/slopscale/commit/41142bde324fe0492d8de4931d2598e2381b6f24))
+
 ## [0.43.0](https://github.com/aislopware/slopscale/compare/v0.42.3...v0.43.0) (2026-09-14)
 
 
