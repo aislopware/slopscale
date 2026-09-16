@@ -28,7 +28,17 @@ func (s *State) AccessModel() types.AccessModel {
 // loadAccessModel creates the builtin groups when missing, reads the
 // model from the database and hands it to the policy manager. It runs
 // at start and after every mutation.
+//
+// Reading and publishing are one step under [State.accessMu]: two writes
+// that commit together would otherwise each read the database and
+// publish in whichever order they finished, and the loser would leave
+// the policy holding a model that no longer matches the rows. Revoking
+// two grants at once is the case that makes it visible, because the
+// stale model still has the access the other call took away.
 func (s *State) loadAccessModel() (change.Change, error) {
+	s.accessMu.Lock()
+	defer s.accessMu.Unlock()
+
 	err := s.db.EnsureBuiltinGroups()
 	if err != nil {
 		return change.Change{}, fmt.Errorf("ensuring the builtin groups: %w", err)
