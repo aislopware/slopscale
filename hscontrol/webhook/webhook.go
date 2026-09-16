@@ -452,7 +452,8 @@ func deliveryStatus(status int, err error) string {
 		return "rejected"
 
 	case errors.Is(err, ErrRedirected), errors.Is(err, ErrNoMailer),
-		errors.Is(err, ErrQueueFull), errors.Is(err, ErrClosed):
+		errors.Is(err, ErrNoRecipients), errors.Is(err, ErrQueueFull),
+		errors.Is(err, ErrClosed):
 		// slopscale's own words about its own state, with nothing of the
 		// receiver's network in them.
 		return err.Error()

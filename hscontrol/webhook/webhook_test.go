@@ -200,6 +200,68 @@ func TestEmailEndpointGoesThroughTheMailer(t *testing.T) {
 	assert.Equal(t, "rejected", store.status(8), "the mail server's reply stays in the log")
 }
 
+func TestApproversAreResolvedWhenTheMailIsSent(t *testing.T) {
+	t.Parallel()
+
+	store := &memStore{}
+	d := New(store, "example.ts.net")
+	t.Cleanup(d.Close)
+
+	mailer := &memMailer{}
+	d.SetMailer(mailer)
+
+	endpoint := types.Webhook{
+		ID: 11, ProviderType: types.WebhookProviderEmail,
+		URL: "mailto:approvers, ops@example.com",
+	}
+
+	// Without a resolver the token stands for nobody. The addresses beside it
+	// are still mailed; only a token-only endpoint has nobody left.
+	require.NoError(t, d.Test(t.Context(), endpoint))
+	require.Equal(t, 1, mailer.count())
+	assert.Equal(t, []string{"ops@example.com"}, mailer.sent[0].to)
+
+	err := d.Test(t.Context(), types.Webhook{
+		ID: 10, ProviderType: types.WebhookProviderEmail, URL: "mailto:approvers",
+	})
+	require.ErrorIs(t, err, ErrNoRecipients)
+	assert.False(t, retryable(0, err), "another attempt would resolve to nobody too")
+
+	approvers := []string{"jane@example.com", "ops@example.com"}
+
+	d.SetApprovers(func() []string { return approvers })
+
+	require.NoError(t, d.Test(t.Context(), endpoint))
+	require.Equal(t, 2, mailer.count())
+	assert.Equal(t, []string{"jane@example.com", "ops@example.com"}, mailer.sent[1].to,
+		"the address listed twice is mailed once")
+
+	// The list follows the roles: a promotion between two sends is picked up
+	// without touching the endpoint.
+	approvers = []string{"jane@example.com", "sam@example.com"}
+
+	require.NoError(t, d.Test(t.Context(), endpoint))
+	require.Equal(t, 3, mailer.count())
+	assert.Equal(t, []string{"jane@example.com", "sam@example.com", "ops@example.com"}, mailer.sent[2].to)
+
+	// Nobody left to mail is the state an approvers endpoint can reach on its
+	// own, so it is reported rather than sent empty.
+	approvers = nil
+
+	d.Reload([]types.Webhook{{
+		ID: 12, ProviderType: types.WebhookProviderEmail, URL: "mailto:approvers",
+		Subscriptions: []types.WebhookEventType{types.EventAccessRequestCreated},
+	}})
+	d.Emit(types.EventAccessRequestCreated, "Bob asked for Staging.", nil)
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.Equal(c, 1, store.record(12).Attempts, "not retried")
+	}, 5*time.Second, 10*time.Millisecond)
+	assert.False(t, store.record(12).OK)
+	assert.Equal(t, ErrNoRecipients.Error(), store.status(12))
+	assert.Equal(t, 3, mailer.count(), "nothing was sent")
+}
+
 func TestMailMessage(t *testing.T) {
 	t.Parallel()
 
