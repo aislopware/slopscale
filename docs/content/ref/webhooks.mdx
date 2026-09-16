@@ -52,6 +52,7 @@ show the rest, newest first.
 | `accessRequestCreated`  | A user asked to join a group for a while; see [Temporary access](/ref/temporary-access). |
 | `accessRequestApproved` | An approver granted the request and the membership was added.                          |
 | `accessRequestDenied`   | An approver turned the request down.                                                   |
+| `accessRequestRevoked`  | An approver ended a grant before it ran out.                                           |
 | `sshRecordingFailed`    | An SSH session could not be recorded; see [SSH session recording](/ref/ssh-recording).   |
 
 `GET /api/v1/webhook/event-types` and `slopscale webhooks event-types` list
@@ -192,6 +193,19 @@ notifications:
 $ slopscale webhooks create --provider email \
     --url 'mailto:ops@example.com, security@example.com' \
     --event nodeNeedsApproval --event userRoleUpdated
+```
+
+A recipient may be the word `approvers` instead of an address. It is
+resolved when the message is sent, to the email addresses of every user
+whose role may decide access requests, so the endpoint follows the roles
+rather than a list somebody has to keep up to date. It mixes with plain
+addresses, and a person listed both ways is mailed once. An endpoint
+that resolves to nobody records the delivery as failed rather than
+retrying it.
+
+```console
+$ slopscale webhooks create --provider email \
+    --url 'mailto:approvers' --event accessRequestCreated
 ```
 
 Each event is one message: the subject is the event's message with the
