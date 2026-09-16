@@ -206,7 +206,7 @@ func apiKeyIDOrPrefix(cmd *cobra.Command) (uint64, string, error) {
 var expireAPIKeyCmd = &cobra.Command{
 	Use:     cmdExpire,
 	Short:   "Expire an API key",
-	Aliases: []string{"revoke", aliasExp, "e"},
+	Aliases: []string{cmdRevoke, aliasExp, "e"},
 	RunE: clientRunE(
 		func(ctx context.Context, client *clientv1.ClientWithResponses, cmd *cobra.Command, _ []string) error {
 			id, prefix, err := apiKeyIDOrPrefix(cmd)

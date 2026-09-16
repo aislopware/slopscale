@@ -12,6 +12,7 @@ const (
 	cmdDelete = "delete"
 	cmdUpdate = "update"
 	cmdExpire = "expire"
+	cmdRevoke = "revoke"
 
 	// Subcommand aliases.
 	aliasDel = "del"

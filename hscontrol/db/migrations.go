@@ -687,7 +687,35 @@ WHERE tags IS NOT NULL AND tags != '[]' AND tags != '' AND tags != 'null'
 				return tx.ex.addColumnIfMissing("nodes", "exit_node_priority", typeIntegerZero)
 			},
 		},
+		{
+			// Revoking access: access_requests gain who ended an approval
+			// early, when, and what they said. They leave the approval's
+			// own decided_by, decided_at and note in place, so a revoked
+			// request still says who granted it.
+			id:  "202609211000-access-request-revoke",
+			run: migrateAccessRequestRevoke,
+		},
 	}
+}
+
+// migrateAccessRequestRevoke (202609211000) adds the revocation record to
+// access_requests.
+func migrateAccessRequestRevoke(tx *Tx) error {
+	for _, col := range []struct {
+		column string
+		typ    columnType
+	}{
+		{"revoked_by", typeText},
+		{"revoked_at", typeTimestamp},
+		{"revoke_note", typeText},
+	} {
+		err := tx.ex.addColumnIfMissing("access_requests", col.column, col.typ)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // migrateFederatedIdentity (202609191000) adds the columns that turn a row

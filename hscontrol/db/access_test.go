@@ -108,13 +108,13 @@ func TestAccessGroupsAndRules(t *testing.T) {
 	assert.True(t, updated.Bidirectional)
 	assert.ElementsMatch(t, []types.GroupID{eng.ID, all.ID}, updated.SourceGroupIDs)
 
-	replaced, err := db.SetGroupMembers(eng.ID, nil, []types.UserID{types.UserID(alice.ID)})
+	replaced, err := db.SetGroupMembers(eng.ID, nil, []types.UserID{types.UserID(alice.ID)}, "test")
 	require.NoError(t, err)
 	assert.Empty(t, replaced.NodeIDs)
 	assert.Len(t, replaced.UserIDs, 1)
 
-	require.NoError(t, db.RemoveGroupUser(eng.ID, types.UserID(alice.ID)))
-	require.ErrorIs(t, db.RemoveGroupUser(eng.ID, types.UserID(alice.ID)), types.ErrGroupMemberMissing)
+	require.NoError(t, db.RemoveGroupUser(eng.ID, types.UserID(alice.ID), "test"))
+	require.ErrorIs(t, db.RemoveGroupUser(eng.ID, types.UserID(alice.ID), "test"), types.ErrGroupMemberMissing)
 
 	require.NoError(t, db.DeleteAccessRule(rule.ID))
 	require.ErrorIs(t, db.DeleteAccessRule(rule.ID), types.ErrRuleNotFound)

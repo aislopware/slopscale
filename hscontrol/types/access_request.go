@@ -18,17 +18,20 @@ func (id AccessRequestID) String() string {
 type AccessRequestStatus string
 
 // The statuses a request moves through. A request is decided once and
-// never reopened; the membership an approval made ends on its own.
+// never reopened; the membership an approval made ends on its own, or
+// early when an approver revokes it.
 const (
 	AccessRequestPending   AccessRequestStatus = "pending"
 	AccessRequestApproved  AccessRequestStatus = "approved"
 	AccessRequestDenied    AccessRequestStatus = "denied"
 	AccessRequestCancelled AccessRequestStatus = "cancelled"
+	AccessRequestRevoked   AccessRequestStatus = "revoked"
 )
 
 // AccessRequestStatuses lists every status, in lifecycle order.
 var AccessRequestStatuses = []AccessRequestStatus{
-	AccessRequestPending, AccessRequestApproved, AccessRequestDenied, AccessRequestCancelled,
+	AccessRequestPending, AccessRequestApproved, AccessRequestDenied,
+	AccessRequestCancelled, AccessRequestRevoked,
 }
 
 // AccessRequest is a user's ask to join a requestable group for a while,
@@ -52,8 +55,15 @@ type AccessRequest struct {
 	Note      string
 	CreatedAt time.Time
 	DecidedAt *time.Time
-	// ExpiresAt is when the granted membership ends; set on approval.
+	// ExpiresAt is when the granted membership ends; set on approval. A
+	// revoked request keeps it, as the record of what was approved, and
+	// RevokedAt says when the access really ended.
 	ExpiresAt *time.Time
+	// RevokedBy, RevokedAt and RevokeNote record an approval ended early;
+	// they leave the approval's own record in place.
+	RevokedBy  string
+	RevokedAt  *time.Time
+	RevokeNote string
 }
 
 // Pending reports whether the request still waits for a decision.
@@ -65,6 +75,11 @@ func (r AccessRequest) Pending() bool {
 // the instant.
 func (r AccessRequest) Active(now time.Time) bool {
 	return r.Status == AccessRequestApproved && r.ExpiresAt != nil && now.Before(*r.ExpiresAt)
+}
+
+// Revoked reports whether an approval was ended early.
+func (r AccessRequest) Revoked() bool {
+	return r.Status == AccessRequestRevoked
 }
 
 // The bounds on how long a request may ask for.
@@ -85,6 +100,8 @@ var (
 	ErrAccessRequestNodeOwner      = errors.New("the machine must belong to the requester")
 	ErrAccessRequestOwn            = errors.New("nobody decides their own access request")
 	ErrAccessRequestPendingExists  = errors.New("a request for the same group and machine is already pending")
+	ErrAccessRequestNotActive      = errors.New("only access that is in effect can be revoked")
+	ErrAccessRequestActive         = errors.New("revoke the access before deleting the request")
 )
 
 // ValidateAccessRequestDuration checks the bounds.

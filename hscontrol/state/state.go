@@ -376,6 +376,7 @@ func NewState(cfg *types.Config) (*State, error) {
 
 	// Webhooks come after the first loads so that boot emits nothing.
 	s.webhooks = webhook.New(db, tailnetName(cfg))
+	s.webhooks.SetApprovers(s.ApproverEmails)
 
 	if mailer := webhook.NewSMTPMailer(cfg.SMTP); mailer != nil {
 		s.mailer = mailer

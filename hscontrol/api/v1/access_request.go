@@ -30,14 +30,19 @@ type AccessRequest struct {
 	Reason  string `json:"reason"`
 	// DurationSeconds is how long the membership lasts once approved.
 	DurationSeconds int64  `json:"durationSeconds"`
-	Status          string `doc:"One of pending, approved, denied, cancelled." json:"status"`
+	Status          string `doc:"One of pending, approved, denied, cancelled, revoked." json:"status"`
 	// DecidedBy names who approved or denied.
 	DecidedBy string     `json:"decidedBy"`
 	Note      string     `doc:"What the approver said." json:"note"`
 	CreatedAt time.Time  `json:"createdAt"`
 	DecidedAt *time.Time `json:"decidedAt"              nullable:"true"`
-	// ExpiresAt is when the granted membership ends; set on approval.
+	// ExpiresAt is when the granted membership ends; set on approval. A
+	// revoked request keeps it as the record of what was approved.
 	ExpiresAt *time.Time `json:"expiresAt" nullable:"true"`
+	// RevokedBy, RevokedAt and RevokeNote record an approval ended early.
+	RevokedBy  string     `json:"revokedBy"`
+	RevokedAt  *time.Time `json:"revokedAt"                      nullable:"true"`
+	RevokeNote string     `doc:"Why the access was ended early." json:"revokeNote"`
 }
 
 // AccessRequestBody files a request.
@@ -56,6 +61,11 @@ type AccessDecisionBody struct {
 	// DurationSeconds overrides what was asked for; only an approval
 	// reads it.
 	DurationSeconds int64 `json:"durationSeconds,omitempty"`
+}
+
+// AccessRevokeBody ends an approved request's access early.
+type AccessRevokeBody struct {
+	Note string `doc:"Why the access is ending; shown to the requester." json:"note,omitempty"`
 }
 
 // AccessRequestOption is a group a user may ask to join, or a machine
@@ -80,6 +90,10 @@ type (
 	decisionInput struct {
 		ID   string `format:"uint64" path:"id"`
 		Body AccessDecisionBody
+	}
+	revokeInput struct {
+		ID   string `format:"uint64" path:"id"`
+		Body AccessRevokeBody
 	}
 	requestOutput struct {
 		Body struct {
@@ -114,6 +128,9 @@ func accessRequestFrom(r types.AccessRequest) AccessRequest {
 		CreatedAt:       r.CreatedAt,
 		DecidedAt:       r.DecidedAt,
 		ExpiresAt:       r.ExpiresAt,
+		RevokedBy:       r.RevokedBy,
+		RevokedAt:       r.RevokedAt,
+		RevokeNote:      r.RevokeNote,
 	}
 
 	if r.NodeID != nil {
@@ -172,6 +189,7 @@ func requireRequestAccess(ctx context.Context, req types.AccessRequest) error {
 func registerAccessRequests(api huma.API, b Backend) {
 	registerAccessRequestReads(api, b)
 	registerAccessRequestWrites(api, b)
+	registerAccessRequestDecisions(api, b)
 }
 
 func registerAccessRequestReads(api huma.API, b Backend) {
@@ -334,6 +352,35 @@ func registerAccessRequestWrites(api huma.API, b Backend) {
 		return out, nil
 	})
 
+	huma.Register(api, audited(huma.Operation{
+		OperationID: "cancelAccessRequest",
+		Method:      http.MethodDelete,
+		Path:        "/api/v1/access-request/{id}",
+		Summary:     "Cancel or delete access request",
+		Description: "The requester withdraws a pending request. A caller with policy_file " +
+			"withdraws any pending request, or deletes a decided one from the record.",
+		Tags:     []string{tagAccessControl},
+		Security: bearerAuth,
+	}, "access_request.cancel", "access_request", "id"), func(
+		ctx context.Context, in *requestIDInput,
+	) (*emptyOutput, error) {
+		id, err := parseAccessRequestID(in.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		err = cancelOrDelete(ctx, b, id)
+		if err != nil {
+			return nil, err
+		}
+
+		return &emptyOutput{}, nil
+	})
+}
+
+// registerAccessRequestDecisions adds what an approver does with a
+// request: approve it, turn it down, or end the access it granted.
+func registerAccessRequestDecisions(api huma.API, b Backend) {
 	huma.Register(api, audited(withScope(huma.Operation{
 		OperationID: "approveAccessRequest",
 		Method:      http.MethodPost,
@@ -394,29 +441,38 @@ func registerAccessRequestWrites(api huma.API, b Backend) {
 		return out, nil
 	})
 
-	huma.Register(api, audited(huma.Operation{
-		OperationID: "cancelAccessRequest",
-		Method:      http.MethodDelete,
-		Path:        "/api/v1/access-request/{id}",
-		Summary:     "Cancel or delete access request",
-		Description: "The requester withdraws a pending request. A caller with policy_file " +
-			"withdraws any pending request, or deletes a decided one from the record.",
+	huma.Register(api, audited(withScope(huma.Operation{
+		OperationID: "revokeAccessRequest",
+		Method:      http.MethodPost,
+		Path:        "/api/v1/access-request/{id}/revoke",
+		Summary:     "Revoke access request",
+		Description: "Ends an approved request's access now: the membership it granted goes and " +
+			"the policy is rebuilt. Only access that is in effect can be revoked, and an approver " +
+			"may revoke their own.",
 		Tags:     []string{tagAccessControl},
 		Security: bearerAuth,
-	}, "access_request.cancel", "access_request", "id"), func(
-		ctx context.Context, in *requestIDInput,
-	) (*emptyOutput, error) {
+	}, scope.PolicyFile), "access_request.revoke", "access_request", "id"), func(
+		ctx context.Context, in *revokeInput,
+	) (*requestOutput, error) {
 		id, err := parseAccessRequestID(in.ID)
 		if err != nil {
 			return nil, err
 		}
 
-		err = cancelOrDelete(ctx, b, id)
+		req, c, err := b.State.RevokeAccessRequest(id, state.AccessRevocation{
+			RevokedBy: deciderName(ctx, b),
+			Note:      in.Body.Note,
+		})
 		if err != nil {
-			return nil, err
+			return nil, mapError("revoking access request", err)
 		}
 
-		return &emptyOutput{}, nil
+		b.Change(c)
+
+		out := &requestOutput{}
+		out.Body.Request = accessRequestFrom(req)
+
+		return out, nil
 	})
 }
 

@@ -182,11 +182,13 @@ func (s *State) DeleteGroup(id types.GroupID) (change.Change, error) {
 	return c, nil
 }
 
-// SetGroupMembers replaces the group's direct nodes and users.
+// SetGroupMembers replaces the group's direct nodes and users; by names
+// who did it, for the access requests a dropped member loses.
 func (s *State) SetGroupMembers(
 	id types.GroupID,
 	nodeIDs []types.NodeID,
 	userIDs []types.UserID,
+	by string,
 ) (types.AccessGroup, change.Change, error) {
 	err := s.requireEditableGroup(id)
 	if err != nil {
@@ -211,7 +213,7 @@ func (s *State) SetGroupMembers(
 		return types.AccessGroup{}, change.Change{}, err
 	}
 
-	group, err := s.db.SetGroupMembers(id, nodeIDs, userIDs)
+	group, err := s.db.SetGroupMembers(id, nodeIDs, userIDs, by)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
 	}
@@ -251,14 +253,17 @@ func (s *State) AddGroupNode(
 	return s.groupAfterChange(id)
 }
 
-// RemoveGroupNode drops the node's direct membership.
-func (s *State) RemoveGroupNode(id types.GroupID, nodeID types.NodeID) (types.AccessGroup, change.Change, error) {
+// RemoveGroupNode drops the node's direct membership; by names who did
+// it, for the access request that granted it.
+func (s *State) RemoveGroupNode(
+	id types.GroupID, nodeID types.NodeID, by string,
+) (types.AccessGroup, change.Change, error) {
 	err := s.requireEditableGroup(id)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
 	}
 
-	err = s.db.RemoveGroupNode(id, nodeID)
+	err = s.db.RemoveGroupNode(id, nodeID, by)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
 	}
@@ -294,14 +299,17 @@ func (s *State) AddGroupUser(
 	return s.groupAfterChange(id)
 }
 
-// RemoveGroupUser drops the user's membership.
-func (s *State) RemoveGroupUser(id types.GroupID, userID types.UserID) (types.AccessGroup, change.Change, error) {
+// RemoveGroupUser drops the user's membership; by names who did it, for
+// the access request that granted it.
+func (s *State) RemoveGroupUser(
+	id types.GroupID, userID types.UserID, by string,
+) (types.AccessGroup, change.Change, error) {
 	err := s.requireEditableGroupUsers(id, nil)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
 	}
 
-	err = s.db.RemoveGroupUser(id, userID)
+	err = s.db.RemoveGroupUser(id, userID, by)
 	if err != nil {
 		return types.AccessGroup{}, change.Change{}, err
 	}

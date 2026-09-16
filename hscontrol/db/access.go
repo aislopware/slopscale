@@ -530,6 +530,7 @@ func (hsdb *HSDatabase) SetGroupMembers(
 	id types.GroupID,
 	nodeIDs []types.NodeID,
 	userIDs []types.UserID,
+	by string,
 ) (types.AccessGroup, error) {
 	return Write(hsdb, func(tx *Tx) (types.AccessGroup, error) {
 		ex := tx.executor()
@@ -565,6 +566,11 @@ func (hsdb *HSDatabase) SetGroupMembers(
 			}
 		}
 
+		err = revokeDroppedMembers(tx, id, before, nodeIDs, userIDs, by)
+		if err != nil {
+			return types.AccessGroup{}, err
+		}
+
 		err = touchGroup(tx, id)
 		if err != nil {
 			return types.AccessGroup{}, err
@@ -572,6 +578,37 @@ func (hsdb *HSDatabase) SetGroupMembers(
 
 		return getGroup(tx, id)
 	})
+}
+
+// revokeDroppedMembers marks revoked the approvals of the members the
+// new list no longer holds; see [HSDatabase.RemoveGroupNode].
+func revokeDroppedMembers(
+	q Querier, id types.GroupID, before types.AccessGroup,
+	nodeIDs []types.NodeID, userIDs []types.UserID, by string,
+) error {
+	for _, nid := range before.NodeIDs {
+		if slices.Contains(nodeIDs, nid) {
+			continue
+		}
+
+		err := revokeAccessRequestsForMember(q, id, 0, &nid, by)
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, uid := range before.UserIDs {
+		if slices.Contains(userIDs, uid) {
+			continue
+		}
+
+		err := revokeAccessRequestsForMember(q, id, uid, nil, by)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func dedupe[T cmp.Ordered](ids []T) []T {
@@ -717,8 +754,10 @@ func utcPtr(t *time.Time) *time.Time {
 	return &at
 }
 
-// RemoveGroupNode drops the node's direct membership.
-func (hsdb *HSDatabase) RemoveGroupNode(id types.GroupID, nodeID types.NodeID) error {
+// RemoveGroupNode drops the node's direct membership. An access request
+// that granted it is marked revoked, so the request list and the group
+// agree; by names who removed it.
+func (hsdb *HSDatabase) RemoveGroupNode(id types.GroupID, nodeID types.NodeID, by string) error {
 	return hsdb.Write(func(tx *Tx) error {
 		affected, err := tx.executor().exec(
 			table.GroupNodes.DELETE().WHERE(
@@ -732,6 +771,11 @@ func (hsdb *HSDatabase) RemoveGroupNode(id types.GroupID, nodeID types.NodeID) e
 
 		if affected == 0 {
 			return types.ErrGroupMemberMissing
+		}
+
+		err = revokeAccessRequestsForMember(tx, id, 0, &nodeID, by)
+		if err != nil {
+			return err
 		}
 
 		return touchGroup(tx, id)
@@ -768,8 +812,9 @@ func AddGroupUser(q Querier, id types.GroupID, userID types.UserID, expiresAt *t
 	return nil
 }
 
-// RemoveGroupUser drops the user's membership.
-func (hsdb *HSDatabase) RemoveGroupUser(id types.GroupID, userID types.UserID) error {
+// RemoveGroupUser drops the user's membership, marking revoked the
+// access request that granted it; see [HSDatabase.RemoveGroupNode].
+func (hsdb *HSDatabase) RemoveGroupUser(id types.GroupID, userID types.UserID, by string) error {
 	return hsdb.Write(func(tx *Tx) error {
 		affected, err := tx.executor().exec(
 			table.GroupUsers.DELETE().WHERE(
@@ -783,6 +828,11 @@ func (hsdb *HSDatabase) RemoveGroupUser(id types.GroupID, userID types.UserID) e
 
 		if affected == 0 {
 			return types.ErrGroupMemberMissing
+		}
+
+		err = revokeAccessRequestsForMember(tx, id, userID, nil, by)
+		if err != nil {
+			return err
 		}
 
 		return touchGroup(tx, id)

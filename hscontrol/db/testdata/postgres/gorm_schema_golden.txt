@@ -10,6 +10,9 @@ COL access_requests.note text null=YES
 COL access_requests.created_at timestamp with time zone null=YES
 COL access_requests.decided_at timestamp with time zone null=YES
 COL access_requests.expires_at timestamp with time zone null=YES
+COL access_requests.revoked_by text null=YES
+COL access_requests.revoked_at timestamp with time zone null=YES
+COL access_requests.revoke_note text null=YES
 COL access_rule_groups.id bigint null=NO default=nextval('access_rule_groups_id_seq'::regclass)
 COL access_rule_groups.rule_id bigint null=NO
 COL access_rule_groups.group_id bigint null=NO
