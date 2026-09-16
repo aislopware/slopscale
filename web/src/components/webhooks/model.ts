@@ -16,6 +16,19 @@ export function notifiesApprovers(url: string): boolean {
   return url.startsWith(mailto) && recipientsOf(url).includes(approversRecipient);
 }
 
+/** Whether an endpoint sends mail at all, whoever it is addressed to. */
+export function isEmailEndpoint(url: string): boolean {
+  return url.startsWith(mailto);
+}
+
+/**
+ * Whether the endpoint names somebody outright. Such a recipient is mailed whatever the roles say,
+ * so an endpoint that has one reaches a person even when no approver has an address.
+ */
+export function hasNamedRecipient(url: string): boolean {
+  return recipientsOf(url).some((recipient) => recipient !== approversRecipient);
+}
+
 /** The recipients of an email endpoint, trimmed; empty for any other kind. */
 export function recipientsOf(url: string): string[] {
   if (!url.startsWith(mailto)) {

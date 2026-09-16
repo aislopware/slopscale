@@ -10,7 +10,11 @@ import type { Me } from "~/auth/me.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { Frame, FramePanel } from "~/components/ui/frame.tsx";
 import { toast } from "~/components/ui/toast.ts";
-import { approversMailto, notifiesApprovers } from "~/components/webhooks/model.ts";
+import {
+  approversMailto,
+  hasNamedRecipient,
+  isEmailEndpoint,
+} from "~/components/webhooks/model.ts";
 
 const newRequestEvent = "accessRequestCreated";
 
@@ -42,19 +46,24 @@ export function ApproverNotice({ me }: { readonly me: Me }): ReactElement | null
     return null;
   }
 
-  const told = data.webhooks.some(
-    (hook) => notifiesApprovers(hook.url) && hook.subscriptions.includes(newRequestEvent),
+  const mailers = data.webhooks.filter(
+    (hook) => isEmailEndpoint(hook.url) && hook.subscriptions.includes(newRequestEvent),
   );
+  const problem = mailProblem({
+    mailers: mailers.map((hook) => hook.url),
+    mailAvailable: data.mailAvailable,
+    approvers: data.approvers,
+  });
 
-  if (told) {
+  if (problem === null) {
     return null;
   }
 
   return (
     <Frame>
       <FramePanel className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-5 py-3">
-        <p className="text-kumo-subtle">{reason(data.mailAvailable, data.approvers)}</p>
-        {allowed && data.mailAvailable && data.approvers > 0 ? (
+        <p className="text-kumo-subtle">{problem}</p>
+        {allowed && mailers.length === 0 && data.mailAvailable && data.approvers > 0 ? (
           <Button
             size="sm"
             variant="secondary"
@@ -79,15 +88,42 @@ export function ApproverNotice({ me }: { readonly me: Me }): ReactElement | null
   );
 }
 
-/** Why nobody is emailed, in the words of whatever is missing. */
-function reason(mailAvailable: boolean, approvers: number): string {
+/**
+ * What stops a new request from reaching anybody by email, or null when nothing does. An endpoint
+ * that exists is not the same as one that sends: a mail server has to be configured, and an
+ * endpoint addressed only to the approvers reaches nobody while no approver has an address.
+ */
+function mailProblem({
+  mailers,
+  mailAvailable,
+  approvers,
+}: {
+  readonly mailers: readonly string[];
+  readonly mailAvailable: boolean;
+  readonly approvers: number;
+}): string | null {
+  if (mailers.length === 0) {
+    if (!mailAvailable) {
+      return "Nobody is emailed about a new request. Set notifications.smtp in the config file to send mail.";
+    }
+
+    if (approvers === 0) {
+      return "Nobody is emailed about a new request: no user who may decide one has an email address.";
+    }
+
+    return `Nobody is emailed about a new request. ${plural(approvers, "person")} may decide them.`;
+  }
+
   if (!mailAvailable) {
-    return "Nobody is emailed about a new request. Set notifications.smtp in the config file to send mail.";
+    return "New requests are set to be emailed, but no mail server is configured. Set notifications.smtp in the config file.";
   }
 
-  if (approvers === 0) {
-    return "Nobody is emailed about a new request: no user who may decide one has an email address.";
+  // Somebody named outright is mailed whatever the roles say.
+  if (mailers.some((url) => hasNamedRecipient(url))) {
+    return null;
   }
 
-  return `Nobody is emailed about a new request. ${plural(approvers, "person")} may decide them.`;
+  return approvers === 0
+    ? "New requests are emailed to the approvers, but no user who may decide one has an email address, so the mail goes nowhere."
+    : null;
 }
