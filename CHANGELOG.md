@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.46.0](https://github.com/aislopware/slopscale/compare/v0.45.0...v0.46.0) (2026-09-18)
+
+
+### Changes
+
+* **types:** give the logo a dark variant, so a flat mark does not disappear in dark mode ([#25](https://github.com/aislopware/slopscale/issues/25)) ([157a12a](https://github.com/aislopware/slopscale/commit/157a12ab4bdd6175ff35f7c1696fa0f12bdcf709))
+
 ## [0.45.0](https://github.com/aislopware/slopscale/compare/v0.44.0...v0.45.0) (2026-09-18)
 
 
