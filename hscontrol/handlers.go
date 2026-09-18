@@ -63,7 +63,7 @@ func httpUserError(w http.ResponseWriter, err error) {
 	w.WriteHeader(code)
 
 	page := templates.AuthError(templates.AuthErrorResult{
-		Title:   "Slopscale - Error",
+		Title:   "Error",
 		Heading: http.StatusText(code),
 		Message: userMsg,
 	})
@@ -427,9 +427,38 @@ func (a *AuthProviderWeb) RegisterHandler(
 	}
 }
 
-func FaviconHandler(writer http.ResponseWriter, req *http.Request) {
-	writer.Header().Set("Content-Type", "image/png")
-	http.ServeContent(writer, req, "favicon.ico", time.Unix(0, 0), bytes.NewReader(assets.Favicon))
+// FaviconHandler serves the icon a browser puts on the tab. An operator
+// who configured a logo gets theirs, so a rebranded server does not show
+// the product's mark in every tab.
+func (h *Slopscale) FaviconHandler(writer http.ResponseWriter, req *http.Request) {
+	logo, contentType, ok := h.cfg.Branding.Logo()
+	if !ok {
+		logo, contentType = assets.Favicon, "image/png"
+	}
+
+	writer.Header().Set("Content-Type", contentType)
+	http.ServeContent(writer, req, "favicon.ico", time.Unix(0, 0), bytes.NewReader(logo))
+}
+
+// LogoHandler serves the brand's mark for the pages and the console. It
+// answers with the built-in mark while no logo is configured rather than
+// 404, because the path is public and a proxy or a ban rule that watches
+// for misses must not see one because a setting was removed.
+func (h *Slopscale) LogoHandler(writer http.ResponseWriter, req *http.Request) {
+	logo, contentType, ok := h.cfg.Branding.Logo()
+	if !ok {
+		writer.Header().Set("Content-Type", "image/svg+xml")
+		writer.Header().Set("Cache-Control", "no-cache")
+		http.ServeContent(writer, req, "logo.svg", time.Unix(0, 0), strings.NewReader(assets.SVG))
+
+		return
+	}
+
+	writer.Header().Set("Content-Type", contentType)
+	// The address the pages use carries the file's hash, so the bytes
+	// behind one URL never change and a replaced logo is a new URL.
+	writer.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	http.ServeContent(writer, req, "logo", time.Unix(0, 0), bytes.NewReader(logo))
 }
 
 // OpenGraphHandler serves the social card the server's pages name as their

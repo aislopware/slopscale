@@ -8,8 +8,8 @@ import (
 // to users in their browser when a browser-facing operation fails
 // (OIDC callback, SSH check, registration confirmation, etc.).
 type AuthErrorResult struct {
-	// Title is the browser tab / page title,
-	// e.g. "Slopscale - Error".
+	// Title says what the page is, e.g. "Error"; the page adds the brand
+	// behind it.
 	Title string
 
 	// Heading is the bold red text inside the error box,
@@ -31,7 +31,7 @@ func AuthError(result AuthErrorResult) *elem.Element {
 	)
 
 	return page(
-		result.Title,
+		pageTitle(result.Title),
 		box,
 	)
 }

@@ -73,10 +73,13 @@ function clickPart(root: Element, selector: string): void {
 describe(documentTitle, () => {
   // The tab reads page first, so a row of tabs tells apart by what is in front.
   it("puts the page before its section and the product last, each once", () => {
-    expect(documentTitle("Machines", "backup-nas")).toBe("backup-nas - Machines - Slopscale");
-    expect(documentTitle("Machines", null)).toBe("Machines - Slopscale");
-    expect(documentTitle("Keys", "Keys")).toBe("Keys - Slopscale");
-    expect(documentTitle(undefined, null)).toBe("Slopscale");
+    expect(documentTitle("Slopscale", "Machines", "backup-nas")).toBe(
+      "backup-nas - Machines - Slopscale",
+    );
+    expect(documentTitle("Slopscale", "Machines", null)).toBe("Machines - Slopscale");
+    expect(documentTitle("Slopscale", "Keys", "Keys")).toBe("Keys - Slopscale");
+    expect(documentTitle("Slopscale", undefined, null)).toBe("Slopscale");
+    expect(documentTitle("Jmango360 VPN", "Machines", null)).toBe("Machines - Jmango360 VPN");
   });
 });
 

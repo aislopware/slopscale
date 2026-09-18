@@ -2,6 +2,7 @@ package hscontrol
 
 import (
 	"bytes"
+	"encoding/xml"
 	"net/http"
 	textTemplate "text/template"
 	"uuid"
@@ -71,6 +72,7 @@ func (h *Slopscale) ApplePlatformConfig(
 
 	config := AppleMobileConfig{
 		UUID:    id,
+		Brand:   h.cfg.Branding.Title,
 		URL:     h.cfg.ServerURL,
 		Payload: payload.String(),
 	}
@@ -90,9 +92,27 @@ func (h *Slopscale) ApplePlatformConfig(
 }
 
 type AppleMobileConfig struct {
-	UUID    uuid.UUID
+	UUID uuid.UUID
+	// Brand is the name the profile shows in System Settings; the
+	// identifier below stays the product's, as replacing an installed
+	// profile keys on it.
+	Brand   string
 	URL     string
 	Payload string
+}
+
+// xmlText escapes a value for an XML text node, which text/template does
+// not do; a brand with an ampersand in it would otherwise make the profile
+// unreadable to macOS.
+func xmlText(s string) string {
+	var b bytes.Buffer
+
+	err := xml.EscapeText(&b, []byte(s))
+	if err != nil {
+		return ""
+	}
+
+	return b.String()
 }
 
 type AppleMobilePlatformConfig struct {
@@ -110,14 +130,16 @@ var applePayloadType = map[string]string{
 }
 
 var commonTemplate = textTemplate.Must(
-	textTemplate.New("mobileconfig").Parse(`<?xml version="1.0" encoding="UTF-8"?>
+	textTemplate.New("mobileconfig").
+		Funcs(textTemplate.FuncMap{"xml": xmlText}).
+		Parse(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
     <key>PayloadUUID</key>
     <string>{{.UUID}}</string>
     <key>PayloadDisplayName</key>
-    <string>Slopscale</string>
+    <string>{{xml .Brand}}</string>
     <key>PayloadDescription</key>
     <string>Configure Tailscale login server to: {{.URL}}</string>
     <key>PayloadIdentifier</key>

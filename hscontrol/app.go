@@ -126,6 +126,7 @@ func NewSlopscale(cfg *types.Config) (*Slopscale, error) {
 	// The pages the server renders name the server in their social card, so
 	// a link to a sign-in or a client page unfurls with the server's own image.
 	templates.SetServerURL(cfg.ServerURL)
+	templates.SetBranding(cfg.Branding)
 
 	noisePrivateKey, err := readOrCreatePrivateKey(cfg.NoisePrivateKeyPath)
 	if err != nil {
@@ -1370,7 +1371,10 @@ func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	// The admin console is a static bundle embedded at build time; it
 	// authenticates against /api/v1 with an API key, so nothing here is
 	// privileged. See package web.
-	console := web.Handler(h.cfg.ServerURL)
+	console := web.Handler(h.cfg.ServerURL, web.Brand{
+		Title:  h.cfg.Branding.Title,
+		Custom: h.cfg.Branding.Custom(),
+	})
 	r.Handle(strings.TrimSuffix(web.Prefix, "/"), console)
 	r.Handle(web.Prefix+"*", console)
 	r.Get(strings.TrimSuffix(web.LegacyPrefix, "/"), web.LegacyHandler)
@@ -1378,8 +1382,10 @@ func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 
 	// Slack's link unfurler asks HEAD for the card image before it fetches
 	// it, and chi answers 405 to a method the route did not name.
-	r.Get("/favicon.ico", FaviconHandler)
-	r.Head("/favicon.ico", FaviconHandler)
+	r.Get("/favicon.ico", h.FaviconHandler)
+	r.Head("/favicon.ico", h.FaviconHandler)
+	r.Get(types.BrandingLogoPath, h.LogoHandler)
+	r.Head(types.BrandingLogoPath, h.LogoHandler)
 	r.Get(templates.OpenGraphPath, OpenGraphHandler)
 	r.Head(templates.OpenGraphPath, OpenGraphHandler)
 	r.Get("/", web.RootHandler)

@@ -180,8 +180,16 @@ func TestEmailEndpointGoesThroughTheMailer(t *testing.T) {
 
 	require.Equal(t, 1, mailer.count())
 	assert.Equal(t, []string{"ops@example.com", "sec@example.com"}, mailer.sent[0].to)
-	assert.Equal(t, "[example.ts.net] This is a test event from slopscale.", mailer.sent[0].subject)
+	assert.Equal(t, "[example.ts.net] This is a test event from Slopscale.", mailer.sent[0].subject)
 	assert.Contains(t, mailer.sent[0].body, "Event: test")
+
+	// A renamed server says its own name in the message a person reads.
+	d.SetBrand("Example VPN")
+	require.NoError(t, d.Test(t.Context(), endpoint))
+	assert.Equal(
+		t, "[example.ts.net] This is a test event from Example VPN.", mailer.sent[1].subject,
+	)
+	d.SetBrand(types.DefaultBrandTitle)
 
 	// A permanent rejection is not retried.
 	rejecting := &memMailer{err: fmt.Errorf("%w: 550 no such user", ErrMailRejected)}

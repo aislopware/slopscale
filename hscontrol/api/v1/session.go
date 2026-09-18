@@ -63,6 +63,21 @@ type ConsoleAuth struct {
 	// OIDC is present when the server signs users in through an identity
 	// provider.
 	OIDC *ConsoleOIDC `json:"oidc,omitempty"`
+	// Branding is the name and logo the console puts on itself. It rides
+	// on this public operation because the sign-in page shows both before
+	// anyone has a credential to read a setting with.
+	Branding ConsoleBranding `json:"branding"`
+}
+
+// ConsoleBranding is what the console calls the server and what mark it
+// draws for it.
+type ConsoleBranding struct {
+	// Title is the product name, "Slopscale" unless the config file
+	// renames it.
+	Title string `json:"title"`
+	// LogoURL is where the operator's own logo is served, empty while
+	// none is configured; then the console draws its own mark.
+	LogoURL string `json:"logoUrl"`
 }
 
 // ConsoleOIDC describes the identity provider sign-in.
@@ -94,6 +109,15 @@ func registerSession(api huma.API, b Backend) {
 		Tags: []string{tagAuth},
 	}, func(_ context.Context, _ *struct{}) (*consoleAuthOutput, error) {
 		out := &consoleAuthOutput{}
+		out.Body.Branding = ConsoleBranding{
+			Title:   types.DefaultBrandTitle,
+			LogoURL: "",
+		}
+
+		if b.Cfg != nil {
+			out.Body.Branding.Title = b.Cfg.Branding.Title
+			out.Body.Branding.LogoURL = b.Cfg.Branding.LogoURL()
+		}
 
 		if b.ConsoleLogin != nil {
 			out.Body.OIDC = &ConsoleOIDC{

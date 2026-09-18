@@ -1321,14 +1321,14 @@ func renderRegistrationSuccessTemplate(
 	newNode bool,
 ) *bytes.Buffer {
 	result := templates.AuthSuccessResult{
-		Title:   "Slopscale - Node Reauthenticated",
+		Title:   "Node Reauthenticated",
 		Heading: "Node reauthenticated",
 		Verb:    "Reauthenticated",
 		User:    user.Display(),
 		Message: "You can now close this window.",
 	}
 	if newNode {
-		result.Title = "Slopscale - Node Registered"
+		result.Title = "Node Registered"
 		result.Heading = "Node registered"
 		result.Verb = "Registered"
 	}
@@ -1340,7 +1340,7 @@ func renderAuthSuccessTemplate(
 	user *types.User,
 ) *bytes.Buffer {
 	result := templates.AuthSuccessResult{
-		Title:   "Slopscale - SSH Session Authorized",
+		Title:   "SSH Session Authorized",
 		Heading: "SSH session authorized",
 		Verb:    "Authorized",
 		User:    user.Display(),

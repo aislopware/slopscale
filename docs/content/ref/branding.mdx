@@ -1,0 +1,74 @@
+---
+title: "Branding"
+---
+
+A slopscale server can carry your own name and logo instead of the product's.
+The console, the pages the server renders in a browser, the Apple configuration
+profile, the browser tab and the mail the server sends all follow one setting,
+so a company deploying it internally does not hand its staff somebody else's
+brand.
+
+Both values come from the configuration file. They are read once at startup:
+changing either needs a restart.
+
+```yaml
+branding:
+  title: "Example VPN"
+  logo_path: /etc/slopscale/logo.svg
+```
+
+Either may be set on its own. Renaming without a logo leaves the built-in mark
+in place; a logo without a rename keeps the name Slopscale.
+
+Like every other setting, both can come from the environment instead, which
+suits a container or a systemd unit:
+
+```
+SLOPSCALE_BRANDING_TITLE="Example VPN"
+SLOPSCALE_BRANDING_LOGO_PATH=/etc/slopscale/logo.svg
+```
+
+## The title
+
+`branding.title` is the name of the server everywhere a person reads one:
+
+- the console's sidebar, its sign-in page and every browser tab title
+- the pages the server renders for a device login, a registration, an error
+  and the platform instructions
+- the name macOS shows for the installed configuration profile
+- the display name on the mail the server sends, when
+  [`notifications.smtp.from`](/ref/webhooks) is a bare address
+- the title of an [ntfy](/ref/webhooks) notification
+
+What stays the product's own: the `slopscale` command, the configuration keys,
+the API, the `X-Mailer` header and the "Powered by Slopscale" line in the
+footer of a rendered page. Those name the software, not your service.
+
+## The logo
+
+`branding.logo_path` is a file on the server: `.svg`, `.png`, `.jpg` or
+`.webp`, up to 1 MB. It must be readable by the user the server runs as.
+
+The file is read at startup and served from memory at `/branding/logo`, so a
+page render never touches the disk and a file deleted later does not break the
+console. The address carries a hash of the file, which lets a browser cache it
+forever and still pick up a replacement after a restart.
+
+The logo replaces the built-in mark in the console's sidebar, on the sign-in
+page, at the top of every rendered page, and as the browser tab's icon.
+
+It is always fitted, never stretched. The sidebar gives it the square slot the
+built-in mark sits in, next to the name, so a square icon suits it best; a wide
+wordmark is legible on the sign-in page and on the rendered pages, but shrinks
+to fit the sidebar and repeats a name the sidebar already prints.
+
+One thing changes with a logo: the server stops offering its social card. The
+1200×630 picture a chat or a feed draws for a shared link is baked with the
+product's mark and name, so a rebranded server serves the link without an image
+rather than with the wrong one.
+
+## What it does not change
+
+Branding is presentation. It does not rename the tailnet, the base domain or
+any user-visible address, and it grants nothing: a console page still shows
+only what the signed-in [role](/ref/roles) may see.

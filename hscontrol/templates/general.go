@@ -2,8 +2,10 @@ package templates
 
 import (
 	"strings"
+	"sync/atomic"
 
 	"github.com/aislopware/slopscale/hscontrol/assets"
+	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/chasefleming/elem-go"
 	"github.com/chasefleming/elem-go/attrs"
 	"github.com/chasefleming/elem-go/styles"
@@ -85,11 +87,74 @@ func codeBlockText(code string) *elem.Element {
 	return elem.Pre(nil, elem.Code(nil, elem.Text(code)))
 }
 
-// slopscaleLogo returns the Slopscale SVG logo for consistent branding across all pages.
-// The logo is styled by the .slopscale-logo CSS class.
-func slopscaleLogo() elem.Node {
-	// Return the embedded SVG as-is
-	return elem.Raw(assets.SVG)
+// pageSettings is what every page render needs and no handler carries: the
+// server's own address, for the absolute URLs a social card needs, and the
+// operator's brand. Pages are rendered from several packages and from
+// handlers that hold no configuration, so it is package state, replaced as
+// a whole under an atomic pointer: a server starting in one test renders
+// pages in another.
+//
+//nolint:gochecknoglobals // set at startup, read by every page render
+var pageSettings atomic.Pointer[pageState]
+
+// pageState is one consistent view of those settings.
+type pageState struct {
+	// serverURL has no trailing slash.
+	serverURL string
+	branding  types.Branding
+}
+
+// settings returns the current view, the product's own before a server set
+// anything, so a page rendered in a test still says what it is.
+func settings() pageState {
+	current := pageSettings.Load()
+	if current == nil {
+		return pageState{branding: types.Branding{Title: types.DefaultBrandTitle}}
+	}
+
+	return *current
+}
+
+// SetBranding records the operator's product name and logo for the pages.
+// A branding without a title keeps the product's own, so a page always has
+// a name in its title bar.
+func SetBranding(b types.Branding) {
+	if b.Title == "" {
+		b.Title = types.DefaultBrandTitle
+	}
+
+	next := settings()
+	next.branding = b
+	pageSettings.Store(&next)
+}
+
+// brandTitle is what the operator calls this server.
+func brandTitle() string {
+	return settings().branding.Title
+}
+
+// pageTitle is a document title: what the page is, then whose server it is.
+func pageTitle(what string) string {
+	return what + " - " + brandTitle()
+}
+
+// brandLogo returns the mark every page opens with: the operator's image
+// when the config file names one, the built-in SVG otherwise. The image is
+// referenced rather than inlined so a browser caches it once for every
+// page; its URL carries a hash, so replacing it is picked up.
+func brandLogo() elem.Node {
+	brand := settings().branding
+
+	url := brand.LogoURL()
+	if url == "" {
+		return elem.Raw(assets.SVG)
+	}
+
+	return elem.Img(attrs.Props{
+		attrs.Src:   url,
+		attrs.Alt:   brand.Title,
+		attrs.Class: "brand-logo",
+	})
 }
 
 // pageFooter creates a consistent footer for all pages.
@@ -121,17 +186,14 @@ const OpenGraphPath = "/opengraph.png"
 // the server's pages.
 const socialDescription = "Self-hosted Tailscale control server with a built-in admin console"
 
-// serverURL is the address the server is reached at, set once at startup.
-// A social card needs absolute URLs, and a crawler that unfurls a link has
-// no other way to learn them.
-//
-//nolint:gochecknoglobals // set once at startup, read by every page render
-var serverURL string
-
 // SetServerURL records the server's public address for the pages' social
-// cards. The empty string leaves the cards without an image or a URL.
+// cards. A card needs absolute URLs, and a crawler that unfurls a link has
+// no other way to learn them. The empty string leaves the cards without an
+// image or a URL.
 func SetServerURL(url string) {
-	serverURL = strings.TrimSuffix(url, "/")
+	next := settings()
+	next.serverURL = strings.TrimSuffix(url, "/")
+	pageSettings.Store(&next)
 }
 
 // socialMeta returns the Open Graph and Twitter card tags for a page, which
@@ -145,21 +207,26 @@ func socialMeta(title string) []elem.Node {
 		return elem.Meta(attrs.Props{attrs.Name: name, attrs.Content: content})
 	}
 
+	current := settings()
+
 	tags := []elem.Node{
 		named("description", socialDescription),
 		property("og:type", "website"),
-		property("og:site_name", "Slopscale"),
+		property("og:site_name", current.branding.Title),
 		property("og:title", title),
 		property("og:description", socialDescription),
 		named("twitter:title", title),
 		named("twitter:description", socialDescription),
 	}
 
-	if serverURL == "" {
+	// The card is baked with the product's own mark and name, so an
+	// operator who put their own brand on the server gets no image
+	// rather than somebody else's.
+	if current.serverURL == "" || current.branding.Custom() {
 		return append(tags, named("twitter:card", "summary"))
 	}
 
-	image := serverURL + OpenGraphPath
+	image := current.serverURL + OpenGraphPath
 
 	return append(tags,
 		property("og:image", image),
@@ -172,12 +239,12 @@ func socialMeta(title string) []elem.Node {
 	)
 }
 
-// page renders a standard Slopscale page: the given title in the document
-// head, and a body that begins with the Slopscale logo, contains the supplied
-// content nodes in order, and ends with the shared footer.
+// page renders a standard page: the given title in the document head, and a
+// body that begins with the brand's logo, contains the supplied content
+// nodes in order, and ends with the shared footer.
 func page(title string, content ...elem.Node) *elem.Element {
 	body := make([]elem.Node, 0, len(content)+2)
-	body = append(body, slopscaleLogo())
+	body = append(body, brandLogo())
 	body = append(body, content...)
 	body = append(body, pageFooter())
 

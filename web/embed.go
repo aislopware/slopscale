@@ -14,6 +14,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"html"
 	"io/fs"
 	"net/http"
 	"path"
@@ -106,11 +107,30 @@ func LegacyHandler(w http.ResponseWriter, r *http.Request) {
 // address is known.
 const serverURLPlaceholder = "__SLOPSCALE_URL__"
 
+// brandPlaceholder is what index.html carries where the product's name
+// belongs, for the same reason: the bundle is built before the operator's
+// configuration is read.
+const brandPlaceholder = "__SLOPSCALE_BRAND__"
+
+// cardMarkers bracket the social card tags in index.html. The card is
+// drawn with the product's own mark, so a console an operator rebranded
+// serves the page without it rather than unfurling the wrong picture.
+var cardMarkers = [2]string{"<!--card-->", "<!--/card-->"}
+
+// Brand is what the entry page calls the server.
+type Brand struct {
+	// Title is the product name, "Slopscale" unless the config file
+	// renames it.
+	Title string
+	// Custom reports that the operator put their own logo on the server.
+	Custom bool
+}
+
 // Handler serves the console. Mount it at both Prefix without the trailing
 // slash (to redirect) and Prefix followed by a wildcard. serverURL is the
 // address the server is reached at, written into the entry page's social
-// card tags.
-func Handler(serverURL string) http.Handler {
+// card tags, and brand is what the page calls it.
+func Handler(serverURL string, brand Brand) http.Handler {
 	sub, err := fs.Sub(dist, "dist")
 	if err != nil {
 		// The embed directive guarantees the directory exists.
@@ -146,7 +166,7 @@ func Handler(serverURL string) http.Handler {
 		}
 
 		if rel == "" || rel == indexFile {
-			serveIndex(w, r, sub, serverURL)
+			serveIndex(w, r, sub, serverURL, brand)
 
 			return
 		}
@@ -158,7 +178,7 @@ func Handler(serverURL string) http.Handler {
 		}
 
 		if errors.Is(statErr, fs.ErrNotExist) {
-			serveIndex(w, r, sub, serverURL)
+			serveIndex(w, r, sub, serverURL, brand)
 
 			return
 		}
@@ -270,10 +290,9 @@ func serveGzipped(w http.ResponseWriter, r *http.Request, sub fs.FS, rel string)
 }
 
 // serveIndex writes index.html uncached so a new release is picked up on the
-// next load while its hashed assets stay cached.
-// serveIndex serves the SPA entry with the server's address in place of the
-// placeholder its social card tags carry.
-func serveIndex(w http.ResponseWriter, r *http.Request, sub fs.FS, serverURL string) {
+// next load while its hashed assets stay cached, with the server's address
+// and the operator's brand in place of the placeholders it carries.
+func serveIndex(w http.ResponseWriter, r *http.Request, sub fs.FS, serverURL string, brand Brand) {
 	index, err := fs.ReadFile(sub, indexFile)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -282,6 +301,11 @@ func serveIndex(w http.ResponseWriter, r *http.Request, sub fs.FS, serverURL str
 	}
 
 	page := strings.ReplaceAll(string(index), serverURLPlaceholder, strings.TrimSuffix(serverURL, "/"))
+	page = strings.ReplaceAll(page, brandPlaceholder, html.EscapeString(brand.Title))
+
+	if brand.Custom {
+		page = cutCard(page)
+	}
 
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -299,4 +323,21 @@ func serveUnbuilt(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusServiceUnavailable)
 	_, _ = w.Write([]byte(unbuiltPage))
+}
+
+// cutCard removes the social card tags, markers and all. A page without the
+// markers is returned as it is, so a bundle built from a different entry
+// page still serves.
+func cutCard(page string) string {
+	before, rest, found := strings.Cut(page, cardMarkers[0])
+	if !found {
+		return page
+	}
+
+	_, after, found := strings.Cut(rest, cardMarkers[1])
+	if !found {
+		return page
+	}
+
+	return before + strings.TrimLeft(after, " \t\n")
 }

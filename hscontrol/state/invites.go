@@ -328,7 +328,7 @@ func (s *State) SendInviteMail(ctx context.Context, invite types.UserInvite, lin
 
 	subject := "You have been invited to " + tailnet
 	if tailnet == "" {
-		subject = "You have been invited to a Slopscale tailnet"
+		subject = "You have been invited to a " + s.cfg.Branding.Title + " tailnet"
 	}
 
 	var body strings.Builder

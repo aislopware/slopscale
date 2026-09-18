@@ -73,6 +73,8 @@ machine it runs on:
 - `oidc`, the [identity provider](/ref/oidc), and `policy.geoip_database` for [postures](/ref/device-trust#postures).
 - `derp.paths`, the relay's key and `automatically_add_embedded_derp_region`; see [DERP](/ref/derp).
 - `ssh_recording`, `https_certificates`, `funnel` and `notifications.smtp`, which run something inside the server.
+- `branding`, the name and logo the server puts on itself; the logo is a file, read once at startup. See
+  [Branding](/ref/branding).
 - `client_updates`: the server reads the latest stable Tailscale release from pkgs.tailscale.com once a day and
   tells each client whether it runs it, so an older client shows Tailscale's own _update available_ warning and,
   with auto-update on, updates itself. `check: false` turns the lookup off on a server without internet access;

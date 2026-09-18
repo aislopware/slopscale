@@ -185,6 +185,10 @@ type Config struct {
 	// SMTP is the mail server email webhooks send through.
 	SMTP SMTPConfig
 
+	// Branding is the name and mark the console, the rendered pages and
+	// the mail carry.
+	Branding Branding
+
 	// SSHRecording is the embedded session recorder.
 	SSHRecording SSHRecordingConfig
 
@@ -762,6 +766,7 @@ func setNodeServiceDefaults() {
 	conf.SetDefault("egress.allow_loopback_targets", false)
 	conf.SetDefault("debug.node_api_enabled", false)
 	conf.SetDefault("notifications.smtp.encryption", string(SMTPStartTLS))
+	conf.SetDefault("branding.title", DefaultBrandTitle)
 }
 
 // LoadConfig prepares and loads the Slopscale configuration into the conf store.
@@ -1573,36 +1578,23 @@ func oidcConfig() (OIDCConfig, error) {
 	}, nil
 }
 
-// LoadServerConfig returns the full Slopscale configuration to
-// host a Slopscale server. This is called as part of `slopscale serve`.
-//
-//nolint:funlen // legacy: one linear read of every config key; splitting it would only scatter the key list
-func LoadServerConfig() (*Config, error) {
-	err := validateServerConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	logConfig := logConfig()
-	zerolog.SetGlobalLevel(logConfig.Level)
-
+// prefixesConfig reads the prefixes section: the two ranges nodes are given
+// addresses from and how one is picked. It warns, rather than refuses, on a
+// range outside CGNAT or the Tailscale ULA: the client is not designed for
+// one, but an existing deployment on such a range must still start.
+func prefixesConfig() (*netip.Prefix, *netip.Prefix, IPAllocationStrategy, error) {
 	prefix4, v4NonStandard, err := parsePrefixConfig("prefixes.v4", tsaddr.CGNATRange(), "IPv4")
 	if err != nil {
-		return nil, err
+		return nil, nil, "", err
 	}
 
 	prefix6, v6NonStandard, err := parsePrefixConfig("prefixes.v6", tsaddr.TailscaleULARange(), "IPv6")
 	if err != nil {
-		return nil, err
-	}
-
-	trusted, err := trustedProxies()
-	if err != nil {
-		return nil, err
+		return nil, nil, "", err
 	}
 
 	if prefix4 == nil && prefix6 == nil {
-		return nil, ErrNoPrefixConfigured
+		return nil, nil, "", ErrNoPrefixConfigured
 	}
 
 	if v4NonStandard || v6NonStandard {
@@ -1628,21 +1620,43 @@ func LoadServerConfig() (*Config, error) {
 
 	allocStr := conf.GetString("prefixes.allocation")
 
-	var alloc IPAllocationStrategy
-
 	switch allocStr {
 	case string(IPAllocationStrategySequential):
-		alloc = IPAllocationStrategySequential
+		return prefix4, prefix6, IPAllocationStrategySequential, nil
 	case string(IPAllocationStrategyRandom):
-		alloc = IPAllocationStrategyRandom
+		return prefix4, prefix6, IPAllocationStrategyRandom, nil
 	default:
-		return nil, fmt.Errorf(
+		return nil, nil, "", fmt.Errorf(
 			"%w: %q, allowed options: %s, %s",
 			ErrInvalidAllocationStrategy,
 			allocStr,
 			IPAllocationStrategySequential,
 			IPAllocationStrategyRandom,
 		)
+	}
+}
+
+// LoadServerConfig returns the full Slopscale configuration to
+// host a Slopscale server. This is called as part of `slopscale serve`.
+//
+//nolint:funlen // legacy: one linear read of every config key; splitting it would only scatter the key list
+func LoadServerConfig() (*Config, error) {
+	err := validateServerConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	logConfig := logConfig()
+	zerolog.SetGlobalLevel(logConfig.Level)
+
+	prefix4, prefix6, alloc, err := prefixesConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	trusted, err := trustedProxies()
+	if err != nil {
+		return nil, err
 	}
 
 	dnsConfig, err := dns()
@@ -1654,6 +1668,11 @@ func LoadServerConfig() (*Config, error) {
 	logTailConfig := logtailConfig()
 
 	smtp, err := smtpConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	branding, err := brandingConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -1764,6 +1783,8 @@ func LoadServerConfig() (*Config, error) {
 		Policy: policyConfig(),
 
 		SMTP: smtp,
+
+		Branding: branding,
 
 		SSHRecording: sshRecordingConfig(),
 

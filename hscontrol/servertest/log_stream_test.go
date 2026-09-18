@@ -522,6 +522,9 @@ func TestNotificationProviders(t *testing.T) {
 		assert.Equal(t, "hs@example.com", mail.messages[0].from)
 		assert.Equal(t, []string{"ops@example.com", "sec@example.com"}, mail.messages[0].to)
 		assert.Contains(t, mail.messages[0].data, "Subject: ")
-		assert.Contains(t, mail.messages[0].data, "This is a test event from slopscale.")
+		assert.Contains(t, mail.messages[0].data, "This is a test event from Slopscale.")
+		// The sender in the config file is a bare address, so the server puts
+		// its own name in front of it for whoever reads the mail.
+		assert.Contains(t, mail.messages[0].data, `From: "Slopscale" <hs@example.com>`)
 	})
 }
