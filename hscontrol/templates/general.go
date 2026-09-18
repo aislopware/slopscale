@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"strconv"
 	"strings"
 	"sync/atomic"
 
@@ -109,18 +110,25 @@ type pageState struct {
 func settings() pageState {
 	current := pageSettings.Load()
 	if current == nil {
-		return pageState{branding: types.Branding{Title: types.DefaultBrandTitle}}
+		return pageState{branding: types.Branding{
+			Title:       types.DefaultBrandTitle,
+			Description: types.DefaultBrandDescription,
+		}}
 	}
 
 	return *current
 }
 
 // SetBranding records the operator's product name and logo for the pages.
-// A branding without a title keeps the product's own, so a page always has
-// a name in its title bar.
+// A branding without a title or a description keeps the product's own, so a
+// page always has a name in its title bar and a line under its link.
 func SetBranding(b types.Branding) {
 	if b.Title == "" {
 		b.Title = types.DefaultBrandTitle
+	}
+
+	if b.Description == "" {
+		b.Description = types.DefaultBrandDescription
 	}
 
 	next := settings()
@@ -198,9 +206,17 @@ func pageFooter() *elem.Element {
 // as their og:image.
 const OpenGraphPath = "/opengraph.png"
 
-// socialDescription is what a chat or a feed shows under a link to one of
-// the server's pages.
-const socialDescription = "Self-hosted Tailscale control server with a built-in admin console"
+// builtInCard is the card baked into the binary, named by every page until
+// an operator configures one of their own.
+func builtInCard() types.SocialCard {
+	return types.SocialCard{
+		URL:         OpenGraphPath,
+		ContentType: "image/png",
+		Width:       1200,
+		Height:      630,
+		Alt:         "The slopscale mark and name",
+	}
+}
 
 // SetServerURL records the server's public address for the pages' social
 // cards. A card needs absolute URLs, and a crawler that unfurls a link has
@@ -224,35 +240,55 @@ func socialMeta(title string) []elem.Node {
 	}
 
 	current := settings()
+	description := current.branding.Description
 
 	tags := []elem.Node{
-		named("description", socialDescription),
+		named("description", description),
 		property("og:type", "website"),
 		property("og:site_name", current.branding.Title),
 		property("og:title", title),
-		property("og:description", socialDescription),
+		property("og:description", description),
 		named("twitter:title", title),
-		named("twitter:description", socialDescription),
+		named("twitter:description", description),
 	}
 
-	// The card is baked with the product's own mark and name, so an
-	// operator who put their own brand on the server gets no image
-	// rather than somebody else's.
-	if current.serverURL == "" || current.branding.Custom() {
+	card, ok := socialCard(current)
+	if !ok {
 		return append(tags, named("twitter:card", "summary"))
 	}
 
-	image := current.serverURL + OpenGraphPath
+	image := current.serverURL + card.URL
 
 	return append(tags,
 		property("og:image", image),
-		property("og:image:type", "image/png"),
-		property("og:image:width", "1200"),
-		property("og:image:height", "630"),
-		property("og:image:alt", "The slopscale mark and name"),
+		property("og:image:type", card.ContentType),
+		property("og:image:width", strconv.Itoa(card.Width)),
+		property("og:image:height", strconv.Itoa(card.Height)),
+		property("og:image:alt", card.Alt),
 		named("twitter:card", "summary_large_image"),
 		named("twitter:image", image),
 	)
+}
+
+// socialCard picks the picture a shared link unfurls with: the operator's
+// own where they supplied one, the built-in card otherwise. A server whose
+// address is not known yet has nowhere to point at, and one that carries a
+// custom logo without a card of its own gets no picture rather than the
+// product's mark, which is the wrong brand.
+func socialCard(current pageState) (types.SocialCard, bool) {
+	if current.serverURL == "" {
+		return types.SocialCard{}, false
+	}
+
+	if card, ok := current.branding.Card(); ok {
+		return card, true
+	}
+
+	if current.branding.Custom() {
+		return types.SocialCard{}, false
+	}
+
+	return builtInCard(), true
 }
 
 // page renders a standard page: the given title in the document head, and a

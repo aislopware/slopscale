@@ -338,10 +338,18 @@ policy:
 # out when one image works on both, which it does for a mark that carries
 # its own background; the tab icon is always the light one, because a
 # browser offers no way to give it two.
+#
+# description is the line a chat, a feed or a search engine shows under a
+# link to this server, and social_image_path is the picture that link
+# unfurls with. A rebranded server drops the built-in card, which carries
+# the product's own mark, so set this to get a picture back. It must be a
+# .png or .jpg, up to 4 MB; 1200x630 is what every unfurler expects.
 # branding:
 #   title: "Example VPN"
+#   description: "The Example Inc private network"
 #   logo_path: /etc/slopscale/logo.svg
 #   logo_dark_path: /etc/slopscale/logo-dark.svg
+#   social_image_path: /etc/slopscale/social.png
 
 ## HTTPS certificates
 #

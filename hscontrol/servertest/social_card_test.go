@@ -19,7 +19,10 @@ func TestSocialCardAnswersHead(t *testing.T) {
 	srv := servertest.NewServer(t)
 	client := srv.HTTPClient(t)
 
-	for _, path := range []string{"/opengraph.png", "/favicon.ico"} {
+	// /branding/social is unconfigured here, so it answers with the
+	// built-in card: the path never 404s, which a ban rule watching for
+	// misses depends on.
+	for _, path := range []string{"/opengraph.png", "/favicon.ico", "/branding/social"} {
 		for _, method := range []string{http.MethodHead, http.MethodGet} {
 			req, err := http.NewRequestWithContext(t.Context(), method, srv.URL+path, http.NoBody)
 			require.NoError(t, err)
