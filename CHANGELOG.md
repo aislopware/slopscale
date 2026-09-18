@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.47.0](https://github.com/aislopware/slopscale/compare/v0.46.0...v0.47.0) (2026-09-18)
+
+
+### Changes
+
+* **types:** set the description and the preview picture a shared link unfurls with ([#27](https://github.com/aislopware/slopscale/issues/27)) ([dbe3d62](https://github.com/aislopware/slopscale/commit/dbe3d626a415b25e81e097c77c2814fc27d4cfe2))
+
 ## [0.46.0](https://github.com/aislopware/slopscale/compare/v0.45.0...v0.46.0) (2026-09-18)
 
 
