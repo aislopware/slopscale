@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.45.0](https://github.com/aislopware/slopscale/compare/v0.44.0...v0.45.0) (2026-09-18)
+
+
+### Changes
+
+* **types:** put your own name and logo on the console, the pages it serves and the mail it sends ([db58572](https://github.com/aislopware/slopscale/commit/db58572fd1e3113adfe53b8b7cc2c094fef4e079))
+
+
+### Fixes
+
+* **templates:** serve pages without racing on the server URL ([db58572](https://github.com/aislopware/slopscale/commit/db58572fd1e3113adfe53b8b7cc2c094fef4e079))
+
 ## [0.44.0](https://github.com/aislopware/slopscale/compare/v0.43.1...v0.44.0) (2026-09-16)
 
 
