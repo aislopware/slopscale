@@ -38,7 +38,7 @@ func TestTemplateHTMLConsistency(t *testing.T) {
 			name: "Auth Web Register",
 			html: templates.AuthWeb(
 				"Machine registration",
-				"Run the command below in the slopscale server to add this machine to your network:",
+				"Run the command below on the control server to add this machine to your network:",
 				"slopscale auth register --auth-id test-key-123 --user USERNAME",
 			).Render(),
 		},
@@ -46,7 +46,7 @@ func TestTemplateHTMLConsistency(t *testing.T) {
 			name: "Auth Web Approve",
 			html: templates.AuthWeb(
 				"Authentication check",
-				"Run the command below in the slopscale server to approve this authentication request:",
+				"Run the command below on the control server to approve this authentication request:",
 				"slopscale auth approve --auth-id test-key-123",
 			).Render(),
 		},
@@ -124,7 +124,7 @@ func TestTemplateModernHTMLFeatures(t *testing.T) {
 			name: "Auth Web Register",
 			html: templates.AuthWeb(
 				"Machine registration",
-				"Run the command below in the slopscale server to add this machine to your network:",
+				"Run the command below on the control server to add this machine to your network:",
 				"slopscale auth register --auth-id test-key-123 --user USERNAME",
 			).Render(),
 		},
@@ -132,7 +132,7 @@ func TestTemplateModernHTMLFeatures(t *testing.T) {
 			name: "Auth Web Approve",
 			html: templates.AuthWeb(
 				"Authentication check",
-				"Run the command below in the slopscale server to approve this authentication request:",
+				"Run the command below on the control server to approve this authentication request:",
 				"slopscale auth approve --auth-id test-key-123",
 			).Render(),
 		},
@@ -203,7 +203,7 @@ func TestTemplateExternalLinkSecurity(t *testing.T) {
 			name: "Auth Web Register",
 			html: templates.AuthWeb(
 				"Machine registration",
-				"Run the command below in the slopscale server to add this machine to your network:",
+				"Run the command below on the control server to add this machine to your network:",
 				"slopscale auth register --auth-id test-key-123 --user USERNAME",
 			).Render(),
 			externalURLs: []string{}, // No external links
@@ -212,7 +212,7 @@ func TestTemplateExternalLinkSecurity(t *testing.T) {
 			name: "Auth Web Approve",
 			html: templates.AuthWeb(
 				"Authentication check",
-				"Run the command below in the slopscale server to approve this authentication request:",
+				"Run the command below on the control server to approve this authentication request:",
 				"slopscale auth approve --auth-id test-key-123",
 			).Render(),
 			externalURLs: []string{}, // No external links
@@ -299,7 +299,7 @@ func TestTemplateAccessibilityAttributes(t *testing.T) {
 			name: "Auth Web Register",
 			html: templates.AuthWeb(
 				"Machine registration",
-				"Run the command below in the slopscale server to add this machine to your network:",
+				"Run the command below on the control server to add this machine to your network:",
 				"slopscale auth register --auth-id test-key-123 --user USERNAME",
 			).Render(),
 		},
@@ -307,7 +307,7 @@ func TestTemplateAccessibilityAttributes(t *testing.T) {
 			name: "Auth Web Approve",
 			html: templates.AuthWeb(
 				"Authentication check",
-				"Run the command below in the slopscale server to approve this authentication request:",
+				"Run the command below on the control server to approve this authentication request:",
 				"slopscale auth approve --auth-id test-key-123",
 			).Render(),
 		},

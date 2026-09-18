@@ -1294,6 +1294,29 @@ func (h *Slopscale) ensureUnixSocketIsAbsent() error {
 	return nil
 }
 
+// consoleBrand is the branding the console's entry page carries: the name
+// and the line under a shared link, and the picture that link unfurls with
+// where the operator supplied one.
+func consoleBrand(b types.Branding) web.Brand {
+	brand := web.Brand{
+		Title:       b.Title,
+		Description: b.Description,
+		Custom:      b.Custom(),
+	}
+
+	if card, ok := b.Card(); ok {
+		brand.Card = web.SocialCard{
+			URL:         card.URL,
+			ContentType: card.ContentType,
+			Width:       card.Width,
+			Height:      card.Height,
+			Alt:         card.Alt,
+		}
+	}
+
+	return brand
+}
+
 func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(metrics.Collector(metrics.CollectorOpts{
@@ -1371,10 +1394,7 @@ func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	// The admin console is a static bundle embedded at build time; it
 	// authenticates against /api/v1 with an API key, so nothing here is
 	// privileged. See package web.
-	console := web.Handler(h.cfg.ServerURL, web.Brand{
-		Title:  h.cfg.Branding.Title,
-		Custom: h.cfg.Branding.Custom(),
-	})
+	console := web.Handler(h.cfg.ServerURL, consoleBrand(h.cfg.Branding))
 	r.Handle(strings.TrimSuffix(web.Prefix, "/"), console)
 	r.Handle(web.Prefix+"*", console)
 	r.Get(strings.TrimSuffix(web.LegacyPrefix, "/"), web.LegacyHandler)
@@ -1388,6 +1408,8 @@ func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	r.Head(types.BrandingLogoPath, h.LogoHandler)
 	r.Get(types.BrandingDarkLogoPath, h.LogoHandler)
 	r.Head(types.BrandingDarkLogoPath, h.LogoHandler)
+	r.Get(types.BrandingSocialPath, h.SocialCardHandler)
+	r.Head(types.BrandingSocialPath, h.SocialCardHandler)
 	r.Get(templates.OpenGraphPath, OpenGraphHandler)
 	r.Head(templates.OpenGraphPath, OpenGraphHandler)
 	r.Get("/", web.RootHandler)

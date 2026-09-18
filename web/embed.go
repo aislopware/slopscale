@@ -18,6 +18,7 @@ import (
 	"io/fs"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -112,9 +113,14 @@ const serverURLPlaceholder = "__SLOPSCALE_URL__"
 // configuration is read.
 const brandPlaceholder = "__SLOPSCALE_BRAND__"
 
-// cardMarkers bracket the social card tags in index.html. The card is
-// drawn with the product's own mark, so a console an operator rebranded
-// serves the page without it rather than unfurling the wrong picture.
+// descriptionPlaceholder is what index.html carries where the line under a
+// shared link belongs.
+const descriptionPlaceholder = "__SLOPSCALE_DESCRIPTION__"
+
+// cardMarkers bracket the social card tags in index.html. The card between
+// them is drawn with the product's own mark, so a console an operator
+// rebranded serves their own card in its place, or none at all where they
+// configured none, rather than unfurling the wrong picture.
 var cardMarkers = [2]string{"<!--card-->", "<!--/card-->"}
 
 // Brand is what the entry page calls the server.
@@ -122,9 +128,28 @@ type Brand struct {
 	// Title is the product name, "Slopscale" unless the config file
 	// renames it.
 	Title string
+	// Description is the line a chat or a feed shows under a link to the
+	// console.
+	Description string
 	// Custom reports that the operator put their own logo on the server.
 	Custom bool
+	// Card is the operator's own social image. The zero value means they
+	// configured none.
+	Card SocialCard
 }
+
+// SocialCard is the picture a link to the console unfurls with. The size is
+// the file's own, because an unfurler told the wrong one crops to fit it.
+type SocialCard struct {
+	// URL is the path the card is served at, relative to the server.
+	URL         string
+	ContentType string
+	Width       int
+	Height      int
+	Alt         string
+}
+
+func (c SocialCard) set() bool { return c.URL != "" }
 
 // Handler serves the console. Mount it at both Prefix without the trailing
 // slash (to redirect) and Prefix followed by a wildcard. serverURL is the
@@ -300,10 +325,16 @@ func serveIndex(w http.ResponseWriter, r *http.Request, sub fs.FS, serverURL str
 		return
 	}
 
-	page := strings.ReplaceAll(string(index), serverURLPlaceholder, strings.TrimSuffix(serverURL, "/"))
-	page = strings.ReplaceAll(page, brandPlaceholder, html.EscapeString(brand.Title))
+	base := strings.TrimSuffix(serverURL, "/")
 
-	if brand.Custom {
+	page := strings.ReplaceAll(string(index), serverURLPlaceholder, base)
+	page = strings.ReplaceAll(page, brandPlaceholder, html.EscapeString(brand.Title))
+	page = strings.ReplaceAll(page, descriptionPlaceholder, html.EscapeString(brand.Description))
+
+	switch {
+	case brand.Card.set():
+		page = replaceCard(page, cardTags(base, brand))
+	case brand.Custom:
 		page = cutCard(page)
 	}
 
@@ -329,6 +360,11 @@ func serveUnbuilt(w http.ResponseWriter) {
 // markers is returned as it is, so a bundle built from a different entry
 // page still serves.
 func cutCard(page string) string {
+	return replaceCard(page, "")
+}
+
+// replaceCard puts tags in place of the ones between the markers.
+func replaceCard(page, tags string) string {
 	before, rest, found := strings.Cut(page, cardMarkers[0])
 	if !found {
 		return page
@@ -339,5 +375,31 @@ func cutCard(page string) string {
 		return page
 	}
 
-	return before + strings.TrimLeft(after, " \t\n")
+	return before + tags + strings.TrimLeft(after, " \t\n")
+}
+
+// cardTags draws the operator's own card, at the size and type read from
+// their file rather than the product card's.
+func cardTags(base string, brand Brand) string {
+	card := brand.Card
+	image := html.EscapeString(base + card.URL)
+	title := html.EscapeString(brand.Title) + " admin console"
+
+	var tags strings.Builder
+
+	for _, tag := range [][2]string{
+		{`property="og:image"`, image},
+		{`property="og:image:type"`, html.EscapeString(card.ContentType)},
+		{`property="og:image:width"`, strconv.Itoa(card.Width)},
+		{`property="og:image:height"`, strconv.Itoa(card.Height)},
+		{`property="og:image:alt"`, html.EscapeString(card.Alt)},
+		{`name="twitter:card"`, "summary_large_image"},
+		{`name="twitter:title"`, title},
+		{`name="twitter:description"`, html.EscapeString(brand.Description)},
+		{`name="twitter:image"`, image},
+	} {
+		fmt.Fprintf(&tags, "<meta %s content=\"%s\" />\n    ", tag[0], tag[1])
+	}
+
+	return tags.String()
 }

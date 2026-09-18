@@ -93,3 +93,46 @@ func TestPageBrandingDarkLogo(t *testing.T) {
 	assert.Contains(t, out, `class="brand-logo"`)
 	assert.Contains(t, out, `src="`+types.BrandingLogoPath+`?v=`)
 }
+
+// TestPageDescription proves the line a chat or a feed shows under a link
+// is the operator's where they wrote one.
+func TestPageDescription(t *testing.T) {
+	out := page(pageTitle("Sign in")).Render()
+
+	assert.Contains(t, out, `content="`+types.DefaultBrandDescription+`" name="description"`)
+
+	SetBranding(types.Branding{Title: "Example VPN", Description: "The Example Inc private network"})
+	t.Cleanup(func() { SetBranding(types.Branding{Title: types.DefaultBrandTitle}) })
+
+	named := page(pageTitle("Sign in")).Render()
+
+	assert.Contains(t, named, `content="The Example Inc private network" name="description"`)
+	assert.Contains(t, named, `content="The Example Inc private network" property="og:description"`)
+	assert.Contains(t, named, `content="The Example Inc private network" name="twitter:description"`)
+	assert.NotContains(t, named, types.DefaultBrandDescription)
+}
+
+// TestPageBrandingSocialImage proves an operator who supplies their own card
+// gets the picture back that a custom logo takes away, at the size read from
+// their file rather than the product card's.
+func TestPageBrandingSocialImage(t *testing.T) {
+	SetServerURL("https://vpn.example.test")
+	t.Cleanup(func() { SetServerURL("") })
+
+	brand := types.NewBranding("Example VPN", "image/png", []byte("png bytes")).
+		WithSocialImage("image/jpeg", []byte("jpeg bytes"), 1600, 900)
+
+	SetBranding(brand)
+	t.Cleanup(func() { SetBranding(types.Branding{Title: types.DefaultBrandTitle}) })
+
+	out := page(pageTitle("Sign in")).Render()
+
+	assert.Contains(t, out, `content="https://vpn.example.test`+types.BrandingSocialPath+`?v=`)
+	assert.Contains(t, out, `content="image/jpeg" property="og:image:type"`)
+	assert.Contains(t, out, `content="1600" property="og:image:width"`)
+	assert.Contains(t, out, `content="900" property="og:image:height"`)
+	assert.Contains(t, out, `content="Example VPN" property="og:image:alt"`)
+	assert.Contains(t, out, `content="summary_large_image" name="twitter:card"`)
+	// The product's own card is never named for a rebranded server.
+	assert.NotContains(t, out, OpenGraphPath)
+}

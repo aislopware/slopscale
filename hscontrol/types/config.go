@@ -767,6 +767,7 @@ func setNodeServiceDefaults() {
 	conf.SetDefault("debug.node_api_enabled", false)
 	conf.SetDefault("notifications.smtp.encryption", string(SMTPStartTLS))
 	conf.SetDefault("branding.title", DefaultBrandTitle)
+	conf.SetDefault("branding.description", DefaultBrandDescription)
 }
 
 // LoadConfig prepares and loads the Slopscale configuration into the conf store.

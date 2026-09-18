@@ -28,6 +28,80 @@ func serve(t *testing.T, method, target string) *httptest.ResponseRecorder {
 	return rec
 }
 
+// serveIndexAs renders the console's entry page for one brand.
+func serveIndexAs(t *testing.T, brand Brand) string {
+	t.Helper()
+
+	if !Built() {
+		t.Skip("the console was not built; run make web")
+	}
+
+	rec := httptest.NewRecorder()
+	Handler(testServerURL, brand).
+		ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/console/", http.NoBody))
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	return rec.Body.String()
+}
+
+// TestIndexCarriesBranding proves the entry page says what the operator
+// called the server and what they said it is, everywhere it says either.
+func TestIndexCarriesBranding(t *testing.T) {
+	t.Parallel()
+
+	page := serveIndexAs(t, Brand{Title: "Example VPN", Description: "The Example Inc private network"})
+
+	assert.NotContains(t, page, descriptionPlaceholder)
+	assert.NotContains(t, page, brandPlaceholder)
+	assert.Contains(t, page, `<meta name="description" content="The Example Inc private network" />`)
+	assert.Contains(t, page, `<meta property="og:description" content="The Example Inc private network" />`)
+	assert.Contains(t, page, `<meta property="og:site_name" content="Example VPN" />`)
+}
+
+// TestIndexDropsCardForARebrand proves a console with the operator's own
+// logo and no card of its own unfurls without a picture, rather than with
+// the product's mark.
+func TestIndexDropsCardForARebrand(t *testing.T) {
+	t.Parallel()
+
+	page := serveIndexAs(t, Brand{Title: "Example VPN", Description: "Private", Custom: true})
+
+	assert.NotContains(t, page, "og:image")
+	assert.NotContains(t, page, "twitter:card")
+	assert.Contains(t, page, `<meta property="og:site_name" content="Example VPN" />`)
+}
+
+// TestIndexServesTheOperatorsCard proves a configured card replaces the
+// product's, at the size and type read from their own file.
+func TestIndexServesTheOperatorsCard(t *testing.T) {
+	t.Parallel()
+
+	page := serveIndexAs(t, Brand{
+		Title:       "Example VPN",
+		Description: "The Example Inc private network",
+		Custom:      true,
+		Card: SocialCard{
+			URL:         "/branding/social?v=abcd1234",
+			ContentType: "image/jpeg",
+			Width:       1600,
+			Height:      900,
+			Alt:         "Example VPN",
+		},
+	})
+
+	assert.Contains(t, page,
+		`<meta property="og:image" content="https://hs.example.test/branding/social?v=abcd1234" />`)
+	assert.Contains(t, page, `<meta property="og:image:type" content="image/jpeg" />`)
+	assert.Contains(t, page, `<meta property="og:image:width" content="1600" />`)
+	assert.Contains(t, page, `<meta property="og:image:height" content="900" />`)
+	assert.Contains(t, page, `<meta name="twitter:title" content="Example VPN admin console" />`)
+	assert.Contains(t, page, `<meta name="twitter:description" content="The Example Inc private network" />`)
+	// Nothing of the product's own card survives.
+	assert.NotContains(t, page, "opengraph.png")
+	assert.NotContains(t, page, "1200")
+	assert.NotContains(t, page, "The slopscale mark and name")
+}
+
 func TestHandlerRedirectsBarePrefix(t *testing.T) {
 	t.Parallel()
 

@@ -366,7 +366,7 @@ func (a *AuthProviderWeb) AuthHandler(
 
 	_, err = writer.Write([]byte(templates.AuthWeb(
 		"Authentication check",
-		"Run the command below in the slopscale server to approve this authentication request:",
+		"Run the command below on the control server to approve this authentication request:",
 		"slopscale auth approve --auth-id "+authID.String(),
 	).Render()))
 	if err != nil {
@@ -419,7 +419,7 @@ func (a *AuthProviderWeb) RegisterHandler(
 
 	_, err = writer.Write([]byte(templates.AuthWeb(
 		"Node registration",
-		"Run the command below in the slopscale server to add this node to your network:",
+		"Run the command below on the control server to add this node to your network:",
 		fmt.Sprintf("slopscale auth register --auth-id %s --user USERNAME", authID.String()),
 	).Render()))
 	if err != nil {
@@ -463,6 +463,23 @@ func (h *Slopscale) LogoHandler(writer http.ResponseWriter, req *http.Request) {
 	// behind one URL never change and a replaced logo is a new URL.
 	writer.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 	http.ServeContent(writer, req, "logo", time.Unix(0, 0), bytes.NewReader(logo))
+}
+
+// SocialCardHandler serves the picture a chat or a feed draws for a link to
+// this server. Like LogoHandler it falls back to the built-in card rather
+// than 404, so the path answers whether or not a card is configured.
+func (h *Slopscale) SocialCardHandler(writer http.ResponseWriter, req *http.Request) {
+	card, contentType, ok := h.cfg.Branding.SocialImage()
+	if !ok {
+		OpenGraphHandler(writer, req)
+
+		return
+	}
+
+	writer.Header().Set("Content-Type", contentType)
+	// The URL carries the file's hash, so a replaced card is a new URL.
+	writer.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	http.ServeContent(writer, req, "social", time.Unix(0, 0), bytes.NewReader(card))
 }
 
 // OpenGraphHandler serves the social card the server's pages name as their

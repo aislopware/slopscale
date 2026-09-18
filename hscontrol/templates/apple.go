@@ -88,7 +88,7 @@ func appleMacOSSection(url string) []elem.Node {
 				nil,
 				elem.Text("Enter "),
 				Code(elem.Text(url)),
-				elem.Text(" of the slopscale instance and press "),
+				elem.Text(" of the "+brandTitle()+" server and press "),
 				elem.Strong(nil, elem.Text("Add Account")),
 			),
 			elem.Li(

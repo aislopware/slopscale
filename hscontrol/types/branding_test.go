@@ -1,6 +1,9 @@
 package types
 
 import (
+	"bytes"
+	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,8 +24,12 @@ func TestBrandingDefault(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, DefaultBrandTitle, b.Title)
+	assert.Equal(t, DefaultBrandDescription, b.Description)
 	assert.False(t, b.Custom())
 	assert.Empty(t, b.LogoURL())
+
+	_, ok := b.Card()
+	assert.False(t, ok)
 }
 
 // TestBrandingFromEnv proves the title can be renamed without touching the
@@ -37,6 +44,46 @@ func TestBrandingFromEnv(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, "Example VPN", b.Title)
+}
+
+// TestBrandingSocialImage proves an operator's own card is read, sized from
+// the file itself, and served under a hashed address of its own.
+func TestBrandingSocialImage(t *testing.T) {
+	dir := t.TempDir()
+	card := filepath.Join(dir, "card.png")
+	require.NoError(t, os.WriteFile(card, testPNG(t, 1200, 630), 0o600))
+
+	t.Setenv("SLOPSCALE_BRANDING_SOCIAL_IMAGE_PATH", card)
+
+	conf.Reset()
+	require.NoError(t, LoadConfig("testdata/minimal.yaml", true))
+
+	b, err := brandingConfig()
+	require.NoError(t, err)
+
+	got, ok := b.Card()
+	require.True(t, ok)
+	assert.True(t, strings.HasPrefix(got.URL, BrandingSocialPath+"?v="))
+	assert.Equal(t, "image/png", got.ContentType)
+	assert.Equal(t, 1200, got.Width)
+	assert.Equal(t, 630, got.Height)
+	assert.Equal(t, DefaultBrandTitle, got.Alt)
+
+	raw, contentType, ok := b.SocialImage()
+	assert.True(t, ok)
+	assert.NotEmpty(t, raw)
+	assert.Equal(t, "image/png", contentType)
+}
+
+// testPNG returns a real PNG of the given size, so the header a card is
+// measured by is the one a decoder wrote.
+func testPNG(t *testing.T, width, height int) []byte {
+	t.Helper()
+
+	var buf bytes.Buffer
+	require.NoError(t, png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, width, height))))
+
+	return buf.Bytes()
 }
 
 // TestBrandingLogo proves a configured logo is read at startup and given a
@@ -100,9 +147,9 @@ func TestBrandingDarkLogo(t *testing.T) {
 	b, err := brandingConfig()
 	require.NoError(t, err)
 
-	image, contentType, ok := b.Logo(true)
+	raw, contentType, ok := b.Logo(true)
 	assert.True(t, ok)
-	assert.Equal(t, "dark bytes", string(image))
+	assert.Equal(t, "dark bytes", string(raw))
 	assert.Equal(t, "image/png", contentType)
 
 	assert.True(t, strings.HasPrefix(b.DarkLogoURL(), BrandingDarkLogoPath+"?v="))
@@ -129,6 +176,12 @@ func TestBrandingRefused(t *testing.T) {
 
 	good := filepath.Join(dir, "good.svg")
 	require.NoError(t, os.WriteFile(good, []byte("<svg/>"), 0o600))
+
+	socialFormat := filepath.Join(dir, "card.webp")
+	require.NoError(t, os.WriteFile(socialFormat, []byte("x"), 0o600))
+
+	notAnImage := filepath.Join(dir, "card.png")
+	require.NoError(t, os.WriteFile(notAnImage, []byte("not a png"), 0o600))
 
 	tests := []struct {
 		name string
@@ -164,6 +217,21 @@ func TestBrandingRefused(t *testing.T) {
 			name: "dark logo without a light one",
 			env:  map[string]string{"SLOPSCALE_BRANDING_LOGO_DARK_PATH": unsupported},
 			want: errDarkNoLight,
+		},
+		{
+			name: "empty description",
+			env:  map[string]string{"SLOPSCALE_BRANDING_DESCRIPTION": " "},
+			want: errBrandingDescriptionEmpty,
+		},
+		{
+			name: "social card in a format no unfurler draws",
+			env:  map[string]string{"SLOPSCALE_BRANDING_SOCIAL_IMAGE_PATH": socialFormat},
+			want: errSocialFormat,
+		},
+		{
+			name: "social card that is not an image",
+			env:  map[string]string{"SLOPSCALE_BRANDING_SOCIAL_IMAGE_PATH": notAnImage},
+			want: errSocialDecode,
 		},
 		{
 			name: "missing dark logo behind a good light one",

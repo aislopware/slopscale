@@ -2,24 +2,26 @@
 title: "Branding"
 ---
 
-A slopscale server can carry your own name and logo instead of the product's.
-The console, the pages the server renders in a browser, the Apple configuration
-profile, the browser tab and the mail the server sends all follow one setting,
-so a company deploying it internally does not hand its staff somebody else's
-brand.
+A slopscale server can carry your own name, logo, description and link
+preview instead of the product's. The console, the pages the server renders in
+a browser, the Apple configuration profile, the browser tab and the mail the
+server sends all follow these settings, so a company deploying it internally
+does not hand its staff somebody else's brand.
 
-Both values come from the configuration file. They are read once at startup:
-changing either needs a restart.
+Every value comes from the configuration file. They are read once at startup:
+changing any of them needs a restart.
 
 ```yaml
 branding:
   title: "Example VPN"
+  description: "The Example Inc private network"
   logo_path: /etc/slopscale/logo.svg
   logo_dark_path: /etc/slopscale/logo-dark.svg
+  social_image_path: /etc/slopscale/social.png
 ```
 
-The title and the logo may be set on their own. Renaming without a logo leaves
-the built-in mark in place; a logo without a rename keeps the name Slopscale.
+Each setting stands on its own. Renaming without a logo leaves the built-in
+mark in place; a logo without a rename keeps the name Slopscale.
 `logo_dark_path` is the exception: it is a variant of `logo_path`, so the server
 refuses to start with only the dark one set.
 
@@ -28,8 +30,10 @@ suits a container or a systemd unit:
 
 ```
 SLOPSCALE_BRANDING_TITLE="Example VPN"
+SLOPSCALE_BRANDING_DESCRIPTION="The Example Inc private network"
 SLOPSCALE_BRANDING_LOGO_PATH=/etc/slopscale/logo.svg
 SLOPSCALE_BRANDING_LOGO_DARK_PATH=/etc/slopscale/logo-dark.svg
+SLOPSCALE_BRANDING_SOCIAL_IMAGE_PATH=/etc/slopscale/social.png
 ```
 
 ## The title
@@ -47,6 +51,17 @@ SLOPSCALE_BRANDING_LOGO_DARK_PATH=/etc/slopscale/logo-dark.svg
 What stays the product's own: the `slopscale` command, the configuration keys,
 the API, the `X-Mailer` header and the "Powered by Slopscale" line in the
 footer of a rendered page. Those name the software, not your service.
+
+## The description
+
+`branding.description` is the one line under a link to this server: what a chat
+or a feed prints beneath the preview, and what a search engine reads as the
+page description. It defaults to the product's own pitch, which is the wrong
+sentence for an internal deployment.
+
+An empty value is refused rather than treated as "leave it out", the same way
+an empty title is, because a page with a blank description reads as a mistake
+to whatever is unfurling it.
 
 ## The logo
 
@@ -83,10 +98,21 @@ logo, because there is no way to hand a browser two.
 
 Without `logo_dark_path`, everything above serves `logo_path`.
 
-One thing changes with a logo: the server stops offering its social card. The
-1200×630 picture a chat or a feed draws for a shared link is baked with the
-product's mark and name, so a rebranded server serves the link without an image
-rather than with the wrong one.
+## The social card
+
+The picture a chat or a feed draws for a shared link is baked with the
+product's mark and name, so a server with its own `logo_path` stops offering
+it: the link unfurls without an image rather than with the wrong one.
+
+`branding.social_image_path` gives it back. It is a `.png` or `.jpg` on the
+server, up to 4 MB, served from `/branding/social` under a hash of the file
+like the logos. Make it 1200×630; that is the shape every unfurler crops to.
+The server reads the real size out of the file and tells the unfurler that,
+rather than assuming, so a picture in another shape is at least described
+honestly.
+
+Set it whenever you set a logo. The card is the only branding a person sees
+before they open the link at all.
 
 ## What it does not change
 
