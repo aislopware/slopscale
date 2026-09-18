@@ -164,7 +164,7 @@ func brandLogo() elem.Node {
 	// These pages carry no theme control of their own, so the browser's
 	// own preference is the only signal there is; <picture> reads it
 	// without script.
-	return elem.Picture(nil,
+	return elem.Picture(attrs.Props{attrs.Class: "brand-picture"},
 		elem.Source(attrs.Props{
 			"srcset":    dark,
 			attrs.Media: "(prefers-color-scheme: dark)",
