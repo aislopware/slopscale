@@ -150,11 +150,27 @@ func brandLogo() elem.Node {
 		return elem.Raw(assets.SVG)
 	}
 
-	return elem.Img(attrs.Props{
+	img := elem.Img(attrs.Props{
 		attrs.Src:   url,
 		attrs.Alt:   brand.Title,
 		attrs.Class: "brand-logo",
 	})
+
+	dark := brand.DarkLogoURL()
+	if dark == url {
+		return img
+	}
+
+	// These pages carry no theme control of their own, so the browser's
+	// own preference is the only signal there is; <picture> reads it
+	// without script.
+	return elem.Picture(nil,
+		elem.Source(attrs.Props{
+			"srcset":    dark,
+			attrs.Media: "(prefers-color-scheme: dark)",
+		}),
+		img,
+	)
 }
 
 // pageFooter creates a consistent footer for all pages.

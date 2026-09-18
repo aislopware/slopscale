@@ -54,13 +54,21 @@ func TestBrandingLogo(t *testing.T) {
 	b, err := brandingConfig()
 	require.NoError(t, err)
 
-	logo, contentType, ok := b.Logo()
+	logo, contentType, ok := b.Logo(false)
 	assert.True(t, ok)
 	assert.Equal(t, "<svg/>", string(logo))
 	assert.Equal(t, "image/svg+xml", contentType)
 
 	first := b.LogoURL()
 	assert.True(t, strings.HasPrefix(first, BrandingLogoPath+"?v="))
+
+	// One logo answers for both themes, so a caller picking by theme does
+	// not have to ask whether a second one exists.
+	assert.Equal(t, first, b.DarkLogoURL())
+
+	darkLogo, _, ok := b.Logo(true)
+	assert.True(t, ok)
+	assert.Equal(t, "<svg/>", string(darkLogo))
 
 	require.NoError(t, os.WriteFile(path, []byte("<svg id='2'/>"), 0o600))
 
@@ -70,6 +78,39 @@ func TestBrandingLogo(t *testing.T) {
 	replaced, err := brandingConfig()
 	require.NoError(t, err)
 	assert.NotEqual(t, first, replaced.LogoURL())
+}
+
+// TestBrandingDarkLogo proves the dark variant is served from its own
+// address, so the console can swap logos with its theme control and a
+// browser cache keeps both.
+func TestBrandingDarkLogo(t *testing.T) {
+	dir := t.TempDir()
+	light := filepath.Join(dir, "logo.svg")
+	dark := filepath.Join(dir, "logo-dark.png")
+
+	require.NoError(t, os.WriteFile(light, []byte("<svg/>"), 0o600))
+	require.NoError(t, os.WriteFile(dark, []byte("dark bytes"), 0o600))
+
+	t.Setenv("SLOPSCALE_BRANDING_LOGO_PATH", light)
+	t.Setenv("SLOPSCALE_BRANDING_LOGO_DARK_PATH", dark)
+
+	conf.Reset()
+	require.NoError(t, LoadConfig("testdata/minimal.yaml", true))
+
+	b, err := brandingConfig()
+	require.NoError(t, err)
+
+	image, contentType, ok := b.Logo(true)
+	assert.True(t, ok)
+	assert.Equal(t, "dark bytes", string(image))
+	assert.Equal(t, "image/png", contentType)
+
+	assert.True(t, strings.HasPrefix(b.DarkLogoURL(), BrandingDarkLogoPath+"?v="))
+	assert.NotEqual(t, b.LogoURL(), b.DarkLogoURL())
+
+	light2, _, ok := b.Logo(false)
+	assert.True(t, ok)
+	assert.Equal(t, "<svg/>", string(light2))
 }
 
 // TestBrandingRefused proves the server refuses a branding section it
@@ -85,6 +126,9 @@ func TestBrandingRefused(t *testing.T) {
 
 	big := filepath.Join(dir, "big.png")
 	require.NoError(t, os.WriteFile(big, make([]byte, maxLogoBytes+1), 0o600))
+
+	good := filepath.Join(dir, "good.svg")
+	require.NoError(t, os.WriteFile(good, []byte("<svg/>"), 0o600))
 
 	tests := []struct {
 		name string
@@ -114,6 +158,19 @@ func TestBrandingRefused(t *testing.T) {
 		{
 			name: "missing file",
 			env:  map[string]string{"SLOPSCALE_BRANDING_LOGO_PATH": filepath.Join(dir, "gone.png")},
+			want: os.ErrNotExist,
+		},
+		{
+			name: "dark logo without a light one",
+			env:  map[string]string{"SLOPSCALE_BRANDING_LOGO_DARK_PATH": unsupported},
+			want: errDarkNoLight,
+		},
+		{
+			name: "missing dark logo behind a good light one",
+			env: map[string]string{
+				"SLOPSCALE_BRANDING_LOGO_PATH":      good,
+				"SLOPSCALE_BRANDING_LOGO_DARK_PATH": filepath.Join(dir, "gone.png"),
+			},
 			want: os.ErrNotExist,
 		},
 	}
