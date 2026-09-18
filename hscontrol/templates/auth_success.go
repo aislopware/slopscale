@@ -9,8 +9,8 @@ import (
 // flow (node registration, reauthentication, SSH check, …) can clearly
 // communicate what just happened.
 type AuthSuccessResult struct {
-	// Title is the browser tab / page title,
-	// e.g. "Slopscale - Node Registered".
+	// Title says what happened, e.g. "Node Registered"; the page adds
+	// the brand behind it.
 	Title string
 
 	// Heading is the bold green text inside the success box,
@@ -42,10 +42,10 @@ func AuthSuccess(result AuthSuccessResult) *elem.Element {
 	)
 
 	return page(
-		result.Title,
+		pageTitle(result.Title),
 		box,
 		H2(elem.Text("Getting started")),
-		P(elem.Text("Check out the documentation to learn more about slopscale and Tailscale:")),
+		P(elem.Text("Check out the documentation to learn more about the control server and Tailscale:")),
 		Ul(
 			elem.Li(
 				nil,

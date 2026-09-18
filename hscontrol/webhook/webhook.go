@@ -41,8 +41,11 @@ type Store interface {
 type Dispatcher struct {
 	store   Store
 	tailnet string
-	client  *http.Client
-	mailer  Mailer
+	// brand is what the operator calls this server; it names the tailnet
+	// in a notification a person reads.
+	brand  string
+	client *http.Client
+	mailer Mailer
 	// approvers resolves [types.RecipientApprovers] to the addresses of
 	// the people who may decide access requests, at the moment the
 	// message is sent.
@@ -88,6 +91,7 @@ func New(store Store, tailnet string) *Dispatcher {
 	d := &Dispatcher{
 		store:   store,
 		tailnet: tailnet,
+		brand:   types.DefaultBrandTitle,
 		// Receiver URLs are operator input, so deliveries dial through the
 		// egress guard; see hscontrol/egress.
 		client:  &http.Client{Timeout: deliveryTimeout, CheckRedirect: noRedirect, Transport: egress.Transport()},
@@ -135,6 +139,14 @@ func (d *Dispatcher) SetBackoff(backoff []time.Duration) {
 // SetMailer sets how email endpoints are delivered; with none, they fail.
 func (d *Dispatcher) SetMailer(m Mailer) {
 	d.mailer = m
+}
+
+// SetBrand names the server in the notifications a person reads. Without
+// one they carry the product's own name.
+func (d *Dispatcher) SetBrand(brand string) {
+	if brand != "" {
+		d.brand = brand
+	}
 }
 
 // SetApprovers sets how [types.RecipientApprovers] is resolved. Without
@@ -239,7 +251,7 @@ func (d *Dispatcher) Test(ctx context.Context, endpoint types.Webhook) error {
 
 	defer func() { <-d.slots }()
 
-	event := d.event(types.EventTest, "This is a test event from slopscale.", nil)
+	event := d.event(types.EventTest, "This is a test event from "+d.brand+".", nil)
 
 	started := time.Now()
 	status, err := d.deliver(ctx, endpoint, event)
@@ -390,7 +402,7 @@ func (d *Dispatcher) deliver(ctx context.Context, endpoint types.Webhook, event 
 	req.Header.Set(SignatureHeader, Sign(endpoint.Secret, now, payload.Body))
 
 	if endpoint.ProviderType == types.WebhookProviderNtfy {
-		req.Header.Set("Title", ntfyTitle(event))
+		req.Header.Set("Title", d.ntfyTitle(event))
 	}
 
 	resp, err := d.client.Do(req)

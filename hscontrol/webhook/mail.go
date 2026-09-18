@@ -136,29 +136,36 @@ func mailBody(event types.WebhookEvent) string {
 	return b.String()
 }
 
-// ntfyTitle is the notification title for an ntfy topic: the tailnet, or
-// the server.
-func ntfyTitle(event types.WebhookEvent) string {
+// ntfyTitle is the notification title for an ntfy topic: the server's
+// name, and the tailnet when there is one.
+func (d *Dispatcher) ntfyTitle(event types.WebhookEvent) string {
 	if event.Tailnet != "" {
-		return "slopscale " + event.Tailnet
+		return d.brand + " " + event.Tailnet
 	}
 
-	return "slopscale"
+	return d.brand
 }
 
 // SMTPMailer sends through one SMTP server, per [types.SMTPConfig].
 type SMTPMailer struct {
 	cfg types.SMTPConfig
+	// brand is the display name put on a sender address that has none, so
+	// a recipient sees whose server wrote rather than a bare address.
+	brand string
 }
 
 // NewSMTPMailer returns a mailer for the server, or nil when none is
 // configured, so a nil check is the only feature switch.
-func NewSMTPMailer(cfg types.SMTPConfig) *SMTPMailer {
+func NewSMTPMailer(cfg types.SMTPConfig, brand string) *SMTPMailer {
 	if !cfg.Configured() {
 		return nil
 	}
 
-	return &SMTPMailer{cfg: cfg}
+	if brand == "" {
+		brand = types.DefaultBrandTitle
+	}
+
+	return &SMTPMailer{cfg: cfg, brand: brand}
 }
 
 // Send delivers one message. A connection or authentication failure is
@@ -264,6 +271,12 @@ func (m *SMTPMailer) submit(client *smtp.Client, to []string, subject, body stri
 	from, err := mail.ParseAddress(m.cfg.From)
 	if err != nil {
 		return fmt.Errorf("%w: sender %q: %w", ErrMailRejected, m.cfg.From, err)
+	}
+
+	// A bare address in the config becomes "Brand <address>"; an operator
+	// who wrote a display name of their own keeps it.
+	if from.Name == "" {
+		from.Name = m.brand
 	}
 
 	err = client.Mail(from.Address)

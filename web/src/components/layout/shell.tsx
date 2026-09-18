@@ -13,7 +13,7 @@ import type { Me } from "~/auth/me.ts";
 import { can, canSeeMachines, displayName, roleLabel } from "~/auth/me.ts";
 import { signOut } from "~/auth/session.ts";
 import { pendingCount } from "~/components/access/request-model.ts";
-import { Mark } from "~/components/layout/mark.tsx";
+import { BrandMark, useBrand } from "~/components/layout/brand.tsx";
 import type { NavBadge, NavItem, NavPath, NavPlace } from "~/components/layout/nav.ts";
 import { isActive, pagesOf, placeOf, visibleGroups } from "~/components/layout/nav.ts";
 import { QuickSearch } from "~/components/layout/quick-search.tsx";
@@ -260,19 +260,25 @@ function CountBadge({ count }: { readonly count: number }): ReactElement | null 
 }
 
 function Brand(): ReactElement {
+  const brand = useBrand();
+
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2 px-2 group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0">
-      <Mark className="size-5 shrink-0" />
+      <BrandMark markClassName="size-5 shrink-0" logoClassName="size-5 shrink-0" />
       <span className="flex-1 truncate font-semibold text-kumo-strong group-data-[state=collapsed]/sidebar:hidden">
-        slopscale
+        {brand.title}
       </span>
     </div>
   );
 }
 
 /** The tab's title from the trail: "backup-nas - Machines - Slopscale", so tabs and history read. */
-export function documentTitle(section: string | undefined, page: string | null): string {
-  return [page, section, "Slopscale"]
+export function documentTitle(
+  brand: string,
+  section: string | undefined,
+  page: string | null,
+): string {
+  return [page, section, brand]
     .filter((part): part is string => part !== undefined && part !== null && part !== "")
     .filter((part, index, parts) => parts.indexOf(part) === index)
     .join(" - ");
@@ -291,17 +297,18 @@ function useDocumentTitle(title: string): void {
  */
 function Trail({ place }: { readonly place: NavPlace | undefined }): ReactElement {
   const leaf = useBreadcrumbLeaf();
+  const brand = useBrand();
   const current = place?.item;
   const last: string | null = place?.child?.label ?? leaf;
 
-  useDocumentTitle(documentTitle(current?.label, last));
+  useDocumentTitle(documentTitle(brand.title, current?.label, last));
 
   return (
     <div className="flex min-w-0 items-center gap-2">
       <Sidebar.Trigger className="md:hidden" aria-label="Open navigation" />
       <Breadcrumbs>
         {current === undefined || last === null ? (
-          <Breadcrumbs.Current>{current?.label ?? leaf ?? "slopscale"}</Breadcrumbs.Current>
+          <Breadcrumbs.Current>{current?.label ?? leaf ?? brand.title}</Breadcrumbs.Current>
         ) : (
           <>
             <Breadcrumbs.Link href={current.children?.[0]?.to ?? current.to}>

@@ -20,7 +20,10 @@ func serve(t *testing.T, method, target string) *httptest.ResponseRecorder {
 	t.Helper()
 
 	rec := httptest.NewRecorder()
-	Handler(testServerURL).ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), method, target, http.NoBody))
+	Handler(
+		testServerURL,
+		Brand{Title: "Slopscale"},
+	).ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), method, target, http.NoBody))
 
 	return rec
 }

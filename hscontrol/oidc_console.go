@@ -175,7 +175,7 @@ func renderConsoleRefused(writer http.ResponseWriter, code int, heading, message
 	writer.WriteHeader(code)
 
 	page := templates.AuthError(templates.AuthErrorResult{
-		Title:   "Slopscale - " + heading,
+		Title:   heading,
 		Heading: heading,
 		Message: message,
 	})

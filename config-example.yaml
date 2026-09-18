@@ -326,6 +326,17 @@ policy:
 #     # none for a relay on localhost.
 #     encryption: starttls
 
+## Branding
+#
+# What this server calls itself in the admin console, on the pages it
+# renders and in the mail it sends. The logo replaces the built-in mark in
+# the console, on those pages and on the browser tab; it is read once at
+# startup, so a replacement needs a restart. Accepted formats are .svg,
+# .png, .jpg and .webp, up to 1 MB.
+# branding:
+#   title: "Example VPN"
+#   logo_path: /etc/slopscale/logo.svg
+
 ## HTTPS certificates
 #
 # Let machines get Let's Encrypt certificates for their MagicDNS names

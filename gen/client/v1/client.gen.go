@@ -625,7 +625,14 @@ type CheckPolicyOutputBody = map[string]interface{}
 
 // ConsoleAuth defines model for ConsoleAuth.
 type ConsoleAuth struct {
-	Oidc *ConsoleOIDC `json:"oidc,omitempty"`
+	Branding ConsoleBranding `json:"branding"`
+	Oidc     *ConsoleOIDC    `json:"oidc,omitempty"`
+}
+
+// ConsoleBranding defines model for ConsoleBranding.
+type ConsoleBranding struct {
+	LogoUrl string `json:"logoUrl"`
+	Title   string `json:"title"`
 }
 
 // ConsoleOIDC defines model for ConsoleOIDC.

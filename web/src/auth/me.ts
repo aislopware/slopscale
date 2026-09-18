@@ -43,8 +43,13 @@ export const meQuery = api.queryOptions("get", "/api/v1/whoami", undefined, {
   staleTime: sharedStaleTime,
 });
 
-/** What the sign-in page may offer; public, so it loads before any credential. */
-export const consoleAuthQuery = api.queryOptions("get", "/api/v1/auth/console");
+/**
+ * What the sign-in page may offer and what the operator calls this server; public, so it loads
+ * before any credential. Both come from the config file, so they hold until the server restarts.
+ */
+export const consoleAuthQuery = api.queryOptions("get", "/api/v1/auth/console", undefined, {
+  staleTime: "static",
+});
 
 export function can(me: Me, scope: Scope): boolean {
   return me.permissions[scope] === true;

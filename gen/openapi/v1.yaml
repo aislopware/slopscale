@@ -580,8 +580,23 @@ components:
     ConsoleAuth:
       additionalProperties: false
       properties:
+        branding:
+          $ref: "#/components/schemas/ConsoleBranding"
         oidc:
           $ref: "#/components/schemas/ConsoleOIDC"
+      required:
+        - branding
+      type: object
+    ConsoleBranding:
+      additionalProperties: false
+      properties:
+        logoUrl:
+          type: string
+        title:
+          type: string
+      required:
+        - title
+        - logoUrl
       type: object
     ConsoleOIDC:
       additionalProperties: false

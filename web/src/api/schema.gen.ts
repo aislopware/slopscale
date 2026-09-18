@@ -2796,7 +2796,12 @@ export interface components {
         };
         CheckPolicyOutputBody: Record<string, unknown>;
         ConsoleAuth: {
+            branding: components["schemas"]["ConsoleBranding"];
             oidc?: components["schemas"]["ConsoleOIDC"];
+        };
+        ConsoleBranding: {
+            logoUrl: string;
+            title: string;
         };
         ConsoleOIDC: {
             loginPath: string;
@@ -4374,6 +4379,7 @@ export type AuthRejectRequestBody = components['schemas']['AuthRejectRequestBody
 export type BackfillNodeIPsOutputBody = components['schemas']['BackfillNodeIPsOutputBody'];
 export type CheckPolicyOutputBody = components['schemas']['CheckPolicyOutputBody'];
 export type ConsoleAuth = components['schemas']['ConsoleAuth'];
+export type ConsoleBranding = components['schemas']['ConsoleBranding'];
 export type ConsoleOidc = components['schemas']['ConsoleOIDC'];
 export type ConsoleSession = components['schemas']['ConsoleSession'];
 export type CreateApiKeyOutputBody = components['schemas']['CreateAPIKeyOutputBody'];
