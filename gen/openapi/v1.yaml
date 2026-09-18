@@ -590,6 +590,8 @@ components:
     ConsoleBranding:
       additionalProperties: false
       properties:
+        logoDarkUrl:
+          type: string
         logoUrl:
           type: string
         title:
@@ -597,6 +599,7 @@ components:
       required:
         - title
         - logoUrl
+        - logoDarkUrl
       type: object
     ConsoleOIDC:
       additionalProperties: false

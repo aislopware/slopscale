@@ -78,6 +78,10 @@ type ConsoleBranding struct {
 	// LogoURL is where the operator's own logo is served, empty while
 	// none is configured; then the console draws its own mark.
 	LogoURL string `json:"logoUrl"`
+	// DarkLogoURL is the logo to draw in dark mode. It repeats LogoURL
+	// when the operator configured one image for both, so the console
+	// picks by theme without asking how many there are.
+	DarkLogoURL string `json:"logoDarkUrl"`
 }
 
 // ConsoleOIDC describes the identity provider sign-in.
@@ -110,13 +114,15 @@ func registerSession(api huma.API, b Backend) {
 	}, func(_ context.Context, _ *struct{}) (*consoleAuthOutput, error) {
 		out := &consoleAuthOutput{}
 		out.Body.Branding = ConsoleBranding{
-			Title:   types.DefaultBrandTitle,
-			LogoURL: "",
+			Title:       types.DefaultBrandTitle,
+			LogoURL:     "",
+			DarkLogoURL: "",
 		}
 
 		if b.Cfg != nil {
 			out.Body.Branding.Title = b.Cfg.Branding.Title
 			out.Body.Branding.LogoURL = b.Cfg.Branding.LogoURL()
+			out.Body.Branding.DarkLogoURL = b.Cfg.Branding.DarkLogoURL()
 		}
 
 		if b.ConsoleLogin != nil {

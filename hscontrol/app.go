@@ -1386,6 +1386,8 @@ func (h *Slopscale) createRouter(apiV1Mux, apiV2Mux http.Handler) *chi.Mux {
 	r.Head("/favicon.ico", h.FaviconHandler)
 	r.Get(types.BrandingLogoPath, h.LogoHandler)
 	r.Head(types.BrandingLogoPath, h.LogoHandler)
+	r.Get(types.BrandingDarkLogoPath, h.LogoHandler)
+	r.Head(types.BrandingDarkLogoPath, h.LogoHandler)
 	r.Get(templates.OpenGraphPath, OpenGraphHandler)
 	r.Head(templates.OpenGraphPath, OpenGraphHandler)
 	r.Get("/", web.RootHandler)

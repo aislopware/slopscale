@@ -15,17 +15,21 @@ changing either needs a restart.
 branding:
   title: "Example VPN"
   logo_path: /etc/slopscale/logo.svg
+  logo_dark_path: /etc/slopscale/logo-dark.svg
 ```
 
-Either may be set on its own. Renaming without a logo leaves the built-in mark
-in place; a logo without a rename keeps the name Slopscale.
+The title and the logo may be set on their own. Renaming without a logo leaves
+the built-in mark in place; a logo without a rename keeps the name Slopscale.
+`logo_dark_path` is the exception: it is a variant of `logo_path`, so the server
+refuses to start with only the dark one set.
 
-Like every other setting, both can come from the environment instead, which
+Like every other setting, these can come from the environment instead, which
 suits a container or a systemd unit:
 
 ```
 SLOPSCALE_BRANDING_TITLE="Example VPN"
 SLOPSCALE_BRANDING_LOGO_PATH=/etc/slopscale/logo.svg
+SLOPSCALE_BRANDING_LOGO_DARK_PATH=/etc/slopscale/logo-dark.svg
 ```
 
 ## The title
@@ -61,6 +65,23 @@ It is always fitted, never stretched. The sidebar gives it the square slot the
 built-in mark sits in, next to the name, so a square icon suits it best; a wide
 wordmark is legible on the sign-in page and on the rendered pages, but shrinks
 to fit the sidebar and repeats a name the sidebar already prints.
+
+## One logo or two
+
+A mark that carries its own background, the way an app icon does, reads on both
+themes and needs only `logo_path`. A logo drawn in one flat colour does not: a
+dark wordmark disappears against the console in dark mode. Give
+`logo_dark_path` for that case and the server serves it from
+`/branding/logo-dark`, with its own hash.
+
+Who picks which depends on where the logo is drawn. The console follows the
+theme in effect, so switching its light/dark control swaps the logo even when
+that disagrees with the browser's own preference. The pages the server renders
+carry no such control, so they offer both through `<picture>` and the browser
+chooses by `prefers-color-scheme`. The browser tab's icon is always the light
+logo, because there is no way to hand a browser two.
+
+Without `logo_dark_path`, everything above serves `logo_path`.
 
 One thing changes with a logo: the server stops offering its social card. The
 1200×630 picture a chat or a feed draws for a shared link is baked with the

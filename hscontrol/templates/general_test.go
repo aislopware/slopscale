@@ -69,4 +69,27 @@ func TestPageBrandingLogo(t *testing.T) {
 	assert.NotContains(t, out, `class="slopscale-logo"`)
 	assert.NotContains(t, out, "og:image")
 	assert.Contains(t, out, `content="summary" name="twitter:card"`)
+	// One logo answers for both themes, so there is nothing to choose
+	// between and the image stands on its own.
+	assert.NotContains(t, out, "srcset")
+}
+
+// TestPageBrandingDarkLogo proves a page with two logos offers both and lets
+// the browser pick, since these pages carry no theme control of their own.
+func TestPageBrandingDarkLogo(t *testing.T) {
+	brand := types.NewBranding("Example VPN", "image/png", []byte("png bytes")).
+		WithDarkLogo("image/png", []byte("dark png bytes"))
+
+	SetBranding(brand)
+	t.Cleanup(func() { SetBranding(types.Branding{Title: types.DefaultBrandTitle}) })
+
+	out := page(pageTitle("Sign in")).Render()
+
+	assert.Contains(t, out, `<picture class="brand-picture">`)
+	assert.Contains(t, out, `media="(prefers-color-scheme: dark)"`)
+	assert.Contains(t, out, `srcset="`+types.BrandingDarkLogoPath+`?v=`)
+	// The light logo stays the <img>, so a browser without <picture>
+	// support still draws something.
+	assert.Contains(t, out, `class="brand-logo"`)
+	assert.Contains(t, out, `src="`+types.BrandingLogoPath+`?v=`)
 }

@@ -2800,6 +2800,7 @@ export interface components {
             oidc?: components["schemas"]["ConsoleOIDC"];
         };
         ConsoleBranding: {
+            logoDarkUrl: string;
             logoUrl: string;
             title: string;
         };

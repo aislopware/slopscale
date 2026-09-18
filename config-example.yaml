@@ -333,9 +333,15 @@ policy:
 # the console, on those pages and on the browser tab; it is read once at
 # startup, so a replacement needs a restart. Accepted formats are .svg,
 # .png, .jpg and .webp, up to 1 MB.
+#
+# logo_dark_path is the variant to draw against a dark background. Leave it
+# out when one image works on both, which it does for a mark that carries
+# its own background; the tab icon is always the light one, because a
+# browser offers no way to give it two.
 # branding:
 #   title: "Example VPN"
 #   logo_path: /etc/slopscale/logo.svg
+#   logo_dark_path: /etc/slopscale/logo-dark.svg
 
 ## HTTPS certificates
 #

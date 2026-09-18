@@ -4680,7 +4680,12 @@ func TestHASubnetRouterFailoverDockerDisconnect(t *testing.T) {
 	// on the phases before: on run 34460377686 r2's fired twelve
 	// seconds into phase 5a and the test called the correct answer a
 	// regression.
-	requirePrimaryStable := func(want types.NodeID, window time.Duration, msg string) {
+	//
+	// It reports whether the window ran out with want still online. False
+	// means slopscale reaped want first, so the election was entitled to
+	// move the prefix and a later phase must not assume want still holds
+	// it.
+	requirePrimaryStable := func(want types.NodeID, window time.Duration, msg string) bool {
 		t.Helper()
 
 		deadline := time.NewTimer(window)
@@ -4693,7 +4698,7 @@ func TestHASubnetRouterFailoverDockerDisconnect(t *testing.T) {
 			if !wantOnline(want) {
 				t.Logf("%s: slopscale reaped node %d, ending the window here", msg, want)
 
-				return
+				return false
 			}
 
 			pr, err := slopscale.PrimaryRoutes()
@@ -4705,10 +4710,35 @@ func TestHASubnetRouterFailoverDockerDisconnect(t *testing.T) {
 
 			select {
 			case <-deadline.C:
-				return
+				return true
 			case <-tick.C:
 			}
 		}
+	}
+
+	// requireSomePrimary blocks until the prefix is served by one of the
+	// two routers, and reports which. It is the right assertion once
+	// either of them is a correct answer: what matters then is that the
+	// prefix came back at all.
+	requireSomePrimary := func(msg string) types.NodeID {
+		t.Helper()
+
+		var owner types.NodeID
+
+		assert.EventuallyWithT(t, func(c *assert.CollectT) {
+			pr, err := slopscale.PrimaryRoutes()
+			if !assert.NoError(c, err) {
+				return
+			}
+
+			got, ok := pr.PrimaryRoutes[pref.String()]
+			assert.Truef(c, ok, "%s: the prefix has no primary", msg)
+			assert.Containsf(c, []types.NodeID{nodeID1, nodeID2}, got, "%s", msg)
+
+			owner = got
+		}, propagationTime, 1*time.Second, msg)
+
+		return owner
 	}
 
 	// ============================================================
@@ -4765,7 +4795,10 @@ func TestHASubnetRouterFailoverDockerDisconnect(t *testing.T) {
 	t.Log("=== Phase 4b: cable-pull r2, primary must NOT flap to offline r1. ===")
 	require.NoError(t, subRouter2.DisconnectFromNetwork(usernet1),
 		"phase 4b: docker disconnect r2")
-	requirePrimaryStable(nodeID2, flapWindow,
+	// r1 stays cable-pulled until phase 4d, so r2 is the only router
+	// slopscale can believe in either way and phase 4c's expectation
+	// does not depend on whether this window ended early.
+	_ = requirePrimaryStable(nodeID2, flapWindow,
 		"phase 4b: primary must not flap to offline r1 (issue #3203)")
 
 	t.Log("=== Phase 4c: reconnect r2, r2 should resume as primary. ===")
@@ -4788,14 +4821,27 @@ func TestHASubnetRouterFailoverDockerDisconnect(t *testing.T) {
 		"phase 5a: docker disconnect r1")
 	require.NoError(t, subRouter2.DisconnectFromNetwork(usernet1),
 		"phase 5a: docker disconnect r2")
-	requirePrimaryStable(nodeID2, flapWindow,
+
+	r2HeldThrough := requirePrimaryStable(nodeID2, flapWindow,
 		"phase 5a: primary must not flap to offline r1 (issue #3203)")
 
-	t.Log("=== Phase 5b: reconnect both, r2 should remain primary. ===")
+	t.Log("=== Phase 5b: reconnect both, the prefix must come back. ===")
 	require.NoError(t, subRouter1.ReconnectToNetwork(usernet1),
 		"phase 5b: docker reconnect r1")
 	require.NoError(t, subRouter2.ReconnectToNetwork(usernet1),
 		"phase 5b: docker reconnect r2")
-	requirePrimary(nodeID2, "phase 5b: r2 primary after both reconnect")
-	requireTrafficWorks("phase 5b: client reaches webservice via r2")
+
+	// Which router should hold the prefix depends on what phase 5a
+	// settled on. While slopscale still believed in r2 it kept it there,
+	// and nothing about two routers coming back may move it. Once r2's
+	// map poll timed out, though, slopscale handed the prefix to the
+	// router it still believed in, exactly as phase 5a allows; demanding
+	// r2 back would be demanding the flap this test exists to forbid.
+	if r2HeldThrough {
+		requirePrimary(nodeID2, "phase 5b: r2 primary after both reconnect")
+	} else {
+		requireSomePrimary("phase 5b: the prefix is served again after both reconnect")
+	}
+
+	requireTrafficWorks("phase 5b: client reaches webservice")
 }
