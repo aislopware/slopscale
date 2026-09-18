@@ -631,8 +631,9 @@ type ConsoleAuth struct {
 
 // ConsoleBranding defines model for ConsoleBranding.
 type ConsoleBranding struct {
-	LogoUrl string `json:"logoUrl"`
-	Title   string `json:"title"`
+	LogoDarkUrl string `json:"logoDarkUrl"`
+	LogoUrl     string `json:"logoUrl"`
+	Title       string `json:"title"`
 }
 
 // ConsoleOIDC defines model for ConsoleOIDC.
