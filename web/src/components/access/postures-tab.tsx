@@ -84,17 +84,6 @@ export function PosturesTab({
                   size="sm"
                   title="No postures yet"
                   description="A posture names conditions a machine must meet. Attach it to a rule to require it of the sources."
-                  contents={
-                    <Button
-                      variant="secondary"
-                      disabled={!canEdit}
-                      onClick={() => {
-                        setCreating(true);
-                      }}
-                    >
-                      New posture
-                    </Button>
-                  }
                 />
               ) : (
                 <Empty

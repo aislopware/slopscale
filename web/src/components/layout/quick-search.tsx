@@ -11,6 +11,7 @@ import type { Node, User } from "~/api/queries.ts";
 import type { Me } from "~/auth/me.ts";
 import { can, canSeeMachines } from "~/auth/me.ts";
 import type { NavPage } from "~/components/layout/nav.ts";
+import { userHint, userLabel } from "~/lib/node.ts";
 
 interface Command {
   readonly id: string;
@@ -217,7 +218,7 @@ function buildGroups(
       limit: maxResources,
       items: users.map((user) => ({
         id: `user:${user.id}`,
-        title: user.displayName === "" ? user.name : user.displayName,
+        title: userLabel(user),
         // The second line says something the first does not: an email, or the account name behind a
         // display name. A user with neither is one line.
         hint: userHint(user),
@@ -228,16 +229,6 @@ function buildGroups(
       })),
     },
   ];
-}
-
-function userHint(user: User): string | undefined {
-  const title = user.displayName === "" ? user.name : user.displayName;
-
-  if (user.email !== "" && user.email !== title) {
-    return user.email;
-  }
-
-  return user.name === title ? undefined : user.name;
 }
 
 function Key({ children }: { readonly children: string }): ReactElement {

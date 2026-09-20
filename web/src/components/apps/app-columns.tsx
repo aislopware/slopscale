@@ -1,7 +1,7 @@
 import { Popover } from "@cloudflare/kumo/components/popover";
 import { Tooltip } from "@cloudflare/kumo/components/tooltip";
 import { Link } from "@tanstack/react-router";
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement } from "react";
 
 import type { App, AppNode } from "~/api/queries.ts";
 import { AppMenu } from "~/components/apps/app-menu.tsx";
@@ -152,7 +152,9 @@ function MachineRow({ node }: { readonly node: AppNode }): ReactElement {
  * Everything the app covers: its domains, the prefixes it was configured with, and the addresses
  * its connectors learned for those domains. All three reach the same machines and an operator
  * checking a route wants them side by side, so they share a cell rather than each taking a column
- * the table has no width for.
+ * the table has no width for. Nothing learned yet says nothing under a cell that already lists what
+ * the app covers, and on a tailnet whose connectors are all offline it said it on every row; the
+ * Machines column carries that, and the app's own page has the reason.
  */
 function ServesCell({ app }: { readonly app: AppRow }): ReactElement {
   const { learned } = app;
@@ -168,11 +170,7 @@ function ServesCell({ app }: { readonly app: AppRow }): ReactElement {
       {app.routes.length === 0 ? null : (
         <MonoList values={app.routes} className="text-kumo-default" />
       )}
-      {addresses.length === 0 ? (
-        <LearnedCell learned={learned} />
-      ) : (
-        <LearnedRoutes addresses={addresses} learned={learned} />
-      )}
+      {addresses.length === 0 ? null : <LearnedRoutes addresses={addresses} learned={learned} />}
     </div>
   );
 }
@@ -230,26 +228,6 @@ function LearnedRoutes({
  * Why there is nothing to show: the caller cannot ask machines, none of the app's connectors is
  * connected, or none has answered yet.
  */
-function LearnedCell({ learned }: { readonly learned: LearnedCount | null }): ReactElement | null {
-  if (learned === null) {
-    return null;
-  }
-
-  if (learned.connected === 0) {
-    return <Muted>No connector connected</Muted>;
-  }
-
-  if (learned.answered === 0) {
-    return <Muted>Asking the connectors{"\u2026"}</Muted>;
-  }
-
-  return <Muted>Nothing learned yet</Muted>;
-}
-
-function Muted({ children }: { readonly children: ReactNode }): ReactElement {
-  return <span className="text-xs text-kumo-subtle">{children}</span>;
-}
-
 /**
  * Routes the connectors advertise that nobody has approved yet. Until they are approved the app's
  * addresses are learned but unreachable, so the count is a link straight to them.

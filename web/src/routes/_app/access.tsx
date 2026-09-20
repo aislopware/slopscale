@@ -109,18 +109,6 @@ function MyAccessPage(): ReactElement {
                 size="sm"
                 title="No requests"
                 description={emptyText(me.user !== undefined, options.groups.length > 0)}
-                contents={
-                  canAsk ? (
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        setRequesting(true);
-                      }}
-                    >
-                      Request access
-                    </Button>
-                  ) : undefined
-                }
               />
             }
             footer={

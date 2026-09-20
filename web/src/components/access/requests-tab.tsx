@@ -151,7 +151,7 @@ export function RequestsTab({
             footer={
               rows.length === 0 ? undefined : (
                 <TableFooter>
-                  {`Showing ${shown} of ${rows.length === 1 ? "1 request" : `${rows.length} requests`} · ${pending} pending · ${active} in effect`}
+                  {`Showing ${shown} of ${rows.length === 1 ? "1 request" : `${rows.length} requests`}`}
                 </TableFooter>
               )
             }

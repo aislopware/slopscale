@@ -83,12 +83,7 @@ export function ServicesTab({
             }}
             empty={
               total === 0 ? (
-                <ServicesEmpty
-                  canEdit={canEdit}
-                  onCreate={() => {
-                    setCreating(true);
-                  }}
-                />
+                <ServicesEmpty />
               ) : (
                 <Empty
                   className={tableEmptyClass}
@@ -128,19 +123,13 @@ export function ServicesTab({
 }
 
 /** The first service takes two commands on the machine as well, so the empty state carries them. */
-function ServicesEmpty({
-  canEdit,
-  onCreate,
-}: {
-  readonly canEdit: boolean;
-  readonly onCreate: () => void;
-}): ReactElement {
+function ServicesEmpty(): ReactElement {
   return (
     <Empty
       className={tableEmptyClass}
       size="sm"
       title="No services"
-      description="A service is a name and a pair of addresses of its own that tagged machines host, so clients reach it by name however it moves."
+      description="Nothing announces a service yet. It takes two commands on a machine that carries one of its tags:"
       contents={
         <div className="flex w-full max-w-md flex-col items-center gap-3">
           <CommandBox
@@ -156,12 +145,8 @@ function ServicesEmpty({
             command="tailscale serve advertise svc:web"
           />
           <p className="text-center text-kumo-subtle">
-            Create the service here, run those on a tagged machine, then approve the machine to host
-            it.
+            Create the service here, run those on the machine, then approve it as a host.
           </p>
-          <Button variant="secondary" icon={PlusIcon} disabled={!canEdit} onClick={onCreate}>
-            New service
-          </Button>
         </div>
       }
     />

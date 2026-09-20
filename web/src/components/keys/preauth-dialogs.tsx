@@ -26,7 +26,7 @@ import {
 } from "~/components/ui/dialog.tsx";
 import { MultiPicker } from "~/components/ui/multi-picker.tsx";
 import { TagField } from "~/components/ui/tag-field.tsx";
-import { userLabel } from "~/lib/node.ts";
+import { userHint, userLabel } from "~/lib/node.ts";
 
 interface Draft {
   readonly userId: string;
@@ -298,16 +298,18 @@ function UserSelect({
         onChange(userId ?? "");
       }}
     >
-      {users.map((user) => (
-        <Select.Option key={user.id} value={user.id}>
-          <span className="flex flex-col gap-0.5">
-            <span className="font-medium text-kumo-default">{userLabel(user)}</span>
-            <span className="text-sm text-kumo-subtle">
-              {user.email === "" ? user.name : user.email}
+      {users.map((user) => {
+        const hint = userHint(user);
+
+        return (
+          <Select.Option key={user.id} value={user.id}>
+            <span className="flex flex-col gap-0.5">
+              <span className="font-medium text-kumo-default">{userLabel(user)}</span>
+              {hint === undefined ? null : <span className="text-sm text-kumo-subtle">{hint}</span>}
             </span>
-          </span>
-        </Select.Option>
-      ))}
+          </Select.Option>
+        );
+      })}
     </Select>
   );
 }

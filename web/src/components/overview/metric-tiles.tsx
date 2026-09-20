@@ -203,7 +203,7 @@ function AccessTile({ requests }: { readonly requests: readonly AccessRequest[] 
       <TileBody
         label="Temporary access"
         value={active}
-        context={pending === 0 ? "Nothing to decide" : `${plural(pending, "request")} waiting`}
+        context={pending === 0 ? "In effect now" : `${plural(pending, "request")} waiting`}
         tone={pending === 0 ? "neutral" : "warning"}
       />
     </Link>

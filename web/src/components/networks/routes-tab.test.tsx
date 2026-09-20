@@ -158,7 +158,7 @@ describe(RoutesTab, () => {
       .toHaveAttribute("href", "/machines/1");
     await expect.element(screen.getByRole("link", { name: "machine-2" })).toBeVisible();
     await expect.element(screen.getByText("Primary")).toBeVisible();
-    await expect.element(screen.getByText("Offline")).toBeVisible();
+    await expect.element(screen.getByText("Disconnected")).toBeVisible();
   });
 
   it("leaves a prefix only one machine advertises a flat row", async () => {
@@ -175,11 +175,11 @@ describe(RoutesTab, () => {
     const nodes = [...pair, node("3", { available: ["10.9.0.0/24"], approved: ["10.9.0.0/24"] })];
     const screen = await render(app(nodes));
 
-    await expect.element(screen.getByText("Showing 2 of 2 routes · 1 pending")).toBeVisible();
+    await expect.element(screen.getByText("Showing 2 of 2 routes")).toBeVisible();
 
     await screen.getByRole("button", { name: /^Pending/u }).click();
 
-    await expect.element(screen.getByText("Showing 1 of 2 routes · 1 pending")).toBeVisible();
+    await expect.element(screen.getByText("Showing 1 of 2 routes")).toBeVisible();
     await expect.element(screen.getByText("10.9.0.0/24")).not.toBeInTheDocument();
   });
 

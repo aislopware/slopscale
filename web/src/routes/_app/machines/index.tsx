@@ -183,9 +183,7 @@ function MachinesPage(): ReactElement {
                     view.tag !== "" ||
                     view.attestation !== defaultAttestation
                   }
-                  canCreateKeys={can(me, "auth_keys")}
                   ownOnly={!can(me, "devices:core:read")}
-                  onAddMachine={addMachine}
                   onClearFilters={clearFilters}
                 />
               }

@@ -8,7 +8,6 @@ import {
   PathIcon,
   ShareNetworkIcon,
   StarIcon,
-  TagIcon,
 } from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import type { ReactElement } from "react";
@@ -44,6 +43,8 @@ const helper = createAppColumnHelper<Node>();
 
 const statusOrder = { online: 0, pending: 1, suspended: 2, offline: 3, expired: 4 } as const;
 const markSize = 13;
+/** Tags an owner cell shows before it counts the rest; the column is 18% of the table. */
+const maxOwnerTags = 2;
 
 /**
  * The tick box that puts a machine into a bulk action. It is a column of its own rather than part
@@ -131,7 +132,6 @@ function NameCell({ node }: { readonly node: Node }): ReactElement {
         {node.name === name ? null : (
           <span className="truncate font-mono text-xs">{node.name}</span>
         )}
-        {node.tags.length === 0 ? null : <TagList tags={node.tags} size="sm" />}
         <Attributes node={node} />
       </div>
     </div>
@@ -254,16 +254,13 @@ function Mark({
   );
 }
 
+/**
+ * Who the machine belongs to: the person, or the tags themselves. A tagged machine used to read
+ * "Tagged" here beside the chips that already said which tags, so the column repeated the row.
+ */
 function OwnerCell({ node }: { readonly node: Node }): ReactElement {
   if (isTagged(node)) {
-    return (
-      <span className="flex items-center gap-1.5 text-kumo-subtle">
-        <span className="flex h-lh items-center">
-          <TagIcon size={markSize} />
-        </span>
-        Tagged
-      </span>
-    );
+    return <TagList tags={node.tags} size="sm" max={maxOwnerTags} />;
   }
 
   const label = ownerLabel(node);

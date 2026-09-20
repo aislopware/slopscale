@@ -72,3 +72,32 @@ export function ownerLabel(node: Node): string {
 export function userLabel(user: { name: string; displayName: string }): string {
   return user.displayName === "" ? user.name : user.displayName;
 }
+
+/**
+ * The identifiers under a user's name, each once: the username the policy refers to and the email
+ * the operator knows them by. A provider that hands out no username sets both to the email address,
+ * which read as the address twice over the display name.
+ */
+export function userAliases(user: {
+  name: string;
+  displayName: string;
+  email: string;
+}): readonly string[] {
+  const label = userLabel(user);
+
+  return [...new Set([user.name, user.email])].filter((alias) => alias !== "" && alias !== label);
+}
+
+/**
+ * The one identifier that says who a name belongs to, where a second line is all there is: the
+ * email, or the username when the name on the line is already the email.
+ */
+export function userHint(user: {
+  name: string;
+  displayName: string;
+  email: string;
+}): string | undefined {
+  const aliases = userAliases(user);
+
+  return aliases.find((alias) => alias === user.email) ?? aliases[0];
+}

@@ -7,6 +7,7 @@ import { Avatar } from "~/components/ui/avatar.tsx";
 import { OsMark } from "~/components/ui/os-mark.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section } from "~/components/ui/section.tsx";
+import { TagList } from "~/components/ui/tag.tsx";
 import { isTagged, nodeName, ownerLabel } from "~/lib/node.ts";
 import { parseTime } from "~/lib/time.ts";
 
@@ -24,6 +25,9 @@ function byActivity(left: Node, right: Node): number {
 
   return seenAt(right) - seenAt(left);
 }
+
+/** Tags an owner column shows before it counts the rest. */
+const maxOwnerTags = 2;
 
 /**
  * One machine: whose it is as an avatar, the person's blend or the tag mark, then the OS mark and
@@ -50,7 +54,9 @@ function ActivityRow({ node }: { readonly node: Node }): ReactElement {
           {nodeName(node)}
         </span>
       </span>
-      <span className="hidden min-w-0 truncate text-kumo-subtle sm:block">{owner}</span>
+      <span className="hidden min-w-0 truncate text-kumo-subtle sm:block">
+        {isTagged(node) ? <TagList tags={node.tags} size="sm" max={maxOwnerTags} /> : owner}
+      </span>
       <span className="ml-auto flex shrink-0 items-center gap-6 text-kumo-subtle">
         <span className="hidden font-mono text-[0.9em] lg:block">{address ?? ""}</span>
         <span className="w-32 text-right">

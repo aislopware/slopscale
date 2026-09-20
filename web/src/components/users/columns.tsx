@@ -9,7 +9,7 @@ import { Badge } from "~/components/ui/badge.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { UserMenu } from "~/components/users/menu.tsx";
 import { RoleBadge } from "~/components/users/role-badge.tsx";
-import { userLabel } from "~/lib/node.ts";
+import { userAliases, userLabel } from "~/lib/node.ts";
 
 const helper = createAppColumnHelper<User>();
 
@@ -98,14 +98,15 @@ export const columns = helper.columns([
 
 /**
  * The name, and under it the username and email on one line: the username is what the policy refers
- * to, the email is how the operator knows who that is. A separate Email column pushed the role and
+ * to, the email is how the operator knows who that is. Each shows once, so a provider that uses the
+ * address as the username does not print it twice. A separate Email column pushed the role and
  * status off the right edge at 1280px.
  */
 function NameCell({ user }: { readonly user: User }): ReactElement {
   const label = userLabel(user);
   const provider = externalProvider(user);
-  const parts = [label === user.name ? "" : user.name, user.email].filter((part) => part !== "");
-  const title = [label, user.email, provider ?? ""].filter((part) => part !== "").join(", ");
+  const parts = userAliases(user);
+  const title = [label, ...parts, provider ?? ""].filter((part) => part !== "").join(", ");
 
   return (
     <div className="flex max-w-80 items-center gap-2.5" title={title}>

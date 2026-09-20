@@ -102,12 +102,14 @@ describe("the pre-auth key table", () => {
     await expect.element(screen.getByText(`${secret.slice(0, previewLength)}…`)).toBeVisible();
   });
 
-  it("shows a key without a user as tagged instead of failing on the missing owner", async () => {
+  // The word "Tagged" beside chips that already name the tags said the same thing twice, so the
+  // user column names them instead.
+  it("names the tags a key without a user belongs to, rather than failing on the missing owner", async () => {
     const screen = await render(<PreAuthTable keys={[ownerless, plain]} />);
 
-    await expect.element(screen.getByText("Tagged")).toBeVisible();
     await expect.element(screen.getByText("Alice Nguyen")).toBeVisible();
     await expect.element(screen.getByText("tag:exit")).toBeVisible();
+    await expect.element(screen.getByText("Tagged")).not.toBeInTheDocument();
   });
 
   it("carries tags in the type cell instead of a column of their own", async () => {

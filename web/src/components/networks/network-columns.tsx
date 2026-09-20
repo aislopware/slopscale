@@ -8,12 +8,14 @@ import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { GroupNames } from "~/components/access/group-names.tsx";
 import { groupName, isNarrowed, protocolSummary } from "~/components/access/model.ts";
+import { statusLabel } from "~/components/machines/status-badge.tsx";
 import { prefixesSummary } from "~/components/networks/model.ts";
 import { useNetworkMutations } from "~/components/networks/mutations.ts";
 import { NetworkMenu } from "~/components/networks/network-menu.tsx";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Code } from "~/components/ui/code.tsx";
 import { Flagged } from "~/components/ui/flagged.tsx";
+import { Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
 
 /** A network with its group names spelled out, so the global filter can match them. */
@@ -158,7 +160,11 @@ function RoutersCell({ network }: { readonly network: Network }): ReactElement {
         router.missingPrefixes.length === 0 ? (
           <span key={router.nodeId} className="flex max-w-full items-center gap-2">
             <span className="truncate">{router.name}</span>
-            {router.online ? null : <span className="text-xs text-kumo-subtle">offline</span>}
+            {router.online ? null : (
+              <Status tone="neutral" className="text-xs">
+                {statusLabel("offline")}
+              </Status>
+            )}
           </span>
         ) : (
           <Flagged
@@ -169,7 +175,7 @@ function RoutersCell({ network }: { readonly network: Network }): ReactElement {
                 <Code className="whitespace-normal">{router.missingPrefixes.join(", ")}</Code> is
                 approved for this network, but the machine stopped advertising it, so nothing
                 reaches it through this router.
-                {router.online ? "" : " The machine is offline."}
+                {router.online ? "" : " The machine is disconnected."}
               </>
             }
           >

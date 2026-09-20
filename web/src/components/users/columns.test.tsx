@@ -71,6 +71,23 @@ describe("the users table", () => {
   });
 });
 
+describe("a user whose provider uses the email address as the username", () => {
+  const carol: User = {
+    ...alice,
+    displayName: "Carol Le",
+    email: "carol@example.com",
+    id: "3",
+    name: "carol@example.com",
+  };
+
+  it("prints the address once under the display name", async () => {
+    const screen = await render(<UsersTable users={[carol]} />);
+
+    await expect.element(screen.getByText("carol@example.com", { exact: true })).toBeVisible();
+    expect(screen.getByText(/carol@example\.com/u).elements()).toHaveLength(1);
+  });
+});
+
 describe("a user without a display name", () => {
   const dev: User = { ...alice, displayName: "", email: "", name: "dev", provider: "" };
 

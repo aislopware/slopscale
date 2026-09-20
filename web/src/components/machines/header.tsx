@@ -9,18 +9,10 @@ import { MachineMenu } from "~/components/machines/menu.tsx";
 import { useNodeMutations } from "~/components/machines/mutations.ts";
 import { StatusBadge } from "~/components/machines/status-badge.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
-import { OsMark } from "~/components/ui/os-mark.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { TagList } from "~/components/ui/tag.tsx";
 import { isTagged, nodeName, nodeStatus, ownerLabel } from "~/lib/node.ts";
-import { osLabel } from "~/lib/os.ts";
-
-const registerMethods: Record<string, string> = {
-  REGISTER_METHOD_AUTH_KEY: "registered with a pre-auth key",
-  REGISTER_METHOD_CLI: "registered from the command line",
-  REGISTER_METHOD_OIDC: "signed in through the identity provider",
-};
 
 /** The machine page's title row: what it is, who owns it, how it joined and how it is doing. */
 export function MachineHeader({
@@ -89,7 +81,9 @@ function SSHButton({ node, me }: { readonly node: Node; readonly me: Me }): Reac
 
 /**
  * The line under the name: the state first, since it is the fact the operator came for, then who
- * owns it (its tags, for a tagged machine), how it joined and when it was last seen.
+ * owns it (its tags, for a tagged machine) and when it was last seen. What the Overview panel two
+ * inches below states in full -- the client and its platform, how the machine registered -- is left
+ * to it, so no fact on this page is written twice and in two wordings.
  */
 function MachineFacts({ node }: { readonly node: Node }): ReactElement {
   return (
@@ -97,17 +91,6 @@ function MachineFacts({ node }: { readonly node: Node }): ReactElement {
       <StatusBadge status={nodeStatus(node)} />
       <span aria-hidden>·</span>
       {isTagged(node) ? <TagList tags={node.tags} size="sm" /> : <span>{ownerLabel(node)}</span>}
-      {node.os === "" ? null : (
-        <>
-          <span aria-hidden>·</span>
-          <span className="inline-flex items-center gap-1">
-            <OsMark os={node.os} version={node.osVersion} />
-            {osLabel(node.os, node.osVersion)}
-          </span>
-        </>
-      )}
-      <span aria-hidden>·</span>
-      <span>{registerMethods[node.registerMethod] ?? "registered"}</span>
       {node.ephemeral ? (
         <>
           <span aria-hidden>·</span>
