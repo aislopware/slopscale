@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.47.1](https://github.com/aislopware/slopscale/compare/v0.47.0...v0.47.1) (2026-09-20)
+
+
+### Fixes
+
+* **api/v1:** refuse an OAuth client scope that is not a scope ([#30](https://github.com/aislopware/slopscale/issues/30)) ([e450dda](https://github.com/aislopware/slopscale/commit/e450dda8f5b7c2b0a722e29ec5063bde854196c9))
+* **web:** say each fact once on a console page, and colour a domain instead of dotting it ([#29](https://github.com/aislopware/slopscale/issues/29)) ([81066db](https://github.com/aislopware/slopscale/commit/81066dbeee1d86df9863a824452a6c240fa454eb))
+
 ## [0.47.0](https://github.com/aislopware/slopscale/compare/v0.46.0...v0.47.0) (2026-09-18)
 
 
