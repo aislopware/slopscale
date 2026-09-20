@@ -98,6 +98,27 @@ func Known() []Scope {
 	}
 }
 
+// known is Known() as a set, built once: IsKnown sits on the credential-creation
+// path, which must not allocate the vocabulary per scope it checks.
+var known = func() map[Scope]struct{} {
+	all := Known()
+	set := make(map[Scope]struct{}, len(all))
+
+	for _, s := range all {
+		set[s] = struct{}{}
+	}
+
+	return set
+}()
+
+// IsKnown reports whether s is part of the vocabulary. A scope outside it satisfies
+// no operation, so granting one stores a credential that can never be used.
+func IsKnown(s Scope) bool {
+	_, ok := known[s]
+
+	return ok
+}
+
 // IsRead reports whether s is a read-only scope (its name ends with ":read").
 func (s Scope) IsRead() bool {
 	return strings.HasSuffix(string(s), readSuffix)

@@ -125,6 +125,14 @@ func TestAPIv2Compat(t *testing.T) {
 		assert.Empty(t, updated.Key, "the secret is not re-exposed by an update")
 	})
 
+	t.Run("UnknownScope", func(t *testing.T) {
+		_, err := client.Keys().CreateOAuthClient(ctx, tsclient.CreateOAuthClientRequest{
+			Scopes:      []string{"devices:core:raed"},
+			Description: "typo",
+		})
+		require.Error(t, err, "a scope outside the vocabulary grants nothing, so it is refused")
+	})
+
 	t.Run("DNSConfiguration", func(t *testing.T) {
 		before, err := client.DNS().Configuration(ctx)
 		require.NoError(t, err)
