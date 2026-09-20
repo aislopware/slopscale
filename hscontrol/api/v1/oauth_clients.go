@@ -390,6 +390,10 @@ func authorizeClientGrant(ctx context.Context, b Backend, scopes, tags []string)
 	p := caller(ctx)
 
 	for _, s := range scopes {
+		if !scope.IsKnown(scope.Scope(s)) {
+			return huma.Error400BadRequest("unknown scope " + s)
+		}
+
 		if !p.Allows(scope.Scope(s)) {
 			return huma.Error403Forbidden(
 				"client may not be granted scope " + s + " beyond the creating credential",

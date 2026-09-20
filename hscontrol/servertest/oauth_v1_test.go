@@ -149,6 +149,17 @@ func TestOAuthFederatedV1(t *testing.T) {
 		assert.Equal(t, "deploys, renamed", field(t, body, "oauthClient", "description"))
 	})
 
+	t.Run("a scope outside the vocabulary is refused", func(t *testing.T) {
+		status, body := apiCall(t, client, ownerKey, http.MethodPost, v1+"/oauth-client", map[string]any{
+			"description": "typo", "scopes": []string{"dns:read", "devices:core:raed"},
+		})
+		assert.Equal(t, http.StatusBadRequest, status, body)
+
+		status, body = apiCall(t, client, ownerKey, http.MethodPatch, v1+"/oauth-client/"+clientID,
+			map[string]any{"scopes": []string{"not_a_real_scope"}})
+		assert.Equal(t, http.StatusBadRequest, status, body)
+	})
+
 	t.Run("revoking deletes the identity", func(t *testing.T) {
 		status, _ := apiCall(t, client, ownerKey, http.MethodDelete, v1+"/oauth-client/"+identityID, nil)
 		require.Equal(t, http.StatusOK, status)

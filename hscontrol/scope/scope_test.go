@@ -232,3 +232,17 @@ func TestKnownIsComplete(t *testing.T) {
 		t.Errorf("Known() has %d scopes, want 26", len(known))
 	}
 }
+
+func TestIsKnown(t *testing.T) {
+	for _, s := range Known() {
+		if !IsKnown(s) {
+			t.Errorf("IsKnown(%q) = false, want true", s)
+		}
+	}
+
+	for _, s := range []Scope{"", "not_a_real_scope", "devices:core:raed", "DNS", "dns:write"} {
+		if IsKnown(s) {
+			t.Errorf("IsKnown(%q) = true, want false", s)
+		}
+	}
+}
