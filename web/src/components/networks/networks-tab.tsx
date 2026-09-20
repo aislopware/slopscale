@@ -55,7 +55,6 @@ export function NetworksTab({
 
   const total = networks.length;
   const shown = table.getRowModel().rows.length;
-  const enabled = networks.filter((network) => network.enabled).length;
 
   return (
     <>
@@ -89,17 +88,6 @@ export function NetworksTab({
                   size="sm"
                   title="No networks"
                   description="A network approves a subnet or exit node on its routers and hands the routes only to the groups you pick."
-                  contents={
-                    <Button
-                      variant="secondary"
-                      disabled={!canEdit}
-                      onClick={() => {
-                        setCreating(true);
-                      }}
-                    >
-                      New network
-                    </Button>
-                  }
                 />
               ) : (
                 <Empty
@@ -121,7 +109,7 @@ export function NetworksTab({
             }
             footer={
               total === 0 ? undefined : (
-                <TableFooter>{`Showing ${shown} of ${countNetworks(total)} · ${enabled} enabled`}</TableFooter>
+                <TableFooter>{`Showing ${shown} of ${countNetworks(total)}`}</TableFooter>
               )
             }
           />

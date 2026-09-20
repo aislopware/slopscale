@@ -1,8 +1,7 @@
-import { TagIcon } from "@phosphor-icons/react";
 import type { ReactElement, ReactNode } from "react";
 
 import { errorMessage } from "~/api/error.ts";
-import type { Group, PreAuthKey, User } from "~/api/queries.ts";
+import type { Group, PreAuthKey } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
 import { groupName } from "~/components/access/model.ts";
@@ -36,7 +35,8 @@ function shortName(authKey: PreAuthKey): string {
 }
 
 /** Matches the tag mark in the machines table so a tagged key and a tagged machine read alike. */
-const markSize = 13;
+/** Tags a user cell shows before it counts the rest. */
+const maxOwnerTags = 2;
 
 /**
  * Who a key registers machines for. A tagged key has no user at all (tags and users are exclusive,
@@ -60,7 +60,7 @@ export const preAuthKeyColumns = helper.columns([
     id: "user",
     header: "User",
     enableSorting: true,
-    cell: ({ row }) => <UserCell user={row.original.user} />,
+    cell: ({ row }) => <UserCell authKey={row.original} />,
     meta: { className: "hidden min-w-36 sm:table-cell" },
   }),
   // A column of its own for tags was empty on most rows, so they ride along in this cell; the
@@ -131,16 +131,15 @@ function KeyCell({ authKey }: { readonly authKey: PreAuthKey }): ReactElement {
   );
 }
 
-function UserCell({ user }: { readonly user: User | undefined }): ReactElement {
+/**
+ * Who the key registers machines for: the person, or the tags the machines wear. It used to say
+ * "Tagged" while the Options cell beside it listed which tags, so the row said it twice.
+ */
+function UserCell({ authKey }: { readonly authKey: PreAuthKey }): ReactElement {
+  const { user } = authKey;
+
   if (user === undefined) {
-    return (
-      <span className="flex items-center gap-1.5 text-kumo-subtle">
-        <span className="flex h-lh items-center">
-          <TagIcon size={markSize} />
-        </span>
-        Tagged
-      </span>
-    );
+    return <TagList tags={authKey.aclTags} size="sm" max={maxOwnerTags} empty="Tagged" />;
   }
 
   const name = userLabel(user);
@@ -171,7 +170,12 @@ function TypeCell({
           </span>
         ))}
       </span>
-      {authKey.aclTags.length === 0 ? null : <TagList tags={authKey.aclTags} size="sm" />}
+      {authKey.aclTags.length === 0 || authKey.user === undefined ? null : (
+        <Labelled label="Tags">
+          {/* Inline, so the label and the chips share a line the way "Groups Engineering" does. */}
+          <TagList tags={authKey.aclTags} size="sm" className="inline-flex align-middle" />
+        </Labelled>
+      )}
       {authKey.groupIds.length === 0 ? null : (
         <Labelled label="Groups">
           {authKey.groupIds.map((id) => groupName(groups, id)).join(", ")}

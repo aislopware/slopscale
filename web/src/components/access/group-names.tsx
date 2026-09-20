@@ -8,7 +8,7 @@ import { ValueList } from "~/components/ui/value-list.tsx";
 export function GroupNames({
   ids,
   groups,
-  emptyLabel = "—",
+  emptyLabel,
   max,
 }: {
   readonly ids: readonly string[];
@@ -20,7 +20,7 @@ export function GroupNames({
   return (
     <ValueList
       items={ids.map((id) => groupName(groups, id))}
-      empty={emptyLabel}
+      {...(emptyLabel === undefined ? {} : { empty: emptyLabel })}
       {...(max === undefined ? {} : { max })}
     />
   );

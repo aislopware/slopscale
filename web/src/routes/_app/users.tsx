@@ -151,7 +151,7 @@ function UsersPage(): ReactElement {
           <DataTable
             empty={
               total === 0 ? (
-                <FirstUserEmpty me={me} />
+                <FirstUserEmpty />
               ) : (
                 <Empty
                   className={tableEmptyClass}

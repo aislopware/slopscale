@@ -99,23 +99,12 @@ export function BuildingBlocks({
         </Collapsible.Trigger>
         <Collapsible.Panel>
           <FramePanel>
-            <BlockRow
-              label="Groups"
-              names={blocks.groups}
-              empty="No groups yet"
-              onSelect={onSelect}
-            />
-            <BlockRow
-              label="Tags"
-              names={blocks.tags}
-              empty="No tags yet"
-              tags
-              onSelect={onSelect}
-            />
+            <BlockRow label="Groups" names={blocks.groups} empty="None" onSelect={onSelect} />
+            <BlockRow label="Tags" names={blocks.tags} empty="None" tags onSelect={onSelect} />
             <BlockRow
               label="Autogroups"
               names={blocks.autogroups}
-              empty="No autogroups yet"
+              empty="None"
               onSelect={onSelect}
             />
           </FramePanel>

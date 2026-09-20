@@ -9,6 +9,7 @@ import { errorMessage } from "~/api/error.ts";
 import type { Node } from "~/api/queries.ts";
 import { can } from "~/auth/me.ts";
 import type { Me } from "~/auth/me.ts";
+import { statusLabel } from "~/components/machines/status-badge.tsx";
 import { withRouteApproved } from "~/components/networks/model.ts";
 import type { RouteStatus } from "~/components/networks/model.ts";
 import { useNetworkMutations } from "~/components/networks/mutations.ts";
@@ -22,6 +23,7 @@ import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper } from "~/components/table/app-table.tsx";
 import { Badge } from "~/components/ui/badge.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
+import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { Status } from "~/components/ui/status.tsx";
 import { toast } from "~/components/ui/toast.ts";
 import { ValueList } from "~/components/ui/value-list.tsx";
@@ -194,7 +196,7 @@ function MachineLink({
         {nodeName(node)}
       </Link>
       <Status tone={node.online ? "success" : "neutral"} className="text-kumo-subtle">
-        {node.online ? "Online" : "Offline"}
+        {statusLabel(node.online ? "online" : "offline")}
       </Status>
     </span>
   );
@@ -202,9 +204,9 @@ function MachineLink({
 
 function NetworksCell({ row }: { readonly row: RoutesRow }): ReactElement | null {
   if (row.networks.length === 0) {
-    // The group's row already says where the approval comes from; repeating it under each machine
-    // it unfolds into only fills the column.
-    return isRouteGroup(row) ? <span className="text-kumo-subtle">Approved by hand</span> : null;
+    // Only the group's row says so: repeating it under each machine it unfolds into fills the
+    // column with nothing.
+    return isRouteGroup(row) ? <span className="text-kumo-subtle">None</span> : null;
   }
 
   return (
@@ -298,9 +300,30 @@ function withdrawal(advertiser: RouteAdvertiser): {
 }
 
 /**
+ * Why the button is off, or undefined while it works. A greyed control with nothing to explain it
+ * is the page's worst answer: a route a network owns is approved by that network, not here.
+ */
+function approveDisabledReason(
+  me: Me,
+  advertiser: RouteAdvertiser,
+  owned: boolean,
+): string | undefined {
+  if (!can(me, "devices:routes")) {
+    return "Approving routes needs the routes and networks permission";
+  }
+
+  if (owned) {
+    return `Approved by ${advertiser.networks.map((network) => network.name).join(", ")}; disable or edit the network instead`;
+  }
+
+  return undefined;
+}
+
+/**
  * Approve a route, or take the approval back through the machine's route endpoint. Taking it back
- * asks first, because it puts a prefix out of service on a machine this row only names. A route a
- * network owns is approved by the network, so its button is off; disable or edit the network.
+ * asks first, because it puts a prefix out of service on a machine this row only names. The buttons
+ * stay in the row rather than moving into its menu: approving is what an operator opens this page
+ * to do, and a queue whose one action is a click deep reads as a list of problems to admire.
  */
 function ApproveCell({
   advertiser,
@@ -314,6 +337,8 @@ function ApproveCell({
   const approved = advertiser.status !== "pending";
   const owned = advertiser.networks.some((network) => network.enabled);
   const withdraw = withdrawal(advertiser);
+
+  const reason = approveDisabledReason(me, advertiser, owned);
 
   const set = (next: boolean): void => {
     setRoutes.mutate(
@@ -336,21 +361,22 @@ function ApproveCell({
 
   return (
     <>
-      <Button
-        variant={approved ? "ghost" : "secondary"}
-        size="sm"
-        disabled={!can(me, "devices:routes") || owned || setRoutes.isPending}
-        title={owned ? "Approved by its network" : undefined}
-        onClick={() => {
-          if (approved) {
-            setConfirming(true);
-          } else {
-            set(true);
-          }
-        }}
-      >
-        {approved ? withdraw.label : "Approve"}
-      </Button>
+      <DisabledReason reason={reason}>
+        <Button
+          variant={approved ? "ghost" : "secondary"}
+          size="sm"
+          disabled={reason !== undefined || setRoutes.isPending}
+          onClick={() => {
+            if (approved) {
+              setConfirming(true);
+            } else {
+              set(true);
+            }
+          }}
+        >
+          {approved ? withdraw.label : "Approve"}
+        </Button>
+      </DisabledReason>
       {approved ? (
         <ConfirmDialog
           open={confirming}

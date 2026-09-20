@@ -14,8 +14,25 @@ describe(Domain, () => {
 
     expect(token).not.toBeNull();
     expect(token?.textContent).toBe("*.example.com");
-    expect(token?.querySelector(".text-kumo-subtle")?.textContent).toBe("*.");
-    expect(tint(token)).not.toBe("rgba(0, 0, 0, 0)");
+    expect(token?.querySelector(".opacity-60")?.textContent).toBe("*.");
+    expect(token?.querySelector(".rounded-full")).toBeNull();
+  });
+
+  it("tints the token by the registered site, so hosts under one site match", async () => {
+    const view = await render(
+      <>
+        <Domain domain="a.example.com" />
+        <Domain domain="b.example.com" />
+        <Domain domain="c.example.net" />
+      </>,
+    );
+    const shades = ["a.example.com", "b.example.com", "c.example.net"].map((domain) =>
+      tint(view.container.querySelector(`[title="${domain}"]`)),
+    );
+
+    expect(shades[0]).not.toBe("rgba(0, 0, 0, 0)");
+    expect(shades[0]).toBe(shades[1]);
+    expect(shades[0]).not.toBe(shades[2]);
   });
 });
 

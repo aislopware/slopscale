@@ -9,7 +9,7 @@ import type { NodeDialogProps } from "~/components/machines/dialogs.tsx";
 import { ownerId } from "~/components/machines/owner.ts";
 import { DialogContent, DialogError, DialogRoot } from "~/components/ui/dialog.tsx";
 import { toast } from "~/components/ui/toast.ts";
-import { userLabel } from "~/lib/node.ts";
+import { userHint, userLabel } from "~/lib/node.ts";
 
 type ShareDialogProps = NodeDialogProps & { readonly users: readonly User[] };
 
@@ -80,15 +80,14 @@ function ShareForm({
           renderValue={(value) => userName(candidates, value)}
         >
           {candidates.map((user) => {
-            const label = userLabel(user);
-            const secondary = user.email === "" ? user.name : user.email;
+            const hint = userHint(user);
 
             return (
               <Select.Option key={user.id} value={user.id}>
                 <span className="flex flex-col gap-0.5">
-                  <span>{label}</span>
-                  {secondary === label ? null : (
-                    <span className="text-sm text-kumo-subtle">{secondary}</span>
+                  <span>{userLabel(user)}</span>
+                  {hint === undefined ? null : (
+                    <span className="text-sm text-kumo-subtle">{hint}</span>
                   )}
                 </span>
               </Select.Option>

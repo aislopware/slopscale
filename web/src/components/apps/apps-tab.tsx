@@ -79,12 +79,7 @@ export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): Rea
           <DataTable
             empty={
               total === 0 ? (
-                <EmptyApps
-                  canEdit={canEdit}
-                  onCreate={() => {
-                    setCreating(true);
-                  }}
-                />
+                <EmptyApps />
               ) : (
                 <Empty
                   className={tableEmptyClass}
@@ -120,13 +115,7 @@ export function AppsTab({ me, apps, search, onSearchChange }: AppsTabProps): Rea
  * Nothing to list yet, so the panel explains the two halves an app needs: the definition the
  * operator writes here, and the machine that carries the tag and runs the connector.
  */
-function EmptyApps({
-  canEdit,
-  onCreate,
-}: {
-  readonly canEdit: boolean;
-  readonly onCreate: () => void;
-}): ReactElement {
+function EmptyApps(): ReactElement {
   return (
     <Empty
       className={tableEmptyClass}
@@ -143,9 +132,6 @@ function EmptyApps({
               Run <Code>tailscale set --advertise-connector</Code> on it.
             </li>
           </ol>
-          <Button variant="primary" disabled={!canEdit} onClick={onCreate}>
-            New app
-          </Button>
         </div>
       }
     />

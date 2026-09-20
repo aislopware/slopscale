@@ -16,7 +16,7 @@ import { Frame, FramePanel } from "~/components/ui/frame.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
 import { Section, SectionRow } from "~/components/ui/section.tsx";
 import { toast } from "~/components/ui/toast.ts";
-import { nodeName, ownerLabel, userLabel } from "~/lib/node.ts";
+import { nodeName, ownerLabel, userHint, userLabel } from "~/lib/node.ts";
 import { formatDuration, parseTime } from "~/lib/time.ts";
 
 /** Enough to see what is waiting without turning the overview into a list page. */
@@ -146,7 +146,7 @@ export function pendingRows({ nodes, users, requests, groups, meId }: Waiting): 
       id: user.id,
       kind: "user",
       title: userLabel(user),
-      subtitle: user.email === "" ? "No email address" : user.email,
+      subtitle: userHint(user) ?? "No email address",
       createdAt: user.createdAt,
     });
   }

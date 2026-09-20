@@ -35,11 +35,12 @@ export function splitDomain(name: string): { readonly sub: string; readonly site
 }
 
 /**
- * A domain as a name token: the code face on the recessed surface, so a column of domains reads as
- * a column of names rather than a run of text. The registered site leads and its subdomain and a
- * wildcard's `*.` step back, and a dot in a hue seeded by the site keys the family, so a list of
- * hosts under two sites reads as two groups before any name is read. It is not a chip: a domain is
- * a value, not a label, and a tint on the whole would say more than it means.
+ * A domain as a name token in a tint seeded by the registered site, so a list of hosts under two
+ * sites reads as two groups before any name is read. The tint carries the grouping itself: a
+ * coloured dot beside grey text made the token look like a status light, and at 6px the hue it
+ * carried was the one thing on the row too small to compare. The registered site leads, its
+ * subdomain and a wildcard's `*.` step back within the tint, and the code face keeps the token a
+ * value rather than a `Tag`'s label.
  */
 export function Domain({
   domain,
@@ -56,18 +57,14 @@ export function Domain({
     <span
       title={domain}
       className={cn(
-        "inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-md bg-kumo-recessed py-0.5 pr-2 pl-1.5 font-mono text-[0.9em] leading-4 text-kumo-default ring ring-kumo-hairline ring-inset",
+        "inline-flex max-w-full min-w-0 items-center rounded-md px-1.5 py-0.5 font-mono text-[0.9em] leading-4 ring ring-kumo-line ring-inset",
         className,
       )}
+      style={seededColours(site, tagHueSteps)}
     >
-      <span
-        aria-hidden
-        className="size-1.5 shrink-0 rounded-full"
-        style={{ backgroundColor: seededColours(site, tagHueSteps).color }}
-      />
       <span className="truncate">
-        {wild ? <span className="text-kumo-subtle">{wildcard}</span> : null}
-        {sub === "" ? null : <span className="text-kumo-subtle">{sub}</span>}
+        {wild ? <span className="opacity-60">{wildcard}</span> : null}
+        {sub === "" ? null : <span className="opacity-60">{sub}</span>}
         <span className="font-medium">{site}</span>
       </span>
     </span>

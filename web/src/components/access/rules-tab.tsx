@@ -95,17 +95,6 @@ export function RulesTab({
                       ? "The policy file decides who reaches what. A rule adds to it."
                       : "Every machine can reach every other machine. The first enabled rule blocks everything it does not allow."
                   }
-                  contents={
-                    <Button
-                      variant="primary"
-                      disabled={!canEdit}
-                      onClick={() => {
-                        setCreating(true);
-                      }}
-                    >
-                      New rule
-                    </Button>
-                  }
                 />
               ) : (
                 <Empty
@@ -127,7 +116,7 @@ export function RulesTab({
             }
             footer={
               total === 0 ? undefined : (
-                <TableFooter>{`Showing ${shown} of ${countRules(total)} · ${enabled} enabled`}</TableFooter>
+                <TableFooter>{`Showing ${shown} of ${countRules(total)}`}</TableFooter>
               )
             }
           />

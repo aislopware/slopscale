@@ -33,33 +33,17 @@ export function AddUserButton({ me }: { readonly me: Me }): ReactElement {
 }
 
 /**
- * The only empty state that can offer something: there is not a single user yet. The toolbar above
- * already holds the page's primary "Add user", so this one is secondary.
+ * There is not a single user yet. It says where users come from and stops there: the toolbar an
+ * inch above holds "Add user", and a second copy of it inside the empty panel only made the page
+ * ask twice.
  */
-export function FirstUserEmpty({ me }: { readonly me: Me }): ReactElement {
-  const [open, setOpen] = useState(false);
-  const mutations = useUserMutations();
-
+export function FirstUserEmpty(): ReactElement {
   return (
-    <>
-      <Empty
-        className={tableEmptyClass}
-        size="sm"
-        title="No users yet"
-        description="Users appear here after their first sign-in. Add one now to hand out a pre-auth key."
-        contents={
-          <Button
-            variant="secondary"
-            disabled={!can(me, "users")}
-            onClick={() => {
-              setOpen(true);
-            }}
-          >
-            Add user
-          </Button>
-        }
-      />
-      <CreateUserDialog open={open} onOpenChange={setOpen} mutations={mutations} />
-    </>
+    <Empty
+      className={tableEmptyClass}
+      size="sm"
+      title="No users yet"
+      description="Users appear here after their first sign-in, or add one to hand out a pre-auth key."
+    />
   );
 }

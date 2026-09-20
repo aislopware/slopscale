@@ -18,24 +18,38 @@ describe(Badge, () => {
     expect(getComputedStyle(badge).borderRadius).not.toBe("9999px");
   });
 
-  it("tints each tone differently, and the tint is not the page", async () => {
+  it("tints each tone that wants something, and the tint is not the page", async () => {
     const view = await render(
       <>
-        <Badge tone="success">Connected</Badge>
         <Badge tone="warning">Pending</Badge>
         <Badge tone="danger">Expired</Badge>
-        <Badge tone="neutral">Disconnected</Badge>
+        <Badge tone="info">Learned</Badge>
       </>,
     );
     const background = (text: string): string =>
       getComputedStyle(view.getByText(text).element()).backgroundColor;
-    const tints = ["Connected", "Pending", "Expired", "Disconnected"].map((text) =>
-      background(text),
-    );
+    const tints = ["Pending", "Expired", "Learned"].map((text) => background(text));
 
     expect(new Set(tints).size).toBe(tints.length);
     for (const tint of tints) {
       expect(tint).not.toBe("rgba(0, 0, 0, 0)");
     }
+  });
+
+  // A state column earns its width on the tables where nearly every row is fine, so a good or
+  // ordinary state steps back and the rows that want something keep the colour to themselves.
+  it("gives a good state the same quiet surface as an ordinary one", async () => {
+    const view = await render(
+      <>
+        <Badge tone="success">Approved</Badge>
+        <Badge tone="neutral">Disconnected</Badge>
+        <Badge tone="warning">Needs approval</Badge>
+      </>,
+    );
+    const background = (text: string): string =>
+      getComputedStyle(view.getByText(text).element()).backgroundColor;
+
+    expect(background("Approved")).toBe(background("Disconnected"));
+    expect(background("Approved")).not.toBe(background("Needs approval"));
   });
 });

@@ -111,11 +111,6 @@ export function PreAuthPanel({
               size="sm"
               title="No pre-auth keys"
               description="A pre-auth key lets a machine register without anyone signing in on it."
-              contents={
-                <Button variant="secondary" disabled={!can(me, "auth_keys")} onClick={create}>
-                  Create key
-                </Button>
-              }
             />
           }
         />
@@ -177,11 +172,6 @@ export function ApiPanel({
               size="sm"
               title="No API keys"
               description="An API key authenticates scripts and other tools against the v1 API."
-              contents={
-                <Button variant="secondary" onClick={create}>
-                  Create API key
-                </Button>
-              }
             />
           }
         />
@@ -269,28 +259,6 @@ export function OAuthPanel({
               size="sm"
               title="No OAuth clients"
               description="An OAuth client or federated identity lets automation get short-lived v2 API tokens."
-              contents={
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <Button
-                    variant="secondary"
-                    disabled={!canCreate}
-                    onClick={() => {
-                      setCreatingFederated(true);
-                    }}
-                  >
-                    New federated identity
-                  </Button>
-                  <Button
-                    variant="primary"
-                    disabled={!canCreate}
-                    onClick={() => {
-                      setCreatingClient(true);
-                    }}
-                  >
-                    New OAuth client
-                  </Button>
-                </div>
-              }
             />
           }
         />

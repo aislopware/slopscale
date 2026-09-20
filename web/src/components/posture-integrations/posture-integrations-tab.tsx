@@ -80,17 +80,6 @@ export function PostureIntegrationsTab({
                   size="sm"
                   title="No posture integrations yet"
                   description="Connect endpoint security or device management services to check machine attributes in postures."
-                  contents={
-                    <Button
-                      variant="primary"
-                      disabled={!canEdit}
-                      onClick={() => {
-                        setCreating(true);
-                      }}
-                    >
-                      New posture integration
-                    </Button>
-                  }
                 />
               ) : (
                 <Empty

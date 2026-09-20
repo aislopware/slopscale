@@ -48,7 +48,7 @@ export function SplitDnsSection({
   return (
     <Section
       title="Split DNS"
-      description="Domains answered by their own resolvers, such as an internal zone behind a subnet router."
+      description="Every machine in the tailnet resolves these domains through the resolvers you name here."
       bodyClassName="p-0"
       {...(canEdit
         ? {

@@ -69,7 +69,6 @@ export function RoutesTab({
 
   const total = groups.length;
   const shown = table.getRowModel().rows.filter((row) => row.depth === 0).length;
-  const pending = groups.reduce((sum, group) => sum + group.pending, 0);
   const narrowed = search !== "" || routeFilterCount(filters) > 0;
 
   return (
@@ -128,7 +127,7 @@ export function RoutesTab({
             }
             footer={
               total === 0 ? undefined : (
-                <TableFooter>{`Showing ${shown} of ${countRoutes(total)} · ${pending} pending`}</TableFooter>
+                <TableFooter>{`Showing ${shown} of ${countRoutes(total)}`}</TableFooter>
               )
             }
           />
