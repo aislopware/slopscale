@@ -71,7 +71,9 @@ func TestLostDatagramIsResent(t *testing.T) {
 
 	assert.Equal(t, uint16(dns.RcodeSuccess), m.Rcode)
 	assert.Equal(t, int32(2), count.Load())
-	assert.Less(t, time.Since(start), 1500*time.Millisecond)
+	// Answered within the attempt; without the resend the attempt timed
+	// out and the client got SERVFAIL.
+	assert.Less(t, time.Since(start), attemptTimeout)
 }
 
 // TestSlowOnlyUpstreamGetsTheWholeBudget answers after 2.5 s, longer than
