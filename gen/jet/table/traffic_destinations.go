@@ -28,6 +28,7 @@ type trafficDestinationsTable struct {
 	HostSource sqlite.ColumnString
 	Asn        sqlite.ColumnInteger
 	Country    sqlite.ColumnString
+	Private    sqlite.ColumnInteger
 	TxBytes    sqlite.ColumnInteger
 	RxBytes    sqlite.ColumnInteger
 	TxPackets  sqlite.ColumnInteger
@@ -85,14 +86,15 @@ func newTrafficDestinationsTableImpl(schemaName, tableName, alias string) traffi
 		HostSourceColumn = sqlite.StringColumn("host_source")
 		AsnColumn        = sqlite.IntegerColumn("asn")
 		CountryColumn    = sqlite.StringColumn("country")
+		PrivateColumn    = sqlite.IntegerColumn("private")
 		TxBytesColumn    = sqlite.IntegerColumn("tx_bytes")
 		RxBytesColumn    = sqlite.IntegerColumn("rx_bytes")
 		TxPacketsColumn  = sqlite.IntegerColumn("tx_packets")
 		RxPacketsColumn  = sqlite.IntegerColumn("rx_packets")
 		ConnsColumn      = sqlite.IntegerColumn("conns")
-		allColumns       = sqlite.ColumnList{ResolutionColumn, BucketColumn, NodeIDColumn, ReporterIDColumn, DstColumn, PortColumn, ProtoColumn, HostColumn, HostSourceColumn, AsnColumn, CountryColumn, TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn}
-		mutableColumns   = sqlite.ColumnList{HostSourceColumn, AsnColumn, CountryColumn, TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn}
-		defaultColumns   = sqlite.ColumnList{AsnColumn, TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn}
+		allColumns       = sqlite.ColumnList{ResolutionColumn, BucketColumn, NodeIDColumn, ReporterIDColumn, DstColumn, PortColumn, ProtoColumn, HostColumn, HostSourceColumn, AsnColumn, CountryColumn, PrivateColumn, TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn}
+		mutableColumns   = sqlite.ColumnList{HostSourceColumn, AsnColumn, CountryColumn, PrivateColumn, TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn}
+		defaultColumns   = sqlite.ColumnList{AsnColumn, PrivateColumn, TxBytesColumn, RxBytesColumn, TxPacketsColumn, RxPacketsColumn, ConnsColumn}
 	)
 
 	return trafficDestinationsTable{
@@ -110,6 +112,7 @@ func newTrafficDestinationsTableImpl(schemaName, tableName, alias string) traffi
 		HostSource: HostSourceColumn,
 		Asn:        AsnColumn,
 		Country:    CountryColumn,
+		Private:    PrivateColumn,
 		TxBytes:    TxBytesColumn,
 		RxBytes:    RxBytesColumn,
 		TxPackets:  TxPacketsColumn,

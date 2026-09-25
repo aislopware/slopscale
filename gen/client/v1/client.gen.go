@@ -2423,7 +2423,7 @@ type TrafficDestination struct {
 	Nodes int64 `json:"nodes"`
 	Port  int64 `json:"port"`
 
-	// Private A private address, reached through a subnet route.
+	// Private A private address, or a group of only private ones.
 	Private bool `json:"private"`
 
 	// Proto IP protocol number: 6 TCP, 17 UDP.
@@ -2496,14 +2496,16 @@ type TrafficReporter struct {
 	FirstSeenAt time.Time `json:"firstSeenAt"`
 
 	// Instance Changes each time the agent starts.
-	Instance       string    `json:"instance"`
-	LastReportAt   time.Time `json:"lastReportAt"`
-	NodeId         string    `json:"nodeId"`
-	NodeName       string    `json:"nodeName"`
-	Online         bool      `json:"online"`
-	ResolverActive bool      `json:"resolverActive"`
+	Instance           string     `json:"instance"`
+	LastReportAt       time.Time  `json:"lastReportAt"`
+	NodeId             string     `json:"nodeId"`
+	NodeName           string     `json:"nodeName"`
+	Online             bool       `json:"online"`
+	Refused            string     `json:"refused"`
+	ResolverActive     bool       `json:"resolverActive"`
+	ResolverApprovedAt *time.Time `json:"resolverApprovedAt,omitempty"`
 
-	// Stale No report for three minutes.
+	// Stale No report for 90 seconds.
 	Stale        bool  `json:"stale"`
 	Unattributed int64 `json:"unattributed"`
 
@@ -2511,11 +2513,18 @@ type TrafficReporter struct {
 	Version string `json:"version"`
 }
 
+// TrafficReporterPatch defines model for TrafficReporterPatch.
+type TrafficReporterPatch struct {
+	Resolver bool `json:"resolver"`
+}
+
 // TrafficReportersOutputBody defines model for TrafficReportersOutputBody.
 type TrafficReportersOutputBody struct {
-	AsnRanges int64             `json:"asnRanges"`
-	Reporters []TrafficReporter `json:"reporters"`
-	Resolvers []string          `json:"resolvers"`
+	AsnRanges        int64             `json:"asnRanges"`
+	DnsBlocked       string            `json:"dnsBlocked"`
+	Reporters        []TrafficReporter `json:"reporters"`
+	Resolvers        []string          `json:"resolvers"`
+	SkippedUpstreams []string          `json:"skippedUpstreams"`
 }
 
 // TrafficRetention defines model for TrafficRetention.
@@ -3105,6 +3114,9 @@ type UpdateSettingsJSONRequestBody = UpdateSettingsRequestBody
 
 // CreateSSHSessionJSONRequestBody defines body for CreateSSHSession for application/json ContentType.
 type CreateSSHSessionJSONRequestBody = CreateSSHSessionRequestBody
+
+// UpdateTrafficReporterJSONRequestBody defines body for UpdateTrafficReporter for application/json ContentType.
+type UpdateTrafficReporterJSONRequestBody = TrafficReporterPatch
 
 // UpdateTrafficSettingsJSONRequestBody defines body for UpdateTrafficSettings for application/json ContentType.
 type UpdateTrafficSettingsJSONRequestBody = TrafficSettingsPatch
@@ -5093,6 +5105,28 @@ type ClientInterface interface {
 	// Corresponds with DELETE /api/v1/traffic/reporters/{nodeId} (the `DeleteTrafficReporter` operationId).
 	DeleteTrafficReporter(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UpdateTrafficReporterWithBody Approve a gateway resolver
+	//
+	// Lets the tailnet's clients use a gateway's resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies. Needs the dns scope too, since it moves the clients' DNS.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+	UpdateTrafficReporterWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateTrafficReporter Approve a gateway resolver
+	//
+	// Lets the tailnet's clients use a gateway's resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies. Needs the dns scope too, since it moves the clients' DNS.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+	UpdateTrafficReporter(ctx context.Context, nodeId string, body UpdateTrafficReporterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetTrafficSettings Get traffic settings
 	//
 	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -5102,7 +5136,7 @@ type ClientInterface interface {
 
 	// UpdateTrafficSettingsWithBody Update traffic settings
 	//
-	// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points every client at the gateways' resolvers while they report; turning it off points them back.
+	// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points each client at one approved gateway resolver, besides the global nameservers, while the gateway reports; turning it off points them back. Changing DNS logging needs the dns scope too, and turning it on needs a global nameserver the agents can forward to.
 	//
 	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -5113,7 +5147,7 @@ type ClientInterface interface {
 
 	// UpdateTrafficSettings Update traffic settings
 	//
-	// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points every client at the gateways' resolvers while they report; turning it off points them back.
+	// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points each client at one approved gateway resolver, besides the global nameservers, while the gateway reports; turning it off points them back. Changing DNS logging needs the dns scope too, and turning it on needs a global nameserver the agents can forward to.
 	//
 	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -9306,6 +9340,48 @@ func (c *Client) DeleteTrafficReporter(ctx context.Context, nodeId string, reqEd
 	return c.Client.Do(req)
 }
 
+// UpdateTrafficReporterWithBody Approve a gateway resolver
+//
+// Lets the tailnet's clients use a gateway's resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies. Needs the dns scope too, since it moves the clients' DNS.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+func (c *Client) UpdateTrafficReporterWithBody(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTrafficReporterRequestWithBody(c.Server, nodeId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateTrafficReporter Approve a gateway resolver
+//
+// Lets the tailnet's clients use a gateway's resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies. Needs the dns scope too, since it moves the clients' DNS.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+func (c *Client) UpdateTrafficReporter(ctx context.Context, nodeId string, body UpdateTrafficReporterJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTrafficReporterRequest(c.Server, nodeId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetTrafficSettings Get traffic settings
 //
 // Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -9325,7 +9401,7 @@ func (c *Client) GetTrafficSettings(ctx context.Context, reqEditors ...RequestEd
 
 // UpdateTrafficSettingsWithBody Update traffic settings
 //
-// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points every client at the gateways' resolvers while they report; turning it off points them back.
+// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points each client at one approved gateway resolver, besides the global nameservers, while the gateway reports; turning it off points them back. Changing DNS logging needs the dns scope too, and turning it on needs a global nameserver the agents can forward to.
 //
 // Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -9346,7 +9422,7 @@ func (c *Client) UpdateTrafficSettingsWithBody(ctx context.Context, contentType 
 
 // UpdateTrafficSettings Update traffic settings
 //
-// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points every client at the gateways' resolvers while they report; turning it off points them back.
+// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points each client at one approved gateway resolver, besides the global nameservers, while the gateway reports; turning it off points them back. Changing DNS logging needs the dns scope too, and turning it on needs a global nameserver the agents can forward to.
 //
 // Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -15919,6 +15995,53 @@ func NewDeleteTrafficReporterRequest(server string, nodeId string) (*http.Reques
 	return req, nil
 }
 
+// NewUpdateTrafficReporterRequest calls the generic UpdateTrafficReporter builder with application/json body
+func NewUpdateTrafficReporterRequest(server string, nodeId string, body UpdateTrafficReporterJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateTrafficReporterRequestWithBody(server, nodeId, "application/json", bodyReader)
+}
+
+// NewUpdateTrafficReporterRequestWithBody constructs an http.Request for the UpdateTrafficReporter method, with any body, and a specified content type
+func NewUpdateTrafficReporterRequestWithBody(server string, nodeId string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "nodeId", nodeId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uint64"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/traffic/reporters/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetTrafficSettingsRequest constructs an http.Request for the GetTrafficSettings method
 func NewGetTrafficSettingsRequest(server string) (*http.Request, error) {
 	var err error
@@ -18910,6 +19033,28 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with DELETE /api/v1/traffic/reporters/{nodeId} (the `DeleteTrafficReporter` operationId).
 	DeleteTrafficReporterWithResponse(ctx context.Context, nodeId string, reqEditors ...RequestEditorFn) (*DeleteTrafficReporterResponse, error)
 
+	// UpdateTrafficReporterWithBodyWithResponse Approve a gateway resolver
+	//
+	// Lets the tailnet's clients use a gateway's resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies. Needs the dns scope too, since it moves the clients' DNS.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+	UpdateTrafficReporterWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTrafficReporterResponse, error)
+
+	// UpdateTrafficReporterWithResponse Approve a gateway resolver
+	//
+	// Lets the tailnet's clients use a gateway's resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies. Needs the dns scope too, since it moves the clients' DNS.
+	//
+	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+	UpdateTrafficReporterWithResponse(ctx context.Context, nodeId string, body UpdateTrafficReporterJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTrafficReporterResponse, error)
+
 	// GetTrafficSettingsWithResponse Get traffic settings
 	//
 	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -18921,7 +19066,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateTrafficSettingsWithBodyWithResponse Update traffic settings
 	//
-	// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points every client at the gateways' resolvers while they report; turning it off points them back.
+	// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points each client at one approved gateway resolver, besides the global nameservers, while the gateway reports; turning it off points them back. Changing DNS logging needs the dns scope too, and turning it on needs a global nameserver the agents can forward to.
 	//
 	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -18932,7 +19077,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateTrafficSettingsWithResponse Update traffic settings
 	//
-	// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points every client at the gateways' resolvers while they report; turning it off points them back.
+	// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points each client at one approved gateway resolver, besides the global nameservers, while the gateway reports; turning it off points them back. Changing DNS logging needs the dns scope too, and turning it on needs a global nameserver the agents can forward to.
 	//
 	// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -26289,6 +26434,54 @@ func (r DeleteTrafficReporterResponse) ContentType() string {
 	return ""
 }
 
+type UpdateTrafficReporterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TrafficReporter
+	// ApplicationproblemJSONDefault the response for an HTTP default `application/problem+json` response
+	ApplicationproblemJSONDefault *ErrorModel
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateTrafficReporterResponse) GetJSON200() *TrafficReporter {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSONDefault returns the response for an HTTP default `application/problem+json` response
+func (r UpdateTrafficReporterResponse) GetApplicationproblemJSONDefault() *ErrorModel {
+	return r.ApplicationproblemJSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateTrafficReporterResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateTrafficReporterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateTrafficReporterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateTrafficReporterResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetTrafficSettingsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -30605,6 +30798,40 @@ func (c *ClientWithResponses) DeleteTrafficReporterWithResponse(ctx context.Cont
 	return ParseDeleteTrafficReporterResponse(rsp)
 }
 
+// UpdateTrafficReporterWithBodyWithResponse Approve a gateway resolver
+//
+// Lets the tailnet's clients use a gateway's resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies. Needs the dns scope too, since it moves the clients' DNS.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+func (c *ClientWithResponses) UpdateTrafficReporterWithBodyWithResponse(ctx context.Context, nodeId string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTrafficReporterResponse, error) {
+	rsp, err := c.UpdateTrafficReporterWithBody(ctx, nodeId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTrafficReporterResponse(rsp)
+}
+
+// UpdateTrafficReporterWithResponse Approve a gateway resolver
+//
+// Lets the tailnet's clients use a gateway's resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies. Needs the dns scope too, since it moves the clients' DNS.
+//
+// Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/traffic/reporters/{nodeId} (the `UpdateTrafficReporter` operationId).
+func (c *ClientWithResponses) UpdateTrafficReporterWithResponse(ctx context.Context, nodeId string, body UpdateTrafficReporterJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTrafficReporterResponse, error) {
+	rsp, err := c.UpdateTrafficReporter(ctx, nodeId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTrafficReporterResponse(rsp)
+}
+
 // GetTrafficSettingsWithResponse Get traffic settings
 //
 // Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -30622,7 +30849,7 @@ func (c *ClientWithResponses) GetTrafficSettingsWithResponse(ctx context.Context
 
 // UpdateTrafficSettingsWithBodyWithResponse Update traffic settings
 //
-// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points every client at the gateways' resolvers while they report; turning it off points them back.
+// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points each client at one approved gateway resolver, besides the global nameservers, while the gateway reports; turning it off points them back. Changing DNS logging needs the dns scope too, and turning it on needs a global nameserver the agents can forward to.
 //
 // Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -30639,7 +30866,7 @@ func (c *ClientWithResponses) UpdateTrafficSettingsWithBodyWithResponse(ctx cont
 
 // UpdateTrafficSettingsWithResponse Update traffic settings
 //
-// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points every client at the gateways' resolvers while they report; turning it off points them back.
+// Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points each client at one approved gateway resolver, besides the global nameservers, while the gateway reports; turning it off points them back. Changing DNS logging needs the dns scope too, and turning it on needs a global nameserver the agents can forward to.
 //
 // Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -35962,6 +36189,39 @@ func ParseDeleteTrafficReporterResponse(rsp *http.Response) (*DeleteTrafficRepor
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest EmptyOutputBody
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest ErrorModel
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateTrafficReporterResponse parses an HTTP response from a UpdateTrafficReporterWithResponse call
+func ParseUpdateTrafficReporterResponse(rsp *http.Response) (*UpdateTrafficReporterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateTrafficReporterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TrafficReporter
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

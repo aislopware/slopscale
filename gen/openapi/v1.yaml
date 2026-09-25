@@ -3948,7 +3948,7 @@ components:
           format: int64
           type: integer
         private:
-          description: A private address, reached through a subnet route.
+          description: A private address, or a group of only private ones.
           type: boolean
         proto:
           description: "IP protocol number: 6 TCP, 17 UDP."
@@ -4149,10 +4149,15 @@ components:
           type: string
         online:
           type: boolean
+        refused:
+          type: string
         resolverActive:
           type: boolean
+        resolverApprovedAt:
+          format: date-time
+          type: string
         stale:
-          description: No report for three minutes.
+          description: No report for 90 seconds.
           type: boolean
         unattributed:
           format: int64
@@ -4173,8 +4178,17 @@ components:
         - collectors
         - dnsListen
         - resolverActive
+        - refused
         - unattributed
         - dropped
+      type: object
+    TrafficReporterPatch:
+      additionalProperties: false
+      properties:
+        resolver:
+          type: boolean
+      required:
+        - resolver
       type: object
     TrafficReportersOutputBody:
       additionalProperties: false
@@ -4182,6 +4196,8 @@ components:
         asnRanges:
           format: int64
           type: integer
+        dnsBlocked:
+          type: string
         reporters:
           items:
             $ref: "#/components/schemas/TrafficReporter"
@@ -4190,10 +4206,16 @@ components:
           items:
             type: string
           type: array
+        skippedUpstreams:
+          items:
+            type: string
+          type: array
       required:
         - reporters
         - resolvers
         - asnRanges
+        - skippedUpstreams
+        - dnsBlocked
       type: object
     TrafficRetention:
       additionalProperties: false
@@ -9595,6 +9617,45 @@ paths:
         - Traffic
       x-audit-action: traffic.reporter.delete
       x-required-scope: logs:network
+    patch:
+      description: |-
+        Lets the tailnet's clients use a gateway's resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies. Needs the dns scope too, since it moves the clients' DNS.
+
+        Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+      operationId: updateTrafficReporter
+      parameters:
+        - in: path
+          name: nodeId
+          required: true
+          schema:
+            format: uint64
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TrafficReporterPatch"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrafficReporter"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      security:
+        - bearer: []
+      summary: Approve a gateway resolver
+      tags:
+        - Traffic
+      x-audit-action: traffic.reporter.update
+      x-required-scope: logs:network
   /api/v1/traffic/settings:
     get:
       description: Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
@@ -9620,7 +9681,7 @@ paths:
       x-required-scope: logs:network:read
     patch:
       description: |-
-        Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points every client at the gateways' resolvers while they report; turning it off points them back.
+        Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points each client at one approved gateway resolver, besides the global nameservers, while the gateway reports; turning it off points them back. Changing DNS logging needs the dns scope too, and turning it on needs a global nameserver the agents can forward to.
 
         Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
       operationId: updateTrafficSettings

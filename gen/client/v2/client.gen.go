@@ -1244,7 +1244,7 @@ type ClientInterface interface {
 
 	// ListNetworkFlowLogs List network flow logs
 	//
-	// The traffic the gateways' agents reported, one record per gateway and hour, covering whole hours from start to end (at most a week). Destinations folded into a gateway's remainder are left out, and nothing is recorded between two nodes.
+	// The traffic the gateways' agents reported, one record per gateway and hour, covering whole hours from start to end (at most a week). Destinations folded into a gateway's remainder are left out, and nothing is recorded between two nodes. A range holding more than 20000 flows is refused with 400; ask for shorter ranges.
 	//
 	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -2478,7 +2478,7 @@ func (c *Client) SetKey(ctx context.Context, tailnet string, keyId string, body 
 
 // ListNetworkFlowLogs List network flow logs
 //
-// The traffic the gateways' agents reported, one record per gateway and hour, covering whole hours from start to end (at most a week). Destinations folded into a gateway's remainder are left out, and nothing is recorded between two nodes.
+// The traffic the gateways' agents reported, one record per gateway and hour, covering whole hours from start to end (at most a week). Destinations folded into a gateway's remainder are left out, and nothing is recorded between two nodes. A range holding more than 20000 flows is refused with 400; ask for shorter ranges.
 //
 // Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //
@@ -6227,7 +6227,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListNetworkFlowLogsWithResponse List network flow logs
 	//
-	// The traffic the gateways' agents reported, one record per gateway and hour, covering whole hours from start to end (at most a week). Destinations folded into a gateway's remainder are left out, and nothing is recorded between two nodes.
+	// The traffic the gateways' agents reported, one record per gateway and hour, covering whole hours from start to end (at most a week). Destinations folded into a gateway's remainder are left out, and nothing is recorded between two nodes. A range holding more than 20000 flows is refused with 400; ask for shorter ranges.
 	//
 	// Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 	//
@@ -11896,7 +11896,7 @@ func (c *ClientWithResponses) SetKeyWithResponse(ctx context.Context, tailnet st
 
 // ListNetworkFlowLogsWithResponse List network flow logs
 //
-// The traffic the gateways' agents reported, one record per gateway and hour, covering whole hours from start to end (at most a week). Destinations folded into a gateway's remainder are left out, and nothing is recorded between two nodes.
+// The traffic the gateways' agents reported, one record per gateway and hour, covering whole hours from start to end (at most a week). Destinations folded into a gateway's remainder are left out, and nothing is recorded between two nodes. A range holding more than 20000 flows is refused with 400; ask for shorter ranges.
 //
 // Requires the `logs:network:read` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
 //

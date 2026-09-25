@@ -17,16 +17,17 @@ type trafficReportersTable struct {
 	sqlite.Table
 
 	// Columns
-	NodeID       sqlite.ColumnInteger
-	Instance     sqlite.ColumnString
-	LastSeq      sqlite.ColumnInteger
-	Version      sqlite.ColumnString
-	Status       sqlite.ColumnString
-	DNSListen    sqlite.ColumnString
-	FirstSeenAt  sqlite.ColumnTimestamp
-	LastReportAt sqlite.ColumnTimestamp
-	Unattributed sqlite.ColumnInteger
-	Dropped      sqlite.ColumnInteger
+	NodeID             sqlite.ColumnInteger
+	Instance           sqlite.ColumnString
+	LastSeq            sqlite.ColumnInteger
+	Version            sqlite.ColumnString
+	Status             sqlite.ColumnString
+	DNSListen          sqlite.ColumnString
+	FirstSeenAt        sqlite.ColumnTimestamp
+	LastReportAt       sqlite.ColumnTimestamp
+	Unattributed       sqlite.ColumnInteger
+	Dropped            sqlite.ColumnInteger
+	ResolverApprovedAt sqlite.ColumnTimestamp
 
 	AllColumns     sqlite.ColumnList
 	MutableColumns sqlite.ColumnList
@@ -68,35 +69,37 @@ func newTrafficReportersTable(schemaName, tableName, alias string) *TrafficRepor
 
 func newTrafficReportersTableImpl(schemaName, tableName, alias string) trafficReportersTable {
 	var (
-		NodeIDColumn       = sqlite.IntegerColumn("node_id")
-		InstanceColumn     = sqlite.StringColumn("instance")
-		LastSeqColumn      = sqlite.IntegerColumn("last_seq")
-		VersionColumn      = sqlite.StringColumn("version")
-		StatusColumn       = sqlite.StringColumn("status")
-		DNSListenColumn    = sqlite.StringColumn("dns_listen")
-		FirstSeenAtColumn  = sqlite.TimestampColumn("first_seen_at")
-		LastReportAtColumn = sqlite.TimestampColumn("last_report_at")
-		UnattributedColumn = sqlite.IntegerColumn("unattributed")
-		DroppedColumn      = sqlite.IntegerColumn("dropped")
-		allColumns         = sqlite.ColumnList{NodeIDColumn, InstanceColumn, LastSeqColumn, VersionColumn, StatusColumn, DNSListenColumn, FirstSeenAtColumn, LastReportAtColumn, UnattributedColumn, DroppedColumn}
-		mutableColumns     = sqlite.ColumnList{InstanceColumn, LastSeqColumn, VersionColumn, StatusColumn, DNSListenColumn, FirstSeenAtColumn, LastReportAtColumn, UnattributedColumn, DroppedColumn}
-		defaultColumns     = sqlite.ColumnList{LastSeqColumn, UnattributedColumn, DroppedColumn}
+		NodeIDColumn             = sqlite.IntegerColumn("node_id")
+		InstanceColumn           = sqlite.StringColumn("instance")
+		LastSeqColumn            = sqlite.IntegerColumn("last_seq")
+		VersionColumn            = sqlite.StringColumn("version")
+		StatusColumn             = sqlite.StringColumn("status")
+		DNSListenColumn          = sqlite.StringColumn("dns_listen")
+		FirstSeenAtColumn        = sqlite.TimestampColumn("first_seen_at")
+		LastReportAtColumn       = sqlite.TimestampColumn("last_report_at")
+		UnattributedColumn       = sqlite.IntegerColumn("unattributed")
+		DroppedColumn            = sqlite.IntegerColumn("dropped")
+		ResolverApprovedAtColumn = sqlite.TimestampColumn("resolver_approved_at")
+		allColumns               = sqlite.ColumnList{NodeIDColumn, InstanceColumn, LastSeqColumn, VersionColumn, StatusColumn, DNSListenColumn, FirstSeenAtColumn, LastReportAtColumn, UnattributedColumn, DroppedColumn, ResolverApprovedAtColumn}
+		mutableColumns           = sqlite.ColumnList{InstanceColumn, LastSeqColumn, VersionColumn, StatusColumn, DNSListenColumn, FirstSeenAtColumn, LastReportAtColumn, UnattributedColumn, DroppedColumn, ResolverApprovedAtColumn}
+		defaultColumns           = sqlite.ColumnList{LastSeqColumn, UnattributedColumn, DroppedColumn}
 	)
 
 	return trafficReportersTable{
 		Table: sqlite.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		NodeID:       NodeIDColumn,
-		Instance:     InstanceColumn,
-		LastSeq:      LastSeqColumn,
-		Version:      VersionColumn,
-		Status:       StatusColumn,
-		DNSListen:    DNSListenColumn,
-		FirstSeenAt:  FirstSeenAtColumn,
-		LastReportAt: LastReportAtColumn,
-		Unattributed: UnattributedColumn,
-		Dropped:      DroppedColumn,
+		NodeID:             NodeIDColumn,
+		Instance:           InstanceColumn,
+		LastSeq:            LastSeqColumn,
+		Version:            VersionColumn,
+		Status:             StatusColumn,
+		DNSListen:          DNSListenColumn,
+		FirstSeenAt:        FirstSeenAtColumn,
+		LastReportAt:       LastReportAtColumn,
+		Unattributed:       UnattributedColumn,
+		Dropped:            DroppedColumn,
+		ResolverApprovedAt: ResolverApprovedAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

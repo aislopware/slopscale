@@ -45,6 +45,7 @@ func UseSchema(schema string) {
 	TkaAums = TkaAums.FromSchema(schema)
 	TrafficDestinations = TrafficDestinations.FromSchema(schema)
 	TrafficDNS = TrafficDNS.FromSchema(schema)
+	TrafficInstances = TrafficInstances.FromSchema(schema)
 	TrafficReporters = TrafficReporters.FromSchema(schema)
 	TrafficTotals = TrafficTotals.FromSchema(schema)
 	UserInvites = UserInvites.FromSchema(schema)

@@ -2338,7 +2338,13 @@ export interface paths {
         delete: operations["deleteTrafficReporter"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Approve a gateway resolver
+         * @description Lets the tailnet's clients use a gateway's resolver, or stops them. An approved resolver is used while DNS logging is on, the gateway reports it working and still qualifies. Needs the dns scope too, since it moves the clients' DNS.
+         *
+         *     Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
+         */
+        patch: operations["updateTrafficReporter"];
         trace?: never;
     };
     "/api/v1/traffic/settings": {
@@ -2360,7 +2366,7 @@ export interface paths {
         head?: never;
         /**
          * Update traffic settings
-         * @description Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points every client at the gateways' resolvers while they report; turning it off points them back.
+         * @description Changes the settings named. The agents take the collector switches with their next report. Turning DNS logging on points each client at one approved gateway resolver, besides the global nameservers, while the gateway reports; turning it off points them back. Changing DNS logging needs the dns scope too, and turning it on needs a global nameserver the agents can forward to.
          *
          *     Requires the `logs:network` scope (granted by an OAuth token's scopes or the API key owner's role; a legacy API key without a user is all-access).
          */
@@ -4398,7 +4404,7 @@ export interface components {
             nodes: number;
             /** Format: int64 */
             port: number;
-            /** @description A private address, reached through a subnet route. */
+            /** @description A private address, or a group of only private ones. */
             private: boolean;
             /**
              * Format: int64
@@ -4512,19 +4518,27 @@ export interface components {
             nodeId: string;
             nodeName: string;
             online: boolean;
+            refused: string;
             resolverActive: boolean;
-            /** @description No report for three minutes. */
+            /** Format: date-time */
+            resolverApprovedAt?: string;
+            /** @description No report for 90 seconds. */
             stale: boolean;
             /** Format: int64 */
             unattributed: number;
             /** @description The agent's version. */
             version: string;
         };
+        TrafficReporterPatch: {
+            resolver: boolean;
+        };
         TrafficReportersOutputBody: {
             /** Format: int64 */
             asnRanges: number;
+            dnsBlocked: string;
             reporters: components["schemas"]["TrafficReporter"][];
             resolvers: string[];
+            skippedUpstreams: string[];
         };
         TrafficRetention: {
             /**
@@ -4915,6 +4929,7 @@ export type TrafficName = components['schemas']['TrafficName'];
 export type TrafficNode = components['schemas']['TrafficNode'];
 export type TrafficPoint = components['schemas']['TrafficPoint'];
 export type TrafficReporter = components['schemas']['TrafficReporter'];
+export type TrafficReporterPatch = components['schemas']['TrafficReporterPatch'];
 export type TrafficReportersOutputBody = components['schemas']['TrafficReportersOutputBody'];
 export type TrafficRetention = components['schemas']['TrafficRetention'];
 export type TrafficRetentionPatch = components['schemas']['TrafficRetentionPatch'];
@@ -9701,6 +9716,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmptyOutputBody"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    updateTrafficReporter: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                nodeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrafficReporterPatch"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrafficReporter"];
                 };
             };
             /** @description Error */
