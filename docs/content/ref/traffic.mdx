@@ -13,9 +13,8 @@ attributes them to machines, names the destinations and keeps them for the
 It only sees traffic that crosses a gateway running the agent. A laptop that
 reaches the internet directly, without an exit node, sends nothing the
 agent can count, and traffic between two machines on the tailnet never
-reaches a gateway. With [DNS logging](#dns-logging) on, the monitor still
-records the names such a machine looks up, as long as the machine uses the
-tailnet's DNS.
+reaches a gateway. [DNS logging](#dns-logging) covers only machines while
+they use a gateway as their exit node, so it adds nothing for these.
 :::
 
 ## How it works
@@ -47,8 +46,9 @@ it saw, preferring the most specific source:
    ClientHello over TCP, on any port, and from the QUIC Initial over UDP
    that the machine sends through the gateway. A filter in the kernel hands
    it those packets and nothing else from the tailnet interface.
-2. **The same machine's DNS answer.** With [DNS logging](#dns-logging) on,
-   a name the machine resolved to the destination in the last few minutes.
+2. **The same machine's DNS answer.** With [DNS logging](#dns-logging) on
+   and the machine using the gateway as its exit node, a name it resolved to
+   the destination in the last few minutes.
    The name is the one the machine asked for, not the end of a CNAME chain.
 3. **The app connector.** On an [app connector](/ref/apps), the connector
    domain that resolved to the destination.
@@ -56,8 +56,8 @@ it saw, preferring the most specific source:
    Encrypted Client Hello hides the real name behind a public one such as
    `cloudflare-ech.com`; the agent records that only when nothing better is
    known.
-5. **Another machine's DNS answer.** A name some other machine resolved to
-   the same address. It is usually right for an address that serves one
+5. **Another machine's DNS answer.** A name some other machine using the
+   gateway as its exit node resolved to the same address. It is usually right for an address that serves one
    site, and a guess for a CDN.
 
 The server also looks up each destination's network, its AS number and
@@ -189,17 +189,15 @@ unattributed on the gateway and not stored.
 
 ## DNS logging
 
-DNS logging is off by default, because it changes every client's DNS.
-Turning it on needs the `dns` scope as well as `logs:network`, and at least
-one global nameserver on the [DNS page](/ref/dns) that the agents can
-forward to: an IP address, an address with a port, or an `https://` URL,
-outside the tailnet. The server refuses to turn it on without one, with
-`400`.
+DNS logging is off by default. It only ever covers machines while they use
+a gateway as their exit node: a machine that uses no exit node, or another
+one, keeps its DNS exactly as configured and is never logged. Turning it on
+needs the `dns` scope as well as `logs:network`.
 
 When it is on, the agent on each gateway runs a resolver on the gateway's
 tailnet addresses, port 53 over UDP and TCP. The server uses a gateway's
 resolver only once an operator approves it, since it will see the names
-every client it serves looks up:
+the gateway's exit node users look up:
 
 ```console
 $ slopscale traffic reporters resolver --identifier 12
@@ -208,65 +206,69 @@ $ slopscale traffic reporters resolver --identifier 12 --approve=false
 
 or `PATCH /api/v1/traffic/reporters/{nodeId}` with `{"resolver": true}`,
 which also needs the `dns` scope. The approval is written to the
-[audit log](/ref/audit), and so is every change of the resolvers the
-clients are pointed at.
+[audit log](/ref/audit), and so is every change of the resolvers in use.
 
-Each client is pointed at one approved gateway's resolver, on the
-gateway's IPv4 address when it answers there. The server picks it by
-hashing the client with each gateway, so the clients spread evenly over the
-gateways, and a gateway that joins or leaves moves only the clients it
-takes or held. The client's DNS then is:
+A client reports the exit node it uses to the server (Tailscale 1.86,
+capability version 122, and later). While that exit node is a gateway
+whose resolver is approved and answering, the server gives that client, and
+only that client, this DNS:
 
-- The gateway's resolver first, followed by the global nameservers you
-  configured on the [DNS page](/ref/dns).
-- **Override local DNS** on. This replaces the client's local DNS: the
-  resolvers of its own network, such as the office router or a VPN's, are
-  no longer asked, only the tailnet's. Without it a client asks the
-  global nameservers only when its own resolver fails, and the log would
-  miss most questions. Split DNS routes you configured stay.
-- Every one of them marked **use with exit node**, so a client that uses
-  an exit node keeps asking them rather than the exit node. The client
-  races them and takes the first answer, so when the
-  gateway's resolver goes away the client still resolves through the
-  global nameservers. Older clients that ignore the mark send their DNS to
-  the exit node, and those names are not logged.
-- A grant opens UDP and TCP port 53 on the approved gateways to every
-  machine, so the policy cannot leave the clients without DNS.
-- A gateway that runs a resolver is never pointed at a gateway resolver,
-  its own or another's, and gets the configured DNS.
+- The gateway's resolver, on its IPv4 address when it answers there.
+- Then the gateway's own exit node resolver, the DNS-over-HTTP endpoint of
+  its peer API, which the client would use without the monitor. The client
+  asks the resolvers in parallel, so it keeps resolving if the agent stops.
+- Then the global nameservers you marked **use with exit node** on the
+  [DNS page](/ref/dns), if **override local DNS** is on.
+- Every one of them marked **use with exit node**, so the client keeps
+  them while it uses the exit node. Split DNS routes you configured stay.
+- A grant opens UDP and TCP port 53 on the approved gateways, so the
+  policy cannot leave these clients without DNS.
+
+When the client switches the exit node off or to another gateway, it gets
+the tailnet's DNS or the other gateway's resolver with its next map
+update, within a second. A client older than Tailscale 1.86 does not say
+which exit node it uses, so it is never pointed at a gateway resolver and
+never logged.
+
+The agent answers any tailnet address that asks it, but records questions,
+and remembers answers to name flows with, only for the machines the server
+lists as using its gateway as their exit node right now. The server sends
+that list with the answer to every report, so a machine that picks the
+gateway is recorded from the agent's next report on, within a minute, and
+one that drops it is recorded no more after the same delay; its DNS has
+left the gateway by then. The agent never saves the list, and records
+nobody after a restart until the server names them again.
 
 None of this is stored in the DNS settings. Saving the DNS page never
 writes the gateways' resolvers, and turning DNS logging off gives the
-clients the configured DNS back.
+exit node users the configured DNS back.
 
-The resolver forwards every question unchanged to the tailnet's global
-nameservers that are plain addresses or DNS-over-HTTPS URLs, skipping
-tailnet addresses and `tls://` ones; `slopscale traffic reporters list`
-names the ones it skips. With none left, it forwards to the
-gateway's own upstream resolvers, read from
-`/run/systemd/resolve/resolv.conf` or else `/etc/resolv.conf`, skipping the
-systemd stub `127.0.0.53`. It answers only tailnet addresses, refuses
-everyone else, and limits each machine to 100 questions a second.
+The resolver forwards every question unchanged to the global nameservers
+marked **use with exit node**, when **override local DNS** is on and they
+are plain addresses or DNS-over-HTTPS URLs, skipping tailnet addresses and
+`tls://` ones; `slopscale traffic reporters list` names the ones it skips.
+Otherwise it forwards to the gateway's own upstream resolvers, which is
+where the gateway sends its exit node users' DNS without the monitor,
+read from `/run/systemd/resolve/resolv.conf` or else `/etc/resolv.conf`,
+skipping the systemd stub `127.0.0.53`. It answers only tailnet addresses,
+refuses everyone else, and limits each machine to 100 questions a second.
 
-A gateway's resolver leaves the clients' DNS:
+A gateway's resolver leaves its exit node users' DNS:
 
 - at once, when the agent reports an error in it, when the gateway stops
   qualifying (its routes or tags change, it is suspended, expires or loses
   its approval, or it is deleted), when you withdraw the approval or
-  remove the gateway with `slopscale traffic reporters delete`, when
-  DNS logging is turned off, or when a change on the DNS page leaves no
-  global nameserver the agents can forward to;
+  remove the gateway with `slopscale traffic reporters delete`, or when
+  DNS logging is turned off;
 - within 15 seconds of the gateway's last report turning 90 seconds old,
   or of the gateway going offline. A server that has just started counts
   its start as every gateway's last report, and waits those 90 seconds
-  before it looks at who is online, so a restart does not move every
-  client's DNS.
+  before it looks at who is online, so a restart does not move anyone's
+  DNS.
 
 The server keeps the names each machine asks for per hour and per day,
 with the number of questions and how many got NXDOMAIN, SERVFAIL, REFUSED
-or no answer at all. The answers also [name destinations](#naming-destinations),
-and the monitor sees the names a machine looks up even when its traffic
-does not cross a gateway.
+or no answer at all. The answers also [name destinations](#naming-destinations).
 
 ```console
 $ slopscale traffic settings set --dns-logging
@@ -352,9 +354,9 @@ latter being the gateway's node ID. `destinations` groups by `destination`, `hos
 | `GET /api/v1/traffic/summary`                | `logs:network:read` | The total, a series with a point per bucket, the top machines, and each gateway's volume |
 | `GET /api/v1/traffic/destinations`           | `logs:network:read` | Destinations grouped by `groupBy`, with host, network, country and whether the address, or every address of the group, is private; private addresses have no network and group apart |
 | `GET /api/v1/traffic/dns`                    | `logs:network:read` | The names asked, by name or by machine                                  |
-| `GET /api/v1/traffic/reporters`              | `logs:network:read` | Each gateway's agent: version, last report, collectors and their errors, why it is refused, resolver approval and state, unattributed and dropped counts; the resolvers in use, the global nameservers the resolvers skip, and why DNS logging points nobody anywhere |
+| `GET /api/v1/traffic/reporters`              | `logs:network:read` | Each gateway's agent: version, last report, collectors and their errors, why it is refused, resolver approval and state, unattributed and dropped counts; the resolvers in use and the exit node nameservers the resolvers skip |
 | `PATCH /api/v1/traffic/reporters/{nodeId}`   | `logs:network` and `dns` | Approves the gateway's resolver, `{"resolver": true}`, or withdraws the approval |
-| `DELETE /api/v1/traffic/reporters/{nodeId}`  | `logs:network`      | Forgets a gateway, and its resolver approval, and takes its resolver out of the clients' DNS; what it reported stays |
+| `DELETE /api/v1/traffic/reporters/{nodeId}`  | `logs:network`      | Forgets a gateway, and its resolver approval, and takes its resolver out of its exit node users' DNS; what it reported stays |
 | `GET /api/v1/traffic/settings`               | `logs:network:read` | The settings                                                            |
 | `PATCH /api/v1/traffic/settings`             | `logs:network`      | Changes the fields sent; changing `dnsLogging` also needs `dns`         |
 
@@ -388,8 +390,9 @@ ranges. It needs `logs:network:read`. Network flow logs are not
 ## Privacy
 
 The monitor records which machine, and so which person, reached which
-site, when and how much, and with DNS logging on every name they looked up.
-Treat it as the sensitive record it is:
+site, when and how much, and with DNS logging on the names they looked up
+while they used a gateway as their exit node. Treat it as the sensitive
+record it is:
 
 - Tell the people on the tailnet that it runs, and check what your
   jurisdiction and your agreements require before turning it on.
@@ -398,6 +401,12 @@ Treat it as the sensitive record it is:
 - Keep the retention as short as your needs allow. A machine's traffic is
   deleted with the machine, and deleting a gateway deletes everything it
   reported, every machine's traffic through it included.
+- DNS logging never covers a machine that uses no exit node, one that uses
+  an exit node that is not an approved gateway, or one on Tailscale older
+  than 1.86. A machine is logged only between picking the gateway as its
+  exit node and switching it off, give or take the agent's report
+  interval of a minute; the agent learns the list with each report and
+  never records anyone else, whoever asks its resolver.
 - Turn off handshake reading with `slopscale traffic settings set --sni=false`
   if destination addresses and networks are enough.
 
@@ -411,10 +420,11 @@ journal, `journalctl -u slopscale-flowd`.
   exit node or subnet router with approved routes or an app connector an
   app selects, or it waits for approval, is suspended or has expired. The
   reason is in the agent's log and in `slopscale traffic reporters list`.
-- **DNS logging is on but no client uses a gateway's resolver.** Approve
-  the resolver with `slopscale traffic reporters resolver`. The reporters
-  list also says when the tailnet has no global nameserver the resolvers
-  can forward to.
+- **DNS logging is on but no lookups are logged.** Approve the resolver
+  with `slopscale traffic reporters resolver`, and check that the machine
+  uses that gateway as its exit node and runs Tailscale 1.86 or later.
+  Lookups show from the agent's next report after the machine picks the
+  exit node.
 - **Connection tracking fails with a message about `nf_conntrack`.** The
   kernel module is not loaded, usually because no masquerade rule exists
   yet. It loads once `tailscaled` sets up an exit node or subnet route.
@@ -424,8 +434,9 @@ journal, `journalctl -u slopscale-flowd`.
 - **A long download is missing right after installing.** It started before
   the agent turned on accounting. Its next connection is counted.
 - **Names are missing or show `cloudflare-ech.com`.** The site uses
-  Encrypted Client Hello. Turn on [DNS logging](#dns-logging) to name it
-  from the question the machine asked.
+  Encrypted Client Hello. With [DNS logging](#dns-logging) on, a machine
+  using the gateway as its exit node gets it named from the question it
+  asked.
 - **Dropped is not zero.** The server was out of reach longer than the
   spool holds. Raise `--spool-size`.
 - **Unattributed is not zero.** Flows came from addresses no machine holds
