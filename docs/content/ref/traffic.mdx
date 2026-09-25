@@ -79,9 +79,12 @@ dependencies. The gateway must:
 - run `tailscaled` in its default kernel networking mode. With
   `--tun=userspace-networking` the gateway proxies connections from its own
   sockets, so the connection table never shows the machines' addresses.
+- be [tagged](/ref/tags). Any user can advertise routes or an app connector
+  on their own device, while tags are the operator's to hand out, so only a
+  tagged node may report other machines' traffic.
 - be an exit node or subnet router with approved routes, or an app
-  connector. Any other node is refused, since no other node sees another
-  machine's traffic.
+  connector that a configured [app](/ref/apps) selects. Any other node is
+  refused, since no other node sees another machine's traffic.
 - be approved, not suspended and not expired.
 
 Install the Debian package from the [release](https://github.com/aislopware/slopscale/releases) that matches your
@@ -155,42 +158,82 @@ stops it; `apt purge` also deletes the spool.
 ## Which gateways may report
 
 The report endpoint, `POST /traffic/v1/report`, takes the identity token as
-a bearer credential. The server answers:
+a bearer credential. The server checks it before it reads a byte of the
+body, so a caller without a gateway's token costs it nothing but the check.
+It answers:
 
 - `401` when the token is missing, forged, expired, meant for another
   audience or issued to a node key the node no longer has. The agent
   fetches a new token and tries once more, then waits five minutes.
-- `403` when the node may not report: it waits for approval, is suspended,
-  has expired, or is no exit node, subnet router or app connector. The
-  agent keeps spooling and tries again every five minutes.
+- `403` when the node may not report: it is not tagged, waits for approval,
+  is suspended, has expired, or is no exit node, subnet router or app
+  connector an app selects. The reason is in the answer. The agent keeps
+  spooling and tries again every five minutes.
+- `429` with `Retry-After: 5` when four reports are already being applied.
+  The agent keeps the report and sends it again.
 - `400` for a report that breaks the format, for instance a minute in the
   future because the gateway's clock runs more than five minutes ahead;
-  the agent drops that report. `413` for more than 50,000 flows or
-  questions, or more than 16 MiB decoded.
+  the agent drops that report. `413` for more than 20,000 flows or 20,000
+  questions, or a body of more than 4 MiB after decompression. The server
+  stops reading at the first entry or byte past the bound.
 
-The server does not store a flow from an address no machine holds any
-more, for instance a machine removed since. It counts it as unattributed on
-the gateway instead.
+The server applies a report in transactions of at most 2,000 rows, so a
+large one never holds the database for long, and a report interrupted
+half way is finished, not counted twice, when the agent sends it again.
+
+A gateway can only carry traffic for machines that can reach it, so the
+server attributes a flow or a question only to the gateway itself or a
+machine that is its peer. Anything else, from an address no machine holds
+or from a machine that cannot reach the gateway, is counted as
+unattributed on the gateway and not stored.
 
 ## DNS logging
 
-DNS logging is off by default, because it changes every client's DNS. When
-it is on, the agent on each gateway runs a resolver on the gateway's
-tailnet addresses, port 53 over UDP and TCP, and the server points the
-clients at the ones that answer:
+DNS logging is off by default, because it changes every client's DNS.
+Turning it on needs the `dns` scope as well as `logs:network`, and at least
+one global nameserver on the [DNS page](/ref/dns) that the agents can
+forward to: an IP address, an address with a port, or an `https://` URL,
+outside the tailnet. The server refuses to turn it on without one, with
+`400`.
 
-- The gateways' resolvers are put first among the global nameservers,
-  ahead of the ones you configured on the [DNS page](/ref/dns).
-- **Override local DNS** is turned on, since without it a client asks the
-  global nameservers only when its own resolver fails.
-- The resolvers are marked **use with exit node**, so a client that uses an
-  exit node keeps asking them rather than the exit node. Older clients that
-  ignore the mark send their DNS to the exit node, and those names are not
-  logged.
-- A grant opens UDP and TCP port 53 on those gateways to every machine, so
-  the policy cannot leave the clients without DNS.
-- A gateway that runs a resolver gets the tailnet DNS without its own
-  resolver, so it cannot ask itself.
+When it is on, the agent on each gateway runs a resolver on the gateway's
+tailnet addresses, port 53 over UDP and TCP. The server uses a gateway's
+resolver only once an operator approves it, since it will see the names
+every client it serves looks up:
+
+```console
+$ slopscale traffic reporters resolver --identifier 12
+$ slopscale traffic reporters resolver --identifier 12 --approve=false
+```
+
+or `PATCH /api/v1/traffic/reporters/{nodeId}` with `{"resolver": true}`,
+which also needs the `dns` scope. The approval is written to the
+[audit log](/ref/audit), and so is every change of the resolvers the
+clients are pointed at.
+
+Each client is pointed at one approved gateway's resolver, on the
+gateway's IPv4 address when it answers there. The server picks it by
+hashing the client with each gateway, so the clients spread evenly over the
+gateways, and a gateway that joins or leaves moves only the clients it
+takes or held. The client's DNS then is:
+
+- The gateway's resolver first, followed by the global nameservers you
+  configured on the [DNS page](/ref/dns).
+- **Override local DNS** on. This replaces the client's local DNS: the
+  resolvers of its own network, such as the office router or a VPN's, are
+  no longer asked, only the tailnet's. Without it a client asks the
+  global nameservers only when its own resolver fails, and the log would
+  miss most questions. Split DNS routes you configured stay.
+- Every one of them marked **use with exit node**, so a client that uses
+  an exit node keeps asking them rather than the exit node. The client
+  races them and takes the first answer, so when the
+  gateway's resolver goes away the client still resolves through the
+  global nameservers. Older clients that ignore the mark send their DNS to
+  the exit node, and those names are not logged.
+- A grant opens UDP and TCP port 53 on the approved gateways to every
+  machine, so the policy cannot leave the clients without DNS.
+- A gateway that runs a resolver is never pointed at a gateway resolver,
+  its own or another's, and gets the configured DNS.
 
 None of this is stored in the DNS settings. Saving the DNS page never
 writes the gateways' resolvers, and turning DNS logging off gives the
@@ -198,18 +241,25 @@ clients the configured DNS back.
 
 The resolver forwards every question unchanged to the tailnet's global
 nameservers that are plain addresses or DNS-over-HTTPS URLs, skipping
-tailnet addresses and `tls://` ones. With none left, it forwards to the
+tailnet addresses and `tls://` ones; `slopscale traffic reporters list`
+names the ones it skips. With none left, it forwards to the
 gateway's own upstream resolvers, read from
 `/run/systemd/resolve/resolv.conf` or else `/etc/resolv.conf`, skipping the
 systemd stub `127.0.0.53`. It answers only tailnet addresses, refuses
 everyone else, and limits each machine to 100 questions a second.
 
-A gateway's resolver leaves the clients' DNS when the agent reports an
-error in it, when the gateway has not reported for three minutes, checked
-every minute, when you remove the gateway with
-`slopscale traffic reporters delete`, or when DNS logging is turned off. A
-client lists every fresh gateway, so one gateway going down leaves the
-others answering.
+A gateway's resolver leaves the clients' DNS:
+
+- at once, when the agent reports an error in it, when the gateway stops
+  qualifying (its routes or tags change, it is suspended, expires or loses
+  its approval, or it is deleted), when you withdraw the approval or
+  remove the gateway with `slopscale traffic reporters delete`, or when
+  DNS logging is turned off;
+- within 15 seconds of the gateway's last report turning 90 seconds old,
+  or of the gateway going offline. A server that has just started counts
+  its start as every gateway's last report, and waits those 90 seconds
+  before it looks at who is online, so a restart does not move every
+  client's DNS.
 
 The server keeps the names each machine asks for per hour and per day,
 with the number of questions and how many got NXDOMAIN, SERVFAIL, REFUSED
@@ -233,13 +283,17 @@ and DNS names per hour and per day. How long each is kept is a setting:
 | Hour       | 14 days   | 1 to 90 days   | Totals, destinations and DNS names    |
 | Day        | 180 days  | 1 day to 10 years | Totals, destinations and DNS names    |
 
-A finer resolution cannot be kept longer than a coarser one. An hourly job
-deletes what the retention no longer keeps, and folds each machine's
-destinations and names beyond the largest 500 per hour and 1,000 per day,
-per gateway, into one remainder row, so a machine that talks to thousands
-of addresses cannot fill the database. A read picks the finest resolution
-that still covers its range, with at most 1,500 points; destinations and
-names are hourly at the finest.
+A finer resolution cannot be kept longer than a coarser one. A job that
+runs when the server starts and then every hour deletes what the retention
+no longer keeps, about 5,000 rows per transaction, and folds each
+machine's destinations and names beyond the largest 500 per hour and 1,000
+per day, per gateway, into one remainder row, so a machine that talks to
+thousands of addresses cannot fill the database. It remembers how far it
+has folded, so every closed hour and day is folded once, also after the
+server was down, and again when a late report adds to it. A read picks the
+finest resolution that still covers its range, with at most 1,500 points
+at any resolution, so a range longer than 1,500 days is refused;
+destinations and names are hourly at the finest.
 
 ```console
 $ slopscale traffic settings set --minute-hours 72 --hour-days 30 --day-days 365
@@ -249,10 +303,13 @@ $ slopscale traffic settings set --minute-hours 72 --hour-days 30 --day-days 365
 
 The server names each destination's network and country from
 [iptoasn.com](https://iptoasn.com)'s table, which is in the public domain.
-It downloads the table daily through the
-[outbound request rules](/ref/configuration#settings-that-live-only-in-the-file),
-keeps the last good copy so a restart has names before the next download,
-and keeps the table in use when a download fails. The configuration file
+It loads the table only once a gateway has reported, since it holds about
+20 MiB in memory, and downloads it again through the
+[outbound request rules](/ref/configuration#settings-that-live-only-in-the-file)
+when the cached copy is a day old, asking only for a newer one. It keeps
+the last good copy so a restart has names before the next download, and
+keeps the table in use when a download fails, trying again 15 minutes
+later. The configuration file
 holds the two keys:
 
 ```yaml
@@ -289,16 +346,18 @@ latter being the gateway's node ID. `destinations` groups by `destination`, `hos
 | Operation                                    | Scope               | Returns                                                                 |
 | -------------------------------------------- | ------------------- | ----------------------------------------------------------------------- |
 | `GET /api/v1/traffic/summary`                | `logs:network:read` | The total, a series with a point per bucket, the top machines, and each gateway's volume |
-| `GET /api/v1/traffic/destinations`           | `logs:network:read` | Destinations grouped by `groupBy`, with host, network, country and whether the address is private |
+| `GET /api/v1/traffic/destinations`           | `logs:network:read` | Destinations grouped by `groupBy`, with host, network, country and whether the address, or every address of the group, is private; private addresses have no network and group apart |
 | `GET /api/v1/traffic/dns`                    | `logs:network:read` | The names asked, by name or by machine                                  |
-| `GET /api/v1/traffic/reporters`              | `logs:network:read` | Each gateway's agent: version, last report, collectors and their errors, resolver state, unattributed and dropped counts |
-| `DELETE /api/v1/traffic/reporters/{nodeId}`  | `logs:network`      | Forgets a gateway and takes its resolver out of the clients' DNS; what it reported stays |
+| `GET /api/v1/traffic/reporters`              | `logs:network:read` | Each gateway's agent: version, last report, collectors and their errors, why it is refused, resolver approval and state, unattributed and dropped counts; the resolvers in use, the global nameservers the resolvers skip, and why DNS logging points nobody anywhere |
+| `PATCH /api/v1/traffic/reporters/{nodeId}`   | `logs:network` and `dns` | Approves the gateway's resolver, `{"resolver": true}`, or withdraws the approval |
+| `DELETE /api/v1/traffic/reporters/{nodeId}`  | `logs:network`      | Forgets a gateway, and its resolver approval, and takes its resolver out of the clients' DNS; what it reported stays |
 | `GET /api/v1/traffic/settings`               | `logs:network:read` | The settings                                                            |
-| `PATCH /api/v1/traffic/settings`             | `logs:network`      | Changes the fields sent                                                 |
+| `PATCH /api/v1/traffic/settings`             | `logs:network`      | Changes the fields sent; changing `dnsLogging` also needs `dns`         |
 
 Reads take `start` and `end` as RFC 3339 times, the last 24 hours by
 default, and `nodeId` and `reporterId`. They answer with the `resolution` they used and
-the range widened to whole buckets. Byte counts are plain numbers. Changes
+the range widened to whole buckets, and refuse with `400` a range that
+would need more than 1,500 daily buckets. Byte counts are plain numbers. Changes
 are written to the [audit log](/ref/audit).
 
 The owner and admins hold both scopes, the network admin holds
@@ -313,7 +372,9 @@ builds one record per gateway and hour: `nodeId` is the gateway, `src` the
 sending machine's address with port 0, `subnetTraffic` holds private
 destinations and `exitTraffic` the rest. The range covers whole hours and
 at most a week. Remainder rows are left out, and there is nothing between
-two machines. It needs `logs:network:read`. Network flow logs are not
+two machines. Like Tailscale's, it has no pages: a range holding more than
+20,000 flows is refused with `400`, and the caller asks for shorter
+ranges. It needs `logs:network:read`. Network flow logs are not
 [streamed](/ref/log-streaming).
 
 ## Privacy
@@ -327,7 +388,8 @@ Treat it as the sensitive record it is:
 - Give `logs:network:read` to the people who need it; the auditor and the
   IT admin roles hold it by default.
 - Keep the retention as short as your needs allow. A machine's traffic is
-  deleted with the machine.
+  deleted with the machine, and deleting a gateway deletes everything it
+  reported, every machine's traffic through it included.
 - Turn off handshake reading with `slopscale traffic settings set --sni=false`
   if destination addresses and networks are enough.
 
@@ -337,9 +399,14 @@ Treat it as the sensitive record it is:
 collectors and the error of any that is not working. The agent logs to the
 journal, `journalctl -u slopscale-flowd`.
 
-- **The gateway is refused with 403.** The node is not an exit node, subnet
-  router or app connector with approved routes, or it waits for approval,
-  is suspended or has expired. The reason is in the agent's log.
+- **The gateway is refused with 403.** The node is not tagged, is not an
+  exit node or subnet router with approved routes or an app connector an
+  app selects, or it waits for approval, is suspended or has expired. The
+  reason is in the agent's log and in `slopscale traffic reporters list`.
+- **DNS logging is on but no client uses a gateway's resolver.** Approve
+  the resolver with `slopscale traffic reporters resolver`. The reporters
+  list also says when the tailnet has no global nameserver the resolvers
+  can forward to.
 - **Connection tracking fails with a message about `nf_conntrack`.** The
   kernel module is not loaded, usually because no masquerade rule exists
   yet. It loads once `tailscaled` sets up an exit node or subnet route.
@@ -354,6 +421,7 @@ journal, `journalctl -u slopscale-flowd`.
 - **Dropped is not zero.** The server was out of reach longer than the
   spool holds. Raise `--spool-size`.
 - **Unattributed is not zero.** Flows came from addresses no machine holds
-  any more, typically a machine removed while its connections ran.
+  any more, typically a machine removed while its connections ran, or from
+  a machine the policy does not let reach the gateway.
 - **Reports are dropped with 400 and a clock message.** The gateway's clock
   runs ahead. Fix its time synchronisation.
