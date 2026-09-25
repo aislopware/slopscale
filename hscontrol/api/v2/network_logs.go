@@ -16,9 +16,17 @@ func init() {
 	registrations = append(registrations, registerNetworkLogs)
 }
 
-// maxNetworkLogRange bounds one read of the network flow log: a week of
-// hourly rows is already the largest answer worth building in memory.
-const maxNetworkLogRange = 7 * 24 * time.Hour
+const (
+	// maxNetworkLogRange bounds one read of the network flow log: a week
+	// of hourly rows is already the largest answer worth building in
+	// memory.
+	maxNetworkLogRange = 7 * 24 * time.Hour
+
+	// maxNetworkLogFlows bounds the flows in one answer. Tailscale's
+	// endpoint has no pagination, so a range holding more is refused and
+	// the caller asks for shorter ones.
+	maxNetworkLogFlows = 20000
+)
 
 // NetworkFlowLog is Tailscale's network flow log record. Slopscale builds
 // one per gateway and hour from what the gateway's traffic agent
@@ -68,7 +76,8 @@ func registerNetworkLogs(api huma.API, b Backend) {
 		Summary:     "List network flow logs",
 		Description: "The traffic the gateways' agents reported, one record per gateway and hour, " +
 			"covering whole hours from start to end (at most a week). Destinations folded into " +
-			"a gateway's remainder are left out, and nothing is recorded between two nodes.",
+			"a gateway's remainder are left out, and nothing is recorded between two nodes. A " +
+			"range holding more than 20000 flows is refused with 400; ask for shorter ranges.",
 		Tags:     []string{"Logging", tagTailscaleCompat},
 		Security: security,
 		Errors:   []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound},
@@ -83,9 +92,16 @@ func registerNetworkLogs(api huma.API, b Backend) {
 			return nil, err
 		}
 
+		f.Limit = maxNetworkLogFlows + 1
+
 		rows, err := b.State.TrafficDestinationRows(f)
 		if err != nil {
 			return nil, internalError("reading network flow logs", err)
+		}
+
+		if len(rows) > maxNetworkLogFlows {
+			return nil, huma.Error400BadRequest(
+				"the range holds more than 20000 flows; narrow it and ask for the rest separately")
 		}
 
 		out := &networkLogsOutput{}
