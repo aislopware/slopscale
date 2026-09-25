@@ -1,0 +1,50 @@
+[Unit]
+After=network-online.target tailscaled.service
+Wants=network-online.target
+Description=slopscale traffic reporter for Tailscale gateways
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/slopscale-flowd
+Restart=always
+RestartSec=10
+# Shutdown flushes the open buckets to the spool and gives the upload 5s.
+TimeoutStopSec=20
+
+# Root for the tailscaled socket and the conntrack sysctls, but only with
+# the capabilities the collectors need: conntrack netlink (NET_ADMIN), the
+# packet socket (NET_RAW) and the resolver on port 53 (NET_BIND_SERVICE).
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+DevicePolicy=closed
+LockPersonality=true
+MemoryDenyWriteExecute=true
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateMounts=true
+PrivateTmp=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+# ProtectKernelTunables and ProcSubset=pid stay off: the agent turns on
+# nf_conntrack_acct under /proc/sys at start.
+ProtectProc=invisible
+ProtectSystem=strict
+RemoveIPC=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK AF_PACKET
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+StateDirectory=slopscale-flowd
+StateDirectoryMode=0700
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged
+SystemCallFilter=~@resources
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

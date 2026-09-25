@@ -1,0 +1,28 @@
+#!/bin/sh
+# postrm script for slopscale-flowd.
+
+set -e
+
+case "$1" in
+    remove)
+      if [ -d /run/systemd/system ]; then
+        systemctl --system daemon-reload >/dev/null || true
+      fi
+    ;;
+
+    purge)
+      # The spool holds reports not yet delivered; purging drops them.
+      rm -rf /var/lib/slopscale-flowd
+      if [ -x "/usr/bin/deb-systemd-helper" ]; then
+        deb-systemd-helper purge slopscale-flowd.service >/dev/null || true
+      fi
+    ;;
+
+    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+    ;;
+
+    *)
+        echo "postrm called with unknown argument '$1'" >&2
+        exit 1
+    ;;
+esac
