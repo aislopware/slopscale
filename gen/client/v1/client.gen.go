@@ -2872,6 +2872,15 @@ type ListTrafficDestinationsParams struct {
 	// Q Keep hosts or addresses containing this.
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
 
+	// Host Keep one host exactly: a name, or the address of a destination without one.
+	Host *string `form:"host,omitempty" json:"host,omitempty"`
+
+	// Dst Keep one destination address exactly.
+	Dst *string `form:"dst,omitempty" json:"dst,omitempty"`
+
+	// Private Keep only destinations in private ranges (LAN).
+	Private *bool `form:"private,omitempty" json:"private,omitempty"`
+
 	// Asn Keep one network (AS number).
 	Asn *int64 `form:"asn,omitempty" json:"asn,omitempty"`
 
@@ -2908,6 +2917,9 @@ type ListTrafficNamesParams struct {
 
 	// Q Keep names containing this.
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Name Keep one name exactly.
+	Name *string `form:"name,omitempty" json:"name,omitempty"`
 
 	// Limit At most 1000; default 100.
 	Limit *int64 `form:"limit,omitempty" json:"limit,omitempty"`
@@ -15734,6 +15746,42 @@ func NewListTrafficDestinationsRequest(server string, params *ListTrafficDestina
 
 		}
 
+		if params.Host != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "host", *params.Host, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Dst != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "dst", *params.Dst, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Private != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "private", *params.Private, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if params.Asn != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "asn", *params.Asn, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: "int64"}); err != nil {
@@ -15899,6 +15947,18 @@ func NewListTrafficNamesRequest(server string, params *ListTrafficNamesParams) (
 		if params.Q != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "q", *params.Q, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Name != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", false, "name", *params.Name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {

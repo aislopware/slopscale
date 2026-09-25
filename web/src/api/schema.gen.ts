@@ -9582,15 +9582,21 @@ export interface operations {
                 asn?: number;
                 /** @description Keep one country (ISO 3166). */
                 country?: string;
+                /** @description Keep one destination address exactly. */
+                dst?: string;
                 /** @description RFC 3339; defaults to now. */
                 end?: string;
                 groupBy?: "destination" | "host" | "asn" | "country" | "port" | "node" | "reporter";
+                /** @description Keep one host exactly: a name, or the address of a destination without one. */
+                host?: string;
                 /** @description At most 1000; default 100. */
                 limit?: number;
                 /** @description Keep the traffic of one node. */
                 nodeId?: string;
                 /** @description Keep one port; needs proto. */
                 port?: number;
+                /** @description Keep only destinations in private ranges (LAN). */
+                private?: boolean;
                 /** @description Keep one IP protocol. */
                 proto?: number;
                 /** @description Keep hosts or addresses containing this. */
@@ -9634,6 +9640,8 @@ export interface operations {
                 groupBy?: "name" | "node";
                 /** @description At most 1000; default 100. */
                 limit?: number;
+                /** @description Keep one name exactly. */
+                name?: string;
                 /** @description Keep the traffic of one node. */
                 nodeId?: string;
                 /** @description Keep names containing this. */
