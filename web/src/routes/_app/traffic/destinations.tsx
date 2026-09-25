@@ -28,7 +28,7 @@ import {
 } from "~/components/traffic/search.ts";
 import type { DestinationSearch } from "~/components/traffic/search.ts";
 import { WindowHeader } from "~/components/traffic/window-header.tsx";
-import { loadWindow } from "~/components/traffic/window-refusal.tsx";
+import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
@@ -118,12 +118,14 @@ function DestinationsPage(): ReactElement {
           onValueChange={setDraft}
         />
       </WindowToolbar>
-      <DestinationsFrame
-        search={search}
-        rows={destinations.data?.destinations ?? []}
-        chips={destinationChips(search, machineName, setSearch)}
-        onSearch={setSearch}
-      />
+      {isRefusedWindow(destinations.error) ? null : (
+        <DestinationsFrame
+          search={search}
+          rows={destinations.data?.destinations ?? []}
+          chips={destinationChips(search, machineName, setSearch)}
+          onSearch={setSearch}
+        />
+      )}
     </>
   );
 }

@@ -30,6 +30,26 @@ export function useTrafficSettingsMutation({
   });
 }
 
+/**
+ * Lets the clients use a gateway's resolver, or stops them. It moves their DNS, so the DNS pages
+ * refresh too; errors are shown in the confirmation dialog.
+ */
+export function useResolverApprovalMutation(): Mutation<
+  "patch",
+  "/api/v1/traffic/reporters/{nodeId}"
+> {
+  const queryClient = useQueryClient();
+
+  return api.useMutation("patch", "/api/v1/traffic/reporters/{nodeId}", {
+    onSuccess: async (reporter) => {
+      toast.success(
+        reporter.resolverApprovedAt === undefined ? "Resolver no longer used" : "Resolver approved",
+      );
+      await invalidate(queryClient, "/api/v1/traffic", "/api/v1/dns");
+    },
+  });
+}
+
 /** Forgets a gateway's agent; errors are shown in the confirmation dialog. */
 export function useForgetGatewayMutation(): Mutation<
   "delete",

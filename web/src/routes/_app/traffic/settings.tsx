@@ -4,6 +4,7 @@ import type { ReactElement } from "react";
 
 import { trafficReportersQuery, trafficSettingsQuery } from "~/api/traffic.ts";
 import { can } from "~/auth/me.ts";
+import { ResolverNotices } from "~/components/traffic/resolver-notices.tsx";
 import { TrafficSettingsSections } from "~/components/traffic/settings-section.tsx";
 import { PageHeader } from "~/components/ui/page-header.tsx";
 
@@ -28,6 +29,7 @@ function TrafficSettingsPage(): ReactElement {
         title="Settings"
         description="What the gateways collect and how long the server keeps it."
       />
+      <ResolverNotices reporters={reporters} />
       <TrafficSettingsSections
         settings={settings}
         reporters={reporters}

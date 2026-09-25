@@ -12,7 +12,7 @@ import { MachinesTable, trafficNodeName } from "~/components/traffic/machines-ta
 import { optionalText, trafficWindowEntries, windowOf } from "~/components/traffic/range.ts";
 import type { TrafficWindowSearch } from "~/components/traffic/range.ts";
 import { WindowHeader } from "~/components/traffic/window-header.tsx";
-import { loadWindow } from "~/components/traffic/window-refusal.tsx";
+import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
@@ -81,30 +81,32 @@ function MachinesPage(): ReactElement {
           }}
         />
       </WindowToolbar>
-      <Frame>
-        <MachinesTable
-          nodes={shown}
-          whole={whole}
-          search={search}
-          empty={
-            needle === "" ? undefined : (
-              <SectionEmpty
-                title="No machine matches"
-                description={`None of the ${plural(nodes.length, "machine")} in the window is called that.`}
-              />
-            )
-          }
-          footer={
-            nodes.length === 0 ? undefined : (
-              <TableFooter>
-                {shown.length === nodes.length
-                  ? `Showing ${plural(nodes.length, "machine")}`
-                  : `Showing ${shown.length} of ${plural(nodes.length, "machine")}`}
-              </TableFooter>
-            )
-          }
-        />
-      </Frame>
+      {isRefusedWindow(error) ? null : (
+        <Frame>
+          <MachinesTable
+            nodes={shown}
+            whole={whole}
+            search={search}
+            empty={
+              needle === "" ? undefined : (
+                <SectionEmpty
+                  title="No machine matches"
+                  description={`None of the ${plural(nodes.length, "machine")} in the window is called that.`}
+                />
+              )
+            }
+            footer={
+              nodes.length === 0 ? undefined : (
+                <TableFooter>
+                  {shown.length === nodes.length
+                    ? `Showing ${plural(nodes.length, "machine")}`
+                    : `Showing ${shown.length} of ${plural(nodes.length, "machine")}`}
+                </TableFooter>
+              )
+            }
+          />
+        </Frame>
+      )}
     </>
   );
 }

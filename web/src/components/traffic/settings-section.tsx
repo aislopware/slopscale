@@ -4,10 +4,11 @@ import { Switch } from "@cloudflare/kumo/components/switch";
 import { useState } from "react";
 import type { ReactElement, SubmitEvent } from "react";
 
-import { errorMessage } from "~/api/error.ts";
 import type { TrafficReporters, TrafficSettings } from "~/api/traffic.ts";
 import { SettingRow } from "~/components/settings/setting-row.tsx";
 import { useTrafficSettingsMutation } from "~/components/traffic/mutations.ts";
+import { TextLink } from "~/components/traffic/window-header.tsx";
+import { refusalOf } from "~/components/traffic/window-refusal.tsx";
 import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { Section } from "~/components/ui/section.tsx";
 import { Note } from "~/components/ui/status.tsx";
@@ -157,7 +158,12 @@ function DnsRow({
     <SettingRow
       title="Log DNS lookups"
       description={
-        <DnsLoggingDescription reporters={reporters} on={settings.dnsLogging} refusal={refusal} />
+        <DnsLoggingDescription
+          reporters={reporters}
+          on={settings.dnsLogging}
+          refusal={refusal}
+          canEdit={canEdit}
+        />
       }
       control={
         <DisabledReason
@@ -177,7 +183,7 @@ function DnsRow({
                     toast.success(on ? "DNS logging on" : "DNS logging off");
                   },
                   onError: (failure) => {
-                    setRefusal(errorMessage(failure));
+                    setRefusal(refusalOf(failure));
                   },
                 },
               );
@@ -193,25 +199,37 @@ function DnsLoggingDescription({
   reporters,
   on,
   refusal,
+  canEdit,
 }: {
   readonly reporters: TrafficReporters;
   readonly on: boolean;
   readonly refusal: string;
+  readonly canEdit: boolean;
 }): ReactElement {
   return (
     <span className="flex flex-col gap-2">
       <span>
-        Every gateway runs a resolver. While one reports, each machine that accepts the
-        tailnet&apos;s DNS is given one gateway resolver ahead of the global nameservers, and sends
-        every lookup there instead of to its local DNS, with an exit node too. That names
-        destinations exactly, and shows what a machine looks up even when its traffic does not pass
-        a gateway. A gateway that stops reporting for three minutes is taken out again.
+        Every gateway runs a resolver, and you approve which ones the machines may use on the{" "}
+        <TextLink to="/traffic/gateways">Gateways</TextLink> page. With this on, each machine that
+        accepts the tailnet&apos;s DNS is given one approved gateway resolver plus the
+        tailnet&apos;s global nameservers, which replace its local DNS: every lookup goes through
+        the tailnet, with an exit node too. That names destinations exactly and shows what a machine
+        looks up even when its traffic does not pass a gateway. A gateway that stops reporting is
+        taken out again within minutes, and the global nameservers carry on.
       </span>
+      {canEdit ? null : (
+        <Note tone="neutral">
+          It moves every machine&apos;s DNS, so changing it takes the DNS permission as well as the
+          traffic one.
+        </Note>
+      )}
       {refusal === "" ? null : <Note tone="danger">{refusal}</Note>}
-      {on && refusal === "" && reporters.resolvers.length === 0 ? (
-        <Note>No gateway resolver is answering yet, so machines still use their usual DNS.</Note>
+      {on && refusal === "" && reporters.dnsBlocked === "" && reporters.resolvers.length === 0 ? (
+        <Note>
+          No approved gateway resolver is answering yet, so the machines still use their usual DNS.
+        </Note>
       ) : null}
-      {on && reporters.resolvers.length > 0 ? (
+      {on && reporters.dnsBlocked === "" && reporters.resolvers.length > 0 ? (
         <span className="flex flex-wrap items-baseline gap-x-2">
           <span>Resolvers in use</span>
           <ValueList items={reporters.resolvers} mono />

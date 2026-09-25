@@ -104,7 +104,7 @@ function AddressCell({ row }: { readonly row: TrafficDestination }): ReactElemen
 
 function NetworkCell({ row }: { readonly row: TrafficDestination }): ReactElement {
   if (row.asn === 0) {
-    return <Subtle>{row.private ? "Private network" : unknownLabel}</Subtle>;
+    return row.private ? <span>LAN</span> : <Subtle>{unknownLabel}</Subtle>;
   }
 
   return (
@@ -115,8 +115,12 @@ function NetworkCell({ row }: { readonly row: TrafficDestination }): ReactElemen
   );
 }
 
-function CountryCell({ code }: { readonly code: string }): ReactElement {
-  return code === "" ? <Subtle>{unknownLabel}</Subtle> : <span>{countryName(code)}</span>;
+function CountryCell({ row }: { readonly row: TrafficDestination }): ReactElement {
+  if (row.country !== "") {
+    return <span>{countryName(row.country)}</span>;
+  }
+
+  return row.private ? <span>LAN</span> : <Subtle>{unknownLabel}</Subtle>;
 }
 
 function PortCell({ row }: { readonly row: TrafficDestination }): ReactElement {
@@ -149,7 +153,7 @@ const keyCells: Record<
   host: HostCell,
   destination: AddressCell,
   asn: NetworkCell,
-  country: ({ row }) => <CountryCell code={row.country} />,
+  country: CountryCell,
   port: PortCell,
   node: NodeCell,
   reporter: NodeCell,
@@ -201,7 +205,7 @@ function columnsFor(
     id: "country",
     header: "Country",
     enableSorting: true,
-    cell: ({ row }) => <CountryCell code={row.original.country} />,
+    cell: ({ row }) => <CountryCell row={row.original} />,
     meta: { className: "hidden xl:table-cell whitespace-nowrap" },
   });
   const port = helper.accessor((row) => row.port, {

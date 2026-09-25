@@ -22,7 +22,7 @@ import {
 } from "~/components/traffic/search.ts";
 import { TrafficSummaryPanel, emptySummary } from "~/components/traffic/summary.tsx";
 import { TextLink, WindowHeader } from "~/components/traffic/window-header.tsx";
-import { loadWindow } from "~/components/traffic/window-refusal.tsx";
+import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
 import { Callout } from "~/components/ui/callout.tsx";
 import { Section } from "~/components/ui/section.tsx";
@@ -105,15 +105,19 @@ function OverviewPage(): ReactElement {
           void navigate({ search: (previous) => ({ ...previous, ...next }) });
         }}
       />
-      <TrafficSummaryPanel
-        summary={data ?? emptySummary}
-        loading={data === undefined && error === null}
-        onZoom={(from, to) => {
-          void navigate({ search: (previous) => ({ ...previous, range: "custom", from, to }) });
-        }}
-      />
-      <TopMachinesSection nodes={data?.nodes ?? []} whole={whole} search={search} />
-      <TopDestinationsSection search={search} whole={whole} />
+      {isRefusedWindow(error) ? null : (
+        <>
+          <TrafficSummaryPanel
+            summary={data ?? emptySummary}
+            loading={data === undefined && error === null}
+            onZoom={(from, to) => {
+              void navigate({ search: (previous) => ({ ...previous, range: "custom", from, to }) });
+            }}
+          />
+          <TopMachinesSection nodes={data?.nodes ?? []} whole={whole} search={search} />
+          <TopDestinationsSection search={search} whole={whole} />
+        </>
+      )}
     </>
   );
 }

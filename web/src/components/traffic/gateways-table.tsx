@@ -1,5 +1,11 @@
 import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
-import { ArrowSquareOutIcon, ChartLineIcon, TrashIcon } from "@phosphor-icons/react";
+import {
+  ArrowSquareOutIcon,
+  ChartLineIcon,
+  CheckCircleIcon,
+  TrashIcon,
+  XCircleIcon,
+} from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import type { ReactElement } from "react";
@@ -12,7 +18,10 @@ import { DataTable } from "~/components/table/data-table.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { formatCount } from "~/components/traffic/format.ts";
 import { trafficNodeName } from "~/components/traffic/machines-table.tsx";
-import { useForgetGatewayMutation } from "~/components/traffic/mutations.ts";
+import {
+  useForgetGatewayMutation,
+  useResolverApprovalMutation,
+} from "~/components/traffic/mutations.ts";
 import { defaultTrafficRange } from "~/components/traffic/range.ts";
 import { Badge } from "~/components/ui/badge.tsx";
 import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
@@ -24,13 +33,18 @@ import type { Tone } from "~/components/ui/status.tsx";
 import { Status, StatusDetail } from "~/components/ui/status.tsx";
 import { ValueList } from "~/components/ui/value-list.tsx";
 
-export type GatewayState = "reporting" | "silent" | "offline";
+export type GatewayState = "refused" | "reporting" | "silent" | "offline";
 
 /**
  * A gateway reports every minute while its agent runs. Silent while the machine is connected means
- * the agent stopped, which is worth a look; silent while it is offline is the machine being away.
+ * the agent stopped, which is worth a look; silent while it is offline is the machine being away. A
+ * gateway the server no longer takes reports from is refused whatever its agent does.
  */
 export function gatewayState(reporter: TrafficReporter): GatewayState {
+  if (reporter.refused !== "") {
+    return "refused";
+  }
+
   if (!reporter.stale) {
     return "reporting";
   }
@@ -39,12 +53,14 @@ export function gatewayState(reporter: TrafficReporter): GatewayState {
 }
 
 const stateLabels: Record<GatewayState, string> = {
+  refused: "Refused",
   reporting: "Reporting",
   silent: "Not reporting",
   offline: "Offline",
 };
 
 const stateTones: Record<GatewayState, Tone> = {
+  refused: "danger",
   reporting: "success",
   silent: "warning",
   offline: "neutral",
@@ -98,26 +114,118 @@ function Collectors({ reporter }: { readonly reporter: TrafficReporter }): React
   );
 }
 
-function ResolverCell({ reporter }: { readonly reporter: TrafficReporter }): ReactElement {
+/** The state in a word, and a refusal's reason under it, since that reason is what to fix. */
+function StateCell({ reporter }: { readonly reporter: TrafficReporter }): ReactElement {
+  const state = gatewayState(reporter);
+
+  return (
+    <span className="flex max-w-60 flex-col items-start gap-1">
+      <Badge tone={stateTones[state]}>{stateLabels[state]}</Badge>
+      {reporter.refused === "" ? null : (
+        <span className="text-xs text-pretty text-kumo-subtle">{sentence(reporter.refused)}</span>
+      )}
+    </span>
+  );
+}
+
+function sentence(reason: string): string {
+  return `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.`;
+}
+
+/** What the clients do with the gateway's resolver: use it, wait for an approval, or nothing. */
+function ResolverUse({ reporter }: { readonly reporter: TrafficReporter }): ReactElement {
   if (reporter.resolverActive) {
     return <ValueList items={reporter.dnsListen} mono />;
   }
 
-  if (reporter.collectors.dns.enabled) {
-    return <Status tone="neutral">Not in use</Status>;
+  if (reporter.resolverApprovedAt === undefined) {
+    return reporter.collectors.dns.enabled ? (
+      <Status tone="warning">Not approved</Status>
+    ) : (
+      <span className="text-kumo-subtle">Off</span>
+    );
   }
 
-  return <span className="text-kumo-subtle">Off</span>;
+  return (
+    <StatusDetail
+      tone="neutral"
+      label="Not in use"
+      title="Approved, not in use"
+      detail="The clients use an approved resolver while DNS logging is on, the gateway reports it answering, and the gateway may report."
+    />
+  );
+}
+
+function ResolverCell({ reporter }: { readonly reporter: TrafficReporter }): ReactElement {
+  return (
+    <span className="flex flex-col items-start gap-0.5">
+      <ResolverUse reporter={reporter} />
+      {reporter.resolverApprovedAt === undefined ? null : (
+        <span className="text-xs whitespace-nowrap text-kumo-subtle">
+          Approved <RelativeTime value={reporter.resolverApprovedAt} />
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Approving a resolver hands every client's DNS to it, so it asks first and says what changes; so
+ * does taking it back.
+ */
+function ResolverDialog({
+  reporter,
+  open,
+  onOpenChange,
+}: {
+  readonly reporter: TrafficReporter;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
+}): ReactElement {
+  const approval = useResolverApprovalMutation();
+  const name = trafficNodeName(reporter);
+  const approve = reporter.resolverApprovedAt === undefined;
+
+  return (
+    <ConfirmDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      destructive={!approve}
+      title={approve ? `Use ${name}'s resolver for DNS?` : `Stop using ${name}'s resolver?`}
+      description={
+        approve
+          ? "While DNS logging is on and the gateway keeps reporting, each machine that accepts the tailnet's DNS is given one approved gateway resolver next to the global nameservers, in place of its local DNS. Every lookup then goes through a gateway, so the DNS page shows it."
+          : "The machines using it move to another approved gateway's resolver, or back to the global nameservers alone, with their next update."
+      }
+      confirmLabel={approve ? "Approve resolver" : "Stop using it"}
+      loading={approval.isPending}
+      error={approval.isError ? errorMessage(approval.error) : undefined}
+      onConfirm={() => {
+        approval.mutate(
+          { params: { path: { nodeId: reporter.nodeId } }, body: { resolver: approve } },
+          {
+            onSuccess: () => {
+              onOpenChange(false);
+            },
+          },
+        );
+      }}
+    />
+  );
 }
 
 function GatewayMenu({
   reporter,
   writable,
+  canApprove,
 }: {
   readonly reporter: TrafficReporter;
   readonly writable: boolean;
+  /** Approving a resolver moves the clients' DNS, so it takes the DNS scope as well. */
+  readonly canApprove: boolean;
 }): ReactElement {
   const [forgetting, setForgetting] = useState(false);
+  const [approving, setApproving] = useState(false);
   const forget = useForgetGatewayMutation();
   const name = trafficNodeName(reporter);
 
@@ -144,6 +252,23 @@ function GatewayMenu({
           }
         />
         <DropdownMenu.Separator />
+        <DisabledReason
+          reason={
+            canApprove ? undefined : "Approving a resolver takes the traffic and DNS permissions"
+          }
+        >
+          <DropdownMenu.Item
+            icon={reporter.resolverApprovedAt === undefined ? CheckCircleIcon : XCircleIcon}
+            disabled={!canApprove}
+            onClick={() => {
+              setApproving(true);
+            }}
+          >
+            {reporter.resolverApprovedAt === undefined
+              ? "Use its resolver for DNS…"
+              : "Stop using its resolver…"}
+          </DropdownMenu.Item>
+        </DisabledReason>
         <DisabledReason reason={writable ? undefined : "Your credentials may not forget gateways"}>
           <DropdownMenu.Item
             icon={TrashIcon}
@@ -157,6 +282,7 @@ function GatewayMenu({
           </DropdownMenu.Item>
         </DisabledReason>
       </RowMenu>
+      <ResolverDialog reporter={reporter} open={approving} onOpenChange={setApproving} />
       <ConfirmDialog
         open={forgetting}
         onOpenChange={setForgetting}
@@ -182,7 +308,7 @@ function GatewayMenu({
 
 const helper = createAppColumnHelper<TrafficReporter>();
 
-function columns(writable: boolean): ReturnType<typeof helper.columns> {
+function columns(writable: boolean, canApprove: boolean): ReturnType<typeof helper.columns> {
   return helper.columns([
     helper.accessor((reporter) => trafficNodeName(reporter), {
       id: "gateway",
@@ -210,11 +336,7 @@ function columns(writable: boolean): ReturnType<typeof helper.columns> {
       id: "state",
       header: "State",
       enableSorting: true,
-      cell: ({ row }) => {
-        const state = gatewayState(row.original);
-
-        return <Badge tone={stateTones[state]}>{stateLabels[state]}</Badge>;
-      },
+      cell: ({ row }) => <StateCell reporter={row.original} />,
     }),
     helper.accessor((reporter) => reporter.lastReportAt, {
       id: "lastReport",
@@ -238,7 +360,7 @@ function columns(writable: boolean): ReturnType<typeof helper.columns> {
       id: "resolver",
       header: "Resolver",
       cell: ({ row }) => <ResolverCell reporter={row.original} />,
-      meta: { className: "hidden lg:table-cell" },
+      meta: { className: "hidden md:table-cell" },
     }),
     helper.accessor((reporter) => reporter.dropped + reporter.unattributed, {
       id: "lost",
@@ -251,7 +373,9 @@ function columns(writable: boolean): ReturnType<typeof helper.columns> {
     helper.display({
       id: "actions",
       header: "",
-      cell: ({ row }) => <GatewayMenu reporter={row.original} writable={writable} />,
+      cell: ({ row }) => (
+        <GatewayMenu reporter={row.original} writable={writable} canApprove={canApprove} />
+      ),
       meta: { sticky: "right", className: "w-12 text-right" },
     }),
   ]);
@@ -285,13 +409,15 @@ function LostCell({ reporter }: { readonly reporter: TrafficReporter }): ReactEl
 export function GatewaysTable({
   reporters,
   writable,
+  canApprove,
 }: {
   readonly reporters: readonly TrafficReporter[];
   readonly writable: boolean;
+  readonly canApprove: boolean;
 }): ReactElement {
   const table = useAppTable({
     data: reporters,
-    columns: columns(writable),
+    columns: columns(writable, canApprove),
     getRowId: (reporter) => reporter.nodeId,
     initialState: { sorting: [{ id: "gateway", desc: false }] },
   });

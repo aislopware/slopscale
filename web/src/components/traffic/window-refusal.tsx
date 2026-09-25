@@ -6,6 +6,27 @@ import { Callout } from "~/components/ui/callout.tsx";
 
 const statusBadRequest = 400;
 
+/**
+ * The server's reason for refusing a request. The traffic endpoints' detail names only the
+ * operation that failed ("reading traffic"), so the reasons alone read better when there are any.
+ */
+export function refusalOf(failure: unknown): string {
+  const reasons =
+    failure instanceof ApiError
+      ? (failure.problem?.errors ?? []).flatMap((entry) =>
+          entry.message === undefined || entry.message === "" ? [] : [entry.message],
+        )
+      : [];
+
+  if (reasons.length === 0) {
+    return errorMessage(failure);
+  }
+
+  const text = reasons.join(". ");
+
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`;
+}
+
 /** Whether the server refused the window itself, such as a custom range longer than it reads. */
 export function isRefusedWindow(failure: unknown): boolean {
   return failure instanceof ApiError && failure.status === statusBadRequest;
@@ -41,7 +62,7 @@ export function WindowRefusal({
     <Callout
       tone="error"
       title="The server would not read this window"
-      description={errorMessage(failure)}
+      description={refusalOf(failure)}
       action={
         <Button size="sm" variant="secondary" onClick={onReset}>
           Last 24 hours

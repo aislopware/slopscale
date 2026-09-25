@@ -29,7 +29,7 @@ import {
 } from "~/components/traffic/search.ts";
 import { TrafficSummaryPanel, emptySummary } from "~/components/traffic/summary.tsx";
 import { TextLink, WindowHeader } from "~/components/traffic/window-header.tsx";
-import { loadWindow } from "~/components/traffic/window-refusal.tsx";
+import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
 import { Section, SectionEmpty } from "~/components/ui/section.tsx";
@@ -123,16 +123,20 @@ function MachineTrafficPage(): ReactElement {
           void navigate({ search: (previous) => ({ ...previous, ...next }) });
         }}
       />
-      <TrafficSummaryPanel
-        summary={data ?? emptySummary}
-        loading={data === undefined && error === null}
-        onZoom={(from, to) => {
-          void navigate({ search: (previous) => ({ ...previous, range: "custom", from, to }) });
-        }}
-      />
-      <MachineDestinationsSection nodeId={nodeId} search={search} whole={whole} />
-      <GatewaysSection gateways={data?.reporters ?? []} whole={whole} />
-      <MachineNamesSection nodeId={nodeId} search={search} />
+      {isRefusedWindow(error) ? null : (
+        <>
+          <TrafficSummaryPanel
+            summary={data ?? emptySummary}
+            loading={data === undefined && error === null}
+            onZoom={(from, to) => {
+              void navigate({ search: (previous) => ({ ...previous, range: "custom", from, to }) });
+            }}
+          />
+          <MachineDestinationsSection nodeId={nodeId} search={search} whole={whole} />
+          <GatewaysSection gateways={data?.reporters ?? []} whole={whole} />
+          <MachineNamesSection nodeId={nodeId} search={search} />
+        </>
+      )}
     </>
   );
 }

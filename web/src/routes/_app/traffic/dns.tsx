@@ -23,7 +23,7 @@ import { useSearchDraft } from "~/components/traffic/search-draft.ts";
 import { nameSearchEntries, pickName, toNameGrouping } from "~/components/traffic/search.ts";
 import type { NameSearch } from "~/components/traffic/search.ts";
 import { TextLink, WindowHeader } from "~/components/traffic/window-header.tsx";
-import { loadWindow } from "~/components/traffic/window-refusal.tsx";
+import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
@@ -152,12 +152,14 @@ function DnsPage(): ReactElement {
           />
         )}
       </WindowToolbar>
-      <NamesFrame
-        search={search}
-        rows={names.data?.names ?? []}
-        chips={chips}
-        onSearch={setSearch}
-      />
+      {isRefusedWindow(names.error) ? null : (
+        <NamesFrame
+          search={search}
+          rows={names.data?.names ?? []}
+          chips={chips}
+          onSearch={setSearch}
+        />
+      )}
     </>
   );
 }

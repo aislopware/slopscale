@@ -89,6 +89,25 @@ describe(DestinationsTable, () => {
   });
 });
 
+describe("a private group", () => {
+  it("reads as LAN in the network and country views, not as unknown", async () => {
+    const lan: TrafficDestination = { ...blank, private: true, rxBytes: 10 };
+    const unknown: TrafficDestination = { ...blank, rxBytes: 5 };
+    const networks = await render(
+      <DestinationsTable rows={[lan]} groupBy="asn" whole={lan.rxBytes} />,
+    );
+
+    await expect.element(networks.getByText("LAN")).toBeVisible();
+    await networks.unmount();
+
+    const countries = await render(
+      <DestinationsTable rows={[{ ...unknown, private: false }]} groupBy="country" whole={5} />,
+    );
+
+    await expect.element(countries.getByText("Unknown")).toBeVisible();
+  });
+});
+
 describe(WindowRefusal, () => {
   it("shows the server's reason for a refused window and offers the default one", async () => {
     const onReset = vi.fn<() => void>();
