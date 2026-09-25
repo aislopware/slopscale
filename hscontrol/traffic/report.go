@@ -27,15 +27,16 @@ const (
 	// BucketSeconds is the width of the rollup buckets a report carries.
 	BucketSeconds = 60
 
-	// MaxReportBytes bounds a decoded report. The body may be sent
-	// zstd-compressed (Content-Encoding: zstd); the bound applies after
-	// decompression.
-	MaxReportBytes = 16 << 20
+	// MaxReportBytes bounds a report. The body may be sent
+	// zstd-compressed (Content-Encoding: zstd); the bound applies to the
+	// body after decompression, and the server refuses a larger one with
+	// 413.
+	MaxReportBytes = 4 << 20
 
 	// MaxFlowsPerReport and MaxQueriesPerReport bound the entries in one
 	// report; an agent with more splits them over several reports.
-	MaxFlowsPerReport   = 50000
-	MaxQueriesPerReport = 50000
+	MaxFlowsPerReport   = 20000
+	MaxQueriesPerReport = 20000
 )
 
 // HostSource says how the agent learnt the hostname of a flow.
