@@ -350,6 +350,13 @@ func TestTrafficMonitor(t *testing.T) {
 	}, trafficReportWait, 2*time.Second, "the HTTP download should be named from the DNS answer")
 
 	// --- An agent on a node that is no gateway is refused.
+	//
+	// The control server sits on the client's own Docker network, which
+	// the client does not reach through the exit node; the agent needs the
+	// server, so the client stops using the exit node first.
+	_, _, err = client.Execute([]string{"tailscale", "set", "--exit-node="})
+	require.NoError(t, err)
+
 	token := trafficIDToken(t, client)
 	status := trafficPostReport(t, slopscale, token)
 	assert.Equal(t, http.StatusForbidden, status, "a node that routes nothing may not report")
@@ -386,14 +393,19 @@ func TestTrafficMonitor(t *testing.T) {
 		}
 	}, trafficStaleWait, 5*time.Second, "a stale gateway's resolver should leave the client's DNS")
 
-	var after trafficReportersOut
+	// The agent's last report on the way down already takes its resolver
+	// out, so the gateway turns stale only once that report ages.
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		var after trafficReportersOut
 
-	require.NoError(t, api.get("/api/v1/traffic/reporters", &after))
+		assert.NoError(c, api.get("/api/v1/traffic/reporters", &after))
 
-	reporter, ok := after.find(gatewayID)
-	require.True(t, ok)
-	assert.True(t, reporter.Stale)
-	assert.False(t, reporter.ResolverActive)
+		reporter, ok := after.find(gatewayID)
+		if assert.True(c, ok) {
+			assert.True(c, reporter.Stale)
+			assert.False(c, reporter.ResolverActive)
+		}
+	}, trafficStaleWait, 5*time.Second, "the stopped gateway should turn stale")
 }
 
 // trafficPolicy lets every node reach everything, the internet through the
