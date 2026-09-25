@@ -97,6 +97,17 @@ export function TrafficSettingsSections({
       >
         <SniRow settings={settings} canEdit={canEdit} />
         <DnsRow settings={settings} reporters={reporters} canEdit={canEditDns} />
+        <SettingRow
+          title="Network names"
+          description="Each destination's network and country, from iptoasn.com's table. The server loads it once a gateway has reported and downloads a newer one daily; the configuration file sets where from."
+          control={
+            <span className="text-kumo-subtle tabular-nums">
+              {reporters.asnRanges === 0
+                ? "Not loaded yet"
+                : `${reporters.asnRanges.toLocaleString()} address ranges`}
+            </span>
+          }
+        />
       </Section>
       <RetentionSection settings={settings} canEdit={canEdit} />
     </>
@@ -209,13 +220,11 @@ function DnsLoggingDescription({
   return (
     <span className="flex flex-col gap-2">
       <span>
-        Every gateway runs a resolver, and you approve which ones the machines may use on the{" "}
-        <TextLink to="/traffic/gateways">Gateways</TextLink> page. With this on, each machine that
-        accepts the tailnet&apos;s DNS is given one approved gateway resolver plus the
-        tailnet&apos;s global nameservers, which replace its local DNS: every lookup goes through
-        the tailnet, with an exit node too. That names destinations exactly and shows what a machine
-        looks up even when its traffic does not pass a gateway. A gateway that stops reporting is
-        taken out again within minutes, and the global nameservers carry on.
+        Machines that accept the tailnet&apos;s DNS use one approved gateway resolver plus the
+        global nameservers in place of their local DNS, so every lookup is logged and destinations
+        are named exactly. Approve resolvers on the{" "}
+        <TextLink to="/traffic/gateways">Gateways</TextLink> page; one that stops reporting is taken
+        out within minutes.
       </span>
       {canEdit ? null : (
         <Note tone="neutral">
@@ -281,7 +290,7 @@ function RetentionSection({
   return (
     <Section
       title="Retention"
-      description="How long each resolution is kept. Lowering one removes what is older within the hour."
+      description="How long each level of detail is kept. Lowering one removes what is older within the hour."
       bodyClassName="p-0"
     >
       <form onSubmit={save}>

@@ -60,7 +60,11 @@ describe(TrafficSettingsSections, () => {
     const screen = await render(app(true));
 
     await expect
-      .element(screen.getByText(/one approved gateway resolver plus the tailnet's global/u))
+      .element(
+        screen.getByText(
+          /one approved gateway resolver plus the\s+global nameservers in place of their local DNS/u,
+        ),
+      )
       .toBeVisible();
     await expect.element(screen.getByText(/takes the DNS permission/u)).not.toBeInTheDocument();
   });
