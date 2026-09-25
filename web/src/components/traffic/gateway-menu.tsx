@@ -23,8 +23,8 @@ import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { RowMenu } from "~/components/ui/row-menu.tsx";
 
 /**
- * Approving a resolver hands every client's DNS to it, so it asks first and says what changes; so
- * does taking it back.
+ * Approving a resolver hands the DNS of the gateway's exit node users to it, so it asks first and
+ * says what changes and whom it covers; so does taking it back.
  */
 function ResolverDialog({
   reporter,
@@ -47,8 +47,8 @@ function ResolverDialog({
       title={approve ? `Use ${name}'s resolver for DNS?` : `Stop using ${name}'s resolver?`}
       description={
         approve
-          ? "While DNS logging is on and the gateway keeps reporting, each machine that accepts the tailnet's DNS is given one approved gateway resolver next to the global nameservers, in place of its local DNS. Every lookup then goes through a gateway, so the DNS page shows it."
-          : "The machines using it move to another approved gateway's resolver, or back to the global nameservers alone, with their next update."
+          ? `While DNS logging is on and ${name} keeps reporting, machines using ${name} as their exit node resolve through its resolver, and their lookups are logged only while they use it. Machines on another exit node or none, and any on Tailscale older than 1.86, keep their usual DNS and are never logged.`
+          : `The machines using ${name} as their exit node go back to its usual DNS with their next update, and their lookups are no longer logged.`
       }
       confirmLabel={approve ? "Approve resolver" : "Stop using it"}
       loading={approval.isPending}
@@ -98,7 +98,7 @@ export function GatewayMenu({
 }: {
   readonly reporter: TrafficReporter;
   readonly writable: boolean;
-  /** Approving a resolver moves the clients' DNS, so it takes the DNS scope as well. */
+  /** Approving a resolver moves its exit node users' DNS, so it takes the DNS scope as well. */
   readonly canApprove: boolean;
 }): ReactElement {
   const [forgetting, setForgetting] = useState(false);
@@ -159,7 +159,7 @@ export function GatewayMenu({
         open={forgetting}
         onOpenChange={setForgetting}
         title={`Forget ${name}?`}
-        description="The gateway leaves this list and its resolver leaves the machines' DNS. What it reported stays until the retention removes it. An agent that is still running comes back with its next report, so stop it on the machine first."
+        description="The gateway leaves this list and its resolver leaves the DNS of the machines using it as their exit node. What it reported stays until the retention removes it. An agent that is still running comes back with its next report, so stop it on the machine first."
         confirmLabel="Forget gateway"
         loading={forget.isPending}
         error={forget.isError ? errorMessage(forget.error) : undefined}

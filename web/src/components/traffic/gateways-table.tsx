@@ -35,7 +35,7 @@ const collectorKeys: readonly CollectorKey[] = ["conntrack", "sni", "dns", "appC
 const collectorPurpose: Record<CollectorKey, string> = {
   conntrack: "Counts what each machine sends through the gateway.",
   sni: "Names destinations from TLS and QUIC handshakes.",
-  dns: "Answers the machines' lookups and names destinations from the answers.",
+  dns: "Answers the lookups of the machines using the gateway as their exit node, and names their destinations from the answers.",
   appConnector: "Names destinations from the app connector's domains.",
 };
 
@@ -137,7 +137,7 @@ function sentence(reason: string): string {
   return `${reason.charAt(0).toUpperCase()}${reason.slice(1)}.`;
 }
 
-/** What the clients do with the gateway's resolver: use it, wait for an approval, or nothing. */
+/** Whether the gateway's exit node users resolve through it: yes, not approved, or not now. */
 function ResolverUse({ reporter }: { readonly reporter: TrafficReporter }): ReactElement {
   if (reporter.resolverActive) {
     return <ValueList items={reporter.dnsListen} mono />;
@@ -156,7 +156,7 @@ function ResolverUse({ reporter }: { readonly reporter: TrafficReporter }): Reac
       tone="neutral"
       label="Not in use"
       title="Approved, not in use"
-      detail="The clients use an approved resolver while DNS logging is on, the gateway reports it answering, and the gateway may report."
+      detail="The machines using the gateway as their exit node use its approved resolver while DNS logging is on, the gateway reports it answering, and the gateway may report."
     />
   );
 }

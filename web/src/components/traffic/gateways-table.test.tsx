@@ -113,7 +113,7 @@ describe(GatewaysTable, () => {
     await expect.element(screen.getByText(/^Approved/u)).toBeVisible();
   });
 
-  it("asks before handing the clients' DNS to a gateway, and only with the DNS permission", async () => {
+  it("asks before handing its exit node users' DNS to a gateway, and says whom it covers", async () => {
     const screen = await render(app(<GatewaysTable reporters={[office]} writable canApprove />));
 
     await screen.getByRole("button", { name: "Actions for gateway office-gateway" }).click();
@@ -121,7 +121,10 @@ describe(GatewaysTable, () => {
 
     const dialog = screen.getByRole("alertdialog");
 
-    await expect.element(dialog.getByText(/one approved gateway resolver/u)).toBeVisible();
+    await expect
+      .element(dialog.getByText(/machines using office-gateway as their exit node/u))
+      .toBeVisible();
+    await expect.element(dialog.getByText(/older than 1\.86/u)).toBeVisible();
     await expect.element(dialog.getByRole("button", { name: "Approve resolver" })).toBeVisible();
   });
 
@@ -139,28 +142,21 @@ describe(GatewaysTable, () => {
 });
 
 describe(ResolverNotices, () => {
-  it("says why DNS logging reaches no machine and which nameservers the resolvers skip", async () => {
+  it("says which exit node nameservers the resolvers skip", async () => {
     const screen = await render(
       app(
-        <ResolverNotices
-          reporters={{
-            dnsBlocked: "DNS logging needs at least one global nameserver",
-            skippedUpstreams: ["tls://dns.example", "100.64.0.53"],
-          }}
-        />,
+        <ResolverNotices reporters={{ skippedUpstreams: ["tls://dns.example", "100.64.0.53"] }} />,
       ),
     );
 
     await expect
-      .element(screen.getByText("DNS logging is on, but no machine uses a gateway resolver"))
+      .element(screen.getByText("The gateway resolvers skip some exit node nameservers"))
       .toBeVisible();
     await expect.element(screen.getByText(/tls:\/\/dns\.example, 100\.64\.0\.53/u)).toBeVisible();
   });
 
   it("stays away while the resolvers have what they need", async () => {
-    const screen = await render(
-      app(<ResolverNotices reporters={{ dnsBlocked: "", skippedUpstreams: [] }} />),
-    );
+    const screen = await render(app(<ResolverNotices reporters={{ skippedUpstreams: [] }} />));
 
     expect(screen.container.textContent).toBe("");
   });

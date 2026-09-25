@@ -85,7 +85,7 @@ export function TrafficSettingsSections({
   readonly settings: TrafficSettings;
   readonly reporters: TrafficReporters;
   readonly canEdit: boolean;
-  /** DNS logging rewrites every machine's resolvers, so it takes the DNS scope as well. */
+  /** DNS logging moves the DNS of the gateways' exit node users, so it takes the DNS scope too. */
   readonly canEditDns: boolean;
 }): ReactElement {
   return (
@@ -160,8 +160,8 @@ function DnsRow({
   readonly reporters: TrafficReporters;
   readonly canEdit: boolean;
 }): ReactElement {
-  // The server says why it will not switch DNS logging on, such as no nameserver to forward to;
-  // that reason stays beside the switch rather than in a toast that goes away.
+  // The server says why it will not switch DNS logging, such as a policy that cannot take the
+  // resolver grant; that reason stays beside the switch rather than in a toast that goes away.
   const [refusal, setRefusal] = useState("");
   const update = useTrafficSettingsMutation({ quiet: true });
 
@@ -220,25 +220,24 @@ function DnsLoggingDescription({
   return (
     <span className="flex flex-col gap-2">
       <span>
-        Machines that accept the tailnet&apos;s DNS use one approved gateway resolver plus the
-        global nameservers in place of their local DNS, so every lookup is logged and destinations
-        are named exactly. Approve resolvers on the{" "}
-        <TextLink to="/traffic/gateways">Gateways</TextLink> page; one that stops reporting is taken
-        out within minutes.
+        Only machines using a gateway as their exit node are logged, and only while they use it:
+        they resolve through that gateway&apos;s approved resolver, so their lookups are logged and
+        their destinations named exactly. Every other machine, and any on Tailscale older than 1.86,
+        which does not say which exit node it uses, keeps its usual DNS and is never logged. Approve
+        resolvers on the <TextLink to="/traffic/gateways">Gateways</TextLink> page; one that stops
+        reporting is taken out within minutes.
       </span>
       {canEdit ? null : (
         <Note tone="neutral">
-          It moves every machine&apos;s DNS, so changing it takes the DNS permission as well as the
-          traffic one.
+          It moves the DNS of the machines using a gateway as their exit node, so changing it takes
+          the DNS permission as well as the traffic one.
         </Note>
       )}
       {refusal === "" ? null : <Note tone="danger">{refusal}</Note>}
-      {on && refusal === "" && reporters.dnsBlocked === "" && reporters.resolvers.length === 0 ? (
-        <Note>
-          No approved gateway resolver is answering yet, so the machines still use their usual DNS.
-        </Note>
+      {on && refusal === "" && reporters.resolvers.length === 0 ? (
+        <Note>No approved gateway resolver is answering yet, so nothing is logged.</Note>
       ) : null}
-      {on && reporters.dnsBlocked === "" && reporters.resolvers.length > 0 ? (
+      {on && reporters.resolvers.length > 0 ? (
         <span className="flex flex-wrap items-baseline gap-x-2">
           <span>Resolvers in use</span>
           <ValueList items={reporters.resolvers} mono />

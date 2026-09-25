@@ -112,7 +112,7 @@ function DnsPage(): ReactElement {
     <>
       <WindowHeader
         title="DNS lookups"
-        description="The names machines look up through the gateways' resolvers."
+        description="The names machines look up while they use a gateway as their exit node."
         window={names.data}
         reporters={reporters.data?.reporters ?? []}
         gateway={search.gateway}

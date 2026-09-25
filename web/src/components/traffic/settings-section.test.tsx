@@ -25,7 +25,6 @@ const settings: TrafficSettings = {
 
 const reporters: TrafficReporters = {
   asnRanges: 0,
-  dnsBlocked: "",
   reporters: [],
   resolvers: [],
   skippedUpstreams: [],
@@ -56,16 +55,17 @@ function app(canEditDns: boolean): ReactElement {
 }
 
 describe(TrafficSettingsSections, () => {
-  it("explains that DNS logging replaces the machines' local DNS", async () => {
+  it("explains that DNS logging covers only the machines using a gateway as their exit node", async () => {
     const screen = await render(app(true));
 
     await expect
       .element(
         screen.getByText(
-          /one approved gateway resolver plus the\s+global nameservers in place of their local DNS/u,
+          /Only machines using a gateway as their exit node are logged, and only while/u,
         ),
       )
       .toBeVisible();
+    await expect.element(screen.getByText(/older than 1\.86/u)).toBeVisible();
     await expect.element(screen.getByText(/takes the DNS permission/u)).not.toBeInTheDocument();
   });
 
@@ -85,12 +85,12 @@ describe(refusalOf, () => {
         type: "about:blank",
         title: "Bad Request",
         detail: "setting traffic settings",
-        errors: [{ message: "DNS logging needs at least one global nameserver" }],
+        errors: [{ message: "granting the traffic resolvers: policy does not compile" }],
       },
       "",
     );
 
-    expect(refusalOf(refusal)).toBe("DNS logging needs at least one global nameserver.");
+    expect(refusalOf(refusal)).toBe("Granting the traffic resolvers: policy does not compile.");
     expect(refusalOf(new ApiError(500, undefined, "The server failed."))).toBe(
       "The server failed.",
     );
