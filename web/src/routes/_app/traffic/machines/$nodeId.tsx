@@ -17,6 +17,7 @@ import { plural } from "~/components/overview/plural.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { VolumeCell } from "~/components/traffic/cells.tsx";
 import { DestinationsSection, whereGrouping } from "~/components/traffic/destinations-section.tsx";
+import { DnsLoggingOff } from "~/components/traffic/dns-logging-off.tsx";
 import { trafficNodeName } from "~/components/traffic/machines-table.tsx";
 import { NamesTable } from "~/components/traffic/names-table.tsx";
 import { windowOf } from "~/components/traffic/range.ts";
@@ -32,7 +33,7 @@ import { TextLink, WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
 import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
 import { DefinitionList } from "~/components/ui/definition-list.tsx";
-import { Section, SectionEmpty } from "~/components/ui/section.tsx";
+import { Section } from "~/components/ui/section.tsx";
 import { useBreadcrumb } from "~/lib/breadcrumbs.tsx";
 
 /** How many destinations and names the machine's page lists; the pages it links to list the rest. */
@@ -63,7 +64,7 @@ function destinationsOf(search: MachineSearch): ReturnType<typeof destinationFil
   );
 }
 
-const nameFilters = { groupBy: "name", q: "", limit: nameRows } as const;
+const machineNames = { groupBy: "name", q: "", name: "", limit: nameRows } as const;
 
 export const Route = createFileRoute("/_app/traffic/machines/$nodeId")({
   validateSearch: searchSchema,
@@ -75,7 +76,7 @@ export const Route = createFileRoute("/_app/traffic/machines/$nodeId")({
     await loadWindow([
       context.queryClient.query(trafficSummaryQuery(scope, 1)),
       context.queryClient.query(trafficDestinationsQuery(scope, destinations)),
-      context.queryClient.query(trafficNamesQuery(scope, nameFilters)),
+      context.queryClient.query(trafficNamesQuery(scope, machineNames)),
       context.queryClient.query(trafficReportersQuery),
       context.queryClient.query(trafficSettingsQuery),
     ]);
@@ -106,6 +107,7 @@ function MachineTrafficPage(): ReactElement {
         description="What this machine sent through the gateways, and where it went."
         window={data}
         reporters={reporterList}
+        carried={data?.reporters}
         gateway={search.gateway}
         actions={
           self?.nodeName === "" ? undefined : (
@@ -238,7 +240,7 @@ function MachineNamesSection({
 }): ReactElement {
   const navigate = useNavigate({ from: Route.fullPath });
   const names = useQuery({
-    ...trafficNamesQuery(scopeOf(search, nodeId), nameFilters),
+    ...trafficNamesQuery(scopeOf(search, nodeId), machineNames),
     placeholderData: keepPreviousData,
   });
   const settings = useQuery(trafficSettingsQuery);
@@ -254,34 +256,29 @@ function MachineNamesSection({
         rows={rows}
         groupBy="name"
         oneMachine
-        empty={
-          settings.data?.dnsLogging === false ? (
-            <SectionEmpty
-              title="DNS logging is off"
-              description="Turn it on in the traffic settings to see what machines look up."
-            />
-          ) : undefined
-        }
+        empty={settings.data?.dnsLogging === false ? <DnsLoggingOff /> : undefined}
         footer={
           rows.length === 0 ? undefined : (
             <TableFooter
               actions={
                 <TextLink
                   to="/traffic/dns"
-                  search={{ ...windowOf(search), by: "name", q: "", node: nodeId }}
+                  search={{ ...windowOf(search), by: "name", q: "", name: "", node: nodeId }}
                 >
                   All lookups
                 </TextLink>
               }
             >
-              {`The ${nameRows} most asked`}
+              {rows.length >= nameRows
+                ? `The ${nameRows} most asked`
+                : `Showing ${plural(rows.length, "name")}`}
             </TableFooter>
           )
         }
         onPick={(row) => {
           void navigate({
             to: "/traffic/dns",
-            search: { ...windowOf(search), by: "node", q: row.name, node: "" },
+            search: { ...windowOf(search), by: "node", q: "", name: row.name, node: "" },
           });
         }}
       />

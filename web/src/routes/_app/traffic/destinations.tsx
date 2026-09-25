@@ -1,4 +1,3 @@
-import { Button } from "@cloudflare/kumo/components/button";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback } from "react";
@@ -16,6 +15,7 @@ import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { GroupingPicker } from "~/components/traffic/destinations-section.tsx";
 import { DestinationsTable, groupingLabels } from "~/components/traffic/destinations-table.tsx";
+import { NothingMatches } from "~/components/traffic/nothing-matches.tsx";
 import { windowOf } from "~/components/traffic/range.ts";
 import { useSearchDraft } from "~/components/traffic/search-draft.ts";
 import {
@@ -29,9 +29,8 @@ import {
 import type { DestinationSearch } from "~/components/traffic/search.ts";
 import { WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
-import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
+import { WindowToolbar, windowSearchClass } from "~/components/traffic/window-toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
-import { SectionEmpty } from "~/components/ui/section.tsx";
 import { nodeName } from "~/lib/node.ts";
 
 /** The server's cap on one destinations read. */
@@ -113,6 +112,7 @@ function DestinationsPage(): ReactElement {
         }
       >
         <SearchInput
+          className={windowSearchClass}
           value={draft}
           placeholder="Search hosts and addresses"
           onValueChange={setDraft}
@@ -154,17 +154,13 @@ function DestinationsFrame({
         rows={rows}
         groupBy={search.by}
         whole={whole}
+        of="the rows shown"
         oneMachine={search.node !== ""}
         empty={
-          chips.length === 0 ? undefined : (
-            <SectionEmpty
-              title="Nothing matches"
+          chips.length === 0 && search.q === "" ? undefined : (
+            <NothingMatches
               description="No destination in the window matches these filters."
-              contents={
-                <Button variant="secondary" onClick={clear}>
-                  Clear filters
-                </Button>
-              }
+              onClear={clear}
             />
           )
         }

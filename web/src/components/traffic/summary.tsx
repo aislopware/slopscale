@@ -1,12 +1,18 @@
 import type { TimeseriesData } from "@cloudflare/kumo/components/chart";
 import { ChartLegend, ChartPalette, TimeseriesChart } from "@cloudflare/kumo/components/chart";
 import { cn } from "@cloudflare/kumo/utils";
-import { useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
 
 import type { TrafficPoint, TrafficSummary } from "~/api/traffic.ts";
-import { formatBytes, formatCount, formatRate } from "~/components/traffic/format.ts";
+import {
+  formatBytes,
+  formatCount,
+  formatRate,
+  formatScaled,
+  rateScale,
+} from "~/components/traffic/format.ts";
 import { Frame, framePanelClass } from "~/components/ui/frame.tsx";
+import { useMinWidth } from "~/lib/breakpoint.ts";
 import { echarts } from "~/lib/echarts.ts";
 import { useDarkMode } from "~/lib/theme.ts";
 import { daySeconds, formatAbsolute, hourSeconds, minuteSeconds, parseTime } from "~/lib/time.ts";
@@ -66,29 +72,18 @@ export const emptySummary: TrafficSummary = {
   reporters: [],
 };
 
-// Tailwind's `sm`: below it the chart is phone-wide and only has room for a few time labels.
-const wideQuery = "(min-width: 40rem)";
+// Below `sm` the chart is phone-wide and only has room for a few time labels.
 const narrowTicks = 3;
-
-function subscribeWide(onChange: () => void): () => void {
-  const media = globalThis.matchMedia(wideQuery);
-
-  media.addEventListener("change", onChange);
-
-  return () => {
-    media.removeEventListener("change", onChange);
-  };
-}
-
-function useWide(): boolean {
-  return useSyncExternalStore(subscribeWide, () => globalThis.matchMedia(wideQuery).matches);
-}
 
 function tickFormat(summary: TrafficSummary): (value: number) => string {
   const start = parseTime(summary.start)?.getTime() ?? 0;
   const end = parseTime(summary.end)?.getTime() ?? 0;
 
   return (value) => (end - start <= dayMs ? timeOfDay : dayOfMonth).format(new Date(value));
+}
+
+function scaledBy(points: readonly [number, number][], divisor: number): [number, number][] {
+  return points.map(([time, rate]) => [time, rate / divisor]);
 }
 
 function Stat({
@@ -101,12 +96,45 @@ function Stat({
   readonly hint: string;
 }): ReactElement {
   return (
-    <div className={cn(framePanelClass, "flex min-w-0 flex-col gap-1 px-5 py-4")}>
-      <span className="text-sm text-kumo-subtle">{label}</span>
-      <span className="text-xl font-semibold text-kumo-strong tabular-nums">{value}</span>
-      <span className="truncate text-sm text-kumo-subtle">{hint}</span>
+    <div
+      className={cn(
+        framePanelClass,
+        "flex min-w-0 flex-col gap-0.5 px-3 py-3 sm:gap-1 sm:px-5 sm:py-4",
+      )}
+    >
+      <span className="text-xs text-kumo-subtle sm:text-sm">{label}</span>
+      <span className="text-base font-semibold text-kumo-strong tabular-nums sm:text-xl">
+        {value}
+      </span>
+      <span className="text-xs text-pretty text-kumo-subtle sm:truncate sm:text-sm" title={hint}>
+        {hint}
+      </span>
     </div>
   );
+}
+
+const resolutionNames: ReadonlyMap<number, string> = new Map([
+  [minuteSeconds, "minute"],
+  [hourSeconds, "hour"],
+  [daySeconds, "day"],
+]);
+
+/** "Busiest hour 6.9 MiB/s": the peak, named by the stretch it averages over. */
+function busiest(resolution: number, rate: number): string {
+  const name = resolutionNames.get(resolution);
+
+  return name === undefined ? `Busiest ${formatRate(rate)}` : `Busiest ${name} ${formatRate(rate)}`;
+}
+
+/** ", 1-minute buckets": what one point on the chart averages over. */
+function bucketLabel(resolution: number): string {
+  if (resolution <= 0) {
+    return "";
+  }
+
+  const name = resolutionNames.get(resolution);
+
+  return name === undefined ? `, ${resolution}-second buckets` : `, 1-${name} buckets`;
 }
 
 /**
@@ -125,51 +153,43 @@ export function TrafficSummaryPanel({
   readonly onZoom?: (start: string, end: string) => void;
 }): ReactElement {
   const dark = useDarkMode();
-  const wide = useWide();
+  const wide = useMinWidth("sm");
   const rates = ratesOf(summary.series, summary.resolution);
+  const scale = rateScale(Math.max(rates.peakUpload, rates.peakDownload));
   const uploadColour = ChartPalette.categorical(0, dark);
   const downloadColour = ChartPalette.categorical(1, dark);
   const data: TimeseriesData[] = [
-    { name: "Upload", color: uploadColour, data: rates.upload },
-    { name: "Download", color: downloadColour, data: rates.download },
+    { name: "Upload", color: uploadColour, data: scaledBy(rates.upload, scale.divisor) },
+    { name: "Download", color: downloadColour, data: scaledBy(rates.download, scale.divisor) },
   ];
   const start = parseTime(summary.start);
   const end = parseTime(summary.end);
 
   return (
-    <Frame className="grid gap-1 sm:grid-cols-3">
+    <Frame className="grid grid-cols-3 gap-1">
       <Stat
         label="Upload"
         value={formatBytes(summary.total.txBytes)}
-        hint={`Peak ${formatRate(rates.peakUpload)}`}
+        hint={busiest(summary.resolution, rates.peakUpload)}
       />
       <Stat
         label="Download"
         value={formatBytes(summary.total.rxBytes)}
-        hint={`Peak ${formatRate(rates.peakDownload)}`}
+        hint={busiest(summary.resolution, rates.peakDownload)}
       />
       <Stat
         label="Connections"
         value={formatCount(summary.total.conns)}
         hint={`${formatCount(summary.total.txPackets + summary.total.rxPackets)} packets`}
       />
-      <div className={cn(framePanelClass, "flex min-w-0 flex-col gap-3 px-5 py-4 sm:col-span-3")}>
+      <div className={cn(framePanelClass, "col-span-3 flex min-w-0 flex-col gap-3 px-5 py-4")}>
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
           <span className="text-sm text-kumo-subtle">
-            Average rate
-            {summary.resolution > 0 ? ` per ${resolutionLabel(summary.resolution)}` : ""}
+            {`Average rate${bucketLabel(summary.resolution)}`}
           </span>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <ChartLegend.SmallItem
-              name="Upload"
-              color={uploadColour}
-              value={formatBytes(summary.total.txBytes)}
-            />
-            <ChartLegend.SmallItem
-              name="Download"
-              color={downloadColour}
-              value={formatBytes(summary.total.rxBytes)}
-            />
+            <ChartLegend.SmallItem name="Upload" color={uploadColour} value="" />
+            <ChartLegend.SmallItem name="Download" color={downloadColour} value="" />
           </div>
         </div>
         <TimeseriesChart
@@ -182,8 +202,8 @@ export function TrafficSummaryPanel({
           loading={loading}
           yAxisTickCount={4}
           {...(wide ? {} : { xAxisTickCount: narrowTicks })}
-          yAxisTickFormat={formatRate}
-          tooltipValueFormat={formatRate}
+          yAxisTickFormat={(value) => formatScaled(value, scale)}
+          tooltipValueFormat={(value) => formatRate(value * scale.divisor)}
           tooltipFollowCursor="x"
           xAxisTickFormat={tickFormat(summary)}
           {...(onZoom === undefined
@@ -202,14 +222,4 @@ export function TrafficSummaryPanel({
       </div>
     </Frame>
   );
-}
-
-const resolutionNames: ReadonlyMap<number, string> = new Map([
-  [minuteSeconds, "minute"],
-  [hourSeconds, "hour"],
-  [daySeconds, "day"],
-]);
-
-function resolutionLabel(resolution: number): string {
-  return resolutionNames.get(resolution) ?? `${resolution} seconds`;
 }

@@ -100,6 +100,22 @@ describe("a private group", () => {
     await expect.element(networks.getByText("LAN")).toBeVisible();
     await networks.unmount();
 
+    const onPick = vi.fn<(row: TrafficDestination) => void>();
+    const both = await render(
+      <DestinationsTable rows={[lan, unknown]} groupBy="asn" whole={15} onPick={onPick} />,
+    );
+    const rows = both.getByRole("row").elements();
+
+    // The LAN opens; the unknown public addresses stand for no one network.
+    expect(rows[1]?.classList.contains("cursor-pointer")).toBe(true);
+    expect(rows[2]?.classList.contains("cursor-pointer")).toBe(false);
+
+    await both.getByText("Unknown").click();
+    await both.getByText("LAN").click();
+
+    expect(onPick).toHaveBeenCalledExactlyOnceWith(lan);
+    await both.unmount();
+
     const countries = await render(
       <DestinationsTable rows={[{ ...unknown, private: false }]} groupBy="country" whole={5} />,
     );

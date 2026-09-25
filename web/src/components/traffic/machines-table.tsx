@@ -11,6 +11,8 @@ import { formatCount } from "~/components/traffic/format.ts";
 import { windowOf } from "~/components/traffic/range.ts";
 import type { TrafficWindowSearch } from "~/components/traffic/range.ts";
 import { SectionEmpty } from "~/components/ui/section.tsx";
+import { useWidths } from "~/lib/breakpoint.ts";
+import type { Widths } from "~/lib/breakpoint.ts";
 
 /** A machine the server no longer knows keeps its traffic under its old id. */
 export function trafficNodeName(node: {
@@ -33,66 +35,71 @@ interface Row extends TrafficNode {
 
 const helper = createAppColumnHelper<Row>();
 
-function columns(search: TrafficWindowSearch): ReturnType<typeof helper.columns> {
+function columns(search: TrafficWindowSearch, widths: Widths): ReturnType<typeof helper.columns> {
+  const machine = helper.accessor((row) => trafficNodeName(row), {
+    id: "machine",
+    header: "Machine",
+    enableSorting: true,
+    cell: ({ row }) => (
+      <Link
+        to="/traffic/machines/$nodeId"
+        params={{ nodeId: row.original.nodeId }}
+        search={{ ...windowOf(search), by: "host" }}
+        className={
+          row.original.nodeName === ""
+            ? "text-kumo-subtle hover:underline"
+            : "font-medium text-kumo-default hover:underline"
+        }
+      >
+        {trafficNodeName(row.original)}
+      </Link>
+    ),
+    meta: { className: "w-[30%] max-w-0 min-w-40 truncate" },
+  });
+  const volume = helper.accessor((row) => total(row), {
+    id: "total",
+    header: "Total",
+    enableSorting: true,
+    sortDescFirst: true,
+    cell: ({ row }) => (
+      <VolumeCell
+        bytes={total(row.original)}
+        widest={row.original.widest}
+        whole={row.original.whole}
+      />
+    ),
+    meta: { numeric: true },
+  });
+  const upload = helper.accessor((row) => row.txBytes, {
+    id: "upload",
+    header: "Upload",
+    enableSorting: true,
+    sortDescFirst: true,
+    cell: ({ row }) => <BytesCell bytes={row.original.txBytes} />,
+    meta: { numeric: true },
+  });
+  const download = helper.accessor((row) => row.rxBytes, {
+    id: "download",
+    header: "Download",
+    enableSorting: true,
+    sortDescFirst: true,
+    cell: ({ row }) => <BytesCell bytes={row.original.rxBytes} />,
+    meta: { numeric: true },
+  });
+  const conns = helper.accessor((row) => row.conns, {
+    id: "conns",
+    header: "Connections",
+    enableSorting: true,
+    sortDescFirst: true,
+    cell: ({ row }) => <span className="tabular-nums">{formatCount(row.original.conns)}</span>,
+    meta: { numeric: true, className: "text-kumo-subtle" },
+  });
+
   return helper.columns([
-    helper.accessor((row) => trafficNodeName(row), {
-      id: "machine",
-      header: "Machine",
-      enableSorting: true,
-      cell: ({ row }) => (
-        <Link
-          to="/traffic/machines/$nodeId"
-          params={{ nodeId: row.original.nodeId }}
-          search={{ ...windowOf(search), by: "host" }}
-          className={
-            row.original.nodeName === ""
-              ? "text-kumo-subtle hover:underline"
-              : "font-medium text-kumo-default hover:underline"
-          }
-        >
-          {trafficNodeName(row.original)}
-        </Link>
-      ),
-      meta: { className: "w-[30%] max-w-0 min-w-40 truncate" },
-    }),
-    helper.accessor((row) => total(row), {
-      id: "total",
-      header: "Total",
-      enableSorting: true,
-      sortDescFirst: true,
-      cell: ({ row }) => (
-        <VolumeCell
-          bytes={total(row.original)}
-          widest={row.original.widest}
-          whole={row.original.whole}
-        />
-      ),
-      meta: { numeric: true },
-    }),
-    helper.accessor((row) => row.txBytes, {
-      id: "upload",
-      header: "Upload",
-      enableSorting: true,
-      sortDescFirst: true,
-      cell: ({ row }) => <BytesCell bytes={row.original.txBytes} />,
-      meta: { numeric: true, className: "hidden sm:table-cell" },
-    }),
-    helper.accessor((row) => row.rxBytes, {
-      id: "download",
-      header: "Download",
-      enableSorting: true,
-      sortDescFirst: true,
-      cell: ({ row }) => <BytesCell bytes={row.original.rxBytes} />,
-      meta: { numeric: true, className: "hidden sm:table-cell" },
-    }),
-    helper.accessor((row) => row.conns, {
-      id: "conns",
-      header: "Connections",
-      enableSorting: true,
-      sortDescFirst: true,
-      cell: ({ row }) => <span className="tabular-nums">{formatCount(row.original.conns)}</span>,
-      meta: { numeric: true, className: "hidden md:table-cell text-kumo-subtle" },
-    }),
+    machine,
+    volume,
+    ...(widths.sm ? [upload, download] : []),
+    ...(widths.md ? [conns] : []),
   ]);
 }
 
@@ -116,11 +123,12 @@ export function MachinesTable({
   readonly empty?: ReactNode;
 }): ReactElement {
   const navigate = useNavigate();
+  const widths = useWidths();
   const widest = Math.max(0, ...nodes.map((node) => total(node)));
   const rows: Row[] = nodes.map((node) => ({ ...node, widest, whole }));
   const table = useAppTable({
     data: rows,
-    columns: columns(search),
+    columns: columns(search, widths),
     getRowId: (row) => row.nodeId,
     initialState: { sorting: [{ id: "total", desc: true }] },
   });

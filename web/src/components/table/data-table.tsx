@@ -20,6 +20,11 @@ export interface DataTableProps {
   readonly footer?: ReactNode;
   /** Adds a click handler and pointer cursor to every row. */
   readonly onRowClick?: ((rowId: string) => void) | undefined;
+  /**
+   * Which rows the click reaches, when not all of them: a row that stands for nothing to open keeps
+   * the plain cursor, so it does not promise a click that does nothing.
+   */
+  readonly isRowClickable?: ((rowId: string) => boolean) | undefined;
 }
 
 /**
@@ -29,7 +34,12 @@ export interface DataTableProps {
  * to an edge and `enableSorting` for a sortable header; everything else is the column's `cell`
  * renderer.
  */
-export function DataTable({ empty, footer, onRowClick }: DataTableProps): ReactElement {
+export function DataTable({
+  empty,
+  footer,
+  onRowClick,
+  isRowClickable,
+}: DataTableProps): ReactElement {
   const table = useTableContext();
   const { rows } = table.getRowModel();
   const pinnedRight = table
@@ -88,43 +98,47 @@ export function DataTable({ empty, footer, onRowClick }: DataTableProps): ReactE
               ))}
             </Table.Header>
             <Table.Body>
-              {rows.map((row) => (
-                <Table.Row
-                  key={row.id}
-                  className={cn(frameTableRowClass, onRowClick !== undefined && "cursor-pointer")}
-                  onClick={
-                    onRowClick === undefined
-                      ? undefined
-                      : (event) => {
-                          // Clicks on controls inside a row belong to the control.
-                          if (
-                            !(event.target instanceof Element) ||
-                            // Kumo's Checkbox is a span carrying the role, not a real input, so
-                            // the role is what keeps a tick box from opening the row behind it.
-                            event.target.closest(
-                              "button, a, input, [role=checkbox], [role=menu]",
-                            ) === null
-                          ) {
-                            onRowClick(row.id);
-                          }
-                        }
-                  }
-                >
-                  {row.getAllCells().map((cell) => {
-                    const { meta } = cell.column.columnDef;
+              {rows.map((row) => {
+                const clickable = onRowClick !== undefined && (isRowClickable?.(row.id) ?? true);
 
-                    return (
-                      <Table.Cell
-                        key={cell.id}
-                        {...(meta?.sticky === undefined ? {} : { sticky: meta.sticky })}
-                        className={cellClass(meta, overflowing)}
-                      >
-                        <table.FlexRender cell={cell} />
-                      </Table.Cell>
-                    );
-                  })}
-                </Table.Row>
-              ))}
+                return (
+                  <Table.Row
+                    key={row.id}
+                    className={cn(frameTableRowClass, clickable && "cursor-pointer")}
+                    onClick={
+                      !clickable || onRowClick === undefined
+                        ? undefined
+                        : (event) => {
+                            // Clicks on controls inside a row belong to the control.
+                            if (
+                              !(event.target instanceof Element) ||
+                              // Kumo's Checkbox is a span carrying the role, not a real input, so
+                              // the role is what keeps a tick box from opening the row behind it.
+                              event.target.closest(
+                                "button, a, input, [role=checkbox], [role=menu]",
+                              ) === null
+                            ) {
+                              onRowClick(row.id);
+                            }
+                          }
+                    }
+                  >
+                    {row.getAllCells().map((cell) => {
+                      const { meta } = cell.column.columnDef;
+
+                      return (
+                        <Table.Cell
+                          key={cell.id}
+                          {...(meta?.sticky === undefined ? {} : { sticky: meta.sticky })}
+                          className={cellClass(meta, overflowing)}
+                        >
+                          <table.FlexRender cell={cell} />
+                        </Table.Cell>
+                      );
+                    })}
+                  </Table.Row>
+                );
+              })}
             </Table.Body>
           </Table>
         )}

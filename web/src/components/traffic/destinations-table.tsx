@@ -8,11 +8,16 @@ import {
   countryName,
   formatCount,
   networkLabel,
+  networkName,
   portLabel,
   serviceName,
 } from "~/components/traffic/format.ts";
 import { trafficNodeName } from "~/components/traffic/machines-table.tsx";
+import { Domain } from "~/components/ui/domain.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
+import { useWidths } from "~/lib/breakpoint.ts";
+import type { Widths } from "~/lib/breakpoint.ts";
+import { isIp } from "~/lib/ip.ts";
 
 /** What the rows of each grouping are, for the first column's heading and the counts. */
 export const groupingLabels: Record<DestinationGrouping, string> = {
@@ -25,11 +30,13 @@ export const groupingLabels: Record<DestinationGrouping, string> = {
   reporter: "Gateway",
 };
 
+// The server keeps private destinations apart from public ones of the same network or country, so
+// the flag is part of those keys.
 const keys: Record<DestinationGrouping, (row: TrafficDestination) => string> = {
   host: (row) => row.host,
   destination: (row) => `${row.dst}|${row.proto}|${row.port}|${row.host}`,
-  asn: (row) => String(row.asn),
-  country: (row) => row.country,
+  asn: (row) => `${row.asn}|${String(row.private)}`,
+  country: (row) => `${row.country}|${String(row.private)}`,
   port: (row) => `${row.proto}:${row.port}`,
   node: (row) => row.nodeId,
   reporter: (row) => row.nodeId,
@@ -46,15 +53,16 @@ const remainders: Record<DestinationGrouping, (row: TrafficDestination) => boole
   host: (row) => row.host === "",
   destination: (row) => row.dst === "",
   port: (row) => row.proto === 0,
-  asn: (row) => row.asn === 0,
-  country: (row) => row.country === "",
+  asn: (row) => row.asn === 0 && !row.private,
+  country: (row) => row.country === "" && !row.private,
   node: never,
   reporter: never,
 };
 
 /**
  * Whether the row stands for no one value: the remainder the server folds the smaller destinations
- * of a busy hour into, or the addresses with no known network or country. Nothing narrows to it.
+ * of a busy hour into, or the public addresses with no known network or country. Nothing narrows to
+ * it; the private ones open as the LAN.
  */
 export function isRemainder(row: TrafficDestination, groupBy: DestinationGrouping): boolean {
   return remainders[groupBy](row);
@@ -67,16 +75,25 @@ function Subtle({ children }: { readonly children: ReactNode }): ReactElement {
   return <span className="text-kumo-subtle">{children}</span>;
 }
 
+/** A name as a domain token; an address, which has no site to tint by, in plain code type. */
+function HostName({ name }: { readonly name: string }): ReactElement {
+  return isIp(name) ? (
+    <span className="truncate font-mono text-[0.9em]" title={name}>
+      {name}
+    </span>
+  ) : (
+    <Domain domain={name} />
+  );
+}
+
 function HostCell({ row }: { readonly row: TrafficDestination }): ReactElement {
   if (row.host === "") {
     return <Subtle>{remainderLabel}</Subtle>;
   }
 
   return (
-    <span className="flex min-w-0 items-baseline gap-2">
-      <span className="truncate font-mono text-[0.9em]" title={row.host}>
-        {row.host}
-      </span>
+    <span className="flex min-w-0 items-center gap-2">
+      <HostName name={row.host} />
       {row.private ? <Subtle>LAN</Subtle> : null}
     </span>
   );
@@ -88,16 +105,34 @@ function AddressCell({ row }: { readonly row: TrafficDestination }): ReactElemen
   }
 
   return (
-    <span className="flex min-w-0 flex-col">
-      <span className="flex min-w-0 items-baseline gap-2">
+    <span className="flex min-w-0 flex-col items-start gap-1">
+      <span className="flex max-w-full min-w-0 items-center gap-2">
         <span className="truncate font-mono text-[0.9em]">{row.dst}</span>
         {row.private ? <Subtle>LAN</Subtle> : null}
       </span>
-      {row.host === "" ? null : (
-        <span className="truncate text-xs text-kumo-subtle" title={row.host}>
-          {row.host}
-        </span>
+      {row.host === "" || row.host === row.dst ? null : (
+        <Domain domain={row.host} className="text-xs" />
       )}
+    </span>
+  );
+}
+
+/** The organisation leads; the registry handle and the number are there for whoever needs them. */
+function NetworkName({
+  row,
+  withHandle,
+}: {
+  readonly row: TrafficDestination;
+  readonly withHandle: boolean;
+}): ReactElement {
+  const { org, handle } = networkName(row.asName);
+
+  return (
+    <span className="block truncate" title={networkLabel(row.asn, row.asName)}>
+      {org === "" ? `AS${row.asn}` : org}
+      <span className="ms-2 text-xs text-kumo-subtle">
+        {withHandle && handle !== "" ? `${handle} · AS${row.asn}` : `AS${row.asn}`}
+      </span>
     </span>
   );
 }
@@ -107,12 +142,7 @@ function NetworkCell({ row }: { readonly row: TrafficDestination }): ReactElemen
     return row.private ? <span>LAN</span> : <Subtle>{unknownLabel}</Subtle>;
   }
 
-  return (
-    <span className="block truncate" title={networkLabel(row.asn, row.asName)}>
-      {row.asName === "" ? `AS${row.asn}` : row.asName}
-      <span className="ms-2 text-xs text-kumo-subtle">AS{row.asn}</span>
-    </span>
-  );
+  return <NetworkName row={row} withHandle />;
 }
 
 function CountryCell({ row }: { readonly row: TrafficDestination }): ReactElement {
@@ -121,6 +151,22 @@ function CountryCell({ row }: { readonly row: TrafficDestination }): ReactElemen
   }
 
   return row.private ? <span>LAN</span> : <Subtle>{unknownLabel}</Subtle>;
+}
+
+/**
+ * An address's network beside it, without the registry handle the column has no room for. A LAN
+ * address, already marked so, has none to show.
+ */
+function NetworkColumnCell({ row }: { readonly row: TrafficDestination }): ReactElement | null {
+  if (row.asn === 0) {
+    return row.private ? null : <Subtle>{unknownLabel}</Subtle>;
+  }
+
+  return <NetworkName row={row} withHandle={false} />;
+}
+
+function CountryColumnCell({ row }: { readonly row: TrafficDestination }): ReactElement | null {
+  return row.private && row.country === "" ? null : <CountryCell row={row} />;
 }
 
 function PortCell({ row }: { readonly row: TrafficDestination }): ReactElement {
@@ -174,6 +220,7 @@ function KeyCell({
 interface Row extends TrafficDestination {
   readonly widest: number;
   readonly whole: number;
+  readonly of: string | undefined;
 }
 
 const helper = createAppColumnHelper<Row>();
@@ -182,38 +229,41 @@ function total(row: TrafficDestination): number {
   return row.txBytes + row.rxBytes;
 }
 
-/** The columns for a grouping: its key first, then what the grouping does not already say. */
+/**
+ * The columns for a grouping and the width at hand: its key first, then what the grouping does not
+ * already say, dropping the least telling ones as the screen narrows.
+ */
 function columnsFor(
   groupBy: DestinationGrouping,
   oneMachine: boolean,
+  widths: Widths,
 ): ReturnType<typeof helper.columns> {
   const key = helper.accessor((row) => destinationKey(row, groupBy), {
     id: "key",
     header: groupingLabels[groupBy],
     enableSorting: true,
     cell: ({ row }) => <KeyCell row={row.original} groupBy={groupBy} />,
-    meta: { className: "w-[34%] max-w-0 min-w-48" },
+    meta: { className: "w-[34%] max-w-0 min-w-40 max-sm:w-3/5" },
   });
   const network = helper.accessor((row) => row.asName, {
     id: "network",
     header: "Network",
     enableSorting: true,
-    cell: ({ row }) => <NetworkCell row={row.original} />,
-    meta: { className: "hidden lg:table-cell max-w-0 w-[20%] min-w-36" },
+    cell: ({ row }) => <NetworkColumnCell row={row.original} />,
+    meta: { className: "max-w-0 w-[20%] min-w-36" },
   });
   const country = helper.accessor((row) => countryName(row.country), {
     id: "country",
     header: "Country",
     enableSorting: true,
-    cell: ({ row }) => <CountryCell row={row.original} />,
-    meta: { className: "hidden xl:table-cell whitespace-nowrap" },
+    cell: ({ row }) => <CountryColumnCell row={row.original} />,
+    meta: { className: "whitespace-nowrap" },
   });
   const port = helper.accessor((row) => row.port, {
     id: "port",
     header: "Port",
     enableSorting: true,
     cell: ({ row }) => <PortCell row={row.original} />,
-    meta: { className: "hidden md:table-cell" },
   });
   const machines = helper.accessor((row) => row.nodes, {
     id: "machines",
@@ -221,58 +271,72 @@ function columnsFor(
     enableSorting: true,
     sortDescFirst: true,
     cell: ({ row }) => <span className="tabular-nums">{row.original.nodes}</span>,
-    meta: { numeric: true, className: "hidden md:table-cell text-kumo-subtle" },
+    meta: { numeric: true, className: "text-kumo-subtle" },
   });
-  const counts = [
-    helper.accessor((row) => total(row), {
-      id: "total",
-      header: "Total",
-      enableSorting: true,
-      sortDescFirst: true,
-      cell: ({ row }) => (
-        <VolumeCell
-          bytes={total(row.original)}
-          widest={row.original.widest}
-          whole={row.original.whole}
-        />
-      ),
-      meta: { numeric: true },
-    }),
-    helper.accessor((row) => row.txBytes, {
-      id: "upload",
-      header: "Upload",
-      enableSorting: true,
-      sortDescFirst: true,
-      cell: ({ row }) => <BytesCell bytes={row.original.txBytes} />,
-      meta: { numeric: true, className: "hidden sm:table-cell" },
-    }),
-    helper.accessor((row) => row.rxBytes, {
-      id: "download",
-      header: "Download",
-      enableSorting: true,
-      sortDescFirst: true,
-      cell: ({ row }) => <BytesCell bytes={row.original.rxBytes} />,
-      meta: { numeric: true, className: "hidden sm:table-cell" },
-    }),
-    helper.accessor((row) => row.conns, {
-      id: "conns",
-      header: "Connections",
-      enableSorting: true,
-      sortDescFirst: true,
-      cell: ({ row }) => <span className="tabular-nums">{formatCount(row.original.conns)}</span>,
-      meta: { numeric: true, className: "hidden xl:table-cell text-kumo-subtle" },
-    }),
-  ];
+  const volume = helper.accessor((row) => total(row), {
+    id: "total",
+    header: "Total",
+    enableSorting: true,
+    sortDescFirst: true,
+    cell: ({ row }) => (
+      <VolumeCell
+        bytes={total(row.original)}
+        widest={row.original.widest}
+        whole={row.original.whole}
+        {...(row.original.of === undefined ? {} : { of: row.original.of })}
+      />
+    ),
+    meta: { numeric: true },
+  });
+  const upload = helper.accessor((row) => row.txBytes, {
+    id: "upload",
+    header: "Upload",
+    enableSorting: true,
+    sortDescFirst: true,
+    cell: ({ row }) => <BytesCell bytes={row.original.txBytes} />,
+    meta: { numeric: true },
+  });
+  const download = helper.accessor((row) => row.rxBytes, {
+    id: "download",
+    header: "Download",
+    enableSorting: true,
+    sortDescFirst: true,
+    cell: ({ row }) => <BytesCell bytes={row.original.rxBytes} />,
+    meta: { numeric: true },
+  });
+  const conns = helper.accessor((row) => row.conns, {
+    id: "conns",
+    header: "Connections",
+    enableSorting: true,
+    sortDescFirst: true,
+    cell: ({ row }) => <span className="tabular-nums">{formatCount(row.original.conns)}</span>,
+    meta: { numeric: true, className: "text-kumo-subtle" },
+  });
+  const directions = widths.sm ? [upload, download] : [];
 
   if (groupBy === "destination") {
-    return helper.columns([key, network, country, port, ...counts]);
+    return helper.columns([
+      key,
+      ...(widths.lg ? [network] : []),
+      ...(widths.xl ? [country] : []),
+      ...(widths.md ? [port] : []),
+      volume,
+      ...directions,
+      ...(widths["2xl"] ? [conns] : []),
+    ]);
   }
 
   // A row of machines or gateways is one machine, and so is every row of a view narrowed to one;
   // otherwise a row gathers several.
-  return oneMachine || groupBy === "node" || groupBy === "reporter"
-    ? helper.columns([key, ...counts])
-    : helper.columns([key, machines, ...counts]);
+  const many = !oneMachine && groupBy !== "node" && groupBy !== "reporter" && widths.md;
+
+  return helper.columns([
+    key,
+    ...(many ? [machines] : []),
+    volume,
+    ...directions,
+    ...(widths.xl ? [conns] : []),
+  ]);
 }
 
 /**
@@ -284,6 +348,7 @@ export function DestinationsTable({
   rows,
   groupBy,
   whole,
+  of,
   footer,
   empty,
   oneMachine = false,
@@ -295,17 +360,25 @@ export function DestinationsTable({
   readonly oneMachine?: boolean;
   /** Upload plus download of everything the rows were drawn from. */
   readonly whole: number;
+  /** What `whole` is, for the share a total's tooltip gives; the window when absent. */
+  readonly of?: string;
   readonly footer?: ReactNode;
   readonly empty?: ReactNode;
   /** Called with the clicked row; a folded remainder row is not clickable. */
   readonly onPick?: (row: TrafficDestination) => void;
 }): ReactElement {
+  const widths = useWidths();
   const widest = Math.max(0, ...rows.map((row) => total(row)));
-  const data: Row[] = rows.map((row) => ({ ...row, widest, whole }));
+  const data: Row[] = rows.map((row) => ({ ...row, widest, whole, of }));
   const byId = new Map(rows.map((row) => [destinationKey(row, groupBy), row]));
+  const pickable = (id: string): TrafficDestination | undefined => {
+    const row = byId.get(id);
+
+    return row === undefined || isRemainder(row, groupBy) ? undefined : row;
+  };
   const table = useAppTable({
     data,
-    columns: columnsFor(groupBy, oneMachine),
+    columns: columnsFor(groupBy, oneMachine, widths),
     getRowId: (row) => destinationKey(row, groupBy),
     initialState: { sorting: [{ id: "total", desc: true }] },
   });
@@ -326,13 +399,14 @@ export function DestinationsTable({
           onPick === undefined
             ? undefined
             : (id) => {
-                const row = byId.get(id);
+                const row = pickable(id);
 
-                if (row !== undefined && !isRemainder(row, groupBy)) {
+                if (row !== undefined) {
                   onPick(row);
                 }
               }
         }
+        isRowClickable={(id) => pickable(id) !== undefined}
       />
     </table.AppTable>
   );

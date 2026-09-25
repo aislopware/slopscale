@@ -22,16 +22,19 @@ export function VolumeCell({
   bytes,
   widest,
   whole,
+  of = "the window",
 }: {
   readonly bytes: number;
   /** The largest value in the column, which fills the bar. */
   readonly widest: number;
   /** Everything in the window, for the share. */
   readonly whole: number;
+  /** What `whole` is, in the tooltip's words. */
+  readonly of?: string;
 }): ReactElement {
   return (
     <span className="flex items-center justify-end gap-2">
-      <Tooltip content={`${shareLabel(bytes, whole)} of the window`}>
+      <Tooltip content={`${shareLabel(bytes, whole)} of ${of}`}>
         <span className="whitespace-nowrap tabular-nums">{formatBytes(bytes)}</span>
       </Tooltip>
       <span aria-hidden className="h-1.5 w-20 shrink-0 overflow-clip rounded-full bg-kumo-tint">

@@ -76,12 +76,36 @@ describe(trafficWindow, () => {
 });
 
 describe(pickDestination, () => {
-  it("turns a place into the machines that reached it, and a machine into its hosts", () => {
-    expect(pickDestination(row, "host")).toStrictEqual({ q: "www.youtube.com", by: "node" });
+  it("turns a place into the machines that reached exactly it, and a machine into its hosts", () => {
+    expect(pickDestination(row, "host")).toStrictEqual({ host: "www.youtube.com", by: "node" });
     expect(pickDestination(row, "asn")).toStrictEqual({ asn: 15_169, by: "node" });
     expect(pickDestination(row, "port")).toStrictEqual({ proto: 6, port: 443, by: "node" });
     expect(pickDestination(row, "reporter")).toStrictEqual({ gateway: "7", by: "host" });
     expect(pickDestination(row, "node")).toStrictEqual({ node: "7", by: "host" });
+  });
+
+  it("keeps an address's protocol and port, which are part of the row", () => {
+    expect(pickDestination(row, "destination")).toStrictEqual({
+      dst: "142.250.1.1",
+      proto: 6,
+      port: 443,
+      by: "node",
+    });
+  });
+
+  it("opens a private network or country row as the LAN", () => {
+    const lan = { ...row, private: true, asn: 0, country: "" };
+
+    expect(pickDestination(lan, "asn")).toStrictEqual({ lan: true, by: "node" });
+    expect(pickDestination(lan, "country")).toStrictEqual({ lan: true, by: "node" });
+  });
+});
+
+describe("the LAN flag in the address", () => {
+  it("reads the router's boolean and a hand-typed one, and nothing else", () => {
+    expect(parse(search, { lan: true }).lan).toBe(true);
+    expect(parse(search, { lan: "true" }).lan).toBe(true);
+    expect(parse(search, { lan: "yes" }).lan).toBe(false);
   });
 });
 
@@ -104,5 +128,12 @@ describe(destinationChips, () => {
     chips.find((chip) => chip.name === "Port")?.onRemove();
 
     expect(onChange).toHaveBeenCalledWith({ ...narrowed, proto: 0, port: 0 });
+  });
+
+  it("names a picked host as a host, and leaves typed text to the search box", () => {
+    const picked: DestinationSearch = { ...parse(search, {}), q: "git", host: "github.com" };
+    const chips = destinationChips(picked, (id) => id, vi.fn<(next: DestinationSearch) => void>());
+
+    expect(chips.map((chip) => [chip.name, chip.value])).toStrictEqual([["Host", "github.com"]]);
   });
 });

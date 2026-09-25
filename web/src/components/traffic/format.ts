@@ -32,6 +32,35 @@ export function formatRate(bytesPerSecond: number): string {
   return `${formatBytes(bytesPerSecond)}/s`;
 }
 
+/** One rate unit for a whole chart, and what a rate in bytes per second is divided by to be in it. */
+export interface RateScale {
+  readonly unit: string;
+  readonly divisor: number;
+}
+
+/**
+ * The unit the largest rate on a chart reads best in. Every tick is then in it, where formatting
+ * each tick on its own gave an axis of "512 KiB/s, 1.0 MiB/s, 1.5 MiB/s".
+ */
+export function rateScale(peak: number): RateScale {
+  let divisor = 1;
+  let unit = 0;
+
+  while (peak / divisor >= binaryStep && unit < byteUnits.length - 1) {
+    divisor *= binaryStep;
+    unit += 1;
+  }
+
+  return { unit: `${byteUnits[unit] ?? ""}/s`, divisor };
+}
+
+const scaled = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
+
+/** A value already divided into the scale's unit, with the unit: "2.5 MiB/s". */
+export function formatScaled(value: number, scale: RateScale): string {
+  return `${scaled.format(value)} ${scale.unit}`;
+}
+
 const counts = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
 
 /** A count that may run to millions, compact: "950", "12K", "3.4M". */
@@ -118,6 +147,25 @@ export function networkLabel(asn: number, name: string): string {
   }
 
   return name === "" ? `AS${asn}` : `AS${asn} ${name}`;
+}
+
+const registryHandle = /^(?=[^ ]*[A-Z])[A-Z0-9][A-Z0-9._-]*$/u;
+
+/**
+ * A network's name split into the organisation and the registry handle it leads with: "VIETEL-AS-AP
+ * Viettel Group" is Viettel Group, handle VIETEL-AS-AP. A name that is only a handle,
+ * "CLOUDFLARENET", has nothing better to show, so it stays the name.
+ */
+export function networkName(name: string): { readonly org: string; readonly handle: string } {
+  const space = name.indexOf(" ");
+  const first = space === -1 ? name : name.slice(0, space);
+  const rest = space === -1 ? "" : name.slice(space + 1).trim();
+
+  if (rest === "" || !registryHandle.test(first)) {
+    return { org: name, handle: "" };
+  }
+
+  return { org: rest, handle: first };
 }
 
 const wholePercent = 100;

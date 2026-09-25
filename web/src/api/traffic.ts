@@ -102,8 +102,14 @@ export function trafficSummaryQuery(
 /** What narrows a destinations read beyond the window: the values of a row clicked through. */
 export interface DestinationFilters {
   readonly groupBy: DestinationGrouping;
-  /** Hosts or addresses containing this. */
+  /** Hosts or addresses containing this: what the operator typed. */
   readonly q: string;
+  /** One host exactly, as the host grouping keys it: the name, or an unnamed destination's address. */
+  readonly host: string;
+  /** One address exactly. */
+  readonly dst: string;
+  /** Only destinations inside private ranges. */
+  readonly lan: boolean;
   readonly asn: number;
   readonly country: string;
   readonly proto: number;
@@ -145,6 +151,9 @@ export function trafficDestinationsQuery(
             groupBy: filters.groupBy,
             limit: filters.limit,
             ...(filters.q === "" ? {} : { q: filters.q }),
+            ...(filters.host === "" ? {} : { host: filters.host }),
+            ...(filters.dst === "" ? {} : { dst: filters.dst }),
+            ...(filters.lan ? { private: true } : {}),
             ...(filters.asn === 0 ? {} : { asn: filters.asn }),
             ...(filters.country === "" ? {} : { country: filters.country }),
             ...(filters.proto === 0 ? {} : { proto: filters.proto }),
@@ -161,7 +170,10 @@ export function trafficDestinationsQuery(
 
 export interface NameFilters {
   readonly groupBy: NameGrouping;
+  /** Names containing this: what the operator typed. */
   readonly q: string;
+  /** One name exactly. */
+  readonly name: string;
   readonly limit: number;
 }
 
@@ -184,6 +196,7 @@ export function trafficNamesQuery(
             groupBy: filters.groupBy,
             limit: filters.limit,
             ...(filters.q === "" ? {} : { q: filters.q }),
+            ...(filters.name === "" ? {} : { name: filters.name }),
           },
         },
       });

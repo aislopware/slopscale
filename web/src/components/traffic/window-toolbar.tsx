@@ -23,6 +23,12 @@ const presetTabs: TabsItem[] = [
   { value: "90d", label: "90d" },
 ];
 
+/**
+ * A search box among the toolbar's controls: it shares a phone's row with the gateway picker rather
+ * than taking one of its own.
+ */
+export const windowSearchClass = "min-w-40 flex-1";
+
 function isPreset(value: string): value is Exclude<TrafficRange, "custom"> {
   return presetTabs.some((tab) => tab.value === value);
 }
@@ -153,13 +159,7 @@ function CustomRange({
       }}
     >
       <Popover.Trigger
-        render={
-          <Button
-            variant={custom ? "primary" : "secondary"}
-            icon={CalendarDotsIcon}
-            aria-label="Custom range"
-          />
-        }
+        render={<Button variant="secondary" icon={CalendarDotsIcon} aria-label="Custom range" />}
       >
         {custom ? customLabel(current.start, current.end) : "Custom"}
       </Popover.Trigger>

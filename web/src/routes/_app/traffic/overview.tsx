@@ -9,6 +9,7 @@ import {
   trafficSummaryQuery,
 } from "~/api/traffic.ts";
 import type { DestinationGrouping, TrafficNode, TrafficScope } from "~/api/traffic.ts";
+import { plural } from "~/components/overview/plural.ts";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { DestinationsSection } from "~/components/traffic/destinations-section.tsx";
 import { MachinesTable } from "~/components/traffic/machines-table.tsx";
@@ -84,6 +85,7 @@ function OverviewPage(): ReactElement {
         description="What the machines send through the gateways, and where it goes."
         window={data}
         reporters={reporterList}
+        carried={data?.reporters}
         gateway={search.gateway}
       />
       {reporters.data !== undefined && reporterList.length === 0 ? (
@@ -149,7 +151,9 @@ function TopMachinesSection({
               </TextLink>
             }
           >
-            {`The ${topRows} busiest`}
+            {nodes.length >= topRows
+              ? `The ${topRows} busiest`
+              : `Showing ${plural(nodes.length, "machine")}`}
           </TableFooter>
         }
       />
@@ -169,12 +173,13 @@ function TopDestinationsSection({
     ...trafficDestinationsQuery(scopeOf(search), topFilters(search)),
     placeholderData: keepPreviousData,
   });
+  const rows = destinations.data?.destinations ?? [];
 
   return (
     <DestinationsSection
       title="Top destinations"
       description="Where that traffic went. Pick a row to see which machines reached it."
-      rows={destinations.data?.destinations ?? []}
+      rows={rows}
       groupBy={search.by}
       whole={whole}
       footer={
@@ -188,7 +193,9 @@ function TopDestinationsSection({
             </TextLink>
           }
         >
-          {`The ${topRows} busiest`}
+          {rows.length >= topRows
+            ? `The ${topRows} busiest`
+            : `Showing ${plural(rows.length, "row")}`}
         </TableFooter>
       }
       onGroupChange={(by) => {

@@ -63,6 +63,7 @@ function MachinesPage(): ReactElement {
         description="Every machine that sent traffic through a gateway in the window, busiest first."
         window={data}
         reporters={reporters.data?.reporters ?? []}
+        carried={data?.reporters}
         gateway={search.gateway}
       />
       <WindowToolbar

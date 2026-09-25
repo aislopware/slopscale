@@ -61,7 +61,7 @@ export function WindowRefusal({
   return (
     <Callout
       tone="error"
-      title="The server would not read this window"
+      title="This range cannot be shown"
       description={refusalOf(failure)}
       action={
         <Button size="sm" variant="secondary" onClick={onReset}>

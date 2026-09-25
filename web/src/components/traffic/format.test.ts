@@ -4,8 +4,11 @@ import {
   countryName,
   formatBytes,
   formatRate,
+  formatScaled,
   networkLabel,
+  networkName,
   portLabel,
+  rateScale,
   serviceName,
   shareLabel,
 } from "~/components/traffic/format.ts";
@@ -61,5 +64,29 @@ describe(shareLabel, () => {
     expect(shareLabel(1, 1000)).toBe("<1%");
     expect(shareLabel(0, 1000)).toBe("0%");
     expect(shareLabel(5, 0)).toBe("0%");
+  });
+});
+
+describe(networkName, () => {
+  it("leads with the organisation and keeps the registry handle apart", () => {
+    expect(networkName("VIETEL-AS-AP Viettel Group")).toStrictEqual({
+      org: "Viettel Group",
+      handle: "VIETEL-AS-AP",
+    });
+    expect(networkName("CLOUDFLARENET")).toStrictEqual({ org: "CLOUDFLARENET", handle: "" });
+    expect(networkName("Google LLC")).toStrictEqual({ org: "Google LLC", handle: "" });
+    expect(networkName("")).toStrictEqual({ org: "", handle: "" });
+  });
+});
+
+describe(rateScale, () => {
+  it("puts every tick of a chart in the unit of its largest rate", () => {
+    const scale = rateScale(6.9 * 1024 ** 2);
+
+    expect(scale).toStrictEqual({ unit: "MiB/s", divisor: 1024 ** 2 });
+    expect(formatScaled(0.5, scale)).toBe("0.5 MiB/s");
+    expect(formatScaled(4, scale)).toBe("4 MiB/s");
+    expect(rateScale(900)).toStrictEqual({ unit: "B/s", divisor: 1 });
+    expect(rateScale(0)).toStrictEqual({ unit: "B/s", divisor: 1 });
   });
 });

@@ -1,4 +1,3 @@
-import { Button } from "@cloudflare/kumo/components/button";
 import { Select } from "@cloudflare/kumo/components/select";
 import { Tabs } from "@cloudflare/kumo/components/tabs";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -10,23 +9,30 @@ import { object } from "valibot";
 import { nodesQuery } from "~/api/queries.ts";
 import type { Node } from "~/api/queries.ts";
 import { trafficNamesQuery, trafficReportersQuery, trafficSettingsQuery } from "~/api/traffic.ts";
-import type { TrafficName, TrafficScope } from "~/api/traffic.ts";
+import type { NameFilters, TrafficName, TrafficScope } from "~/api/traffic.ts";
 import { can } from "~/auth/me.ts";
 import { FilterChips } from "~/components/machines/filter-chips.tsx";
 import type { FilterChip } from "~/components/machines/filter-chips.tsx";
 import { plural } from "~/components/overview/plural.ts";
 import { SearchInput } from "~/components/table/search-input.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
+import { DnsLoggingOff, DnsLoggingOffNote } from "~/components/traffic/dns-logging-off.tsx";
 import { NamesTable } from "~/components/traffic/names-table.tsx";
+import { NothingMatches } from "~/components/traffic/nothing-matches.tsx";
 import { windowOf } from "~/components/traffic/range.ts";
 import { useSearchDraft } from "~/components/traffic/search-draft.ts";
-import { nameSearchEntries, pickName, toNameGrouping } from "~/components/traffic/search.ts";
+import {
+  nameChips,
+  nameFilters,
+  nameSearchEntries,
+  pickName,
+  toNameGrouping,
+} from "~/components/traffic/search.ts";
 import type { NameSearch } from "~/components/traffic/search.ts";
-import { TextLink, WindowHeader } from "~/components/traffic/window-header.tsx";
+import { WindowHeader } from "~/components/traffic/window-header.tsx";
 import { isRefusedWindow, loadWindow } from "~/components/traffic/window-refusal.tsx";
-import { WindowToolbar } from "~/components/traffic/window-toolbar.tsx";
+import { WindowToolbar, windowSearchClass } from "~/components/traffic/window-toolbar.tsx";
 import { Frame } from "~/components/ui/frame.tsx";
-import { SectionEmpty } from "~/components/ui/section.tsx";
 import { nodeName } from "~/lib/node.ts";
 
 /** The server's cap on one read. */
@@ -38,8 +44,8 @@ function scopeOf(search: NameSearch): TrafficScope {
   return { ...windowOf(search), node: search.node };
 }
 
-function filtersOf(search: NameSearch): { groupBy: NameSearch["by"]; q: string; limit: number } {
-  return { groupBy: search.by, q: search.q, limit: allRows };
+function filtersOf(search: NameSearch): NameFilters {
+  return nameFilters(search, allRows);
 }
 
 export const Route = createFileRoute("/_app/traffic/dns")({
@@ -94,19 +100,13 @@ function DnsPage(): ReactElement {
   const setSearch = (next: NameSearch): void => {
     void navigate({ search: () => next });
   };
-  const chips: FilterChip[] = [];
-
   // The machine picker says which machine it holds only when the caller may list machines; a
   // machine that came from a link is spelled out as a chip either way.
-  if (search.node !== "" && nodes.data === undefined) {
-    chips.push({
-      name: "Machine",
-      value: `Machine ${search.node}`,
-      onRemove: () => {
-        setSearch({ ...search, node: "" });
-      },
-    });
-  }
+  const chips = nameChips(
+    search,
+    nodes.data === undefined ? (id: string): string => `Machine ${id}` : undefined,
+    setSearch,
+  );
 
   return (
     <>
@@ -139,7 +139,12 @@ function DnsPage(): ReactElement {
           />
         }
       >
-        <SearchInput value={draft} placeholder="Search names" onValueChange={setDraft} />
+        <SearchInput
+          className={windowSearchClass}
+          value={draft}
+          placeholder="Search names"
+          onValueChange={setDraft}
+        />
         {nodes.data === undefined ? null : (
           <Select
             aria-label="Machine"
@@ -177,53 +182,46 @@ function NamesFrame({
 }): ReactElement {
   const settings = useQuery(trafficSettingsQuery);
   const clear = (): void => {
-    onSearch({ ...search, node: "", q: "" });
+    onSearch({ ...search, node: "", q: "", name: "" });
   };
+  const loggingOff = settings.data?.dnsLogging === false;
   let empty: ReactNode = undefined;
 
-  if (settings.data?.dnsLogging === false) {
+  if (loggingOff) {
+    empty = <DnsLoggingOff />;
+  } else if (search.q !== "" || search.name !== "" || search.node !== "") {
     empty = (
-      <SectionEmpty
-        title="DNS logging is off"
-        description="With it on, every gateway runs a resolver and the machines send their lookups to it, so this page can list what each machine looks up."
-        contents={<TextLink to="/traffic/settings">Traffic settings</TextLink>}
-      />
-    );
-  } else if (search.q !== "" || search.node !== "") {
-    empty = (
-      <SectionEmpty
-        title="Nothing matches"
+      <NothingMatches
         description="No lookup in the window matches these filters."
-        contents={
-          <Button variant="secondary" onClick={clear}>
-            Clear filters
-          </Button>
-        }
+        onClear={clear}
       />
     );
   }
 
   return (
-    <Frame>
-      <FilterChips chips={chips} onClearAll={clear} />
-      <NamesTable
-        rows={rows}
-        groupBy={search.by}
-        empty={empty}
-        oneMachine={search.node !== ""}
-        footer={
-          rows.length === 0 ? undefined : (
-            <TableFooter>
-              {rows.length >= allRows
-                ? `The ${allRows} most asked`
-                : `Showing ${plural(rows.length, search.by === "node" ? "machine" : "name")}`}
-            </TableFooter>
-          )
-        }
-        onPick={(row) => {
-          onSearch({ ...search, ...pickName(row, search.by) });
-        }}
-      />
-    </Frame>
+    <>
+      {loggingOff && rows.length > 0 ? <DnsLoggingOffNote /> : null}
+      <Frame>
+        <FilterChips chips={chips} onClearAll={clear} />
+        <NamesTable
+          rows={rows}
+          groupBy={search.by}
+          empty={empty}
+          oneMachine={search.node !== ""}
+          footer={
+            rows.length === 0 ? undefined : (
+              <TableFooter>
+                {rows.length >= allRows
+                  ? `The ${allRows} most asked`
+                  : `Showing ${plural(rows.length, search.by === "node" ? "machine" : "name")}`}
+              </TableFooter>
+            )
+          }
+          onPick={(row) => {
+            onSearch({ ...search, ...pickName(row, search.by) });
+          }}
+        />
+      </Frame>
+    </>
   );
 }

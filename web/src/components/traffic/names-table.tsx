@@ -5,8 +5,11 @@ import { createAppColumnHelper, useAppTable } from "~/components/table/app-table
 import { DataTable } from "~/components/table/data-table.tsx";
 import { formatCount, shareLabel } from "~/components/traffic/format.ts";
 import { trafficNodeName } from "~/components/traffic/machines-table.tsx";
+import { Domain } from "~/components/ui/domain.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
 import { Status } from "~/components/ui/status.tsx";
+import { useWidths } from "~/lib/breakpoint.ts";
+import type { Widths } from "~/lib/breakpoint.ts";
 
 /** A share of failed answers worth drawing the eye to: a name that mostly does not resolve. */
 const failingShare = 0.5;
@@ -21,29 +24,43 @@ function NameCell({ row }: { readonly row: TrafficName }): ReactElement {
   }
 
   return (
-    <span className="block truncate font-mono text-[0.9em]" title={row.name}>
-      {row.name}
+    <span className="flex min-w-0">
+      <Domain domain={row.name} />
     </span>
   );
 }
 
-function FailedCell({ row }: { readonly row: TrafficName }): ReactElement {
+/** The failed answers, with their share of the lookups where there is room for it. */
+function FailedCell({
+  row,
+  withShare,
+}: {
+  readonly row: TrafficName;
+  readonly withShare: boolean;
+}): ReactElement {
   if (row.failed === 0) {
     return <span className="text-kumo-subtle">0</span>;
   }
 
   const failing = row.queries > 0 && row.failed / row.queries >= failingShare;
+  const count = formatCount(row.failed);
 
   return (
     <Status tone={failing ? "warning" : "neutral"} className="tabular-nums">
-      {`${formatCount(row.failed)} (${shareLabel(row.failed, row.queries)})`}
+      {withShare ? `${count} (${shareLabel(row.failed, row.queries)})` : count}
     </Status>
   );
 }
 
 const helper = createAppColumnHelper<TrafficName>();
 
-function columnsFor(groupBy: NameGrouping, oneMachine: boolean): ReturnType<typeof helper.columns> {
+function columnsFor(
+  groupBy: NameGrouping,
+  oneMachine: boolean,
+  widths: Widths,
+): ReturnType<typeof helper.columns> {
+  // A phone keeps the name's column narrow enough that the figures beside it still fit across.
+  const keyClass = "w-[45%] max-w-0 min-w-32 sm:min-w-48";
   const key =
     groupBy === "node"
       ? helper.accessor((row) => trafficNodeName(row), {
@@ -55,14 +72,14 @@ function columnsFor(groupBy: NameGrouping, oneMachine: boolean): ReturnType<type
               {trafficNodeName(row.original)}
             </span>
           ),
-          meta: { className: "w-[45%] max-w-0 min-w-48" },
+          meta: { className: `${keyClass} truncate` },
         })
       : helper.accessor((row) => row.name, {
           id: "key",
           header: "Name",
           enableSorting: true,
           cell: ({ row }) => <NameCell row={row.original} />,
-          meta: { className: "w-[45%] max-w-0 min-w-48" },
+          meta: { className: keyClass },
         });
 
   return helper.columns([
@@ -80,10 +97,10 @@ function columnsFor(groupBy: NameGrouping, oneMachine: boolean): ReturnType<type
       header: "Failed",
       enableSorting: true,
       sortDescFirst: true,
-      cell: ({ row }) => <FailedCell row={row.original} />,
+      cell: ({ row }) => <FailedCell row={row.original} withShare={widths.sm} />,
       meta: { numeric: true },
     }),
-    ...(groupBy === "name" && !oneMachine
+    ...(groupBy === "name" && !oneMachine && widths.sm
       ? [
           helper.accessor((row) => row.nodes, {
             id: "machines",
@@ -93,7 +110,7 @@ function columnsFor(groupBy: NameGrouping, oneMachine: boolean): ReturnType<type
             cell: ({ row }) => (
               <span className="text-kumo-subtle tabular-nums">{row.original.nodes}</span>
             ),
-            meta: { numeric: true, className: "hidden sm:table-cell" },
+            meta: { numeric: true },
           }),
         ]
       : []),
@@ -117,10 +134,17 @@ export function NamesTable({
   readonly empty?: ReactNode;
   readonly onPick?: (row: TrafficName) => void;
 }): ReactElement {
+  const widths = useWidths();
   const byId = new Map(rows.map((row) => [nameKey(row, groupBy), row]));
+  const pickable = (id: string): TrafficName | undefined => {
+    const row = byId.get(id);
+
+    // The folded remainder stands for no one name.
+    return row === undefined || (groupBy === "name" && row.name === "") ? undefined : row;
+  };
   const table = useAppTable({
     data: rows,
-    columns: columnsFor(groupBy, oneMachine),
+    columns: columnsFor(groupBy, oneMachine, widths),
     getRowId: (row) => nameKey(row, groupBy),
     initialState: { sorting: [{ id: "queries", desc: true }] },
   });
@@ -141,13 +165,14 @@ export function NamesTable({
           onPick === undefined
             ? undefined
             : (id) => {
-                const row = byId.get(id);
+                const row = pickable(id);
 
-                if (row !== undefined && (groupBy === "node" || row.name !== "")) {
+                if (row !== undefined) {
                   onPick(row);
                 }
               }
         }
+        isRowClickable={(id) => pickable(id) !== undefined}
       />
     </table.AppTable>
   );
