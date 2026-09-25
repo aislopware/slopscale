@@ -57,6 +57,7 @@ require (
 	golang.org/x/net v0.59.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.23.0
+	golang.org/x/sys v0.48.0
 	golang.org/x/term v0.46.0
 	pgregory.net/rapid v1.3.0
 	tailscale.com v1.103.0-pre.0.20260911203917-e2ed432399c9
@@ -185,7 +186,6 @@ require (
 	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
 	golang.org/x/exp/typeparams v0.0.0-20260603202125-055de637280b // indirect
 	golang.org/x/image v0.41.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260908163034-4bcc4b2ee518 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
