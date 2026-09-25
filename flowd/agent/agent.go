@@ -50,7 +50,14 @@ const (
 
 // DefaultResolvConf are the files the resolver's upstreams come from when
 // the server names none: systemd-resolved's list of real upstreams first.
-var DefaultResolvConf = []string{"/run/systemd/resolve/resolv.conf", "/etc/resolv.conf"}
+// A gateway that accepts the tailnet's DNS without systemd-resolved has
+// only MagicDNS in /etc/resolv.conf; tailscaled keeps the original in the
+// backup, the last file.
+var DefaultResolvConf = []string{
+	"/run/systemd/resolve/resolv.conf",
+	"/etc/resolv.conf",
+	"/etc/resolv.pre-tailscale-backup.conf",
+}
 
 // LocalAPI is what the agent asks of the gateway's tailscaled;
 // tailscale.com/client/local.Client implements it.

@@ -249,8 +249,10 @@ are plain addresses or DNS-over-HTTPS URLs, skipping tailnet addresses and
 `tls://` ones; `slopscale traffic reporters list` names the ones it skips.
 Otherwise it forwards to the gateway's own upstream resolvers, which is
 where the gateway sends its exit node users' DNS without the monitor,
-read from `/run/systemd/resolve/resolv.conf` or else `/etc/resolv.conf`,
-skipping the systemd stub `127.0.0.53`. It answers only tailnet addresses,
+read from the first of `/run/systemd/resolve/resolv.conf`,
+`/etc/resolv.conf` and tailscaled's `/etc/resolv.pre-tailscale-backup.conf`
+that names one, skipping the systemd stub `127.0.0.53` and tailnet
+addresses such as MagicDNS's `100.100.100.100`. It answers only tailnet addresses,
 refuses everyone else, and limits each machine to 100 questions a second.
 
 A gateway's resolver leaves its exit node users' DNS:
