@@ -167,13 +167,20 @@ type Response struct {
 type Config struct {
 	// SNI turns hostname capture from TLS and QUIC handshakes on.
 	SNI bool `json:"sni"`
-	// DNS turns the agent's logging resolver on. The server points the
-	// tailnet's clients at it only once the agent reports it answering.
+	// DNS turns the agent's resolver on. The server points a node at it
+	// only while the node uses this gateway as its exit node, and only
+	// once the agent reports it answering.
 	DNS bool `json:"dns"`
 	// Upstreams are the resolvers the agent forwards to, as IP, IP:port
 	// or https:// (DoH) addresses; empty means the gateway's own
-	// resolver configuration.
+	// resolver configuration, which is what the gateway would use for
+	// its exit node users without the monitor.
 	Upstreams []string `json:"upstreams,omitempty"`
+	// LogSources are the tailnet addresses of the nodes using this
+	// gateway as their exit node right now. The agent records the DNS
+	// questions of these nodes only, and names flows from their answers
+	// only; it answers any other asker without recording anything.
+	LogSources []netip.Addr `json:"logSources,omitempty"`
 	// ReportInterval is how often the agent reports, in seconds.
 	ReportInterval int `json:"reportInterval"`
 }
