@@ -152,9 +152,31 @@ export function Shell({
           </main>
         </div>
         <QuickSearch me={me} pages={pages} open={searchOpen} onOpenChange={setSearchOpen} />
+        <CurrentPageIntoView key={pathname} />
       </Sidebar.Provider>
     </BreadcrumbProvider>
   );
+}
+
+/**
+ * On a short screen the pages low in the sidebar sit below its fold, so the current one would be
+ * out of sight. Keyed by the path, this brings it into view on every page change, a frame later so
+ * its branch has opened.
+ */
+function CurrentPageIntoView(): null {
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      document
+        .querySelector('[data-sidebar="content"] [data-active]')
+        ?.scrollIntoView({ block: "nearest" });
+    });
+
+    return (): void => {
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  return null;
 }
 
 interface Toggles {
