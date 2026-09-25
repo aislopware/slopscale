@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -162,6 +163,23 @@ func TestEndToEndThroughNetfilter(t *testing.T) {
 		_ = server.Process.Kill()
 		_ = server.Wait()
 	})
+
+	// The agent probes its upstream as it starts; an upstream that is not
+	// up yet would put a DNS error on the first report.
+	upstream := &net.Resolver{PreferGo: true, Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, "udp", net.JoinHostPort(internetV4, "53"))
+	}}
+
+	require.Eventually(t, func() bool {
+		ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
+		defer cancel()
+
+		_, err := upstream.LookupHost(ctx, "plain.example.test")
+
+		var dnsErr *net.DNSError
+
+		return err == nil || errors.As(err, &dnsErr) && dnsErr.IsNotFound
+	}, 20*time.Second, 100*time.Millisecond, "the upstream resolver should answer")
 
 	srv := &reportServer{config: traffic.Config{
 		SNI:            true,
