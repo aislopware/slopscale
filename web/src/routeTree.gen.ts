@@ -53,7 +53,15 @@ import { Route as AppServicesLabelRouteImport } from './routes/_app/services/$la
 import { Route as AppSettingsIndexRouteImport } from './routes/_app/settings/index'
 import { Route as AppSettingsServerRouteImport } from './routes/_app/settings/server'
 import { Route as AppSettingsTailnetRouteImport } from './routes/_app/settings/tailnet'
+import { Route as AppTrafficIndexRouteImport } from './routes/_app/traffic/index'
+import { Route as AppTrafficDestinationsRouteImport } from './routes/_app/traffic/destinations'
+import { Route as AppTrafficDnsRouteImport } from './routes/_app/traffic/dns'
+import { Route as AppTrafficGatewaysRouteImport } from './routes/_app/traffic/gateways'
+import { Route as AppTrafficOverviewRouteImport } from './routes/_app/traffic/overview'
+import { Route as AppTrafficSettingsRouteImport } from './routes/_app/traffic/settings'
 import { Route as AppMachinesNodeIdSshRouteImport } from './routes/_app/machines/$nodeId_.ssh'
+import { Route as AppTrafficMachinesIndexRouteImport } from './routes/_app/traffic/machines/index'
+import { Route as AppTrafficMachinesNodeIdRouteImport } from './routes/_app/traffic/machines/$nodeId'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -275,11 +283,52 @@ const AppSettingsTailnetRoute = AppSettingsTailnetRouteImport.update({
   path: '/settings/tailnet',
   getParentRoute: () => AppRoute,
 } as any)
+const AppTrafficIndexRoute = AppTrafficIndexRouteImport.update({
+  id: '/traffic/',
+  path: '/traffic/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTrafficDestinationsRoute = AppTrafficDestinationsRouteImport.update({
+  id: '/traffic/destinations',
+  path: '/traffic/destinations',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTrafficDnsRoute = AppTrafficDnsRouteImport.update({
+  id: '/traffic/dns',
+  path: '/traffic/dns',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTrafficGatewaysRoute = AppTrafficGatewaysRouteImport.update({
+  id: '/traffic/gateways',
+  path: '/traffic/gateways',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTrafficOverviewRoute = AppTrafficOverviewRouteImport.update({
+  id: '/traffic/overview',
+  path: '/traffic/overview',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTrafficSettingsRoute = AppTrafficSettingsRouteImport.update({
+  id: '/traffic/settings',
+  path: '/traffic/settings',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMachinesNodeIdSshRoute = AppMachinesNodeIdSshRouteImport.update({
   id: '/machines/$nodeId_/ssh',
   path: '/machines/$nodeId/ssh',
   getParentRoute: () => AppRoute,
 } as any)
+const AppTrafficMachinesIndexRoute = AppTrafficMachinesIndexRouteImport.update({
+  id: '/traffic/machines/',
+  path: '/traffic/machines/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppTrafficMachinesNodeIdRoute =
+  AppTrafficMachinesNodeIdRouteImport.update({
+    id: '/traffic/machines/$nodeId',
+    path: '/traffic/machines/$nodeId',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -317,6 +366,11 @@ export interface FileRoutesByFullPath {
   '/services/$label': typeof AppServicesLabelRoute
   '/settings/server': typeof AppSettingsServerRoute
   '/settings/tailnet': typeof AppSettingsTailnetRoute
+  '/traffic/destinations': typeof AppTrafficDestinationsRoute
+  '/traffic/dns': typeof AppTrafficDnsRoute
+  '/traffic/gateways': typeof AppTrafficGatewaysRoute
+  '/traffic/overview': typeof AppTrafficOverviewRoute
+  '/traffic/settings': typeof AppTrafficSettingsRoute
   '/dns/': typeof AppDnsIndexRoute
   '/integrations/': typeof AppIntegrationsIndexRoute
   '/keys/': typeof AppKeysIndexRoute
@@ -325,7 +379,10 @@ export interface FileRoutesByFullPath {
   '/relays/': typeof AppRelaysIndexRoute
   '/services/': typeof AppServicesIndexRoute
   '/settings/': typeof AppSettingsIndexRoute
+  '/traffic/': typeof AppTrafficIndexRoute
   '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
+  '/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/traffic/machines/': typeof AppTrafficMachinesIndexRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -363,6 +420,11 @@ export interface FileRoutesByTo {
   '/services/$label': typeof AppServicesLabelRoute
   '/settings/server': typeof AppSettingsServerRoute
   '/settings/tailnet': typeof AppSettingsTailnetRoute
+  '/traffic/destinations': typeof AppTrafficDestinationsRoute
+  '/traffic/dns': typeof AppTrafficDnsRoute
+  '/traffic/gateways': typeof AppTrafficGatewaysRoute
+  '/traffic/overview': typeof AppTrafficOverviewRoute
+  '/traffic/settings': typeof AppTrafficSettingsRoute
   '/dns': typeof AppDnsIndexRoute
   '/integrations': typeof AppIntegrationsIndexRoute
   '/keys': typeof AppKeysIndexRoute
@@ -371,7 +433,10 @@ export interface FileRoutesByTo {
   '/relays': typeof AppRelaysIndexRoute
   '/services': typeof AppServicesIndexRoute
   '/settings': typeof AppSettingsIndexRoute
+  '/traffic': typeof AppTrafficIndexRoute
   '/machines/$nodeId/ssh': typeof AppMachinesNodeIdSshRoute
+  '/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/traffic/machines': typeof AppTrafficMachinesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -411,6 +476,11 @@ export interface FileRoutesById {
   '/_app/services/$label': typeof AppServicesLabelRoute
   '/_app/settings/server': typeof AppSettingsServerRoute
   '/_app/settings/tailnet': typeof AppSettingsTailnetRoute
+  '/_app/traffic/destinations': typeof AppTrafficDestinationsRoute
+  '/_app/traffic/dns': typeof AppTrafficDnsRoute
+  '/_app/traffic/gateways': typeof AppTrafficGatewaysRoute
+  '/_app/traffic/overview': typeof AppTrafficOverviewRoute
+  '/_app/traffic/settings': typeof AppTrafficSettingsRoute
   '/_app/dns/': typeof AppDnsIndexRoute
   '/_app/integrations/': typeof AppIntegrationsIndexRoute
   '/_app/keys/': typeof AppKeysIndexRoute
@@ -419,7 +489,10 @@ export interface FileRoutesById {
   '/_app/relays/': typeof AppRelaysIndexRoute
   '/_app/services/': typeof AppServicesIndexRoute
   '/_app/settings/': typeof AppSettingsIndexRoute
+  '/_app/traffic/': typeof AppTrafficIndexRoute
   '/_app/machines/$nodeId_/ssh': typeof AppMachinesNodeIdSshRoute
+  '/_app/traffic/machines/$nodeId': typeof AppTrafficMachinesNodeIdRoute
+  '/_app/traffic/machines/': typeof AppTrafficMachinesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -459,6 +532,11 @@ export interface FileRouteTypes {
     | '/services/$label'
     | '/settings/server'
     | '/settings/tailnet'
+    | '/traffic/destinations'
+    | '/traffic/dns'
+    | '/traffic/gateways'
+    | '/traffic/overview'
+    | '/traffic/settings'
     | '/dns/'
     | '/integrations/'
     | '/keys/'
@@ -467,7 +545,10 @@ export interface FileRouteTypes {
     | '/relays/'
     | '/services/'
     | '/settings/'
+    | '/traffic/'
     | '/machines/$nodeId/ssh'
+    | '/traffic/machines/$nodeId'
+    | '/traffic/machines/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -505,6 +586,11 @@ export interface FileRouteTypes {
     | '/services/$label'
     | '/settings/server'
     | '/settings/tailnet'
+    | '/traffic/destinations'
+    | '/traffic/dns'
+    | '/traffic/gateways'
+    | '/traffic/overview'
+    | '/traffic/settings'
     | '/dns'
     | '/integrations'
     | '/keys'
@@ -513,7 +599,10 @@ export interface FileRouteTypes {
     | '/relays'
     | '/services'
     | '/settings'
+    | '/traffic'
     | '/machines/$nodeId/ssh'
+    | '/traffic/machines/$nodeId'
+    | '/traffic/machines'
   id:
     | '__root__'
     | '/_app'
@@ -552,6 +641,11 @@ export interface FileRouteTypes {
     | '/_app/services/$label'
     | '/_app/settings/server'
     | '/_app/settings/tailnet'
+    | '/_app/traffic/destinations'
+    | '/_app/traffic/dns'
+    | '/_app/traffic/gateways'
+    | '/_app/traffic/overview'
+    | '/_app/traffic/settings'
     | '/_app/dns/'
     | '/_app/integrations/'
     | '/_app/keys/'
@@ -560,7 +654,10 @@ export interface FileRouteTypes {
     | '/_app/relays/'
     | '/_app/services/'
     | '/_app/settings/'
+    | '/_app/traffic/'
     | '/_app/machines/$nodeId_/ssh'
+    | '/_app/traffic/machines/$nodeId'
+    | '/_app/traffic/machines/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -878,11 +975,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsTailnetRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/traffic/': {
+      id: '/_app/traffic/'
+      path: '/traffic'
+      fullPath: '/traffic/'
+      preLoaderRoute: typeof AppTrafficIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/traffic/destinations': {
+      id: '/_app/traffic/destinations'
+      path: '/traffic/destinations'
+      fullPath: '/traffic/destinations'
+      preLoaderRoute: typeof AppTrafficDestinationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/traffic/dns': {
+      id: '/_app/traffic/dns'
+      path: '/traffic/dns'
+      fullPath: '/traffic/dns'
+      preLoaderRoute: typeof AppTrafficDnsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/traffic/gateways': {
+      id: '/_app/traffic/gateways'
+      path: '/traffic/gateways'
+      fullPath: '/traffic/gateways'
+      preLoaderRoute: typeof AppTrafficGatewaysRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/traffic/overview': {
+      id: '/_app/traffic/overview'
+      path: '/traffic/overview'
+      fullPath: '/traffic/overview'
+      preLoaderRoute: typeof AppTrafficOverviewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/traffic/settings': {
+      id: '/_app/traffic/settings'
+      path: '/traffic/settings'
+      fullPath: '/traffic/settings'
+      preLoaderRoute: typeof AppTrafficSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/machines/$nodeId_/ssh': {
       id: '/_app/machines/$nodeId_/ssh'
       path: '/machines/$nodeId/ssh'
       fullPath: '/machines/$nodeId/ssh'
       preLoaderRoute: typeof AppMachinesNodeIdSshRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/traffic/machines/': {
+      id: '/_app/traffic/machines/'
+      path: '/traffic/machines'
+      fullPath: '/traffic/machines/'
+      preLoaderRoute: typeof AppTrafficMachinesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/traffic/machines/$nodeId': {
+      id: '/_app/traffic/machines/$nodeId'
+      path: '/traffic/machines/$nodeId'
+      fullPath: '/traffic/machines/$nodeId'
+      preLoaderRoute: typeof AppTrafficMachinesNodeIdRouteImport
       parentRoute: typeof AppRoute
     }
   }
@@ -923,6 +1076,11 @@ interface AppRouteChildren {
   AppServicesLabelRoute: typeof AppServicesLabelRoute
   AppSettingsServerRoute: typeof AppSettingsServerRoute
   AppSettingsTailnetRoute: typeof AppSettingsTailnetRoute
+  AppTrafficDestinationsRoute: typeof AppTrafficDestinationsRoute
+  AppTrafficDnsRoute: typeof AppTrafficDnsRoute
+  AppTrafficGatewaysRoute: typeof AppTrafficGatewaysRoute
+  AppTrafficOverviewRoute: typeof AppTrafficOverviewRoute
+  AppTrafficSettingsRoute: typeof AppTrafficSettingsRoute
   AppDnsIndexRoute: typeof AppDnsIndexRoute
   AppIntegrationsIndexRoute: typeof AppIntegrationsIndexRoute
   AppKeysIndexRoute: typeof AppKeysIndexRoute
@@ -931,7 +1089,10 @@ interface AppRouteChildren {
   AppRelaysIndexRoute: typeof AppRelaysIndexRoute
   AppServicesIndexRoute: typeof AppServicesIndexRoute
   AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+  AppTrafficIndexRoute: typeof AppTrafficIndexRoute
   AppMachinesNodeIdSshRoute: typeof AppMachinesNodeIdSshRoute
+  AppTrafficMachinesNodeIdRoute: typeof AppTrafficMachinesNodeIdRoute
+  AppTrafficMachinesIndexRoute: typeof AppTrafficMachinesIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -969,6 +1130,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppServicesLabelRoute: AppServicesLabelRoute,
   AppSettingsServerRoute: AppSettingsServerRoute,
   AppSettingsTailnetRoute: AppSettingsTailnetRoute,
+  AppTrafficDestinationsRoute: AppTrafficDestinationsRoute,
+  AppTrafficDnsRoute: AppTrafficDnsRoute,
+  AppTrafficGatewaysRoute: AppTrafficGatewaysRoute,
+  AppTrafficOverviewRoute: AppTrafficOverviewRoute,
+  AppTrafficSettingsRoute: AppTrafficSettingsRoute,
   AppDnsIndexRoute: AppDnsIndexRoute,
   AppIntegrationsIndexRoute: AppIntegrationsIndexRoute,
   AppKeysIndexRoute: AppKeysIndexRoute,
@@ -977,7 +1143,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppRelaysIndexRoute: AppRelaysIndexRoute,
   AppServicesIndexRoute: AppServicesIndexRoute,
   AppSettingsIndexRoute: AppSettingsIndexRoute,
+  AppTrafficIndexRoute: AppTrafficIndexRoute,
   AppMachinesNodeIdSshRoute: AppMachinesNodeIdSshRoute,
+  AppTrafficMachinesNodeIdRoute: AppTrafficMachinesNodeIdRoute,
+  AppTrafficMachinesIndexRoute: AppTrafficMachinesIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

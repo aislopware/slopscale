@@ -139,7 +139,7 @@ export function Shell({
         <div className="flex min-h-svh min-w-0 flex-1 flex-col bg-kumo-canvas">
           <header className="sticky top-0 z-10 flex h-12 shrink-0 items-center justify-between gap-3 border-b border-kumo-line bg-kumo-base px-4 lg:px-6">
             <RouteProgress />
-            <Trail place={place} />
+            <Trail place={place} pathname={pathname} />
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <AccountMenu me={me} />
@@ -293,15 +293,24 @@ function useDocumentTitle(title: string): void {
 /**
  * Breadcrumb trail: the sidebar item, then the page under it when the item is a branch, or the page
  * a detail route announced through useBreadcrumb. A branch's crumb goes straight to its first page
- * the caller may see, the one its own address would redirect to.
+ * the caller may see, the one its own address would redirect to. A detail page below a page of a
+ * branch (one machine's traffic under Traffic, Machines) gets all three: branch, page, detail.
  */
-function Trail({ place }: { readonly place: NavPlace | undefined }): ReactElement {
+function Trail({
+  place,
+  pathname,
+}: {
+  readonly place: NavPlace | undefined;
+  readonly pathname: string;
+}): ReactElement {
   const leaf = useBreadcrumbLeaf();
   const brand = useBrand();
   const current = place?.item;
-  const last: string | null = place?.child?.label ?? leaf;
+  const page = place?.child;
+  const detail = page !== undefined && pathname !== page.to && leaf !== null ? leaf : null;
+  const last: string | null = page?.label ?? leaf;
 
-  useDocumentTitle(documentTitle(brand.title, current?.label, last));
+  useDocumentTitle(documentTitle(brand.title, current?.label, detail ?? last));
 
   return (
     <div className="flex min-w-0 items-center gap-2">
@@ -315,7 +324,15 @@ function Trail({ place }: { readonly place: NavPlace | undefined }): ReactElemen
               {current.label}
             </Breadcrumbs.Link>
             <Breadcrumbs.Separator />
-            <Breadcrumbs.Current>{last}</Breadcrumbs.Current>
+            {detail === null || page === undefined ? (
+              <Breadcrumbs.Current>{last}</Breadcrumbs.Current>
+            ) : (
+              <>
+                <Breadcrumbs.Link href={page.to}>{page.label}</Breadcrumbs.Link>
+                <Breadcrumbs.Separator />
+                <Breadcrumbs.Current>{detail}</Breadcrumbs.Current>
+              </>
+            )}
           </>
         )}
       </Breadcrumbs>

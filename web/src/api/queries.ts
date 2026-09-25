@@ -451,7 +451,8 @@ type Collection =
   | "/api/v1/posture-integrations"
   | "/api/v1/ssh-recording"
   | "/api/v1/auth/sessions"
-  | "/api/v1/invite";
+  | "/api/v1/invite"
+  | "/api/v1/traffic";
 
 /** Refetches every query under the given paths; a node change touches the node list and its detail. */
 export async function invalidate(

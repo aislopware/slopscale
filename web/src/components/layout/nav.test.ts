@@ -150,3 +150,36 @@ describe(pagesOf, () => {
     expect(pages.some((page) => page.to === "/policy")).toBe(false);
   });
 });
+
+describe("the traffic pages", () => {
+  const network = member({ "logs:network:read": true });
+  const signedIn = { ...member({}), user };
+
+  it("sit under Logs for a caller that may read network logs, and nowhere for a member", () => {
+    const traffic = visibleGroups(network)
+      .flatMap((group) => group.items)
+      .find((item) => item.label === "Traffic");
+
+    expect(traffic?.children?.map((child) => child.label)).toStrictEqual([
+      "Overview",
+      "Machines",
+      "Destinations",
+      "DNS lookups",
+      "Gateways",
+      "Settings",
+    ]);
+    expect(pagesOf(visibleGroups(signedIn)).some((page) => page.to.startsWith("/traffic"))).toBe(
+      false,
+    );
+  });
+
+  it("keep one machine's traffic under Machines, so the guard lets it through", () => {
+    const place = placeOf(visibleGroups(network), "/traffic/machines/42");
+
+    expect(place?.item.label).toBe("Traffic");
+    expect(place?.child?.label).toBe("Machines");
+    expect(redirectFor(network, "/traffic/machines/42")).toBeNull();
+    expect(redirectFor(network, "/traffic")).toBe("/traffic/overview");
+    expect(redirectFor(signedIn, "/traffic/overview")).toBe("/");
+  });
+});
