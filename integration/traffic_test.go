@@ -62,9 +62,10 @@ const (
 // TestTrafficMonitor runs the real slopscale-flowd on a real exit node
 // and proves the whole path: a client's download through the exit node is
 // attributed to the client with its size and SNI name, DNS logging points
-// the client at the gateway's resolver and records what it resolves, a
-// stopped agent's resolver leaves the client's DNS again, and an agent on
-// a node that is no gateway is refused.
+// the client at the gateway's resolver while it uses the gateway as its
+// exit node and records what it resolves then, and nothing once it stops,
+// a stopped agent's resolver leaves the client's DNS again, and an agent
+// on a node that is no gateway is refused.
 func TestTrafficMonitor(t *testing.T) {
 	IntegrationSkip(t)
 
@@ -269,10 +270,10 @@ func TestTrafficMonitor(t *testing.T) {
 		}
 	}, trafficReportWait, 2*time.Second, "the client should be attributed with the download")
 
-	// --- DNS logging points the client at the gateway's resolver once an
-	// operator approves it. The harness already gives the tailnet global
-	// nameservers (127.0.0.11 and 1.1.1.1), which DNS logging requires and
-	// the gateway forwards to, so Docker's resolver answers container names.
+	// --- DNS logging points the client, which uses the gateway as its exit
+	// node, at the gateway's resolver once an operator approves it. The
+	// agent forwards to the gateway's own resolvers, Docker's, which answer
+	// container names.
 	require.NoError(t, api.patch("/api/v1/traffic/settings", map[string]any{"dnsLogging": true}))
 	require.NoError(t, api.patch("/api/v1/traffic/reporters/"+gatewayID, map[string]any{"resolver": true}))
 
@@ -305,18 +306,21 @@ func TestTrafficMonitor(t *testing.T) {
 	}, trafficReportWait, 2*time.Second, "the gateway resolver should reach the client's DNS")
 
 	// The client's MagicDNS resolver forwards to the gateway, which asks
-	// Docker's resolver for the web service's container name.
-	var resolved string
-
+	// Docker's resolver for the web service's container name. The agent
+	// learns that the client uses its gateway with its next report, so the
+	// client keeps looking the name up until the log holds it.
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		out, _, lookupErr := client.Execute([]string{"nslookup", webName, "100.100.100.100"})
 		assert.NoError(c, lookupErr)
 		assert.Contains(c, out, webIP)
 
-		resolved = out
-	}, 60*time.Second, time.Second, "the client should resolve the web service through the gateway")
+		var names trafficNamesOut
 
-	t.Logf("lookup through the gateway:\n%s", resolved)
+		assert.NoError(c, api.get("/api/v1/traffic/dns?nodeId="+clientID, &names))
+		assert.True(c, slices.ContainsFunc(names.Names, func(n trafficName) bool {
+			return n.Name == webName && n.Queries > 0
+		}), "the client's lookup of %s should be logged: %+v", webName, names.Names)
+	}, trafficReportWait, 5*time.Second, "the client's lookup through the gateway should be logged")
 
 	// A plain HTTP download of the name it just resolved: no handshake to
 	// read, so the gateway names it from the client's own DNS answer.
@@ -330,15 +334,6 @@ func TestTrafficMonitor(t *testing.T) {
 	require.Equal(t, strconv.Itoa(trafficBlobBytes), strings.TrimSpace(stdout))
 
 	assert.EventuallyWithT(t, func(c *assert.CollectT) {
-		var out trafficNamesOut
-
-		assert.NoError(c, api.get("/api/v1/traffic/dns?nodeId="+clientID, &out))
-		assert.True(c, slices.ContainsFunc(out.Names, func(n trafficName) bool {
-			return n.Name == webName && n.Queries > 0
-		}), "the client's lookup of %s should be logged: %+v", webName, out.Names)
-	}, trafficReportWait, 2*time.Second, "the DNS log should hold the client's lookup")
-
-	assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		var out trafficDestinationsOut
 
 		assert.NoError(c, api.get("/api/v1/traffic/destinations?groupBy=host&nodeId="+clientID, &out))
@@ -349,13 +344,49 @@ func TestTrafficMonitor(t *testing.T) {
 		}
 	}, trafficReportWait, 2*time.Second, "the HTTP download should be named from the DNS answer")
 
-	// --- An agent on a node that is no gateway is refused.
-	//
-	// The control server sits on the client's own Docker network, which
-	// the client does not reach through the exit node; the agent needs the
-	// server, so the client stops using the exit node first.
+	// --- Once the client stops using the exit node, its DNS leaves the
+	// gateway and the agent records it no more, even when it asks the
+	// gateway's resolver directly.
 	_, _, err = client.Execute([]string{"tailscale", "set", "--exit-node="})
 	require.NoError(t, err)
+
+	exitOff := time.Now()
+
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		nm, nmErr := client.Netmap()
+		if !assert.NoError(c, nmErr) {
+			return
+		}
+
+		for _, r := range nm.DNS.Resolvers {
+			assert.False(c, strings.HasPrefix(r.Addr, resolverAddr),
+				"the gateway resolver should leave the client's DNS: %+v", nm.DNS.Resolvers)
+		}
+	}, 30*time.Second, time.Second, "the gateway resolver should leave the client's DNS with the exit node")
+
+	// The agent learns it with its next report.
+	trafficWaitForReportAfter(t, api, gatewayID, exitOff)
+
+	const unloggedName = "after-exit-node.example.test"
+
+	lookup := time.Now()
+	stdout, stderr, _ := client.Execute([]string{"nslookup", unloggedName, resolverAddr})
+	require.Contains(t, stdout+stderr, "server can't find", "the gateway's resolver should answer the client")
+
+	// A report covering the minute of the lookup has arrived by the time
+	// one is sent after that minute closed.
+	trafficWaitForReportAfter(t, api, gatewayID, lookup.Truncate(time.Minute).Add(time.Minute))
+
+	var names trafficNamesOut
+
+	require.NoError(t, api.get("/api/v1/traffic/dns?nodeId="+clientID, &names))
+	assert.False(t, slices.ContainsFunc(names.Names, func(n trafficName) bool { return n.Name == unloggedName }),
+		"a lookup after the exit node was switched off should not be logged: %+v", names.Names)
+
+	// --- An agent on a node that is no gateway is refused. The control
+	// server sits on the client's own Docker network, which the client
+	// does not reach through the exit node; the agent needs the server,
+	// which is why this runs after the client stopped using the exit node.
 
 	token := trafficIDToken(t, client)
 	status := trafficPostReport(t, slopscale, token)
@@ -707,12 +738,30 @@ type trafficReporter struct {
 		SNI       trafficCollector `json:"sni"`
 		DNS       trafficCollector `json:"dns"`
 	} `json:"collectors"`
-	DNSListen      []string `json:"dnsListen"`
-	ResolverActive bool     `json:"resolverActive"`
+	DNSListen      []string  `json:"dnsListen"`
+	ResolverActive bool      `json:"resolverActive"`
+	LastReportAt   time.Time `json:"lastReportAt"`
 }
 
 type trafficReportersOut struct {
 	Reporters []trafficReporter `json:"reporters"`
+}
+
+// trafficWaitForReportAfter waits for the gateway's first report sent
+// after at.
+func trafficWaitForReportAfter(t *testing.T, api *trafficAPI, gatewayID string, at time.Time) {
+	t.Helper()
+
+	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+		var out trafficReportersOut
+
+		assert.NoError(c, api.get("/api/v1/traffic/reporters", &out))
+
+		reporter, ok := out.find(gatewayID)
+		if assert.True(c, ok) {
+			assert.True(c, reporter.LastReportAt.After(at), "last report at %s", reporter.LastReportAt)
+		}
+	}, trafficReportWait, 2*time.Second, "the gateway should report after %s", at)
 }
 
 func (o trafficReportersOut) find(id string) (trafficReporter, bool) {
