@@ -21,7 +21,6 @@ import (
 
 	"github.com/aislopware/slopscale/flowd/capture"
 	"github.com/aislopware/slopscale/flowd/conntrack"
-	"github.com/aislopware/slopscale/flowd/dnsproxy"
 	"github.com/aislopware/slopscale/flowd/names"
 	"github.com/aislopware/slopscale/flowd/rollup"
 	"github.com/aislopware/slopscale/flowd/spool"
@@ -80,10 +79,12 @@ type Options struct {
 	Logger     *slog.Logger
 
 	// dnsPort and allowDNS let tests run the resolver on loopback;
-	// dumpEvery lets them read the table more often.
-	dnsPort   uint16
-	allowDNS  func(netip.Addr) bool
-	dumpEvery time.Duration
+	// dumpEvery and dnsCheckEvery let them read the table and check the
+	// resolver more often.
+	dnsPort       uint16
+	allowDNS      func(netip.Addr) bool
+	dumpEvery     time.Duration
+	dnsCheckEvery time.Duration
 }
 
 // Agent is a running agent.
@@ -135,6 +136,10 @@ func newAgent(ctx context.Context, opts Options) (*Agent, error) {
 
 	if opts.dumpEvery == 0 {
 		opts.dumpEvery = dumpInterval
+	}
+
+	if opts.dnsCheckEvery == 0 {
+		opts.dnsCheckEvery = recheckInterval
 	}
 
 	server, err := serverURL(ctx, opts)
@@ -503,112 +508,4 @@ func (a *Agent) runSNI(ctx context.Context) {
 
 		stop()
 	}
-}
-
-// runDNS runs the logging resolver while the configuration asks for it,
-// on the node's current tailnet addresses.
-func (a *Agent) runDNS(ctx context.Context) {
-	var (
-		server  *dnsproxy.Server
-		running []string // listen addresses and upstreams it runs with
-	)
-
-	stopServer := func() {
-		if server != nil {
-			_ = server.Close()
-			server, running = nil, nil
-		}
-
-		a.mu.Lock()
-		a.dnsListen = nil
-		a.mu.Unlock()
-	}
-	defer stopServer()
-
-	for ctx.Err() == nil {
-		cfg, changed := a.current()
-
-		if !cfg.DNS {
-			stopServer()
-			a.setStatus(func(s *traffic.Status) { s.DNS = traffic.Collector{} })
-		} else {
-			want, listen, upstreams, err := a.dnsPlan(ctx, cfg)
-			if err == nil && !slices.Equal(want, running) {
-				stopServer()
-
-				server, err = a.startDNS(listen, upstreams)
-				if err == nil {
-					running = want
-				}
-			}
-
-			a.setStatus(func(s *traffic.Status) { s.DNS = traffic.Collector{Enabled: true, Error: errString(err)} })
-		}
-
-		select {
-		case <-ctx.Done():
-		case <-changed:
-		case <-time.After(recheckInterval):
-		}
-	}
-}
-
-// dnsPlan works out where the resolver should listen and where it should
-// forward, with a key that changes when either does.
-func (a *Agent) dnsPlan(ctx context.Context, cfg traffic.Config) ([]string, []netip.AddrPort, []string, error) {
-	status, err := a.opts.Local.StatusWithoutPeers(ctx)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("reading the node's tailnet addresses: %w", err)
-	}
-
-	if status.Self == nil || len(status.Self.TailscaleIPs) == 0 {
-		return nil, nil, nil, errors.New("the node has no tailnet address yet")
-	}
-
-	listen := make([]netip.AddrPort, 0, len(status.Self.TailscaleIPs))
-	for _, ip := range status.Self.TailscaleIPs {
-		listen = append(listen, netip.AddrPortFrom(ip, a.opts.dnsPort))
-	}
-
-	upstreams := cfg.Upstreams
-	if len(upstreams) == 0 {
-		upstreams, err = dnsproxy.SystemUpstreams(a.opts.ResolvConf...)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-	}
-
-	var key []string
-	for _, l := range listen {
-		key = append(key, l.String())
-	}
-
-	return append(key, upstreams...), listen, upstreams, nil
-}
-
-func (a *Agent) startDNS(listen []netip.AddrPort, upstreams []string) (*dnsproxy.Server, error) {
-	server, err := dnsproxy.Start(dnsproxy.Config{
-		Listen:    listen,
-		Upstreams: upstreams,
-		Allowed:   a.opts.allowDNS,
-		OnQuery: func(src netip.Addr, name string, failed bool) {
-			a.table.AddQuery(rollup.Bucket(time.Now()), src, name, failed)
-		},
-		OnAnswer: func(src netip.Addr, name string, addrs []netip.Addr, ttl time.Duration) {
-			a.resolver.PutDNS(src, name, addrs, ttl, time.Now())
-		},
-		HTTPClient: a.opts.HTTPClient,
-		Logger:     a.log,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("starting the resolver: %w", err)
-	}
-
-	a.log.Info("resolver answering", "listen", server.Addrs(), "upstreams", upstreams)
-
-	a.mu.Lock()
-	a.dnsListen = server.Addrs()
-	a.mu.Unlock()
-
-	return server, nil
 }

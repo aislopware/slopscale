@@ -34,10 +34,10 @@ func hdr(name string, ttl uint32) dns.Header {
 }
 
 // reply builds the zone's answer to query, for the test goroutine.
-func reply(t *testing.T, query []byte, overUDP bool) []byte {
+func reply(t *testing.T, query []byte) []byte {
 	t.Helper()
 
-	resp, err := zoneReply(query, overUDP)
+	resp, err := zoneReply(query, false)
 	require.NoError(t, err)
 
 	return resp
@@ -74,6 +74,17 @@ func zoneReply(query []byte, overUDP bool) ([]byte, error) {
 		} else {
 			m.Answer = []dns.RR{&dns.A{Hdr: hdr("big.test.", 30), Addr: netip.MustParseAddr("192.0.2.20")}}
 		}
+	case "large.test":
+		// Well over 512 bytes, well under 4096, and never truncated by the
+		// upstream: the proxy has to fit it to the asker.
+		for i := range 60 {
+			m.Answer = append(m.Answer, &dns.A{
+				Hdr:  hdr("large.test.", 60),
+				Addr: netip.AddrFrom4([4]byte{192, 0, 2, byte(i + 1)}),
+			})
+		}
+	case "doh.test":
+		m.Answer = []dns.RR{&dns.A{Hdr: hdr("doh.test.", 60), Addr: netip.MustParseAddr("127.0.0.1")}}
 	case "loop.test":
 		m.Answer = []dns.RR{
 			&dns.CNAME{Hdr: hdr("loop.test.", 60), Target: "loop2.test."},
@@ -91,20 +102,9 @@ func zoneReply(query []byte, overUDP bool) ([]byte, error) {
 func startUpstream(t *testing.T) *upstreamServer {
 	t.Helper()
 
-	var lc net.ListenConfig
+	pc, ln, port := listenPair(t)
 
-	pc, err := lc.ListenPacket(t.Context(), "udp", "127.0.0.1:0")
-	require.NoError(t, err)
-
-	bound, err := netip.ParseAddrPort(pc.LocalAddr().String())
-	require.NoError(t, err)
-
-	port := int(bound.Port())
-
-	ln, err := lc.Listen(t.Context(), "tcp", net.JoinHostPort("127.0.0.1", itoa(port)))
-	require.NoError(t, err)
-
-	u := &upstreamServer{addr: netip.AddrPortFrom(netip.MustParseAddr("127.0.0.1"), uint16(port))}
+	u := &upstreamServer{addr: netip.AddrPortFrom(netip.MustParseAddr("127.0.0.1"), port)}
 
 	t.Cleanup(func() {
 		pc.Close()
@@ -157,6 +157,34 @@ func startUpstream(t *testing.T) *upstreamServer {
 	}()
 
 	return u
+}
+
+// listenPair opens UDP and TCP on one loopback port. The kernel picks the
+// UDP port, which some other process may hold for TCP, so a collision is
+// retried rather than failing the test.
+func listenPair(t *testing.T) (net.PacketConn, net.Listener, uint16) {
+	t.Helper()
+
+	var lc net.ListenConfig
+
+	for range 20 {
+		pc, err := lc.ListenPacket(t.Context(), "udp", "127.0.0.1:0")
+		require.NoError(t, err)
+
+		bound, err := netip.ParseAddrPort(pc.LocalAddr().String())
+		require.NoError(t, err)
+
+		ln, err := lc.Listen(t.Context(), "tcp", net.JoinHostPort("127.0.0.1", itoa(int(bound.Port()))))
+		if err == nil {
+			return pc, ln, bound.Port()
+		}
+
+		pc.Close()
+	}
+
+	t.Fatal("no free UDP and TCP port pair")
+
+	return nil, nil, 0
 }
 
 func (u *upstreamServer) record(network string, query []byte) {
@@ -396,7 +424,7 @@ func TestDNSOverHTTPSUpstream(t *testing.T) {
 		body, _ := io.ReadAll(r.Body)
 
 		w.Header().Set("Content-Type", dohContentType)
-		_, _ = w.Write(reply(t, body, false))
+		_, _ = w.Write(reply(t, body))
 	}))
 	t.Cleanup(doh.Close)
 
@@ -448,7 +476,7 @@ func TestIgnoresGarbage(t *testing.T) {
 	assert.Nil(t, proxy.answer(netip.MustParseAddr("127.0.0.1"), []byte{1, 2, 3}))
 
 	// A response sent to the proxy is not a question.
-	resp := reply(t, query(t, "www.example.test.", dns.TypeA), false)
+	resp := reply(t, query(t, "www.example.test.", dns.TypeA))
 	assert.Nil(t, proxy.answer(netip.MustParseAddr("127.0.0.1"), resp))
 	assert.Empty(t, up.seen())
 }

@@ -36,6 +36,14 @@ type fakeLocal struct {
 	prefs     ipn.Prefs
 	routeInfo appctype.RouteInfo
 	tokens    int
+	statusErr error
+}
+
+func (f *fakeLocal) failStatus(err error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	f.statusErr = err
 }
 
 func (f *fakeLocal) IDToken(context.Context, string) (*tailcfg.TokenResponse, error) {
@@ -50,6 +58,10 @@ func (f *fakeLocal) IDToken(context.Context, string) (*tailcfg.TokenResponse, er
 func (f *fakeLocal) StatusWithoutPeers(context.Context) (*ipnstate.Status, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	if f.statusErr != nil {
+		return nil, f.statusErr
+	}
 
 	return &ipnstate.Status{Self: &ipnstate.PeerStatus{TailscaleIPs: f.ips}}, nil
 }
