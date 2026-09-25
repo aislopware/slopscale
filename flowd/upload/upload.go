@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/aislopware/slopscale/flowd/spool"
@@ -39,6 +40,7 @@ var (
 	// feature is off.
 	ErrForbidden    = errors.New("server refused the gateway")
 	errServerStatus = errors.New("server answered with an error")
+	errServerAhead  = errors.New("server claims later reports from a new instance")
 )
 
 // TokenFetcher returns a fresh identity token for [traffic.Audience].
@@ -122,6 +124,39 @@ type Uploader struct {
 	log      *slog.Logger
 	kick     chan struct{}
 	sleep    func(ctx context.Context, d time.Duration)
+
+	skew atomic.Int64 // server clock minus ours, in nanoseconds
+
+	mu        sync.Mutex
+	rejection *rejection
+}
+
+// rejection is the last report the server refused for good, remembered
+// until a report built after it has been delivered.
+type rejection struct {
+	message string
+	// after is the first sequence built after the refusal; delivering it
+	// or a later one means the refusal has been reported.
+	after uint64
+}
+
+// Skew is how far the server's clock is ahead of the gateway's, as read
+// from the Date header of its last response; zero before any.
+func (u *Uploader) Skew() time.Duration {
+	return time.Duration(u.skew.Load())
+}
+
+// Rejection describes the last report the server refused for good, until
+// a report built after it reaches the server; empty when there is none.
+func (u *Uploader) Rejection() string {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	if u.rejection == nil {
+		return ""
+	}
+
+	return u.rejection.message
 }
 
 // New returns an uploader posting to server's [traffic.ReportPath].
@@ -198,6 +233,8 @@ func (u *Uploader) Run(ctx context.Context) {
 // the error and, when the server refused rather than failed, how long to
 // wait before trying again.
 func (u *Uploader) Drain(ctx context.Context) (time.Duration, error) {
+	restamped := false
+
 	for ctx.Err() == nil {
 		seq, body, err := u.spool.Oldest()
 		if errors.Is(err, spool.ErrEmpty) {
@@ -217,10 +254,38 @@ func (u *Uploader) Drain(ctx context.Context) (time.Duration, error) {
 			continue // rejected for good and dropped
 		}
 
-		err = u.spool.Ack(max(resp.Seq, seq))
+		// The server acknowledges up to the last sequence it applied for
+		// the instance. Past the one sent, it has seen this instance from
+		// somewhere else (a cloned or restored state directory) and took
+		// the report for a duplicate without applying it; the spool starts
+		// a new instance and everything is sent again under it.
+		if resp.Seq > seq {
+			// A fresh random instance cannot have been seen before; a
+			// server that claims so again is not believed twice.
+			if restamped {
+				return refusedBackoff, fmt.Errorf("%w: it acknowledged %d for a report numbered %d",
+					errServerAhead, resp.Seq, seq)
+			}
+
+			u.log.Warn("the server has seen later reports from this instance; starting a new one",
+				"sent", seq, "server_seq", resp.Seq)
+
+			err = u.spool.Restamp()
+			if err != nil {
+				return 0, err
+			}
+
+			restamped = true
+
+			continue
+		}
+
+		err = u.spool.Ack(seq)
 		if err != nil {
 			return 0, err
 		}
+
+		u.delivered(seq)
 
 		if u.onConfig != nil {
 			u.onConfig(resp.Config)
@@ -262,7 +327,9 @@ func (u *Uploader) send(ctx context.Context, seq uint64, body []byte) (*traffic.
 		case status == http.StatusUnauthorized:
 			return nil, refusedBackoff, ErrUnauthorized
 		case status == http.StatusBadRequest || status == http.StatusRequestEntityTooLarge:
-			u.log.Error("the server rejected a report; dropping it", "seq", seq, "status", status, "body", string(raw))
+			reason := strings.TrimSpace(string(raw))
+			u.log.Error("the server rejected a report; dropping it", "seq", seq, "status", status, "body", reason)
+			u.rejected(seq, status, reason)
 
 			return nil, 0, u.spool.Reject(seq)
 		case status == http.StatusForbidden:
@@ -288,11 +355,15 @@ func (u *Uploader) post(ctx context.Context, token string, body []byte) (int, []
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "zstd")
 
+	sent := time.Now()
+
 	resp, err := u.client.Do(req)
 	if err != nil {
 		return 0, nil, fmt.Errorf("posting the report: %w", err)
 	}
 	defer resp.Body.Close()
+
+	u.observeClock(resp.Header.Get("Date"), sent, time.Now())
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseSize))
 	if err != nil {
@@ -300,4 +371,36 @@ func (u *Uploader) post(ctx context.Context, token string, body []byte) (int, []
 	}
 
 	return resp.StatusCode, raw, nil
+}
+
+func (u *Uploader) rejected(seq uint64, status int, reason string) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	u.rejection = &rejection{
+		message: fmt.Sprintf("the server refused report %d (%d %s): %s", seq, status, http.StatusText(status), reason),
+		after:   u.spool.NextSeq(),
+	}
+}
+
+func (u *Uploader) delivered(seq uint64) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	if u.rejection != nil && seq >= u.rejection.after {
+		u.rejection = nil
+	}
+}
+
+// observeClock estimates the skew from a response's Date header, taking
+// the server's second as the middle of the round trip. The header has
+// one-second resolution, which is plenty against minute buckets.
+func (u *Uploader) observeClock(date string, sent, received time.Time) {
+	server, err := http.ParseTime(date)
+	if err != nil {
+		return
+	}
+
+	mid := sent.Add(received.Sub(sent) / 2)
+	u.skew.Store(int64(server.Add(time.Second / 2).Sub(mid)))
 }

@@ -28,7 +28,13 @@ const (
 	reportExt   = ".json.zst"
 	instanceLen = 16
 	seqDigits   = 20
+	// maxSpooledReport bounds reading the spool's own reports, which may
+	// be over the server's limit.
+	maxSpooledReport = 256 << 20
+	encoderWindow    = 1 << 20
 )
+
+var errNoInstance = errors.New("no instance id")
 
 var (
 	// ErrEmpty is returned by [Spool.Oldest] when nothing is spooled.
@@ -57,6 +63,8 @@ type Spool struct {
 	state state
 	files []spooled // oldest first
 	size  int64
+
+	recovered error
 }
 
 type spooled struct {
@@ -193,21 +201,99 @@ func (s *Spool) Reject(seq uint64) error {
 	return s.saveState()
 }
 
+// Restamp gives the spool a new instance and renumbers every spooled
+// report under it, oldest first. The server keeps the last sequence it
+// applied per instance and acknowledges anything up to it without applying
+// it, so once it reports a later sequence than this spool ever sent (a
+// cloned or restored state directory shares the instance), the spooled
+// reports would be discarded as already seen.
+func (s *Spool) Restamp() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.state.Instance = newInstance()
+
+	files := make([]spooled, 0, len(s.files))
+
+	for _, f := range s.files {
+		r, err := readReport(s.path(f.seq))
+		if err != nil {
+			s.state.Dropped++
+
+			_ = os.Remove(s.path(f.seq))
+			s.size -= f.size
+
+			continue
+		}
+
+		r.Instance, r.Seq = s.state.Instance, s.state.NextSeq
+
+		body, err := Encode(r)
+		if err != nil {
+			return err
+		}
+
+		err = writeAtomic(s.path(r.Seq), body)
+		if err != nil {
+			return err
+		}
+
+		_ = os.Remove(s.path(f.seq))
+		s.size += int64(len(body)) - f.size
+		files = append(files, spooled{seq: r.Seq, size: int64(len(body))})
+		s.state.NextSeq++
+	}
+
+	s.files = files
+
+	return s.saveState()
+}
+
+// NextSeq is the sequence number the next spooled report gets.
+func (s *Spool) NextSeq() uint64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.state.NextSeq
+}
+
+// Recovered is why the spool started a new instance on open, nil when it
+// did not have to.
+func (s *Spool) Recovered() error {
+	return s.recovered
+}
+
+func newInstance() string {
+	var id [instanceLen]byte
+
+	_, _ = rand.Read(id[:])
+
+	return hex.EncodeToString(id[:])
+}
+
 func (s *Spool) load() error {
-	raw, err := os.ReadFile(filepath.Join(s.dir, stateFile))
+	path := filepath.Join(s.dir, stateFile)
+	raw, err := os.ReadFile(path)
 
 	switch {
 	case errors.Is(err, os.ErrNotExist):
-		var id [instanceLen]byte
-
-		_, _ = rand.Read(id[:])
-		s.state = state{Instance: hex.EncodeToString(id[:]), NextSeq: 1}
+		s.state = state{Instance: newInstance(), NextSeq: 1}
 	case err != nil:
 		return fmt.Errorf("reading the spool state: %w", err)
 	default:
 		err = json.Unmarshal(raw, &s.state)
-		if err != nil || s.state.Instance == "" {
-			return fmt.Errorf("spool state %s is corrupt: %w", filepath.Join(s.dir, stateFile), err)
+		if err == nil && s.state.Instance == "" {
+			err = errNoInstance
+		}
+
+		if err != nil {
+			// A state that cannot be read starts a new instance rather
+			// than stopping the agent for good; the spooled reports keep
+			// the instance they were stamped with, and their sequence
+			// numbers stay taken.
+			s.recovered = fmt.Errorf("spool state %s is corrupt, kept as %s.corrupt: %w", path, stateFile, err)
+			_ = os.Rename(path, path+".corrupt")
+			s.state = state{Instance: newInstance(), NextSeq: 1}
 		}
 	}
 
@@ -261,19 +347,25 @@ func (s *Spool) discardOldestLocked() error {
 }
 
 // entriesIn counts the entries of a spooled report and the drops it
-// carried; an unreadable report counts nothing.
+// carried; an unreadable report counts nothing. The spool's own files are
+// read without the size bound, which is the server's: a report over it is
+// exactly the one whose entries are lost.
 func entriesIn(path string) uint64 {
-	body, err := os.ReadFile(path)
-	if err != nil {
-		return 0
-	}
-
-	r, err := Decode(body)
+	r, err := readReport(path)
 	if err != nil {
 		return 0
 	}
 
 	return uint64(len(r.Flows)+len(r.Queries)) + r.Dropped
+}
+
+func readReport(path string) (*traffic.Report, error) {
+	body, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", path, err)
+	}
+
+	return decode(body, maxSpooledReport)
 }
 
 func (s *Spool) path(seq uint64) string {
@@ -323,7 +415,9 @@ func writeAtomic(path string, data []byte) error {
 func Encode(r *traffic.Report) ([]byte, error) {
 	var buf bytes.Buffer
 
-	enc, err := zstd.NewWriter(&buf, zstd.WithEncoderLevel(zstd.SpeedDefault))
+	// A decoder bounded to the report size refuses frames whose window is
+	// larger, and the default window grows to 8 MiB on a large report.
+	enc, err := zstd.NewWriter(&buf, zstd.WithEncoderLevel(zstd.SpeedDefault), zstd.WithWindowSize(encoderWindow))
 	if err != nil {
 		return nil, fmt.Errorf("creating the encoder: %w", err)
 	}
@@ -345,18 +439,23 @@ func Encode(r *traffic.Report) ([]byte, error) {
 
 // Decode reverses [Encode], bounded by [traffic.MaxReportBytes].
 func Decode(body []byte) (*traffic.Report, error) {
-	dec, err := zstd.NewReader(bytes.NewReader(body), zstd.WithDecoderMaxMemory(traffic.MaxReportBytes))
+	return decode(body, traffic.MaxReportBytes)
+}
+
+func decode(body []byte, limit uint64) (*traffic.Report, error) {
+	dec, err := zstd.NewReader(bytes.NewReader(body), zstd.WithDecoderMaxMemory(limit))
 	if err != nil {
 		return nil, fmt.Errorf("creating the decoder: %w", err)
 	}
 	defer dec.Close()
 
-	raw, err := io.ReadAll(io.LimitReader(dec, traffic.MaxReportBytes+1))
+	//nolint:gosec // the limits are the package's constants, far below MaxInt64
+	raw, err := io.ReadAll(io.LimitReader(dec, int64(limit)+1))
 	if err != nil {
 		return nil, fmt.Errorf("decompressing the report: %w", err)
 	}
 
-	if len(raw) > traffic.MaxReportBytes {
+	if uint64(len(raw)) > limit {
 		return nil, ErrTooLarge
 	}
 

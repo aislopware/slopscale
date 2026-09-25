@@ -101,6 +101,7 @@ type Agent struct {
 	changed   chan struct{} // closed and replaced on every config change
 	status    traffic.Status
 	dnsListen []netip.AddrPort
+	userspace bool // tailscaled forwards in userspace, past connection tracking
 }
 
 // Run runs the agent until ctx ends, then flushes what it holds.
@@ -172,6 +173,10 @@ func newAgent(ctx context.Context, opts Options) (*Agent, error) {
 		return resp.IDToken, nil
 	})
 	a.uploader = upload.New(server, opts.HTTPClient, tokens, sp, a.applyConfig, a.log)
+
+	if recovered := sp.Recovered(); recovered != nil {
+		a.log.Warn("the spool state was unreadable; reporting as a new instance", "err", recovered)
+	}
 
 	a.log.Info("agent starting", "server", server, "instance", sp.Instance(), "spooled", sp.Len())
 
@@ -274,6 +279,7 @@ func (a *Agent) run(ctx context.Context) error {
 	wg.Go(func() { a.runAppConnector(workers) })
 	wg.Go(func() { a.runSNI(workers) })
 	wg.Go(func() { a.runDNS(workers) })
+	wg.Go(func() { a.runModeChecks(workers) })
 
 	a.runReports(ctx)
 	stop()
@@ -310,45 +316,15 @@ func (a *Agent) runReports(ctx context.Context) {
 		case <-timer.C:
 		}
 
-		a.report(rollup.Bucket(time.Now()))
+		a.report(a.bucket())
 	}
 }
 
-// report spools the buckets before before as one or more reports and asks
-// the uploader to send them. It reports even when there is no traffic: the
-// server learns from it that the gateway and its resolver are alive.
-func (a *Agent) report(before int64) {
-	flows, queries, dropped := a.table.Drain(before)
-
-	a.mu.Lock()
-	status := a.status
-	dnsListen := slices.Clone(a.dnsListen)
-	a.mu.Unlock()
-
-	for first := true; first || len(flows) > 0 || len(queries) > 0; first = false {
-		r := &traffic.Report{
-			Version:   a.opts.Version,
-			SentAt:    time.Now().UTC(),
-			Status:    status,
-			DNSListen: dnsListen,
-			Dropped:   dropped,
-		}
-		dropped = 0
-
-		n := min(len(flows), traffic.MaxFlowsPerReport)
-		r.Flows, flows = flows[:n], flows[n:]
-
-		n = min(len(queries), traffic.MaxQueriesPerReport)
-		r.Queries, queries = queries[:n], queries[n:]
-
-		err := a.spool.Enqueue(r)
-		if err != nil {
-			a.log.Error("spooling a report failed; its entries are lost", "err", err,
-				"flows", len(r.Flows), "queries", len(r.Queries))
-		}
-	}
-
-	a.uploader.Kick()
+// bucket is the current bucket by the server's clock, so a gateway whose
+// clock is off neither files traffic under minutes the server takes for
+// the future nor under ones it has already closed.
+func (a *Agent) bucket() int64 {
+	return rollup.Bucket(time.Now().Add(a.uploader.Skew()))
 }
 
 // onDelta files a connection's traffic under the current bucket and the
@@ -358,7 +334,7 @@ func (a *Agent) onDelta(d conntrack.Delta) {
 	host, source := a.resolver.Lookup(d.Conn, now)
 
 	a.table.AddFlow(rollup.FlowKey{
-		Bucket:     rollup.Bucket(now),
+		Bucket:     a.bucket(),
 		Src:        d.Conn.Src.Addr(),
 		Dst:        d.Conn.Dst.Addr(),
 		Proto:      d.Conn.Proto,

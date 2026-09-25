@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/flowd/dnsproxy"
-	"github.com/aislopware/slopscale/flowd/rollup"
 	"github.com/aislopware/slopscale/hscontrol/traffic"
 )
 
@@ -188,7 +187,7 @@ func (a *Agent) startDNS(plan dnsPlan) (*dnsproxy.Server, error) {
 		Bootstrap: plan.bootstrap,
 		Allowed:   a.opts.allowDNS,
 		OnQuery: func(src netip.Addr, name string, failed bool) {
-			a.table.AddQuery(rollup.Bucket(time.Now()), src, name, failed)
+			a.table.AddQuery(a.bucket(), src, name, failed)
 		},
 		OnAnswer: func(src netip.Addr, name string, addrs []netip.Addr, ttl time.Duration) {
 			a.resolver.PutDNS(src, name, addrs, ttl, time.Now())

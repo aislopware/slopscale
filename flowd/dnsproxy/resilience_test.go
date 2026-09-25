@@ -20,6 +20,7 @@ import (
 	"github.com/aislopware/slopscale/flowd/tailnet"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/time/rate"
 )
 
 // scriptedUpstream is a UDP-only resolver whose answer to the n-th datagram
@@ -241,13 +242,13 @@ func TestOverTheRateIsDropped(t *testing.T) {
 	proxy := startProxy(t, newRecorder(), allowAll, up.addr.String())
 	src := netip.MustParseAddr("127.0.0.1")
 
-	drained := 0
-	for proxy.allow(src) {
-		drained++
-	}
+	// A budget that never refills, so the test does not race the clock.
+	proxy.limMu.Lock()
+	proxy.limiters[src] = &limiter{Limiter: rate.NewLimiter(0, 0), lastUsed: time.Now()}
+	proxy.limMu.Unlock()
 
-	assert.GreaterOrEqual(t, drained, perSourceBurst)
 	assert.Nil(t, proxy.answer(src, query(t, "www.example.test.", dns.TypeA)))
+	assert.Empty(t, up.seen(), "a dropped question is not forwarded")
 }
 
 // TestNeverForwardsIntoTheTailnet leaves MagicDNS and every tailnet

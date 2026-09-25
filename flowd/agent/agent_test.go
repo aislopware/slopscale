@@ -37,6 +37,7 @@ type fakeLocal struct {
 	routeInfo appctype.RouteInfo
 	tokens    int
 	statusErr error
+	userspace bool
 }
 
 func (f *fakeLocal) failStatus(err error) {
@@ -63,7 +64,7 @@ func (f *fakeLocal) StatusWithoutPeers(context.Context) (*ipnstate.Status, error
 		return nil, f.statusErr
 	}
 
-	return &ipnstate.Status{Self: &ipnstate.PeerStatus{TailscaleIPs: f.ips}}, nil
+	return &ipnstate.Status{TUN: !f.userspace, Self: &ipnstate.PeerStatus{TailscaleIPs: f.ips}}, nil
 }
 
 func (f *fakeLocal) GetPrefs(context.Context) (*ipn.Prefs, error) {

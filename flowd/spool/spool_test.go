@@ -138,12 +138,109 @@ func TestRejectCountsEntries(t *testing.T) {
 	assert.Equal(t, uint64(5), next.Dropped)
 }
 
-func TestCorruptState(t *testing.T) {
+// TestCorruptStateStartsANewInstance: an unreadable state no longer stops
+// the agent for good. The spool starts a new instance, keeps the reports
+// already spooled (stamped with the old one) and numbers after them.
+func TestCorruptStateStartsANewInstance(t *testing.T) {
 	dir := t.TempDir()
+
+	s, err := Open(dir, 1<<20)
+	require.NoError(t, err)
+
+	old := s.Instance()
+
+	require.NoError(t, s.Enqueue(report(2)))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, stateFile), []byte("{"), 0o600))
 
-	_, err := Open(dir, 1<<20)
-	require.Error(t, err)
+	s, err = Open(dir, 1<<20)
+	require.NoError(t, err)
+	require.Error(t, s.Recovered())
+	assert.NotEqual(t, old, s.Instance())
+	assert.FileExists(t, filepath.Join(dir, stateFile+".corrupt"))
+
+	seq, body, err := s.Oldest()
+	require.NoError(t, err)
+	assert.Equal(t, uint64(1), seq)
+
+	kept, err := Decode(body)
+	require.NoError(t, err)
+	assert.Equal(t, old, kept.Instance)
+
+	next := report(0)
+	require.NoError(t, s.Enqueue(next))
+	assert.Equal(t, uint64(2), next.Seq, "numbering continues past the kept report")
+
+	s, err = Open(dir, 1<<20)
+	require.NoError(t, err)
+	require.NoError(t, s.Recovered(), "the new state is readable")
+
+	// A state without an instance is as unusable as one that is not JSON.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, stateFile), []byte(`{"nextSeq":7}`), 0o600))
+
+	s, err = Open(dir, 1<<20)
+	require.NoError(t, err)
+	require.Error(t, s.Recovered())
+}
+
+// TestOversizedReportCountsAsDropped discards a report over the server's
+// size limit: its entries count as dropped, where they used to count as
+// nothing because the spool could not read its own file back.
+func TestOversizedReportCountsAsDropped(t *testing.T) {
+	s, err := Open(t.TempDir(), 1<<30)
+	require.NoError(t, err)
+
+	big := report(0)
+	big.Version = strings.Repeat("v", traffic.MaxReportBytes)
+
+	for i := range 7 {
+		big.Flows = append(big.Flows, traffic.Flow{Bucket: 60, Port: uint16(i)})
+	}
+
+	require.NoError(t, s.Enqueue(big))
+	require.NoError(t, s.Reject(1))
+
+	next := report(0)
+	require.NoError(t, s.Enqueue(next))
+	assert.Equal(t, uint64(7), next.Dropped)
+}
+
+// TestRestampRenumbersUnderANewInstance keeps every spooled report, in
+// order, under a new instance and later sequence numbers.
+func TestRestampRenumbersUnderANewInstance(t *testing.T) {
+	dir := t.TempDir()
+
+	s, err := Open(dir, 1<<20)
+	require.NoError(t, err)
+
+	old := s.Instance()
+
+	for n := range 3 {
+		require.NoError(t, s.Enqueue(report(n+1)))
+	}
+
+	require.NoError(t, s.Restamp())
+	assert.NotEqual(t, old, s.Instance())
+	assert.Equal(t, 3, s.Len())
+
+	for want := range 3 {
+		seq, body, readErr := s.Oldest()
+		require.NoError(t, readErr)
+		assert.Equal(t, uint64(4+want), seq)
+
+		r, decodeErr := Decode(body)
+		require.NoError(t, decodeErr)
+		assert.Equal(t, s.Instance(), r.Instance)
+		assert.Equal(t, seq, r.Seq)
+		assert.Len(t, r.Flows, want+1)
+
+		require.NoError(t, s.Ack(seq))
+	}
+
+	// The new instance survives a restart.
+	reopened, err := Open(dir, 1<<20)
+	require.NoError(t, err)
+	assert.Equal(t, s.Instance(), reopened.Instance())
+	assert.Equal(t, uint64(7), reopened.NextSeq())
 }
 
 func TestDecodeRejects(t *testing.T) {

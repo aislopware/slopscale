@@ -158,19 +158,92 @@ func TestDrainDeliversInOrder(t *testing.T) {
 	assert.True(t, h.configs[0].SNI)
 }
 
-// TestServerAckSkipsAhead: when the server says it already applied a later
-// sequence (a resend after a lost response), the agent drops everything up
-// to it without sending it again.
-func TestServerAckSkipsAhead(t *testing.T) {
+// TestServerAheadStartsANewInstance: the server has applied later reports
+// of this instance than the spool ever sent, as when a gateway's state
+// directory was cloned or restored. Acknowledging up to the server's
+// sequence would delete reports it never got; instead the spool starts a
+// new instance and everything arrives, once.
+func TestServerAheadStartsANewInstance(t *testing.T) {
 	h := newHarness(t)
 	h.enqueue(t, 3)
-	h.server.extraSeq = 2
+
+	old := h.spool.Instance()
+	h.server.applied[old] = 10 // the clone got there first
 
 	_, err := h.uploader.Drain(t.Context())
 	require.NoError(t, err)
 
-	assert.Len(t, h.server.reports, 1)
+	assert.NotEqual(t, old, h.spool.Instance())
 	assert.Zero(t, h.spool.Len())
+
+	var applied []uint64
+
+	for _, r := range h.server.reports {
+		if r.Instance == h.spool.Instance() {
+			applied = append(applied, r.Seq)
+		}
+	}
+
+	assert.Len(t, applied, 3, "every spooled report arrives under the new instance")
+	assert.Equal(t, uint64(10), h.server.applied[old], "nothing more is taken for the old instance")
+}
+
+// TestServerAlwaysAheadIsNotBelieved has a server that claims a later
+// sequence for any instance: the uploader starts a new instance once, then
+// backs off instead of spinning.
+func TestServerAlwaysAheadIsNotBelieved(t *testing.T) {
+	h := newHarness(t)
+	h.enqueue(t, 2)
+	h.server.extraSeq = 5
+
+	wait, err := h.uploader.Drain(t.Context())
+	require.ErrorIs(t, err, errServerAhead)
+	assert.Equal(t, refusedBackoff, wait)
+	assert.Equal(t, 2, h.spool.Len(), "the reports stay spooled")
+	assert.Len(t, h.server.reports, 2)
+}
+
+// TestRejectionIsReportedUntilDelivered remembers why the server refused a
+// report until a report built after the refusal has been delivered, so the
+// refusal reaches the server's view of the gateway.
+func TestRejectionIsReportedUntilDelivered(t *testing.T) {
+	h := newHarness(t)
+	h.enqueue(t, 1)
+	h.server.statuses = []int{http.StatusBadRequest}
+
+	_, err := h.uploader.Drain(t.Context())
+	require.NoError(t, err)
+	assert.Contains(t, h.uploader.Rejection(), "refused report 1 (400 Bad Request): scripted")
+
+	// The next report is built with the rejection in its status, and once
+	// it is delivered the rejection is forgotten.
+	h.enqueue(t, 1)
+
+	_, err = h.uploader.Drain(t.Context())
+	require.NoError(t, err)
+	assert.Empty(t, h.uploader.Rejection())
+}
+
+// TestSkewFromTheServersDate reads the server's clock from the Date header
+// of any response.
+func TestSkewFromTheServersDate(t *testing.T) {
+	h := newHarness(t)
+	assert.Zero(t, h.uploader.Skew())
+
+	sent := time.Now()
+	h.uploader.observeClock(sent.Add(10*time.Minute).UTC().Format(http.TimeFormat), sent, sent)
+	assert.InDelta(t, float64(10*time.Minute), float64(h.uploader.Skew()), float64(time.Second))
+
+	h.uploader.observeClock("not a date", sent, sent)
+	assert.InDelta(t, float64(10*time.Minute), float64(h.uploader.Skew()), float64(time.Second),
+		"an unreadable header changes nothing")
+
+	// A real exchange with a server whose clock agrees brings it back.
+	h.enqueue(t, 1)
+
+	_, err := h.uploader.Drain(t.Context())
+	require.NoError(t, err)
+	assert.InDelta(t, 0, float64(h.uploader.Skew()), float64(1500*time.Millisecond))
 }
 
 func TestUnauthorizedRefreshesTokenOnce(t *testing.T) {
