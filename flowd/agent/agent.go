@@ -80,11 +80,13 @@ type Options struct {
 
 	// dnsPort and allowDNS let tests run the resolver on loopback;
 	// dumpEvery and dnsCheckEvery let them read the table and check the
-	// resolver more often.
+	// resolver more often; capture stands in for the packet capture, which
+	// needs Linux and CAP_NET_RAW.
 	dnsPort       uint16
 	allowDNS      func(netip.Addr) bool
 	dumpEvery     time.Duration
 	dnsCheckEvery time.Duration
+	capture       func(ctx context.Context, iface string, onPacket func([]byte, time.Time)) error
 }
 
 // Agent is a running agent.
@@ -141,6 +143,10 @@ func newAgent(ctx context.Context, opts Options) (*Agent, error) {
 
 	if opts.dnsCheckEvery == 0 {
 		opts.dnsCheckEvery = recheckInterval
+	}
+
+	if opts.capture == nil {
+		opts.capture = capture.Run
 	}
 
 	server, err := serverURL(ctx, opts)
@@ -464,13 +470,26 @@ func (a *Agent) runSNI(ctx context.Context) {
 
 		run, stop := context.WithCancel(ctx)
 
-		go func() {
-			select {
-			case <-changed:
-				stop()
-			case <-run.Done():
+		// Only switching SNI off stops the capture. Restarting it on
+		// every other change (DNS, upstreams, interval) would drop the
+		// handshakes in flight and leave a gap in which none are seen.
+		go func(watch <-chan struct{}) {
+			for {
+				select {
+				case <-watch:
+					var next traffic.Config
+
+					next, watch = a.current()
+					if !next.SNI {
+						stop()
+
+						return
+					}
+				case <-run.Done():
+					return
+				}
 			}
-		}()
+		}(changed)
 
 		processor := capture.NewProcessor(func(h capture.Hello) {
 			a.resolver.PutSNI(h.Conn, h.Hello.ServerName, h.Hello.ECH, time.Now())
@@ -479,7 +498,7 @@ func (a *Agent) runSNI(ctx context.Context) {
 		a.supervise(run, "handshake capture", func(err error) {
 			a.setStatus(func(s *traffic.Status) { s.SNI.Error = errString(err) })
 		}, func(ctx context.Context) error {
-			return capture.Run(ctx, a.opts.Interface, processor.Packet)
+			return a.opts.capture(ctx, a.opts.Interface, processor.Packet)
 		})
 
 		stop()

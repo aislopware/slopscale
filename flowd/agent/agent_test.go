@@ -406,6 +406,78 @@ func TestServicePort(t *testing.T) {
 	}
 }
 
+// TestSNICaptureSurvivesOtherConfigChanges: turning DNS logging on or
+// changing upstreams leaves the handshake capture running, so no
+// handshake falls into a restart gap; only switching SNI off stops it.
+func TestSNICaptureSurvivesOtherConfigChanges(t *testing.T) {
+	starts := make(chan struct{}, 10)
+	stops := make(chan struct{}, 10)
+
+	a, err := newAgent(t.Context(), Options{
+		Local: &fakeLocal{}, Server: "http://unused", StateDir: t.TempDir(), SpoolBytes: 1 << 20,
+		capture: func(ctx context.Context, _ string, _ func([]byte, time.Time)) error {
+			starts <- struct{}{}
+
+			<-ctx.Done()
+
+			stops <- struct{}{}
+
+			return ctx.Err()
+		},
+	})
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+
+	go func() {
+		a.runSNI(ctx)
+		close(done)
+	}()
+
+	receive := func(ch chan struct{}, what string) {
+		t.Helper()
+
+		select {
+		case <-ch:
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "the capture did not "+what)
+		}
+	}
+	none := func(ch chan struct{}, what string) {
+		t.Helper()
+
+		select {
+		case <-ch:
+			require.FailNow(t, "the capture should not "+what)
+		case <-time.After(200 * time.Millisecond):
+		}
+	}
+
+	receive(starts, "start")
+
+	a.applyConfig(traffic.Config{SNI: true, DNS: true, Upstreams: []string{"192.0.2.53"}})
+	a.applyConfig(traffic.Config{SNI: true, DNS: false, ReportInterval: 120})
+	none(stops, "stop on a change that keeps SNI on")
+	none(starts, "restart on a change that keeps SNI on")
+
+	a.applyConfig(traffic.Config{SNI: false})
+	receive(stops, "stop when SNI is switched off")
+	assert.Eventually(t, func() bool {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+
+		return a.status.SNI == traffic.Collector{}
+	}, 5*time.Second, 10*time.Millisecond, "the status should say SNI is off")
+
+	a.applyConfig(traffic.Config{SNI: true})
+	receive(starts, "start again when SNI is switched on")
+
+	cancel()
+	receive(stops, "stop with the agent")
+	<-done
+}
+
 var errBoom = errors.New("boom")
 
 // TestSupervisorRecordsAndRestarts: a failing collector is restarted and
