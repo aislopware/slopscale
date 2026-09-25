@@ -168,11 +168,23 @@ type State struct {
 	// [State.TrafficSettings].
 	trafficSettings atomic.Pointer[types.TrafficSettings]
 	// trafficMu guards trafficReporters, the gateways as their last
-	// report left them, and trafficResolvers, the gateway resolvers the
-	// clients are pointed at; it orders report writes against them.
+	// report left them, trafficResolvers, the gateway resolvers the
+	// clients are pointed at, and trafficBoot, when the server started,
+	// which counts as every gateway's last report.
 	trafficMu        sync.Mutex
 	trafficReporters map[types.NodeID]types.TrafficReporter
-	trafficResolvers []netip.Addr
+	trafficResolvers []types.TrafficResolver
+	trafficBoot      time.Time
+	// trafficIngest holds a *sync.Mutex per gateway, so one gateway's
+	// reports are applied one at a time.
+	trafficIngest sync.Map
+	// trafficFoldMu keeps one maintenance run at a time and guards
+	// trafficFoldMarks, how far it has folded. trafficDirty holds, for
+	// the hourly and the daily rows, the oldest bucket a report wrote to
+	// since the last run.
+	trafficFoldMu    sync.Mutex
+	trafficFoldMarks types.TrafficFoldMarks
+	trafficDirty     [2]atomic.Int64
 	// asnTable names destinations' networks; nil until one is loaded.
 	asnTable atomic.Pointer[asn.Table]
 
@@ -689,7 +701,7 @@ func (s *State) DeleteNode(node types.NodeView) (change.Change, error) {
 
 	s.ipAlloc.FreeIPs(node.IPs())
 
-	c := change.NodeRemoved(node.ID())
+	c := change.NodeRemoved(node.ID()).Merge(s.trafficForgetNode(node.ID()))
 
 	// The database dropped the node's group memberships by cascade; the
 	// policy manager's copy follows.
@@ -1039,7 +1051,7 @@ func (s *State) SetNodeExpiry(nodeID types.NodeID, expiry *time.Time) (types.Nod
 		c = change.NodeAdded(n.ID())
 	}
 
-	return n, c, nil
+	return n, c.Merge(s.trafficRecheck()), nil
 }
 
 // SetNodeTags assigns tags to a node, making it a "tagged node".
@@ -1109,7 +1121,7 @@ func (s *State) SetNodeTags(nodeID types.NodeID, tags []string) (types.NodeView,
 	// Setting OriginNode ensures the node gets a self-update with the new tags.
 	c.OriginNode = nodeID
 
-	return nodeView, c, nil
+	return nodeView, c.Merge(s.trafficRecheck()), nil
 }
 
 // SetApprovedRoutes sets the network routes that a node is approved to advertise.
@@ -1146,7 +1158,7 @@ func (s *State) SetApprovedRoutes(nodeID types.NodeID, routes []netip.Prefix) (t
 		c = change.PolicyChange()
 	}
 
-	return nodeView, c, nil
+	return nodeView, c.Merge(s.trafficRecheck()), nil
 }
 
 // RenameNode changes the display name of a node. The admin supplies

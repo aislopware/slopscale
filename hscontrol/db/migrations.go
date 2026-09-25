@@ -2287,13 +2287,17 @@ func migrateAPIKeyScopes(tx *Tx) error {
 	return nil
 }
 
-// migrateTraffic (202609251000) creates the traffic_reporters,
-// traffic_totals, traffic_destinations and traffic_dns tables.
+// migrateTraffic (202609251000) creates the traffic tables.
 func migrateTraffic(tx *Tx) error {
-	return createTables(tx, []tableDefinition{
-		{
-			name: "traffic_reporters",
-			sqlite: `CREATE TABLE traffic_reporters(
+	return createTables(tx, trafficTables)
+}
+
+// trafficTables are traffic_reporters, traffic_instances, traffic_totals,
+// traffic_destinations and traffic_dns as migrateTraffic creates them.
+var trafficTables = []tableDefinition{
+	{
+		name: "traffic_reporters",
+		sqlite: `CREATE TABLE traffic_reporters(
   node_id integer PRIMARY KEY,
   instance text NOT NULL,
   last_seq integer NOT NULL DEFAULT 0,
@@ -2304,9 +2308,10 @@ func migrateTraffic(tx *Tx) error {
   last_report_at datetime,
   unattributed integer NOT NULL DEFAULT 0,
   dropped integer NOT NULL DEFAULT 0,
+  resolver_approved_at datetime,
   CONSTRAINT fk_traffic_reporters_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
 )`,
-			postgres: `CREATE TABLE traffic_reporters(
+		postgres: `CREATE TABLE traffic_reporters(
   node_id bigint PRIMARY KEY,
   instance text NOT NULL,
   last_seq bigint NOT NULL DEFAULT 0,
@@ -2317,12 +2322,36 @@ func migrateTraffic(tx *Tx) error {
   last_report_at timestamptz,
   unattributed bigint NOT NULL DEFAULT 0,
   dropped bigint NOT NULL DEFAULT 0,
+  resolver_approved_at timestamptz,
   CONSTRAINT fk_traffic_reporters_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
 )`,
-		},
-		{
-			name: "traffic_totals",
-			sqlite: `CREATE TABLE traffic_totals(
+	},
+	{
+		name: "traffic_instances",
+		sqlite: `CREATE TABLE traffic_instances(
+  node_id integer NOT NULL,
+  instance text NOT NULL,
+  last_seq integer NOT NULL DEFAULT 0,
+  pending_seq integer NOT NULL DEFAULT 0,
+  pending_chunks integer NOT NULL DEFAULT 0,
+  seen_at datetime,
+  PRIMARY KEY(node_id, instance),
+  CONSTRAINT fk_traffic_instances_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+)`,
+		postgres: `CREATE TABLE traffic_instances(
+  node_id bigint NOT NULL,
+  instance text NOT NULL,
+  last_seq bigint NOT NULL DEFAULT 0,
+  pending_seq bigint NOT NULL DEFAULT 0,
+  pending_chunks bigint NOT NULL DEFAULT 0,
+  seen_at timestamptz,
+  PRIMARY KEY(node_id, instance),
+  CONSTRAINT fk_traffic_instances_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+)`,
+	},
+	{
+		name: "traffic_totals",
+		sqlite: `CREATE TABLE traffic_totals(
   resolution integer NOT NULL,
   bucket integer NOT NULL,
   node_id integer NOT NULL,
@@ -2333,9 +2362,10 @@ func migrateTraffic(tx *Tx) error {
   rx_packets integer NOT NULL DEFAULT 0,
   conns integer NOT NULL DEFAULT 0,
   PRIMARY KEY(resolution, bucket, node_id, reporter_id),
-  CONSTRAINT fk_traffic_totals_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+  CONSTRAINT fk_traffic_totals_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_traffic_totals_reporter FOREIGN KEY(reporter_id) REFERENCES nodes(id) ON DELETE CASCADE
 )`,
-			postgres: `CREATE TABLE traffic_totals(
+		postgres: `CREATE TABLE traffic_totals(
   resolution bigint NOT NULL,
   bucket bigint NOT NULL,
   node_id bigint NOT NULL,
@@ -2346,15 +2376,17 @@ func migrateTraffic(tx *Tx) error {
   rx_packets bigint NOT NULL DEFAULT 0,
   conns bigint NOT NULL DEFAULT 0,
   PRIMARY KEY(resolution, bucket, node_id, reporter_id),
-  CONSTRAINT fk_traffic_totals_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+  CONSTRAINT fk_traffic_totals_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_traffic_totals_reporter FOREIGN KEY(reporter_id) REFERENCES nodes(id) ON DELETE CASCADE
 )`,
-			indexes: []string{
-				`CREATE INDEX idx_traffic_totals_node ON traffic_totals(node_id, resolution, bucket)`,
-			},
+		indexes: []string{
+			`CREATE INDEX idx_traffic_totals_node ON traffic_totals(node_id, resolution, bucket)`,
+			`CREATE INDEX idx_traffic_totals_reporter ON traffic_totals(reporter_id)`,
 		},
-		{
-			name: "traffic_destinations",
-			sqlite: `CREATE TABLE traffic_destinations(
+	},
+	{
+		name: "traffic_destinations",
+		sqlite: `CREATE TABLE traffic_destinations(
   resolution integer NOT NULL,
   bucket integer NOT NULL,
   node_id integer NOT NULL,
@@ -2366,15 +2398,17 @@ func migrateTraffic(tx *Tx) error {
   host_source text,
   asn integer NOT NULL DEFAULT 0,
   country text,
+  private integer NOT NULL DEFAULT 0,
   tx_bytes integer NOT NULL DEFAULT 0,
   rx_bytes integer NOT NULL DEFAULT 0,
   tx_packets integer NOT NULL DEFAULT 0,
   rx_packets integer NOT NULL DEFAULT 0,
   conns integer NOT NULL DEFAULT 0,
   PRIMARY KEY(resolution, bucket, node_id, reporter_id, dst, port, proto, host),
-  CONSTRAINT fk_traffic_destinations_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+  CONSTRAINT fk_traffic_destinations_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_traffic_destinations_reporter FOREIGN KEY(reporter_id) REFERENCES nodes(id) ON DELETE CASCADE
 )`,
-			postgres: `CREATE TABLE traffic_destinations(
+		postgres: `CREATE TABLE traffic_destinations(
   resolution bigint NOT NULL,
   bucket bigint NOT NULL,
   node_id bigint NOT NULL,
@@ -2386,21 +2420,24 @@ func migrateTraffic(tx *Tx) error {
   host_source text,
   asn bigint NOT NULL DEFAULT 0,
   country text,
+  private bigint NOT NULL DEFAULT 0,
   tx_bytes bigint NOT NULL DEFAULT 0,
   rx_bytes bigint NOT NULL DEFAULT 0,
   tx_packets bigint NOT NULL DEFAULT 0,
   rx_packets bigint NOT NULL DEFAULT 0,
   conns bigint NOT NULL DEFAULT 0,
   PRIMARY KEY(resolution, bucket, node_id, reporter_id, dst, port, proto, host),
-  CONSTRAINT fk_traffic_destinations_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+  CONSTRAINT fk_traffic_destinations_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_traffic_destinations_reporter FOREIGN KEY(reporter_id) REFERENCES nodes(id) ON DELETE CASCADE
 )`,
-			indexes: []string{
-				`CREATE INDEX idx_traffic_destinations_node ON traffic_destinations(node_id, resolution, bucket)`,
-			},
+		indexes: []string{
+			`CREATE INDEX idx_traffic_destinations_node ON traffic_destinations(node_id, resolution, bucket)`,
+			`CREATE INDEX idx_traffic_destinations_reporter ON traffic_destinations(reporter_id)`,
 		},
-		{
-			name: "traffic_dns",
-			sqlite: `CREATE TABLE traffic_dns(
+	},
+	{
+		name: "traffic_dns",
+		sqlite: `CREATE TABLE traffic_dns(
   resolution integer NOT NULL,
   bucket integer NOT NULL,
   node_id integer NOT NULL,
@@ -2409,9 +2446,10 @@ func migrateTraffic(tx *Tx) error {
   queries integer NOT NULL DEFAULT 0,
   failed integer NOT NULL DEFAULT 0,
   PRIMARY KEY(resolution, bucket, node_id, reporter_id, name),
-  CONSTRAINT fk_traffic_dns_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+  CONSTRAINT fk_traffic_dns_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_traffic_dns_reporter FOREIGN KEY(reporter_id) REFERENCES nodes(id) ON DELETE CASCADE
 )`,
-			postgres: `CREATE TABLE traffic_dns(
+		postgres: `CREATE TABLE traffic_dns(
   resolution bigint NOT NULL,
   bucket bigint NOT NULL,
   node_id bigint NOT NULL,
@@ -2420,11 +2458,12 @@ func migrateTraffic(tx *Tx) error {
   queries bigint NOT NULL DEFAULT 0,
   failed bigint NOT NULL DEFAULT 0,
   PRIMARY KEY(resolution, bucket, node_id, reporter_id, name),
-  CONSTRAINT fk_traffic_dns_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE
+  CONSTRAINT fk_traffic_dns_node FOREIGN KEY(node_id) REFERENCES nodes(id) ON DELETE CASCADE,
+  CONSTRAINT fk_traffic_dns_reporter FOREIGN KEY(reporter_id) REFERENCES nodes(id) ON DELETE CASCADE
 )`,
-			indexes: []string{
-				`CREATE INDEX idx_traffic_dns_node ON traffic_dns(node_id, resolution, bucket)`,
-			},
+		indexes: []string{
+			`CREATE INDEX idx_traffic_dns_node ON traffic_dns(node_id, resolution, bucket)`,
+			`CREATE INDEX idx_traffic_dns_reporter ON traffic_dns(reporter_id)`,
 		},
-	})
+	},
 }

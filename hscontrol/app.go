@@ -105,6 +105,12 @@ type Slopscale struct {
 	asnRefreshedAt atomic.Pointer[time.Time]
 	asnRefreshing  atomic.Bool
 
+	// trafficIngests counts the traffic reports being applied; see
+	// TrafficReportHandler. trafficTicking is set while a trafficTick
+	// runs.
+	trafficIngests atomic.Int32
+	trafficTicking atomic.Bool
+
 	clientStreamsOpen sync.WaitGroup
 }
 
@@ -937,8 +943,14 @@ func (h *Slopscale) scheduledTasks(ctx context.Context) {
 	integrationTicker := time.NewTicker(state.PostureIntegrationSyncInterval)
 	defer integrationTicker.Stop()
 
+	// Gateway resolvers leave the clients' DNS within the freshness
+	// window of their last report plus one tick.
+	trafficTicker := time.NewTicker(trafficTickInterval)
+	defer trafficTicker.Stop()
+
 	go h.syncPostureIntegrations(ctx)
 	go h.refreshASNIfDue(ctx)
+	go h.trafficMaintenance()
 
 	lastScheduleCheck := time.Now()
 
@@ -996,10 +1008,12 @@ func (h *Slopscale) scheduledTasks(ctx context.Context) {
 		case <-integrationTicker.C:
 			go h.syncPostureIntegrations(ctx)
 
+		case now := <-trafficTicker.C:
+			go h.trafficTick(now)
+
 		case now := <-attributeTicker.C:
 			h.expireNodeAttributes()
 			h.expireAccess(lastScheduleCheck, now)
-			h.trafficTick(now)
 
 			if h.postureBoundaryPassed(lastScheduleCheck, now) {
 				h.recompilePostures()

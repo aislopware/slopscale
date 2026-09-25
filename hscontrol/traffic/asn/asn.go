@@ -10,6 +10,7 @@ import (
 	"cmp"
 	"compress/gzip"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -41,6 +42,9 @@ var (
 	ErrBadLine     = errors.New("malformed ASN table line")
 	ErrHTTPStatus  = errors.New("unexpected HTTP status")
 	ErrNoCacheFile = errors.New("no cached ASN table")
+	// ErrNotModified: the server has nothing newer than the cached table,
+	// so the table in use, parsed from it, stays.
+	ErrNotModified = errors.New("the ASN table has not changed")
 )
 
 // Info is what the table knows about an address.
@@ -56,10 +60,25 @@ type range4 struct {
 	country    [2]byte
 }
 
+// range6 holds its bounds as two words each rather than as netip.Addr,
+// which carries a zone pointer: 40 bytes a range instead of 64, over the
+// table's hundreds of thousands of IPv6 ranges.
 type range6 struct {
-	start, end netip.Addr
+	start, end u128
 	asn        uint32
 	country    [2]byte
+}
+
+type u128 struct{ hi, lo uint64 }
+
+func u128Of(a netip.Addr) u128 {
+	b := a.As16()
+
+	return u128{hi: binary.BigEndian.Uint64(b[:8]), lo: binary.BigEndian.Uint64(b[8:])}
+}
+
+func (a u128) compare(b u128) int {
+	return cmp.Or(cmp.Compare(a.hi, b.hi), cmp.Compare(a.lo, b.lo))
 }
 
 // Table is a parsed ASN table. It is immutable once built, so lookups
@@ -103,12 +122,14 @@ func (t *Table) Lookup(addr netip.Addr) (Info, bool) {
 		return t.info(t.v4[i].asn, t.v4[i].country), true
 	}
 
-	i, found := slices.BinarySearchFunc(t.v6, addr, func(r range6, a netip.Addr) int { return r.start.Compare(a) })
+	v := u128Of(addr)
+
+	i, found := slices.BinarySearchFunc(t.v6, v, func(r range6, v u128) int { return r.start.compare(v) })
 	if !found {
 		i--
 	}
 
-	if i < 0 || addr.Compare(t.v6[i].end) > 0 {
+	if i < 0 || v.compare(t.v6[i].end) > 0 {
 		return Info{}, false
 	}
 
@@ -180,7 +201,7 @@ func Parse(r io.Reader) (*Table, error) {
 	}
 
 	slices.SortFunc(t.v4, func(a, b range4) int { return cmp.Compare(a.start, b.start) })
-	slices.SortFunc(t.v6, func(a, b range6) int { return a.start.Compare(b.start) })
+	slices.SortFunc(t.v6, func(a, b range6) int { return a.start.compare(b.start) })
 
 	return t, nil
 }
@@ -227,13 +248,14 @@ func (t *Table) addLine(text string) error {
 	}
 
 	if _, ok := t.names[asn]; !ok {
-		t.names[asn] = strings.TrimSpace(fields[4])
+		// A copy, so the name does not keep the whole line alive.
+		t.names[asn] = strings.Clone(strings.TrimSpace(fields[4]))
 	}
 
 	if start.Is4() {
 		t.v4 = append(t.v4, range4{start: v4Uint(start), end: v4Uint(end), asn: asn, country: country})
 	} else {
-		t.v6 = append(t.v6, range6{start: start, end: end, asn: asn, country: country})
+		t.v6 = append(t.v6, range6{start: u128Of(start), end: u128Of(end), asn: asn, country: country})
 	}
 
 	return nil
@@ -276,9 +298,9 @@ func (s Source) LoadCache() (*Table, error) {
 }
 
 // Fetch downloads the table, keeps a copy in the cache and returns it. It
-// asks only for a table newer than the cached one; when the server has
-// none, it returns the cached table. A table with too few ranges is
-// refused and the cache left as it was.
+// asks only for a table newer than the cached one and returns
+// [ErrNotModified] when the server has none. A table with too few ranges
+// is refused and the cache left as it was.
 func (s Source) Fetch(ctx context.Context) (*Table, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.URL, http.NoBody)
 	if err != nil {
@@ -298,7 +320,7 @@ func (s Source) Fetch(ctx context.Context) (*Table, error) {
 
 	switch resp.StatusCode {
 	case http.StatusNotModified:
-		return s.LoadCache()
+		return nil, ErrNotModified
 	case http.StatusOK:
 	default:
 		return nil, fmt.Errorf("%w %d downloading the ASN table", ErrHTTPStatus, resp.StatusCode)
@@ -324,6 +346,20 @@ func (s Source) Fetch(ctx context.Context) (*Table, error) {
 	}
 
 	return t, nil
+}
+
+// CachedAt is when the cached copy was last replaced, zero without one.
+func (s Source) CachedAt() time.Time {
+	if s.CachePath == "" {
+		return time.Time{}
+	}
+
+	info, err := os.Stat(s.CachePath)
+	if err != nil {
+		return time.Time{}
+	}
+
+	return info.ModTime()
 }
 
 // writeCache replaces the cached copy atomically and dates it as the

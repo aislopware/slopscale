@@ -5,16 +5,20 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"net/netip"
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/aislopware/slopscale/hscontrol/audit"
 	hsdb "github.com/aislopware/slopscale/hscontrol/db"
 	"github.com/aislopware/slopscale/hscontrol/traffic"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	"github.com/aislopware/slopscale/hscontrol/types/change"
+	"github.com/rs/zerolog/log"
 	"tailscale.com/net/tsaddr"
 )
 
@@ -32,13 +36,20 @@ var (
 	ErrTrafficReportTooLarge = errors.New("traffic report too large")
 	// ErrTrafficReporterNotFound: the node never reported (404).
 	ErrTrafficReporterNotFound = errors.New("traffic reporter not found")
+	// ErrTrafficDNSLoggingNoNameservers: DNS logging needs a global
+	// nameserver the clients keep when a gateway resolver goes away (400).
+	ErrTrafficDNSLoggingNoNameservers = errors.New(
+		"DNS logging needs at least one global nameserver (an IP address or an https:// resolver outside " +
+			"the tailnet), which the clients keep using when a gateway resolver goes away",
+	)
 )
 
 const (
 	// trafficResolverFreshness is how long after its last report a
 	// gateway's resolver stays in the clients' DNS. Agents report every
-	// minute, so three missed reports take it out.
-	trafficResolverFreshness = 3 * time.Minute
+	// minute; the clients also keep the global nameservers, so a gateway
+	// that died costs them nothing but its answers until it is dropped.
+	trafficResolverFreshness = 90 * time.Second
 
 	// trafficReportInterval is how often the server asks agents to report.
 	trafficReportInterval = 60
@@ -84,17 +95,28 @@ func (s *State) TrafficSettings() types.TrafficSettings {
 	return types.DefaultTrafficSettings()
 }
 
-// SetTrafficSettings validates, stores and applies the settings. Turning
-// the DNS log on or off changes every client's DNS, so it returns the
-// change to publish.
-func (s *State) SetTrafficSettings(settings types.TrafficSettings) (types.TrafficSettings, change.Change, error) {
+// PatchTrafficSettings changes the settings through patch, validates,
+// stores and applies them, all under the traffic lock so two changes at
+// once cannot lose each other's fields. Turning the DNS log on or off
+// changes the clients' DNS, so it returns the change to publish.
+func (s *State) PatchTrafficSettings(
+	patch func(*types.TrafficSettings),
+) (types.TrafficSettings, change.Change, error) {
+	s.trafficMu.Lock()
+	defer s.trafficMu.Unlock()
+
+	current := s.TrafficSettings()
+	settings := current
+	patch(&settings)
+
 	err := settings.Validate()
 	if err != nil {
 		return types.TrafficSettings{}, change.Change{}, err
 	}
 
-	s.trafficMu.Lock()
-	defer s.trafficMu.Unlock()
+	if settings.DNSLogging && !current.DNSLogging && len(s.trafficUpstreams()) == 0 {
+		return types.TrafficSettings{}, change.Change{}, ErrTrafficDNSLoggingNoNameservers
+	}
 
 	err = s.db.SaveTrafficSettings(settings)
 	if err != nil {
@@ -108,11 +130,11 @@ func (s *State) SetTrafficSettings(settings types.TrafficSettings) (types.Traffi
 	return settings, c, err
 }
 
-// loadTraffic reads the ASN cache, the settings and the reporters when
-// the server starts, and points the clients at the resolvers still fresh.
+// loadTraffic reads the settings, the fold marks and the reporters when
+// the server starts. The resolvers are recomputed from them, with the
+// start as their last report so a restart does not take every resolver
+// out of the clients' DNS until the gateways report again.
 func (s *State) loadTraffic() error {
-	s.loadASNCache()
-
 	settings, err := s.db.LoadTrafficSettings()
 	if err != nil {
 		return err
@@ -120,27 +142,51 @@ func (s *State) loadTraffic() error {
 
 	s.trafficSettings.Store(&settings)
 
+	marks, err := s.db.LoadTrafficFoldMarks()
+	if err != nil {
+		return err
+	}
+
 	reporters, err := s.db.ListTrafficReporters()
 	if err != nil {
 		return err
 	}
 
+	s.trafficFoldMu.Lock()
+	s.trafficFoldMarks = marks
+	s.trafficFoldMu.Unlock()
+
+	for i := range s.trafficDirty {
+		s.trafficDirty[i].Store(math.MaxInt64)
+	}
+
 	s.trafficMu.Lock()
 	defer s.trafficMu.Unlock()
 
+	s.trafficBoot = time.Now()
 	s.trafficReporters = make(map[types.NodeID]types.TrafficReporter, len(reporters))
+
 	for _, r := range reporters {
 		s.trafficReporters[r.NodeID] = r
 	}
 
-	_, err = s.applyTrafficResolversLocked(time.Now())
+	_, err = s.applyTrafficResolversLocked(s.trafficBoot)
 
 	return err
 }
 
+// TrafficInUse reports whether any gateway has reported, which is when
+// the monitor needs the ASN table.
+func (s *State) TrafficInUse() bool {
+	s.trafficMu.Lock()
+	defer s.trafficMu.Unlock()
+
+	return len(s.trafficReporters) > 0
+}
+
 // TrafficReporters returns the gateways that have reported, in node ID
 // order, with the resolvers the clients are pointed at now.
-func (s *State) TrafficReporters() ([]types.TrafficReporter, []netip.Addr) {
+func (s *State) TrafficReporters() ([]types.TrafficReporter, []types.TrafficResolver) {
 	s.trafficMu.Lock()
 	defer s.trafficMu.Unlock()
 
@@ -176,8 +222,53 @@ func (s *State) DeleteTrafficReporter(id types.NodeID) (change.Change, error) {
 	return s.applyTrafficResolversLocked(time.Now())
 }
 
-// TrafficTick drops the resolvers of gateways that stopped reporting; the
-// scheduler calls it every half minute.
+// SetTrafficResolverApproval lets the tailnet's clients use a gateway's
+// resolver, or stops them. An approved resolver is used only while the DNS
+// log is on and the gateway reports it working.
+func (s *State) SetTrafficResolverApproval(
+	id types.NodeID,
+	approved bool,
+) (types.TrafficReporter, change.Change, error) {
+	s.trafficMu.Lock()
+	defer s.trafficMu.Unlock()
+
+	reporter, ok := s.trafficReporters[id]
+	if !ok {
+		return types.TrafficReporter{}, change.Change{}, ErrTrafficReporterNotFound
+	}
+
+	var at *time.Time
+
+	if approved {
+		at = new(reporter.ResolverApprovedAt)
+		if at.IsZero() {
+			*at = time.Now().UTC()
+		}
+	}
+
+	err := s.db.SetTrafficResolverApproval(id, at)
+	if err != nil {
+		if errors.Is(err, hsdb.ErrTrafficReporterNotFound) {
+			return types.TrafficReporter{}, change.Change{}, ErrTrafficReporterNotFound
+		}
+
+		return types.TrafficReporter{}, change.Change{}, err
+	}
+
+	reporter.ResolverApprovedAt = time.Time{}
+	if at != nil {
+		reporter.ResolverApprovedAt = *at
+	}
+
+	s.trafficReporters[id] = reporter
+
+	c, err := s.applyTrafficResolversLocked(time.Now())
+
+	return reporter, c, err
+}
+
+// TrafficTick drops the resolvers of gateways that stopped reporting or
+// no longer qualify; the scheduler calls it every 15 seconds.
 func (s *State) TrafficTick(now time.Time) (change.Change, error) {
 	s.trafficMu.Lock()
 	defer s.trafficMu.Unlock()
@@ -185,104 +276,192 @@ func (s *State) TrafficTick(now time.Time) (change.Change, error) {
 	return s.applyTrafficResolversLocked(now)
 }
 
+// trafficRecheck recomputes the resolvers after a node changed in a way
+// that can make a gateway ineligible (tags, routes, approval, suspension,
+// expiry), so the clients leave its resolver at once rather than at the
+// next tick.
+func (s *State) trafficRecheck() change.Change {
+	c, err := s.TrafficTick(time.Now())
+	if err != nil {
+		log.Error().Err(err).Msg("updating the traffic resolvers after a node change")
+
+		return change.Change{}
+	}
+
+	return c
+}
+
+// trafficForgetNode drops a deleted node from the reporters; the database
+// removed its row and its traffic by cascade.
+func (s *State) trafficForgetNode(id types.NodeID) change.Change {
+	s.trafficMu.Lock()
+	defer s.trafficMu.Unlock()
+
+	delete(s.trafficReporters, id)
+	s.trafficIngest.Delete(id)
+
+	c, err := s.applyTrafficResolversLocked(time.Now())
+	if err != nil {
+		log.Error().Err(err).Msg("updating the traffic resolvers after a node deletion")
+
+		return change.Change{}
+	}
+
+	return c
+}
+
+// TrafficDNSBlocked says why the DNS log points no client anywhere even
+// though it is on; empty when it is off or working.
+func (s *State) TrafficDNSBlocked() string {
+	if s.TrafficSettings().DNSLogging && len(s.trafficUpstreams()) == 0 {
+		return ErrTrafficDNSLoggingNoNameservers.Error()
+	}
+
+	return ""
+}
+
 // trafficResolversLocked is the resolvers the clients should use: with
-// the DNS log on, every address a fresh gateway reports its working
-// resolver on, as long as the address is the gateway's own.
-func (s *State) trafficResolversLocked(now time.Time) []netip.Addr {
-	if !s.TrafficSettings().DNSLogging {
+// the DNS log on and a global nameserver to fall back to, one address of
+// every gateway whose resolver an operator approved, that reported it
+// working within the freshness, and that still qualifies as a gateway
+// and is online. Right after the server starts, the start counts as a
+// report and the online check waits, since the gateways have had no time
+// to report or connect.
+func (s *State) trafficResolversLocked(now time.Time) []types.TrafficResolver {
+	if !s.TrafficSettings().DNSLogging || len(s.trafficUpstreams()) == 0 {
 		return nil
 	}
 
-	var out []netip.Addr
+	apps := s.AppConnectors()
+	booting := now.Sub(s.trafficBoot) < trafficResolverFreshness
+
+	var out []types.TrafficResolver
 
 	for _, r := range s.trafficReporters {
-		if TrafficReporterStale(r, now) || !r.Status.DNS.Enabled || r.Status.DNS.Error != "" {
+		last := r.LastReportAt
+		if last.Before(s.trafficBoot) {
+			last = s.trafficBoot
+		}
+
+		if r.ResolverApprovedAt.IsZero() || now.Sub(last) > trafficResolverFreshness ||
+			!r.Status.DNS.Enabled || r.Status.DNS.Error != "" {
 			continue
 		}
 
 		node, ok := s.nodeStore.GetNode(r.NodeID)
-		if !ok {
+		if !ok || trafficGatewayRefusal(node, apps) != "" {
 			continue
 		}
 
-		for _, ap := range r.DNSListen {
-			if ap.Port() == dnsPort && slices.Contains(node.IPs(), ap.Addr()) {
-				out = append(out, ap.Addr())
-			}
+		if !booting && (!node.IsOnline().Valid() || !node.IsOnline().Get()) {
+			continue
+		}
+
+		if addr, ok := trafficResolverAddr(node, r.DNSListen); ok {
+			out = append(out, types.TrafficResolver{Node: r.NodeID, Addr: addr})
 		}
 	}
 
-	slices.SortFunc(out, netip.Addr.Compare)
+	slices.SortFunc(out, func(a, b types.TrafficResolver) int { return cmp.Compare(a.Node, b.Node) })
 
-	return slices.Compact(out)
+	return out
+}
+
+// trafficResolverAddr is the one address clients use for a gateway's
+// resolver: port 53 on one of the gateway's own addresses, IPv4 first,
+// since some clients have no IPv6 route to the tailnet.
+func trafficResolverAddr(node types.NodeView, listen []netip.AddrPort) (netip.Addr, bool) {
+	var v6 netip.Addr
+
+	for _, ap := range listen {
+		addr := ap.Addr().Unmap()
+		if ap.Port() != dnsPort || !slices.Contains(node.IPs(), addr) {
+			continue
+		}
+
+		if addr.Is4() {
+			return addr, true
+		}
+
+		if !v6.IsValid() {
+			v6 = addr
+		}
+	}
+
+	return v6, v6.IsValid()
 }
 
 // applyTrafficResolversLocked moves the clients' DNS and the grant to the
-// resolvers when the set changed, and returns the change to publish.
+// resolvers when the set changed, and returns the change to publish. The
+// grant goes first: when the policy cannot compile it, the clients keep
+// their DNS, which the old grant still admits.
 func (s *State) applyTrafficResolversLocked(now time.Time) (change.Change, error) {
 	next := s.trafficResolversLocked(now)
 	if slices.Equal(next, s.trafficResolvers) {
 		return change.Change{}, nil
 	}
 
-	s.trafficResolvers = next
-	s.cfg.SetTrafficResolvers(next)
+	addrs := make([]netip.Addr, 0, len(next))
+	for _, r := range next {
+		addrs = append(addrs, r.Addr)
+	}
 
-	_, err := s.polMan.SetTrafficResolvers(next)
+	slices.SortFunc(addrs, netip.Addr.Compare)
+
+	_, err := s.polMan.SetTrafficResolvers(addrs)
 	if err != nil {
 		return change.Change{}, fmt.Errorf("granting the traffic resolvers: %w", err)
 	}
 
+	prev := s.trafficResolvers
+	s.trafficResolvers = next
+	s.cfg.SetTrafficResolvers(next)
+
+	s.auditTrafficResolvers(prev, next)
+
 	return change.DNSConfig().Merge(change.PolicyChange()), nil
 }
 
-// IngestTrafficReport checks the agent's identity token, attributes the
-// report's traffic to nodes, rolls it up and stores it. It returns what
-// the agent should do next and the change to publish when the clients'
-// resolvers moved.
-func (s *State) IngestTrafficReport(
-	token string,
-	report traffic.Report,
-	now time.Time,
-) (traffic.Response, change.Change, error) {
-	gateway, err := s.trafficReporterNode(token, now)
-	if err != nil {
-		return traffic.Response{}, change.Change{}, err
+// auditTrafficResolvers records a change of the resolver set: it moves
+// every client's DNS, so it belongs in the audit log whatever caused it.
+func (s *State) auditTrafficResolvers(prev, next []types.TrafficResolver) {
+	names := func(rs []types.TrafficResolver) []string {
+		out := make([]string, 0, len(rs))
+		for _, r := range rs {
+			out = append(out, r.Addr.String())
+		}
+
+		return out
 	}
 
-	err = validateTrafficReport(report, now)
-	if err != nil {
-		return traffic.Response{}, change.Change{}, err
+	var added, removed []string
+
+	for _, r := range next {
+		if !slices.Contains(prev, r) {
+			added = append(added, r.Addr.String())
+		}
 	}
 
-	settings := s.TrafficSettings()
-	batch := s.rollUpTraffic(gateway.ID(), report, settings.Retention, now)
-
-	s.trafficMu.Lock()
-	defer s.trafficMu.Unlock()
-
-	stored, _, err := s.db.ApplyTrafficBatch(batch)
-	if err != nil {
-		return traffic.Response{}, change.Change{}, err
+	for _, r := range prev {
+		if !slices.Contains(next, r) {
+			removed = append(removed, r.Addr.String())
+		}
 	}
 
-	if s.trafficReporters == nil {
-		s.trafficReporters = make(map[types.NodeID]types.TrafficReporter)
-	}
+	audit.Record(s, &types.AuditEvent{
+		ActorKind:  types.ActorSystem,
+		Action:     "traffic.resolvers.change",
+		TargetKind: "dns",
+		Detail:     map[string]any{"resolvers": names(next), "added": added, "removed": removed},
+	})
 
-	s.trafficReporters[stored.NodeID] = stored
-
-	c, err := s.applyTrafficResolversLocked(now)
-	if err != nil {
-		return traffic.Response{}, change.Change{}, err
-	}
-
-	return traffic.Response{Seq: stored.LastSeq, Config: s.trafficAgentConfig(settings)}, c, nil
+	log.Info().Strs("resolvers", names(next)).Strs("added", added).Strs("removed", removed).
+		Msg("traffic resolvers changed")
 }
 
-// trafficReporterNode is the gateway the identity token names, when the
-// token is current and the gateway may report.
-func (s *State) trafficReporterNode(token string, now time.Time) (types.NodeView, error) {
+// AuthenticateTrafficReporter checks the agent's identity token and
+// returns the gateway it names, before the report body is read.
+func (s *State) AuthenticateTrafficReporter(token string, now time.Time) (types.NodeView, error) {
 	signer, err := s.IDTokenSigner()
 	if err != nil {
 		return types.NodeView{}, err
@@ -307,34 +486,138 @@ func (s *State) trafficReporterNode(token string, now time.Time) (types.NodeView
 		)
 	}
 
-	switch {
-	case !node.IsApproved():
-		return types.NodeView{}, fmt.Errorf("%w: the device is waiting for approval", ErrTrafficForbidden)
-	case node.IsSuspended():
-		return types.NodeView{}, fmt.Errorf("%w: the device is suspended", ErrTrafficForbidden)
-	case node.IsExpired():
-		return types.NodeView{}, fmt.Errorf("%w: the device's key has expired", ErrTrafficForbidden)
-	case !isTrafficGateway(node):
-		return types.NodeView{}, fmt.Errorf(
-			"%w: the device is no exit node, subnet router or app connector", ErrTrafficForbidden,
-		)
+	if reason := trafficGatewayRefusal(node, s.AppConnectors()); reason != "" {
+		return types.NodeView{}, fmt.Errorf("%w: %s", ErrTrafficForbidden, reason)
 	}
 
 	return node, nil
 }
 
-// isTrafficGateway reports whether other nodes' traffic can cross the
-// node: it serves approved exit or subnet routes, or runs an app
-// connector. Nothing else sees another node's traffic, so nothing else
-// may report it.
-func isTrafficGateway(node types.NodeView) bool {
-	if node.IsExitNode() || node.IsSubnetRouter() {
-		return true
+// TrafficGatewayRefusal says why node may not report traffic, empty when
+// it may.
+func (s *State) TrafficGatewayRefusal(node types.NodeView) string {
+	return trafficGatewayRefusal(node, s.AppConnectors())
+}
+
+// trafficGatewayRefusal says why a node may not report traffic, empty
+// when it may. Only a tagged node qualifies: tags are the operator's to
+// hand out, while any user can advertise routes or an app connector on
+// their own device. And only a gateway sees other nodes' traffic: approved
+// exit or subnet routes, or an app connector a configured app selects.
+func trafficGatewayRefusal(node types.NodeView, apps []types.AppConnector) string {
+	switch {
+	case !node.IsTagged():
+		return "the device is not tagged; only tagged gateways may report traffic"
+	case !node.IsApproved():
+		return "the device is waiting for approval"
+	case node.IsSuspended():
+		return "the device is suspended"
+	case node.IsExpired():
+		return "the device's key has expired"
+	case node.IsExitNode() || node.IsSubnetRouter():
+		return ""
+	case runsSelectedConnector(node, apps):
+		return ""
+	default:
+		return "the device has no approved exit or subnet routes and runs no app connector an app selects"
+	}
+}
+
+// runsSelectedConnector reports whether the node runs the app connector
+// service for at least one configured app.
+func runsSelectedConnector(node types.NodeView, apps []types.AppConnector) bool {
+	hostinfo := node.Hostinfo()
+	if !hostinfo.Valid() || !hostinfo.AppConnector().EqualBool(true) {
+		return false
 	}
 
-	hostinfo := node.Hostinfo()
+	tags := node.Tags().AsSlice()
 
-	return hostinfo.Valid() && hostinfo.AppConnector().EqualBool(true)
+	return slices.ContainsFunc(apps, func(app types.AppConnector) bool { return app.Selects(tags, true) })
+}
+
+// trafficIngestLock is the lock that keeps two reports of one gateway
+// from being applied at once, since a report may take several
+// transactions.
+func (s *State) trafficIngestLock(id types.NodeID) *sync.Mutex {
+	lock, _ := s.trafficIngest.LoadOrStore(id, &sync.Mutex{})
+
+	//nolint:forcetypeassert // the map only ever holds *sync.Mutex
+	return lock.(*sync.Mutex)
+}
+
+// IngestTrafficReport attributes the report of an authenticated gateway
+// to nodes, rolls it up and stores it. It returns what the agent should
+// do next and the change to publish when the clients' resolvers moved.
+func (s *State) IngestTrafficReport(
+	gateway types.NodeView,
+	report traffic.Report,
+	now time.Time,
+) (traffic.Response, change.Change, error) {
+	err := validateTrafficReport(report, now)
+	if err != nil {
+		return traffic.Response{}, change.Change{}, err
+	}
+
+	settings := s.TrafficSettings()
+
+	lock := s.trafficIngestLock(gateway.ID())
+	lock.Lock()
+	defer lock.Unlock()
+
+	batch := s.rollUpTraffic(gateway.ID(), report, settings.Retention, now)
+
+	applied, err := s.db.ApplyTrafficBatch(batch)
+	if err != nil {
+		return traffic.Response{}, change.Change{}, err
+	}
+
+	if applied.Applied {
+		s.markTrafficDirty(batch)
+	}
+
+	s.trafficMu.Lock()
+	defer s.trafficMu.Unlock()
+
+	// A node deleted while its report was written stays deleted: its
+	// rows went with it, and it must not come back as a reporter.
+	if _, ok := s.nodeStore.GetNode(gateway.ID()); ok {
+		if s.trafficReporters == nil {
+			s.trafficReporters = make(map[types.NodeID]types.TrafficReporter)
+		}
+
+		s.trafficReporters[gateway.ID()] = applied.Reporter
+	}
+
+	c, err := s.applyTrafficResolversLocked(now)
+	if err != nil {
+		return traffic.Response{}, change.Change{}, err
+	}
+
+	return traffic.Response{Seq: applied.Seq, Config: s.trafficAgentConfig(settings)}, c, nil
+}
+
+// markTrafficDirty moves the fold marks back to the oldest hour and day
+// the batch wrote, so the next maintenance folds a bucket a late report
+// added to after it was folded.
+func (s *State) markTrafficDirty(batch types.TrafficBatch) {
+	for _, d := range batch.Destinations {
+		s.markTrafficDirtySlot(trafficDirtySlot(d.Resolution), d.Bucket)
+	}
+
+	for _, d := range batch.DNS {
+		s.markTrafficDirtySlot(trafficDirtySlot(d.Resolution), d.Bucket)
+	}
+}
+
+// trafficDirtySlot is the index of a foldable resolution in
+// State.trafficDirty.
+func trafficDirtySlot(resolution int64) int {
+	if resolution == types.TrafficDay {
+		return 1
+	}
+
+	return 0
 }
 
 // validateTrafficReport checks what the whole report must honour; a
@@ -405,12 +688,27 @@ func (s *State) trafficAgentConfig(settings types.TrafficSettings) traffic.Confi
 // resolver can forward to: plain addresses and DoH URLs, never a tailnet
 // address, which could be a gateway resolver and loop.
 func (s *State) trafficUpstreams() []string {
-	var out []string
+	usable, _ := s.splitTrafficUpstreams()
+
+	return usable
+}
+
+// TrafficSkippedUpstreams are the global nameservers the agents cannot
+// forward to: DNS over TLS, which they do not speak, and tailnet
+// addresses.
+func (s *State) TrafficSkippedUpstreams() []string {
+	_, skipped := s.splitTrafficUpstreams()
+
+	return skipped
+}
+
+func (s *State) splitTrafficUpstreams() ([]string, []string) {
+	var usable, skipped []string
 
 	for _, ns := range s.cfg.EffectiveDNS().Nameservers.Global {
 		u, err := url.Parse(ns)
 		if err == nil && u.Scheme == "https" && u.Host != "" {
-			out = append(out, ns)
+			usable = append(usable, ns)
 
 			continue
 		}
@@ -419,6 +717,8 @@ func (s *State) trafficUpstreams() []string {
 		if err != nil {
 			ap, apErr := netip.ParseAddrPort(ns)
 			if apErr != nil {
+				skipped = append(skipped, ns)
+
 				continue
 			}
 
@@ -426,101 +726,19 @@ func (s *State) trafficUpstreams() []string {
 		}
 
 		if isTailnetAddr(addr) {
+			skipped = append(skipped, ns)
+
 			continue
 		}
 
-		out = append(out, ns)
+		usable = append(usable, ns)
 	}
 
-	return out
+	return usable, skipped
 }
 
 func isTailnetAddr(addr netip.Addr) bool {
 	addr = addr.Unmap()
 
 	return tsaddr.CGNATRange().Contains(addr) || tsaddr.TailscaleULARange().Contains(addr)
-}
-
-// TrafficResolutionFor picks the finest resolution, no finer than
-// minimum, whose rows still cover start and that splits the range into
-// at most maxPoints buckets.
-func (s *State) TrafficResolutionFor(start, end, now time.Time, minimum int64, maxPoints int) int64 {
-	retention := s.TrafficSettings().Retention
-
-	for _, res := range []int64{types.TrafficMinute, types.TrafficHour} {
-		if res < minimum {
-			continue
-		}
-
-		covered := !start.Before(now.Add(-retention.Of(res)))
-		points := end.Sub(start) / (time.Duration(res) * time.Second)
-
-		if covered && points <= time.Duration(maxPoints) {
-			return res
-		}
-	}
-
-	return types.TrafficDay
-}
-
-// TrafficMaintenance deletes what the retention no longer keeps and
-// folds each closed bucket's smaller destinations and names, the
-// scheduler's hourly job.
-func (s *State) TrafficMaintenance(now time.Time) error {
-	settings := s.TrafficSettings()
-
-	_, err := s.db.PruneTraffic(now, settings.Retention)
-	if err != nil {
-		return err
-	}
-
-	// Only closed buckets are folded; the last few are looked at again
-	// in case a late report added to them after the previous fold.
-	hour := now.Truncate(time.Hour)
-
-	_, err = s.db.FoldTraffic(types.TrafficHour, hour.Add(-3*time.Hour), hour, trafficKeepPerHour)
-	if err != nil {
-		return err
-	}
-
-	day := time.Unix(now.Unix()-now.Unix()%types.TrafficDay, 0)
-
-	_, err = s.db.FoldTraffic(types.TrafficDay, day.AddDate(0, 0, -3), day, trafficKeepPerDay)
-
-	return err
-}
-
-// Traffic reads for the API.
-
-// TrafficSeries sums the totals per bucket.
-func (s *State) TrafficSeries(f types.TrafficFilter) ([]types.TrafficPoint, error) {
-	return s.db.TrafficSeries(f)
-}
-
-// TrafficTopNodes sums the totals per node, or per gateway.
-func (s *State) TrafficTopNodes(f types.TrafficFilter, byReporter bool) ([]types.TrafficNodeSum, error) {
-	return s.db.TrafficTopNodes(f, byReporter)
-}
-
-// TrafficSum sums the totals in the filter.
-func (s *State) TrafficSum(f types.TrafficFilter) (types.TrafficCounts, error) {
-	return s.db.TrafficSum(f)
-}
-
-// TrafficDestinations sums the destinations by group.
-func (s *State) TrafficDestinations(
-	f types.TrafficFilter,
-	group types.TrafficGroup,
-) ([]types.TrafficDestinationSum, error) {
-	return s.db.TrafficDestinations(f, group)
-}
-
-// TrafficDestinationRows reads the destination rows as stored.
-func (s *State) TrafficDestinationRows(f types.TrafficFilter) ([]types.TrafficDestination, error) {
-	return s.db.TrafficDestinationRows(f)
-}
-
-// TrafficNames sums the DNS questions by name or node.
-func (s *State) TrafficNames(f types.TrafficFilter, group types.TrafficGroup) ([]types.TrafficNameSum, error) {
-	return s.db.TrafficNames(f, group)
 }

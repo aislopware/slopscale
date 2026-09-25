@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/gen/jet/table"
-	"github.com/aislopware/slopscale/hscontrol/types"
 	jet "github.com/go-jet/jet/v2/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -120,35 +119,7 @@ func fixedCases(t *testing.T) []fixedCase {
 		{name: "all attributes", fixed: allAttributes, jet: selectNodeAttributes()},
 	}
 
-	return slices.Concat(static, nodeUpdateCases(&row), trafficUpsertCases())
-}
-
-// trafficUpsertCases covers the rows a traffic report writes.
-func trafficUpsertCases() []fixedCase {
-	key := types.TrafficKey{Resolution: types.TrafficHour, Bucket: 3600, NodeID: 3, ReporterID: 4}
-	counts := types.TrafficCounts{TxBytes: 10, RxBytes: 20, TxPackets: 1, RxPackets: 2, Conns: 1}
-	total := types.TrafficTotal{TrafficKey: key, TrafficCounts: counts}
-	destination := types.TrafficDestination{
-		TrafficKey: key, Dst: "1.1.1.1", Port: 443, Proto: 6, Host: "one.one.one.one",
-		HostSource: "sni", ASN: 13335, Country: "AU", TrafficCounts: counts,
-	}
-	name := types.TrafficDNS{TrafficKey: key, Name: "example.com", Queries: 5, Failed: 1}
-
-	return []fixedCase{
-		{
-			name:  "traffic total upsert",
-			fixed: upsertTrafficTotal,
-			args:  totalArgs(total),
-			jet:   trafficTotalUpsert(total),
-		},
-		{
-			name:  "traffic destination upsert",
-			fixed: upsertTrafficDestination,
-			args:  destinationArgs(destination),
-			jet:   trafficDestinationUpsert(destination),
-		},
-		{name: "traffic dns upsert", fixed: upsertTrafficDNS, args: dnsArgs(name), jet: trafficDNSUpsert(name)},
-	}
+	return slices.Concat(static, nodeUpdateCases(&row))
 }
 
 // nodeUpdateCases covers the four shapes of [UpdateNode].

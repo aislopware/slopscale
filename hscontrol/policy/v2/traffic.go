@@ -24,9 +24,19 @@ func (pm *PolicyManager) SetTrafficResolvers(addrs []netip.Addr) (bool, error) {
 		return false, nil
 	}
 
+	prev := pm.trafficResolvers
 	pm.trafficResolvers = slices.Clone(addrs)
 
-	return pm.updateLocked()
+	changed, err := pm.updateLocked()
+	if err != nil {
+		// Keep the set the compiled policy still reflects, so the next
+		// call with the same addresses tries the grant again.
+		pm.trafficResolvers = prev
+
+		return false, err
+	}
+
+	return changed, nil
 }
 
 // trafficResolverGrants is the grant that lets every node ask the

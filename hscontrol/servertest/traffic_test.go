@@ -13,9 +13,11 @@ import (
 	"net/http/httptest"
 	"net/netip"
 	"net/url"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -31,6 +33,7 @@ import (
 	"tailscale.com/net/tsaddr"
 	"tailscale.com/tailcfg"
 	"tailscale.com/types/netmap"
+	"tailscale.com/types/opt"
 )
 
 const trafficWait = 10 * time.Second
@@ -199,6 +202,56 @@ func resolvesThrough(nm *netmap.NetworkMap, addr netip.Addr) bool {
 	return first.Addr == addr.String() && first.UseWithExitNode
 }
 
+// keepsGlobalsWithExitNode reports whether the netmap's DNS keeps the
+// tailnet's global nameserver while an exit node is in use, so a client
+// whose gateway resolver died still resolves.
+func keepsGlobalsWithExitNode(nm *netmap.NetworkMap) bool {
+	if nm == nil {
+		return false
+	}
+
+	global := false
+
+	for _, r := range nm.DNS.Resolvers {
+		if !r.UseWithExitNode {
+			return false
+		}
+
+		global = global || r.Addr == "1.1.1.1"
+	}
+
+	return global
+}
+
+func nodeIP6(t *testing.T, node *servertest.TestClient) netip.Addr {
+	t.Helper()
+
+	for _, p := range node.Netmap().SelfNode.Addresses().All() {
+		if p.Addr().Is6() {
+			return p.Addr()
+		}
+	}
+
+	require.FailNow(t, "no IPv6 address", node.Name)
+
+	return netip.Addr{}
+}
+
+// oauthToken mints an access token holding only scopes, through an OAuth
+// client the key's user creates.
+func oauthToken(t *testing.T, client *http.Client, srv *servertest.TestServer, key string, scopes ...string) string {
+	t.Helper()
+
+	status, body := apiCall(t, client, key, http.MethodPost, srv.URL+"/api/v1/oauth-client",
+		map[string]any{"description": "scoped", "scopes": scopes})
+	require.Equal(t, http.StatusOK, status, body)
+
+	secret, ok := body["clientSecret"].(string)
+	require.True(t, ok)
+
+	return accessToken(t, client, srv.URL, secret)
+}
+
 func mentionsResolver(nm *netmap.NetworkMap, addr netip.Addr) bool {
 	for _, r := range slices.Concat(nm.DNS.Resolvers, nm.DNS.FallbackResolvers) {
 		if r.Addr == addr.String() {
@@ -263,15 +316,22 @@ func TestTrafficMonitor(t *testing.T) {
 	ownerKey := srv.CreateAPIKey(t, owner)
 
 	// The nodes may only use exit nodes, so the only way to one's port 53
-	// is the grant the DNS log adds.
-	setStatePolicy(t, srv, `{"grants": [
-		{"src": ["traffic-owner@"], "dst": ["autogroup:internet"], "ip": ["*"]}
-	]}`)
+	// is the grant the DNS log adds. The stranger has no grant at all, so
+	// it is no peer of the gateway.
+	setStatePolicy(t, srv, `{
+		"tagOwners": {"tag:gateway": ["traffic-owner@"], "tag:connector": ["traffic-owner@"]},
+		"grants": [{"src": ["traffic-owner@"], "dst": ["autogroup:internet"], "ip": ["*"]}]
+	}`)
 
-	exit := servertest.NewClient(t, srv, "exit-1", servertest.WithUser(owner))
+	runsConnector := servertest.WithHostinfo(func(h *tailcfg.Hostinfo) { h.AppConnector = opt.NewBool(true) })
+
+	exit := servertest.NewClient(t, srv, "exit-1", servertest.WithUser(owner), servertest.WithTags("tag:gateway"))
 	laptop := servertest.NewClient(t, srv, "laptop", servertest.WithUser(owner))
 	phone := servertest.NewClient(t, srv, "phone", servertest.WithUser(owner))
-	plain := servertest.NewClient(t, srv, "plain", servertest.WithUser(owner))
+	plain := servertest.NewClient(t, srv, "plain", servertest.WithUser(owner), runsConnector)
+	connector := servertest.NewClient(t, srv, "connector", servertest.WithUser(owner),
+		servertest.WithTags("tag:connector"), runsConnector)
+	stranger := servertest.NewClient(t, srv, "stranger", servertest.WithUser(srv.CreateUser(t, "traffic-stranger")))
 
 	exit.Direct().SetHostinfo(&tailcfg.Hostinfo{
 		BackendLogID: "servertest-exit-1",
@@ -299,6 +359,7 @@ func TestTrafficMonitor(t *testing.T) {
 	})
 
 	exitIP, laptopIP, phoneIP := nodeIP4(t, exit), nodeIP4(t, laptop), nodeIP4(t, phone)
+	strangerIP := nodeIP4(t, stranger)
 	token := idToken(t, srv, exit, traffic.Audience)
 	now := time.Now()
 	minute := minuteBucket(now) - 60
@@ -347,6 +408,9 @@ func TestTrafficMonitor(t *testing.T) {
 			{Bucket: minute, Src: laptopIP, Dst: phoneIP, Proto: 6, Port: 80, TxBytes: 9999},
 			// From an address no node holds.
 			{Bucket: minute, Src: netip.MustParseAddr("100.99.99.99"), Dst: netip.MustParseAddr("1.1.1.1"), TxBytes: 1},
+			// From a node that cannot reach the gateway: a gateway cannot
+			// pin traffic on a node it never carried.
+			{Bucket: minute, Src: strangerIP, Dst: netip.MustParseAddr("1.1.1.1"), TxBytes: 77_777},
 		},
 		Queries: []traffic.Query{
 			{Bucket: minute, Src: laptopIP, Name: "GitHub.com.", Count: 5, Failed: 1},
@@ -404,7 +468,7 @@ func TestTrafficMonitor(t *testing.T) {
 			rows[dst] = row
 		}
 
-		require.Len(t, rows, 4, "nothing between nodes, nothing from strangers")
+		require.Len(t, rows, 4, "nothing between nodes, nothing from strangers or non-peers")
 		assert.Equal(t, "GITHUB", rows["140.82.112.3"]["asName"])
 		assert.InDelta(t, 36459, rows["140.82.112.3"]["asn"], 0)
 		assert.Equal(t, "US", rows["140.82.112.3"]["country"])
@@ -412,6 +476,34 @@ func TestTrafficMonitor(t *testing.T) {
 		assert.Equal(t, "GOOGLE", rows["8.8.8.8"]["asName"])
 		assert.Equal(t, true, rows["192.168.1.10"]["private"])
 		assert.Equal(t, false, rows["8.8.8.8"]["private"])
+
+		// Grouped by host or network, a group of private destinations
+		// still says so, and has no network of its own.
+		for _, groupBy := range []string{"host", "asn", "country"} {
+			status, body = apiCall(t, client, ownerKey, http.MethodGet,
+				v1+"/traffic/destinations?groupBy="+groupBy, nil)
+			require.Equal(t, http.StatusOK, status, body)
+
+			groups, ok := field(t, body, "destinations").([]any)
+			require.True(t, ok)
+
+			private := 0
+
+			for _, g := range groups {
+				row, ok := g.(map[string]any)
+				require.True(t, ok)
+
+				if row["private"] == true {
+					private++
+
+					assert.InDelta(t, 300, row["txBytes"], 0, "by %s: only the private destination", groupBy)
+					assert.InDelta(t, 0, row["asn"], 0)
+					assert.Empty(t, row["asName"])
+				}
+			}
+
+			assert.Equal(t, 1, private, "by %s: one private group", groupBy)
+		}
 
 		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/dns", nil)
 		require.Equal(t, http.StatusOK, status, body)
@@ -430,7 +522,9 @@ func TestTrafficMonitor(t *testing.T) {
 		require.Equal(t, http.StatusOK, status, body)
 		assert.Equal(t, "exit-1", field(t, body, "reporters", "0", "nodeName"))
 		assert.Equal(t, "0.1.0", field(t, body, "reporters", "0", "version"))
-		assert.InDelta(t, 1, field(t, body, "reporters", "0", "unattributed"), 0)
+		assert.InDelta(t, 2, field(t, body, "reporters", "0", "unattributed"), 0,
+			"the unknown address and the node that is no peer of the gateway")
+		assert.Empty(t, field(t, body, "reporters", "0", "refused"))
 		assert.Equal(t, false, field(t, body, "reporters", "0", "stale"))
 		assert.Equal(t, true, field(t, body, "reporters", "0", "collectors", "conntrack", "enabled"))
 		assert.InDelta(t, 100_002, field(t, body, "asnRanges"), 0)
@@ -499,25 +593,37 @@ func TestTrafficMonitor(t *testing.T) {
 			http.StatusUnauthorized, "expired")
 		refused(t, signedToken(t, srv, signer, exit, laptop.NodePrivateKey().Public().String(), time.Now()),
 			http.StatusUnauthorized, "a node key the gateway no longer has")
-		refused(t, idToken(t, srv, plain, traffic.Audience), http.StatusForbidden, "not a gateway")
+		refused(t, idToken(t, srv, laptop, traffic.Audience), http.StatusForbidden, "not a gateway")
 
-		status, body := apiCall(t, client, ownerKey, http.MethodPost,
+		// Anyone can advertise an app connector or routes on their own
+		// device; only a tag, which the operator hands out, makes a
+		// gateway. And a tagged connector reports only once an app
+		// selects it.
+		status, body := postReport(t, client, srv.URL, idToken(t, srv, plain, traffic.Audience), report, "")
+		assert.Equal(t, http.StatusForbidden, status, body)
+		assert.Contains(t, body, "not tagged")
+
+		status, body = postReport(t, client, srv.URL, idToken(t, srv, connector, traffic.Audience), report, "")
+		assert.Equal(t, http.StatusForbidden, status, body)
+		assert.Contains(t, body, "app connector an app selects")
+
+		status, apiBody := apiCall(t, client, ownerKey, http.MethodPost,
 			v1+"/node/"+exit.NodeIDString()+"/suspend", map[string]any{"suspended": true})
-		require.Equal(t, http.StatusOK, status, body)
+		require.Equal(t, http.StatusOK, status, apiBody)
 		refused(t, token, http.StatusForbidden, "suspended")
 
-		status, body = apiCall(t, client, ownerKey, http.MethodPost,
+		status, apiBody = apiCall(t, client, ownerKey, http.MethodPost,
 			v1+"/node/"+exit.NodeIDString()+"/suspend", map[string]any{"suspended": false})
-		require.Equal(t, http.StatusOK, status, body)
+		require.Equal(t, http.StatusOK, status, apiBody)
 
-		status, body = apiCall(t, client, ownerKey, http.MethodPost,
+		status, apiBody = apiCall(t, client, ownerKey, http.MethodPost,
 			v1+"/node/"+exit.NodeIDString()+"/approve", map[string]any{"approved": false})
-		require.Equal(t, http.StatusOK, status, body)
+		require.Equal(t, http.StatusOK, status, apiBody)
 		refused(t, token, http.StatusForbidden, "waiting for approval")
 
-		status, body = apiCall(t, client, ownerKey, http.MethodPost,
+		status, apiBody = apiCall(t, client, ownerKey, http.MethodPost,
 			v1+"/node/"+exit.NodeIDString()+"/approve", map[string]any{"approved": true})
-		require.Equal(t, http.StatusOK, status, body)
+		require.Equal(t, http.StatusOK, status, apiBody)
 		refused(t, token, http.StatusOK, "approved again")
 	})
 
@@ -592,6 +698,11 @@ func TestTrafficMonitor(t *testing.T) {
 
 		q := url.Values{"start": {end.Format(time.RFC3339)}, "end": {end.Add(-time.Hour).Format(time.RFC3339)}}
 		status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/summary?"+q.Encode(), nil)
+		assert.Equal(t, http.StatusBadRequest, status, body)
+
+		// More daily buckets than a chart holds is refused, not scanned.
+		q = url.Values{"start": {end.AddDate(-5, 0, 0).Format(time.RFC3339)}, "end": {end.Format(time.RFC3339)}}
+		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/destinations?"+q.Encode(), nil)
 		assert.Equal(t, http.StatusBadRequest, status, body)
 
 		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/destinations?groupBy=bogus", nil)
@@ -690,7 +801,7 @@ func TestTrafficMonitor(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, status, "minutes may not outlive hours: %v", body)
 	})
 
-	t.Run("the DNS log points clients at a fresh gateway resolver only", func(t *testing.T) {
+	t.Run("the DNS log uses a gateway resolver once approved, and only while it reports", func(t *testing.T) {
 		dnsStatus := traffic.Status{
 			Conntrack: traffic.Collector{Enabled: true},
 			DNS:       traffic.Collector{Enabled: true},
@@ -702,13 +813,35 @@ func TestTrafficMonitor(t *testing.T) {
 			return traffic.Report{Instance: "boot-2", Seq: seq, Status: dnsStatus, DNSListen: listen}
 		}
 		ownResolver := netip.AddrPortFrom(exitIP, 53)
+		resolvers := func() []any {
+			t.Helper()
+
+			status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/reporters", nil)
+			require.Equal(t, http.StatusOK, status, body)
+
+			list, ok := body["resolvers"].([]any)
+			require.True(t, ok)
+
+			return list
+		}
 
 		// Off by default: a working resolver is not used.
 		sendReport(t, client, srv.URL, token, report(ownResolver))
 		assert.False(t, mentionsResolver(laptop.Netmap(), exitIP))
 		assert.False(t, opensDNS(exit.Netmap(), exitIP))
 
-		status, body := apiCall(t, client, ownerKey, http.MethodPatch, v1+"/traffic/settings",
+		// Moving every client's DNS takes the dns scope on top of the
+		// monitor's.
+		monitorOnly := oauthToken(t, client, srv, ownerKey, "logs:network")
+		status, body := apiCall(t, client, monitorOnly, http.MethodPatch, v1+"/traffic/settings",
+			map[string]any{"dnsLogging": true})
+		assert.Equal(t, http.StatusForbidden, status, body)
+
+		status, body = apiCall(t, client, monitorOnly, http.MethodPatch, v1+"/traffic/settings",
+			map[string]any{"sni": true, "dnsLogging": false})
+		assert.Equal(t, http.StatusOK, status, "an unchanged dnsLogging needs no dns scope: %v", body)
+
+		status, body = apiCall(t, client, ownerKey, http.MethodPatch, v1+"/traffic/settings",
 			map[string]any{"dnsLogging": true})
 		require.Equal(t, http.StatusOK, status, body)
 		assert.Equal(t, true, body["dnsLogging"])
@@ -718,16 +851,30 @@ func TestTrafficMonitor(t *testing.T) {
 		resp := sendReport(t, client, srv.URL, token,
 			report(netip.AddrPortFrom(laptopIP, 53), netip.AddrPortFrom(exitIP, 5353)))
 		assert.True(t, resp.Config.DNS)
+		assert.Empty(t, resolvers())
 
-		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/reporters", nil)
-		require.Equal(t, http.StatusOK, status, body)
-		assert.Equal(t, []any{}, body["resolvers"])
-
+		// A working resolver on the gateway's own address is still not
+		// used until an operator approves it.
 		sendReport(t, client, srv.URL, token, report(ownResolver))
+		assert.Empty(t, resolvers(), "not approved yet")
+
+		approve := func(key string, on bool) (int, map[string]any) {
+			return apiCall(t, client, key, http.MethodPatch, v1+"/traffic/reporters/"+exit.NodeIDString(),
+				map[string]any{"resolver": on})
+		}
+
+		status, body = approve(monitorOnly, true)
+		assert.Equal(t, http.StatusForbidden, status, body)
+		assert.Empty(t, resolvers())
+
+		status, body = approve(ownerKey, true)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.NotEmpty(t, body["resolverApprovedAt"])
+		assert.Equal(t, true, body["resolverActive"])
 
 		for _, c := range []*servertest.TestClient{laptop, phone} {
 			c.WaitForCondition(t, "DNS through the gateway", trafficWait, func(nm *netmap.NetworkMap) bool {
-				return resolvesThrough(nm, exitIP) && mentionsResolver(nm, netip.MustParseAddr("1.1.1.1"))
+				return resolvesThrough(nm, exitIP) && keepsGlobalsWithExitNode(nm)
 			})
 		}
 
@@ -735,11 +882,7 @@ func TestTrafficMonitor(t *testing.T) {
 			return opensDNS(nm, exitIP)
 		})
 		assert.False(t, mentionsResolver(exit.Netmap(), exitIP), "the gateway never resolves through itself")
-
-		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/reporters", nil)
-		require.Equal(t, http.StatusOK, status, body)
-		assert.Equal(t, []any{exitIP.String()}, body["resolvers"])
-		assert.Equal(t, true, field(t, body, "reporters", "0", "resolverActive"))
+		assert.Equal(t, []any{exitIP.String()}, resolvers())
 
 		// A resolver that stopped working is dropped at once.
 		broken := report(ownResolver)
@@ -752,24 +895,62 @@ func TestTrafficMonitor(t *testing.T) {
 			return !opensDNS(nm, exitIP)
 		})
 
-		// A gateway whose last report is older than three minutes is
-		// dropped by the scheduler's tick. The report is backdated
-		// through the state, with a token the server issued back then.
+		// So is one whose gateway stops qualifying, without waiting for
+		// a tick.
 		sendReport(t, client, srv.URL, token, report(ownResolver))
 		laptop.WaitForCondition(t, "DNS through the gateway again", trafficWait, func(nm *netmap.NetworkMap) bool {
 			return resolvesThrough(nm, exitIP)
 		})
 
-		then := time.Now().Add(-4 * time.Minute)
-		backdated := signedToken(t, srv, signer, exit, exit.NodePrivateKey().Public().String(), then)
-		_, c, err := srv.State().IngestTrafficReport(backdated, report(ownResolver), then)
-		require.NoError(t, err)
-		assert.True(t, c.IsEmpty(), "still fresh as of then")
+		status, apiBody := apiCall(t, client, ownerKey, http.MethodPost,
+			v1+"/node/"+exit.NodeIDString()+"/suspend", map[string]any{"suspended": true})
+		require.Equal(t, http.StatusOK, status, apiBody)
+		assert.Empty(t, resolvers(), "a suspended gateway's resolver goes at once")
+		laptop.WaitForCondition(t, "the suspended gateway's resolver dropped", trafficWait,
+			func(nm *netmap.NetworkMap) bool { return !mentionsResolver(nm, exitIP) })
 
-		c, err = srv.State().TrafficTick(time.Now())
-		require.NoError(t, err)
-		require.False(t, c.IsEmpty(), "the stale resolver is a change")
-		srv.App.Change(c)
+		status, apiBody = apiCall(t, client, ownerKey, http.MethodPost,
+			v1+"/node/"+exit.NodeIDString()+"/suspend", map[string]any{"suspended": false})
+		require.Equal(t, http.StatusOK, status, apiBody)
+		laptop.WaitForCondition(t, "the resolver back with the gateway", trafficWait,
+			func(nm *netmap.NetworkMap) bool { return resolvesThrough(nm, exitIP) })
+
+		// A gateway that stops reporting leaves the clients' DNS 90
+		// seconds after its last report, at the next tick. Right after a
+		// start, the start counts as the last report. The reports are
+		// backdated through the state; each change is published the way
+		// the report handler and the scheduler publish theirs.
+		gateway, ok := srv.State().GetNodeByID(types.NodeID(mustID(t, exit)))
+		require.True(t, ok)
+
+		ingestAt := func(at time.Time) {
+			t.Helper()
+
+			_, c, err := srv.State().IngestTrafficReport(gateway, report(ownResolver), at)
+			require.NoError(t, err)
+			srv.App.Change(c)
+		}
+		tick := func() {
+			t.Helper()
+
+			c, err := srv.State().TrafficTick(time.Now())
+			require.NoError(t, err)
+			srv.App.Change(c)
+		}
+
+		srv.State().SetTrafficBootForTest(time.Now())
+		ingestAt(time.Now().Add(-2 * time.Minute))
+		tick()
+		assert.Equal(t, []any{exitIP.String()}, resolvers(), "the start counts as a report")
+
+		srv.State().SetTrafficBootForTest(time.Now().Add(-time.Hour))
+		ingestAt(time.Now().Add(-80 * time.Second))
+		tick()
+		assert.Equal(t, []any{exitIP.String()}, resolvers(), "80 seconds is fresh")
+
+		ingestAt(time.Now().Add(-91 * time.Second))
+		tick()
+		assert.Empty(t, resolvers(), "91 seconds is not")
 
 		laptop.WaitForCondition(t, "the stale resolver dropped", trafficWait, func(nm *netmap.NetworkMap) bool {
 			return !mentionsResolver(nm, exitIP)
@@ -778,14 +959,29 @@ func TestTrafficMonitor(t *testing.T) {
 			return !opensDNS(nm, exitIP)
 		})
 
-		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/reporters", nil)
-		require.Equal(t, http.StatusOK, status, body)
-		assert.Equal(t, true, field(t, body, "reporters", "0", "stale"))
+		status, apiBody = apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/reporters", nil)
+		require.Equal(t, http.StatusOK, status, apiBody)
+		assert.Equal(t, true, field(t, apiBody, "reporters", "0", "stale"))
 
-		// Reporting again brings it back; switching the log off takes it
-		// away for good.
-		sendReport(t, client, srv.URL, token, report(ownResolver))
+		// Reporting again brings it back, on its IPv4 address when it
+		// answers on both; withdrawing the approval, or switching the log
+		// off, takes it away.
+		sendReport(t, client, srv.URL, token, report(netip.AddrPortFrom(nodeIP6(t, exit), 53), ownResolver))
 		laptop.WaitForCondition(t, "the resolver back", trafficWait, func(nm *netmap.NetworkMap) bool {
+			return resolvesThrough(nm, exitIP)
+		})
+		assert.Equal(t, []any{exitIP.String()}, resolvers())
+
+		status, body = approve(ownerKey, false)
+		require.Equal(t, http.StatusOK, status, body)
+		assert.Nil(t, body["resolverApprovedAt"])
+		laptop.WaitForCondition(t, "the approval withdrawn", trafficWait, func(nm *netmap.NetworkMap) bool {
+			return !mentionsResolver(nm, exitIP)
+		})
+
+		status, body = approve(ownerKey, true)
+		require.Equal(t, http.StatusOK, status, body)
+		laptop.WaitForCondition(t, "approved again", trafficWait, func(nm *netmap.NetworkMap) bool {
 			return resolvesThrough(nm, exitIP)
 		})
 
@@ -908,6 +1104,148 @@ func TestTrafficMonitor(t *testing.T) {
 		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/summary", nil)
 		require.Equal(t, http.StatusOK, status, body)
 		assert.InDelta(t, 2000, field(t, body, "total", "txBytes"), 0, "what it reported stays")
+	})
+}
+
+// endlessBody is a request body of JSON that never ends, counting what the
+// server read of it.
+type endlessBody struct {
+	read atomic.Int64
+	sent bool
+}
+
+func (b *endlessBody) Read(p []byte) (int, error) {
+	n := len(p)
+	b.read.Add(int64(n))
+
+	for i := range p {
+		p[i] = 'a'
+	}
+
+	if !b.sent {
+		b.sent = true
+		n = copy(p, `{"version":"`)
+	}
+
+	return n, nil
+}
+
+// stalledBody is a request body that blocks its reader until released.
+type stalledBody struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+}
+
+func (b *stalledBody) Read([]byte) (int, error) {
+	b.once.Do(func() { close(b.started) })
+	<-b.release
+
+	return 0, io.ErrUnexpectedEOF
+}
+
+// TestTrafficReportAdmission proves what a report costs the server before
+// it is accepted: a credential that is not a gateway's current token is
+// refused without reading a byte of the body, a gateway's body is read no
+// further than the bound, and ingests beyond the server-wide limit are
+// told to come back instead of queueing. It does not run in parallel, so
+// the allocations it measures are the handler's.
+//
+//nolint:paralleltest // measures the process's allocations, which parallel tests would disturb
+func TestTrafficReportAdmission(t *testing.T) {
+	srv := servertest.NewServer(t)
+	client := srv.HTTPClient(t)
+	owner := srv.CreateUser(t, "admission-owner")
+	ownerKey := srv.CreateAPIKey(t, owner)
+
+	setStatePolicy(t, srv, `{
+		"tagOwners": {"tag:gateway": ["admission-owner@"]},
+		"grants": [{"src": ["admission-owner@"], "dst": ["autogroup:internet"], "ip": ["*"]}]
+	}`)
+
+	gateway := servertest.NewClient(t, srv, "gateway", servertest.WithUser(owner),
+		servertest.WithTags("tag:gateway"),
+		servertest.WithHostinfo(func(h *tailcfg.Hostinfo) { h.RoutableIPs = tsaddr.ExitRoutes() }))
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		status, body := apiCall(t, client, ownerKey, http.MethodPost,
+			srv.URL+"/api/v1/node/"+gateway.NodeIDString()+"/approve_routes",
+			map[string]any{"routes": []string{"0.0.0.0/0", "::/0"}})
+		assert.Equal(c, http.StatusOK, status, body)
+	}, trafficWait, 100*time.Millisecond)
+
+	token := idToken(t, srv, gateway, traffic.Audience)
+
+	post := func(token string, body io.Reader) *httptest.ResponseRecorder {
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, traffic.ReportPath, body)
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+
+		rec := httptest.NewRecorder()
+		srv.App.TrafficReportHandler(rec, req)
+
+		return rec
+	}
+
+	t.Run("a stranger's body is never read", func(t *testing.T) {
+		const requests = 10
+
+		var before, after runtime.MemStats
+
+		body := &endlessBody{}
+
+		runtime.GC()
+		runtime.ReadMemStats(&before)
+
+		for range requests {
+			assert.Equal(t, http.StatusUnauthorized, post("forged", body).Code)
+			assert.Equal(t, http.StatusUnauthorized, post("", body).Code)
+		}
+
+		runtime.ReadMemStats(&after)
+
+		perRequest := (after.TotalAlloc - before.TotalAlloc) / (2 * requests)
+		t.Logf("a refused report allocates %d bytes and reads %d of its body", perRequest, body.read.Load())
+		assert.Zero(t, body.read.Load())
+		assert.Less(t, perRequest, uint64(64<<10))
+	})
+
+	t.Run("a gateway's body is read no further than the bound", func(t *testing.T) {
+		body := &endlessBody{}
+
+		rec := post(token, body)
+		assert.Equal(t, http.StatusRequestEntityTooLarge, rec.Code, rec.Body.String())
+		t.Logf("an endless report read %d bytes before the refusal", body.read.Load())
+		assert.LessOrEqual(t, body.read.Load(), int64(traffic.MaxReportBytes+64<<10))
+	})
+
+	t.Run("ingests beyond the limit are told to come back", func(t *testing.T) {
+		var wg sync.WaitGroup
+
+		stalled := make([]*stalledBody, 0, 4)
+
+		for range 4 {
+			b := &stalledBody{started: make(chan struct{}), release: make(chan struct{})}
+			stalled = append(stalled, b)
+
+			wg.Go(func() { post(token, b) })
+
+			<-b.started
+		}
+
+		rec := post(token, bytes.NewReader(reportJSON(t, traffic.Report{Instance: "admission", Seq: 1})))
+		assert.Equal(t, http.StatusTooManyRequests, rec.Code, rec.Body.String())
+		assert.Equal(t, "5", rec.Header().Get("Retry-After"))
+
+		for _, b := range stalled {
+			close(b.release)
+		}
+
+		wg.Wait()
+
+		rec = post(token, bytes.NewReader(reportJSON(t, traffic.Report{Instance: "admission", Seq: 1})))
+		assert.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	})
 }
 

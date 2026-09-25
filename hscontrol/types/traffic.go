@@ -13,6 +13,38 @@ import (
 // without it the tailnet runs with [DefaultTrafficSettings].
 const SettingTraffic SettingKey = "traffic"
 
+// SettingTrafficFold is the settings row that holds [TrafficFoldMarks] as
+// JSON: how far the maintenance has folded each resolution.
+const SettingTrafficFold SettingKey = "traffic_fold"
+
+// TrafficFoldMarks are, per resolution, the start of the first bucket the
+// next fold looks at: every closed bucket before it has been folded. A
+// report adding to an older bucket moves the mark back.
+type TrafficFoldMarks struct {
+	Hour int64 `json:"hour"`
+	Day  int64 `json:"day"`
+}
+
+// Of returns the mark of resolution.
+func (m TrafficFoldMarks) Of(resolution int64) int64 {
+	if resolution == TrafficDay {
+		return m.Day
+	}
+
+	return m.Hour
+}
+
+// With returns the marks with resolution's set to mark.
+func (m TrafficFoldMarks) With(resolution, mark int64) TrafficFoldMarks {
+	if resolution == TrafficDay {
+		m.Day = mark
+	} else {
+		m.Hour = mark
+	}
+
+	return m
+}
+
 // The resolutions traffic is rolled up at, in seconds. Totals are kept at
 // all three; destinations and DNS names only per hour and per day, since
 // a minute of them is more rows than it is worth.
@@ -128,9 +160,20 @@ type TrafficReporter struct {
 	FirstSeenAt  time.Time
 	LastReportAt time.Time
 	// Unattributed counts flows and queries from addresses no node held
-	// when they arrived; Dropped the entries the agent discarded.
+	// when they arrived, or held by a node that may not use the gateway;
+	// Dropped the entries the agent discarded.
 	Unattributed uint64
 	Dropped      uint64
+	// ResolverApprovedAt is when an operator let the tailnet's clients
+	// use the gateway's resolver; zero while it may not.
+	ResolverApprovedAt time.Time
+}
+
+// TrafficResolver is a gateway resolver the traffic monitor's DNS log
+// points clients at: the gateway and the address it answers on.
+type TrafficResolver struct {
+	Node NodeID
+	Addr netip.Addr
 }
 
 // IsPrivateTrafficDestination reports whether dst is an address a gateway
@@ -202,6 +245,9 @@ type TrafficDestination struct {
 	// otherwise.
 	ASN     uint32
 	Country string
+	// Private is a destination inside a private network, reached through
+	// a subnet route; it has no network or country.
+	Private bool
 }
 
 // TrafficDNS is the questions a node asked about one name in one bucket.
@@ -294,6 +340,8 @@ type TrafficDestinationSum struct {
 	Host    string
 	ASN     uint32
 	Country string
+	// Private is set when every destination in the group is private.
+	Private bool
 	NodeID  NodeID
 	// Nodes is how many distinct nodes the group covers.
 	Nodes uint64

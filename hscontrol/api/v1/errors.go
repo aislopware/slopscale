@@ -127,6 +127,7 @@ var badRequestErrors = []error{
 	types.ErrTrafficRetentionInvalid,
 	types.ErrTrafficRangeInvalid,
 	types.ErrTrafficGroupUnknown,
+	state.ErrTrafficDNSLoggingNoNameservers,
 }
 
 // notFoundErrors are the missing records; mapError answers them with 404.

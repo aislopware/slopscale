@@ -11,23 +11,41 @@ import (
 	"time"
 
 	"github.com/aislopware/slopscale/gen/jet/table"
+	"github.com/aislopware/slopscale/hscontrol/traffic"
 	"github.com/aislopware/slopscale/hscontrol/types"
 	jet "github.com/go-jet/jet/v2/sqlite"
+)
+
+const (
+	// trafficChunkRows bounds the rows one transaction of a report writes.
+	// SQLite has one connection, shared with the map request path, so a
+	// large report is written in several short transactions rather than
+	// one long one.
+	trafficChunkRows = 2000
+
+	// trafficStatementRows is how many rows one upsert statement carries.
+	trafficStatementRows = 250
+
+	// trafficInstancesKept is how many of a gateway's agent instances the
+	// idempotency record remembers; an instance older than that which
+	// resends a report is counted again.
+	trafficInstancesKept = 8
 )
 
 // trafficReporterRow is a row of the traffic_reporters table; see
 // schema.sql.
 type trafficReporterRow struct {
-	NodeID       uint64 `sql:"primary_key"`
-	Instance     string
-	LastSeq      int64
-	Version      *string
-	Status       *string
-	DNSListen    *string
-	FirstSeenAt  *time.Time
-	LastReportAt *time.Time
-	Unattributed int64
-	Dropped      int64
+	NodeID             uint64 `sql:"primary_key"`
+	Instance           string
+	LastSeq            int64
+	Version            *string
+	Status             *string
+	DNSListen          *string
+	FirstSeenAt        *time.Time
+	LastReportAt       *time.Time
+	Unattributed       int64
+	Dropped            int64
+	ResolverApprovedAt *time.Time
 }
 
 type trafficReporterRecord struct {
@@ -55,6 +73,10 @@ func (r trafficReporterRow) reporter() (types.TrafficReporter, error) {
 		rep.LastReportAt = *r.LastReportAt
 	}
 
+	if r.ResolverApprovedAt != nil {
+		rep.ResolverApprovedAt = *r.ResolverApprovedAt
+	}
+
 	if r.Status != nil && *r.Status != "" {
 		err := json.Unmarshal([]byte(*r.Status), &rep.Status)
 		if err != nil {
@@ -76,6 +98,19 @@ func (r trafficReporterRow) reporter() (types.TrafficReporter, error) {
 	return rep, nil
 }
 
+// trafficInstanceRow is a row of the traffic_instances table.
+type trafficInstanceRow struct {
+	NodeID        uint64
+	Instance      string
+	LastSeq       int64
+	PendingSeq    int64
+	PendingChunks int64
+}
+
+type trafficInstanceRecord struct {
+	Row trafficInstanceRow `alias:"traffic_instances"`
+}
+
 // toSQLInt stores a counter in a signed 64-bit column; nothing the agents
 // count gets near the top bit, but a hostile report must not wrap.
 func toSQLInt(v uint64) int64 {
@@ -90,34 +125,38 @@ func fromSQLInt(v int64) uint64 {
 	return uint64(max(v, 0))
 }
 
-// The upserts a report writes, one row per statement, adding the counts
-// to the row the bucket already has. They run inside the report's
-// transaction for every row, so they are rendered once from the builders
-// below; fixed_test.go pins each builder to the argument order its
-// *Args function supplies.
-var (
-	upsertTrafficTotal = newFixedSQL(func() statement {
-		return trafficTotalUpsert(types.TrafficTotal{})
-	})
-	upsertTrafficDestination = newFixedSQL(func() statement {
-		return trafficDestinationUpsert(types.TrafficDestination{})
-	})
-	upsertTrafficDNS = newFixedSQL(func() statement {
-		return trafficDNSUpsert(types.TrafficDNS{})
-	})
-)
+// hostSourceRank ranks how a host name was learnt, in SQL: the name the
+// node itself sent beats the one it looked up, which beats the app
+// connector's, the outer ECH name and another node's lookup. The ranks
+// are literals: PostgreSQL types a bound CASE result as text.
+func hostSourceRank(col jet.StringExpression) jet.IntegerExpression {
+	return jet.IntExp(jet.CASE(col).
+		WHEN(jet.String(string(traffic.HostSNI))).THEN(jet.RawInt("5")).
+		WHEN(jet.String(string(traffic.HostDNS))).THEN(jet.RawInt("4")).
+		WHEN(jet.String(string(traffic.HostAppConnector))).THEN(jet.RawInt("3")).
+		WHEN(jet.String(string(traffic.HostECH))).THEN(jet.RawInt("2")).
+		WHEN(jet.String(string(traffic.HostDNSShared))).THEN(jet.RawInt("1")).
+		ELSE(jet.RawInt("0")))
+}
 
-func trafficTotalUpsert(r types.TrafficTotal) jet.InsertStatement {
+// trafficTotalsUpsert adds rows to the totals their buckets already have.
+func trafficTotalsUpsert(rows []types.TrafficTotal) jet.InsertStatement {
 	t := table.TrafficTotals
 
-	return t.INSERT(
+	stmt := t.INSERT(
 		t.Resolution, t.Bucket, t.NodeID, t.ReporterID,
 		t.TxBytes, t.RxBytes, t.TxPackets, t.RxPackets, t.Conns,
-	).VALUES(
-		jet.Int64(r.Resolution), jet.Int64(r.Bucket), jet.Uint64(r.NodeID.Uint64()), jet.Uint64(r.ReporterID.Uint64()),
-		jet.Int64(toSQLInt(r.TxBytes)), jet.Int64(toSQLInt(r.RxBytes)),
-		jet.Int64(toSQLInt(r.TxPackets)), jet.Int64(toSQLInt(r.RxPackets)), jet.Int64(toSQLInt(r.Conns)),
-	).ON_CONFLICT(t.Resolution, t.Bucket, t.NodeID, t.ReporterID).DO_UPDATE(jet.SET(
+	)
+
+	for _, r := range rows {
+		stmt = stmt.VALUES(
+			r.Resolution, r.Bucket, r.NodeID.Uint64(), r.ReporterID.Uint64(),
+			toSQLInt(r.TxBytes), toSQLInt(r.RxBytes),
+			toSQLInt(r.TxPackets), toSQLInt(r.RxPackets), toSQLInt(r.Conns),
+		)
+	}
+
+	return stmt.ON_CONFLICT(t.Resolution, t.Bucket, t.NodeID, t.ReporterID).DO_UPDATE(jet.SET(
 		t.TxBytes.SET(t.TxBytes.ADD(t.EXCLUDED.TxBytes)),
 		t.RxBytes.SET(t.RxBytes.ADD(t.EXCLUDED.RxBytes)),
 		t.TxPackets.SET(t.TxPackets.ADD(t.EXCLUDED.TxPackets)),
@@ -126,25 +165,42 @@ func trafficTotalUpsert(r types.TrafficTotal) jet.InsertStatement {
 	))
 }
 
-func trafficDestinationUpsert(r types.TrafficDestination) jet.InsertStatement {
+// trafficDestinationsUpsert adds rows to the destinations their buckets
+// already have. A row keeps its network when the new one does not know
+// it (the ASN table was not loaded), and its host source unless the new
+// one ranks higher.
+func trafficDestinationsUpsert(rows []types.TrafficDestination) jet.InsertStatement {
 	t := table.TrafficDestinations
 
-	return t.INSERT(
+	stmt := t.INSERT(
 		t.Resolution, t.Bucket, t.NodeID, t.ReporterID, t.Dst, t.Port, t.Proto, t.Host,
-		t.HostSource, t.Asn, t.Country,
+		t.HostSource, t.Asn, t.Country, t.Private,
 		t.TxBytes, t.RxBytes, t.TxPackets, t.RxPackets, t.Conns,
-	).VALUES(
-		jet.Int64(r.Resolution), jet.Int64(r.Bucket), jet.Uint64(r.NodeID.Uint64()), jet.Uint64(r.ReporterID.Uint64()),
-		jet.String(r.Dst), jet.Int64(int64(r.Port)), jet.Int64(int64(r.Proto)), jet.String(r.Host),
-		jet.String(r.HostSource), jet.Int64(int64(r.ASN)), jet.String(r.Country),
-		jet.Int64(toSQLInt(r.TxBytes)), jet.Int64(toSQLInt(r.RxBytes)),
-		jet.Int64(toSQLInt(r.TxPackets)), jet.Int64(toSQLInt(r.RxPackets)), jet.Int64(toSQLInt(r.Conns)),
-	).ON_CONFLICT(
+	)
+
+	for _, r := range rows {
+		stmt = stmt.VALUES(
+			r.Resolution, r.Bucket, r.NodeID.Uint64(), r.ReporterID.Uint64(),
+			r.Dst, int64(r.Port), int64(r.Proto), r.Host,
+			r.HostSource, int64(r.ASN), r.Country, sqlFlag(r.Private),
+			toSQLInt(r.TxBytes), toSQLInt(r.RxBytes),
+			toSQLInt(r.TxPackets), toSQLInt(r.RxPackets), toSQLInt(r.Conns),
+		)
+	}
+
+	return stmt.ON_CONFLICT(
 		t.Resolution, t.Bucket, t.NodeID, t.ReporterID, t.Dst, t.Port, t.Proto, t.Host,
 	).DO_UPDATE(jet.SET(
-		t.HostSource.SET(t.EXCLUDED.HostSource),
-		t.Asn.SET(t.EXCLUDED.Asn),
-		t.Country.SET(t.EXCLUDED.Country),
+		t.HostSource.SET(jet.StringExp(jet.CASE().
+			WHEN(hostSourceRank(t.EXCLUDED.HostSource).GT(hostSourceRank(t.HostSource))).
+			THEN(t.EXCLUDED.HostSource).
+			ELSE(t.HostSource))),
+		t.Asn.SET(jet.IntExp(jet.CASE().
+			WHEN(t.EXCLUDED.Asn.NOT_EQ(jet.Int(0))).THEN(t.EXCLUDED.Asn).
+			ELSE(t.Asn))),
+		t.Country.SET(jet.StringExp(jet.CASE().
+			WHEN(t.EXCLUDED.Country.NOT_EQ(jet.String(""))).THEN(t.EXCLUDED.Country).
+			ELSE(t.Country))),
 		t.TxBytes.SET(t.TxBytes.ADD(t.EXCLUDED.TxBytes)),
 		t.RxBytes.SET(t.RxBytes.ADD(t.EXCLUDED.RxBytes)),
 		t.TxPackets.SET(t.TxPackets.ADD(t.EXCLUDED.TxPackets)),
@@ -153,119 +209,272 @@ func trafficDestinationUpsert(r types.TrafficDestination) jet.InsertStatement {
 	))
 }
 
-func trafficDNSUpsert(r types.TrafficDNS) jet.InsertStatement {
+// trafficDNSUpsert adds rows to the names their buckets already have.
+func trafficDNSUpsert(rows []types.TrafficDNS) jet.InsertStatement {
 	t := table.TrafficDNS
 
-	return t.INSERT(
-		t.Resolution, t.Bucket, t.NodeID, t.ReporterID, t.Name, t.Queries, t.Failed,
-	).VALUES(
-		jet.Int64(r.Resolution), jet.Int64(r.Bucket), jet.Uint64(r.NodeID.Uint64()), jet.Uint64(r.ReporterID.Uint64()),
-		jet.String(r.Name), jet.Int64(toSQLInt(r.Queries)), jet.Int64(toSQLInt(r.Failed)),
-	).ON_CONFLICT(t.Resolution, t.Bucket, t.NodeID, t.ReporterID, t.Name).DO_UPDATE(jet.SET(
+	stmt := t.INSERT(t.Resolution, t.Bucket, t.NodeID, t.ReporterID, t.Name, t.Queries, t.Failed)
+
+	for _, r := range rows {
+		stmt = stmt.VALUES(
+			r.Resolution, r.Bucket, r.NodeID.Uint64(), r.ReporterID.Uint64(),
+			r.Name, toSQLInt(r.Queries), toSQLInt(r.Failed),
+		)
+	}
+
+	return stmt.ON_CONFLICT(t.Resolution, t.Bucket, t.NodeID, t.ReporterID, t.Name).DO_UPDATE(jet.SET(
 		t.Queries.SET(t.Queries.ADD(t.EXCLUDED.Queries)),
 		t.Failed.SET(t.Failed.ADD(t.EXCLUDED.Failed)),
 	))
 }
 
-func totalArgs(r types.TrafficTotal) []any {
-	return []any{
-		r.Resolution, r.Bucket, r.NodeID.Uint64(), r.ReporterID.Uint64(),
-		toSQLInt(r.TxBytes), toSQLInt(r.RxBytes), toSQLInt(r.TxPackets), toSQLInt(r.RxPackets), toSQLInt(r.Conns),
+// trafficChunks splits a batch into the statements of each transaction:
+// at most trafficChunkRows rows per transaction and trafficStatementRows
+// per statement. The split depends only on the batch, so a resend of the
+// same report splits the same way and can skip what was written.
+func trafficChunks(batch types.TrafficBatch) [][]jet.Statement {
+	var (
+		chunks  [][]jet.Statement
+		current []jet.Statement
+		rows    int
+	)
+
+	add := func(stmt jet.Statement, n int) {
+		if rows+n > trafficChunkRows && len(current) > 0 {
+			chunks = append(chunks, current)
+			current, rows = nil, 0
+		}
+
+		current = append(current, stmt)
+		rows += n
 	}
+
+	for part := range slices.Chunk(batch.Totals, trafficStatementRows) {
+		add(trafficTotalsUpsert(part), len(part))
+	}
+
+	for part := range slices.Chunk(batch.Destinations, trafficStatementRows) {
+		add(trafficDestinationsUpsert(part), len(part))
+	}
+
+	for part := range slices.Chunk(batch.DNS, trafficStatementRows) {
+		add(trafficDNSUpsert(part), len(part))
+	}
+
+	if len(current) > 0 {
+		chunks = append(chunks, current)
+	}
+
+	return chunks
 }
 
-func destinationArgs(r types.TrafficDestination) []any {
-	return []any{
-		r.Resolution, r.Bucket, r.NodeID.Uint64(), r.ReporterID.Uint64(),
-		r.Dst, int64(r.Port), int64(r.Proto), r.Host,
-		r.HostSource, int64(r.ASN), r.Country,
-		toSQLInt(r.TxBytes), toSQLInt(r.RxBytes), toSQLInt(r.TxPackets), toSQLInt(r.RxPackets), toSQLInt(r.Conns),
-	}
+// TrafficApplied is what [HSDatabase.ApplyTrafficBatch] did.
+type TrafficApplied struct {
+	// Reporter is the gateway as stored.
+	Reporter types.TrafficReporter
+	// Applied is whether the rollups were written; false for a resend.
+	Applied bool
+	// Seq is how far the report's instance is applied, what the agent
+	// may drop from its spool.
+	Seq uint64
+	// Holds is how long each transaction held the database.
+	Holds []time.Duration
 }
 
-func dnsArgs(r types.TrafficDNS) []any {
-	return []any{
-		r.Resolution, r.Bucket, r.NodeID.Uint64(), r.ReporterID.Uint64(), r.Name,
-		toSQLInt(r.Queries), toSQLInt(r.Failed),
+// ApplyTrafficBatch writes a report: the rollups in transactions of at
+// most trafficChunkRows rows, then the reporter. The reporter's liveness
+// always moves on, since a resent report still says the agent is alive;
+// the rollups are written only when the report's sequence is new for its
+// instance. Each transaction records how far the report got, so a report
+// sent again after a failure part way writes only what is missing. The
+// caller must not apply two reports of one gateway at once.
+func (hsdb *HSDatabase) ApplyTrafficBatch(batch types.TrafficBatch) (TrafficApplied, error) {
+	next := batch.Reporter
+	seq := next.LastSeq
+
+	inst, found, err := getTrafficInstance(hsdb, next.NodeID, next.Instance)
+	if err != nil {
+		return TrafficApplied{}, err
 	}
-}
 
-// ApplyTrafficBatch writes a report in one transaction: the reporter's
-// row always, since a resent report still says the agent is alive, and
-// the rollups only when the report is new for the agent's instance. It
-// returns the reporter as stored and whether the rollups were applied.
-func (hsdb *HSDatabase) ApplyTrafficBatch(batch types.TrafficBatch) (types.TrafficReporter, bool, error) {
-	type result struct {
-		reporter types.TrafficReporter
-		applied  bool
+	if found && seq <= fromSQLInt(inst.LastSeq) {
+		out := TrafficApplied{Seq: fromSQLInt(inst.LastSeq)}
+
+		hold, writeErr := timedWrite(hsdb, func(tx *Tx) error {
+			var saveErr error
+
+			out.Reporter, saveErr = saveTrafficReporter(tx, next, false)
+
+			return saveErr
+		})
+		out.Holds = append(out.Holds, hold)
+
+		return out, writeErr
 	}
 
-	res, err := Write(hsdb, func(tx *Tx) (result, error) {
-		reporter, applied, err := saveTrafficReporter(tx, batch.Reporter)
-		if err != nil {
-			return result{}, err
-		}
+	skip := 0
+	if found && fromSQLInt(inst.PendingSeq) == seq {
+		skip = int(min(max(inst.PendingChunks, 0), math.MaxInt32))
+	}
 
-		if !applied {
-			return result{reporter: reporter}, nil
-		}
+	out := TrafficApplied{Applied: true, Seq: seq}
+	chunks := trafficChunks(batch)
 
-		for _, r := range batch.Totals {
-			err = tx.executor().execFixed(upsertTrafficTotal, totalArgs(r)...)
-			if err != nil {
-				return result{}, fmt.Errorf("writing traffic totals: %w", err)
+	for i := skip; i < len(chunks); i++ {
+		hold, writeErr := timedWrite(hsdb, func(tx *Tx) error {
+			for _, stmt := range chunks[i] {
+				_, execErr := tx.executor().exec(stmt)
+				if execErr != nil {
+					return fmt.Errorf("writing traffic rollups: %w", execErr)
+				}
 			}
+
+			return saveTrafficInstance(tx, next, 0, seq, i+1)
+		})
+		out.Holds = append(out.Holds, hold)
+
+		if writeErr != nil {
+			return TrafficApplied{}, writeErr
+		}
+	}
+
+	hold, err := timedWrite(hsdb, func(tx *Tx) error {
+		txErr := saveTrafficInstance(tx, next, seq, 0, 0)
+		if txErr != nil {
+			return txErr
 		}
 
-		for _, r := range batch.Destinations {
-			err = tx.executor().execFixed(upsertTrafficDestination, destinationArgs(r)...)
-			if err != nil {
-				return result{}, fmt.Errorf("writing traffic destinations: %w", err)
-			}
+		txErr = trimTrafficInstances(tx, next.NodeID)
+		if txErr != nil {
+			return txErr
 		}
 
-		for _, r := range batch.DNS {
-			err = tx.executor().execFixed(upsertTrafficDNS, dnsArgs(r)...)
-			if err != nil {
-				return result{}, fmt.Errorf("writing traffic dns: %w", err)
-			}
-		}
+		out.Reporter, txErr = saveTrafficReporter(tx, next, true)
 
-		return result{reporter: reporter, applied: true}, nil
+		return txErr
 	})
+	out.Holds = append(out.Holds, hold)
 
-	return res.reporter, res.applied, err
+	if err != nil {
+		return TrafficApplied{}, err
+	}
+
+	return out, nil
 }
 
-// saveTrafficReporter merges the report's reporter into the stored row.
-// A report whose sequence the instance has already passed is a resend:
-// the row's liveness fields move on, its counters and sequence do not.
-func saveTrafficReporter(tx *Tx, next types.TrafficReporter) (types.TrafficReporter, bool, error) {
+// sqlFlag is a flag as the integer column that stores it.
+func sqlFlag(on bool) int64 {
+	if on {
+		return 1
+	}
+
+	return 0
+}
+
+// timedWrite runs fn in a write transaction and returns how long the
+// transaction took.
+func timedWrite(hsdb *HSDatabase, fn func(tx *Tx) error) (time.Duration, error) {
+	start := time.Now()
+	err := hsdb.Write(fn)
+
+	return time.Since(start), err
+}
+
+func getTrafficInstance(q Querier, node types.NodeID, instance string) (trafficInstanceRow, bool, error) {
+	t := table.TrafficInstances
+
+	var records []trafficInstanceRecord
+
+	err := q.executor().query(
+		jet.SELECT(t.NodeID, t.Instance, t.LastSeq, t.PendingSeq, t.PendingChunks).
+			FROM(t).
+			WHERE(t.NodeID.EQ(jet.Uint64(node.Uint64())).AND(t.Instance.EQ(jet.String(instance)))),
+		&records,
+	)
+	if err != nil {
+		return trafficInstanceRow{}, false, fmt.Errorf("reading traffic instance %d/%s: %w", node, instance, err)
+	}
+
+	if len(records) == 0 {
+		return trafficInstanceRow{}, false, nil
+	}
+
+	return records[0].Row, true, nil
+}
+
+// saveTrafficInstance records how far a report of the instance got: the
+// last sequence applied in full, or the chunks of pendingSeq written. A
+// zero lastSeq keeps the stored one.
+func saveTrafficInstance(tx *Tx, r types.TrafficReporter, lastSeq, pendingSeq uint64, pendingChunks int) error {
+	t := table.TrafficInstances
+
+	update := []jet.ColumnAssigment{
+		t.PendingSeq.SET(t.EXCLUDED.PendingSeq),
+		t.PendingChunks.SET(t.EXCLUDED.PendingChunks),
+		t.SeenAt.SET(t.EXCLUDED.SeenAt),
+	}
+	if lastSeq > 0 {
+		update = append(update, t.LastSeq.SET(t.EXCLUDED.LastSeq))
+	}
+
+	_, err := tx.executor().exec(
+		t.INSERT(t.NodeID, t.Instance, t.LastSeq, t.PendingSeq, t.PendingChunks, t.SeenAt).
+			VALUES(r.NodeID.Uint64(), r.Instance, toSQLInt(lastSeq), toSQLInt(pendingSeq),
+				int64(pendingChunks), r.LastReportAt.UTC()).
+			ON_CONFLICT(t.NodeID, t.Instance).DO_UPDATE(jet.SET(update...)),
+	)
+	if err != nil {
+		return fmt.Errorf("saving traffic instance %d/%s: %w", r.NodeID, r.Instance, err)
+	}
+
+	return nil
+}
+
+// trimTrafficInstances forgets all but the gateway's newest instances.
+func trimTrafficInstances(tx *Tx, node types.NodeID) error {
+	t := table.TrafficInstances
+	byNode := t.NodeID.EQ(jet.Uint64(node.Uint64()))
+
+	_, err := tx.executor().exec(t.DELETE().WHERE(byNode.AND(t.Instance.NOT_IN(
+		jet.SELECT(t.Instance).FROM(t).WHERE(byNode).
+			ORDER_BY(t.SeenAt.DESC(), t.Instance.ASC()).
+			LIMIT(trafficInstancesKept),
+	))))
+	if err != nil {
+		return fmt.Errorf("trimming traffic instances of %d: %w", node, err)
+	}
+
+	return nil
+}
+
+// saveTrafficReporter merges the report's reporter into the stored row:
+// the liveness fields always, the counters only when the report was
+// applied. The resolver approval is the operator's and never changes here.
+func saveTrafficReporter(tx *Tx, next types.TrafficReporter, applied bool) (types.TrafficReporter, error) {
 	current, found, err := getTrafficReporter(tx, next.NodeID)
 	if err != nil {
-		return types.TrafficReporter{}, false, err
+		return types.TrafficReporter{}, err
 	}
-
-	applied := !found || current.Instance != next.Instance || next.LastSeq > current.LastSeq
 
 	merged := next
 	merged.FirstSeenAt = next.LastReportAt
 
 	if found {
 		merged.FirstSeenAt = current.FirstSeenAt
+		merged.ResolverApprovedAt = current.ResolverApprovedAt
 		merged.Unattributed += current.Unattributed
 		merged.Dropped += current.Dropped
-	}
 
-	if !applied {
-		merged.LastSeq = current.LastSeq
-		merged.Unattributed = current.Unattributed
-		merged.Dropped = current.Dropped
+		if !applied {
+			merged.LastSeq = current.LastSeq
+			merged.Unattributed = current.Unattributed
+			merged.Dropped = current.Dropped
+		}
 	}
 
 	status, err := json.Marshal(merged.Status)
 	if err != nil {
-		return types.TrafficReporter{}, false, fmt.Errorf("encoding traffic reporter status: %w", err)
+		return types.TrafficReporter{}, fmt.Errorf("encoding traffic reporter status: %w", err)
 	}
 
 	listen := merged.DNSListen
@@ -275,7 +484,7 @@ func saveTrafficReporter(tx *Tx, next types.TrafficReporter) (types.TrafficRepor
 
 	dnsListen, err := json.Marshal(listen)
 	if err != nil {
-		return types.TrafficReporter{}, false, fmt.Errorf("encoding traffic reporter resolvers: %w", err)
+		return types.TrafficReporter{}, fmt.Errorf("encoding traffic reporter resolvers: %w", err)
 	}
 
 	t := table.TrafficReporters
@@ -300,10 +509,36 @@ func saveTrafficReporter(tx *Tx, next types.TrafficReporter) (types.TrafficRepor
 		)),
 	)
 	if err != nil {
-		return types.TrafficReporter{}, false, fmt.Errorf("saving traffic reporter %d: %w", merged.NodeID, err)
+		return types.TrafficReporter{}, fmt.Errorf("saving traffic reporter %d: %w", merged.NodeID, err)
 	}
 
-	return merged, applied, nil
+	return merged, nil
+}
+
+// SetTrafficResolverApproval records whether the tailnet's clients may use
+// the gateway's resolver: approved at the time given, or not when nil.
+func (hsdb *HSDatabase) SetTrafficResolverApproval(id types.NodeID, at *time.Time) error {
+	t := table.TrafficReporters
+
+	var value any = jet.NULL
+	if at != nil {
+		value = at.UTC()
+	}
+
+	affected, err := hsdb.ex.exec(
+		t.UPDATE(t.ResolverApprovedAt).
+			SET(value).
+			WHERE(t.NodeID.EQ(jet.Uint64(id.Uint64()))),
+	)
+	if err != nil {
+		return fmt.Errorf("setting the resolver approval of traffic reporter %d: %w", id, err)
+	}
+
+	if affected == 0 {
+		return ErrTrafficReporterNotFound
+	}
+
+	return nil
 }
 
 func getTrafficReporter(q Querier, id types.NodeID) (types.TrafficReporter, bool, error) {
@@ -605,11 +840,17 @@ func (hsdb *HSDatabase) TrafficSum(f types.TrafficFilter) (types.TrafficCounts, 
 	return row.counts(), nil
 }
 
-// searchPattern is a LIKE pattern matching s anywhere, lower case to
-// match the stored names; a % in s is dropped rather than escaped, since
-// no host name holds one.
-func searchPattern(s string) string {
-	return "%" + strings.ReplaceAll(strings.ToLower(s), "%", "") + "%"
+// searchEscape escapes what LIKE would read as a wildcard, with ! as the
+// escape character, so a search for "a_b" finds only "a_b".
+var searchEscape = strings.NewReplacer("!", "!!", "%", "!%", "_", "!_")
+
+// contains matches col holding s anywhere, lower case to match the stored
+// names. jet's LIKE takes no ESCAPE clause, so it is spelled out; both
+// dialects accept it.
+func contains(col jet.StringExpression, s string) jet.BoolExpression {
+	pattern := jet.String("%" + searchEscape.Replace(strings.ToLower(s)) + "%")
+
+	return jet.BoolExp(jet.CustomExpression(col, jet.Token("LIKE"), pattern, jet.Token("ESCAPE '!'")))
 }
 
 func destinationWhere(f types.TrafficFilter) jet.BoolExpression {
@@ -617,8 +858,7 @@ func destinationWhere(f types.TrafficFilter) jet.BoolExpression {
 	cond := destinationColumns.where(f)
 
 	if f.Search != "" {
-		pattern := jet.String(searchPattern(f.Search))
-		cond = cond.AND(t.Host.LIKE(pattern).OR(t.Dst.LIKE(pattern)))
+		cond = cond.AND(contains(t.Host, f.Search).OR(contains(t.Dst, f.Search)))
 	}
 
 	if f.ASN != 0 {
@@ -647,6 +887,7 @@ type trafficDestinationRow struct {
 	Host      string
 	Asn       int64
 	Country   *string
+	Private   int64
 	NodeID    int64
 	Nodes     int64
 	TxBytes   int64
@@ -663,6 +904,7 @@ func (r trafficDestinationRow) sum() types.TrafficDestinationSum {
 		Proto:         uint8(min(max(r.Proto, 0), math.MaxUint8)),
 		Host:          r.Host,
 		ASN:           uint32(min(max(r.Asn, 0), math.MaxUint32)),
+		Private:       r.Private != 0,
 		NodeID:        types.NodeID(fromSQLInt(r.NodeID)),
 		TrafficCounts: countsOf(r.TxBytes, r.RxBytes, r.TxPackets, r.RxPackets, r.Conns),
 		Nodes:         fromSQLInt(r.Nodes),
@@ -682,11 +924,16 @@ func destinationGrouping(group types.TrafficGroup) ([]jet.Projection, []jet.Grou
 
 	const alias = "traffic_destination_row."
 
+	// A group is private when every destination in it is. Private
+	// destinations have no network or country, so grouped by either they
+	// get their own row rather than joining the unknown public ones.
+	allPrivate := jet.MIN(t.Private).AS(alias + "private")
+
 	switch group {
 	case types.TrafficByDestination, "":
 		return []jet.Projection{
 				t.Dst.AS(alias + "dst"), t.Port.AS(alias + "port"), t.Proto.AS(alias + "proto"),
-				t.Host.AS(alias + "host"), t.Asn.AS(alias + "asn"), t.Country.AS(alias + "country"),
+				t.Host.AS(alias + "host"), t.Asn.AS(alias + "asn"), t.Country.AS(alias + "country"), allPrivate,
 			},
 			[]jet.GroupByClause{t.Dst, t.Port, t.Proto, t.Host, t.Asn, t.Country},
 			nil
@@ -697,19 +944,25 @@ func destinationGrouping(group types.TrafficGroup) ([]jet.Projection, []jet.Grou
 		// grouped expression in SELECT when both are the same text.
 		key := jet.COALESCE(jet.NULLIF(t.Host, jet.StringExp(jet.Raw("''"))), t.Dst)
 
-		return []jet.Projection{key.AS(alias + "host")}, []jet.GroupByClause{key}, nil
+		return []jet.Projection{key.AS(alias + "host"), allPrivate}, []jet.GroupByClause{key}, nil
 	case types.TrafficByASN:
-		return []jet.Projection{t.Asn.AS(alias + "asn")}, []jet.GroupByClause{t.Asn}, nil
+		return []jet.Projection{t.Asn.AS(alias + "asn"), allPrivate},
+			[]jet.GroupByClause{t.Asn, t.Private},
+			nil
 	case types.TrafficByCountry:
-		return []jet.Projection{t.Country.AS(alias + "country")}, []jet.GroupByClause{t.Country}, nil
+		return []jet.Projection{t.Country.AS(alias + "country"), allPrivate},
+			[]jet.GroupByClause{t.Country, t.Private},
+			nil
 	case types.TrafficByPort:
-		return []jet.Projection{t.Proto.AS(alias + "proto"), t.Port.AS(alias + "port")},
+		return []jet.Projection{t.Proto.AS(alias + "proto"), t.Port.AS(alias + "port"), allPrivate},
 			[]jet.GroupByClause{t.Proto, t.Port},
 			nil
 	case types.TrafficByNode:
-		return []jet.Projection{t.NodeID.AS(alias + "node_id")}, []jet.GroupByClause{t.NodeID}, nil
+		return []jet.Projection{t.NodeID.AS(alias + "node_id"), allPrivate}, []jet.GroupByClause{t.NodeID}, nil
 	case types.TrafficByReporter:
-		return []jet.Projection{t.ReporterID.AS(alias + "node_id")}, []jet.GroupByClause{t.ReporterID}, nil
+		return []jet.Projection{t.ReporterID.AS(alias + "node_id"), allPrivate},
+			[]jet.GroupByClause{t.ReporterID},
+			nil
 	case types.TrafficByName:
 	}
 
@@ -800,6 +1053,7 @@ type trafficDestinationStored struct {
 	HostSource *string
 	Asn        int64
 	Country    *string
+	Private    int64
 	TxBytes    int64
 	RxBytes    int64
 	TxPackets  int64
@@ -822,6 +1076,7 @@ func (r trafficDestinationStored) destination() types.TrafficDestination {
 		Proto:         uint8(min(max(r.Proto, 0), math.MaxUint8)),
 		Host:          r.Host,
 		ASN:           uint32(min(max(r.Asn, 0), math.MaxUint32)),
+		Private:       r.Private != 0,
 		TrafficCounts: countsOf(r.TxBytes, r.RxBytes, r.TxPackets, r.RxPackets, r.Conns),
 	}
 
@@ -868,7 +1123,7 @@ func (hsdb *HSDatabase) TrafficNames(f types.TrafficFilter, group types.TrafficG
 
 	cond := dnsColumns.where(f)
 	if f.Search != "" {
-		cond = cond.AND(t.Name.LIKE(jet.String(searchPattern(f.Search))))
+		cond = cond.AND(contains(t.Name, f.Search))
 	}
 
 	var rows []trafficNameRow
@@ -903,42 +1158,4 @@ func (hsdb *HSDatabase) TrafficNames(f types.TrafficFilter, group types.TrafficG
 	}
 
 	return out, nil
-}
-
-// PruneTraffic deletes the rows of each resolution older than its
-// retention and returns how many went.
-func (hsdb *HSDatabase) PruneTraffic(now time.Time, retention types.TrafficRetention) (int64, error) {
-	return Write(hsdb, func(tx *Tx) (int64, error) {
-		var deleted int64
-
-		for _, target := range []struct {
-			del         func() jet.DeleteStatement
-			cols        trafficColumns
-			resolutions []int64
-		}{
-			{
-				table.TrafficTotals.DELETE, totalsColumns,
-				[]int64{types.TrafficMinute, types.TrafficHour, types.TrafficDay},
-			},
-			{table.TrafficDestinations.DELETE, destinationColumns, []int64{types.TrafficHour, types.TrafficDay}},
-			{table.TrafficDNS.DELETE, dnsColumns, []int64{types.TrafficHour, types.TrafficDay}},
-		} {
-			for _, res := range target.resolutions {
-				cutoff := now.Add(-retention.Of(res)).Unix()
-
-				n, err := tx.executor().exec(
-					target.del().WHERE(
-						target.cols.resolution.EQ(jet.Int64(res)).AND(target.cols.bucket.LT(jet.Int64(cutoff))),
-					),
-				)
-				if err != nil {
-					return 0, fmt.Errorf("pruning traffic: %w", err)
-				}
-
-				deleted += n
-			}
-		}
-
-		return deleted, nil
-	})
 }

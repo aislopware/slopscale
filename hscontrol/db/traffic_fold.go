@@ -9,6 +9,10 @@ import (
 	jet "github.com/go-jet/jet/v2/sqlite"
 )
 
+// trafficPruneRows is about how many rows one pruning transaction
+// deletes, so shortening the retention never holds the database long.
+const trafficPruneRows = 5000
+
 // trafficGroupRow is one bucket of one node through one gateway that
 // holds more rows than a fold keeps.
 type trafficGroupRow struct {
@@ -41,20 +45,24 @@ func (c trafficColumns) keyWhere(k types.TrafficKey) jet.BoolExpression {
 // destination or name). It returns how many rows it folded. Buckets still
 // filling must not be folded, or a destination that grows later would
 // start a second row next to the remainder it was folded into.
+//
+// Each bucket is folded in its own transaction by one DELETE that returns
+// what it removed, so a report adding to a row at the same time is either
+// folded with it or lands after it; its bytes are never lost.
 func (hsdb *HSDatabase) FoldTraffic(resolution int64, from, to time.Time, keep int) (int64, error) {
-	return Write(hsdb, func(tx *Tx) (int64, error) {
-		destinations, err := foldDestinations(tx, resolution, from, to, keep)
-		if err != nil {
-			return 0, err
-		}
+	r := foldRange{resolution, from, to, keep}
 
-		names, err := foldNames(tx, resolution, from, to, keep)
-		if err != nil {
-			return 0, err
-		}
+	destinations, err := foldDestinations(hsdb, r)
+	if err != nil {
+		return 0, err
+	}
 
-		return destinations + names, nil
-	})
+	names, err := foldNames(hsdb, r)
+	if err != nil {
+		return destinations, err
+	}
+
+	return destinations + names, nil
 }
 
 // foldRange is the buckets a fold looks at.
@@ -67,7 +75,7 @@ type foldRange struct {
 // crowdedGroups finds the buckets in the range with more than keep rows
 // besides the remainder.
 func crowdedGroups(
-	tx *Tx,
+	q Querier,
 	cols trafficColumns,
 	from jet.ReadableTable,
 	notRemainder jet.BoolExpression,
@@ -75,7 +83,7 @@ func crowdedGroups(
 ) ([]trafficGroupRow, error) {
 	var groups []trafficGroupRow
 
-	err := tx.executor().query(
+	err := q.executor().query(
 		jet.SELECT(
 			cols.bucket.AS("traffic_group_row.bucket"),
 			cols.nodeID.AS("traffic_group_row.node_id"),
@@ -97,11 +105,24 @@ func crowdedGroups(
 	return groups, nil
 }
 
-func foldDestinations(tx *Tx, resolution int64, from, to time.Time, keep int) (int64, error) {
+// foldedCounts receives the counters a fold deleted.
+type foldedCounts struct {
+	TxBytes   int64
+	RxBytes   int64
+	TxPackets int64
+	RxPackets int64
+	Conns     int64
+}
+
+type foldedDestination struct {
+	Row foldedCounts `alias:"traffic_destinations"`
+}
+
+func foldDestinations(hsdb *HSDatabase, r foldRange) (int64, error) {
 	t := table.TrafficDestinations
 	notRemainder := t.Dst.NOT_EQ(jet.String(""))
 
-	groups, err := crowdedGroups(tx, destinationColumns, t, notRemainder, foldRange{resolution, from, to, keep})
+	groups, err := crowdedGroups(hsdb, destinationColumns, t, notRemainder, r)
 	if err != nil {
 		return 0, err
 	}
@@ -109,66 +130,70 @@ func foldDestinations(tx *Tx, resolution int64, from, to time.Time, keep int) (i
 	var folded int64
 
 	for _, g := range groups {
-		key := g.key(resolution)
+		key := g.key(r.resolution)
+		inGroup := destinationColumns.keyWhere(key).AND(notRemainder)
 
-		var records []trafficDestinationRecord
+		err = hsdb.Write(func(tx *Tx) error {
+			var gone []foldedDestination
 
-		err = tx.executor().query(
-			jet.SELECT(t.AllColumns).
-				FROM(t).
-				WHERE(destinationColumns.keyWhere(key).AND(notRemainder)).
-				ORDER_BY(t.TxBytes.ADD(t.RxBytes).DESC(), t.Dst.ASC()),
-			&records,
-		)
-		if err != nil {
-			return 0, fmt.Errorf("reading traffic destinations to fold: %w", err)
-		}
-
-		remainder := types.TrafficDestination{TrafficKey: key}
-
-		for _, r := range records[min(keep, len(records)):] {
-			d := r.Row.destination()
-			remainder.Add(d.TrafficCounts)
-
-			_, err = tx.executor().exec(t.DELETE().WHERE(
-				destinationColumns.keyWhere(key).
-					AND(t.Dst.EQ(jet.String(d.Dst))).
-					AND(t.Port.EQ(jet.Int64(int64(d.Port)))).
-					AND(t.Proto.EQ(jet.Int64(int64(d.Proto)))).
-					AND(t.Host.EQ(jet.String(d.Host))),
-			))
-			if err != nil {
-				return 0, fmt.Errorf("folding a traffic destination: %w", err)
+			txErr := tx.executor().query(
+				t.DELETE().
+					WHERE(inGroup.AND(jet.ROW(t.Dst, t.Port, t.Proto, t.Host).NOT_IN(
+						jet.SELECT(t.Dst, t.Port, t.Proto, t.Host).
+							FROM(t).
+							WHERE(inGroup).
+							ORDER_BY(t.TxBytes.ADD(t.RxBytes).DESC(), t.Dst.ASC(), t.Port.ASC(),
+								t.Proto.ASC(), t.Host.ASC()).
+							LIMIT(int64(r.keep)),
+					))).
+					RETURNING(t.TxBytes, t.RxBytes, t.TxPackets, t.RxPackets, t.Conns),
+				&gone,
+			)
+			if txErr != nil {
+				return fmt.Errorf("folding traffic destinations: %w", txErr)
 			}
 
-			folded++
-		}
+			if len(gone) == 0 {
+				return nil
+			}
 
-		err = tx.executor().execFixed(upsertTrafficDestination, destinationArgs(remainder)...)
+			remainder := types.TrafficDestination{TrafficKey: key}
+			for _, d := range gone {
+				remainder.Add(countsOf(d.Row.TxBytes, d.Row.RxBytes, d.Row.TxPackets, d.Row.RxPackets, d.Row.Conns))
+			}
+
+			folded += int64(len(gone))
+
+			_, txErr = tx.executor().exec(trafficDestinationsUpsert([]types.TrafficDestination{remainder}))
+			if txErr != nil {
+				return fmt.Errorf("writing the folded traffic destinations: %w", txErr)
+			}
+
+			return nil
+		})
 		if err != nil {
-			return 0, fmt.Errorf("writing the folded traffic destinations: %w", err)
+			return folded, err
 		}
 	}
 
 	return folded, nil
 }
 
-// trafficDNSStored is the part of a traffic_dns row a fold reads.
-type trafficDNSStored struct {
-	Name    string
+// foldedQuestions receives the counters a fold of names deleted.
+type foldedQuestions struct {
 	Queries int64
 	Failed  int64
 }
 
-type trafficDNSRecord struct {
-	Row trafficDNSStored `alias:"traffic_dns"`
+type foldedName struct {
+	Row foldedQuestions `alias:"traffic_dns"`
 }
 
-func foldNames(tx *Tx, resolution int64, from, to time.Time, keep int) (int64, error) {
+func foldNames(hsdb *HSDatabase, r foldRange) (int64, error) {
 	t := table.TrafficDNS
 	notRemainder := t.Name.NOT_EQ(jet.String(""))
 
-	groups, err := crowdedGroups(tx, dnsColumns, t, notRemainder, foldRange{resolution, from, to, keep})
+	groups, err := crowdedGroups(hsdb, dnsColumns, t, notRemainder, r)
 	if err != nil {
 		return 0, err
 	}
@@ -176,42 +201,155 @@ func foldNames(tx *Tx, resolution int64, from, to time.Time, keep int) (int64, e
 	var folded int64
 
 	for _, g := range groups {
-		key := g.key(resolution)
+		key := g.key(r.resolution)
+		inGroup := dnsColumns.keyWhere(key).AND(notRemainder)
 
-		var records []trafficDNSRecord
+		err = hsdb.Write(func(tx *Tx) error {
+			var gone []foldedName
 
-		err = tx.executor().query(
-			jet.SELECT(t.Name, t.Queries, t.Failed).
-				FROM(t).
-				WHERE(dnsColumns.keyWhere(key).AND(notRemainder)).
-				ORDER_BY(t.Queries.DESC(), t.Name.ASC()),
-			&records,
-		)
-		if err != nil {
-			return 0, fmt.Errorf("reading traffic names to fold: %w", err)
-		}
-
-		remainder := types.TrafficDNS{TrafficKey: key}
-
-		for _, r := range records[min(keep, len(records)):] {
-			remainder.Queries += fromSQLInt(r.Row.Queries)
-			remainder.Failed += fromSQLInt(r.Row.Failed)
-
-			_, err = tx.executor().exec(
-				t.DELETE().WHERE(dnsColumns.keyWhere(key).AND(t.Name.EQ(jet.String(r.Row.Name)))),
+			txErr := tx.executor().query(
+				t.DELETE().
+					WHERE(inGroup.AND(t.Name.NOT_IN(
+						jet.SELECT(t.Name).
+							FROM(t).
+							WHERE(inGroup).
+							ORDER_BY(t.Queries.DESC(), t.Name.ASC()).
+							LIMIT(int64(r.keep)),
+					))).
+					RETURNING(t.Queries, t.Failed),
+				&gone,
 			)
-			if err != nil {
-				return 0, fmt.Errorf("folding a traffic name: %w", err)
+			if txErr != nil {
+				return fmt.Errorf("folding traffic names: %w", txErr)
 			}
 
-			folded++
-		}
+			if len(gone) == 0 {
+				return nil
+			}
 
-		err = tx.executor().execFixed(upsertTrafficDNS, dnsArgs(remainder)...)
+			remainder := types.TrafficDNS{TrafficKey: key}
+			for _, n := range gone {
+				remainder.Queries += fromSQLInt(n.Row.Queries)
+				remainder.Failed += fromSQLInt(n.Row.Failed)
+			}
+
+			folded += int64(len(gone))
+
+			_, txErr = tx.executor().exec(trafficDNSUpsert([]types.TrafficDNS{remainder}))
+			if txErr != nil {
+				return fmt.Errorf("writing the folded traffic names: %w", txErr)
+			}
+
+			return nil
+		})
 		if err != nil {
-			return 0, fmt.Errorf("writing the folded traffic names: %w", err)
+			return folded, err
 		}
 	}
 
 	return folded, nil
+}
+
+// pruneGroupRow is the rows of one bucket of one node, the unit a prune
+// deletes.
+type pruneGroupRow struct {
+	Bucket int64
+	NodeID int64
+	Rows   int64
+}
+
+// pruneTarget is one table and the resolutions it keeps.
+type pruneTarget struct {
+	from        jet.Table
+	del         func() jet.DeleteStatement
+	cols        trafficColumns
+	resolutions []int64
+}
+
+// PruneTraffic deletes the rows of each resolution older than its
+// retention and returns how many went. It deletes about
+// trafficPruneRows rows per transaction, whole buckets of one node at a
+// time.
+func (hsdb *HSDatabase) PruneTraffic(now time.Time, retention types.TrafficRetention) (int64, error) {
+	var deleted int64
+
+	for _, target := range []pruneTarget{
+		{
+			table.TrafficTotals, table.TrafficTotals.DELETE, totalsColumns,
+			[]int64{types.TrafficMinute, types.TrafficHour, types.TrafficDay},
+		},
+		{
+			table.TrafficDestinations, table.TrafficDestinations.DELETE, destinationColumns,
+			[]int64{types.TrafficHour, types.TrafficDay},
+		},
+		{table.TrafficDNS, table.TrafficDNS.DELETE, dnsColumns, []int64{types.TrafficHour, types.TrafficDay}},
+	} {
+		for _, res := range target.resolutions {
+			n, err := hsdb.pruneResolution(target, res, now.Add(-retention.Of(res)).Unix())
+			deleted += n
+
+			if err != nil {
+				return deleted, err
+			}
+		}
+	}
+
+	return deleted, nil
+}
+
+// pruneResolution deletes the rows of res starting before cutoff.
+func (hsdb *HSDatabase) pruneResolution(target pruneTarget, res, cutoff int64) (int64, error) {
+	var deleted int64
+
+	expired := target.cols.resolution.EQ(jet.Int64(res)).AND(target.cols.bucket.LT(jet.Int64(cutoff)))
+
+	for {
+		var groups []pruneGroupRow
+
+		err := hsdb.ex.query(
+			jet.SELECT(
+				target.cols.bucket.AS("prune_group_row.bucket"),
+				target.cols.nodeID.AS("prune_group_row.node_id"),
+				jet.COUNT(jet.STAR).AS("prune_group_row.rows"),
+			).
+				FROM(target.from).
+				WHERE(expired).
+				GROUP_BY(target.cols.bucket, target.cols.nodeID).
+				ORDER_BY(target.cols.bucket.ASC(), target.cols.nodeID.ASC()).
+				LIMIT(trafficPruneRows),
+			&groups,
+		)
+		if err != nil {
+			return deleted, fmt.Errorf("finding expired traffic: %w", err)
+		}
+
+		if len(groups) == 0 {
+			return deleted, nil
+		}
+
+		for len(groups) > 0 {
+			var (
+				keys []jet.Expression
+				rows int64
+			)
+
+			for len(groups) > 0 && (len(keys) == 0 || rows+groups[0].Rows <= trafficPruneRows) {
+				g := groups[0]
+				groups = groups[1:]
+				rows += g.Rows
+				keys = append(keys, jet.ROW(jet.Int64(g.Bucket), jet.Int64(g.NodeID)))
+			}
+
+			n, err := Write(hsdb, func(tx *Tx) (int64, error) {
+				return tx.executor().exec(target.del().WHERE(
+					expired.AND(jet.ROW(target.cols.bucket, target.cols.nodeID).IN(keys...)),
+				))
+			})
+			if err != nil {
+				return deleted, fmt.Errorf("pruning traffic: %w", err)
+			}
+
+			deleted += n
+		}
+	}
 }

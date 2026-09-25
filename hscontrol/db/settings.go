@@ -73,10 +73,10 @@ func (hsdb *HSDatabase) LoadSettings() (types.Settings, error) {
 
 			continue
 		case types.SettingDNS, types.SettingDERP, types.SettingIDTokenKey, types.SettingTailnetLock,
-			types.SettingTraffic:
+			types.SettingTraffic, types.SettingTrafficFold:
 			// Hold JSON or key material and are read by LoadDNSSettings,
-			// LoadDERPSettings, LoadIDTokenKey, LoadTailnetLock and
-			// LoadTrafficSettings.
+			// LoadDERPSettings, LoadIDTokenKey, LoadTailnetLock,
+			// LoadTrafficSettings and LoadTrafficFoldMarks.
 			continue
 		default:
 			continue
@@ -247,6 +247,47 @@ func (hsdb *HSDatabase) SaveTrafficSettings(settings types.TrafficSettings) erro
 
 	return hsdb.Write(func(tx *Tx) error {
 		return saveSettingValue(tx, types.SettingTraffic, string(value))
+	})
+}
+
+// LoadTrafficFoldMarks reads how far the traffic maintenance has folded,
+// zero marks when it never ran.
+func (hsdb *HSDatabase) LoadTrafficFoldMarks() (types.TrafficFoldMarks, error) {
+	var records []settingRecord
+
+	err := hsdb.ex.query(
+		jet.SELECT(table.Settings.AllColumns).
+			FROM(table.Settings).
+			WHERE(table.Settings.Key.EQ(jet.String(string(types.SettingTrafficFold)))),
+		&records,
+	)
+	if err != nil {
+		return types.TrafficFoldMarks{}, fmt.Errorf("loading traffic fold marks: %w", err)
+	}
+
+	var marks types.TrafficFoldMarks
+
+	if len(records) == 0 {
+		return marks, nil
+	}
+
+	err = json.Unmarshal([]byte(records[0].Setting.Value), &marks)
+	if err != nil {
+		return types.TrafficFoldMarks{}, fmt.Errorf("decoding traffic fold marks: %w", err)
+	}
+
+	return marks, nil
+}
+
+// SaveTrafficFoldMarks writes how far the traffic maintenance has folded.
+func (hsdb *HSDatabase) SaveTrafficFoldMarks(marks types.TrafficFoldMarks) error {
+	value, err := json.Marshal(marks)
+	if err != nil {
+		return fmt.Errorf("encoding traffic fold marks: %w", err)
+	}
+
+	return hsdb.Write(func(tx *Tx) error {
+		return saveSettingValue(tx, types.SettingTrafficFold, string(value))
 	})
 }
 

@@ -171,9 +171,10 @@ func TestFetchKeepsACache(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, info.ModTime().Equal(modified), "the cache is dated as the server dated the table")
 
-	table, err = src.Fetch(t.Context())
-	require.NoError(t, err, "not modified reads the cache")
-	assert.Equal(t, 6, table.Len())
+	assert.True(t, src.CachedAt().Equal(modified))
+
+	_, err = src.Fetch(t.Context())
+	require.ErrorIs(t, err, asn.ErrNotModified, "the table in use stays without parsing the cache again")
 	assert.NotEmpty(t, lastIMS.Load())
 
 	cached, err := src.LoadCache()

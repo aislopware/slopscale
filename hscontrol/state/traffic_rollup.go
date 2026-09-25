@@ -57,9 +57,10 @@ type trafficRollup struct {
 	unattributed uint64
 }
 
-// rollUpTraffic attributes a report's flows and questions to the nodes
-// holding their source addresses now and adds them up per minute, hour
-// and day, leaving out the buckets the retention would delete anyway.
+// rollUpTraffic attributes a report's flows and questions to the gateway
+// and its peers holding their source addresses now and adds them up per
+// minute, hour and day, leaving out the buckets the retention would
+// delete anyway.
 func (s *State) rollUpTraffic(
 	reporter types.NodeID,
 	report traffic.Report,
@@ -77,9 +78,18 @@ func (s *State) rollUpTraffic(
 		names:        make(map[nameKey]*types.TrafficDNS),
 	}
 
-	for _, node := range s.nodeStore.ListNodes().All() {
+	// Only a node that can reach the gateway can send traffic through
+	// it; flows from any other address are counted as unattributed, so a
+	// gateway cannot pin traffic on a node it never carried.
+	for _, node := range s.nodeStore.ListPeers(reporter).All() {
 		for _, ip := range node.IPs() {
 			r.nodes[ip] = node.ID()
+		}
+	}
+
+	if gateway, ok := s.nodeStore.GetNode(reporter); ok {
+		for _, ip := range gateway.IPs() {
+			r.nodes[ip] = reporter
 		}
 	}
 
@@ -161,7 +171,15 @@ func (r *trafficRollup) addFlow(f traffic.Flow) {
 		source = ""
 	}
 
-	info, _ := r.asns.Lookup(f.Dst)
+	dst := f.Dst.Unmap().String()
+	private := types.IsPrivateTrafficDestination(dst)
+
+	// A private address belongs to no public network, whatever the table
+	// says about the range.
+	var info asn.Info
+	if !private {
+		info, _ = r.asns.Lookup(f.Dst)
+	}
 
 	for _, res := range []int64{types.TrafficMinute, types.TrafficHour, types.TrafficDay} {
 		bucket := f.Bucket - f.Bucket%res
@@ -180,7 +198,7 @@ func (r *trafficRollup) addFlow(f traffic.Flow) {
 
 		dk := destinationKey{
 			resolution: res, bucket: bucket, node: node,
-			dst: f.Dst.Unmap().String(), port: f.Port, proto: f.Proto, host: host,
+			dst: dst, port: f.Port, proto: f.Proto, host: host,
 		}
 
 		row, ok := r.destinations[dk]
@@ -193,6 +211,7 @@ func (r *trafficRollup) addFlow(f traffic.Flow) {
 				Host:    host,
 				ASN:     info.ASN,
 				Country: info.Country,
+				Private: private,
 			}
 			r.destinations[dk] = row
 		}

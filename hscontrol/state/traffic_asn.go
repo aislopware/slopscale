@@ -29,8 +29,9 @@ func (s *State) asnSource() asn.Source {
 	}
 }
 
-// loadASNCache puts the cached table in use when the server starts, so
-// destinations have names before the first download.
+// loadASNCache puts the cached table in use, so destinations have names
+// before the next download. The table takes tens of megabytes, so it is
+// loaded only once a gateway reports.
 func (s *State) loadASNCache() {
 	if s.cfg.Traffic.ASNDatabaseURL == "" {
 		return
@@ -57,6 +58,14 @@ func (s *State) RefreshASN(ctx context.Context) error {
 	}
 
 	table, err := s.asnSource().Fetch(ctx)
+	if errors.Is(err, asn.ErrNotModified) {
+		if s.asnTable.Load() == nil {
+			s.loadASNCache()
+		}
+
+		return nil
+	}
+
 	if err != nil {
 		return err
 	}
@@ -81,4 +90,14 @@ func (s *State) ASNName(number uint32) string {
 // ASNRanges is how many ranges the table in use holds, 0 without one.
 func (s *State) ASNRanges() int {
 	return s.asnTable.Load().Len()
+}
+
+// EnsureASN puts the cached table in use when none is, and returns when
+// the cached copy was last replaced, zero without one.
+func (s *State) EnsureASN() time.Time {
+	if s.asnTable.Load() == nil {
+		s.loadASNCache()
+	}
+
+	return s.asnSource().CachedAt()
 }

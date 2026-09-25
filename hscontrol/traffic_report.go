@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,11 +22,30 @@ var (
 	errTrafficNoCredential    = errors.New("no bearer credential")
 	errTrafficBodyTooLarge    = errors.New("report body too large")
 	errTrafficEncodingUnknown = errors.New("unsupported content encoding")
+	errTrafficBusy            = errors.New("too many reports at once; retry later")
+	errTrafficMalformed       = errors.New("malformed report")
+	errTrafficTrailingData    = errors.New("data after the report")
 )
+
+// maxTrafficIngests bounds the reports applied at once, server-wide: a
+// report can take a few hundred milliseconds of database writes, and a
+// burst of gateways must not hold every database connection.
+const maxTrafficIngests = 4
+
+// trafficHeadSize is room for a report's fields other than its entries.
+const trafficHeadSize = 1 << 10
+
+// trafficTickInterval is how often the gateway resolvers are checked.
+const trafficTickInterval = 15 * time.Second
+
+// trafficRetryAfter is how many seconds a report refused for load is told
+// to wait.
+const trafficRetryAfter = "5"
 
 // TrafficReportHandler takes a report from slopscale-flowd on a gateway.
 // The agent's credential is the gateway's own identity token, which its
-// tailscaled fetched for the traffic audience; see hscontrol/traffic.
+// tailscaled fetched for the traffic audience; see hscontrol/traffic. The
+// credential is checked before a byte of the body is read.
 func (h *Slopscale) TrafficReportHandler(w http.ResponseWriter, r *http.Request) {
 	token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !ok || token == "" {
@@ -34,6 +54,22 @@ func (h *Slopscale) TrafficReportHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	gateway, err := h.state.AuthenticateTrafficReporter(token, time.Now())
+	if err != nil {
+		writeTrafficError(w, r, trafficErrorStatus(err), err)
+
+		return
+	}
+
+	if h.trafficIngests.Add(1) > maxTrafficIngests {
+		h.trafficIngests.Add(-1)
+		w.Header().Set("Retry-After", trafficRetryAfter)
+		writeTrafficError(w, r, http.StatusTooManyRequests, errTrafficBusy)
+
+		return
+	}
+	defer h.trafficIngests.Add(-1)
+
 	report, status, err := decodeTrafficReport(r)
 	if err != nil {
 		writeTrafficError(w, r, status, err)
@@ -41,7 +77,7 @@ func (h *Slopscale) TrafficReportHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	resp, c, err := h.state.IngestTrafficReport(token, report, time.Now())
+	resp, c, err := h.state.IngestTrafficReport(gateway, report, time.Now())
 	if err != nil {
 		writeTrafficError(w, r, trafficErrorStatus(err), err)
 
@@ -50,6 +86,11 @@ func (h *Slopscale) TrafficReportHandler(w http.ResponseWriter, r *http.Request)
 
 	if !c.IsEmpty() {
 		h.Change(c)
+	}
+
+	// The first report is what makes the ASN table worth its memory.
+	if h.state.ASNRanges() == 0 {
+		go h.refreshASNIfDue(context.WithoutCancel(r.Context()))
 	}
 
 	log.Debug().Caller().
@@ -62,9 +103,10 @@ func (h *Slopscale) TrafficReportHandler(w http.ResponseWriter, r *http.Request)
 }
 
 // decodeTrafficReport reads the body, zstd-compressed or not, bounded
-// both before and after decompression.
+// both before and after decompression, and stops at the first entry past
+// the per-report bounds rather than decoding the rest.
 func decodeTrafficReport(r *http.Request) (traffic.Report, int, error) {
-	body := io.Reader(http.MaxBytesReader(nil, r.Body, traffic.MaxReportBytes))
+	body := http.MaxBytesReader(nil, r.Body, traffic.MaxReportBytes)
 
 	switch r.Header.Get("Content-Encoding") {
 	case "", "identity":
@@ -78,33 +120,156 @@ func decodeTrafficReport(r *http.Request) (traffic.Report, int, error) {
 		}
 		defer dec.Close()
 
-		body = dec
+		body = http.MaxBytesReader(nil, io.NopCloser(dec), traffic.MaxReportBytes)
 	default:
 		return traffic.Report{}, http.StatusUnsupportedMediaType, fmt.Errorf("%w: %q",
 			errTrafficEncodingUnknown, r.Header.Get("Content-Encoding"))
 	}
 
-	raw, err := io.ReadAll(io.LimitReader(body, traffic.MaxReportBytes+1))
-	if err != nil {
-		if _, tooLarge := errors.AsType[*http.MaxBytesError](err); tooLarge {
-			return traffic.Report{}, http.StatusRequestEntityTooLarge, errTrafficBodyTooLarge
-		}
+	report, err := streamTrafficReport(body)
 
-		return traffic.Report{}, http.StatusBadRequest, fmt.Errorf("reading the report: %w", err)
-	}
+	_, overLimit := errors.AsType[*http.MaxBytesError](err)
 
-	if len(raw) > traffic.MaxReportBytes {
+	switch {
+	case err == nil:
+		return report, http.StatusOK, nil
+	case errors.Is(err, state.ErrTrafficReportTooLarge):
+		return traffic.Report{}, http.StatusRequestEntityTooLarge, err
+	case overLimit || errors.Is(err, zstd.ErrDecoderSizeExceeded):
 		return traffic.Report{}, http.StatusRequestEntityTooLarge, errTrafficBodyTooLarge
+	default:
+		return traffic.Report{}, http.StatusBadRequest, fmt.Errorf("decoding the report: %w", err)
+	}
+}
+
+// streamTrafficReport decodes a report entry by entry, counting the flows
+// and queries so it stops at the first one past the bounds. The other
+// fields are small; they are collected and decoded as a report without
+// entries, so a field added to the contract needs nothing here.
+func streamTrafficReport(r io.Reader) (traffic.Report, error) {
+	dec := json.NewDecoder(r)
+
+	err := expectDelim(dec, '{')
+	if err != nil {
+		return traffic.Report{}, err
 	}
 
 	var report traffic.Report
 
-	err = json.Unmarshal(raw, &report)
-	if err != nil {
-		return traffic.Report{}, http.StatusBadRequest, fmt.Errorf("decoding the report: %w", err)
+	head := make([]byte, 1, trafficHeadSize)
+	head[0] = '{'
+
+	for dec.More() {
+		var tok json.Token
+
+		tok, err = dec.Token()
+		if err != nil {
+			return traffic.Report{}, fmt.Errorf("reading a field name: %w", err)
+		}
+
+		key, _ := tok.(string)
+
+		switch key {
+		case "flows":
+			report.Flows, err = decodeTrafficEntries(dec, report.Flows, traffic.MaxFlowsPerReport, key)
+		case "queries":
+			report.Queries, err = decodeTrafficEntries(dec, report.Queries, traffic.MaxQueriesPerReport, key)
+		default:
+			head, err = appendTrafficField(dec, head, key)
+		}
+
+		if err != nil {
+			return traffic.Report{}, err
+		}
 	}
 
-	return report, http.StatusOK, nil
+	err = expectDelim(dec, '}')
+	if err != nil {
+		return traffic.Report{}, err
+	}
+
+	_, err = dec.Token()
+	if !errors.Is(err, io.EOF) {
+		return traffic.Report{}, errTrafficTrailingData
+	}
+
+	flows, queries := report.Flows, report.Queries
+
+	err = json.Unmarshal(append(head, '}'), &report)
+	if err != nil {
+		return traffic.Report{}, fmt.Errorf("decoding the report's fields: %w", err)
+	}
+
+	report.Flows, report.Queries = flows, queries
+
+	return report, nil
+}
+
+// appendTrafficField appends the next value, under key, to the JSON
+// object being collected in head.
+func appendTrafficField(dec *json.Decoder, head []byte, key string) ([]byte, error) {
+	var value json.RawMessage
+
+	err := dec.Decode(&value)
+	if err != nil {
+		return nil, fmt.Errorf("decoding %s: %w", key, err)
+	}
+
+	if len(head) > 1 {
+		head = append(head, ',')
+	}
+
+	head = strconv.AppendQuote(head, key)
+	head = append(head, ':')
+
+	return append(head, value...), nil
+}
+
+// decodeTrafficEntries appends the entries of a JSON array, or null, to
+// into, refusing the one past limit.
+func decodeTrafficEntries[T any](dec *json.Decoder, into []T, limit int, what string) ([]T, error) {
+	tok, err := dec.Token()
+	if err != nil {
+		return nil, fmt.Errorf("reading %s: %w", what, err)
+	}
+
+	if tok == nil {
+		return into, nil
+	}
+
+	if d, ok := tok.(json.Delim); !ok || d != '[' {
+		return nil, fmt.Errorf("%w: %s is not an array", errTrafficMalformed, what)
+	}
+
+	for dec.More() {
+		if len(into) >= limit {
+			return nil, fmt.Errorf("%w: more than %d %s", state.ErrTrafficReportTooLarge, limit, what)
+		}
+
+		var entry T
+
+		err = dec.Decode(&entry)
+		if err != nil {
+			return nil, fmt.Errorf("decoding %s entry %d: %w", what, len(into), err)
+		}
+
+		into = append(into, entry)
+	}
+
+	return into, expectDelim(dec, ']')
+}
+
+func expectDelim(dec *json.Decoder, want json.Delim) error {
+	tok, err := dec.Token()
+	if err != nil {
+		return fmt.Errorf("reading the report: %w", err)
+	}
+
+	if d, ok := tok.(json.Delim); !ok || d != want {
+		return fmt.Errorf("%w: expected %q", errTrafficMalformed, want)
+	}
+
+	return nil
 }
 
 func trafficErrorStatus(err error) int {
@@ -127,15 +292,15 @@ func trafficErrorStatus(err error) int {
 // right, and each download is a few seconds of parsing on a small host.
 const asnRefreshInterval = 24 * time.Hour
 
-// refreshASNIfDue downloads the ASN table when the last download is a day
-// old, or has never happened. It runs off the scheduler goroutine.
-func (h *Slopscale) refreshASNIfDue(ctx context.Context) {
-	if h.cfg.Traffic.ASNDatabaseURL == "" {
-		return
-	}
+// asnRetryInterval is how long a failed download waits before the next.
+const asnRetryInterval = 15 * time.Minute
 
-	last := h.asnRefreshedAt.Load()
-	if last != nil && time.Since(*last) < asnRefreshInterval {
+// refreshASNIfDue puts the ASN table in use once a gateway has reported,
+// from the cache when there is one, and downloads it again when the
+// cached copy is a day old. It runs off the scheduler goroutine, one at
+// a time.
+func (h *Slopscale) refreshASNIfDue(ctx context.Context) {
+	if h.cfg.Traffic.ASNDatabaseURL == "" || !h.state.TrafficInUse() {
 		return
 	}
 
@@ -144,9 +309,23 @@ func (h *Slopscale) refreshASNIfDue(ctx context.Context) {
 	}
 	defer h.asnRefreshing.Store(false)
 
+	last := h.state.EnsureASN()
+	if p := h.asnRefreshedAt.Load(); p != nil && p.After(last) {
+		last = *p
+	}
+
+	if time.Since(last) < asnRefreshInterval {
+		return
+	}
+
 	err := h.state.RefreshASN(ctx)
 	if err != nil {
 		log.Warn().Err(err).Msg("downloading the ASN table failed; keeping the one in use")
+
+		// Dated so the next attempt comes after the retry interval
+		// rather than with the next report.
+		retry := time.Now().Add(asnRetryInterval - asnRefreshInterval)
+		h.asnRefreshedAt.Store(&retry)
 
 		return
 	}
@@ -155,9 +334,16 @@ func (h *Slopscale) refreshASNIfDue(ctx context.Context) {
 	h.asnRefreshedAt.Store(&now)
 }
 
-// trafficTick takes gateway resolvers that stopped reporting out of the
-// clients' DNS.
+// trafficTick takes the resolvers of gateways that stopped reporting or
+// no longer qualify out of the clients' DNS. The scheduler starts it in
+// its own goroutine every 15 seconds; while one still waits on the
+// traffic lock, the next returns at once.
 func (h *Slopscale) trafficTick(now time.Time) {
+	if !h.trafficTicking.CompareAndSwap(false, true) {
+		return
+	}
+	defer h.trafficTicking.Store(false)
+
 	c, err := h.state.TrafficTick(now)
 	if err != nil {
 		log.Error().Err(err).Msg("updating the traffic resolvers")
@@ -169,7 +355,7 @@ func (h *Slopscale) trafficTick(now time.Time) {
 }
 
 // trafficMaintenance prunes and folds the traffic rollups, off the
-// scheduler goroutine.
+// scheduler goroutine; a run that finds another still going returns.
 func (h *Slopscale) trafficMaintenance() {
 	err := h.state.TrafficMaintenance(time.Now())
 	if err != nil {

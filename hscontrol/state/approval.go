@@ -89,8 +89,8 @@ func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error)
 		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see SetKeyExpiry", ErrUnknownSetting, key)
 	case types.SettingSSHRecorders, types.SettingSSHRecordingEnforce:
 		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see SetSSHRecording", ErrUnknownSetting, key)
-	case types.SettingTraffic:
-		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see SetTrafficSettings", ErrUnknownSetting, key)
+	case types.SettingTraffic, types.SettingTrafficFold:
+		return change.Change{}, fmt.Errorf("%w: %q is not a switch, see PatchTrafficSettings", ErrUnknownSetting, key)
 	default:
 		return change.Change{}, fmt.Errorf("%w: %q", ErrUnknownSetting, key)
 	}
@@ -113,7 +113,7 @@ func (s *State) SetSetting(key types.SettingKey, on bool) (change.Change, error)
 		return s.approvePendingUsers()
 	case types.SettingDNS, types.SettingDERP, types.SettingKeyExpiry, types.SettingPostureIdentityOn,
 		types.SettingSSHRecorders, types.SettingSSHRecordingEnforce, types.SettingDeviceAttributesOn,
-		types.SettingIDTokenKey, types.SettingTailnetLock, types.SettingTraffic:
+		types.SettingIDTokenKey, types.SettingTailnetLock, types.SettingTraffic, types.SettingTrafficFold:
 		return change.Change{}, nil
 	default:
 		return change.Change{}, nil
@@ -217,7 +217,7 @@ func (s *State) policyChangeAfterApproval() (change.Change, error) {
 	c.Reason = "node approval"
 	c.IncludeSelf = true
 
-	return c, nil
+	return c.Merge(s.trafficRecheck()), nil
 }
 
 // SetUserApproval admits a user to the tailnet or withdraws them again.
