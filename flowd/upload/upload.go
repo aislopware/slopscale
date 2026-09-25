@@ -336,7 +336,7 @@ func (u *Uploader) send(ctx context.Context, seq uint64, body []byte) (*traffic.
 
 			return nil, 0, u.spool.Reject(seq)
 		case status == http.StatusForbidden:
-			return nil, refusedBackoff, fmt.Errorf("%w: %s", ErrForbidden, strings.TrimSpace(string(raw)))
+			return nil, refusedBackoff, fmt.Errorf("%w (%d): %s", ErrForbidden, status, strings.TrimSpace(string(raw)))
 		default:
 			return nil, 0, fmt.Errorf("%w: %d: %s", errServerStatus, status, strings.TrimSpace(string(raw)))
 		}

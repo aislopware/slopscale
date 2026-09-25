@@ -274,7 +274,8 @@ func TestForbiddenKeepsReports(t *testing.T) {
 	h.server.statuses = []int{http.StatusForbidden}
 
 	wait, err := h.uploader.Drain(t.Context())
-	require.Error(t, err)
+	require.ErrorIs(t, err, ErrForbidden)
+	assert.Contains(t, err.Error(), "403", "the log names the status the operator looks up")
 	assert.Equal(t, refusedBackoff, wait)
 	assert.Equal(t, 2, h.spool.Len())
 }
