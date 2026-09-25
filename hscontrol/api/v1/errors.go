@@ -127,6 +127,7 @@ var badRequestErrors = []error{
 	types.ErrTrafficRetentionInvalid,
 	types.ErrTrafficRangeInvalid,
 	types.ErrTrafficGroupUnknown,
+	types.ErrTrafficFilterInvalid,
 	state.ErrTrafficDNSLoggingNoNameservers,
 }
 

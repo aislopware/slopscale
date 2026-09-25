@@ -361,7 +361,11 @@ latter being the gateway's node ID. `destinations` groups by `destination`, `hos
 Reads take `start` and `end` as RFC 3339 times, the last 24 hours by
 default, and `nodeId` and `reporterId`. They answer with the `resolution` they used and
 the range widened to whole buckets, and refuse with `400` a range that
-would need more than 1,500 daily buckets. Byte counts are plain numbers. Changes
+would need more than 1,500 daily buckets. Destinations narrow with `q`,
+which keeps hosts or addresses containing it, and with exact filters:
+`host` (a name, or the address of a destination without one), `dst`,
+`proto` with `port`, `asn`, `country`, and `private=true` for the LAN.
+Names narrow with `q` or, exactly, `name`. Byte counts are plain numbers. Changes
 are written to the [audit log](/ref/audit).
 
 The owner and admins hold both scopes, the network admin holds

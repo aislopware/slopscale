@@ -507,19 +507,19 @@ func (s *State) TrafficGatewayRefusal(node types.NodeView) string {
 func trafficGatewayRefusal(node types.NodeView, apps []types.AppConnector) string {
 	switch {
 	case !node.IsTagged():
-		return "the device is not tagged; only tagged gateways may report traffic"
+		return "the machine is not tagged; only tagged gateways may report traffic"
 	case !node.IsApproved():
-		return "the device is waiting for approval"
+		return "the machine is waiting for approval"
 	case node.IsSuspended():
-		return "the device is suspended"
+		return "the machine is suspended"
 	case node.IsExpired():
-		return "the device's key has expired"
+		return "the machine's key has expired"
 	case node.IsExitNode() || node.IsSubnetRouter():
 		return ""
 	case runsSelectedConnector(node, apps):
 		return ""
 	default:
-		return "the device has no approved exit or subnet routes and runs no app connector an app selects"
+		return "the machine has no approved exit or subnet routes and is not an app connector for any app"
 	}
 }
 

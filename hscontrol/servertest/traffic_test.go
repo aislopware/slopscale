@@ -605,7 +605,7 @@ func TestTrafficMonitor(t *testing.T) {
 
 		status, body = postReport(t, client, srv.URL, idToken(t, srv, connector, traffic.Audience), report, "")
 		assert.Equal(t, http.StatusForbidden, status, body)
-		assert.Contains(t, body, "app connector an app selects")
+		assert.Contains(t, body, "is not an app connector for any app")
 
 		status, apiBody := apiCall(t, client, ownerKey, http.MethodPost,
 			v1+"/node/"+exit.NodeIDString()+"/suspend", map[string]any{"suspended": true})
@@ -1145,6 +1145,82 @@ func TestTrafficMonitor(t *testing.T) {
 		status, body = apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/summary", nil)
 		require.Equal(t, http.StatusOK, status, body)
 		assert.InDelta(t, 2000, field(t, body, "total", "txBytes"), 0, "what it reported stays")
+	})
+
+	t.Run("a picked host, address or name keeps that one, not every one containing it", func(t *testing.T) {
+		sendReport(t, client, srv.URL, idToken(t, srv, exit, traffic.Audience), traffic.Report{
+			Version: "0.1.0", Instance: "exact-1", Seq: 1,
+			Flows: []traffic.Flow{
+				{
+					Bucket: minute, Src: laptopIP, Dst: netip.MustParseAddr("140.82.112.5"), Proto: 6, Port: 443,
+					Host: "api.github.com", TxBytes: 70,
+				},
+				{Bucket: minute, Src: laptopIP, Dst: netip.MustParseAddr("1.1.1.1"), Proto: 17, Port: 53, TxBytes: 11},
+				{Bucket: minute, Src: laptopIP, Dst: netip.MustParseAddr("1.1.1.10"), Proto: 17, Port: 53, TxBytes: 13},
+				{Bucket: minute, Src: laptopIP, Dst: netip.MustParseAddr("1.1.1.1"), Proto: 6, Port: 853, TxBytes: 17},
+			},
+			Queries: []traffic.Query{{Bucket: minute, Src: laptopIP, Name: "api.github.com", Count: 4}},
+		})
+
+		hosts := func(query string) map[string]float64 {
+			t.Helper()
+
+			status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/destinations?"+query, nil)
+			require.Equal(t, http.StatusOK, status, body)
+
+			rows, ok := field(t, body, "destinations").([]any)
+			require.True(t, ok)
+
+			out := map[string]float64{}
+
+			for _, r := range rows {
+				row, ok := r.(map[string]any)
+				require.True(t, ok)
+
+				key, _ := row["host"].(string)
+				if key == "" {
+					key, _ = row["dst"].(string)
+				}
+
+				tx, _ := row["txBytes"].(float64)
+				out[key] += tx
+			}
+
+			return out
+		}
+
+		assert.Contains(t, hosts("groupBy=host&q=github.com"), "api.github.com", "the search still matches a part")
+		assert.Equal(t, map[string]float64{"github.com": 1600},
+			hosts("groupBy=host&host=GitHub.com"), "the pick is exact and case-blind")
+		assert.Equal(t, map[string]float64{"1.1.1.1": 28},
+			hosts("groupBy=host&host=1.1.1.1"), "an unnamed destination is picked by its address")
+		assert.Len(t, hosts("groupBy=destination&q=1.1.1.1"), 2, "the search matches 1.1.1.10 too")
+		assert.Equal(t, map[string]float64{"1.1.1.1": 11},
+			hosts("groupBy=destination&dst=1.1.1.1&proto=17&port=53"), "one address and one service")
+		assert.Equal(t, map[string]float64{"192.168.1.10": 300},
+			hosts("groupBy=destination&private=true"), "only the LAN destinations")
+
+		status, body := apiCall(t, client, ownerKey, http.MethodGet,
+			v1+"/traffic/destinations?dst=github.com", nil)
+		assert.Equal(t, http.StatusBadRequest, status, body)
+
+		names := func(query string) []any {
+			t.Helper()
+
+			status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/dns?"+query, nil)
+			require.Equal(t, http.StatusOK, status, body)
+
+			rows, ok := field(t, body, "names").([]any)
+			require.True(t, ok)
+
+			return rows
+		}
+
+		assert.Len(t, names("q=github.com"), 2, "the search finds github.com and api.github.com")
+
+		exact := names("name=github.com.")
+		require.Len(t, exact, 1)
+		assert.Equal(t, "github.com", field(t, exact[0], "name"))
 	})
 }
 

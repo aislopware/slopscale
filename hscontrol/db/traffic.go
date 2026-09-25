@@ -861,6 +861,19 @@ func destinationWhere(f types.TrafficFilter) jet.BoolExpression {
 		cond = cond.AND(contains(t.Host, f.Search).OR(contains(t.Dst, f.Search)))
 	}
 
+	if f.Host != "" {
+		host := jet.String(strings.ToLower(f.Host))
+		cond = cond.AND(t.Host.EQ(host).OR(t.Host.EQ(jet.String("")).AND(t.Dst.EQ(host))))
+	}
+
+	if f.Dst != "" {
+		cond = cond.AND(t.Dst.EQ(jet.String(f.Dst)))
+	}
+
+	if f.Private {
+		cond = cond.AND(t.Private.EQ(jet.Int64(sqlFlag(true))))
+	}
+
 	if f.ASN != 0 {
 		cond = cond.AND(t.Asn.EQ(jet.Int64(int64(f.ASN))))
 	}
@@ -1124,6 +1137,10 @@ func (hsdb *HSDatabase) TrafficNames(f types.TrafficFilter, group types.TrafficG
 	cond := dnsColumns.where(f)
 	if f.Search != "" {
 		cond = cond.AND(contains(t.Name, f.Search))
+	}
+
+	if f.Name != "" {
+		cond = cond.AND(t.Name.EQ(jet.String(strings.ToLower(strings.TrimSuffix(f.Name, ".")))))
 	}
 
 	var rows []trafficNameRow

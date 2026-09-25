@@ -71,6 +71,7 @@ var (
 	ErrTrafficRetentionInvalid = errors.New("traffic retention is out of range")
 	ErrTrafficRangeInvalid     = errors.New("traffic range is invalid")
 	ErrTrafficGroupUnknown     = errors.New("unknown traffic grouping")
+	ErrTrafficFilterInvalid    = errors.New("traffic filter is invalid")
 )
 
 // TrafficSettings are the operator's choices for the traffic monitor. The
@@ -305,6 +306,14 @@ type TrafficFilter struct {
 	// Search keeps rows whose host or address (destinations) or name
 	// (DNS) contains it.
 	Search string
+	// Host keeps one host as the host grouping keys it: the name, or the
+	// address of a destination without one. Dst keeps one address and
+	// Name one looked-up name; all three match exactly.
+	Host string
+	Dst  string
+	Name string
+	// Private keeps only destinations inside private ranges.
+	Private bool
 	// ASN, Country, Proto and Port keep one destination network,
 	// country or service when set (Port only with Proto).
 	ASN     uint32

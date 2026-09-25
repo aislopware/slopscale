@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"slices"
 	"time"
 
@@ -212,6 +213,12 @@ type (
 
 		Q string `doc:"Keep hosts or addresses containing this." query:"q"`
 
+		Host string `doc:"Keep one host exactly: a name, or the address of a destination without one." query:"host"`
+
+		Dst string `doc:"Keep one destination address exactly." query:"dst"`
+
+		Private bool `doc:"Keep only destinations in private ranges (LAN)." query:"private"`
+
 		ASN int64 `doc:"Keep one network (AS number)." maximum:"4294967295" minimum:"0" query:"asn"`
 
 		Country string `doc:"Keep one country (ISO 3166)." maxLength:"2" query:"country"`
@@ -234,6 +241,7 @@ type (
 
 		GroupBy string `default:"name"                    enum:"name,node" query:"groupBy"`
 		Q       string `doc:"Keep names containing this." query:"q"`
+		Name    string `doc:"Keep one name exactly."      query:"name"`
 		Limit   int    `doc:"At most 1000; default 100."  maximum:"1000"   minimum:"1"     query:"limit"`
 	}
 	trafficDNSOutput struct {
@@ -317,7 +325,18 @@ func registerTrafficReads(api huma.API, b Backend) {
 			return nil, err
 		}
 
-		f.Search, f.Country = in.Q, in.Country
+		f.Search, f.Country, f.Host, f.Private = in.Q, in.Country, in.Host, in.Private
+
+		if in.Dst != "" {
+			dst, parseErr := netip.ParseAddr(in.Dst)
+			if parseErr != nil {
+				return nil, mapError("reading traffic destinations",
+					fmt.Errorf("%w: dst is not an IP address", types.ErrTrafficFilterInvalid))
+			}
+
+			f.Dst = dst.Unmap().String()
+		}
+
 		//nolint:gosec // the schema bounds each to its type's range
 		f.ASN, f.Proto, f.Port = uint32(in.ASN), uint8(in.Proto), uint16(in.Port)
 		f.Limit = cmp0(in.Limit, trafficDefaultRows)
@@ -354,7 +373,7 @@ func registerTrafficReads(api huma.API, b Backend) {
 			return nil, err
 		}
 
-		f.Search = in.Q
+		f.Search, f.Name = in.Q, in.Name
 		f.Limit = cmp0(in.Limit, trafficDefaultRows)
 
 		sums, err := b.State.TrafficNames(f, types.TrafficGroup(in.GroupBy))
