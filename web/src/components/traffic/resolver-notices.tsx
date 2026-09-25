@@ -25,7 +25,7 @@ export function ResolverNotices({
       {dnsBlocked === "" ? null : (
         <Callout
           tone="warning"
-          title="DNS logging points no machine at a gateway resolver"
+          title="DNS logging is on, but no machine uses a gateway resolver"
           description={
             <>
               {`${dnsBlocked.charAt(0).toUpperCase()}${dnsBlocked.slice(1)}. `}

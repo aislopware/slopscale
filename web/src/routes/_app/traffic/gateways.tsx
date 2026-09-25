@@ -5,6 +5,7 @@ import type { ReactElement } from "react";
 import { trafficReportersQuery } from "~/api/traffic.ts";
 import type { TrafficReporter } from "~/api/traffic.ts";
 import { can } from "~/auth/me.ts";
+import { plural } from "~/components/overview/plural.ts";
 import { GatewaysTable, gatewayState } from "~/components/traffic/gateways-table.tsx";
 import type { GatewayState } from "~/components/traffic/gateways-table.tsx";
 import { InstallSection } from "~/components/traffic/install-section.tsx";
@@ -23,25 +24,31 @@ function countIn(reporters: readonly TrafficReporter[], state: GatewayState): nu
   return reporters.filter((reporter) => gatewayState(reporter) === state).length;
 }
 
-/** The gateways worth a look, counted in the header: refused ones first, then silent ones. */
-function Trouble({
-  reporters,
-}: {
-  readonly reporters: readonly TrafficReporter[];
-}): ReactElement | null {
+/**
+ * The gateways in a line for the header, worth-a-look ones in their tone: refused ones first, then
+ * those not reporting, then those reporting with a collector down.
+ */
+function Tally({ reporters }: { readonly reporters: readonly TrafficReporter[] }): ReactElement {
   const refused = countIn(reporters, "refused");
   const silent = countIn(reporters, "silent");
-  const parts = [
-    refused === 0 ? "" : `${refused} ${refused === 1 ? "gateway" : "gateways"} refused`,
-    silent === 0 ? "" : `${silent} stopped reporting`,
+  const degraded = countIn(reporters, "degraded");
+  const trouble = [
+    refused === 0 ? "" : `${refused} refused`,
+    silent === 0 ? "" : `${silent} not reporting`,
+    degraded === 0 ? "" : `${degraded} degraded`,
   ].filter((part) => part !== "");
 
-  return parts.length === 0 ? null : (
+  return (
     <>
-      <span aria-hidden>·</span>
-      <span className={refused === 0 ? "text-kumo-warning" : "text-kumo-danger"}>
-        {parts.join(", ")}
-      </span>
+      <span>{plural(reporters.length, "gateway")}</span>
+      {trouble.length === 0 ? null : (
+        <>
+          <span aria-hidden>·</span>
+          <span className={refused === 0 ? "text-kumo-warning" : "text-kumo-danger"}>
+            {trouble.join(", ")}
+          </span>
+        </>
+      )}
     </>
   );
 }
@@ -56,16 +63,7 @@ function GatewaysPage(): ReactElement {
       <PageHeader
         title="Gateways"
         description="The tagged exit nodes, subnet routers and app connectors that report what passes through them."
-        meta={
-          <>
-            <span>
-              {data.asnRanges === 0
-                ? "Network names not loaded yet"
-                : `Network names for ${data.asnRanges.toLocaleString()} address ranges`}
-            </span>
-            <Trouble reporters={data.reporters} />
-          </>
-        }
+        {...(data.reporters.length === 0 ? {} : { meta: <Tally reporters={data.reporters} /> })}
       />
       <ResolverNotices reporters={data} />
       <Frame>

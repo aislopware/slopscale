@@ -65,7 +65,11 @@ export function InstallSection(): ReactElement {
           </a>{" "}
           and install it. It needs no configuration and starts at once.
         </p>
-        <CommandBox command="sudo apt install ./slopscale-flowd_*_linux_amd64.deb" size="sm" />
+        <CommandBox
+          command="sudo apt install ./slopscale-flowd_*_linux_$(dpkg --print-architecture).deb"
+          size="sm"
+          wrap
+        />
       </Step>
       <Step number={3} title="Wait for the first report">
         <p className="max-w-prose text-kumo-subtle">

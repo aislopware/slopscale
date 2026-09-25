@@ -1,70 +1,24 @@
-import { DropdownMenu } from "@cloudflare/kumo/components/dropdown";
-import {
-  ArrowSquareOutIcon,
-  ChartLineIcon,
-  CheckCircleIcon,
-  TrashIcon,
-  XCircleIcon,
-} from "@phosphor-icons/react";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
 import type { ReactElement } from "react";
 
-import { errorMessage } from "~/api/error.ts";
 import type { TrafficReporter } from "~/api/traffic.ts";
 import { plural } from "~/components/overview/plural.ts";
 import { createAppColumnHelper, useAppTable } from "~/components/table/app-table.tsx";
 import { DataTable } from "~/components/table/data-table.tsx";
 import { TableFooter } from "~/components/table/toolbar.tsx";
 import { formatCount } from "~/components/traffic/format.ts";
+import { GatewayMenu } from "~/components/traffic/gateway-menu.tsx";
 import { trafficNodeName } from "~/components/traffic/machines-table.tsx";
-import {
-  useForgetGatewayMutation,
-  useResolverApprovalMutation,
-} from "~/components/traffic/mutations.ts";
-import { defaultTrafficRange } from "~/components/traffic/range.ts";
 import { Badge } from "~/components/ui/badge.tsx";
-import { ConfirmDialog } from "~/components/ui/confirm-dialog.tsx";
-import { DisabledReason } from "~/components/ui/disabled-reason.tsx";
 import { RelativeTime } from "~/components/ui/relative-time.tsx";
-import { RowMenu } from "~/components/ui/row-menu.tsx";
 import { SectionEmpty } from "~/components/ui/section.tsx";
 import type { Tone } from "~/components/ui/status.tsx";
 import { Status, StatusDetail } from "~/components/ui/status.tsx";
 import { ValueList } from "~/components/ui/value-list.tsx";
+import { useWidths } from "~/lib/breakpoint.ts";
+import type { Widths } from "~/lib/breakpoint.ts";
 
-export type GatewayState = "refused" | "reporting" | "silent" | "offline";
-
-/**
- * A gateway reports every minute while its agent runs. Silent while the machine is connected means
- * the agent stopped, which is worth a look; silent while it is offline is the machine being away. A
- * gateway the server no longer takes reports from is refused whatever its agent does.
- */
-export function gatewayState(reporter: TrafficReporter): GatewayState {
-  if (reporter.refused !== "") {
-    return "refused";
-  }
-
-  if (!reporter.stale) {
-    return "reporting";
-  }
-
-  return reporter.online ? "silent" : "offline";
-}
-
-const stateLabels: Record<GatewayState, string> = {
-  refused: "Refused",
-  reporting: "Reporting",
-  silent: "Not reporting",
-  offline: "Offline",
-};
-
-const stateTones: Record<GatewayState, Tone> = {
-  refused: "danger",
-  reporting: "success",
-  silent: "warning",
-  offline: "neutral",
-};
+export type GatewayState = "refused" | "reporting" | "degraded" | "silent" | "offline";
 
 const collectorNames = {
   conntrack: "Connections",
@@ -83,6 +37,47 @@ const collectorPurpose: Record<CollectorKey, string> = {
   sni: "Names destinations from TLS and QUIC handshakes.",
   dns: "Answers the machines' lookups and names destinations from the answers.",
   appConnector: "Names destinations from the app connector's domains.",
+};
+
+/** The collectors the agent runs that report an error. */
+function failingCollectors(reporter: TrafficReporter): CollectorKey[] {
+  return collectorKeys.filter(
+    (key) => reporter.collectors[key].enabled && reporter.collectors[key].error !== "",
+  );
+}
+
+/**
+ * A gateway reports every minute while its agent runs, and degraded while one of its collectors
+ * fails. Silent while the machine is connected means the agent stopped, which is worth a look;
+ * silent while it is offline is the machine being away. A gateway the server no longer takes
+ * reports from is refused whatever its agent does.
+ */
+export function gatewayState(reporter: TrafficReporter): GatewayState {
+  if (reporter.refused !== "") {
+    return "refused";
+  }
+
+  if (reporter.stale) {
+    return reporter.online ? "silent" : "offline";
+  }
+
+  return failingCollectors(reporter).length === 0 ? "reporting" : "degraded";
+}
+
+const stateLabels: Record<GatewayState, string> = {
+  refused: "Refused",
+  reporting: "Reporting",
+  degraded: "Degraded",
+  silent: "Not reporting",
+  offline: "Offline",
+};
+
+const stateTones: Record<GatewayState, Tone> = {
+  refused: "danger",
+  reporting: "success",
+  degraded: "warning",
+  silent: "warning",
+  offline: "neutral",
 };
 
 /** The collectors the agent runs, each a word; a failing one carries its error one hover away. */
@@ -114,16 +109,26 @@ function Collectors({ reporter }: { readonly reporter: TrafficReporter }): React
   );
 }
 
-/** The state in a word, and a refusal's reason under it, since that reason is what to fix. */
+/**
+ * The state in a word, and what to fix under it: a refusal's reason, or which collectors are
+ * failing.
+ */
 function StateCell({ reporter }: { readonly reporter: TrafficReporter }): ReactElement {
   const state = gatewayState(reporter);
+  let why = "";
+
+  if (state === "refused") {
+    why = sentence(reporter.refused);
+  } else if (state === "degraded") {
+    why = `${failingCollectors(reporter)
+      .map((key) => collectorNames[key])
+      .join(", ")} failing`;
+  }
 
   return (
     <span className="flex max-w-60 flex-col items-start gap-1">
       <Badge tone={stateTones[state]}>{stateLabels[state]}</Badge>
-      {reporter.refused === "" ? null : (
-        <span className="text-xs text-pretty text-kumo-subtle">{sentence(reporter.refused)}</span>
-      )}
+      {why === "" ? null : <span className="text-xs text-pretty text-kumo-subtle">{why}</span>}
     </span>
   );
 }
@@ -169,146 +174,43 @@ function ResolverCell({ reporter }: { readonly reporter: TrafficReporter }): Rea
   );
 }
 
-/**
- * Approving a resolver hands every client's DNS to it, so it asks first and says what changes; so
- * does taking it back.
- */
-function ResolverDialog({
-  reporter,
-  open,
-  onOpenChange,
-}: {
-  readonly reporter: TrafficReporter;
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-}): ReactElement {
-  const approval = useResolverApprovalMutation();
-  const name = trafficNodeName(reporter);
-  const approve = reporter.resolverApprovedAt === undefined;
-
-  return (
-    <ConfirmDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      destructive={!approve}
-      title={approve ? `Use ${name}'s resolver for DNS?` : `Stop using ${name}'s resolver?`}
-      description={
-        approve
-          ? "While DNS logging is on and the gateway keeps reporting, each machine that accepts the tailnet's DNS is given one approved gateway resolver next to the global nameservers, in place of its local DNS. Every lookup then goes through a gateway, so the DNS page shows it."
-          : "The machines using it move to another approved gateway's resolver, or back to the global nameservers alone, with their next update."
-      }
-      confirmLabel={approve ? "Approve resolver" : "Stop using it"}
-      loading={approval.isPending}
-      error={approval.isError ? errorMessage(approval.error) : undefined}
-      onConfirm={() => {
-        approval.mutate(
-          { params: { path: { nodeId: reporter.nodeId } }, body: { resolver: approve } },
-          {
-            onSuccess: () => {
-              onOpenChange(false);
-            },
-          },
-        );
-      }}
-    />
-  );
-}
-
-function GatewayMenu({
-  reporter,
-  writable,
-  canApprove,
-}: {
-  readonly reporter: TrafficReporter;
-  readonly writable: boolean;
-  /** Approving a resolver moves the clients' DNS, so it takes the DNS scope as well. */
-  readonly canApprove: boolean;
-}): ReactElement {
-  const [forgetting, setForgetting] = useState(false);
-  const [approving, setApproving] = useState(false);
-  const forget = useForgetGatewayMutation();
-  const name = trafficNodeName(reporter);
-
-  return (
-    <>
-      <RowMenu label={`Actions for gateway ${name}`}>
-        <DropdownMenu.Item
-          render={
-            <Link
-              to="/traffic/overview"
-              search={{ range: defaultTrafficRange, from: "", to: "", gateway: reporter.nodeId }}
-            >
-              <ChartLineIcon className="mr-2 size-4" />
-              Traffic through it
-            </Link>
-          }
-        />
-        <DropdownMenu.Item
-          render={
-            <Link to="/machines/$nodeId" params={{ nodeId: reporter.nodeId }}>
-              <ArrowSquareOutIcon className="mr-2 size-4" />
-              Machine
-            </Link>
-          }
-        />
-        <DropdownMenu.Separator />
-        <DisabledReason
-          reason={
-            canApprove ? undefined : "Approving a resolver takes the traffic and DNS permissions"
-          }
-        >
-          <DropdownMenu.Item
-            icon={reporter.resolverApprovedAt === undefined ? CheckCircleIcon : XCircleIcon}
-            disabled={!canApprove}
-            onClick={() => {
-              setApproving(true);
-            }}
-          >
-            {reporter.resolverApprovedAt === undefined
-              ? "Use its resolver for DNS…"
-              : "Stop using its resolver…"}
-          </DropdownMenu.Item>
-        </DisabledReason>
-        <DisabledReason reason={writable ? undefined : "Your credentials may not forget gateways"}>
-          <DropdownMenu.Item
-            icon={TrashIcon}
-            variant="danger"
-            disabled={!writable}
-            onClick={() => {
-              setForgetting(true);
-            }}
-          >
-            Forget…
-          </DropdownMenu.Item>
-        </DisabledReason>
-      </RowMenu>
-      <ResolverDialog reporter={reporter} open={approving} onOpenChange={setApproving} />
-      <ConfirmDialog
-        open={forgetting}
-        onOpenChange={setForgetting}
-        title={`Forget ${name}?`}
-        description="The gateway leaves this list and its resolver leaves the machines' DNS. What it reported stays until the retention removes it. An agent that is still running comes back with its next report, so stop it on the machine first."
-        confirmLabel="Forget gateway"
-        loading={forget.isPending}
-        error={forget.isError ? errorMessage(forget.error) : undefined}
-        onConfirm={() => {
-          forget.mutate(
-            { params: { path: { nodeId: reporter.nodeId } } },
-            {
-              onSuccess: () => {
-                setForgetting(false);
-              },
-            },
-          );
-        }}
-      />
-    </>
-  );
-}
-
 const helper = createAppColumnHelper<TrafficReporter>();
 
-function columns(writable: boolean, canApprove: boolean): ReturnType<typeof helper.columns> {
+function columns(
+  writable: boolean,
+  canApprove: boolean,
+  widths: Widths,
+): ReturnType<typeof helper.columns> {
+  const lastReport = helper.accessor((reporter) => reporter.lastReportAt, {
+    id: "lastReport",
+    header: "Last report",
+    enableSorting: true,
+    sortDescFirst: true,
+    cell: ({ row }) => (
+      <span className="whitespace-nowrap text-kumo-subtle">
+        <RelativeTime value={row.original.lastReportAt} />
+      </span>
+    ),
+  });
+  const collectors = helper.display({
+    id: "collectors",
+    header: "Collectors",
+    cell: ({ row }) => <Collectors reporter={row.original} />,
+  });
+  const resolver = helper.display({
+    id: "resolver",
+    header: "Resolver",
+    cell: ({ row }) => <ResolverCell reporter={row.original} />,
+  });
+  const dropped = helper.accessor((reporter) => reporter.dropped, {
+    id: "dropped",
+    header: "Dropped",
+    enableSorting: true,
+    sortDescFirst: true,
+    cell: ({ row }) => <DroppedCell reporter={row.original} />,
+    meta: { numeric: true },
+  });
+
   return helper.columns([
     helper.accessor((reporter) => trafficNodeName(reporter), {
       id: "gateway",
@@ -338,38 +240,10 @@ function columns(writable: boolean, canApprove: boolean): ReturnType<typeof help
       enableSorting: true,
       cell: ({ row }) => <StateCell reporter={row.original} />,
     }),
-    helper.accessor((reporter) => reporter.lastReportAt, {
-      id: "lastReport",
-      header: "Last report",
-      enableSorting: true,
-      sortDescFirst: true,
-      cell: ({ row }) => (
-        <span className="whitespace-nowrap text-kumo-subtle">
-          <RelativeTime value={row.original.lastReportAt} />
-        </span>
-      ),
-      meta: { className: "hidden md:table-cell" },
-    }),
-    helper.display({
-      id: "collectors",
-      header: "Collectors",
-      cell: ({ row }) => <Collectors reporter={row.original} />,
-      meta: { className: "hidden lg:table-cell" },
-    }),
-    helper.display({
-      id: "resolver",
-      header: "Resolver",
-      cell: ({ row }) => <ResolverCell reporter={row.original} />,
-      meta: { className: "hidden md:table-cell" },
-    }),
-    helper.accessor((reporter) => reporter.dropped + reporter.unattributed, {
-      id: "lost",
-      header: "Dropped",
-      enableSorting: true,
-      sortDescFirst: true,
-      cell: ({ row }) => <LostCell reporter={row.original} />,
-      meta: { numeric: true, className: "hidden xl:table-cell" },
-    }),
+    ...(widths.md ? [lastReport] : []),
+    ...(widths.lg ? [collectors] : []),
+    ...(widths.md ? [resolver] : []),
+    ...(widths.xl ? [dropped] : []),
     helper.display({
       id: "actions",
       header: "",
@@ -382,23 +256,30 @@ function columns(writable: boolean, canApprove: boolean): ReturnType<typeof help
 }
 
 /**
- * What a gateway could not account for: rows its spool dropped while the server was out of reach,
- * and traffic from addresses that are no machine of the tailnet.
+ * The rows the agent's spool dropped while the server was out of reach. Traffic from addresses that
+ * are no machine of the tailnet is not lost the same way, so it stays in the popover.
  */
-function LostCell({ reporter }: { readonly reporter: TrafficReporter }): ReactElement {
+function DroppedCell({ reporter }: { readonly reporter: TrafficReporter }): ReactElement {
   if (reporter.dropped === 0 && reporter.unattributed === 0) {
     return <span className="text-kumo-subtle">0</span>;
   }
 
+  const dropped =
+    reporter.dropped === 0
+      ? "Nothing dropped by the agent."
+      : `${formatCount(reporter.dropped)} dropped by the agent while it could not reach the server.`;
+
   return (
     <StatusDetail
       tone={reporter.dropped > 0 ? "warning" : "neutral"}
-      label={formatCount(reporter.dropped + reporter.unattributed)}
+      label={formatCount(reporter.dropped)}
       title="Rows the server could not keep"
       detail={
         <span className="flex flex-col gap-1">
-          <span>{`${formatCount(reporter.dropped)} dropped by the agent while it could not reach the server.`}</span>
-          <span>{`${formatCount(reporter.unattributed)} from addresses that are no machine of the tailnet.`}</span>
+          <span>{dropped}</span>
+          {reporter.unattributed === 0 ? null : (
+            <span>{`${formatCount(reporter.unattributed)} flows and lookups from addresses no machine holds, which are not stored.`}</span>
+          )}
         </span>
       }
     />
@@ -415,9 +296,10 @@ export function GatewaysTable({
   readonly writable: boolean;
   readonly canApprove: boolean;
 }): ReactElement {
+  const widths = useWidths();
   const table = useAppTable({
     data: reporters,
-    columns: columns(writable, canApprove),
+    columns: columns(writable, canApprove, widths),
     getRowId: (reporter) => reporter.nodeId,
     initialState: { sorting: [{ id: "gateway", desc: false }] },
   });

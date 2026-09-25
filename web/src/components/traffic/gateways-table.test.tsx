@@ -44,7 +44,7 @@ const branch: TrafficReporter = {
   nodeName: "branch-gateway",
   dnsListen: [],
   collectors: { ...office.collectors, dns: { enabled: false, error: "" } },
-  refused: "the device is not tagged; only tagged gateways may report traffic",
+  refused: "the machine is not tagged; only tagged gateways may report traffic",
 };
 
 /** The gateway cells link into the app and the menu mutates, so both a router and a query client. */
@@ -72,11 +72,37 @@ describe(GatewaysTable, () => {
     await expect.element(screen.getByText("Refused")).toBeVisible();
     await expect
       .element(
-        screen.getByText("The device is not tagged; only tagged gateways may report traffic."),
+        screen.getByText("The machine is not tagged; only tagged gateways may report traffic."),
       )
       .toBeVisible();
     await expect.element(screen.getByText("Not approved")).toBeVisible();
     expect(gatewayState(branch)).toBe("refused");
+  });
+
+  it("reads a reporting gateway with a failing collector as degraded, and names the collector", async () => {
+    const failing: TrafficReporter = {
+      ...office,
+      collectors: { ...office.collectors, sni: { enabled: true, error: "no BPF support" } },
+    };
+    const screen = await render(app(<GatewaysTable reporters={[failing]} writable canApprove />));
+
+    expect(gatewayState(failing)).toBe("degraded");
+    await expect.element(screen.getByText("Degraded")).toBeVisible();
+    await expect.element(screen.getByText("Handshakes failing")).toBeVisible();
+  });
+
+  it("holds a resolver approval back while the gateway runs no resolver", async () => {
+    const quiet = {
+      ...office,
+      collectors: { ...office.collectors, dns: { enabled: false, error: "" } },
+    };
+    const screen = await render(app(<GatewaysTable reporters={[quiet]} writable canApprove />));
+
+    await screen.getByRole("button", { name: "Actions for gateway office-gateway" }).click();
+
+    await expect
+      .element(screen.getByRole("menuitem", { name: "Use its resolver for DNS…" }))
+      .toHaveAttribute("aria-disabled", "true");
   });
 
   it("shows an approved resolver in use with when it was approved", async () => {
@@ -126,7 +152,7 @@ describe(ResolverNotices, () => {
     );
 
     await expect
-      .element(screen.getByText("DNS logging points no machine at a gateway resolver"))
+      .element(screen.getByText("DNS logging is on, but no machine uses a gateway resolver"))
       .toBeVisible();
     await expect.element(screen.getByText(/tls:\/\/dns\.example, 100\.64\.0\.53/u)).toBeVisible();
   });
