@@ -370,6 +370,7 @@ IDX CREATE INDEX idx_ssh_recordings_started ON public.ssh_recordings USING btree
 IDX CREATE INDEX idx_tka_aums_prev_hash ON public.tka_aums USING btree (prev_hash)
 IDX CREATE INDEX idx_traffic_destinations_node ON public.traffic_destinations USING btree (node_id, resolution, bucket)
 IDX CREATE INDEX idx_traffic_destinations_reporter ON public.traffic_destinations USING btree (reporter_id)
+IDX CREATE INDEX idx_traffic_destinations_unnamed ON public.traffic_destinations USING btree (dst) WHERE ((asn = 0) AND (private = 0))
 IDX CREATE INDEX idx_traffic_dns_node ON public.traffic_dns USING btree (node_id, resolution, bucket)
 IDX CREATE INDEX idx_traffic_dns_reporter ON public.traffic_dns USING btree (reporter_id)
 IDX CREATE INDEX idx_traffic_totals_node ON public.traffic_totals USING btree (node_id, resolution, bucket)

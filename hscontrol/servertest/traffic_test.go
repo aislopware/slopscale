@@ -1307,3 +1307,111 @@ func mustID(t *testing.T, node *servertest.TestClient) uint64 {
 
 	return id
 }
+
+// TestTrafficNamesNetworksReportedBeforeTheTable proves the first reports
+// of a fresh server get their networks: they arrive before the ASN table
+// is in use, are stored without one, and the table the first report sets
+// off names them once it is in use. A destination the table does not
+// know stays unnamed.
+func TestTrafficNamesNetworksReportedBeforeTheTable(t *testing.T) {
+	t.Parallel()
+
+	var asnDown atomic.Bool
+
+	srv := servertest.NewServer(t,
+		servertest.WithRealListener(),
+		servertest.WithTraffic(types.TrafficConfig{
+			ASNDatabaseURL: asnTableServer(t, &asnDown),
+			ASNCachePath:   t.TempDir() + "/ip2asn.tsv.gz",
+		}),
+	)
+	client := srv.HTTPClient(t)
+	v1 := srv.URL + "/api/v1"
+
+	owner := srv.CreateUser(t, "backfill-owner")
+	ownerKey := srv.CreateAPIKey(t, owner)
+
+	setStatePolicy(t, srv, `{
+		"tagOwners": {"tag:gateway": ["backfill-owner@"]},
+		"grants": [{"src": ["backfill-owner@"], "dst": ["autogroup:internet"], "ip": ["*"]}]
+	}`)
+
+	exit := servertest.NewClient(t, srv, "exit-b", servertest.WithUser(owner), servertest.WithTags("tag:gateway"))
+	laptop := servertest.NewClient(t, srv, "laptop-b", servertest.WithUser(owner))
+
+	exit.Direct().SetHostinfo(&tailcfg.Hostinfo{
+		BackendLogID: "servertest-exit-b",
+		Hostname:     "exit-b",
+		RoutableIPs:  tsaddr.ExitRoutes(),
+	})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	_ = exit.Direct().SendUpdate(ctx)
+
+	cancel()
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		status, body := apiCall(t, client, ownerKey, http.MethodPost,
+			v1+"/node/"+exit.NodeIDString()+"/approve_routes",
+			map[string]any{"routes": []string{"0.0.0.0/0", "::/0"}})
+		assert.Equal(c, http.StatusOK, status, body)
+		assert.Len(c, field(t, body, "node", "approvedRoutes"), 2)
+	}, trafficWait, 100*time.Millisecond)
+
+	laptop.WaitForCondition(t, "the exit node as a peer", trafficWait, func(_ *netmap.NetworkMap) bool {
+		_, ok := laptop.PeerByName("exit-b")
+
+		return ok
+	})
+
+	require.Zero(t, srv.State().ASNRanges(), "no table before the first report")
+
+	minute := minuteBucket(time.Now()) - 60
+	laptopIP := nodeIP4(t, laptop)
+
+	sendReport(t, client, srv.URL, idToken(t, srv, exit, traffic.Audience), traffic.Report{
+		Version:  "0.1.0",
+		Instance: "first",
+		Seq:      1,
+		SentAt:   time.Now(),
+		Status:   traffic.Status{Conntrack: traffic.Collector{Enabled: true}},
+		Flows: []traffic.Flow{
+			{Bucket: minute, Src: laptopIP, Dst: netip.MustParseAddr("140.82.112.3"), Proto: 6, Port: 443, TxBytes: 10},
+			{Bucket: minute, Src: laptopIP, Dst: netip.MustParseAddr("8.8.8.8"), Proto: 17, Port: 53, TxBytes: 20},
+			{Bucket: minute, Src: laptopIP, Dst: netip.MustParseAddr("203.0.113.7"), Proto: 6, Port: 22, TxBytes: 30},
+		},
+	})
+
+	asns := func() map[string]any {
+		status, body := apiCall(t, client, ownerKey, http.MethodGet, v1+"/traffic/destinations", nil)
+		require.Equal(t, http.StatusOK, status, body)
+
+		out := map[string]any{}
+
+		rows, ok := body["destinations"].([]any)
+		require.True(t, ok)
+
+		for _, r := range rows {
+			row, ok := r.(map[string]any)
+			require.True(t, ok)
+
+			dst, ok := row["dst"].(string)
+			require.True(t, ok)
+
+			out[dst] = row["asn"]
+		}
+
+		return out
+	}
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.Equal(c, map[string]any{
+			"140.82.112.3": float64(36459),
+			"8.8.8.8":      float64(15169),
+			"203.0.113.7":  float64(0),
+		}, asns())
+	}, trafficWait, 100*time.Millisecond, "the table the first report set off names what it stored")
+
+	assert.Positive(t, srv.State().ASNRanges())
+	require.NoError(t, srv.State().BackfillTrafficASN(t.Context()), "a second walk with the same table is a no-op")
+}

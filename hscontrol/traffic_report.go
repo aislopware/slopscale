@@ -297,8 +297,8 @@ const asnRetryInterval = 15 * time.Minute
 
 // refreshASNIfDue puts the ASN table in use once a gateway has reported,
 // from the cache when there is one, and downloads it again when the
-// cached copy is a day old. It runs off the scheduler goroutine, one at
-// a time.
+// cached copy is a day old; a table newly in use then names what was
+// stored without one. It runs off the scheduler goroutine, one at a time.
 func (h *Slopscale) refreshASNIfDue(ctx context.Context) {
 	if h.cfg.Traffic.ASNDatabaseURL == "" || !h.state.TrafficInUse() {
 		return
@@ -308,6 +308,7 @@ func (h *Slopscale) refreshASNIfDue(ctx context.Context) {
 		return
 	}
 	defer h.asnRefreshing.Store(false)
+	defer h.backfillTrafficASN(ctx)
 
 	last := h.state.EnsureASN()
 	if p := h.asnRefreshedAt.Load(); p != nil && p.After(last) {
@@ -332,6 +333,15 @@ func (h *Slopscale) refreshASNIfDue(ctx context.Context) {
 
 	now := time.Now()
 	h.asnRefreshedAt.Store(&now)
+}
+
+// backfillTrafficASN names the destinations stored before the table in
+// use was; a failure is retried with the next refresh.
+func (h *Slopscale) backfillTrafficASN(ctx context.Context) {
+	err := h.state.BackfillTrafficASN(ctx)
+	if err != nil {
+		log.Warn().Err(err).Msg("naming the networks of traffic stored without one")
+	}
 }
 
 // trafficTick takes the resolvers of gateways that stopped reporting or

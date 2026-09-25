@@ -187,6 +187,9 @@ type State struct {
 	trafficDirty     [2]atomic.Int64
 	// asnTable names destinations' networks; nil until one is loaded.
 	asnTable atomic.Pointer[asn.Table]
+	// asnBackfilled is the table the stored destinations were last named
+	// with; see BackfillTrafficASN.
+	asnBackfilled atomic.Pointer[asn.Table]
 
 	// access holds the groups and access rules; see [State.AccessModel].
 	access atomic.Pointer[types.AccessModel]

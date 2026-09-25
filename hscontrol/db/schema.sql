@@ -750,6 +750,7 @@ CREATE TABLE traffic_destinations(
 );
 CREATE INDEX idx_traffic_destinations_node ON traffic_destinations(node_id, resolution, bucket);
 CREATE INDEX idx_traffic_destinations_reporter ON traffic_destinations(reporter_id);
+CREATE INDEX idx_traffic_destinations_unnamed ON traffic_destinations(dst) WHERE asn = 0 AND private = 0;
 
 CREATE TABLE traffic_dns(
   resolution integer NOT NULL,

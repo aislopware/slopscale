@@ -498,6 +498,72 @@ func TestTrafficPrivateGroups(t *testing.T) {
 	})
 }
 
+func TestTrafficNameUnnamedDestinations(t *testing.T) {
+	t.Parallel()
+
+	forEachDialect(t, func(t *testing.T, db *HSDatabase) {
+		f := newTrafficFixture(t, db)
+		dest := func(node types.NodeID, dst string, asn uint32, private bool) types.TrafficDestination {
+			return types.TrafficDestination{
+				TrafficKey: f.key(types.TrafficHour, f.hour, node), Dst: dst, Port: 443, Proto: 6,
+				ASN: asn, Private: private, TxBytes: 1,
+			}
+		}
+
+		_, err := db.ApplyTrafficBatch(types.TrafficBatch{
+			Reporter: f.reporter("a", 1),
+			Destinations: []types.TrafficDestination{
+				dest(f.laptop, "142.250.1.1", 0, false),
+				dest(f.phone, "142.250.1.1", 0, false),
+				dest(f.laptop, "140.82.112.3", 0, false),
+				dest(f.laptop, "203.0.113.7", 0, false),
+				dest(f.laptop, "192.168.1.5", 0, true),
+				dest(f.laptop, "1.1.1.1", 13335, false),
+				dest(f.laptop, "", 0, false),
+			},
+		})
+		require.NoError(t, err)
+
+		first, err := db.TrafficUnnamedDestinations("", 2)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"140.82.112.3", "142.250.1.1"}, first,
+			"distinct, in address order, without the named, private or folded rows")
+
+		rest, err := db.TrafficUnnamedDestinations(first[len(first)-1], 2)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"203.0.113.7"}, rest)
+
+		done, err := db.TrafficUnnamedDestinations(rest[0], 2)
+		require.NoError(t, err)
+		assert.Empty(t, done)
+
+		named, err := db.NameTrafficDestinations([]TrafficDestinationNetwork{
+			{Dst: "142.250.1.1", ASN: 15169, Country: "US"},
+			{Dst: "140.82.112.3", ASN: 36459, Country: "US"},
+			{Dst: "1.1.1.1", ASN: 1, Country: "XX"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, int64(3), named, "both rows of the shared address, none of the already named one")
+
+		rows, err := db.TrafficDestinationRows(f.filter(types.TrafficHour))
+		require.NoError(t, err)
+
+		got := map[string]uint32{}
+		for _, r := range rows {
+			got[r.Dst] = r.ASN
+		}
+
+		assert.Equal(t, map[string]uint32{
+			"142.250.1.1": 15169, "140.82.112.3": 36459, "203.0.113.7": 0,
+			"192.168.1.5": 0, "1.1.1.1": 13335, "": 0,
+		}, got)
+
+		left, err := db.TrafficUnnamedDestinations("", 10)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"203.0.113.7"}, left)
+	})
+}
+
 func TestTrafficDestinationUpsertKeepsWhatItKnows(t *testing.T) {
 	t.Parallel()
 

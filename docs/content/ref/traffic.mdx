@@ -310,7 +310,10 @@ It loads the table only once a gateway has reported, since it holds about
 when the cached copy is a day old, asking only for a newer one. It keeps
 the last good copy so a restart has names before the next download, and
 keeps the table in use when a download fails, trying again 15 minutes
-later. The configuration file
+later. Destinations stored while no table was in use, such as the first
+reports of a new server, are named once a table is: the server walks them
+in batches of 500 each time a table goes into use, and a destination the
+table does not know stays unnamed. The configuration file
 holds the two keys:
 
 ```yaml

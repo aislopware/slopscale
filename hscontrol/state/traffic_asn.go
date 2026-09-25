@@ -7,6 +7,7 @@ import (
 	"net/netip"
 	"time"
 
+	hsdb "github.com/aislopware/slopscale/hscontrol/db"
 	"github.com/aislopware/slopscale/hscontrol/egress"
 	"github.com/aislopware/slopscale/hscontrol/traffic/asn"
 	"github.com/rs/zerolog/log"
@@ -14,6 +15,10 @@ import (
 
 // asnDownloadTimeout bounds one download of the ASN table.
 const asnDownloadTimeout = 5 * time.Minute
+
+// asnBackfillRows is how many destinations one backfill transaction names,
+// so naming a large history never holds the database long.
+const asnBackfillRows = 500
 
 // ErrASNDisabled is returned by [State.RefreshASN] when no table URL is
 // configured.
@@ -100,4 +105,61 @@ func (s *State) EnsureASN() time.Time {
 	}
 
 	return s.asnSource().CachedAt()
+}
+
+// BackfillTrafficASN names the destinations stored without a network
+// because no ASN table was in use when they were reported, like the first
+// reports of a fresh server, which arrive before the table is downloaded.
+// It walks them once per table put in use, in address order, so a
+// destination no table knows is looked at once, not in a loop.
+func (s *State) BackfillTrafficASN(ctx context.Context) error {
+	table := s.asnTable.Load()
+	if table == nil || s.asnBackfilled.Load() == table {
+		return nil
+	}
+
+	var cursor string
+
+	for {
+		err := ctx.Err()
+		if err != nil {
+			return err
+		}
+
+		dsts, err := s.db.TrafficUnnamedDestinations(cursor, asnBackfillRows)
+		if err != nil {
+			return err
+		}
+
+		if len(dsts) == 0 {
+			break
+		}
+
+		cursor = dsts[len(dsts)-1]
+
+		networks := make([]hsdb.TrafficDestinationNetwork, 0, len(dsts))
+
+		for _, dst := range dsts {
+			addr, parseErr := netip.ParseAddr(dst)
+			if parseErr != nil {
+				continue
+			}
+
+			info, ok := table.Lookup(addr)
+			if !ok || info.ASN == 0 {
+				continue
+			}
+
+			networks = append(networks, hsdb.TrafficDestinationNetwork{Dst: dst, ASN: info.ASN, Country: info.Country})
+		}
+
+		_, err = s.db.NameTrafficDestinations(networks)
+		if err != nil {
+			return err
+		}
+	}
+
+	s.asnBackfilled.Store(table)
+
+	return nil
 }
