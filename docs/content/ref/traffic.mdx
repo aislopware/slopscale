@@ -1,0 +1,359 @@
+---
+title: "Traffic monitor"
+---
+
+The traffic monitor answers two questions: which machine sends and receives
+the most through your gateways, and where each machine goes. A small agent,
+`slopscale-flowd`, runs next to `tailscaled` on each exit node, subnet
+router or app connector. It reports per-minute totals to the server, which
+attributes them to machines, names the destinations and keeps them for the
+[API](#reading-the-data) and the CLI.
+
+:::note[What the monitor cannot see]
+It only sees traffic that crosses a gateway running the agent. A laptop that
+reaches the internet directly, without an exit node, sends nothing the
+agent can count, and traffic between two machines on the tailnet never
+reaches a gateway. With [DNS logging](#dns-logging) on, the monitor still
+records the names such a machine looks up, as long as the machine uses the
+tailnet's DNS.
+:::
+
+## How it works
+
+### Counting
+
+A gateway forwards a machine's packets and masquerades them behind its own
+address. The kernel's connection tracking table records each connection
+under its original addresses, before the masquerade, so the agent reads the
+machine's tailnet address and the real destination from it. It turns on
+`net.netfilter.nf_conntrack_acct` so every connection carries byte and
+packet counters, follows the table's events, and reads the whole table
+every 30 seconds so a connection that stays open for days is counted as it
+goes, not when it closes.
+
+The agent keeps connections whose source is a tailnet address, in
+`100.64.0.0/10` or `fd7a:115c:a1e0::/48`, and whose destination is outside
+the tailnet and not the gateway itself. It adds each connection's growth
+since the last reading to the current minute, per machine, destination
+address, protocol and destination port. Upload is what the machine sent,
+download what it received.
+
+### Naming destinations
+
+An address alone says little, so the agent names each connection from what
+it saw, preferring the most specific source:
+
+1. **The handshake.** The agent reads the server name from the TLS
+   ClientHello over TCP, on any port, and from the QUIC Initial over UDP
+   that the machine sends through the gateway. A filter in the kernel hands
+   it those packets and nothing else from the tailnet interface.
+2. **The same machine's DNS answer.** With [DNS logging](#dns-logging) on,
+   a name the machine resolved to the destination in the last few minutes.
+   The name is the one the machine asked for, not the end of a CNAME chain.
+3. **The app connector.** On an [app connector](/ref/apps), the connector
+   domain that resolved to the destination.
+4. **The outer name of an encrypted handshake.** A ClientHello that uses
+   Encrypted Client Hello hides the real name behind a public one such as
+   `cloudflare-ech.com`; the agent records that only when nothing better is
+   known.
+5. **Another machine's DNS answer.** A name some other machine resolved to
+   the same address. It is usually right for an address that serves one
+   site, and a guess for a CDN.
+
+The server also looks up each destination's network, its AS number and
+name, and its country. See [network names](#network-names).
+
+### Why not Tailscale's network flow logs
+
+Tailscale clients can log flows themselves, but they upload them to
+`log.tailscale.com`, a host fixed in the client that a control server cannot
+change. Slopscale does not switch those logs on, and the agent does not
+depend on anything inside `tailscaled`, so a client update cannot break
+it.
+
+## Installing the agent
+
+The agent runs on Linux gateways only, as a static binary with no
+dependencies. The gateway must:
+
+- run `tailscaled` in its default kernel networking mode. With
+  `--tun=userspace-networking` the gateway proxies connections from its own
+  sockets, so the connection table never shows the machines' addresses.
+- be an exit node or subnet router with approved routes, or an app
+  connector. Any other node is refused, since no other node sees another
+  machine's traffic.
+- be approved, not suspended and not expired.
+
+Install the Debian package from the [release](https://github.com/aislopware/slopscale/releases) that matches your
+server:
+
+```shell
+export SLOPSCALE_VERSION="X.Y.Z" # See the releases page
+export SLOPSCALE_ARCH="amd64"    # or arm64
+wget --output-document=slopscale-flowd.deb \
+  "https://github.com/aislopware/slopscale/releases/download/v${SLOPSCALE_VERSION}/slopscale-flowd_${SLOPSCALE_VERSION}_linux_${SLOPSCALE_ARCH}.deb"
+sudo apt install ./slopscale-flowd.deb
+```
+
+The package enables and starts `slopscale-flowd.service`. The agent needs
+no configuration:
+
+- **Server.** It reads the control URL from the local `tailscaled`, so it
+  reports to the server the gateway is registered with. A node registered
+  with Tailscale's own control plane is refused; pass `--server` in that
+  case.
+- **Credential.** It asks the local `tailscaled` for the gateway's
+  [identity token](/ref/identity-tokens) with the audience
+  `slopscale-flowd`, the way `tailscale id-token` does. The
+  server checks the token against its own signing key and the node's
+  current key, so there is no secret to install or rotate, and a gateway
+  that is removed, suspended or rekeyed stops being accepted at once.
+- **Settings.** Whether to read handshakes and whether to run the resolver
+  come from the server with every answer, so they are changed in one place
+  with `slopscale traffic settings set` or the
+  [API](#reading-the-data).
+
+On start the agent writes `1` to `/proc/sys/net/netfilter/nf_conntrack_acct`
+and `nf_conntrack_timestamp`. Only connections opened after that carry
+counters, so connections already open when the agent first starts are not
+counted. The settings stay on after the package is removed.
+
+The unit runs as root but keeps three capabilities: `CAP_NET_ADMIN` for
+connection tracking, `CAP_NET_RAW` for the handshake capture and
+`CAP_NET_BIND_SERVICE` for the resolver on port 53. It sees the system
+read-only, apart from its state directory `/var/lib/slopscale-flowd`. When
+the defaults do not fit, set flags in a drop-in with
+`systemctl edit slopscale-flowd`:
+
+| Flag           | Default                     | Meaning                                                    |
+| -------------- | --------------------------- | ---------------------------------------------------------- |
+| `--server`     | the node's control URL      | Where to report.                                           |
+| `--socket`     | the platform's default      | The `tailscaled` socket.                                   |
+| `--interface`  | `tailscale0`                | The tailnet interface, for a `tailscaled` started with `--tun`. |
+| `--state-dir`  | `/var/lib/slopscale-flowd`  | Spool and state.                                           |
+| `--spool-size` | `67108864`, 64 MiB          | Bytes of undelivered reports to keep.                      |
+| `--verbose`    | off                         | Debug logging.                                             |
+
+The agent reports every minute. A report it cannot deliver waits in the
+spool, compressed, and is sent again oldest first, backing off up to five
+minutes while the server is unreachable. When the spool is full, the agent
+drops the oldest reports and tells the server how many entries it lost,
+which shows up on the gateway as dropped. A resent report is never counted
+twice. Each carries the agent's instance and a sequence number, and the
+server applies each sequence once. When the service stops, the agent reads
+the table one last time and spools what it holds.
+
+Check that the gateway reports:
+
+```console
+$ slopscale traffic reporters list
+```
+
+Upgrading the package restarts the agent. `apt remove slopscale-flowd`
+stops it; `apt purge` also deletes the spool.
+
+## Which gateways may report
+
+The report endpoint, `POST /traffic/v1/report`, takes the identity token as
+a bearer credential. The server answers:
+
+- `401` when the token is missing, forged, expired, meant for another
+  audience or issued to a node key the node no longer has. The agent
+  fetches a new token and tries once more, then waits five minutes.
+- `403` when the node may not report: it waits for approval, is suspended,
+  has expired, or is no exit node, subnet router or app connector. The
+  agent keeps spooling and tries again every five minutes.
+- `400` for a report that breaks the format, for instance a minute in the
+  future because the gateway's clock runs more than five minutes ahead;
+  the agent drops that report. `413` for more than 50,000 flows or
+  questions, or more than 16 MiB decoded.
+
+The server does not store a flow from an address no machine holds any
+more, for instance a machine removed since. It counts it as unattributed on
+the gateway instead.
+
+## DNS logging
+
+DNS logging is off by default, because it changes every client's DNS. When
+it is on, the agent on each gateway runs a resolver on the gateway's
+tailnet addresses, port 53 over UDP and TCP, and the server points the
+clients at the ones that answer:
+
+- The gateways' resolvers are put first among the global nameservers,
+  ahead of the ones you configured on the [DNS page](/ref/dns).
+- **Override local DNS** is turned on, since without it a client asks the
+  global nameservers only when its own resolver fails.
+- The resolvers are marked **use with exit node**, so a client that uses an
+  exit node keeps asking them rather than the exit node. Older clients that
+  ignore the mark send their DNS to the exit node, and those names are not
+  logged.
+- A grant opens UDP and TCP port 53 on those gateways to every machine, so
+  the policy cannot leave the clients without DNS.
+- A gateway that runs a resolver gets the tailnet DNS without its own
+  resolver, so it cannot ask itself.
+
+None of this is stored in the DNS settings. Saving the DNS page never
+writes the gateways' resolvers, and turning DNS logging off gives the
+clients the configured DNS back.
+
+The resolver forwards every question unchanged to the tailnet's global
+nameservers that are plain addresses or DNS-over-HTTPS URLs, skipping
+tailnet addresses and `tls://` ones. With none left, it forwards to the
+gateway's own upstream resolvers, read from
+`/run/systemd/resolve/resolv.conf` or else `/etc/resolv.conf`, skipping the
+systemd stub `127.0.0.53`. It answers only tailnet addresses, refuses
+everyone else, and limits each machine to 100 questions a second.
+
+A gateway's resolver leaves the clients' DNS when the agent reports an
+error in it, when the gateway has not reported for three minutes, checked
+every minute, when you remove the gateway with
+`slopscale traffic reporters delete`, or when DNS logging is turned off. A
+client lists every fresh gateway, so one gateway going down leaves the
+others answering.
+
+The server keeps the names each machine asks for per hour and per day,
+with the number of questions and how many got NXDOMAIN, SERVFAIL, REFUSED
+or no answer at all. The answers also [name destinations](#naming-destinations),
+and the monitor sees the names a machine looks up even when its traffic
+does not cross a gateway.
+
+```console
+$ slopscale traffic settings set --dns-logging
+$ slopscale traffic settings set --dns-logging=false
+```
+
+## Retention
+
+The server keeps totals per minute, per hour and per day, and destinations
+and DNS names per hour and per day. How long each is kept is a setting:
+
+| Resolution | Default   | Range          | Kept                                  |
+| ---------- | --------- | -------------- | ------------------------------------- |
+| Minute     | 48 hours  | 1 hour to 7 days | Totals per machine and gateway        |
+| Hour       | 14 days   | 1 to 90 days   | Totals, destinations and DNS names    |
+| Day        | 180 days  | 1 day to 10 years | Totals, destinations and DNS names    |
+
+A finer resolution cannot be kept longer than a coarser one. An hourly job
+deletes what the retention no longer keeps, and folds each machine's
+destinations and names beyond the largest 500 per hour and 1,000 per day,
+per gateway, into one remainder row, so a machine that talks to thousands
+of addresses cannot fill the database. A read picks the finest resolution
+that still covers its range, with at most 1,500 points; destinations and
+names are hourly at the finest.
+
+```console
+$ slopscale traffic settings set --minute-hours 72 --hour-days 30 --day-days 365
+```
+
+## Network names
+
+The server names each destination's network and country from
+[iptoasn.com](https://iptoasn.com)'s table, which is in the public domain.
+It downloads the table daily through the
+[outbound request rules](/ref/configuration#settings-that-live-only-in-the-file),
+keeps the last good copy so a restart has names before the next download,
+and keeps the table in use when a download fails. The configuration file
+holds the two keys:
+
+```yaml
+traffic:
+  # Empty turns the naming off.
+  asn_database_url: "https://iptoasn.com/data/ip2asn-combined.tsv.gz"
+  asn_cache_path: /var/lib/slopscale/ip2asn-combined.tsv.gz
+```
+
+A destination keeps the AS number and country it was stored with; the
+network's name is read from the current table.
+
+## Reading the data
+
+### CLI
+
+```console
+$ slopscale traffic summary --since 7d
+$ slopscale traffic destinations --node 12 --group-by host
+$ slopscale traffic destinations --group-by asn --since 24h
+$ slopscale traffic dns --node 12 --search youtube
+$ slopscale traffic reporters list
+$ slopscale traffic settings get
+```
+
+Every read takes `--since` and `--until`, as RFC 3339 times or durations
+back from now such as `24h` or `7d`, and `--node` and `--reporter`, the
+latter being the gateway's node ID. `destinations` groups by `destination`, `host`, `asn`, `country`,
+`port`, `node` or `reporter`, and filters with `--search`, `--asn`,
+`--country`, `--proto` and `--port`.
+
+### REST API
+
+| Operation                                    | Scope               | Returns                                                                 |
+| -------------------------------------------- | ------------------- | ----------------------------------------------------------------------- |
+| `GET /api/v1/traffic/summary`                | `logs:network:read` | The total, a series with a point per bucket, the top machines, and each gateway's volume |
+| `GET /api/v1/traffic/destinations`           | `logs:network:read` | Destinations grouped by `groupBy`, with host, network, country and whether the address is private |
+| `GET /api/v1/traffic/dns`                    | `logs:network:read` | The names asked, by name or by machine                                  |
+| `GET /api/v1/traffic/reporters`              | `logs:network:read` | Each gateway's agent: version, last report, collectors and their errors, resolver state, unattributed and dropped counts |
+| `DELETE /api/v1/traffic/reporters/{nodeId}`  | `logs:network`      | Forgets a gateway and takes its resolver out of the clients' DNS; what it reported stays |
+| `GET /api/v1/traffic/settings`               | `logs:network:read` | The settings                                                            |
+| `PATCH /api/v1/traffic/settings`             | `logs:network`      | Changes the fields sent                                                 |
+
+Reads take `start` and `end` as RFC 3339 times, the last 24 hours by
+default, and `nodeId` and `reporterId`. They answer with the `resolution` they used and
+the range widened to whole buckets. Byte counts are plain numbers. Changes
+are written to the [audit log](/ref/audit).
+
+The owner and admins hold both scopes, the network admin holds
+`logs:network`, and the IT admin and the auditor hold `logs:network:read`;
+see [user roles](/ref/roles).
+
+### Tailscale-compatible API
+
+`GET /api/v2/tailnet/-/logging/network?start=...&end=...` answers in the
+shape of Tailscale's network flow log, for tools written against it. It
+builds one record per gateway and hour: `nodeId` is the gateway, `src` the
+sending machine's address with port 0, `subnetTraffic` holds private
+destinations and `exitTraffic` the rest. The range covers whole hours and
+at most a week. Remainder rows are left out, and there is nothing between
+two machines. It needs `logs:network:read`. Network flow logs are not
+[streamed](/ref/log-streaming).
+
+## Privacy
+
+The monitor records which machine, and so which person, reached which
+site, when and how much, and with DNS logging on every name they looked up.
+Treat it as the sensitive record it is:
+
+- Tell the people on the tailnet that it runs, and check what your
+  jurisdiction and your agreements require before turning it on.
+- Give `logs:network:read` to the people who need it; the auditor and the
+  IT admin roles hold it by default.
+- Keep the retention as short as your needs allow. A machine's traffic is
+  deleted with the machine.
+- Turn off handshake reading with `slopscale traffic settings set --sni=false`
+  if destination addresses and networks are enough.
+
+## Troubleshooting
+
+`slopscale traffic reporters list` shows each gateway's last report, its
+collectors and the error of any that is not working. The agent logs to the
+journal, `journalctl -u slopscale-flowd`.
+
+- **The gateway is refused with 403.** The node is not an exit node, subnet
+  router or app connector with approved routes, or it waits for approval,
+  is suspended or has expired. The reason is in the agent's log.
+- **Connection tracking fails with a message about `nf_conntrack`.** The
+  kernel module is not loaded, usually because no masquerade rule exists
+  yet. It loads once `tailscaled` sets up an exit node or subnet route.
+- **Nothing is counted.** Check that the gateway does not run
+  `tailscaled --tun=userspace-networking`, see
+  [installing](#installing-the-agent).
+- **A long download is missing right after installing.** It started before
+  the agent turned on accounting. Its next connection is counted.
+- **Names are missing or show `cloudflare-ech.com`.** The site uses
+  Encrypted Client Hello. Turn on [DNS logging](#dns-logging) to name it
+  from the question the machine asked.
+- **Dropped is not zero.** The server was out of reach longer than the
+  spool holds. Raise `--spool-size`.
+- **Unattributed is not zero.** Flows came from addresses no machine holds
+  any more, typically a machine removed while its connections ran.
+- **Reports are dropped with 400 and a clock message.** The gateway's clock
+  runs ahead. Fix its time synchronisation.

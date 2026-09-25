@@ -53,8 +53,8 @@ A sink receives one object per audit event:
 
 `id` is the event's ID in the audit log, so a finding in the SIEM can be
 traced back with `slopscale audit` or the console. `type` is always
-`configuration`: the server has no network flow logs to stream, since it
-never sees the data plane.
+`configuration`: the [traffic monitor](/ref/traffic) is not streamed; read
+it through its API.
 
 ## Destinations
 

@@ -51,6 +51,8 @@ of its own, and what it does not do. Each item links to the page that explains i
 - [x] [Webhooks](/ref/webhooks) in Tailscale's delivery format, and [log streaming](/ref/log-streaming) to Splunk,
       Elastic, Datadog, Axiom, Loki or any HTTP sink
 - [x] [Audit log](/ref/audit)
+- [x] [Traffic monitor](/ref/traffic): what each machine sends through exit nodes, subnet routers and app connectors,
+      where it goes and, with DNS logging, which names it looks up
 - [x] [Device management over the control connection](/ref/device-management): client updates, health, diagnostics
       and managed preferences
 - [x] Client update notices, so an old client shows Tailscale's own update warning
@@ -78,8 +80,9 @@ of its own, and what it does not do. Each item links to the page that explains i
 
 ## Not available
 
-- [ ] [Network flow logs](https://tailscale.com/docs/features/logging/network-flow-logs): the client sends them to a
-      host it does not let a control server change
+- [ ] Tailscale's client-side [network flow logs](https://tailscale.com/docs/features/logging/network-flow-logs): the
+      client sends them to a host it does not let a control server change. The [traffic monitor](/ref/traffic) counts
+      the traffic through your gateways instead, and serves it in the same shape on the v2 API.
 - [ ] Tailscale's hosted Funnel ingress: [Funnel](/ref/funnel) needs an ingress node of your own
 - [ ] [IP sets](https://tailscale.com/docs/features/tailnet-policy-file/ip-sets) in the policy file
 - [ ] Contacts and the AWS external ID of the Tailscale API: the Terraform resources for them are refused with an
