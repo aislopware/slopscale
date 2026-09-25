@@ -170,3 +170,58 @@ func TestDNSReportsANeverAnsweringUpstreamAtOnce(t *testing.T) {
 	st, _ := dnsStatus(a)
 	assert.Contains(t, st.Error, "not answering")
 }
+
+// TestDNSAnswerClearsAFailedProbe: the upstream was not up when the
+// resolver first probed it (the end-to-end test starts them together).
+// The failure used to stay in every report until the next probe, 30 s
+// later, although clients were being answered; an answer to a client now
+// proves the resolver at once.
+func TestDNSAnswerClearsAFailedProbe(t *testing.T) {
+	addr, on := switchableUpstream(t)
+	on.Store(false)
+
+	a, err := newAgent(t.Context(), Options{
+		Local:         &fakeLocal{ips: []netip.Addr{netip.MustParseAddr("127.0.0.1")}},
+		Server:        "http://127.0.0.1:1",
+		StateDir:      t.TempDir(),
+		SpoolBytes:    1 << 20,
+		Logger:        slog.New(slog.DiscardHandler),
+		dnsPort:       freePort(t),
+		allowDNS:      func(netip.Addr) bool { return true },
+		dnsCheckEvery: time.Hour,
+	})
+	require.NoError(t, err)
+
+	a.applyConfig(traffic.Config{DNS: true, Upstreams: []string{addr}})
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+
+	go func() {
+		a.runDNS(ctx)
+		close(done)
+	}()
+
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+
+	var listen []netip.AddrPort
+
+	require.Eventually(t, func() bool {
+		st, l := dnsStatus(a)
+		listen = l
+
+		return st.Error != "" && len(l) == 1
+	}, 10*time.Second, 20*time.Millisecond)
+
+	on.Store(true)
+	ask(t, listen[0], "up.example.")
+
+	require.Eventually(t, func() bool {
+		st, _ := dnsStatus(a)
+
+		return st.Enabled && st.Error == ""
+	}, 2*time.Second, 20*time.Millisecond)
+}

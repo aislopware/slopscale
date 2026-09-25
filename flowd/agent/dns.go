@@ -27,19 +27,33 @@ type dnsRunner struct {
 	server   *dnsproxy.Server
 	running  []string // the plan key the server runs with
 	failures int      // probes failed in a row
-	proven   bool     // a probe has succeeded since the server started
+	proven   bool     // the upstreams have answered since the server started
+	// answered is signalled when an upstream answers a client, which
+	// proves the resolver as well as a probe does.
+	answered chan struct{}
 }
 
 // runDNS runs the logging resolver while the configuration asks for it,
 // on the node's current tailnet addresses.
 func (a *Agent) runDNS(ctx context.Context) {
-	r := &dnsRunner{agent: a}
+	r := &dnsRunner{agent: a, answered: make(chan struct{}, 1)}
 	defer r.stop()
 
 	for ctx.Err() == nil {
 		cfg, changed := a.current()
 		r.round(ctx, cfg)
+		r.wait(ctx, changed)
+	}
+}
 
+// wait returns when the next round is due. Meanwhile an answer to a client
+// clears a failed probe at once, so a resolver whose upstreams came back
+// is not reported broken until the next probe.
+func (r *dnsRunner) wait(ctx context.Context, changed <-chan struct{}) {
+	recheck := time.NewTimer(r.agent.opts.dnsCheckEvery)
+	defer recheck.Stop()
+
+	for {
 		var died <-chan struct{}
 		if r.server != nil {
 			died = r.server.Died()
@@ -47,8 +61,16 @@ func (a *Agent) runDNS(ctx context.Context) {
 
 		select {
 		case <-ctx.Done():
+			return
 		case <-changed:
-		case <-time.After(a.opts.dnsCheckEvery):
+			return
+		case <-recheck.C:
+			return
+		case <-r.answered:
+			if r.server != nil && (r.failures > 0 || !r.proven) {
+				r.failures, r.proven = 0, true
+				r.setStatus(nil)
+			}
 		case <-died:
 			// A listener stopped for good; start over on the next round,
 			// a moment later so a failure that repeats does not spin.
@@ -56,7 +78,18 @@ func (a *Agent) runDNS(ctx context.Context) {
 			r.stop()
 			r.setStatus(err)
 			sleep(ctx, time.Second)
+
+			return
 		}
+	}
+}
+
+// noteAnswer is called from the resolver when an upstream answered a
+// client.
+func (r *dnsRunner) noteAnswer() {
+	select {
+	case r.answered <- struct{}{}:
+	default:
 	}
 }
 
@@ -82,7 +115,7 @@ func (r *dnsRunner) round(ctx context.Context, cfg traffic.Config) {
 	case r.server == nil || !slices.Equal(plan.key, r.running):
 		r.stop()
 
-		server, err := r.agent.startDNS(plan)
+		server, err := r.agent.startDNS(plan, r.noteAnswer)
 		if err != nil {
 			r.setStatus(err)
 
@@ -180,7 +213,7 @@ func (a *Agent) dnsPlan(ctx context.Context, cfg traffic.Config) (dnsPlan, error
 	return plan, nil
 }
 
-func (a *Agent) startDNS(plan dnsPlan) (*dnsproxy.Server, error) {
+func (a *Agent) startDNS(plan dnsPlan, answered func()) (*dnsproxy.Server, error) {
 	server, err := dnsproxy.Start(dnsproxy.Config{
 		Listen:    plan.listen,
 		Upstreams: plan.upstreams,
@@ -188,6 +221,10 @@ func (a *Agent) startDNS(plan dnsPlan) (*dnsproxy.Server, error) {
 		Allowed:   a.opts.allowDNS,
 		OnQuery: func(src netip.Addr, name string, failed bool) {
 			a.table.AddQuery(a.bucket(), src, name, failed)
+
+			if !failed {
+				answered()
+			}
 		},
 		OnAnswer: func(src netip.Addr, name string, addrs []netip.Addr, ttl time.Duration) {
 			a.resolver.PutDNS(src, name, addrs, ttl, time.Now())
