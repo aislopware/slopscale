@@ -4,13 +4,17 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math"
 	"net"
 	"net/netip"
+	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"codeberg.org/miekg/dns"
+	"github.com/aislopware/slopscale/flowd/names"
 	"github.com/aislopware/slopscale/hscontrol/traffic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -224,4 +228,88 @@ func TestDNSAnswerClearsAFailedProbe(t *testing.T) {
 
 		return st.Enabled && st.Error == ""
 	}, 2*time.Second, 20*time.Millisecond)
+}
+
+// TestDNSRecordsOnlyTheExitNodeUsers answers every asker, but records the
+// questions, and names flows from the answers, only of the nodes the
+// server lists as using the gateway as their exit node, following each
+// response at once. The list is never saved.
+func TestDNSRecordsOnlyTheExitNodeUsers(t *testing.T) {
+	stateDir := t.TempDir()
+	local := &fakeLocal{ips: []netip.Addr{netip.MustParseAddr("127.0.0.1")}}
+
+	a, err := newAgent(t.Context(), Options{
+		Local:      local,
+		Server:     "http://127.0.0.1:1",
+		StateDir:   stateDir,
+		SpoolBytes: 1 << 20,
+		Logger:     slog.New(slog.DiscardHandler),
+		dnsPort:    freePort(t),
+		allowDNS:   func(netip.Addr) bool { return true },
+	})
+	require.NoError(t, err)
+
+	cfg := traffic.Config{DNS: true, Upstreams: []string{upstream(t)}}
+	a.applyConfig(cfg)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan struct{})
+
+	go func() {
+		a.runDNS(ctx)
+		close(done)
+	}()
+
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+
+	var listen []netip.AddrPort
+
+	require.Eventually(t, func() bool {
+		_, listen = dnsStatus(a)
+
+		return len(listen) == 1
+	}, 5*time.Second, 20*time.Millisecond)
+
+	self := netip.MustParseAddr("127.0.0.1")
+	flow := names.Conn{
+		Src:   netip.AddrPortFrom(self, 40000),
+		Dst:   netip.MustParseAddrPort("192.0.2.44:443"),
+		Proto: 6,
+	}
+	recorded := func(name string) ([]traffic.Query, string) {
+		t.Helper()
+
+		ask(t, listen[0], name)
+
+		_, queries, _ := a.table.Drain(math.MaxInt64)
+		host, _ := a.resolver.Lookup(flow, time.Now())
+
+		return queries, host
+	}
+
+	queries, host := recorded("before.example.")
+	assert.Empty(t, queries, "nobody uses the gateway as their exit node, nobody is recorded")
+	assert.Empty(t, host, "and no answer names a flow")
+
+	withSelf := cfg
+	withSelf.LogSources = []netip.Addr{netip.MustParseAddr("100.64.0.9"), self}
+	a.applyConfig(withSelf)
+
+	queries, host = recorded("during.example.")
+	require.Len(t, queries, 1)
+	assert.Equal(t, self, queries[0].Src)
+	assert.Equal(t, "during.example", queries[0].Name)
+	assert.Equal(t, "during.example", host)
+
+	raw, err := os.ReadFile(filepath.Join(stateDir, configFile))
+	require.NoError(t, err)
+	assert.NotContains(t, string(raw), "logSources", "the list is never saved")
+
+	a.applyConfig(cfg)
+
+	queries, _ = recorded("after.example.")
+	assert.Empty(t, queries, "a node that dropped the exit node is recorded no more")
 }

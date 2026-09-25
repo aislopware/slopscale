@@ -204,6 +204,7 @@ func TestAgentReportsAndFollowsConfig(t *testing.T) {
 		SNI:            false,
 		DNS:            true,
 		Upstreams:      []string{upstream(t)},
+		LogSources:     []netip.Addr{netip.MustParseAddr("127.0.0.1")},
 		ReportInterval: 15,
 	}}
 	ts := httptest.NewServer(srv)

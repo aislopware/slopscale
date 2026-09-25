@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/aislopware/slopscale/flowd/capture"
@@ -98,8 +99,12 @@ type Agent struct {
 	spool    *spool.Spool
 	uploader *upload.Uploader
 
+	// logSources are the nodes whose DNS the agent records, swapped
+	// whole on every server response; nil records nobody.
+	logSources atomic.Pointer[map[netip.Addr]struct{}]
+
 	mu        sync.Mutex
-	config    traffic.Config
+	config    traffic.Config // without LogSources, which live in logSources
 	changed   chan struct{} // closed and replaced on every config change
 	status    traffic.Status
 	dnsListen []netip.AddrPort
@@ -229,8 +234,14 @@ func normaliseConfig(cfg traffic.Config) traffic.Config {
 	return cfg
 }
 
-// applyConfig takes the configuration from a server response.
+// applyConfig takes the configuration from a server response. The nodes
+// to record change as nodes pick and drop the gateway as their exit node,
+// so they take effect at once and are never saved: after a restart the
+// agent records nobody until the server names them again.
 func (a *Agent) applyConfig(cfg traffic.Config) {
+	a.setLogSources(cfg.LogSources)
+
+	cfg.LogSources = nil
 	cfg = normaliseConfig(cfg)
 
 	a.mu.Lock()
@@ -254,6 +265,34 @@ func (a *Agent) applyConfig(cfg traffic.Config) {
 	if err != nil {
 		a.log.Warn("saving the configuration failed", "err", err)
 	}
+}
+
+func (a *Agent) setLogSources(addrs []netip.Addr) {
+	if len(addrs) == 0 {
+		a.logSources.Store(nil)
+
+		return
+	}
+
+	set := make(map[netip.Addr]struct{}, len(addrs))
+	for _, addr := range addrs {
+		set[addr.Unmap()] = struct{}{}
+	}
+
+	a.logSources.Store(&set)
+}
+
+// logs reports whether the agent records the DNS of src: only while src
+// uses the gateway as its exit node.
+func (a *Agent) logs(src netip.Addr) bool {
+	set := a.logSources.Load()
+	if set == nil {
+		return false
+	}
+
+	_, ok := (*set)[src.Unmap()]
+
+	return ok
 }
 
 func configEqual(x, y traffic.Config) bool {

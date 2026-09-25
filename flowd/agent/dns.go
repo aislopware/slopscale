@@ -220,14 +220,18 @@ func (a *Agent) startDNS(plan dnsPlan, answered func()) (*dnsproxy.Server, error
 		Bootstrap: plan.bootstrap,
 		Allowed:   a.opts.allowDNS,
 		OnQuery: func(src netip.Addr, name string, failed bool) {
-			a.table.AddQuery(a.bucket(), src, name, failed)
+			if a.logs(src) {
+				a.table.AddQuery(a.bucket(), src, name, failed)
+			}
 
 			if !failed {
 				answered()
 			}
 		},
 		OnAnswer: func(src netip.Addr, name string, addrs []netip.Addr, ttl time.Duration) {
-			a.resolver.PutDNS(src, name, addrs, ttl, time.Now())
+			if a.logs(src) {
+				a.resolver.PutDNS(src, name, addrs, ttl, time.Now())
+			}
 		},
 		Logger: a.log,
 	})

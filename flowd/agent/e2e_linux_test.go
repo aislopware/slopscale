@@ -163,7 +163,13 @@ func TestEndToEndThroughNetfilter(t *testing.T) {
 		_ = server.Wait()
 	})
 
-	srv := &reportServer{config: traffic.Config{SNI: true, DNS: true, Upstreams: []string{internetV4}, ReportInterval: 10}}
+	srv := &reportServer{config: traffic.Config{
+		SNI:            true,
+		DNS:            true,
+		Upstreams:      []string{internetV4},
+		LogSources:     []netip.Addr{netip.MustParseAddr(clientV4), netip.MustParseAddr(clientV6)},
+		ReportInterval: 10,
+	}}
 	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
 
@@ -190,14 +196,20 @@ func TestEndToEndThroughNetfilter(t *testing.T) {
 		})
 	}()
 
-	// Wait for the resolver, then let the client run its traffic.
+	// Wait for the resolver, and for the first report, whose response
+	// names the client as a node whose DNS the agent records (the list is
+	// never saved), then let the client run its traffic.
 	require.Eventually(t, func() bool {
 		c, err := net.DialTimeout("tcp", net.JoinHostPort(gatewayV4, "53"), 200*time.Millisecond)
 		if err == nil {
 			c.Close()
 		}
 
-		return err == nil
+		srv.mu.Lock()
+		reported := len(srv.reports) > 0
+		srv.mu.Unlock()
+
+		return err == nil && reported
 	}, 20*time.Second, 100*time.Millisecond)
 
 	client := startHelper(t, clientNS, "client")
